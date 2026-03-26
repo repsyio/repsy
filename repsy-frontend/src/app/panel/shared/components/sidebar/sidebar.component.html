@@ -1,0 +1,220 @@
+<aside
+  class="sticky hidden overflow-x-hidden overflow-y-auto md:top-[104px] md:flex md:h-[calc(100vh-125px)] md:flex-col md:justify-between lg:top-[125px] lg:h-[calc(100vh-175px)]"
+>
+  <div class="flex flex-col">
+    <!-- ACCOUNT Text -->
+    <span class="ml-[16px] text-[14px] font-medium text-[#9FA0A0] uppercase">Account</span>
+
+    <!-- Navigation Items -->
+    <nav class="mt-[39px] flex w-full flex-col gap-[35px]">
+      <a
+        routerLink="/"
+        class="flex h-[44px] items-center gap-2 rounded-lg px-4 hover:bg-[#404141]"
+        [routerLinkActiveOptions]="{ exact: true }"
+        routerLinkActive="bg-[#333333]"
+      >
+        <img ngSrc="/assets/icons/sidebar/dashboard.svg" height="20" width="20" alt="Dashboard" />
+        <span class="text-[14px] font-medium text-[#FDFDFD]">Dashboard</span>
+      </a>
+
+      <a
+        routerLink="/repositories"
+        class="flex h-[44px] items-center gap-2 rounded-lg px-4 hover:bg-[#404141]"
+        [ngClass]="{ 'bg-[#333333]': isActive() }"
+      >
+        <img ngSrc="/assets/icons/sidebar/repositories.svg" height="20" width="20" alt="Repositories" />
+        <span class="text-[14px] font-medium text-[#FDFDFD]">Repositories</span>
+      </a>
+
+      <!-- Users Link (Admin Only) -->
+      @if (isAdmin) {
+        <a
+          routerLink="/users"
+          class="flex h-[44px] items-center gap-2 rounded-lg px-4 hover:bg-[#404141]"
+          routerLinkActive="bg-[#333333]"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M14.1667 17.5V15.8333C14.1667 14.9493 13.8155 14.1014 13.1904 13.4763C12.5652 12.8512 11.7174 12.5 10.8333 12.5H4.16667C3.28261 12.5 2.43477 12.8512 1.80964 13.4763C1.18452 14.1014 0.833333 14.9493 0.833333 15.8333V17.5"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M7.50001 9.16667C9.34096 9.16667 10.8333 7.67428 10.8333 5.83333C10.8333 3.99238 9.34096 2.5 7.50001 2.5C5.65906 2.5 4.16667 3.99238 4.16667 5.83333C4.16667 7.67428 5.65906 9.16667 7.50001 9.16667Z"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M19.1667 17.5V15.8333C19.1661 15.0948 18.9204 14.3773 18.4679 13.7936C18.0154 13.2099 17.3819 12.793 16.6667 12.6083"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M13.3333 2.60834C14.0503 2.79192 14.6858 3.20892 15.1397 3.79359C15.5935 4.37827 15.8398 5.09736 15.8398 5.8375C15.8398 6.57765 15.5935 7.29674 15.1397 7.88142C14.6858 8.46609 14.0503 8.88309 13.3333 9.06667"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span class="text-[14px] font-medium text-[#FDFDFD]">Users</span>
+        </a>
+      }
+    </nav>
+  </div>
+
+  <div class="flex flex-col">
+    <!-- Logout -->
+    <button
+      class="flex w-full items-center gap-2 rounded-lg px-4 py-3 hover:bg-[#404141]"
+      (click)="logOut()"
+      aria-label="Log out"
+    >
+      <img ngSrc="/assets/icons/sidebar/logout.svg" height="20" width="20" alt="Logout" />
+      <span class="text-[14px] leading-[20px] text-[#FDFDFD]">Log out</span>
+    </button>
+  </div>
+</aside>
+
+<!-- Mobile Sidebar -->
+@if (isMobileMenuOpen) {
+  <aside class="fixed inset-0 z-3 flex md:hidden">
+    <!-- Backdrop -->
+    <div
+      class="fixed inset-0 z-4 bg-black/50"
+      (click)="closeMobileMenu()"
+      (keydown)="closeMobileMenu()"
+      role="button"
+      tabindex="0"
+    ></div>
+
+    <!-- Content -->
+    <div
+      animate.enter="fade-in-right"
+      class="bg-primary-500 fixed top-0 left-0 z-5 h-full w-[240px] overflow-y-auto p-4"
+    >
+      <div class="pb-6">
+        <div class="flex items-center justify-between">
+          <!-- Logo -->
+          <a [routerLink]="['/']" class="inline-block">
+            <img
+              ngSrc="/assets/icons/repsy/repsy-brand.svg"
+              priority
+              alt="Repsy Logo"
+              class="w-[110px]"
+              height="35"
+              width="126"
+            />
+          </a>
+          <button
+            (click)="closeMobileMenu()"
+            type="button"
+            class="hover:text-secondary-500 inline-flex items-center justify-center rounded-md text-neutral-200"
+          >
+            <span class="sr-only">Close menu</span>
+            <div class="group">
+              <img
+                class="group-hover:brightness-0 group-hover:invert"
+                ngSrc="/assets/icons/cursor/x.svg"
+                height="15"
+                width="15"
+                alt="x"
+              />
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Search Bar -->
+      <app-searchbox placeholder="Search docs" class="w-[192px]" />
+
+      <!-- Navigation Items -->
+      <nav class="mt-[39px] flex w-full flex-col gap-[35px]">
+        <!-- ACCOUNT Text -->
+        <span class="ml-[16px] text-[14px] font-medium text-[#9FA0A0] uppercase">Account</span>
+
+        <a
+          routerLink="/"
+          class="flex h-[44px] items-center gap-2 rounded-lg px-4 hover:bg-[#404141]"
+          [routerLinkActiveOptions]="{ exact: true }"
+          routerLinkActive="bg-[#333333]"
+        >
+          <img ngSrc="/assets/icons/sidebar/dashboard.svg" height="20" width="20" alt="Dashboard" />
+          <span class="text-[14px] font-medium text-[#FDFDFD]">Dashboard</span>
+        </a>
+
+        <a
+          routerLink="/repositories"
+          class="flex h-[44px] items-center gap-2 rounded-lg px-4 hover:bg-[#404141]"
+          [ngClass]="{ 'bg-[#333333]': isActive() }"
+        >
+          <img ngSrc="/assets/icons/sidebar/repositories.svg" height="20" width="20" alt="Repositories" />
+          <span class="text-[14px] font-medium text-[#FDFDFD]">Repositories</span>
+        </a>
+
+        <!-- Users Link (Admin Only) -->
+        @if (isAdmin) {
+          <a
+            routerLink="/users"
+            class="flex h-[44px] items-center gap-2 rounded-lg px-4 hover:bg-[#404141]"
+            routerLinkActive="bg-[#333333]"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M14.1667 17.5V15.8333C14.1667 14.9493 13.8155 14.1014 13.1904 13.4763C12.5652 12.8512 11.7174 12.5 10.8333 12.5H4.16667C3.28261 12.5 2.43477 12.8512 1.80964 13.4763C1.18452 14.1014 0.833333 14.9493 0.833333 15.8333V17.5"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M7.50001 9.16667C9.34096 9.16667 10.8333 7.67428 10.8333 5.83333C10.8333 3.99238 9.34096 2.5 7.50001 2.5C5.65906 2.5 4.16667 3.99238 4.16667 5.83333C4.16667 7.67428 5.65906 9.16667 7.50001 9.16667Z"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M19.1667 17.5V15.8333C19.1661 15.0948 18.9204 14.3773 18.4679 13.7936C18.0154 13.2099 17.3819 12.793 16.6667 12.6083"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M13.3333 2.60834C14.0503 2.79192 14.6858 3.20892 15.1397 3.79359C15.5935 4.37827 15.8398 5.09736 15.8398 5.8375C15.8398 6.57765 15.5935 7.29674 15.1397 7.88142C14.6858 8.46609 14.0503 8.88309 13.3333 9.06667"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span class="text-[14px] font-medium text-[#FDFDFD]">Users</span>
+          </a>
+        }
+      </nav>
+
+      <!-- Logout -->
+      <button
+        class="mt-8 flex w-full items-center gap-2 rounded-lg px-4 py-3 hover:bg-[#404141]"
+        (click)="logOut()"
+        aria-label="Log out"
+      >
+        <img ngSrc="/assets/icons/sidebar/logout.svg" height="20" width="20" alt="Logout" />
+        <span class="text-[14px] leading-[20px] text-[#FDFDFD]">Log out</span>
+      </button>
+    </div>
+  </aside>
+}

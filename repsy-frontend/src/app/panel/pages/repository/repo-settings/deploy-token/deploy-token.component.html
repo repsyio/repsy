@@ -1,0 +1,345 @@
+<section id="deploy-tokens" class="mt-[-100px] pt-[100px]">
+  <div class="flex w-full justify-between rounded-t-[12px] border border-[#404141] bg-[#101112] p-4 sm:p-6">
+    <h3 class="font-medium text-[#FDFDFD]">
+      <a [routerLink]="[]" fragment="deploy-tokens"> Deploy Tokens </a>
+    </h3>
+  </div>
+
+  <!-- Content Section -->
+  <div
+    class="w-full overflow-y-auto rounded-b-[12px] border-r border-b border-l border-[#404141] bg-[#101112] p-4 sm:p-6"
+  >
+    <!-- Description and Create Button -->
+    <div class="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+      <p class="text-sm text-[#9FA0A0]">Manage deploy tokens for this repository.</p>
+      <div class="w-full sm:w-auto">
+        <button class="repsy-btn-confirm w-full sm:w-auto" (click)="createDeployToken()">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 2V14M2 8H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+          Create Token
+        </button>
+      </div>
+    </div>
+
+    <!-- Collaborator list when not empty -->
+    @if (activeRepository.canManage) {
+      @if (deployTokens?.length > 0) {
+        <div class="text-body1 overflo-y-auto mb-16">
+          <!-- Package Headers (Desktop)-->
+          <div
+            class="hidden grid-cols-[1fr_1fr_1fr_1fr_1fr_100px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+            animate.enter="fade-in-up"
+          >
+            <div>Name</div>
+            <div>Username</div>
+            <div>Created</div>
+            <div>Expires</div>
+            <div>Permissions</div>
+            <div class="text-right">Actions</div>
+          </div>
+
+          <!-- Package Table (Desktop) -->
+          <div
+            animate.enter="fade-in-down"
+            class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block"
+          >
+            <!-- Package Rows -->
+            @for (deployToken of deployTokens; track deployToken.id; let i = $index) {
+              <div
+                [ngClass]="{ 'rounded-b-[12px]': i === deployTokens?.length - 1 }"
+                class="grid grid-cols-[1fr_1fr_1fr_1fr_1fr_100px] items-center gap-4 p-4"
+              >
+                <!-- Name -->
+                <app-tooltip
+                  class="text-secondary-500 group-hover:underline"
+                  [text]="deployToken.name | ellipsis"
+                  [textHover]="deployToken.name"
+                />
+
+                <!-- Username -->
+                <app-tooltip
+                  class="text-secondary-500 group-hover:underline"
+                  [text]="deployToken.username | ellipsis"
+                  [textHover]="deployToken.username"
+                />
+
+                <!-- Created Date -->
+                <app-tooltip
+                  class="text-secondary-500 group-hover:underline"
+                  [text]="timeAgo(deployToken.created_at)"
+                  [textHover]="deployToken.created_at | date: 'medium'"
+                  [always]="true"
+                />
+
+                <!-- Expired Date -->
+                <app-tooltip
+                  [ngClass]="getBorderForExpireStatus(deployToken.expiration_date)"
+                  class="group-hover:underline"
+                  [text]="timeAgo(deployToken.expiration_date)"
+                  [textHover]="deployToken.expiration_date | date: 'medium'"
+                  [always]="true"
+                />
+
+                <!-- Read Only -->
+                <app-tooltip
+                  class="text-secondary-500 group-hover:underline"
+                  [text]="deployToken.read_only ? 'R/O' : 'R/W'"
+                />
+
+                <!-- Actions -->
+                <div class="flex justify-end gap-3">
+                  <button class="hover:text-secondary-500 text-neutral-200" (click)="rotateDeployToken(deployToken)">
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 22 22"
+                      stroke="currentColor"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M21.0832 3.66645V9.16645M21.0832 9.16645H15.5832M21.0832 9.16645L16.8298 5.16978C15.8447 4.18411 14.6258 3.46406 13.2871 3.07683C11.9484 2.6896 10.5334 2.64781 9.1741 2.95535C7.81485 3.2629 6.55565 3.90977 5.51402 4.83558C4.47238 5.7614 3.68224 6.936 3.21734 8.24978M0.916504 18.3331V12.8331M0.916504 12.8331H6.4165M0.916504 12.8331L5.16984 16.8298C6.15502 17.8155 7.37385 18.5355 8.71258 18.9227C10.0513 19.31 11.4663 19.3518 12.8256 19.0442C14.1848 18.7367 15.444 18.0898 16.4857 17.164C17.5273 16.2382 18.3174 15.0636 18.7823 13.7498"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </button>
+                  <button class="hover:text-secondary-500 text-neutral-200" (click)="configure(deployToken)">
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 28 28"
+                      stroke="currentColor"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M14 27C21.1797 27 27 21.1797 27 14C27 6.8203 21.1797 1 14 1C6.8203 1 1 6.8203 1 14C1 21.1797 6.8203 27 14 27Z"
+                        stroke-width="2"
+                      />
+                      <path
+                        d="M11.3999 10.1C11.3999 8.66406 12.5639 7.5 13.9999 7.5C15.4359 7.5 16.5999 8.66406 16.5999 10.1C16.5999 10.6176 16.4487 11.0999 16.1879 11.505C15.4109 12.7126 13.9999 13.864 13.9999 15.3V15.95"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                      />
+                      <path d="M13.9897 20.5H14.0005" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </button>
+                  <button class="hover:text-error-500 text-neutral-200" (click)="revokeDeployToken(deployToken)">
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 18 18"
+                      fill="currentColor"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M17.3077 2.76833H14.0225C13.5249 2.76833 13.0846 2.45079 12.9277 1.98002L12.636 1.10404C12.4154 0.443114 11.7997 0 11.1037 0H6.89536C6.19936 0 5.58369 0.443095 5.36308 1.10494L5.0714 1.98002C4.91448 2.45171 4.47414 2.76923 3.9766 2.76923H0.692308C0.310154 2.76923 0 3.07938 0 3.46154C0 3.84369 0.310154 4.15385 0.692308 4.15385H1.89043L2.59846 14.7692C2.71938 16.5812 4.23601 18 6.05262 18H11.9483C13.764 18 15.2815 16.5803 15.4025 14.7692L16.1105 4.15385H17.3077C17.6898 4.15385 18 3.84369 18 3.46154C18 3.07938 17.6898 2.76833 17.3077 2.76833ZM6.67659 1.54158C6.70797 1.44742 6.79566 1.38371 6.89536 1.38371H11.1037C11.2034 1.38371 11.2911 1.44745 11.3225 1.54068L11.6142 2.41665C11.6548 2.5385 11.7055 2.65574 11.7628 2.76743H6.23538C6.29262 2.65482 6.3434 2.53853 6.38402 2.41576L6.67659 1.54158ZM14.0197 14.676C13.9477 15.7634 13.0375 16.6145 11.9474 16.6145H6.05172C4.96249 16.6145 4.05136 15.7634 3.97936 14.676L3.27787 4.15294H3.9766C4.07537 4.15294 4.17231 4.14092 4.26923 4.12985C4.308 4.13631 4.3431 4.15294 4.38371 4.15294H13.6145C13.6551 4.15294 13.6902 4.13631 13.7289 4.12985C13.8258 4.14092 13.9218 4.15294 14.0215 4.15294H14.7203L14.0197 14.676ZM11.5385 8.076V12.6914C11.5385 13.0735 11.2283 13.3837 10.8462 13.3837C10.464 13.3837 10.1538 13.0735 10.1538 12.6914V8.076C10.1538 7.69385 10.464 7.38369 10.8462 7.38369C11.2283 7.38369 11.5385 7.69385 11.5385 8.076ZM7.84615 8.076V12.6914C7.84615 13.0735 7.536 13.3837 7.15385 13.3837C6.77169 13.3837 6.46154 13.0735 6.46154 12.6914V8.076C6.46154 7.69385 6.77169 7.38369 7.15385 7.38369C7.536 7.38369 7.84615 7.69385 7.84615 8.076Z"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+
+          <!-- Package Version List (Mobile) -->
+          @for (deployToken of deployTokens; track deployToken.id; let i = $index) {
+            <div animate.enter="fade-in-down" class="lg:hidden">
+              <!-- Package Version Row -->
+              <div
+                class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+                role="button"
+              >
+                <div class="space-y-2">
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Name: </span>
+                    <span class="text-secondary-500">
+                      {{ deployToken.name }}
+                    </span>
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Username: </span>
+                    <span class="text-secondary-500">
+                      {{ deployToken.username }}
+                    </span>
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Created: </span>
+                    <span class="text-secondary-500 break-all">
+                      {{ deployToken.created_at | date: 'medium' }} {{ '(' + timeAgo(deployToken.created_at) + ')' }}
+                    </span>
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Expires: </span>
+                    <span class="text-secondary-500 break-all">
+                      {{ deployToken.expiration_date | date: 'medium' }}
+                      {{ '(' + timeAgo(deployToken.expiration_date) + ')' }}
+                    </span>
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Permissions: </span>
+                    <span class="text-secondary-500">
+                      {{ deployToken.read_only ? 'R/O' : 'R/W' }}
+                    </span>
+                  </div>
+                  <!-- Actions -->
+                  <div class="flex justify-end gap-3">
+                    <button class="hover:text-secondary-500 text-neutral-200" (click)="rotateDeployToken(deployToken)">
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 22 22"
+                        stroke="currentColor"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M21.0832 3.66645V9.16645M21.0832 9.16645H15.5832M21.0832 9.16645L16.8298 5.16978C15.8447 4.18411 14.6258 3.46406 13.2871 3.07683C11.9484 2.6896 10.5334 2.64781 9.1741 2.95535C7.81485 3.2629 6.55565 3.90977 5.51402 4.83558C4.47238 5.7614 3.68224 6.936 3.21734 8.24978M0.916504 18.3331V12.8331M0.916504 12.8331H6.4165M0.916504 12.8331L5.16984 16.8298C6.15502 17.8155 7.37385 18.5355 8.71258 18.9227C10.0513 19.31 11.4663 19.3518 12.8256 19.0442C14.1848 18.7367 15.444 18.0898 16.4857 17.164C17.5273 16.2382 18.3174 15.0636 18.7823 13.7498"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <button class="hover:text-secondary-500 text-neutral-200" (click)="configure(deployToken)">
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 28 28"
+                        stroke="currentColor"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M14 27C21.1797 27 27 21.1797 27 14C27 6.8203 21.1797 1 14 1C6.8203 1 1 6.8203 1 14C1 21.1797 6.8203 27 14 27Z"
+                          stroke-width="2"
+                        />
+                        <path
+                          d="M11.3999 10.1C11.3999 8.66406 12.5639 7.5 13.9999 7.5C15.4359 7.5 16.5999 8.66406 16.5999 10.1C16.5999 10.6176 16.4487 11.0999 16.1879 11.505C15.4109 12.7126 13.9999 13.864 13.9999 15.3V15.95"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        />
+                        <path
+                          d="M13.9897 20.5H14.0005"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <button class="hover:text-error-500 text-neutral-200" (click)="revokeDeployToken(deployToken)">
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 18 18"
+                        fill="currentColor"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M17.3077 2.76833H14.0225C13.5249 2.76833 13.0846 2.45079 12.9277 1.98002L12.636 1.10404C12.4154 0.443114 11.7997 0 11.1037 0H6.89536C6.19936 0 5.58369 0.443095 5.36308 1.10494L5.0714 1.98002C4.91448 2.45171 4.47414 2.76923 3.9766 2.76923H0.692308C0.310154 2.76923 0 3.07938 0 3.46154C0 3.84369 0.310154 4.15385 0.692308 4.15385H1.89043L2.59846 14.7692C2.71938 16.5812 4.23601 18 6.05262 18H11.9483C13.764 18 15.2815 16.5803 15.4025 14.7692L16.1105 4.15385H17.3077C17.6898 4.15385 18 3.84369 18 3.46154C18 3.07938 17.6898 2.76833 17.3077 2.76833ZM6.67659 1.54158C6.70797 1.44742 6.79566 1.38371 6.89536 1.38371H11.1037C11.2034 1.38371 11.2911 1.44745 11.3225 1.54068L11.6142 2.41665C11.6548 2.5385 11.7055 2.65574 11.7628 2.76743H6.23538C6.29262 2.65482 6.3434 2.53853 6.38402 2.41576L6.67659 1.54158ZM14.0197 14.676C13.9477 15.7634 13.0375 16.6145 11.9474 16.6145H6.05172C4.96249 16.6145 4.05136 15.7634 3.97936 14.676L3.27787 4.15294H3.9766C4.07537 4.15294 4.17231 4.14092 4.26923 4.12985C4.308 4.13631 4.3431 4.15294 4.38371 4.15294H13.6145C13.6551 4.15294 13.6902 4.13631 13.7289 4.12985C13.8258 4.14092 13.9218 4.15294 14.0215 4.15294H14.7203L14.0197 14.676ZM11.5385 8.076V12.6914C11.5385 13.0735 11.2283 13.3837 10.8462 13.3837C10.464 13.3837 10.1538 13.0735 10.1538 12.6914V8.076C10.1538 7.69385 10.464 7.38369 10.8462 7.38369C11.2283 7.38369 11.5385 7.69385 11.5385 8.076ZM7.84615 8.076V12.6914C7.84615 13.0735 7.536 13.3837 7.15385 13.3837C6.77169 13.3837 6.46154 13.0735 6.46154 12.6914V8.076C6.46154 7.69385 6.77169 7.38369 7.15385 7.38369C7.536 7.38369 7.84615 7.69385 7.84615 8.076Z"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              @if (i !== deployTokens?.length - 1) {
+                <div class="px-2 py-4">
+                  <div class="h-[1px] bg-[#404141]"></div>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- Pagination -->
+          <app-pagination
+            (pageNumChange)="loadPage($event)"
+            [(pageNum)]="pageNum"
+            [totalPages]="pagedData.page.totalPages"
+          />
+        </div>
+      } @else {
+        <!-- Empty Deploy Token-->
+        <img
+          class="mx-auto"
+          ngSrc="/assets/images/hippo-empty.svg"
+          priority
+          alt="hippo-empty"
+          height="150"
+          width="300"
+        />
+        <div class="mx-auto mt-4 text-center">
+          <p class="text-[14px] text-[#9FA0A0]">Your list is empty,</p>
+          <p class="mt-2 text-[14px] text-[#9FA0A0]">just like this hippo's to-do list!</p>
+        </div>
+      }
+    } @else {
+      <!-- No deploy tokens state -->
+      <div class="flex items-center gap-2 text-[14px]">
+        <img ngSrc="/assets/icons/cursor/warning.svg" alt="danger" height="24" width="24" />
+        <span class="text-warning-500"> You haven't permission to view deploy tokens. </span>
+      </div>
+    }
+  </div>
+</section>
+
+<app-deploy-token-modal
+  [repoType]="this.repoType"
+  [(open)]="showCreateTokenModal"
+  (created)="fetchDeployTokens(); this.createdDeployToken = $event; showTokenInfoModal = true"
+/>
+
+<app-deploy-token-info-modal [(open)]="showTokenInfoModal" [tokenInfo]="createdDeployToken" />
+
+@if (selectedDeployToken) {
+  @switch (repoType) {
+    @case (RepoType.DOCKER) {
+      <app-docker-config
+        (openChange)="openConfigure($event)"
+        [(open)]="showConfig"
+        [baseUrl]="environment.repoBaseUrl"
+        [username]="this.selectedDeployToken.username"
+        [repoName]="this.activeRepository.repoName"
+        [deployToken]="true"
+      >
+      </app-docker-config>
+    }
+    @case (RepoType.MAVEN) {
+      <app-maven-config
+        (openChange)="openConfigure($event)"
+        [(open)]="showConfig"
+        [baseUrl]="this.environment.repoBaseUrl"
+        [username]="this.selectedDeployToken.username"
+        [repoName]="this.activeRepository.repoName"
+        [deployToken]="true"
+      >
+      </app-maven-config>
+    }
+    @case (RepoType.PYPI) {
+      <app-pypi-config
+        (openChange)="openConfigure($event)"
+        [(open)]="showConfig"
+        [baseUrl]="this.environment.repoBaseUrl"
+        [username]="this.selectedDeployToken.username"
+        [repoName]="this.activeRepository.repoName"
+        [deployToken]="true"
+      >
+      </app-pypi-config>
+    }
+    @case (RepoType.NPM) {
+      <app-npm-config
+        (openChange)="openConfigure($event)"
+        [(open)]="showConfig"
+        [baseUrl]="this.environment.repoBaseUrl"
+        [username]="this.selectedDeployToken.username"
+        [repoName]="this.activeRepository.repoName"
+        [deployToken]="true"
+      >
+      </app-npm-config>
+    }
+    @default {
+      <p>No config available for this repository.</p>
+    }
+  }
+}

@@ -1,0 +1,238 @@
+<app-docker-config [baseUrl]="baseUrl" [repoName]="activeRepo.repoName" [imageName]="imageName" [(open)]="showConfig" />
+
+<div
+  [ngClass]="{ 'pointer-events-none opacity-50 select-none': loading || this.error }"
+  class="mb-8 inline-flex items-start gap-2 rounded-lg bg-[#101112] p-[14px]"
+>
+  <img class="mt-[2px]" ngSrc="/assets/icons/docker/docker.svg" alt="docker-light" height="18" width="18" />
+  <span class="text-[13px] break-all text-[#9C9C9D]">{{ installText }}</span>
+
+  <app-copy-clipboard [text]="installText" />
+</div>
+
+<div
+  [ngClass]="{ 'pointer-events-none opacity-50 select-none': loading || this.error }"
+  class="mb-7 flex flex-col flex-col-reverse items-start justify-between gap-4 md:items-start lg:flex-row lg:items-center"
+>
+  <div class="flex w-full flex-col items-start gap-4 sm:w-auto sm:flex-row sm:items-center">
+    <app-searchbox class="w-full sm:max-w-[192px]" placeholder="tag" (filter)="search($event)" />
+
+    <div class="flex w-full gap-2 sm:w-auto">
+      <app-sort-selector
+        [(selectedOption)]="sortOption"
+        [options]="sortOptions"
+        (choose)="sort($event)"
+        class="w-full sm:w-auto"
+      />
+
+      <button
+        (click)="refreshPage()"
+        class="hover:text-secondary-500 flex h-[40px] w-[40px] items-center justify-center text-neutral-200"
+      >
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 22 22"
+          stroke="currentColor"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M21.0832 3.66645V9.16645M21.0832 9.16645H15.5832M21.0832 9.16645L16.8298 5.16978C15.8447 4.18411 14.6258 3.46406 13.2871 3.07683C11.9484 2.6896 10.5334 2.64781 9.1741 2.95535C7.81485 3.2629 6.55565 3.90977 5.51402 4.83558C4.47238 5.7614 3.68224 6.936 3.21734 8.24978M0.916504 18.3331V12.8331M0.916504 12.8331H6.4165M0.916504 12.8331L5.16984 16.8298C6.15502 17.8155 7.37385 18.5355 8.71258 18.9227C10.0513 19.31 11.4663 19.3518 12.8256 19.0442C14.1848 18.7367 15.444 18.0898 16.4857 17.164C17.5273 16.2382 18.3174 15.0636 18.7823 13.7498"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="flex w-full items-center justify-end gap-2 sm:w-auto">
+    <button (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
+      <img ngSrc="/assets/icons/input/configure.svg" alt="configure" height="16" width="16" />
+      Configure
+    </button>
+    @if (canManage) {
+      <button
+        [disabled]="!activeRepo.canManage"
+        [routerLink]="'/' + activeRepo.repoName + '/settings'"
+        class="repsy-btn-ghost w-full sm:w-auto"
+      >
+        <img ngSrc="/assets/icons/input/settings.svg" alt="settings" height="18" width="18" />
+        Settings
+      </button>
+    }
+  </div>
+</div>
+
+@if (loading) {
+  <app-spinner />
+} @else {
+  @if (!this.error) {
+    @if (tags?.length > 0) {
+      <div class="text-body1">
+        <!-- Table Headers (Desktop) -->
+        <div
+          class="hidden grid-cols-[3fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          animate.enter="fade-in-up"
+        >
+          <div>Tag</div>
+          <div>Platform</div>
+          <div>Last Updated</div>
+          <div></div>
+        </div>
+
+        <!-- Tag Table (Desktop) -->
+        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
+          @for (tag of tags; track tag.name; let i = $index) {
+            <div role="button" [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name + '/detail'">
+              <div
+                animate.enter="fade-in-down"
+                [ngClass]="{ 'rounded-b-[12px]': i === tags.length - 1 }"
+                class="grid grid-cols-[3fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+              >
+                <a
+                  class="group text-secondary-500 flex w-max gap-2"
+                  [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name"
+                >
+                  <img ngSrc="/assets/icons/repo/tag.svg" alt="tag" height="20" width="20" />
+
+                  <app-tooltip class="group-hover:underline" [text]="tag.name | ellipsis" [textHover]="tag.name" />
+
+                  <svg
+                    class="mt-[2px] h-[14px] w-[14px] text-neutral-200 group-hover:text-white"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M4.93386 4.13083L9.90503 4.13076M9.90503 4.13076L9.90503 9.03122M9.90503 4.13076L4.13032 9.90547"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </a>
+
+                <app-tooltip
+                  class="text-[14px] text-[#FDFDFD]"
+                  [text]="tag.platform | ellipsis"
+                  [textHover]="tag.platform"
+                />
+
+                <app-tooltip
+                  class="text-[14px] text-[#FDFDFD]"
+                  [text]="timeAgo(tag.lastUpdatedAt)"
+                  [textHover]="tag.lastUpdatedAt | date: 'medium'"
+                  [always]="true"
+                />
+
+                @if (activeRepo.canManage) {
+                  <app-dropdown (click)="$event.stopPropagation()">
+                    <button
+                      (click)="deleteTag(tag)"
+                      [disabled]="loading"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                    >
+                      <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+
+                      Delete
+                    </button>
+                  </app-dropdown>
+                }
+              </div>
+              @if (i !== tags.length - 1) {
+                <div class="h-[1px] w-full bg-[#404141]"></div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Tag List (Mobile)-->
+        @for (tag of tags; track tag.name; let i = $index) {
+          <div animate.enter="fade-in-down" class="lg:hidden">
+            <div
+              class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+              role="button"
+              [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name + '/detail'"
+            >
+              @if (activeRepo.canManage) {
+                <app-dropdown class="relative left-4 ml-auto" (click)="$event.stopPropagation()">
+                  <button
+                    (click)="deleteTag(tag)"
+                    [disabled]="loading"
+                    class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                  >
+                    <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+                    Delete
+                  </button>
+                </app-dropdown>
+              }
+
+              <a
+                class="group text-secondary-500 flex items-start gap-2"
+                [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name"
+              >
+                <img class="mt-[2px]" ngSrc="/assets/icons/repo/tag.svg" alt="tag" height="18" width="18" />
+                <span class="text-right break-all group-hover:underline">{{ tag.name }}</span>
+                <svg
+                  class="h-4 w-4 shrink-0 text-neutral-200 group-hover:text-white"
+                  viewBox="0 0 14 14"
+                  fill="currentColor"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M4.93386 4.13083L9.90503 4.13076M9.90503 4.13076L9.90503 9.03122M9.90503 4.13076L4.13032 9.90547"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </a>
+
+              <div class="space-y-2">
+                <div class="flex justify-between gap-2">
+                  <span class="text-sm text-[#9FA0A0]">Platform: </span>
+                  <span class="text-right text-sm break-all text-[#FDFDFD]">{{ tag.platform }}</span>
+                </div>
+                <div class="flex justify-between gap-2">
+                  <span class="text-sm text-[#9FA0A0]">Last Updated: </span>
+                  <span class="text-right text-sm break-all text-[#FDFDFD]">
+                    {{ tag.lastUpdatedAt | date: 'medium' }} {{ '(' + timeAgo(tag.lastUpdatedAt) + ')' }}
+                  </span>
+                </div>
+              </div>
+            </div>
+            @if (i !== tags.length - 1) {
+              <div class="px-2 py-4">
+                <div class="h-[1px] bg-[#404141]"></div>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Pagination -->
+        <app-pagination
+          (pageNumChange)="loadPage($event)"
+          [(pageNum)]="pageNum"
+          [totalPages]="pagedData.page.totalPages"
+        />
+      </div>
+    } @else {
+      <app-empty-list />
+    }
+  } @else {
+    <div animate.enter="fade-in-up" class="p-8 text-center">
+      <img
+        class="mx-auto mb-[70px]"
+        ngSrc="/assets/images/hippo-empty.svg"
+        alt="hippo-empty"
+        height="243"
+        width="510"
+      />
+      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+    </div>
+  }
+}

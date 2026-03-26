@@ -1,0 +1,253 @@
+@if (loading) {
+  <app-spinner />
+} @else {
+  @if (!this.error) {
+    <div animate.enter="fade-in-up">
+      <!-- Artifact Information -->
+      <div class="space-y-4">
+        <!-- First row - Group ID and Organization -->
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
+            <div class="mb-1 text-[13px] text-[#FDFDFD]">
+              Group ID: <span class="text-[#9FA0A0]">{{ version.artifactGroupName }}</span>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
+            <div class="mb-1 text-[13px] text-[#FDFDFD]">
+              Organization: <span class="text-[#9FA0A0]">{{ version.organization }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Second row - Artifact ID and Licenses -->
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
+            <div class="mb-1 text-[13px] text-[#FDFDFD]">
+              Artifact ID: <span class="text-[#9FA0A0]">{{ version.artifactName }} ({{ version.versionName }})</span>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
+            <div class="mb-1 text-[13px] text-[#FDFDFD]">
+              Licenses: <span class="text-[#9FA0A0]">{{ version.licenses }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
+          <div class="mb-1 text-[13px] text-[#FDFDFD]">
+            Developers: <span class="text-[#9FA0A0]">{{ version.developers }}</span>
+          </div>
+        </div>
+
+        <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
+          <div class="mb-1 text-[13px] text-[#FDFDFD]">
+            URL: <span class="text-[#9FA0A0]">{{ version.url }}</span>
+          </div>
+        </div>
+
+        <div class="mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
+          <div class="mb-1 text-[13px] text-[#FDFDFD]">
+            SCM URL: <span class="text-[#9FA0A0]">{{ version.scmUrl }}</span>
+          </div>
+        </div>
+
+        <div class="mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
+          <div class="mb-1 text-[13px] text-[#FDFDFD]">
+            Signed:
+            @if (version.signed) {
+              <i class="fa-solid fa-lock"></i>
+            } @else {
+              <i class="fa-solid fa-unlock"></i>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-8 rounded-lg bg-[#101112] p-[22px] text-[24px]">
+        <h3 class="text-neutral-200">{{ artifactName }}</h3>
+      </div>
+
+      <!-- POM File -->
+      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <img ngSrc="/assets/icons/maven/maven2.svg" alt="Apache Maven" width="24" height="24" />
+          <span class="text-[14px] text-[#FDFDFD]">Pom XML</span>
+          <app-copy-clipboard class="ml-auto" [text]="version.pomFile" />
+        </div>
+        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <code [highlight]="version.pomFile" language="xml" lineNumbers>
+        </code>
+      </pre>
+      </div>
+
+      <!-- Apache Maven Dependency -->
+      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <img ngSrc="/assets/icons/maven/maven2.svg" alt="Apache Maven" width="24" height="24" />
+          <span class="text-[14px] text-[#FDFDFD]">Apache Maven</span>
+          <app-copy-clipboard class="ml-auto" [text]="mavenDependencyHtml" />
+        </div>
+        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <code [highlight]="mavenDependencyHtml" language="xml" lineNumbers>
+        </code>
+      </pre>
+      </div>
+
+      <!-- Gradle Groovy DSL -->
+      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <img ngSrc="/assets/icons/maven/detail/gradle.svg" alt="Gradle Groovy DSL" width="24" height="24" />
+          <span class="text-[14px] text-[#FDFDFD]">Gradle Groovy DSL</span>
+          <app-copy-clipboard class="ml-auto" [text]="groovyDependencyHtml" />
+        </div>
+        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <code [highlight]="groovyDependencyHtml" language="groovy" lineNumbers>
+        </code>
+      </pre>
+      </div>
+
+      <!-- Gradle Kotlin DSL -->
+      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <img ngSrc="/assets/icons/maven/detail/kotlin.svg" alt="Gradle Kotlin DSL" width="24" height="24" />
+          <span class="text-[14px] text-[#FDFDFD]">Gradle Kotlin DSL</span>
+          <app-copy-clipboard class="ml-auto" [text]="gradleKotlinDependencyHtml" />
+        </div>
+
+        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <code [highlight]="gradleKotlinDependencyHtml" language="kotlin" lineNumbers>
+        </code>
+      </pre>
+      </div>
+
+      <!-- SBT -->
+      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <img ngSrc="/assets/icons/maven/detail/sbt.svg" alt="SBT" width="24" height="24" />
+          <span class="text-[14px] text-[#FDFDFD]">Scala SBT</span>
+          <app-copy-clipboard class="ml-auto" [text]="sbtDependencyHtml" />
+        </div>
+
+        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <code [highlight]="sbtDependencyHtml" language="scala" lineNumbers>
+        </code>
+      </pre>
+      </div>
+
+      <!-- Apache Ivy -->
+      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <img ngSrc="/assets/icons/maven/detail/ivy.svg" alt="Apache Ivy" width="24" height="24" />
+          <span class="text-[14px] text-[#FDFDFD]">Apache Ivy</span>
+          <app-copy-clipboard class="ml-auto" [text]="ivyDependencyHtml" />
+        </div>
+
+        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <code [highlight]="ivyDependencyHtml" language="xml" lineNumbers>
+        </code>
+      </pre>
+      </div>
+
+      <!-- Groovy Grape -->
+      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <img ngSrc="/assets/icons/maven/detail/groovy.svg" alt="Groovy Grape" width="24" height="24" />
+          <span class="text-[14px] text-[#FDFDFD]">Groovy Grape</span>
+          <app-copy-clipboard class="ml-auto" [text]="groovyDependencyHtml" />
+        </div>
+
+        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <code [highlight]="groovyDependencyHtml" language="groovy" lineNumbers>
+        </code>
+      </pre>
+      </div>
+
+      <!-- Leiningen -->
+      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <img ngSrc="/assets/icons/maven/detail/leiningen.svg" alt="Leiningen" width="18" height="18" />
+          <span class="text-[14px] text-[#FDFDFD]">Leiningen</span>
+          <app-copy-clipboard class="ml-auto" [text]="leiningenDependencyHtml" />
+        </div>
+        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <code [highlight]="leiningenDependencyHtml" language="clojure" lineNumbers>
+        </code>
+      </pre>
+      </div>
+
+      <!-- Apache Buildr -->
+      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <img ngSrc="/assets/icons/maven/detail/buildr.svg" alt="Apache Buildr" width="24" height="24" />
+          <span class="text-[14px] text-[#FDFDFD]">Apache Buildr</span>
+          <app-copy-clipboard class="ml-auto" [text]="buildrDependencyHtml" />
+        </div>
+        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <code [highlight]="buildrDependencyHtml" language="ruby" lineNumbers>
+        </code>
+      </pre>
+      </div>
+
+      <!-- Purl -->
+      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <img ngSrc="/assets/icons/maven/detail/purl.svg" alt="Purl" width="24" height="24" />
+          <span class="text-[14px] text-[#FDFDFD]">Purl</span>
+          <app-copy-clipboard class="ml-auto" [text]="purlDependencyHtml" />
+        </div>
+        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <code [highlight]="purlDependencyHtml" language="text" lineNumbers>
+        </code>
+      </pre>
+      </div>
+
+      <!-- Bazel -->
+      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <img ngSrc="/assets/icons/maven/detail/bazel.svg" alt="Bazel" width="24" height="24" />
+          <span class="text-[14px] text-[#FDFDFD]">Bazel</span>
+          <app-copy-clipboard class="ml-auto" [text]="bazelDependencyHtml" />
+        </div>
+        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <code [highlight]="bazelDependencyHtml" language="python" lineNumbers>
+        </code>
+      </pre>
+      </div>
+
+      <!-- Delete Version -->
+      @if (activeRepo.canManage) {
+        <button (click)="deleteVersion()" [disabled]="loading" class="repsy-btn-danger group ml-auto w-full sm:w-auto">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 18 18"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            class="group-hover:fill-white"
+          >
+            <path
+              d="M17.3077 2.76833H14.0225C13.5249 2.76833 13.0846 2.45079 12.9277 1.98002L12.636 1.10404C12.4154 0.443114 11.7997 0 11.1037 0H6.89536C6.19936 0 5.58369 0.443095 5.36308 1.10494L5.0714 1.98002C4.91448 2.45171 4.47414 2.76923 3.9766 2.76923H0.692308C0.310154 2.76923 0 3.07938 0 3.46154C0 3.84369 0.310154 4.15385 0.692308 4.15385H1.89043L2.59846 14.7692C2.71938 16.5812 4.23601 18 6.05262 18H11.9483C13.764 18 15.2815 16.5803 15.4025 14.7692L16.1105 4.15385H17.3077C17.6898 4.15385 18 3.84369 18 3.46154C18 3.07938 17.6898 2.76833 17.3077 2.76833ZM6.67659 1.54158C6.70797 1.44742 6.79566 1.38371 6.89536 1.38371H11.1037C11.2034 1.38371 11.2911 1.44745 11.3225 1.54068L11.6142 2.41665C11.6548 2.5385 11.7055 2.65574 11.7628 2.76743H6.23538C6.29262 2.65482 6.3434 2.53853 6.38402 2.41576L6.67659 1.54158ZM14.0197 14.676C13.9477 15.7634 13.0375 16.6145 11.9474 16.6145H6.05172C4.96249 16.6145 4.05136 15.7634 3.97936 14.676L3.27787 4.15294H3.9766C4.07537 4.15294 4.17231 4.14092 4.26923 4.12985C4.308 4.13631 4.3431 4.15294 4.38371 4.15294H13.6145C13.6551 4.15294 13.6902 4.13631 13.7289 4.12985C13.8258 4.14092 13.9218 4.15294 14.0215 4.15294H14.7203L14.0197 14.676ZM11.5385 8.076V12.6914C11.5385 13.0735 11.2283 13.3837 10.8462 13.3837C10.464 13.3837 10.1538 13.0735 10.1538 12.6914V8.076C10.1538 7.69385 10.464 7.38369 10.8462 7.38369C11.2283 7.38369 11.5385 7.69385 11.5385 8.076ZM7.84615 8.076V12.6914C7.84615 13.0735 7.536 13.3837 7.15385 13.3837C6.77169 13.3837 6.46154 13.0735 6.46154 12.6914V8.076C6.46154 7.69385 6.77169 7.38369 7.15385 7.38369C7.536 7.38369 7.84615 7.69385 7.84615 8.076Z"
+              fill="currentColor"
+            />
+          </svg>
+          Delete Version
+        </button>
+      }
+    </div>
+  } @else {
+    <div animate.enter="fade-in-up" class="p-8 text-center">
+      <img
+        class="mx-auto mb-[70px]"
+        ngSrc="/assets/images/hippo-empty.svg"
+        alt="hippo-empty"
+        height="243"
+        width="510"
+      />
+      <div>
+        <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      </div>
+    </div>
+  }
+}

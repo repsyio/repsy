@@ -1,0 +1,28 @@
+<button class="hover:text-secondary-500 h-4 w-4 text-[#9FA0A0]" (click)="copyToClipboard(text)">
+  @if (copied) {
+    <svg width="16" height="12" viewBox="0 0 16 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1 5.34547L6.05556 10.4364L14.9311 1.5625" stroke="#69FFB4" stroke-width="1.5" stroke-linecap="round" />
+    </svg>
+  } @else {
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M12.4 6H7.6C7.17565 6 6.76869 6.16857 6.46863 6.46863C6.16857 6.76869 6 7.17565 6 7.6V12.4C6 12.8243 6.16857 13.2313 6.46863 13.5314C6.76869 13.8314 7.17565 14 7.6 14H12.4C12.8243 14 13.2313 13.8314 13.5314 13.5314C13.8314 13.2313 14 12.8243 14 12.4V7.6C14 7.17565 13.8314 6.76869 13.5314 6.46863C13.2313 6.16857 12.8243 6 12.4 6Z"
+        stroke-width="1.5"
+        stroke-miterlimit="10"
+      />
+      <path
+        d="M4 10H3.6C2.71333 10 2 9.28667 2 8.4V3.6C2 2.71333 2.71333 2 3.6 2H8.4C9.28667 2 10 2.71333 10 3.6V4"
+        stroke-width="1.5"
+        stroke-miterlimit="10"
+        stroke-linecap="round"
+      />
+    </svg>
+  }
+</button>

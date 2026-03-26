@@ -1,0 +1,34 @@
+name: Release | Core
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Maven Action
+        uses: s4u/setup-maven-action@v1.19.0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: "25"
+          distribution: "temurin"
+          cache: maven
+
+      - name: Run release:prepare
+        run: |
+          mvn -B release:prepare \
+            -Dmaven.test.skip=true \
+            -Dcheckstyle.skip=true \
+            -Dfmt.skip=true
+
+      - name: Push release commits and tags
+        run: |
+          git push origin HEAD
+          git push origin --tags

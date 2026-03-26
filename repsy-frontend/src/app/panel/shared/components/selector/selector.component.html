@@ -1,0 +1,48 @@
+<div class="relative">
+  <button
+    (click)="toggleDropdown($event)"
+    type="button"
+    [ngClass]="size === 'small' ? 'h-[40px]' : 'h-[50px]'"
+    class="flex h-[40px] w-full min-w-[113px] items-center justify-between gap-2 rounded-lg border border-[#404141] bg-[#101112] px-4 text-[14px] text-white hover:border-white"
+  >
+    <span>{{ selectedOption.charAt(0).toUpperCase() + selectedOption.slice(1) }}</span>
+    <svg
+      [class.rotate-180]="isOpen"
+      class="transition-transform duration-200"
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M4 6L8 10L12 6"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </svg>
+  </button>
+  @if (isOpen) {
+    <div
+      [appOutSideClick]="isOpen"
+      (outSideClick)="isOpen = false"
+      [ngClass]="size === 'small' ? 'top-[44px]' : 'top-[54px]'"
+      class="absolute right-0 z-1 w-full rounded-lg border border-[#404141] bg-[#101112]"
+      animate.enter="fade-in-down"
+    >
+      @for (option of options; track option; let i = $index) {
+        <button
+          type="button"
+          [ngClass]="{ 'rounded-t-lg': i === 0, 'rounded-b-lg': i === options.length - 1 }"
+          class="flex w-full items-center rounded-t-lg px-4 py-2 text-[14px] text-white hover:bg-[#2D2C2C]"
+          [class.text-[#FDFDFD]]="selectedOption === option"
+          (click)="selectOption(option)"
+        >
+          {{ option.charAt(0).toUpperCase() + option.slice(1) }}
+        </button>
+      }
+    </div>
+  }
+</div>

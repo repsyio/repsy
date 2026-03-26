@@ -1,0 +1,164 @@
+<section id="account-information" class="mt-[-100px] pt-[100px]">
+  <h2
+    class="rounded-t-[12px] border border-[#e8546a] border-b-[#404141] bg-[#101112] p-4 text-[16px] font-medium text-white sm:p-6"
+  >
+    <a [routerLink]="[]" fragment="account-information"> Account Information </a>
+  </h2>
+
+  <div
+    class="grid grid-cols-1 gap-2 rounded-b-[12px] border-r border-b border-l border-[#e8546a] bg-[#101112] p-4 sm:grid-cols-2 sm:gap-4 sm:p-6 lg:gap-6"
+  >
+    <!-- Password Fields Column -->
+    <form [formGroup]="passwordForm" (submit)="passwordForm.valid && updatePassword()" class="w-full">
+      <!-- New Password Field -->
+      <div>
+        <label for="new-password" class="text-body1 mb-2 inline-block text-neutral-200">New Password</label>
+        <div class="relative flex items-center">
+          <input
+            id="new-password"
+            [type]="formUi.passwordElement.inputType"
+            formControlName="newPassword"
+            class="input-text-secondary w-full"
+            placeholder="Enter new password"
+          />
+          <button
+            type="button"
+            (click)="toggleVisibility(formUi.passwordElement)"
+            class="absolute right-4 text-neutral-400 hover:text-neutral-200"
+          >
+            <i
+              class="fa-solid"
+              [ngClass]="{
+                'fa-eye': !formUi.passwordElement.visiblePassword,
+                'fa-eye-slash': formUi.passwordElement.visiblePassword,
+              }"
+            ></i>
+          </button>
+        </div>
+        <div class="text-body2 text-error min-h-7 pt-1">
+          @if (passwordForm.get('newPassword').errors?.['required'] && passwordForm.get('newPassword').touched) {
+            <p class="text-error" animate.enter="fade-in-up">• Password should not be empty</p>
+          } @else if (
+            passwordForm.get('newPassword').errors?.['minlength'] && passwordForm.get('newPassword').touched
+          ) {
+            <p class="text-error" animate.enter="fade-in-up">• Password should be minimum 6 characters</p>
+          } @else if (
+            passwordForm.get('newPassword').errors?.['maxlength'] && passwordForm.get('newPassword').touched
+          ) {
+            <p class="text-error" animate.enter="fade-in-up">• Password should be maximum 50 characters</p>
+          } @else if (passwordForm.get('newPassword').errors?.['pattern'] && passwordForm.get('newPassword').touched) {
+            <p class="text-error" animate.enter="fade-in-up">
+              • Password should contain at least 1 lowercase, uppercase letter and digit
+            </p>
+          }
+        </div>
+      </div>
+
+      <!-- Password Confirmation Field -->
+      <div>
+        <label for="password-confirmation" class="text-body1 mb-2 inline-block text-neutral-200"
+          >Password Confirmation</label
+        >
+        <div class="relative flex h-[40px] w-full flex-row items-center">
+          <input
+            id="password-confirmation"
+            [type]="formUi.passwordConfirmationElement.inputType"
+            formControlName="passwordConfirmation"
+            class="input-text-secondary w-full"
+            placeholder="Confirm new password"
+          />
+          <button
+            type="button"
+            (click)="toggleVisibility(formUi.passwordConfirmationElement)"
+            class="absolute right-4 text-neutral-400 hover:text-neutral-200"
+          >
+            <i
+              class="fa-solid"
+              [ngClass]="{
+                'fa-eye': !formUi.passwordConfirmationElement.visiblePassword,
+                'fa-eye-slash': formUi.passwordConfirmationElement.visiblePassword,
+              }"
+            ></i>
+          </button>
+        </div>
+        <div class="text-body2 text-error min-h-7 pt-1">
+          @if (
+            passwordForm.get('passwordConfirmation').errors?.['required'] &&
+            passwordForm.get('passwordConfirmation').touched
+          ) {
+            <p class="text-error" animate.enter="fade-in-up">• Password confirmation should not be empty</p>
+          } @else if (
+            passwordForm.get('passwordConfirmation').errors?.['minlength'] &&
+            passwordForm.get('passwordConfirmation').touched
+          ) {
+            <p class="text-error" animate.enter="fade-in-up">• Password confirmation should be minimum 6 characterss</p>
+          } @else if (
+            passwordForm.get('passwordConfirmation').errors?.['maxlength'] &&
+            passwordForm.get('passwordConfirmation').touched
+          ) {
+            <p class="text-error" animate.enter="fade-in-up">• Password confirmation should be maximum 50 characters</p>
+          } @else if (passwordForm.hasError('notSame') && passwordForm.get('passwordConfirmation').touched) {
+            <p class="text-error" animate.enter="fade-in-up">• Passwords do not match</p>
+          }
+        </div>
+      </div>
+
+      <!-- Update Password Button -->
+      <button
+        type="submit"
+        [disabled]="loading || passwordForm.invalid || passwordForm.pristine"
+        class="repsy-btn-danger ml-auto w-full sm:w-auto"
+      >
+        <span>Update Password</span>
+      </button>
+    </form>
+
+    <!-- Username Column -->
+
+    <form [formGroup]="usernameForm" (submit)="usernameForm.valid && updateUsername()">
+      <label for="username" class="text-body1 mt-4 mb-2 inline-block text-neutral-200 sm:mt-0">Username</label>
+
+      <div class="relative flex items-center">
+        <input
+          id="username"
+          type="text"
+          formControlName="username"
+          placeholder="Enter username"
+          class="input-text-secondary w-full"
+        />
+      </div>
+
+      <div class="text-body2 min-h-7 pt-1">
+        @if (usernameForm.get('username').errors?.['required'] && usernameForm.get('username').touched) {
+          <p class="text-error" animate.enter="fade-in-up">• Username must not be empty</p>
+        } @else if (usernameForm.get('username').errors?.['minlength'] && usernameForm.get('username').touched) {
+          <p class="text-error" animate.enter="fade-in-up">• Username must be minimum 3 characters</p>
+        } @else if (usernameForm.get('username').errors?.['maxlength'] && usernameForm.get('username').touched) {
+          <p class="text-error" animate.enter="fade-in-up">• Username must be maximum 25 characters</p>
+        } @else if (usernameForm.get('username').errors?.['pattern'] && usernameForm.get('username').touched) {
+          <p class="text-error" animate.enter="fade-in-up">
+            • Username can contain only lowercase letters, digits, underscores and hyphens
+          </p>
+        }
+      </div>
+
+      <button
+        type="submit"
+        [disabled]="loading || usernameForm.invalid || usernameForm.get('username')?.value === username"
+        class="repsy-btn-danger ml-auto w-full sm:w-auto"
+      >
+        <span>Change</span>
+      </button>
+
+      <div class="text-body2 min-h-7 pt-5">
+        @if (usernameForm.get('username')?.value !== username) {
+          <p class="text-warning-500" animate.enter="fade-in-up">
+            Usernames are used to build repository URLs. So changing your username will also change your repository
+            URLs, thus this action will most likely affect your current projects set-ups. Be sure to update them after
+            changing your username.
+          </p>
+        }
+      </div>
+    </form>
+  </div>
+</section>

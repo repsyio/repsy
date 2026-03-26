@@ -1,0 +1,27 @@
+<div class="relative flex h-full min-h-[250px] w-full flex-col rounded-[12px] border border-[#404141] bg-[#101112]">
+  <div class="flex flex-col p-[20px]">
+    <!-- Title -->
+    <h2 class="mb-4 text-[13px] text-[#FDFDFD]">Total Disk Usage</h2>
+
+    <!-- Content -->
+    <div class="flex flex-1 flex-col items-center justify-center gap-6 py-6">
+      <!-- Total Usage Display -->
+      <div class="text-center">
+        <p class="text-[10px] text-[#9FA0A0]">Total Usage Across All Repositories</p>
+        <p class="mt-2 text-[32px] leading-none font-bold text-[#FDFDFD]">
+          {{ usage?.diskUsed?.text || '0 B' }}
+        </p>
+      </div>
+
+      <!-- Repository Count -->
+      <div class="w-full max-w-[200px]">
+        <div class="rounded-lg bg-[rgba(17,16,16,0.6)] px-6 py-4">
+          <p class="text-center text-[10px] text-[#9FA0A0]">Total Repositories</p>
+          <p class="mt-1 text-center text-[24px] font-semibold text-[#FDFDFD]">
+            {{ usage?.reposCount || 0 }}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

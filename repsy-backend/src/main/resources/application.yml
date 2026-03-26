@@ -1,0 +1,78 @@
+spring:
+  application:
+    name: repsy-backend
+
+  datasource:
+    url: ${DB_URL:jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${DB_USERNAME:repsy}
+    password: ${DB_PASSWORD:repsy123}
+
+  jpa:
+    show-sql: false
+    open-in-view: false
+    generate-ddl: false
+    hibernate:
+      ddl-auto: none
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    properties:
+      hibernate:
+        globally_quoted_identifiers: true
+        default_schema: ${os.app.schema}
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/{vendor}
+    schemas: public
+    default-schema: public
+
+server:
+  port: ${SERVER_PORT:9090}
+  tomcat:
+    connection-timeout: 120000
+    max-part-count: 50
+
+multiport:
+  main-port: ${server.port}
+  tomcat:
+    connection-timeout: ${server.tomcat.connection-timeout}
+  ports:
+    api: ${API_PORT:8080}
+
+logging:
+  level:
+    root: WARN
+
+storage-gateway:
+  fs:
+    base-path: ${STORAGE_BASE_PATH:${user.home}/.repsy}
+    trash-path: ${storage-gateway.fs.base-path}
+
+admin:
+  initial-password: ${ADMIN_INITIAL_PASSWORD:}
+
+h2:
+  tcp-server:
+    enabled: ${H2_TCP_SERVER_ENABLED:false}
+    port: ${H2_TCP_SERVER_PORT:9092}
+
+os:
+  app:
+    schema: public
+    repo-base-url: ${REPO_BASE_URL:http://localhost:${server.port}}
+    jwt-secret: ${JWT_SECRET:}
+
+    storage:
+      file-system:
+        maven:
+          base-path: ${storage-gateway.fs.base-path}/maven
+          trash-path: ${storage-gateway.fs.base-path}/maven/trash
+        docker:
+          base-path: ${storage-gateway.fs.base-path}/docker
+          trash-path: ${storage-gateway.fs.base-path}/docker/trash
+        npm:
+          base-path: ${storage-gateway.fs.base-path}/npm
+          trash-path: ${storage-gateway.fs.base-path}/npm/trash
+        pypi:
+          base-path: ${storage-gateway.fs.base-path}/pypi
+          trash-path: ${storage-gateway.fs.base-path}/pypi/trash

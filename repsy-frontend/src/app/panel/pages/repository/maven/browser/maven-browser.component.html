@@ -1,0 +1,159 @@
+<app-maven-config [baseUrl]="baseUrl" [repoName]="activeRepo.repoName" [(open)]="showConfig" />
+
+<!-- Navigation and Path -->
+<div
+  class="mb-7 flex flex-col flex-col-reverse items-start justify-between gap-4 md:items-start lg:flex-row lg:items-center"
+>
+  <!-- Back/Forward Buttons -->
+  <div class="flex w-full flex-row items-center gap-4 sm:w-auto sm:gap-0">
+    <app-searchbox class="w-full sm:mr-4 sm:max-w-[192px]" placeholder="File name" (filter)="search($event)" />
+
+    <div class="flex items-center">
+      <button
+        (click)="prev()"
+        class="flex h-[40px] w-[40px] items-center justify-center rounded-l-md border border-[#404141] bg-[#101112] text-[#9FA0A0] hover:border hover:border-[#FDFDFD] hover:text-[#FDFDFD]"
+      >
+        <img class="h-[12px]" ngSrc="/assets/icons/cursor/arrow-left.svg" alt="page-left" height="8" width="4" />
+      </button>
+      <button
+        (click)="next()"
+        class="flex h-[40px] w-[40px] items-center justify-center rounded-r-md border border-[#404141] bg-[#101112] text-[#9FA0A0] hover:border-[#FDFDFD] hover:text-[#FDFDFD]"
+      >
+        <img class="h-[12px]" ngSrc="/assets/icons/cursor/arrow-right.svg" alt="page-right" height="8" width="5" />
+      </button>
+    </div>
+  </div>
+
+  <div class="flex w-full items-center justify-end gap-2 sm:w-auto">
+    <button (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
+      <img ngSrc="/assets/icons/input/configure.svg" alt="configure" height="16" width="16" />
+      Configure
+    </button>
+    <button
+      [disabled]="!activeRepo.canManage"
+      [routerLink]="'/' + activeRepo.repoName + '/settings'"
+      class="repsy-btn-ghost w-full sm:w-auto"
+    >
+      <img ngSrc="/assets/icons/input/settings.svg" alt="settings" height="18" width="18" />
+      Settings
+    </button>
+  </div>
+</div>
+
+<p class="mb-4 text-[14px] font-medium text-[#9FA0A0]">
+  • Browse the
+  <a
+    href="javascript:void(0)"
+    (click)="goToBrowser('/')"
+    class="text-body1 hover:text-brand-500 focus:text-brand-500 inline-block text-neutral-200 underline focus:underline"
+  >
+    files
+  </a>
+  on your browser.
+</p>
+
+<div class="mb-4 text-[14px] text-neutral-200">
+  <a class="hover:text-secondary-500" href="javascript:void(0)" (click)="goToDir({ name: '/', path: '/', prev: null })"
+    >{{ activeRepo.repoName }}:</a
+  >
+  @for (dir of directoryStack; track dir.name; let index = $index) {
+    <a href="javascript:void(0)" (click)="goToDir(dir)">
+      <span
+        class="hover:text-secondary-500"
+        [ngClass]="{ 'text-secondary-500': directoryStack.length - 1 === index }"
+        >{{ dir.name }}</span
+      >
+    </a>
+  }
+</div>
+
+@if (loading) {
+  <app-spinner />
+} @else {
+  @if (filteredFsItems && filteredFsItems.length > 0) {
+    <div class="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
+      @for (file of filteredFsItems; track file.name) {
+        <div
+          animate.enter="fade-in-up"
+          class="relative rounded-lg border border-[#404141] bg-[#14161A] hover:border-[#FDFDFD]"
+        >
+          <app-dropdown class="absolute top-0 right-0 z-1 px-2 py-4">
+            <button
+              (click)="goToBrowser(directoryStack[directoryStack.length - 1]?.path + file.name)"
+              class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FDFDFD] hover:bg-[#2D2C2C]"
+            >
+              <i id="password-toggle-icon" class="fa-solid fa-eye"></i>
+              Browse File
+            </button>
+          </app-dropdown>
+
+          <div class="relative px-[20px] py-[20px] sm:px-[29.65px] sm:py-[26.65px]">
+            <!-- More Options Button -->
+
+            <!-- File Icon -->
+            <div
+              (click)="go(file)"
+              (keydown)="go(file)"
+              class="mb-4 flex items-center justify-center"
+              tabindex="0"
+              role="button"
+              [attr.aria-label]="'Open ' + file.name"
+            >
+              <!-- Default File Icon -->
+              @if (file.name.includes('.xml')) {
+                <img ngSrc="/assets/icons/browser/xml.svg" alt="browser" height="101" width="102" />
+              } @else if (file.name.includes('.jar')) {
+                <img ngSrc="/assets/icons/browser/jar.svg" alt="browser" height="101" width="102" />
+              } @else if (file.name.includes('.pom')) {
+                <img ngSrc="/assets/icons/browser/pom.svg" alt="browser" height="101" width="102" />
+              } @else {
+                <img ngSrc="/assets/icons/browser/default-file.svg" alt="browser" height="101" width="102" />
+              }
+            </div>
+
+            <!-- File Name -->
+            <div
+              class="mb-1 text-start text-[15px] font-medium break-all text-neutral-200"
+              tabindex="0"
+              role="button"
+              [attr.aria-label]="'Open ' + file.name"
+            >
+              {{ file.name }}
+            </div>
+
+            <!-- Separator Line -->
+
+            <img class="my-3 w-full" ngSrc="/assets/icons/maven/line.svg" alt="line" height="4" width="190" />
+
+            <!-- File Details -->
+            @if (file.size) {
+              <div class="text-[13px] text-[#9FA0A0]">File size: {{ formatBytes(file.size) }}</div>
+            }
+
+            @if (file.createdAt) {
+              <div class="text-[13px] text-[#9FA0A0]">Created: {{ file.createdAt | date: 'medium' }}</div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  } @else {
+    @if (!filteredFsItems) {
+      <div animate.enter="fade-in-up" class="p-8 text-center">
+        <img
+          class="mx-auto mb-[70px]"
+          ngSrc="/assets/images/hippo-empty.svg"
+          alt="hippo-empty"
+          height="243"
+          width="510"
+        />
+        <div>
+          <p class="text-[28px] text-[#9FA0A0]">404</p>
+          <p class="mt-2 text-[20px] text-[#9FA0A0]">Repository files not found!</p>
+        </div>
+      </div>
+    } @else {
+      <app-empty-list />
+    }
+  }
+}

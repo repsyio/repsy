@@ -1,0 +1,321 @@
+<section class="space-y-[24px]">
+  <!-- Header -->
+  <div [ngClass]="{ 'pointer-events-none opacity-50 select-none': operationLock }" class="flex flex-col gap-4">
+    <h2 class="text-[14px] text-[#9FA0A0]">User Management</h2>
+
+    <!-- Search, Refresh and Create Button -->
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-center gap-3">
+        <!-- Search Bar -->
+        <app-searchbox placeholder="Search username" (filter)="search($event)" class="w-full sm:max-w-[320px]" />
+
+        <!-- Refresh Button -->
+        <button
+          (click)="refreshPage()"
+          class="hover:text-secondary-500 flex h-[40px] w-[40px] flex-shrink-0 items-center justify-center text-neutral-200"
+          title="Refresh"
+        >
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 22 22"
+            stroke="currentColor"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M21.0832 3.66645V9.16645M21.0832 9.16645H15.5832M21.0832 9.16645L16.8298 5.16978C15.8447 4.18411 14.6258 3.46406 13.2871 3.07683C11.9484 2.6896 10.5334 2.64781 9.1741 2.95535C7.81485 3.2629 6.55565 3.90977 5.51402 4.83558C4.47238 5.7614 3.68224 6.936 3.21734 8.24978M0.916504 18.3331V12.8331M0.916504 12.8331H6.4165M0.916504 12.8331L5.16984 16.8298C6.15502 17.8155 7.37385 18.5355 8.71258 18.9227C10.0513 19.31 11.4663 19.3518 12.8256 19.0442C14.1848 18.7367 15.444 18.0898 16.4857 17.164C17.5273 16.2382 18.3174 15.0636 18.7823 13.7498"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Create Button -->
+      <button
+        (click)="createUser()"
+        class="repsy-btn-confirm flex h-[44px] w-full items-center justify-center gap-2 px-6 text-[15px] font-bold transition-all sm:w-auto"
+      >
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8 2V14M2 8H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        Create User
+      </button>
+    </div>
+  </div>
+
+  <!-- Users List -->
+  @if (users && users.length > 0) {
+    <div class="text-body1">
+      <!-- User Headers (Desktop) -->
+      <div
+        class="hidden grid-cols-[1fr_1fr_1fr_1fr_80px] gap-4 rounded-t-[12px] border-t border-r border-l border-neutral-400 bg-neutral-500 p-4 text-[13px] whitespace-nowrap text-neutral-200 lg:grid"
+        animate.enter="fade-in-up"
+      >
+        <div>Username</div>
+        <div>Role</div>
+        <div>Created</div>
+        <div>Last Login</div>
+        <div></div>
+      </div>
+
+      <!-- User Table (Desktop) -->
+      <div
+        animate.enter="fade-in-down"
+        class="hidden rounded-b-[12px] border border-neutral-400 bg-neutral-500 lg:block"
+      >
+        @for (user of users; track user.id; let i = $index) {
+          <div>
+            <div
+              animate.enter="fade-in-down"
+              [ngClass]="{ 'rounded-b-[12px]': i === users.length - 1 }"
+              class="grid grid-cols-[1fr_1fr_1fr_1fr_80px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+            >
+              <!-- Username -->
+              <app-tooltip class="text-secondary-500" [text]="user.username | ellipsis" [textHover]="user.username" />
+
+              <!-- Role -->
+              <span [ngClass]="getRoleBadgeClass(user.role)" class="inline-block w-fit rounded-full px-3 py-1 text-xs">
+                {{ user.role }}
+              </span>
+
+              <!-- Created Date -->
+              <app-tooltip
+                class="text-secondary-500"
+                [text]="timeAgo(user.createdAt)"
+                [textHover]="user.createdAt | date: 'medium'"
+                [always]="true"
+              />
+
+              <!-- Last Login -->
+              <app-tooltip
+                class="text-secondary-500"
+                [text]="timeAgo(user.lastLoginAt)"
+                [textHover]="user.lastLoginAt ? (user.lastLoginAt | date: 'medium') : 'Never logged in'"
+                [always]="true"
+              />
+
+              <!-- Actions -->
+              <div class="flex items-center justify-end gap-2">
+                <!-- Reset Password Button -->
+                <button
+                  (click)="resetPassword(user)"
+                  [disabled]="operationLock"
+                  class="hover:text-warning-500 text-neutral-200"
+                  title="Reset password"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    stroke-width="2"
+                  >
+                    <!-- Lock body -->
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <!-- Lock shackle -->
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    <!-- Refresh arrow -->
+                    <path d="M12 15v4m0 0l-2-2m2 2l2-2" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </button>
+
+                <!-- Dropdown Menu (Edit & Delete) -->
+                <app-dropdown>
+                  <button
+                    (click)="editUser(user)"
+                    [disabled]="operationLock"
+                    class="flex w-full items-center gap-2 px-4 py-2 text-neutral-200 hover:bg-[#2D2C2C]"
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 18 18"
+                      fill="none"
+                      stroke="currentColor"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M8.25 3H3C2.60218 3 2.22064 3.15804 1.93934 3.43934C1.65804 3.72064 1.5 4.10218 1.5 4.5V15C1.5 15.3978 1.65804 15.7794 1.93934 16.0607C2.22064 16.342 2.60218 16.5 3 16.5H13.5C13.8978 16.5 14.2794 16.342 14.5607 16.0607C14.842 15.7794 15 15.3978 15 15V9.75"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                      <path
+                        d="M13.875 1.87502C14.1734 1.57665 14.5791 1.40918 15.0008 1.40918C15.4225 1.40918 15.8282 1.57665 16.1266 1.87502C16.4249 2.17339 16.5924 2.57909 16.5924 3.00077C16.5924 3.42245 16.4249 3.82815 16.1266 4.12652L9.00078 11.2523L6.00078 12.0015L6.75003 9.00152L13.875 1.87502Z"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                    Edit
+                  </button>
+
+                  <button
+                    (click)="deleteUser(user)"
+                    [disabled]="operationLock"
+                    class="text-error-500 flex w-full items-center gap-2 px-4 py-2 hover:bg-[#2D2C2C]"
+                  >
+                    <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+                    Delete
+                  </button>
+                </app-dropdown>
+              </div>
+            </div>
+            @if (i !== users.length - 1) {
+              <div class="h-[1px] w-full bg-neutral-400"></div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- User List (Mobile) -->
+      @for (user of users; track user.id; let i = $index) {
+        <div animate.enter="fade-in-down" class="lg:hidden">
+          <div
+            class="hover:border-secondary-500 relative flex flex-col gap-2 rounded-[12px] border border-neutral-400 bg-neutral-500 p-4 hover:bg-[#1D1C1C]"
+          >
+            <!-- Actions (Top Right) -->
+            <div class="flex items-center justify-end gap-2">
+              <!-- Reset Password Button -->
+              <button
+                (click)="resetPassword(user)"
+                [disabled]="operationLock"
+                class="hover:text-warning-500 text-neutral-200"
+                title="Reset password"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  stroke-width="2"
+                >
+                  <!-- Lock body -->
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <!-- Lock shackle -->
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  <!-- Refresh arrow -->
+                  <path d="M12 15v4m0 0l-2-2m2 2l2-2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+
+              <!-- Dropdown Menu -->
+              <app-dropdown>
+                <button
+                  (click)="editUser(user)"
+                  [disabled]="operationLock"
+                  class="flex w-full items-center gap-2 px-4 py-2 text-neutral-200 hover:bg-[#2D2C2C]"
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 18 18"
+                    fill="none"
+                    stroke="currentColor"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M8.25 3H3C2.60218 3 2.22064 3.15804 1.93934 3.43934C1.65804 3.72064 1.5 4.10218 1.5 4.5V15C1.5 15.3978 1.65804 15.7794 1.93934 16.0607C2.22064 16.342 2.60218 16.5 3 16.5H13.5C13.8978 16.5 14.2794 16.342 14.5607 16.0607C14.842 15.7794 15 15.3978 15 15V9.75"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M13.875 1.87502C14.1734 1.57665 14.5791 1.40918 15.0008 1.40918C15.4225 1.40918 15.8282 1.57665 16.1266 1.87502C16.4249 2.17339 16.5924 2.57909 16.5924 3.00077C16.5924 3.42245 16.4249 3.82815 16.1266 4.12652L9.00078 11.2523L6.00078 12.0015L6.75003 9.00152L13.875 1.87502Z"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  Edit
+                </button>
+
+                <button
+                  (click)="deleteUser(user)"
+                  [disabled]="operationLock"
+                  class="text-error-500 flex w-full items-center gap-2 px-4 py-2 hover:bg-[#2D2C2C]"
+                >
+                  <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+                  Delete
+                </button>
+              </app-dropdown>
+            </div>
+
+            <div class="space-y-2">
+              <div class="flex justify-between gap-2">
+                <span class="text-neutral-200">Username: </span>
+                <span class="text-secondary-500">{{ user.username }}</span>
+              </div>
+              <div class="flex justify-between gap-2">
+                <span class="text-neutral-200">Role: </span>
+                <span
+                  [ngClass]="getRoleBadgeClass(user.role)"
+                  class="inline-block w-fit rounded-full px-3 py-1 text-xs"
+                >
+                  {{ user.role }}
+                </span>
+              </div>
+              <div class="flex justify-between gap-2">
+                <span class="text-neutral-200">Created: </span>
+                <span class="text-secondary-500 break-all">
+                  {{ user.createdAt | date: 'medium' }} {{ '(' + timeAgo(user.createdAt) + ')' }}
+                </span>
+              </div>
+              <div class="flex justify-between gap-2">
+                <span class="text-neutral-200">Last Login: </span>
+                <span class="text-secondary-500 break-all">
+                  @if (user.lastLoginAt) {
+                    {{ user.lastLoginAt | date: 'medium' }} {{ '(' + timeAgo(user.lastLoginAt) + ')' }}
+                  } @else {
+                    <span class="text-neutral-400 italic">Never logged in</span>
+                  }
+                </span>
+              </div>
+            </div>
+          </div>
+          @if (i !== users.length - 1) {
+            <div class="px-2 py-4">
+              <div class="h-[1px] bg-neutral-400"></div>
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Pagination -->
+      <app-pagination
+        (pageNumChange)="loadPage($event)"
+        [(pageNum)]="pageNum"
+        [totalPages]="pagedData.page.totalPages"
+      />
+    </div>
+  } @else {
+    <!-- Empty State -->
+    <img class="mx-auto" ngSrc="/assets/images/hippo-empty.svg" priority alt="hippo-empty" height="150" width="300" />
+    <div class="mx-auto mt-4 text-center">
+      <p class="text-[14px] text-[#9FA0A0]">No users found,</p>
+      <p class="mt-2 text-[14px] text-[#9FA0A0]">create your first user to get started!</p>
+    </div>
+  }
+</section>
+
+<!-- Modals -->
+<app-user-create-modal [(open)]="showCreateUserModal" (created)="fetchUsers()" />
+
+<app-user-edit-modal
+  [(open)]="showEditUserModal"
+  [user]="selectedUser"
+  [isLastAdmin]="selectedUser?.role === 'ADMIN' && isLastAdmin()"
+  (updated)="fetchUsers()"
+/>
+
+<app-user-reset-password-modal
+  [(open)]="showResetPasswordModal"
+  [username]="selectedUser?.username"
+  [newPassword]="newPassword"
+/>

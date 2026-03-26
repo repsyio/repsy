@@ -1,0 +1,19 @@
+<div class="relative shrink-0" [ngStyle]="avatarStyle()">
+  @if (!showFallback()) {
+    <img
+      [src]="avatarUrl()"
+      alt="User avatar"
+      class="absolute inset-0 h-full w-full rounded-full object-cover ring-4 ring-[#18191A]/60"
+      loading="lazy"
+      (error)="onImageError()"
+    />
+  } @else {
+    <div
+      class="absolute inset-0 flex items-center justify-center rounded-full bg-linear-to-br from-[#FFF0F8] to-[#FF69B4] ring-4 ring-[#18191A]/60"
+    >
+      <span class="font-medium text-[#07080A]" [ngStyle]="{ 'font-size.px': fontSize() }">
+        {{ fallbackChar }}
+      </span>
+    </div>
+  }
+</div>

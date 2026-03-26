@@ -1,0 +1,52 @@
+name: MR Checks
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  pre-checks:
+    name: Editorconfig check - All
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: There must be only one .editorconfig file
+        run: |
+          if [ "$(find . -name '.editorconfig' | wc -l)" != "1" ]
+          then
+            exit 1
+          fi
+
+      - name: Install editorconfig-checker
+        uses: editorconfig-checker/action-editorconfig-checker@v2
+        with:
+          version: v3.0.3
+
+      - run: editorconfig-checker
+
+  java-checks:
+    name: Java Core Lib check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Maven Action
+        uses: s4u/setup-maven-action@v1.19.0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: "25"
+          distribution: "temurin"
+          cache: maven
+
+      - name: License Header Check
+        run: mvn -B -ntp apache-rat:check
+
+      - name: Build and Verify
+        run: mvn -B -ntp verify

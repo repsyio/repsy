@@ -1,0 +1,42 @@
+<!-- Modal Backdrop -->
+@if (open) {
+  <button class="bg-opacity-50 fixed inset-0 z-3 backdrop-blur-sm" (click)="closeModal()">
+    <div></div>
+  </button>
+
+  <!-- Modal Content -->
+  <div
+    animate.enter="fade-in-left"
+    class="text-secondary-500 fixed top-[24px] left-1/2 z-4 flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] -translate-x-1/2 flex-col overflow-y-auto rounded-[12px] border border-[#404141] border-neutral-400 bg-gradient-to-b from-[#111010] to-[#333333] md:right-[24px] md:left-auto md:h-auto md:max-h-[calc(100%-48px)] md:w-[680px] md:translate-x-0"
+  >
+    <!-- Header with close button -->
+    <div class="flex items-center justify-between border-b border-[#404141] px-4 py-3 md:px-6 md:py-4">
+      <div class="flex flex-wrap items-center gap-1">
+        @if (deployToken) {
+          Deploy Token Usage
+        } @else {
+          NPM Configuration
+        }
+      </div>
+      <button (click)="closeModal()" class="ml-2 rounded-full p-1 hover:bg-[#2A2B2B]" aria-label="Close modal">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M15 5L5 15M5 5L15 15"
+            stroke="#FDFDFD"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Scrollable Content -->
+    <div class="flex-1 overflow-y-auto">
+      <!-- Configuration Instructions -->
+      <div class="p-4 md:p-6">
+        <app-markdown class="config-modal" [markdown]="markdown" />
+      </div>
+    </div>
+  </div>
+}

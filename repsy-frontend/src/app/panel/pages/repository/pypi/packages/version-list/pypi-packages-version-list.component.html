@@ -1,0 +1,177 @@
+<app-pypi-config
+  [baseUrl]="baseUrl"
+  [username]="this.username"
+  [repoName]="activeRepo.repoName"
+  [(open)]="showConfig"
+/>
+
+<div
+  [ngClass]="{ 'pointer-events-none opacity-50 select-none': loading || this.error }"
+  class="mb-7 flex flex-col flex-col-reverse items-start justify-between gap-4 md:items-start lg:flex-row lg:items-center"
+>
+  <div class="flex w-full flex-col items-start gap-4 sm:w-auto sm:flex-row sm:items-center">
+    <app-searchbox class="w-full sm:max-w-[192px]" placeholder="version" (filter)="search($event)" />
+
+    <div class="flex w-full gap-2 sm:w-auto">
+      <app-sort-selector
+        [(selectedOption)]="sortOption"
+        [options]="sortOptions"
+        (choose)="sort($event)"
+        class="w-full sm:w-auto"
+      />
+
+      <button
+        (click)="refreshPage()"
+        class="flex h-[40px] w-[40px] items-center justify-center hover:brightness-0 hover:invert"
+      >
+        <img ngSrc="/assets/icons/input/refresh.svg" alt="refresh" height="22" width="22" />
+      </button>
+    </div>
+  </div>
+
+  <div class="flex w-full items-center justify-end gap-2 sm:w-auto">
+    <button (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
+      <img ngSrc="/assets/icons/input/configure.svg" alt="configure" height="16" width="16" />
+      Configure
+    </button>
+    @if (canManage) {
+      <button
+        [disabled]="!activeRepo.canManage"
+        [routerLink]="'/' + activeRepo.repoName + '/settings'"
+        class="repsy-btn-ghost w-full sm:w-auto"
+      >
+        <img ngSrc="/assets/icons/input/settings.svg" alt="settings" height="18" width="18" />
+        Settings
+      </button>
+    }
+  </div>
+</div>
+
+@if (loading) {
+  <app-spinner />
+} @else {
+  @if (!this.error) {
+    @if (versions?.length > 0) {
+      <div class="text-body1">
+        <!-- Version Headers (Desktop) -->
+        <div
+          class="hidden grid-cols-[5fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          animate.enter="fade-in-up"
+        >
+          <div>Version</div>
+          <div>Uploaded</div>
+          <div></div>
+        </div>
+
+        <!-- Version Table (Desktop) -->
+        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
+          @for (version of versions; track version.version; let i = $index) {
+            <div role="button" [routerLink]="'/' + activeRepo.repoName + '/' + packageName + '/' + version.version">
+              <div
+                animate.enter="fade-in-down"
+                [ngClass]="{ 'rounded-b-[12px]': i === versions.length - 1 }"
+                class="grid grid-cols-[5fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+              >
+                <div class="flex gap-2 text-[14px] text-white">
+                  <img class="mb-1" ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
+                  <app-tooltip
+                    class="group-hover:underline"
+                    [text]="version.version | ellipsis"
+                    [textHover]="version.version"
+                  />
+                </div>
+
+                <app-tooltip
+                  class="text-secondary-500 group-hover:underline"
+                  [text]="timeAgo(version.createdAt)"
+                  [textHover]="version.createdAt | date: 'medium'"
+                  [always]="true"
+                />
+
+                @if (activeRepo.canManage) {
+                  <app-dropdown (click)="$event.stopPropagation()">
+                    <button
+                      (click)="deleteVersion(version)"
+                      [disabled]="loading"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                    >
+                      <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+                      Delete
+                    </button>
+                  </app-dropdown>
+                }
+              </div>
+              @if (i !== versions.length - 1) {
+                <div class="h-[1px] w-full bg-[#404141]"></div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Version List (Mobile) -->
+        @for (version of versions; track version.version; let i = $index) {
+          <div animate.enter="fade-in-down" class="lg:hidden">
+            <div
+              class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+              role="button"
+              [routerLink]="'/' + activeRepo.repoName + '/' + packageName + '/' + version.version"
+            >
+              @if (activeRepo.canWrite) {
+                <app-dropdown class="relative left-4 ml-auto" (click)="$event.stopPropagation()">
+                  <button
+                    (click)="deleteVersion(version)"
+                    [disabled]="loading"
+                    class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                  >
+                    <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+                    Delete
+                  </button>
+                </app-dropdown>
+              }
+
+              <div class="group text-secondary-500 flex items-start gap-2 text-[14px]">
+                <img class="mt-[2px]" ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
+
+                <span class="text-right break-all text-[#FDFDFD]">{{ version.version }}</span>
+              </div>
+
+              <div class="space-y-2">
+                <div class="flex justify-between gap-2">
+                  <span class="text-sm text-[#9FA0A0]">Upladed: </span>
+                  <span class="text-secondary-500 text-right break-all">
+                    {{ version.createdAt | date: 'medium' }} {{ '(' + timeAgo(version.createdAt) + ')' }}
+                  </span>
+                </div>
+              </div>
+            </div>
+            @if (i !== versions.length - 1) {
+              <div class="px-2 py-4">
+                <div class="h-[1px] bg-[#404141]"></div>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Pagination -->
+        <app-pagination
+          (pageNumChange)="loadPage($event)"
+          [pageNum]="pageNum"
+          [totalPages]="pagedData.page.totalPages"
+        />
+      </div>
+    } @else {
+      <app-empty-list />
+    }
+  } @else {
+    <div animate.enter="fade-in-up" class="p-8 text-center">
+      <img
+        class="mx-auto mb-[70px]"
+        ngSrc="/assets/images/hippo-empty.svg"
+        alt="hippo-empty"
+        height="243"
+        width="510"
+      />
+      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+    </div>
+  }
+}

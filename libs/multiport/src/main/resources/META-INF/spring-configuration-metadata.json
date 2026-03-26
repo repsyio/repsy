@@ -1,0 +1,36 @@
+{
+  "groups": [
+    {
+      "name": "multiport",
+      "type": "io.repsy.libs.multiport.configs.props.MultiPortProperties",
+      "description": "Multiport Configuration"
+    },
+    {
+      "name": "multiport.tomcat",
+      "type": "io.repsy.libs.multiport.configs.props.MultiPortProperties$TomcatProperties",
+      "description": "Tomcat Configuration"
+    }
+  ],
+  "properties": [
+    {
+      "name": "multiport.main-port",
+      "type": "java.lang.String",
+      "sourceType": "io.repsy.libs.multiport.configs.props.MultiPortProperties",
+      "description": "Main Port",
+      "defaultValue": "8080"
+    },
+    {
+      "name": "multiport.ports",
+      "type": "java.util.Map<java.lang.String,java.lang.Integer>",
+      "sourceType": "io.repsy.libs.multiport.configs.props.MultiPortProperties",
+      "description": "Logical name to port mapping"
+    },
+    {
+      "name": "multiport.tomcat.connection-timeout",
+      "type": "java.lang.Integer",
+      "sourceType": "io.repsy.libs.multiport.configs.props.MultiPortProperties$TomcatProperties",
+      "description": "Tomcat connection timeout in milliseconds",
+      "defaultValue": 12000
+    }
+  ]
+}

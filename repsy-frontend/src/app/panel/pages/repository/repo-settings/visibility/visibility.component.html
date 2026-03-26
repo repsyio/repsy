@@ -1,0 +1,27 @@
+<section id="visibility" class="mt-[-100px] pt-[100px]">
+  <h3 class="w-full rounded-t-[12px] border border-[#404141] bg-[#101112] p-[24px] font-medium text-[#FDFDFD]">
+    <a [routerLink]="[]" fragment="visibility"> Visibility </a>
+  </h3>
+  <div
+    class="flex flex-col gap-4 rounded-b-[12px] border-r border-b border-l border-[#404141] bg-[#101112] p-[24px] sm:flex-row sm:gap-10"
+  >
+    <app-toggle-component
+      class="w-[115px]"
+      [checked]="!this.parentForm.get('privateRepository').value"
+      checkedLabel="Public"
+      uncheckedLabel="Private"
+      (checkedChange)="changePrivacy($event)"
+    />
+
+    <div class="text-[13px]">
+      <p class="text-[#FDFDFD]">When active, only authorized users can access the repository.<br /></p>
+      <p class="text-[#9FA0A0]">
+        {{
+          this.parentForm.get('privateRepository').value
+            ? 'Deactivate it for private visibility.'
+            : 'Activate it for public visibility.'
+        }}
+      </p>
+    </div>
+  </div>
+</section>

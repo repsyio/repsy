@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.repsy.core</groupId>
+    <artifactId>core</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>core/pom.xml</relativePath>
+  </parent>
+
+  <groupId>io.repsy.os</groupId>
+  <artifactId>repsy-os</artifactId>
+  <packaging>pom</packaging>
+  <url>https://github.com/repsyio/repsy-os</url>
+
+  <scm>
+    <connection>scm:git:https://github.com/repsyio/repsy-os-tmp.git</connection>
+    <developerConnection>scm:git:https://github.com/repsyio/repsy-os-tmp.git</developerConnection>
+    <tag>HEAD</tag>
+  </scm>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.repsy.core</groupId>
+        <artifactId>core-bom</artifactId>
+        <version>${project.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <modules>
+    <module>repsy-backend</module>
+    <module>libs</module>
+    <module>repsy-protocols</module>
+  </modules>
+</project>

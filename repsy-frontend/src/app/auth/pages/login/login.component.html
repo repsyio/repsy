@@ -1,0 +1,91 @@
+<main class="grid h-full w-full grid-cols-1 gap-10 p-4 sm:p-6 md:p-8 lg:grid-cols-2 lg:gap-0 lg:p-[50px]">
+  <!-- Left Side -->
+  <div class="flex items-center justify-center xl:me-[156px] xl:justify-end" animate.enter="fade-in-left">
+    <div class="flex w-full max-w-[400px] flex-col items-center justify-center">
+      <!-- Logo -->
+      <a [routerLink]="['/']">
+        <img ngSrc="/assets/icons/repsy/repsy-logo.svg" alt="Repsy Logo" width="42" height="42" />
+      </a>
+      <!-- Titles -->
+      <h2 class="text-h2 text-secondary-500 mt-8 mb-2">Welcome back!</h2>
+      <h3 class="text-body1 text-neutral-200">Sign in to your account</h3>
+      <!-- Form -->
+      <form [formGroup]="form" class="mt-[72px] w-full" (submit)="form.valid && login()">
+        <!-- Username or Email -->
+        <div>
+          <label class="text-body1 mb-2 inline-block text-neutral-200" for="username">Username</label>
+          <input
+            type="text"
+            id="username"
+            name="username"
+            formControlName="username"
+            placeholder="username"
+            class="input-text-brand w-full"
+          />
+
+          <div class="text-body2 text-error min-h-7 pt-1">
+            @if (form.get('username').errors?.['required'] && form.get('username').touched) {
+              <p animate.enter="fade-in-up">• Should not be empty</p>
+            } @else if (form.get('username').errors?.['pattern'] && form.get('username').touched) {
+              <p animate.enter="fade-in-up">• Should not contain invalid characters</p>
+            } @else if (form.get('username').errors?.['minlength'] && form.get('username').touched) {
+              <p animate.enter="fade-in-up">• Should be minimum 3 characters</p>
+            } @else if (form.get('username').errors?.['maxlength'] && form.get('username').touched) {
+              <p animate.enter="fade-in-up">• Should be maximum 150 characters</p>
+            }
+          </div>
+        </div>
+
+        <!-- Password -->
+        <div>
+          <label class="text-body1 mb-2 inline-block text-neutral-200" for="password">Password</label>
+          <div class="relative flex items-center">
+            <input
+              [type]="inputType"
+              id="password"
+              name="password"
+              formControlName="password"
+              [placeholder]="visible ? 'password' : '••••••'"
+              class="input-text-brand w-full"
+            />
+            <button
+              type="button"
+              class="absolute right-[15px] flex items-center justify-center text-neutral-400 hover:text-neutral-200"
+              (click)="toggleVisibility()"
+            >
+              <i
+                id="password-toggle-icon"
+                class="fa-solid"
+                [ngClass]="{
+                  'fa-eye': visible,
+                  'fa-eye-slash': !visible,
+                }"
+              ></i>
+            </button>
+          </div>
+          <div class="text-body2 text-error min-h-7 pt-1">
+            @if (form.get('password').errors?.['required'] && form.get('password').touched) {
+              <p animate.enter="fade-in-up">• Should not be empty</p>
+            } @else if (form.get('password').errors?.['pattern'] && form.get('password').touched) {
+              <p animate.enter="fade-in-up">• Should be at least 1 lowercase, uppercase letter and 1 digit</p>
+            } @else if (form.get('password').errors?.['minlength'] && form.get('password').touched) {
+              <p animate.enter="fade-in-up">• Should be minimum 6 characters</p>
+            } @else if (form.get('password').errors?.['maxlength'] && form.get('password').touched) {
+              <p animate.enter="fade-in-up">• Should be maximum 50 characters</p>
+            }
+          </div>
+        </div>
+
+        <!-- Sign In Button -->
+        <button type="submit" [disabled]="form.invalid || loading" class="repsy-btn-base mb-4 w-full">Sign In</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right Side -->
+  <div class="hidden w-full items-center justify-center lg:flex lg:justify-start" animate.enter="fade-in-right">
+    <div class="lg:w-[490px] xl:w-[556px]">
+      <img [ngSrc]="randomImage" alt="Placeholder" width="556" height="556" priority class="object-cover" />
+    </div>
+  </div>
+</main>
