@@ -1,0 +1,159 @@
+<!-- Modal Backdrop -->
+@if (open) {
+  <button animate.enter="fade-in-up" class="bg-opacity-50 fixed inset-0 z-3 backdrop-blur-sm" (click)="closeModal()">
+    <div></div>
+  </button>
+
+  <!-- Modal Content -->
+  <div
+    class="fixed top-1/2 left-1/2 z-4 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-[#404141] bg-[#101112] p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px]"
+  >
+    <!-- Header -->
+    <div class="flex justify-between">
+      <h1 class="text-[24px] leading-6 text-white">Create User</h1>
+      <button (click)="closeModal()" class="hover:text-secondary-500 text-neutral-200">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 15 15"
+          fill="none"
+          stroke="currentColor"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path d="M0.595215 14.4052L14.4047 0.595703" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M14.4047 14.4052L0.595215 0.595703" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="gradient-border mx-auto my-6 sm:my-10"></div>
+
+    <form [formGroup]="form" class="flex flex-col gap-4" (submit)="form.valid && createUser()">
+      <div class="flex flex-col text-[#9FA0A0]">
+        <!-- Username Input -->
+        <div class="form-group w-full">
+          <label for="username">Username <span class="text-error">*</span></label>
+          <input
+            formControlName="username"
+            placeholder="Enter username"
+            id="username"
+            required
+            type="text"
+            class="input-text-secondary w-full"
+          />
+          <div class="text-body2 text-error min-h-7 pt-1">
+            @if (form.get('username').errors?.['required'] && form.get('username').touched) {
+              <p animate.enter="fade-in-up">â€¢ Should not be empty</p>
+            } @else if (form.get('username').errors?.['minlength'] && form.get('username').touched) {
+              <p animate.enter="fade-in-up">â€¢ Should be minimum 3 characters</p>
+            } @else if (form.get('username').errors?.['maxlength'] && form.get('username').touched) {
+              <p animate.enter="fade-in-up">â€¢ Should be maximum 25 characters</p>
+            } @else if (form.get('username').errors?.['pattern'] && form.get('username').touched) {
+              <p animate.enter="fade-in-up">â€¢ Can contain only lowercase letters, digits, underscores and hyphens</p>
+            }
+          </div>
+        </div>
+
+        <!-- Password Input -->
+        <div class="form-group w-full">
+          <label for="password">Password <span class="text-error">*</span></label>
+          <div class="relative">
+            <input
+              formControlName="password"
+              placeholder="Enter password"
+              id="password"
+              required
+              [type]="showPassword ? 'text' : 'password'"
+              class="input-text-secondary w-full pr-10"
+            />
+            <button
+              type="button"
+              class="absolute top-1/2 right-3 -translate-y-1/2 text-neutral-400 hover:text-neutral-200"
+              (click)="togglePasswordVisibility()"
+            >
+              <i
+                class="fa-solid"
+                [ngClass]="{
+                  'fa-eye': showPassword,
+                  'fa-eye-slash': !showPassword,
+                }"
+              ></i>
+            </button>
+          </div>
+          <div class="text-body2 text-error min-h-7 pt-1">
+            @if (form.get('password').errors?.['required'] && form.get('password').touched) {
+              <p animate.enter="fade-in-up">â€¢ Should not be empty</p>
+            } @else if (form.get('password').errors?.['minlength'] && form.get('password').touched) {
+              <p animate.enter="fade-in-up">â€¢ Should be minimum 6 characters</p>
+            } @else if (form.get('password').errors?.['maxlength'] && form.get('password').touched) {
+              <p animate.enter="fade-in-up">â€¢ Should be maximum 50 characters</p>
+            } @else if (form.get('password').errors?.['pattern'] && form.get('password').touched) {
+              <p animate.enter="fade-in-up">â€¢ Should contain at least 1 lowercase, 1 uppercase letter and 1 digit</p>
+            }
+          </div>
+        </div>
+
+        <!-- Confirm Password Input -->
+        <div class="form-group w-full">
+          <label for="confirmPassword">Confirm Password <span class="text-error">*</span></label>
+          <div class="relative">
+            <input
+              formControlName="confirmPassword"
+              placeholder="Re-enter password"
+              id="confirmPassword"
+              required
+              [type]="showConfirmPassword ? 'text' : 'password'"
+              class="input-text-secondary w-full pr-10"
+            />
+            <button
+              type="button"
+              class="absolute top-1/2 right-3 -translate-y-1/2 text-neutral-400 hover:text-neutral-200"
+              (click)="toggleConfirmPasswordVisibility()"
+            >
+              <i
+                class="fa-solid"
+                [ngClass]="{
+                  'fa-eye': showConfirmPassword,
+                  'fa-eye-slash': !showConfirmPassword,
+                }"
+              ></i>
+            </button>
+          </div>
+          <div class="text-body2 text-error min-h-7 pt-1">
+            @if (form.get('confirmPassword').errors?.['required'] && form.get('confirmPassword').touched) {
+              <p animate.enter="fade-in-up">â€¢ Should not be empty</p>
+            } @else if (
+              form.get('confirmPassword').errors?.['passwordMismatch'] && form.get('confirmPassword').touched
+            ) {
+              <p animate.enter="fade-in-up">â€¢ Passwords do not match</p>
+            }
+          </div>
+        </div>
+
+        <!-- Admin Role Toggle -->
+        <div class="form-group w-full">
+          <label for="isAdmin" class="mb-2 block text-[14px] text-neutral-200">Role</label>
+          <app-toggle-component
+            id="isAdmin"
+            [checked]="form.get('isAdmin').value"
+            checkedLabel="Admin"
+            uncheckedLabel="User"
+            (checkedChange)="form.get('isAdmin').setValue($event)"
+          />
+          <p class="mt-2 text-xs text-[#9FA0A0]">Admin have full access to all features including user management</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex gap-2 sm:ml-auto">
+        <button type="button" (click)="closeModal()" [disabled]="loading" class="repsy-btn-secondary w-full sm:w-auto">
+          Cancel
+        </button>
+
+        <button type="submit" [disabled]="form.invalid || loading" class="repsy-btn-confirm w-full sm:w-auto">
+          Create User
+        </button>
+      </div>
+    </form>
+  </div>
+}

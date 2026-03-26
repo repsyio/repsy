@@ -1,0 +1,39 @@
+<!-- Plan & Create Repository Section -->
+<div
+  class="mb-[24px] flex flex-col justify-between gap-4 sm:flex-row sm:items-center md:flex-col md:items-start lg:flex-row lg:items-center"
+>
+  <button
+    (click)="openCreateRepo()"
+    class="repsy-btn-confirm flex h-[40px] w-auto items-center gap-2 px-4 text-[14px] font-bold transition-all"
+  >
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M8 2V14M2 8H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+    </svg>
+    Create Repository
+  </button>
+</div>
+
+<!-- Cards Grid -->
+<div animate.enter="fade-in-down" class="space-y-[16px]">
+  <!-- Welcome Card + Total Disk Usage & Repository Card -->
+  <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+    <!-- Welcome Card -->
+    <div class="xl:col-span-2">
+      <app-welcome-card />
+    </div>
+
+    <!-- Total Disk Usage & Repository Card - Side by Side -->
+    <app-total-disk [usage]="usage" />
+    <app-repository-card
+      [mavenRepoCount]="mavenRepoCount"
+      [npmRegistryCount]="npmRegistryCount"
+      [pypiRepoCount]="pypiRepoCount"
+      [dockerRepoCount]="dockerRepoCount"
+    />
+  </div>
+
+  <!-- Recent Activity -->
+  <app-recent-activity [repoListInfos]="repoListInfos" />
+</div>
+
+<app-repository-modal [(open)]="createRepoModal" />

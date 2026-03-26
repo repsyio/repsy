@@ -1,0 +1,18 @@
+{
+  "groups": [
+    {
+      "name": "storage-gateway",
+      "type": "io.repsy.libs.storage.core.configs.StorageConfig",
+      "description": "Storage Gateway Configuration"
+    }
+  ],
+  "properties": [
+    {
+      "name": "storage-gateway.enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.repsy.libs.storage.core.configs.StorageConfig",
+      "description": "Enable or disable storage functionality",
+      "defaultValue": true
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+<section id="pgp-signature" class="mt-[-100px] pt-[100px]">
+  <!-- Header with Toggle -->
+  <div class="flex w-full items-center justify-between rounded-t-[12px] border border-[#404141] bg-[#101112] p-[24px]">
+    <div class="flex items-center gap-2">
+      <h3 class="font-medium text-[#FDFDFD]">
+        <a [routerLink]="[]" fragment="pgp-signature"> PGP Signature Key Stores </a>
+      </h3>
+    </div>
+  </div>
+  <!-- Body -->
+  <div class="w-full rounded-b-[12px] border-r border-b border-l border-[#404141] bg-[#101112] p-[24px]">
+    <p class="mb-6 text-[14px] text-[#9FA0A0]">Configure PGP Signature Key Store Server.</p>
+    <form
+      [formGroup]="keyStoreForm"
+      (submit)="keyStoreForm.markAllAsTouched(); keyStoreForm.valid && createKeyStore()"
+      class="flex items-center justify-between gap-2"
+    >
+      <div class="w-full">
+        <div class="flex w-full items-center gap-2">
+          <input
+            id="url"
+            formControlName="url"
+            placeholder="repsy.io"
+            type="text"
+            class="text-body1 min-h-[50px] w-full rounded-lg border border-neutral-400 bg-neutral-600 px-[20px] py-[12px] text-neutral-200 placeholder-neutral-400 focus:border-[#FDFDFD] focus:outline-none disabled:opacity-40"
+          />
+          <button
+            type="submit"
+            [disabled]="isSubmitting"
+            [ngClass]="{ 'pointer-events-none opacity-40': isSubmitting }"
+            class="flex h-[50px] min-w-[50px] items-center justify-center rounded-lg border border-neutral-400 font-bold text-white hover:border-[#FDFDFD] focus:border-[#FDFDFD] focus:outline-none"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M8 2V14M2 8H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+          </button>
+        </div>
+        <div class="text-body2 text-error min-h-7 pt-1">
+          @if (keyStoreForm.get('url')?.errors?.['required'] && keyStoreForm.get('url')?.touched) {
+            <p animate.enter="fade-in-up">• Should not be empty</p>
+          } @else if (keyStoreForm.get('url')?.errors?.['pattern'] && keyStoreForm.get('url')?.touched) {
+            <p animate.enter="fade-in-up">• Should be a valid domain</p>
+          }
+        </div>
+      </div>
+    </form>
+    <!-- Signature List -->
+    <div (scroll)="onScroll($event)" class="flex max-h-[460px] flex-col gap-2 overflow-y-auto">
+      @for (key of wellKnowns; track key) {
+        <div class="flex w-full min-w-0 justify-between gap-2 rounded-lg border border-neutral-400 px-[20px] py-[12px]">
+          <div class="text-secondary-700 flex w-full items-start gap-2">
+            {{ key }}
+          </div>
+        </div>
+      }
+
+      @for (keyStore of keyStores; track keyStore.uuid) {
+        <div class="flex min-w-0 justify-between gap-2">
+          <div
+            class="flex w-full min-w-0 justify-between gap-2 rounded-lg border border-neutral-400 px-[20px] py-[12px]"
+          >
+            <div class="text-secondary-500 flex w-full items-start gap-2">
+              {{ keyStore.url }}
+            </div>
+          </div>
+
+          <button
+            (click)="deleteKeyStore(keyStore.uuid)"
+            class="hover:text-error-500 flex h-[50px] min-w-[50px] flex-shrink-0 items-center justify-center rounded-lg border border-neutral-400 font-bold text-white"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 18 18"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              class="group-hover:fill-white"
+            >
+              <path
+                d="M17.3077 2.76833H14.0225C13.5249 2.76833 13.0846 2.45079 12.9277 1.98002L12.636 1.10404C12.4154 0.443114 11.7997 0 11.1037 0H6.89536C6.19936 0 5.58369 0.443095 5.36308 1.10494L5.0714 1.98002C4.91448 2.45171 4.47414 2.76923 3.9766 2.76923H0.692308C0.310154 2.76923 0 3.07938 0 3.46154C0 3.84369 0.310154 4.15385 0.692308 4.15385H1.89043L2.59846 14.7692C2.71938 16.5812 4.23601 18 6.05262 18H11.9483C13.764 18 15.2815 16.5803 15.4025 14.7692L16.1105 4.15385H17.3077C17.6898 4.15385 18 3.84369 18 3.46154C18 3.07938 17.6898 2.76833 17.3077 2.76833ZM6.67659 1.54158C6.70797 1.44742 6.79566 1.38371 6.89536 1.38371H11.1037C11.2034 1.38371 11.2911 1.44745 11.3225 1.54068L11.6142 2.41665C11.6548 2.5385 11.7055 2.65574 11.7628 2.76743H6.23538C6.29262 2.65482 6.3434 2.53853 6.38402 2.41576L6.67659 1.54158ZM14.0197 14.676C13.9477 15.7634 13.0375 16.6145 11.9474 16.6145H6.05172C4.96249 16.6145 4.05136 15.7634 3.97936 14.676L3.27787 4.15294H3.9766C4.07537 4.15294 4.17231 4.14092 4.26923 4.12985C4.308 4.13631 4.3431 4.15294 4.38371 4.15294H13.6145C13.6551 4.15294 13.6902 4.13631 13.7289 4.12985C13.8258 4.14092 13.9218 4.15294 14.0215 4.15294H14.7203L14.0197 14.676ZM11.5385 8.076V12.6914C11.5385 13.0735 11.2283 13.3837 10.8462 13.3837C10.464 13.3837 10.1538 13.0735 10.1538 12.6914V8.076C10.1538 7.69385 10.464 7.38369 10.8462 7.38369C11.2283 7.38369 11.5385 7.69385 11.5385 8.076ZM7.84615 8.076V12.6914C7.84615 13.0735 7.536 13.3837 7.15385 13.3837C6.77169 13.3837 6.46154 13.0735 6.46154 12.6914V8.076C6.46154 7.69385 6.77169 7.38369 7.15385 7.38369C7.536 7.38369 7.84615 7.69385 7.84615 8.076Z"
+                fill="currentColor"
+              />
+            </svg>
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+</section>

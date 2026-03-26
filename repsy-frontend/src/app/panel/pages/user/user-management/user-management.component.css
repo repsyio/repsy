@@ -1,0 +1,14 @@
+.badge-admin {
+  background-color: #7c3aed;
+  color: #ffffff;
+}
+
+.badge-user {
+  background-color: #3b82f6;
+  color: #ffffff;
+}
+
+.badge-default {
+  background-color: #6b7280;
+  color: #ffffff;
+}

@@ -1,0 +1,36 @@
+{
+  "groups": [
+    {
+      "name": "storage-gateway",
+      "type": "io.repsy.libs.storage.core.configs.StorageConfig",
+      "description": "Storage Configuration"
+    },
+    {
+      "name": "storage-gateway.fs",
+      "type": "io.repsy.libs.storage.gateway.filesystem.configs.FileSystemStorageConfig",
+      "sourceType": "io.repsy.libs.storage.gateway.filesystem.configs.FileSystemStorageConfig",
+      "description": "Storage Configuration for Storage Library"
+    }
+  ],
+  "properties": [
+    {
+      "name": "storage-gateway.enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.repsy.libs.storage.core.configs.StorageConfig",
+      "description": "Enable or disable Storage functionality",
+      "defaultValue": true
+    },
+    {
+      "name": "storage-gateway.fs.base-path",
+      "type": "java.lang.String",
+      "sourceType": "io.repsy.libs.storage.gateway.filesystem.configs.FileSystemStorageConfig",
+      "description": "Base Path"
+    },
+    {
+      "name": "storage-gateway.fs.trash-path",
+      "type": "java.lang.String",
+      "sourceType": "io.repsy.libs.storage.gateway.filesystem.configs.FileSystemStorageConfig",
+      "description": "Trash Path"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+@if (crumbs.length > 0) {
+  <nav class="mb-4 text-[14px]">
+    <ol class="flex items-center p-0">
+      @for (crumbLink of crumbLinks; track crumbLink; let i = $index; let last = $last) {
+        <li class="flex items-center">
+          <!-- Last breadcrumb item (No link) -->
+          @if (last) {
+            <span class="text-[#FDFDFD]">{{ crumbs[i] }}</span>
+          } @else {
+            <a class="text-[#9FA0A0] hover:text-[#FDFDFD]" [routerLink]="crumbLink">{{ crumbs[i] }}</a>
+          }
+
+          <!-- Separator Image -->
+          @if (i < crumbLinks.length - 1) {
+            <img
+              ngSrc="/assets/icons/cursor/breadcrumb-split.svg"
+              height="16"
+              width="16"
+              alt="Breadcrumb Split"
+              class="mx-2"
+            />
+          }
+        </li>
+      }
+    </ol>
+  </nav>
+}

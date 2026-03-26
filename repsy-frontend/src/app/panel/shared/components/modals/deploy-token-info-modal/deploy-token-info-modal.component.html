@@ -1,0 +1,74 @@
+<!-- Modal Backdrop -->
+@if (open) {
+  <button animate.enter="fade-in-up" class="bg-opacity-50 fixed inset-0 z-3 backdrop-blur-sm" (click)="closeModal()">
+    <div></div>
+  </button>
+
+  <!-- Modal Content -->
+  <div
+    class="fixed top-1/2 left-1/2 z-4 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-[#404141] bg-[#101112] p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px] lg:max-w-[882px]"
+  >
+    <div class="flex flex-col flex-col-reverse items-center justify-between sm:flex-row">
+      <h1 class="text-[24px] leading-6 text-white">Deploy Token Information</h1>
+      <button type="button" (click)="closeModal()" class="hover:text-secondary-500 text-neutral-200">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 15 15"
+          fill="none"
+          stroke="currentColor"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path d="M0.595215 14.4052L14.4047 0.595703" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M14.4047 14.4052L0.595215 0.595703" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="gradient-border mx-auto my-6 sm:my-10"></div>
+
+    <div class="flex items-center gap-2 pt-4 pb-6 text-sm">
+      <img ngSrc="/assets/icons/cursor/warning.svg" alt="danger" height="24" width="24" />
+      <span class="text-warning-500">You can only view repsy deploy token once, so be sure to save it.</span>
+    </div>
+
+    <div class="flex flex-col gap-8">
+      <!-- Username -->
+      <div>
+        <p class="mb-1 block text-[16px] text-[#9FA0A0]">Token Username</p>
+        <div class="flex h-[40px] items-center gap-2 rounded-lg border border-[#404141] bg-[#101112] px-4">
+          <span class="flex-1 truncate text-[14px] text-white">{{ tokenInfo.username }}</span>
+          <app-copy-clipboard [text]="tokenInfo.username" />
+        </div>
+      </div>
+
+      <!-- Token -->
+      <div>
+        <p class="mb-1 block text-[16px] text-[#9FA0A0]">Repsy Deploy Token</p>
+        <div class="flex h-[40px] items-center gap-2 rounded-lg border border-[#404141] bg-[#101112] px-4">
+          <input
+            [type]="showToken ? 'text' : 'password'"
+            [value]="tokenInfo.token"
+            readonly
+            class="flex-1 border-none bg-transparent pr-2 text-[14px] text-white outline-none select-all"
+            style="letter-spacing: 0.1em"
+          />
+
+          <div class="flex items-center justify-center gap-2">
+            <button type="button" class="text-neutral-400 hover:text-neutral-200" (click)="toggleShowToken()">
+              <i
+                id="password-toggle-icon"
+                class="fa-solid"
+                [ngClass]="{
+                  'fa-eye': showToken,
+                  'fa-eye-slash': !showToken,
+                }"
+              ></i>
+            </button>
+            <app-copy-clipboard [text]="tokenInfo.token" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,35 @@
+.container {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  gap: 10px;
+}
+
+.custom-toast {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  padding: 10px 15px;
+  font-weight: bold;
+
+  &.success {
+    background-color: #101d13;
+    border-color: #206a35;
+    color: #1eac52;
+  }
+
+  &.success svg {
+    stroke: #206a35;
+  }
+
+  &.error {
+    background-color: #211011;
+    border-color: #952e2e;
+    color: #db3f3f;
+  }
+
+  &.error svg {
+    fill: #952e2e;
+    stroke: #952e2e;
+  }
+}

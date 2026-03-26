@@ -1,0 +1,8 @@
+.gradient-border {
+  border: 1px solid;
+  border-image-source: linear-gradient(90deg, rgba(10, 10, 10, 0) 0%, #ffffff 50%, rgba(10, 10, 10, 0) 100%);
+  border-image-slice: 1;
+  width: 100%;
+  opacity: 0.8;
+  border-width: 1px 0 0 0;
+}

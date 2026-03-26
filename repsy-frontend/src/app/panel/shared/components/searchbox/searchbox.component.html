@@ -1,0 +1,18 @@
+<div
+  class="flex h-[40px] items-center gap-2 rounded-lg border border-[#404141] bg-[#101112] px-4 focus-within:border-[#FDFDFD]"
+>
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M14.1057 14.2L17 17M16.0667 9.53333C16.0667 13.1416 13.1416 16.0667 9.53333 16.0667C5.92507 16.0667 3 13.1416 3 9.53333C3 5.92507 5.92507 3 9.53333 3C13.1416 3 16.0667 5.92507 16.0667 9.53333Z"
+      stroke="#9FA0A0"
+      stroke-linecap="round"
+    />
+  </svg>
+
+  <input
+    type="text"
+    [placeholder]="placeholder"
+    (input)="onSearch($event)"
+    class="w-full bg-transparent text-[14px] text-white outline-none placeholder:text-[#9FA0A0]"
+  />
+</div>

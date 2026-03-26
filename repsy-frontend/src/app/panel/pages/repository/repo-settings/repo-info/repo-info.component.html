@@ -1,0 +1,80 @@
+<section id="repository-info" class="mt-[-100px] pt-[100px]">
+  <h3
+    class="w-full rounded-t-[12px] border border-[#e8546a] border-b-[#404141] bg-[#101112] p-[24px] font-medium text-[#FDFDFD]"
+  >
+    <a [routerLink]="[]" fragment="repository-info"> Repository Info </a>
+  </h3>
+  <div class="rounded-b-[12px] border-r border-b border-l border-[#e8546a] bg-[#101112] p-[24px]">
+    <p class="mb-[50px] text-sm text-[#FDFDFD]">
+      Changing repo name might your current projects set up. Do not forget to change settings of your projects and
+      settings.xml.
+    </p>
+    <div class="form-group">
+      <label for="name" class="mb-2 block text-sm text-[#9FA0A0]">New Repository Name</label>
+      <form [formGroup]="renameForm" (submit)="renameForm.valid && renameRepo()">
+        <div class="flex w-full flex-col gap-2 sm:w-2/3 sm:flex-row">
+          <input
+            type="text"
+            id="name"
+            formControlName="name"
+            required
+            placeholder="repository"
+            class="input-text-secondary w-full"
+          />
+          <button
+            type="submit"
+            [disabled]="loading || renameForm.get('name').value === activeRepository.repoName || renameForm.invalid"
+            class="repsy-btn-danger w-full sm:w-auto"
+          >
+            Rename
+          </button>
+        </div>
+        <div class="text-body2 text-error min-h-7 pt-1">
+          @if (renameForm.get('name').errors?.['required'] && renameForm.get('name').touched) {
+            <p animate.enter="fade-in-up">• Should not be empty</p>
+          } @else if (renameForm.get('name').errors?.['pattern'] && renameForm.get('name').touched) {
+            <p animate.enter="fade-in-up">• Should be maximum 25 characters</p>
+          } @else if (renameForm.get('name').errors?.['maxlength'] && renameForm.get('name').touched) {
+            <p animate.enter="fade-in-up">• Should contain only letters, numbers, - and _</p>
+          }
+        </div>
+      </form>
+    </div>
+    <div class="form-group">
+      <label for="description" class="mb-2 block text-sm text-[#9FA0A0]">Description</label>
+      <form [formGroup]="descriptionForm" (submit)="descriptionForm.valid && updateRepoDescription()">
+        <textarea
+          id="description"
+          formControlName="description"
+          placeholder="Enter description about your repository"
+          rows="5"
+          class="input-text-secondary w-full"
+        ></textarea>
+        <div class="text-body2 text-error min-h-7 pt-1">
+          @if (descriptionForm.get('description').errors?.['maxlength'] && descriptionForm.get('description').touched) {
+            <p animate.enter="fade-in-up">• Should be maximum 500 characters</p>
+          }
+        </div>
+        <div class="flex flex-col flex-col-reverse justify-end gap-2 sm:ml-auto sm:flex-row">
+          <button
+            type="button"
+            class="repsy-btn-secondary w-full sm:w-auto"
+            (click)="resetForms()"
+            [disabled]="
+              renameForm.get('name').value === activeRepository.repoName && descriptionForm.get('description').pristine
+            "
+          >
+            Reset
+          </button>
+          <button
+            type="submit"
+            [disabled]="loading || descriptionForm.pristine || descriptionForm.invalid"
+            class="repsy-btn-confirm w-full sm:w-auto"
+          >
+            Save
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,23 @@
+<app-panel-header />
+
+<main
+  class="flex min-h-screen w-full p-4 pt-[80px] sm:p-6 sm:pt-[90px] md:space-x-8 md:p-8 md:pt-[120px] lg:space-x-[75px] lg:p-[75px] lg:pt-[170px]"
+>
+  @if (isAuthenticated) {
+    <app-sidebar [isMobileMenuOpen]="isMobileMenuOpen" (closeModal)="closeMobileMenu()" />
+  }
+
+  <div
+    class="mx-auto h-full min-h-[775px] w-full overflow-hidden"
+    [ngClass]="{
+      'max-w-[1025px]': isAuthenticated,
+      'max-w-[1400px]': !isAuthenticated,
+    }"
+  >
+    @if (!loading) {
+      <router-outlet />
+    }
+  </div>
+</main>
+
+<app-footer />

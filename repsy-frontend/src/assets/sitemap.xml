@@ -1,0 +1,27 @@
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+  <url>
+    <loc>https://repsy.io/</loc>
+  </url>
+  <url>
+    <loc>https://repsy.io/docker</loc>
+  </url>
+  <url>
+    <loc>https://repsy.io/maven</loc>
+  </url>
+  <url>
+    <loc>https://repsy.io/npm</loc>
+  </url>
+  <url>
+    <loc>https://repsy.io/pypi</loc>
+  </url>
+  <url>
+    <loc>https://repsy.io/privacy-policy</loc>
+  </url>
+  <url>
+    <loc>https://repsy.io/terms-and-conditions</loc>
+  </url>
+  <url>
+    <loc>https://repsy.io/security-and-compliance</loc>
+  </url>
+</urlset>

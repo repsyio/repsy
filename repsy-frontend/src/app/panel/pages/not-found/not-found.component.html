@@ -1,0 +1,24 @@
+<div animate.enter="fade-in-up" class="flex min-h-[600px] items-center justify-center px-4 py-8">
+  <div class="text-center">
+    <!-- Hippo Image -->
+    <img class="mx-auto mb-8" ngSrc="/assets/images/hippo-empty.svg" alt="Page not found" height="243" width="510" />
+
+    <!-- 404 Text -->
+    <h1 class="mb-4 text-[48px] font-bold text-[#FDFDFD] sm:text-[64px]">404</h1>
+
+    <!-- Error Message -->
+    <p class="mb-8 max-w-[600px] text-[16px] text-[#9FA0A0] sm:text-[20px]">
+      {{ message }}
+    </p>
+
+    <!-- Action Buttons -->
+    <div class="flex flex-col items-center justify-center gap-4 sm:flex-row">
+      <a
+        routerLink="/"
+        class="flex h-[40px] w-full items-center justify-center gap-2 rounded-[8px] border border-[#404141] bg-transparent px-6 text-[14px] font-bold text-[#FDFDFD] transition-all hover:border-[#FDFDFD] hover:bg-[#1D1C1C] sm:w-auto"
+      >
+        Go to Home
+      </a>
+    </div>
+  </div>
+</div>

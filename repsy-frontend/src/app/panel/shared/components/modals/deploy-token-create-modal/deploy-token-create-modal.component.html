@@ -1,0 +1,136 @@
+<!-- Modal Backdrop -->
+@if (open) {
+  <button animate.enter="fade-in-up" class="bg-opacity-50 fixed inset-0 z-40 backdrop-blur-sm" (click)="closeModal()">
+    <div></div>
+  </button>
+
+  <!-- Modal Content -->
+  <div
+    class="fixed top-1/2 left-1/2 z-50 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-[#404141] bg-[#101112] p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px] lg:max-w-[882px]"
+  >
+    <!-- Header -->
+    <div class="flex justify-between">
+      <h1 class="text-[24px] leading-6 text-white">Create Deploy Token</h1>
+      <button (click)="closeModal()" class="hover:text-secondary-500 text-neutral-200">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 15 15"
+          fill="none"
+          stroke="currentColor"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path d="M0.595215 14.4052L14.4047 0.595703" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M14.4047 14.4052L0.595215 0.595703" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="gradient-border mx-auto my-6 sm:my-10"></div>
+
+    <form [formGroup]="form" class="flex flex-col gap-4" (submit)="form.valid && createToken()">
+      <div class="flex flex-col text-[#9FA0A0]">
+        <!-- Name Input -->
+
+        <div class="form-group w-full">
+          <label for="name">Name <span class="text-error">*</span></label>
+          <input
+            formControlName="name"
+            placeholder="Enter token name"
+            id="name"
+            required
+            type="text"
+            class="input-text-secondary w-full"
+          />
+          <div class="text-body2 text-error min-h-7 pt-1">
+            @if (form.get('name').errors?.['required'] && form.get('name').touched) {
+              <p animate.enter="fade-in-up">• Should not be empty</p>
+            } @else if (form.get('name').errors?.['minLength'] && form.get('name').touched) {
+              <p animate.enter="fade-in-up">• Should be minimum 1 characters</p>
+            } @else if (form.get('name').errors?.['maxlength'] && form.get('name').touched) {
+              <p animate.enter="fade-in-up">• Should be maximum 80 characters</p>
+            }
+          </div>
+        </div>
+
+        <!-- Username Input -->
+        <div class="form-group w-full">
+          <label for="username">Username</label>
+          <input
+            formControlName="username"
+            placeholder="Enter username"
+            id="username"
+            type="text"
+            class="input-text-secondary w-full"
+          />
+          <div class="text-body2 text-error min-h-7 pt-1">
+            @if (form.get('username').errors?.['minlength'] && form.get('username').touched) {
+              <p class="text-error" animate.enter="fade-in-up">• Username must be minimum 3 characters</p>
+            } @else if (form.get('username').errors?.['maxlength'] && form.get('username').touched) {
+              <p class="text-error" animate.enter="fade-in-up">• Username must be maximum 25 characters</p>
+            } @else if (form.get('username').errors?.['pattern'] && form.get('username').touched) {
+              <p class="text-error" animate.enter="fade-in-up">
+                • Username can contain only lowercase letters, digits, underscores and hyphens
+              </p>
+            }
+          </div>
+        </div>
+
+        <!-- Description Input -->
+        <div class="form-group w-full">
+          <label for="description">Description</label>
+          <textarea
+            id="description"
+            formControlName="description"
+            placeholder="Enter description about token"
+            class="input-text-secondary w-full"
+            rows="5"
+          ></textarea>
+          <div class="text-body2 text-error min-h-7 pt-1">
+            @if (form.get('description').errors?.['maxlength'] && form.get('description').touched) {
+              <p animate.enter="fade-in-up">• Should be maximum 500 characters</p>
+            }
+          </div>
+        </div>
+
+        <!-- ReadOnly Radio Buttons and Expiration Date -->
+        <div class="flex flex-col gap-4 sm:flex-row">
+          <div class="flex-1">
+            <div class="mb-2 block text-sm text-[#9FA0A0]">Access Type</div>
+            <app-radio-group
+              [options]="accessTypeOptions"
+              [selectedValue]="form.get('readOnly').value"
+              name="accessType"
+              (valueChange)="form.get('readOnly').setValue($event)"
+            />
+          </div>
+
+          <div class="flex-1">
+            <label for="expirationDate">Expiration Date</label>
+            <input
+              (click)="expirationDateInput.showPicker()"
+              #expirationDateInput
+              formControlName="expirationDate"
+              [min]="minDate"
+              [max]="maxDate"
+              id="expirationDate"
+              type="date"
+              class="h-[50px] w-full cursor-pointer rounded-lg border border-[#404141] bg-[#101112] bg-transparent px-4 text-[14px] text-white [color-scheme:dark] outline-none placeholder:text-[#9FA0A0] focus-within:border-[#FDFDFD]"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex gap-2 sm:ml-auto">
+        <button type="button" (click)="closeModal()" [disabled]="loading" class="repsy-btn-secondary w-full sm:w-auto">
+          Cancel
+        </button>
+
+        <button type="submit" [disabled]="form.invalid || loading" class="repsy-btn-confirm w-full sm:w-auto">
+          Create
+        </button>
+      </div>
+    </form>
+  </div>
+}

@@ -1,0 +1,51 @@
+<!-- Modal Backdrop -->
+@if (dangerModalService.modal) {
+  <button animate.enter="fade-in-up" class="bg-opacity-50 fixed inset-0 z-50 backdrop-blur-sm" (click)="onClose()">
+    <div></div>
+  </button>
+
+  <!-- Modal Content -->
+  <div
+    class="fixed top-1/2 left-1/2 z-50 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-[#404141] bg-[#101112] p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px] lg:max-w-[882px]"
+  >
+    <div class="flex items-center justify-between">
+      <h1 class="text-[20px] leading-6 text-white sm:text-[24px]">
+        {{ dangerModalService.modal.title }}
+      </h1>
+
+      <button type="button" (click)="onClose()" class="hover:text-secondary-500 text-neutral-200">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 15 15"
+          fill="none"
+          stroke="currentColor"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path d="M0.595215 14.4052L14.4047 0.595703" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M14.4047 14.4052L0.595215 0.595703" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="gradient-border mx-auto my-6 sm:my-10"></div>
+
+    <div class="text-[16px]">
+      <div class="text-[#9FA0A0]">Do you want to {{ dangerModalService.modal.title.toLocaleLowerCase() }}?</div>
+    </div>
+
+    @if (dangerModalService.modal.message !== null) {
+      <div class="mt-2 text-[13px]">
+        <div class="text-warning-500">{{ dangerModalService.modal.message }}</div>
+      </div>
+    }
+
+    <div class="mt-10 flex flex-col flex-col-reverse justify-end gap-2 sm:flex-row">
+      <button (click)="onClose()" class="repsy-btn-secondary w-full sm:w-auto">Cancel</button>
+
+      <button (click)="onClick()" class="repsy-btn-danger w-full sm:w-auto">
+        {{ dangerModalService.modal.action }}
+      </button>
+    </div>
+  </div>
+}

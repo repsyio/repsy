@@ -1,0 +1,22 @@
+<section id="delete-account" class="mt-[-100px] pt-[100px]">
+  <h3
+    class="w-full rounded-t-[12px] border border-[#e8546a] border-b-[#404141] bg-[#101112] p-[24px] font-medium text-[#FDFDFD]"
+  >
+    <a [routerLink]="[]" fragment="delete-account"> Delete Account </a>
+  </h3>
+
+  <div class="rounded-b-[12px] border-r border-b border-l border-[#e8546a] bg-[#101112] p-[24px]">
+    <p class="mb-[24px] text-[14px] leading-relaxed text-[#FDFDFD]">
+      This action cannot be undone. All your data will be permanently deleted.
+    </p>
+
+    <button
+      type="button"
+      (click)="confirmAccountDelete()"
+      [disabled]="loading"
+      class="repsy-btn-danger w-full sm:w-auto"
+    >
+      Delete
+    </button>
+  </div>
+</section>

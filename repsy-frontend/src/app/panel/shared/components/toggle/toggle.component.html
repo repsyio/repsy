@@ -1,0 +1,23 @@
+<div class="flex items-center gap-2">
+  <label
+    class="group relative inline-block h-[24px] w-[48px]"
+    [class.cursor-pointer]="!disabled"
+    [class.cursor-not-allowed]="disabled"
+  >
+    <input type="checkbox" class="peer sr-only" [checked]="checked" [disabled]="disabled" (click)="toggle()" />
+    <div
+      class="absolute inset-0 rounded-full transition-colors duration-300 ease-in-out"
+      [class.bg-[#404141]]="!checked"
+      [class.bg-secondaryBrand-600]="checked"
+      [class.group-hover:ring-2]="!disabled"
+      [class.group-hover:ring-[#9FA0A0]]="!disabled"
+    ></div>
+    <div
+      class="absolute top-[4px] left-[6px] h-[16px] w-[16px] rounded-full bg-white transition-transform duration-300 ease-in-out"
+      [class.translate-x-5]="checked"
+    ></div>
+  </label>
+  <span class="font-['Comfortaa'] leading-6 text-[#9FA0A0]">
+    {{ staticLabel ? staticLabel : checked ? checkedLabel : uncheckedLabel }}
+  </span>
+</div>
