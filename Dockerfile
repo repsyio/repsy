@@ -97,10 +97,10 @@ WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY repsy/repsy-os/repsy-os-frontend/package.json repsy/repsy-os/repsy-os-frontend/pnpm-lock.yaml ./
+COPY repsy/repsy-os/repsy-frontend/package.json repsy/repsy-os/repsy-frontend/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
-COPY repsy/repsy-os/repsy-os-frontend/ .
+COPY repsy/repsy-os/repsy-frontend/ .
 RUN pnpm run build:prod
 
 # ─────────────────────────────────────────
@@ -119,16 +119,16 @@ COPY --from=protocols-build /root/.m2 /root/.m2
 
 COPY core/core-parent/pom.xml ./core/core-parent/pom.xml
 COPY repsy/repsy-os/pom.xml ./repsy/repsy-os/pom.xml
-COPY repsy/repsy-os/repsy-os-backend/pom.xml ./repsy/repsy-os/repsy-os-backend/pom.xml
+COPY repsy/repsy-os/repsy-backend/pom.xml ./repsy/repsy-os/repsy-backend/pom.xml
 
-RUN mvn -f ./repsy/repsy-os/repsy-os-backend/pom.xml dependency:go-offline -Dcheckstyle.skip=true -Dfmt.skip=true -B
+RUN mvn -f ./repsy/repsy-os/repsy-backend/pom.xml dependency:go-offline -Dcheckstyle.skip=true -Dfmt.skip=true -B
 
-COPY repsy/repsy-os/repsy-os-backend/src ./repsy/repsy-os/repsy-os-backend/src
+COPY repsy/repsy-os/repsy-backend/src ./repsy/repsy-os/repsy-backend/src
 
 COPY --from=frontend-build /app/dist/panel-frontend/browser \
-     ./repsy/repsy-os/repsy-os-backend/src/main/resources/static
+     ./repsy/repsy-os/repsy-backend/src/main/resources/static
 
-RUN mvn -f ./repsy/repsy-os/repsy-os-backend/pom.xml package -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B
+RUN mvn -f ./repsy/repsy-os/repsy-backend/pom.xml package -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B
 
 # ─────────────────────────────────────────
 # Stage 6: Runtime
@@ -143,7 +143,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
 USER appuser
 
 COPY --from=backend-build \
-     /app/repsy/repsy-os/repsy-os-backend/target/repsy-os-backend.jar \
+     /app/repsy/repsy-os/repsy-backend/target/repsy-backend.jar \
      app.jar
 
 COPY --from=frontend-build /app/dist/panel-frontend/browser ./static/
