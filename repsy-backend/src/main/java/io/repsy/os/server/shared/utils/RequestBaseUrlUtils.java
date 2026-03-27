@@ -17,10 +17,12 @@ package io.repsy.os.server.shared.utils;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.experimental.UtilityClass;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+@Slf4j
 @UtilityClass
 public class RequestBaseUrlUtils {
 
@@ -36,7 +38,8 @@ public class RequestBaseUrlUtils {
       if (requestAttributes instanceof final ServletRequestAttributes servletRequestAttributes) {
         return resolveBaseUrl(servletRequestAttributes.getRequest());
       }
-    } catch (final Exception ignored) {
+    } catch (final Exception e) {
+      log.debug("Could not resolve base URL from request context, falling back to empty string. Error: {}", e.getMessage());
     }
     return "";
   }
