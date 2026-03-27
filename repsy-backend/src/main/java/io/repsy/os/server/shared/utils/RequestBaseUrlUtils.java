@@ -39,7 +39,9 @@ public class RequestBaseUrlUtils {
         return resolveBaseUrl(servletRequestAttributes.getRequest());
       }
     } catch (final Exception e) {
-      log.debug("Could not resolve base URL from request context, falling back to empty string. Error: {}", e.getMessage());
+      log.debug(
+          "Could not resolve base URL from request context, falling back to empty string. Error: {}",
+          e.getMessage());
     }
     return "";
   }
