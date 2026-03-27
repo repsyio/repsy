@@ -97,7 +97,6 @@ docker run -d \
   -e DB_USERNAME=repsy \
   -e DB_PASSWORD=repsy123 \
   -e ADMIN_INITIAL_PASSWORD=YourSecurePassword123 \
-  -e REPO_BASE_URL=http://localhost:9090 \
   repo.repsy.io/repsy/os/repsy:26.03.0
 ```
 
@@ -178,7 +177,6 @@ Access at:
 | `DB_URL` | JDBC database URL. Defaults to embedded H2. | `jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE` |
 | `DB_USERNAME` | Database username | `repsy` |
 | `DB_PASSWORD` | Database password | `repsy123` |
-| `REPO_BASE_URL` | Public base URL for repository access | `http://localhost:9090` |
 | `STORAGE_BASE_PATH` | Base directory for artifact file storage. Set to a path inside `/app/data` (e.g. `/app/data/storage`) to persist artifacts with a single volume mount. | `~/.repsy` |
 | `JWT_SECRET` | JWT signing secret. If not set, a random 256-bit secret is generated at startup — all sessions are lost on restart. Set a stable value for production. | *(random)* |
 | `SERVER_PORT` | Repository operations port | `9090` |

@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.pypi.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacadeImpl;
+import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
 import io.repsy.protocols.pypi.protocol.handlers.AbstractPypiSimpleProtocolMethodHandler;
 import io.repsy.protocols.pypi.shared.utils.UriUtils;
@@ -26,30 +27,25 @@ import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
 @NullMarked
 public class PypiSimpleProtocolMethodHandler extends AbstractPypiSimpleProtocolMethodHandler<UUID> {
 
-  private final String repoBaseUrl;
-
   public PypiSimpleProtocolMethodHandler(
       @Qualifier("osPypiPathParser") final PathParser basePathParser,
-      @Value("${os.app.repo-base-url}") final String repoBaseUrl,
       final PypiProtocolFacadeImpl pypiProtocolFacade,
       final PypiProtocolProvider provider) {
 
     super(basePathParser, pypiProtocolFacade, provider);
-
-    this.repoBaseUrl = repoBaseUrl;
   }
 
   @Override
   protected @Nullable URI getNormalizedUri(
       final HttpServletRequest request, @Nullable final String packageName) {
 
-    return UriUtils.normalizedUri(request, packageName, this.repoBaseUrl);
+    return UriUtils.normalizedUri(
+        request, packageName, RequestBaseUrlUtils.resolveBaseUrl(request));
   }
 }

@@ -21,6 +21,7 @@ import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
+import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,7 +29,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -41,9 +41,6 @@ public class DockerHeaderPreProcessor extends ProtocolProcessor {
   private static final int PRIORITY = 50;
   private static final String AUTH_BEARER = "Bearer ";
   private static final String SKIP_HEADER_PRE_PROCESSOR_KEY = "skipHeaderPreProcessor";
-
-  @Value("${os.app.repo-base-url}")
-  private String repoBaseUrl;
 
   private final DockerProtocolProvider provider;
 
@@ -72,7 +69,7 @@ public class DockerHeaderPreProcessor extends ProtocolProcessor {
 
     final var responseRealm =
         "Bearer realm=\"%s/v2/token\",service=\"repsy\",scope=\"repository:*:pull\""
-            .formatted(this.repoBaseUrl);
+            .formatted(RequestBaseUrlUtils.resolveBaseUrl(request));
 
     final var result =
         ResponseEntity.status(HttpStatus.UNAUTHORIZED)

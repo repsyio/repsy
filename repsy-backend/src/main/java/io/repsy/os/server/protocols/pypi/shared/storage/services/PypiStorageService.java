@@ -17,13 +17,13 @@ package io.repsy.os.server.protocols.pypi.shared.storage.services;
 
 import freemarker.template.Configuration;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
 import io.repsy.protocols.pypi.shared.storage.services.AbstractPypiStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -31,9 +31,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Service
 @NullMarked
 public class PypiStorageService extends AbstractPypiStorageService<UUID> {
-
-  @Value("${os.app.repo-base-url}")
-  private String repoBaseUrl;
 
   public PypiStorageService(
       @Qualifier("osStorageStrategyPypi") final StorageStrategy storageStrategy,
@@ -45,7 +42,7 @@ public class PypiStorageService extends AbstractPypiStorageService<UUID> {
   @Override
   protected String buildRepoUri(final BaseRepoInfo<UUID> baseRepoInfo) {
 
-    return this.constructRepoBaseUri(baseRepoInfo.getName(), this.repoBaseUrl);
+    return this.constructRepoBaseUri(baseRepoInfo.getName(), RequestBaseUrlUtils.resolveBaseUrl());
   }
 
   private String constructRepoBaseUri(final String repoName, final String repoOrigin) {

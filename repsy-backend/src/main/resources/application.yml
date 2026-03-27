@@ -59,7 +59,6 @@ h2:
 os:
   app:
     schema: public
-    repo-base-url: ${REPO_BASE_URL:http://localhost:${server.port}}
     jwt-secret: ${JWT_SECRET:}
 
     storage:
