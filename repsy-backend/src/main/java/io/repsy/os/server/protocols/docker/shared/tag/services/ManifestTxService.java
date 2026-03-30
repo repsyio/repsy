@@ -617,8 +617,8 @@ public class ManifestTxService implements ManifestService<UUID> {
     final var allLayers = new HashSet<>(layers);
     allLayers.add(configLayer);
 
-    manifest.setLayers(allLayers);
     manifest.getLayers().clear();
+    manifest.getLayers().addAll(allLayers);
     manifest.setLastUpdatedAt(Instant.now());
     manifest.setDigest(tagForm.getManifestDigest());
     manifest.setMediaType(tagForm.getManifestInfo().getMediaType());
