@@ -13,28 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.shared.repo.dtos;
+package io.repsy.protocols.maven.protocol;
 
-import org.jspecify.annotations.NonNull;
+import io.repsy.libs.protocol.router.ProtocolProvider;
+import org.jspecify.annotations.NullMarked;
+import org.springframework.stereotype.Component;
 
-public enum RepoType {
-  MAVEN("mvn__"),
-  NPM("npm__"),
-  PYPI("pypi__"),
-  CARGO("cargo__"),
-  DOCKER("docker__");
+@Component
+@NullMarked
+public class CargoProtocolProvider extends ProtocolProvider {
 
-  private final @NonNull String prefix;
-
-  RepoType(final @NonNull String prefix) {
-    this.prefix = prefix;
-  }
-
-  public @NonNull String getPrefix() {
-    return this.prefix;
-  }
-
-  public @NonNull String withPrefix(final @NonNull String repoName) {
-    return this.prefix + repoName;
+  @Override
+  public String getProtocolType() {
+    return "cargo";
   }
 }
