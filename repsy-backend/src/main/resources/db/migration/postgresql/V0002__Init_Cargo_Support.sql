@@ -16,8 +16,6 @@ create table cargo_crate
     description     text,
     homepage        varchar(255),
     repository      varchar(255),
-    e_tag           varchar(64)  default ''::character varying not null,
-    last_updated    varchar(255) default ''::character varying not null,
     created_at      timestamp                                  not null,
     last_updated_at timestamp
 );
@@ -171,3 +169,10 @@ create table cargo_crate_category
 
 create unique index ux_cargo_crate_category__crate_id_category_id
     on cargo_crate_category (crate_id, category_id);
+
+alter table "repo"
+  drop constraint "ch_repo__type";
+
+alter table "repo"
+  add constraint "ch_repo__type"
+    check ("type" in ('MAVEN', 'NPM', 'PYPI', 'DOCKER', 'CARGO'));

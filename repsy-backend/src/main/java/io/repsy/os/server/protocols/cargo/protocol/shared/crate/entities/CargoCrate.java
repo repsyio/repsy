@@ -30,7 +30,8 @@ import org.jspecify.annotations.NonNull;
 @Table(name = "cargo_crate")
 @NoArgsConstructor
 @ToString(exclude = {"repo", "crateIndexes", "crateMetas", "authors", "keywords", "categories"})
-@EqualsAndHashCode(exclude = {"repo", "crateIndexes", "crateMetas", "authors", "keywords", "categories"})
+@EqualsAndHashCode(
+    exclude = {"repo", "crateIndexes", "crateMetas", "authors", "keywords", "categories"})
 public class CargoCrate {
 
   @Id
@@ -64,12 +65,6 @@ public class CargoCrate {
   @Column(name = "repository", length = 255)
   private String repository;
 
-  @Column(name = "e_tag", nullable = false, length = 64)
-  private String eTag;
-
-  @Column(name = "last_updated", nullable = false, length = 255)
-  private String lastUpdated;
-
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -84,22 +79,22 @@ public class CargoCrate {
 
   @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
   @JoinTable(
-    name = "cargo_crate_author",
-    joinColumns = @JoinColumn(name = "crate_id"),
-    inverseJoinColumns = @JoinColumn(name = "author_id"))
+      name = "cargo_crate_author",
+      joinColumns = @JoinColumn(name = "crate_id"),
+      inverseJoinColumns = @JoinColumn(name = "author_id"))
   private @NonNull Set<CargoAuthor> authors = new HashSet<>();
 
   @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
   @JoinTable(
-    name = "cargo_crate_keyword",
-    joinColumns = @JoinColumn(name = "crate_id"),
-    inverseJoinColumns = @JoinColumn(name = "keyword_id"))
+      name = "cargo_crate_keyword",
+      joinColumns = @JoinColumn(name = "crate_id"),
+      inverseJoinColumns = @JoinColumn(name = "keyword_id"))
   private @NonNull Set<CargoKeyword> keywords = new HashSet<>();
 
   @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
   @JoinTable(
-    name = "cargo_crate_category",
-    joinColumns = @JoinColumn(name = "crate_id"),
-    inverseJoinColumns = @JoinColumn(name = "category_id"))
+      name = "cargo_crate_category",
+      joinColumns = @JoinColumn(name = "crate_id"),
+      inverseJoinColumns = @JoinColumn(name = "category_id"))
   private @NonNull Set<CargoCategory> categories = new HashSet<>();
 }

@@ -8,6 +8,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
+import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -15,26 +16,31 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
-public abstract class AbstractCargoMeProtocolMethodHandler<ID> implements ProtocolMethodHandler {
+public abstract class AbstractCargoMeProtocolMethodHandler implements ProtocolMethodHandler {
 
   private static final String WWW_AUTHENTICATE_VALUE = "Basic realm=\"Repsy Managed Repository\"";
 
-  // private final CargoAuthService<ID> authService;
+  private final CargoAuthenticator authenticator;
 
   public AbstractCargoMeProtocolMethodHandler(
-      // final CargoAuthService<ID> authService,
-      final CargoProtocolProvider provider) {
-    // this.authService = authService;
-
+      final CargoAuthenticator authenticator, final CargoProtocolProvider provider) {
+    this.authenticator = authenticator;
     provider.registerMethodHandler(this);
   }
 
   protected abstract Optional<ProtocolContext> getProtocolContext(RelativePath relativePath);
+
+  @FunctionalInterface
+  public interface CargoAuthenticator {
+    String authenticateAndCreateToken(String authHeader);
+  }
 
   @Override
   public List<HttpMethod> getSupportedMethods() {
@@ -54,18 +60,16 @@ public abstract class AbstractCargoMeProtocolMethodHandler<ID> implements Protoc
   public PathParser getPathParser() {
     return request -> {
       final var method = HttpMethod.valueOf(request.getMethod());
-      if (!HttpMethod.GET.equals(method)) {
+
+      if (!HttpMethod.GET.equals(method) && !HttpMethod.HEAD.equals(method)) {
         return Optional.empty();
       }
 
-      final var path = request.getServletPath();
-      if (!"/me".equals(path)) {
+      if (!"/me".equals(request.getServletPath())) {
         return Optional.empty();
       }
 
-      final var relativePath = new RelativePath("/me");
-
-      return this.getProtocolContext(relativePath);
+      return this.getProtocolContext(new RelativePath("/me"));
     };
   }
 
@@ -73,29 +77,28 @@ public abstract class AbstractCargoMeProtocolMethodHandler<ID> implements Protoc
   public ResponseEntity<Object> handle(
       final ProtocolContext context,
       final HttpServletRequest request,
-      final HttpServletResponse response)
-      throws Exception {
+      final HttpServletResponse response) {
+
+    final var authHeader = request.getHeader(AUTHORIZATION);
+
+    if (authHeader == null) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+          .header(WWW_AUTHENTICATE, WWW_AUTHENTICATE_VALUE)
+          .build();
+    }
 
     try {
-      final var path = request.getServletPath();
-      final var authHeader = request.getHeader(AUTHORIZATION);
+      final var token = this.authenticator.authenticateAndCreateToken(authHeader);
 
-      if (authHeader == null) {
-        return this.buildUnauthorizedResponse();
-      }
+      return ResponseEntity.ok()
+          .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+          .body(Map.of("token", token));
 
-      final var cargoApiToken = "test_token";
-
-      return ResponseEntity.ok(Map.of("token", cargoApiToken));
-
-    } catch (final Exception _) {
-      return this.buildUnauthorizedResponse();
+    } catch (final Exception e) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+          .header(WWW_AUTHENTICATE, WWW_AUTHENTICATE_VALUE)
+          .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+          .body(CargoErrorResponse.of(e.getMessage()));
     }
-  }
-
-  private ResponseEntity<Object> buildUnauthorizedResponse() {
-    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-      .header(WWW_AUTHENTICATE, WWW_AUTHENTICATE_VALUE)
-      .build();
   }
 }

@@ -4,18 +4,40 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
+import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
+import io.repsy.protocols.cargo.protocol.facade.contract.CargoProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 
+@Slf4j
 @NullMarked
-public abstract class AbstractCargoPublishProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractCargoPublishProtocolMethodHandler<ID>
+    implements ProtocolMethodHandler {
 
-  public AbstractCargoPublishProtocolMethodHandler(final CargoProtocolProvider provider) {
+  private static final String PUBLISH_SUCCESS =
+      "{\"warnings\":{\"invalid_categories\":[],\"invalid_badges\":[],\"other\":[]}}";
+
+  private final PathParser basePathParser;
+  private final CargoProtocolFacade<ID> facade;
+
+  public AbstractCargoPublishProtocolMethodHandler(
+      final PathParser basePathParser,
+      final CargoProtocolFacade<ID> facade,
+      final CargoProtocolProvider provider) {
+    this.basePathParser = basePathParser;
+    this.facade = facade;
     provider.registerMethodHandler(this);
   }
 
@@ -26,25 +48,48 @@ public abstract class AbstractCargoPublishProtocolMethodHandler implements Proto
 
   @Override
   public Map<String, Object> getProperties() {
-
     return Map.of("permission", Permission.WRITE);
   }
 
   @Override
   public PathParser getPathParser() {
     return request -> {
-
       if (!HttpMethod.PUT.name().equals(request.getMethod())) {
         return Optional.empty();
       }
 
-      if (!request.getServletPath().endsWith("/api/v1/crates/new")) {
+      final var parsedPathOpt = this.basePathParser.parse(request);
+      if (parsedPathOpt.isEmpty()) {
+        log.warn("Cargo publish: basePathParser returned empty for {}", request.getServletPath());
         return Optional.empty();
       }
 
-      return this.getProtocolContext(request);
+      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
+
+      if (!relativePath.endsWith("/api/v1/crates/new")) {
+        return Optional.empty();
+      }
+
+      return parsedPathOpt;
     };
   }
 
-  protected abstract Optional<ProtocolContext> getProtocolContext(HttpServletRequest request);
+  @Override
+  public ResponseEntity<Object> handle(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
+
+    try {
+      this.facade.publish(context, request.getInputStream());
+      return ResponseEntity.ok()
+          .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+          .body(PUBLISH_SUCCESS);
+    } catch (final Exception e) {
+
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+          .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+          .body(CargoErrorResponse.of(e.getMessage()));
+    }
+  }
 }

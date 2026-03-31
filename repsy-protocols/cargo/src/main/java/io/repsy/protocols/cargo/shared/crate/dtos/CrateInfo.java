@@ -18,5 +18,4 @@ public record CrateInfo(
     @Nullable String repository,
     List<String> authors,
     List<String> keywords,
-    List<String> categories
-) {}
+    List<String> categories) {}

@@ -31,6 +31,4 @@ public interface CargoCrateService<ID> {
   CrateVersionInfo getCrateVersion(BaseRepoInfo<ID> repoInfo, String name, String vers);
 
   Page<CrateListItem> search(BaseRepoInfo<ID> repoInfo, String query, Pageable pageable);
-
-  CrateIndexEntry getIndexEntry(BaseRepoInfo<ID> repoInfo, String name, String vers);
 }

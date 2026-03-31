@@ -1,24 +1,17 @@
 create table cargo_crate
 (
-    id              uuid                 not null
+    id              uuid         not null
         constraint pk_cargo_crate
             primary key,
-    repo_id         bigint               not null
-        constraint fk_cargo_crate__repo_id
-            references "repo"
-            on delete cascade
-        constraint ch_cargo_crate__repo_id
-            check (repo_id > 0),
-    name            varchar(64)          not null,
-    original_name   varchar(64)          default '' not null,
-    max_version     varchar(64)          default '' not null,
-    total_downloads bigint               default 0  not null,
+    repo_id         uuid         not null,
+    name            varchar(64)  not null,
+    original_name   varchar(64)  default '' not null,
+    max_version     varchar(64)  default '' not null,
+    total_downloads bigint       default 0  not null,
     description     clob,
     homepage        varchar(255),
     repository      varchar(255),
-    e_tag           varchar(64)          default '' not null,
-    last_updated    varchar(255)         default '' not null,
-    created_at      timestamp            not null,
+    created_at      timestamp    not null,
     last_updated_at timestamp
 );
 
@@ -31,22 +24,22 @@ create index ix_cargo_crate__repo_id
 
 create table cargo_crate_index
 (
-    id           uuid                 not null
+    id           uuid                  not null
         constraint pk_cargo_crate_index
             primary key,
-    crate_id     uuid                 not null
+    crate_id     uuid                  not null
         constraint fk_cargo_crate_index__crate_id
             references cargo_crate
             on delete cascade,
-    name         varchar(255)         not null,
-    vers         varchar(64)          not null,
+    name         varchar(255)          not null,
+    vers         varchar(64)           not null,
     deps         clob,
-    cksum        varchar(255)         not null,
+    cksum        varchar(255)          not null,
     features     clob,
     features2    clob,
-    yanked       boolean              default false not null,
+    yanked       boolean default false not null,
     links        varchar(255),
-    v            integer              default 1     not null,
+    v            integer default 1     not null,
     rust_version varchar(20)
 );
 
@@ -62,22 +55,22 @@ create index ix_cargo_crate_index__name
 
 create table cargo_crate_meta
 (
-    id            uuid         not null
+    id            uuid             not null
         constraint pk_cargo_crate_meta
             primary key,
-    crate_id      uuid         not null
+    crate_id      uuid             not null
         constraint fk_cargo_crate_meta__crate_id
             references cargo_crate
             on delete cascade,
-    version       varchar(64)  not null,
+    version       varchar(64)      not null,
     readme        clob,
     license       varchar(255),
     license_file  varchar(255),
     documentation varchar(255),
     edition       varchar(10),
     rust_version  varchar(20),
-    downloads     bigint       default 0 not null,
-    created_at    timestamp    not null
+    downloads     bigint default 0 not null,
+    created_at    timestamp        not null
 );
 
 create unique index ux_cargo_crate_meta__crate_id_version
@@ -99,7 +92,7 @@ create table cargo_author
 
 create table cargo_keyword
 (
-    id      uuid        not null
+    id      uuid         not null
         constraint pk_cargo_keyword
             primary key,
     keyword varchar(100) not null
@@ -172,3 +165,10 @@ create table cargo_crate_category
 
 create unique index ux_cargo_crate_category__crate_id_category_id
     on cargo_crate_category (crate_id, category_id);
+
+alter table "repo"
+drop constraint "ch_repo__type";
+
+alter table "repo"
+    add constraint "ch_repo__type"
+        check ("type" in ('MAVEN', 'NPM', 'PYPI', 'DOCKER', 'CARGO'));

@@ -6,7 +6,4 @@ import org.jspecify.annotations.Nullable;
 
 @NullMarked
 public record CrateListItem(
-    String name,
-    @JsonProperty("max_version") String maxVersion,
-    @Nullable String description
-) {}
+    String name, @JsonProperty("max_version") String maxVersion, @Nullable String description) {}

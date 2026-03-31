@@ -1,0 +1,247 @@
+package io.repsy.os.server.protocols.cargo.ui.controllers;
+
+import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+
+import io.repsy.core.response.dtos.RestResponse;
+import io.repsy.core.response.services.RestResponseFactory;
+import io.repsy.libs.multiport.annotations.RestApiPort;
+import io.repsy.os.server.protocols.cargo.protocol.shared.auth.services.CargoAuthComponent;
+import io.repsy.os.server.protocols.cargo.ui.facades.CargoApiFacade;
+import io.repsy.os.shared.repo.dtos.RepoCreateForm;
+import io.repsy.os.shared.repo.dtos.RepoDescriptionForm;
+import io.repsy.os.shared.repo.dtos.RepoListInfo;
+import io.repsy.os.shared.repo.dtos.RepoRenameForm;
+import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
+import io.repsy.os.shared.repo.dtos.RepoSettingsInfo;
+import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.os.shared.usage.dtos.RepoUsageInfo;
+import io.repsy.os.shared.usage.services.UsageService;
+import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateInfo;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
+import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
+import jakarta.validation.Valid;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestApiPort(MultiPortNames.PORT_API)
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/cargo/repo")
+@NullMarked
+public class CargoRepoController {
+
+  private final CargoAuthComponent cargoAuthComponent;
+  private final RepoTxService repoTxService;
+  private final UsageService usageService;
+  private final CargoApiFacade cargoApiFacade;
+  private final RestResponseFactory responseFactory;
+
+  @PostMapping
+  public RestResponse<Void> createRepo(
+      @RequestHeader(AUTHORIZATION) final String authHeader,
+      @RequestBody @Valid final RepoCreateForm form) {
+
+    this.cargoAuthComponent.authenticateAndCreateToken(authHeader);
+
+    final var repoInfo =
+        this.repoTxService.createRepo(
+            form.getName(), RepoType.CARGO, form.isPrivateRepo(), form.getDescription());
+
+    this.cargoApiFacade.createRepo(repoInfo.getStorageKey());
+
+    return this.responseFactory.success("repoCreated");
+  }
+
+  @DeleteMapping("/{repoName}")
+  public RestResponse<Void> deleteRepo(
+      @RequestHeader(AUTHORIZATION) final String authHeader, @PathVariable final String repoName) {
+
+    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
+
+    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.MANAGE);
+
+    this.cargoApiFacade.deleteRepo(repoInfo);
+
+    return this.responseFactory.success("repoDeleted");
+  }
+
+  @GetMapping
+  public RestResponse<List<RepoListInfo>> getRepos(
+      @RequestHeader(AUTHORIZATION) final String authHeader) {
+
+    final var repos = this.repoTxService.findAllByRepoType(RepoType.CARGO);
+
+    return this.responseFactory.success("reposFetched", repos);
+  }
+
+  @GetMapping("/{repoName}/settings")
+  public RestResponse<RepoSettingsInfo> getSettings(
+      @RequestHeader(AUTHORIZATION) final String authHeader, @PathVariable final String repoName) {
+
+    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
+
+    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.MANAGE);
+
+    final var settings = this.cargoApiFacade.getSettings(repoInfo);
+
+    return this.responseFactory.success("settingsFetched", settings);
+  }
+
+  @GetMapping("/{repoName}/usage")
+  public RestResponse<RepoUsageInfo> getUsage(
+      @RequestHeader(AUTHORIZATION) final String authHeader, @PathVariable final String repoName) {
+
+    final var usageInfo = this.usageService.getRepoUsageInfo(repoName, RepoType.CARGO);
+
+    return this.responseFactory.success("usageFetched", usageInfo);
+  }
+
+  @GetMapping("/count")
+  public RestResponse<Long> getRepoCount(@RequestHeader(AUTHORIZATION) final String authHeader) {
+
+    final var repoCount = this.repoTxService.getRepoCount(RepoType.CARGO);
+
+    return this.responseFactory.success("repoCountFetched", repoCount);
+  }
+
+  @PatchMapping("/{repoName}/name")
+  public RestResponse<Void> renameRepo(
+      @RequestHeader(AUTHORIZATION) final String authHeader,
+      @PathVariable final String repoName,
+      @RequestBody @Valid final RepoRenameForm form) {
+
+    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
+
+    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.MANAGE);
+
+    this.repoTxService.renameRepo(repoInfo.getName(), form.getName(), RepoType.CARGO);
+
+    return this.responseFactory.success("repoNameUpdated");
+  }
+
+  @PatchMapping("/{repoName}/description")
+  public RestResponse<Void> updateRepoDescription(
+      @RequestHeader(AUTHORIZATION) final String authHeader,
+      @PathVariable final String repoName,
+      @RequestBody @Valid final RepoDescriptionForm form) {
+
+    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
+
+    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.MANAGE);
+
+    this.repoTxService.updateDescription(repoInfo.getStorageKey(), form.getDescription());
+
+    return this.responseFactory.success("repoDescriptionUpdated");
+  }
+
+  @PutMapping("/{repoName}/settings")
+  public RestResponse<Void> updateSettings(
+      @RequestHeader(AUTHORIZATION) final String authHeader,
+      @PathVariable final String repoName,
+      @RequestBody final RepoSettingsForm form) {
+
+    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
+
+    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.MANAGE);
+
+    this.cargoApiFacade.updateSettings(repoInfo, form);
+
+    return this.responseFactory.success("settingsUpdated");
+  }
+
+  @GetMapping("/{repoName}/crates")
+  public RestResponse<Page<CrateListItem>> searchCrates(
+      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
+      @PathVariable final String repoName,
+      @RequestParam(defaultValue = "") final String query,
+      final Pageable pageable) {
+
+    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
+
+    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.READ);
+
+    final var crates = this.cargoApiFacade.search(repoInfo, query, pageable);
+
+    return this.responseFactory.success("cratesFetched", crates);
+  }
+
+  @GetMapping("/{repoName}/crates/{name}")
+  public RestResponse<CrateInfo> getCrate(
+      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
+      @PathVariable final String repoName,
+      @PathVariable final String name) {
+
+    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
+
+    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.READ);
+
+    final var crate = this.cargoApiFacade.getCrate(repoInfo, name);
+
+    return this.responseFactory.success("crateFetched", crate);
+  }
+
+  @GetMapping("/{repoName}/crates/{name}/{vers}")
+  public RestResponse<CrateVersionInfo> getCrateVersion(
+      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
+      @PathVariable final String repoName,
+      @PathVariable final String name,
+      @PathVariable final String vers) {
+
+    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
+
+    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.READ);
+
+    final var version = this.cargoApiFacade.getCrateVersion(repoInfo, name, vers);
+
+    return this.responseFactory.success("crateVersionFetched", version);
+  }
+
+  @DeleteMapping("/{repoName}/crates/{name}")
+  public RestResponse<Void> deleteCrate(
+      @RequestHeader(AUTHORIZATION) final String authHeader,
+      @PathVariable final String repoName,
+      @PathVariable final String name) {
+
+    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
+
+    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.MANAGE);
+
+    this.cargoApiFacade.deleteCrate(repoInfo, name);
+
+    return this.responseFactory.success("crateDeleted");
+  }
+
+  @DeleteMapping("/{repoName}/crates/{name}/{vers}")
+  public RestResponse<Void> deleteCrateVersion(
+      @RequestHeader(AUTHORIZATION) final String authHeader,
+      @PathVariable final String repoName,
+      @PathVariable final String name,
+      @PathVariable final String vers) {
+
+    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
+
+    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.MANAGE);
+
+    this.cargoApiFacade.deleteCrateVersion(repoInfo, name, vers);
+
+    return this.responseFactory.success("crateVersionDeleted");
+  }
+}

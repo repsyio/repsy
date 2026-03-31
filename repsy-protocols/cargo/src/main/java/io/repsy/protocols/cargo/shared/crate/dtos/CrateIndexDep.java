@@ -17,5 +17,4 @@ public record CrateIndexDep(
     @Nullable String target,
     String kind,
     @Nullable String registry,
-    @JsonProperty("package") @Nullable String packageName
-) {}
+    @JsonProperty("package") @Nullable String packageName) {}

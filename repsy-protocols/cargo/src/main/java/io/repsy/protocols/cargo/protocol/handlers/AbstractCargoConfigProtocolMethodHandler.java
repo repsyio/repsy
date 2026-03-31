@@ -18,6 +18,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @NullMarked
 public abstract class AbstractCargoConfigProtocolMethodHandler implements ProtocolMethodHandler {
@@ -63,32 +64,38 @@ public abstract class AbstractCargoConfigProtocolMethodHandler implements Protoc
 
     try {
       final var path = request.getServletPath();
-      final var baseUrl = path.substring(0, path.lastIndexOf("/config.json"));
+      final var basePath = path.substring(0, path.lastIndexOf("/config.json"));
+      final var baseUrl =
+          ServletUriComponentsBuilder.fromCurrentContextPath().path(basePath).toUriString();
 
-      final var jsonConfig = String.format("""
+      final var jsonConfig =
+          String.format(
+              """
           {
             "dl": "%s/api/v1/crates/{crate}/{version}/download",
-            "api": "%s"
+            "api": "%s",
+            "auth_required": false
           }
-          """, baseUrl, baseUrl);
+          """,
+              baseUrl, baseUrl);
 
       return ResponseEntity.ok()
-        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-        .body(jsonConfig);
+          .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+          .body(jsonConfig);
 
     } catch (final Exception e) {
-      return buildCargoErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
+      return this.buildCargoErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
     }
   }
 
-  protected ResponseEntity<Object> buildCargoErrorResponse(
-    final HttpStatus status, final String detail) {
+  private ResponseEntity<Object> buildCargoErrorResponse(
+      final HttpStatus status, final String detail) {
     return ResponseEntity.status(status)
-      .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-      .body(CargoErrorResponse.of(detail));
+        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+        .body(CargoErrorResponse.of(detail));
   }
 
   protected ResponseEntity<Object> buildNotFoundErrorResponse(final String resourceName) {
-    return buildCargoErrorResponse(HttpStatus.NOT_FOUND, resourceName + " not found");
+    return this.buildCargoErrorResponse(HttpStatus.NOT_FOUND, resourceName + " not found");
   }
 }

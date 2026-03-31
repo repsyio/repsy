@@ -4,18 +4,36 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
+import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
+import io.repsy.protocols.cargo.protocol.facade.contract.CargoProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 
 @NullMarked
-public abstract class AbstractCargoSearchProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractCargoSearchProtocolMethodHandler<ID>
+    implements ProtocolMethodHandler {
 
-  public AbstractCargoSearchProtocolMethodHandler(final CargoProtocolProvider provider) {
+  private final PathParser basePathParser;
+  private final CargoProtocolFacade<ID> facade;
+
+  public AbstractCargoSearchProtocolMethodHandler(
+      final PathParser basePathParser,
+      final CargoProtocolFacade<ID> facade,
+      final CargoProtocolProvider provider) {
+    this.basePathParser = basePathParser;
+    this.facade = facade;
     provider.registerMethodHandler(this);
   }
 
@@ -32,15 +50,49 @@ public abstract class AbstractCargoSearchProtocolMethodHandler implements Protoc
   @Override
   public PathParser getPathParser() {
     return request -> {
-      if (!HttpMethod.GET.name().equals(request.getMethod())) return Optional.empty();
-
-      if (!request.getServletPath().endsWith("/api/v1/crates")) {
+      if (!HttpMethod.GET.name().equals(request.getMethod())) {
         return Optional.empty();
       }
 
-      return this.getProtocolContext(request);
+      final var parsedPathOpt = this.basePathParser.parse(request);
+      if (parsedPathOpt.isEmpty()) {
+        return Optional.empty();
+      }
+
+      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
+
+      if (!relativePath.endsWith("/api/v1/crates")) {
+        return Optional.empty();
+      }
+
+      return parsedPathOpt;
     };
   }
 
-  protected abstract Optional<ProtocolContext> getProtocolContext(HttpServletRequest request);
+  @Override
+  public ResponseEntity<Object> handle(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
+
+    try {
+      final var query = request.getParameter("q");
+      final var perPage =
+          Optional.ofNullable(request.getParameter("per_page")).map(Integer::parseInt).orElse(10);
+
+      final var pageable = Pageable.ofSize(Math.min(perPage, 100));
+      final var result = this.facade.search(context, query != null ? query : "", pageable);
+
+      return ResponseEntity.ok()
+          .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+          .body(
+              Map.of(
+                  "crates", result.getContent(),
+                  "meta", Map.of("total", result.getTotalElements())));
+    } catch (final Exception e) {
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+          .body(CargoErrorResponse.of(e.getMessage()));
+    }
+  }
 }

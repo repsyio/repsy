@@ -21,9 +21,9 @@ public class SemverComparator implements Comparator<String> {
   private String[] splitPreRelease(final String version) {
     final var idx = version.indexOf('-');
     if (idx == -1) {
-      return new String[]{version, ""};
+      return new String[] {version, ""};
     }
-    return new String[]{version.substring(0, idx), version.substring(idx + 1)};
+    return new String[] {version.substring(0, idx), version.substring(idx + 1)};
   }
 
   private int compareCore(final String core1, final String core2) {

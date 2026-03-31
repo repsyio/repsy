@@ -1,12 +1,12 @@
 package io.repsy.protocols.cargo.protocol.facade;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.cargo.protocol.facade.contract.CargoProtocolFacade;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
+import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
@@ -24,12 +24,14 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import tools.jackson.databind.ObjectMapper;
 
 @RequiredArgsConstructor
 @NullMarked
@@ -38,7 +40,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   private static final String USAGES = "usages";
   private static final String SHA256 = "SHA-256";
 
-  private final CargoStorageService<ID> cargoStorageService;
+  private final CargoStorageService cargoStorageService;
   private final CargoCrateService<ID> cargoCrateService;
   private final ObjectMapper objectMapper;
 
@@ -46,13 +48,13 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   public List<CrateIndexEntry> getIndexEntries(final ProtocolContext context) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var crateName = extractCrateNameFromIndexPath(context);
     final var repoId = (UUID) repoInfo.getStorageKey();
+    final var crateName = extractLastSegment(context);
 
-    final var indexResource = this.cargoStorageService.getIndex(
-      repoId, repoInfo.getName(), crateName);
+    final var indexResource =
+        this.cargoStorageService.getIndex(repoId, repoInfo.getName(), crateName);
 
-    return parseIndexResource(indexResource);
+    return this.parseIndexResource(indexResource);
   }
 
   @Override
@@ -60,8 +62,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var repoId = (UUID) repoInfo.getStorageKey();
-    final var path = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var segments = path.split("/");
+    final var segments = splitPath(context);
     final var crateName = segments[segments.length - 3];
     final var versionName = segments[segments.length - 2];
 
@@ -70,10 +71,10 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
 
   @Override
   public void publish(final ProtocolContext context, final InputStream inputStream)
-    throws IOException {
+      throws IOException {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var repoId = (UUID) repoInfo.getStorageKey();
+    final var repoId = repoInfo.getStorageKey();
 
     final var jsonLength = readU32LittleEndian(inputStream);
     final var jsonBytes = inputStream.readNBytes((int) jsonLength);
@@ -81,43 +82,40 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
 
     final var crateLength = readU32LittleEndian(inputStream);
     final var crateBytes = inputStream.readNBytes((int) crateLength);
-    final var cksum = computeSha256(crateBytes);
+    final var checksum = computeSha256(crateBytes);
 
     final var crateName = request.name().toLowerCase().replace('-', '_');
 
-    final var requestWithCksum = new CratePublishRequest(
-      request.name(),
-      request.vers(),
-      request.deps(),
-      request.features(),
-      request.authors(),
-      request.description(),
-      request.documentation(),
-      request.homepage(),
-      request.readme(),
-      request.readmeFile(),
-      request.keywords(),
-      request.categories(),
-      request.license(),
-      request.licenseFile(),
-      request.repository(),
-      request.links(),
-      request.rustVersion(),
-      cksum,
-      request.features2());
+    final var requestWithChecksum =
+        new CratePublishRequest(
+            request.name(),
+            request.vers(),
+            request.deps(),
+            request.features(),
+            request.authors(),
+            request.description(),
+            request.documentation(),
+            request.homepage(),
+            request.readme(),
+            request.readmeFile(),
+            request.keywords(),
+            request.categories(),
+            request.license(),
+            request.licenseFile(),
+            request.repository(),
+            request.links(),
+            request.rustVersion(),
+            checksum,
+            request.features2());
 
-    this.cargoCrateService.publish(repoInfo, requestWithCksum);
+    this.cargoCrateService.publish(repoInfo, requestWithChecksum);
 
-    final var indexEntry = this.cargoCrateService.getIndexEntry(repoInfo, crateName, request.vers());
+    final var indexEntry = buildIndexEntry(requestWithChecksum);
     final var indexJsonLine = this.objectMapper.writeValueAsString(indexEntry);
 
-    final var usages = this.cargoStorageService.writeCrateAndIndex(
-      repoId,
-      repoInfo.getName(),
-      crateName,
-      request.vers(),
-      crateBytes,
-      indexJsonLine);
+    final var usages =
+        this.cargoStorageService.writeCrateAndIndex(
+            repoId, repoInfo.getName(), crateName, request.vers(), crateBytes, indexJsonLine);
 
     context.addProperty(USAGES, usages);
   }
@@ -126,25 +124,27 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   public void yank(final ProtocolContext context) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var name = extractCrateNameFromYankPath(context);
-    final var vers = extractVersionFromYankPath(context);
+    final var segments = splitPath(context);
+    final var crateName = segments[segments.length - 3];
+    final var vers = segments[segments.length - 2];
 
-    this.cargoCrateService.yank(repoInfo, name, vers);
+    this.cargoCrateService.yank(repoInfo, crateName, vers);
   }
 
   @Override
   public void unyank(final ProtocolContext context) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var name = extractCrateNameFromYankPath(context);
-    final var vers = extractVersionFromYankPath(context);
+    final var segments = splitPath(context);
+    final var crateName = segments[segments.length - 3];
+    final var vers = segments[segments.length - 2];
 
-    this.cargoCrateService.unyank(repoInfo, name, vers);
+    this.cargoCrateService.unyank(repoInfo, crateName, vers);
   }
 
   @Override
   public Page<CrateListItem> search(
-    final ProtocolContext context, final String query, final Pageable pageable) {
+      final ProtocolContext context, final String query, final Pageable pageable) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
@@ -155,7 +155,8 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   public CrateInfo getCrate(final ProtocolContext context) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var name = extractCrateNameFromApiPath(context);
+    final var segments = splitPath(context);
+    final var name = segments[segments.length - 1];
 
     return this.cargoCrateService.getCrate(repoInfo, name);
   }
@@ -164,18 +165,70 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   public CrateVersionInfo getCrateVersion(final ProtocolContext context) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var name = extractCrateNameFromApiPath(context);
-    final var vers = extractVersionFromApiPath(context);
+    final var segments = splitPath(context);
+    final var name = segments[segments.length - 2];
+    final var vers = segments[segments.length - 1];
 
     return this.cargoCrateService.getCrateVersion(repoInfo, name, vers);
+  }
+
+  private static CrateIndexEntry buildIndexEntry(final CratePublishRequest request) {
+
+    final var deps =
+        request.deps() == null
+            ? List.<CrateIndexDep>of()
+            : request.deps().stream().map(AbstractCargoProtocolFacade::toIndexDep).toList();
+
+    final var features =
+        request.features() != null ? request.features() : Map.<String, List<String>>of();
+
+    final var v = request.features2() != null ? 2 : 1;
+
+    return new CrateIndexEntry(
+        request.name(),
+        request.vers(),
+        deps,
+        request.cksum(),
+        features,
+        false,
+        request.links(),
+        v,
+        request.features2(),
+        request.rustVersion());
+  }
+
+  private static CrateIndexDep toIndexDep(final CratePublishDep dep) {
+
+    final String packageName;
+    final String name;
+
+    if (dep.explicitNameInToml() != null) {
+      name = dep.explicitNameInToml();
+      packageName = dep.name();
+    } else {
+      name = dep.name();
+      packageName = null;
+    }
+
+    return new CrateIndexDep(
+        name,
+        dep.versionReq(),
+        dep.features(),
+        dep.optional(),
+        dep.defaultFeatures(),
+        dep.target(),
+        dep.kind(),
+        dep.registry(),
+        packageName);
   }
 
   private List<CrateIndexEntry> parseIndexResource(final Resource resource) {
 
     final var entries = new ArrayList<CrateIndexEntry>();
 
-    try (final var reader = new BufferedReader(
-      new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
+    try (final var reader =
+        new BufferedReader(
+            new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
 
       String line;
       while ((line = reader.readLine()) != null) {
@@ -193,8 +246,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
 
   private static long readU32LittleEndian(final InputStream inputStream) throws IOException {
     final var bytes = inputStream.readNBytes(4);
-    return Integer.toUnsignedLong(
-      ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getInt());
+    return Integer.toUnsignedLong(ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getInt());
   }
 
   private static String computeSha256(final byte[] bytes) {
@@ -207,33 +259,12 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
     }
   }
 
-  private static String extractCrateNameFromIndexPath(final ProtocolContext context) {
-    final var path = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var segments = path.split("/");
-    return segments[segments.length - 1];
+  private static String[] splitPath(final ProtocolContext context) {
+    return ProtocolContextUtils.getRelativePath(context).getPath().split("/");
   }
 
-  private static String extractCrateNameFromYankPath(final ProtocolContext context) {
-    final var path = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var segments = path.split("/");
-    return segments[segments.length - 3];
-  }
-
-  private static String extractVersionFromYankPath(final ProtocolContext context) {
-    final var path = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var segments = path.split("/");
-    return segments[segments.length - 2];
-  }
-
-  private static String extractCrateNameFromApiPath(final ProtocolContext context) {
-    final var path = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var segments = path.split("/");
-    return segments[segments.length - 1];
-  }
-
-  private static String extractVersionFromApiPath(final ProtocolContext context) {
-    final var path = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var segments = path.split("/");
+  private static String extractLastSegment(final ProtocolContext context) {
+    final var segments = splitPath(context);
     return segments[segments.length - 1];
   }
 }

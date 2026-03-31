@@ -1,12 +1,7 @@
 package io.repsy.os.server.protocols.cargo.protocol.shared.crate.services;
 
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
-
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateInfo;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
-import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
 import io.repsy.os.server.protocols.cargo.protocol.shared.crate.entities.CargoAuthor;
 import io.repsy.os.server.protocols.cargo.protocol.shared.crate.entities.CargoCategory;
 import io.repsy.os.server.protocols.cargo.protocol.shared.crate.entities.CargoCrate;
@@ -22,23 +17,33 @@ import io.repsy.os.server.protocols.cargo.protocol.shared.crate.repositories.Car
 import io.repsy.os.server.protocols.cargo.protocol.shared.crate.repositories.CargoKeywordRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateInfo;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
+import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
+import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
+import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.exc.JacksonIOException;
+import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Component
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 @NullMarked
-public class CargoCrateServiceImpl {
+public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
 
   private static final String ERR_REPO_NOT_FOUND = "repoNotFound";
   private static final String ERR_CRATE_NOT_FOUND = "crateNotFound";
@@ -52,18 +57,32 @@ public class CargoCrateServiceImpl {
   private final CargoKeywordRepository keywordRepository;
   private final CargoCategoryRepository categoryRepository;
   private final CargoCrateConverter crateConverter;
+  private final ObjectMapper objectMapper;
 
+  @Override
   @Transactional
-  public void publish(final UUID repoId, final CratePublishRequest request) {
+  public void publish(final BaseRepoInfo<UUID> repoInfo, final CratePublishRequest request) {
 
     final var repo =
         this.repoRepository
-            .findById(repoId)
+            .findById(repoInfo.getId())
             .orElseThrow(() -> new ItemNotFoundException(ERR_REPO_NOT_FOUND));
 
     final var normalizedName = normalizeName(request.name());
+    final var existingCrate =
+        this.crateRepository.findByRepoIdAndName(repoInfo.getId(), normalizedName);
 
-    final var existingCrate = this.crateRepository.findByRepoIdAndName(repoId, normalizedName);
+    if (existingCrate.isPresent()) {
+      final var versionExists =
+          this.crateIndexRepository
+              .findByCrateIdAndVers(existingCrate.get().getId(), request.vers())
+              .isPresent();
+      if (versionExists) {
+        throw new ItemAlreadyExistException(
+            "crate `%s@%s` already exists in this registry"
+                .formatted(request.name(), request.vers()));
+      }
+    }
 
     final CargoCrate crate;
 
@@ -84,43 +103,49 @@ public class CargoCrateServiceImpl {
     this.createCrateIndex(crate, request);
     this.createCrateMeta(crate, request);
 
-    log.info("Crate published: {} {} for repo {}", request.name(), request.vers(), repoId);
+    log.info(
+        "Crate published: {} {} for repo {}", request.name(), request.vers(), repoInfo.getId());
   }
 
+  @Override
   @Transactional
-  public void yank(final UUID repoId, final String name, final String vers) {
+  public void yank(final BaseRepoInfo<UUID> repoInfo, final String name, final String vers) {
 
-    final var index = this.findCrateIndex(repoId, name, vers);
+    final var index = this.findCrateIndex(repoInfo.getId(), name, vers);
     index.setYanked(true);
     this.crateIndexRepository.save(index);
 
-    log.info("Crate yanked: {} {} for repo {}", name, vers, repoId);
+    log.info("Crate yanked: {} {} for repo {}", name, vers, repoInfo.getId());
   }
 
+  @Override
   @Transactional
-  public void unyank(final UUID repoId, final String name, final String vers) {
+  public void unyank(final BaseRepoInfo<UUID> repoInfo, final String name, final String vers) {
 
-    final var index = this.findCrateIndex(repoId, name, vers);
+    final var index = this.findCrateIndex(repoInfo.getId(), name, vers);
     index.setYanked(false);
     this.crateIndexRepository.save(index);
 
-    log.info("Crate unyanked: {} {} for repo {}", name, vers, repoId);
+    log.info("Crate unyanked: {} {} for repo {}", name, vers, repoInfo.getId());
   }
 
+  @Override
   @Transactional
-  public void deleteCrate(final UUID repoId, final String name) {
+  public void deleteCrate(final BaseRepoInfo<UUID> repoInfo, final String name) {
 
-    final var crate = this.findCrate(repoId, name);
+    final var crate = this.findCrate(repoInfo.getId(), name);
     this.crateRepository.delete(crate);
 
-    log.info("Crate deleted: {} for repo {}", name, repoId);
+    log.info("Crate deleted: {} for repo {}", name, repoInfo.getId());
   }
 
+  @Override
   @Transactional
-  public void deleteCrateVersion(final UUID repoId, final String name, final String vers) {
+  public void deleteCrateVersion(
+      final BaseRepoInfo<UUID> repoInfo, final String name, final String vers) {
 
-    final var crate = this.findCrate(repoId, name);
-    final var index = this.findCrateIndex(repoId, name, vers);
+    final var crate = this.findCrate(repoInfo.getId(), name);
+    final var index = this.findCrateIndex(repoInfo.getId(), name, vers);
     final var meta =
         this.crateMetaRepository
             .findByCrateIdAndVersion(crate.getId(), vers)
@@ -131,26 +156,32 @@ public class CargoCrateServiceImpl {
 
     this.recalculateMaxVersion(crate);
 
-    log.info("Crate version deleted: {} {} for repo {}", name, vers, repoId);
+    log.info("Crate version deleted: {} {} for repo {}", name, vers, repoInfo.getId());
   }
 
-  public List<CrateIndexEntry> getIndexEntries(final UUID repoId, final String name) {
+  @Override
+  public List<CrateIndexEntry> getIndexEntries(
+      final BaseRepoInfo<UUID> repoInfo, final String name) {
 
     final var normalizedName = normalizeName(name);
-    final var entries = this.crateIndexRepository.findAllByCrateRepoIdAndName(repoId, normalizedName);
+    final var entries =
+        this.crateIndexRepository.findAllByCrateRepoIdAndName(repoInfo.getId(), normalizedName);
 
     return entries.stream().map(this.crateConverter::toCrateIndexEntry).toList();
   }
 
-  public CrateInfo getCrate(final UUID repoId, final String name) {
+  @Override
+  public CrateInfo getCrate(final BaseRepoInfo<UUID> repoInfo, final String name) {
 
-    final var crate = this.findCrate(repoId, name);
+    final var crate = this.findCrate(repoInfo.getId(), name);
     return this.crateConverter.toCrateInfo(crate);
   }
 
-  public CrateVersionInfo getCrateVersion(final UUID repoId, final String name, final String vers) {
+  @Override
+  public CrateVersionInfo getCrateVersion(
+      final BaseRepoInfo<UUID> repoInfo, final String name, final String vers) {
 
-    final var crate = this.findCrate(repoId, name);
+    final var crate = this.findCrate(repoInfo.getId(), name);
     final var meta =
         this.crateMetaRepository
             .findByCrateIdAndVersion(crate.getId(), vers)
@@ -159,9 +190,11 @@ public class CargoCrateServiceImpl {
     return this.crateConverter.toCrateVersionInfo(crate, meta);
   }
 
-  public Page<CrateListItem> search(final UUID repoId, final String query, final Pageable pageable) {
+  @Override
+  public Page<CrateListItem> search(
+      final BaseRepoInfo<UUID> repoInfo, final String query, final Pageable pageable) {
 
-    return this.crateRepository.findAllByRepoIdAndNameContaining(repoId, query, pageable);
+    return this.crateRepository.findAllByRepoIdAndNameContaining(repoInfo.getId(), query, pageable);
   }
 
   private CargoCrate createCrate(
@@ -177,8 +210,6 @@ public class CargoCrateServiceImpl {
     crate.setDescription(request.description());
     crate.setHomepage(request.homepage());
     crate.setRepository(request.repository());
-    crate.setETag("");
-    crate.setLastUpdated("");
     crate.setCreatedAt(Instant.now());
     crate.setLastUpdatedAt(Instant.now());
 
@@ -192,10 +223,10 @@ public class CargoCrateServiceImpl {
     index.setCrate(crate);
     index.setName(crate.getName());
     index.setVers(request.vers());
-    index.setDeps(request.getDepsAsJson());
+    index.setDeps(this.toJson(request.deps()));
     index.setCksum(request.cksum());
-    index.setFeatures(request.getFeaturesAsJson());
-    index.setFeatures2(request.getFeatures2AsJson());
+    index.setFeatures(this.toJson(request.features()));
+    index.setFeatures2(this.toJson(request.features2()));
     index.setYanked(false);
     index.setLinks(request.links());
     index.setV(request.features2() != null ? 2 : 1);
@@ -214,7 +245,6 @@ public class CargoCrateServiceImpl {
     meta.setLicense(request.license());
     meta.setLicenseFile(request.licenseFile());
     meta.setDocumentation(request.documentation());
-    meta.setEdition(request.getEdition());
     meta.setRustVersion(request.rustVersion());
     meta.setDownloads(0L);
     meta.setCreatedAt(Instant.now());
@@ -295,10 +325,7 @@ public class CargoCrateServiceImpl {
     }
 
     final var maxVers =
-        remaining.stream()
-            .map(CargoCrateIndex::getVers)
-            .max(new SemverComparator())
-            .orElse("");
+        remaining.stream().map(CargoCrateIndex::getVers).max(new SemverComparator()).orElse("");
 
     crate.setMaxVersion(maxVers);
     this.crateRepository.save(crate);
@@ -313,14 +340,27 @@ public class CargoCrateServiceImpl {
         .orElseThrow(() -> new ItemNotFoundException(ERR_CRATE_NOT_FOUND));
   }
 
-  private CargoCrateIndex findCrateIndex(
-      final UUID repoId, final String name, final String vers) {
+  private CargoCrateIndex findCrateIndex(final UUID repoId, final String name, final String vers) {
 
     final var crate = this.findCrate(repoId, name);
 
     return this.crateIndexRepository
         .findByCrateIdAndVers(crate.getId(), vers)
         .orElseThrow(() -> new ItemNotFoundException(ERR_CRATE_VERSION_NOT_FOUND));
+  }
+
+  private @Nullable String toJson(final @Nullable Object value) {
+
+    if (value == null) {
+      return null;
+    }
+
+    try {
+      return this.objectMapper.writeValueAsString(value);
+    } catch (final JacksonIOException e) {
+      log.warn("Failed to serialize value to JSON", e);
+      return null;
+    }
   }
 
   private static String normalizeName(final String name) {

@@ -18,5 +18,4 @@ public record CrateVersionInfo(
     @Nullable String edition,
     @JsonProperty("rust_version") @Nullable String rustVersion,
     long downloads,
-    @JsonProperty("created_at") Instant createdAt
-) {}
+    @JsonProperty("created_at") Instant createdAt) {}

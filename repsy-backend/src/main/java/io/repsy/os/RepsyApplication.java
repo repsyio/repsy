@@ -16,6 +16,7 @@
 package io.repsy.os;
 
 import io.repsy.libs.multiport.annotations.EnableMultiport;
+import io.repsy.os.server.protocols.cargo.protocol.shared.crate.storage.configs.CargoFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.docker.shared.storage.configs.DockerFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.maven.shared.storage.configs.MavenFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.npm.shared.storage.configs.NpmFileSystemStorageBackendConfigProps;
@@ -31,7 +32,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
   MavenFileSystemStorageBackendConfigProps.class,
   NpmFileSystemStorageBackendConfigProps.class,
   PypiFileSystemStorageBackendConfigProps.class,
-  DockerFileSystemStorageBackendConfigProps.class
+  DockerFileSystemStorageBackendConfigProps.class,
+  CargoFileSystemStorageBackendConfigProps.class
 })
 @SpringBootApplication(
     scanBasePackages = {"io.repsy.os", "io.repsy.core", "io.repsy.libs", "io.repsy.protocols"})

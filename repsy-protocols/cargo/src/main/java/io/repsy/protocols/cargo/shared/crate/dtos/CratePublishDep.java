@@ -15,5 +15,4 @@ public record CratePublishDep(
     @Nullable String target,
     String kind,
     @Nullable String registry,
-    @JsonProperty("explicit_name_in_toml") @Nullable String explicitNameInToml
-) {}
+    @JsonProperty("explicit_name_in_toml") @Nullable String explicitNameInToml) {}

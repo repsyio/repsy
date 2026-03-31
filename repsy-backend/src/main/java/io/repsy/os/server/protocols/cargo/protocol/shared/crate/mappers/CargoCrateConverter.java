@@ -3,20 +3,19 @@ package io.repsy.os.server.protocols.cargo.protocol.shared.crate.mappers;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexDep;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateInfo;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
 import io.repsy.os.server.protocols.cargo.protocol.shared.crate.entities.CargoAuthor;
 import io.repsy.os.server.protocols.cargo.protocol.shared.crate.entities.CargoCategory;
 import io.repsy.os.server.protocols.cargo.protocol.shared.crate.entities.CargoCrate;
 import io.repsy.os.server.protocols.cargo.protocol.shared.crate.entities.CargoCrateIndex;
 import io.repsy.os.server.protocols.cargo.protocol.shared.crate.entities.CargoCrateMeta;
 import io.repsy.os.server.protocols.cargo.protocol.shared.crate.entities.CargoKeyword;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexDep;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateInfo;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
@@ -25,8 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 @Mapper(componentModel = "spring")
 public abstract class CargoCrateConverter {
 
-  @Autowired
-  private ObjectMapper objectMapper;
+  @Autowired private ObjectMapper objectMapper;
 
   @Mapping(target = "authors", source = "authors", qualifiedByName = "authorsToStrings")
   @Mapping(target = "keywords", source = "keywords", qualifiedByName = "keywordsToStrings")

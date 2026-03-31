@@ -8,8 +8,6 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
-
-import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;

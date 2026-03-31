@@ -19,5 +19,4 @@ public record CrateIndexEntry(
     @Nullable String links,
     int v,
     @JsonProperty("features2") @Nullable Map<String, List<String>> features2,
-    @JsonProperty("rust_version") @Nullable String rustVersion
-) {}
+    @JsonProperty("rust_version") @Nullable String rustVersion) {}
