@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.maven.protocol;
+package io.repsy.protocols.cargo.protocol;
 
 import io.repsy.libs.protocol.router.ProtocolProvider;
 import org.jspecify.annotations.NullMarked;

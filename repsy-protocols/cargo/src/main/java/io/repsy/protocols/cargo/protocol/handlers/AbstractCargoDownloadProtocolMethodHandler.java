@@ -1,44 +1,47 @@
-package io.repsy.protocols.maven.protocol.handlers;
+package io.repsy.protocols.cargo.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
-import io.repsy.protocols.maven.protocol.CargoProtocolProvider;
+import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 
 @NullMarked
-public abstract class AbstractCargoPublishProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractCargoDownloadProtocolMethodHandler implements ProtocolMethodHandler {
 
-  public AbstractCargoPublishProtocolMethodHandler(final CargoProtocolProvider provider) {
+  private static final Pattern DOWNLOAD_PATTERN =
+      Pattern.compile(".*/api/v1/crates/[^/]+/[^/]+/download$");
+
+  public AbstractCargoDownloadProtocolMethodHandler(final CargoProtocolProvider provider) {
     provider.registerMethodHandler(this);
   }
 
   @Override
   public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.PUT);
+    return List.of(HttpMethod.GET);
   }
 
   @Override
   public Map<String, Object> getProperties() {
-
-    return Map.of("permission", Permission.WRITE);
+    return Map.of("permission", Permission.READ);
   }
 
   @Override
   public PathParser getPathParser() {
     return request -> {
 
-      if (!HttpMethod.PUT.name().equals(request.getMethod())) {
+      if (!HttpMethod.GET.name().equals(request.getMethod())) {
         return Optional.empty();
       }
 
-      if (!request.getServletPath().endsWith("/api/v1/crates/new")) {
+      if (!DOWNLOAD_PATTERN.matcher(request.getServletPath()).matches()) {
         return Optional.empty();
       }
 

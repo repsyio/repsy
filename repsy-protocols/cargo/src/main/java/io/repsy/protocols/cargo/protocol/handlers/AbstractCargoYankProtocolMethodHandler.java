@@ -1,9 +1,9 @@
-package io.repsy.protocols.maven.protocol.handlers;
+package io.repsy.protocols.cargo.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
-import io.repsy.protocols.maven.protocol.CargoProtocolProvider;
+import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -14,34 +14,35 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 
 @NullMarked
-public abstract class AbstractCargoDownloadProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractCargoYankProtocolMethodHandler implements ProtocolMethodHandler {
 
-  private static final Pattern DOWNLOAD_PATTERN =
-      Pattern.compile(".*/api/v1/crates/[^/]+/[^/]+/download$");
+  private static final Pattern YANK_PATTERN =
+      Pattern.compile(".*/api/v1/crates/[^/]+/[^/]+/(yank|unyank)$");
 
-  public AbstractCargoDownloadProtocolMethodHandler(final CargoProtocolProvider provider) {
+  public AbstractCargoYankProtocolMethodHandler(final CargoProtocolProvider provider) {
     provider.registerMethodHandler(this);
   }
 
   @Override
   public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
+    return List.of(HttpMethod.DELETE, HttpMethod.PUT);
   }
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ);
+    return Map.of("permission", Permission.WRITE);
   }
 
   @Override
   public PathParser getPathParser() {
     return request -> {
+      final var method = HttpMethod.valueOf(request.getMethod());
 
-      if (!HttpMethod.GET.name().equals(request.getMethod())) {
+      if (!this.getSupportedMethods().contains(method)) {
         return Optional.empty();
       }
 
-      if (!DOWNLOAD_PATTERN.matcher(request.getServletPath()).matches()) {
+      if (!YANK_PATTERN.matcher(request.getServletPath()).matches()) {
         return Optional.empty();
       }
 
