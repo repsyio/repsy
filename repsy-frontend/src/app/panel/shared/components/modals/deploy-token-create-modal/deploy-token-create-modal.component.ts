@@ -23,6 +23,7 @@ import { DockerService } from '../../../../pages/repository/docker/service/docke
 import { MavenService } from '../../../../pages/repository/maven/service/maven.service';
 import { NpmService } from '../../../../pages/repository/npm/service/npm.service';
 import { PypiService } from '../../../../pages/repository/pypi/service/pypi.service';
+import { CargoService } from '../../../../pages/repository/cargo/service/cargo.service';
 import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dto/token-create-info';
 import { DeployTokenForm } from '../../../../pages/repository/repo-settings/deploy-token/form/deploy-token-form';
 import { RepoType } from '../../../dto/repo/repo-type';
@@ -61,6 +62,7 @@ export class DeployTokenCreateModalComponent implements OnInit {
     private readonly npmService: NpmService,
     private readonly mavenService: MavenService,
     private readonly pypiService: PypiService,
+    private readonly cargoService: CargoService,
     private readonly fb: FormBuilder,
     private readonly toastService: ToastService,
   ) {
@@ -167,6 +169,8 @@ export class DeployTokenCreateModalComponent implements OnInit {
         return this.npmService.createDeployToken(form);
       case RepoType.PYPI:
         return this.pypiService.createDeployToken(form);
+      case RepoType.CARGO:
+        return this.cargoService.createDeployToken(form);
       default:
         return Promise.reject('Unsupported repository type: ' + this.repoType);
     }

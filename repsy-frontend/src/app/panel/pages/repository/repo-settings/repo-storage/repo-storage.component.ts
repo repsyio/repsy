@@ -21,6 +21,7 @@ import { RouterLink } from '@angular/router';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
 import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
+import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerService } from '../../docker/service/docker.service';
 import { MavenService } from '../../maven/service/maven.service';
 import { NpmService } from '../../npm/service/npm.service';
@@ -43,6 +44,7 @@ export class RepoStorageComponent implements OnInit {
     private readonly npmService: NpmService,
     private readonly pypiService: PypiService,
     private readonly dockerService: DockerService,
+    private readonly cargoService: CargoService,
     private readonly toastService: ToastService,
   ) {}
 
@@ -60,6 +62,8 @@ export class RepoStorageComponent implements OnInit {
         return this.pypiService.fetchRepositoryUsage();
       case RepoType.DOCKER:
         return this.dockerService.fetchRepositoryUsage();
+      case RepoType.CARGO:
+        return this.cargoService.fetchRepositoryUsage();
       default:
         return Promise.reject('Unsupported repository type');
     }

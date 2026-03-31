@@ -1,3 +1,18 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.repsy.protocols.cargo.shared.storage.services;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
@@ -6,6 +21,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
@@ -17,6 +33,9 @@ import org.springframework.core.io.Resource;
 @NullMarked
 public abstract class AbstractCargoStorageService implements CargoStorageService {
 
+  private static final int ONE = 1;
+  private static final int TWO = 2;
+  private static final int THREE = 3;
   private final StorageStrategy storageStrategy;
 
   @Override
@@ -38,10 +57,26 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
       crateUsages = this.storageStrategy.write(repoName, crateStoragePath, bis);
     }
 
+    // Append Mode for Index file
     final var indexPath = this.getIndexPath(crateName);
     final var indexStoragePath = StoragePath.of(repoId, indexPath.toString());
 
-    final var indexData = (indexJsonLine + "\n").getBytes();
+    final var existingContent =
+        this.storageStrategy
+            .get(indexStoragePath, repoName)
+            .map(
+                resource -> {
+                  try {
+                    return new String(
+                        resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                  } catch (final IOException e) {
+                    return "";
+                  }
+                })
+            .orElse("");
+
+    final var newContent = existingContent + indexJsonLine + "\n";
+    final var indexData = newContent.getBytes(StandardCharsets.UTF_8);
 
     final BaseUsages indexUsages;
     try (final var bis = new ByteArrayInputStream(indexData)) {
@@ -113,15 +148,15 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
     final var len = name.length();
     final var basePath = Paths.get("index");
 
-    if (len == 1) {
+    if (len == ONE) {
       return basePath.resolve("1").resolve(name);
     }
 
-    if (len == 2) {
+    if (len == TWO) {
       return basePath.resolve("2").resolve(name);
     }
 
-    if (len == 3) {
+    if (len == THREE) {
       return basePath.resolve("3").resolve(name.substring(0, 1)).resolve(name);
     }
 

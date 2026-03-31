@@ -1,3 +1,18 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.repsy.protocols.cargo.protocol.facade;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -25,7 +40,6 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
@@ -37,6 +51,9 @@ import tools.jackson.databind.ObjectMapper;
 @NullMarked
 public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFacade<ID> {
 
+  private static final int ONE = 1;
+  private static final int TWO = 2;
+  private static final int THREE = 3;
   private static final String USAGES = "usages";
   private static final String SHA256 = "SHA-256";
 
@@ -48,7 +65,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   public List<CrateIndexEntry> getIndexEntries(final ProtocolContext context) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var repoId = (UUID) repoInfo.getStorageKey();
+    final var repoId = repoInfo.getStorageKey();
     final var crateName = extractLastSegment(context);
 
     final var indexResource =
@@ -61,12 +78,17 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   public Resource download(final ProtocolContext context) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var repoId = (UUID) repoInfo.getStorageKey();
+    final var repoId = repoInfo.getStorageKey();
     final var segments = splitPath(context);
-    final var crateName = segments[segments.length - 3];
-    final var versionName = segments[segments.length - 2];
+    final var crateName = normalizeCrateName(segments[segments.length - THREE]);
+    final var versionName = segments[segments.length - TWO];
 
-    return this.cargoStorageService.getCrate(repoId, repoInfo.getName(), crateName, versionName);
+    final var resource =
+        this.cargoStorageService.getCrate(repoId, repoInfo.getName(), crateName, versionName);
+
+    this.cargoCrateService.incrementDownloadCount(repoInfo, crateName, versionName);
+
+    return resource;
   }
 
   @Override
@@ -125,8 +147,8 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var segments = splitPath(context);
-    final var crateName = segments[segments.length - 3];
-    final var vers = segments[segments.length - 2];
+    final var crateName = segments[segments.length - THREE];
+    final var vers = segments[segments.length - TWO];
 
     this.cargoCrateService.yank(repoInfo, crateName, vers);
   }
@@ -136,8 +158,8 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var segments = splitPath(context);
-    final var crateName = segments[segments.length - 3];
-    final var vers = segments[segments.length - 2];
+    final var crateName = segments[segments.length - THREE];
+    final var vers = segments[segments.length - TWO];
 
     this.cargoCrateService.unyank(repoInfo, crateName, vers);
   }
@@ -266,5 +288,9 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   private static String extractLastSegment(final ProtocolContext context) {
     final var segments = splitPath(context);
     return segments[segments.length - 1];
+  }
+
+  private static String normalizeCrateName(final String name) {
+    return name.toLowerCase().replace('-', '_');
   }
 }

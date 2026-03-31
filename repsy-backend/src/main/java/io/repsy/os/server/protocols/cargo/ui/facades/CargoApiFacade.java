@@ -1,8 +1,23 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.repsy.os.server.protocols.cargo.ui.facades;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.server.protocols.cargo.protocol.shared.crate.repositories.CargoCrateRepository;
-import io.repsy.os.server.protocols.cargo.protocol.shared.crate.services.CargoCrateServiceImpl;
+import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateRepository;
+import io.repsy.os.server.protocols.cargo.shared.crate.services.CargoCrateServiceImpl;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
 import io.repsy.os.shared.repo.dtos.RepoSettingsInfo;
@@ -10,6 +25,7 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -79,6 +95,13 @@ public class CargoApiFacade {
       final RepoInfo repoInfo, final String name, final String vers) {
 
     return this.cargoCrateService.getCrateVersion(repoInfo, name, vers);
+  }
+
+  @Transactional(readOnly = true)
+  public Page<CrateVersionListItem> getCrateVersions(
+      final RepoInfo repoInfo, final String name, final String query, final Pageable pageable) {
+
+    return this.cargoCrateService.getCrateVersions(repoInfo, name, query, pageable);
   }
 
   public BaseUsages deleteCrate(final RepoInfo repoInfo, final String name) {

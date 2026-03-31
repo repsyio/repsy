@@ -1,3 +1,18 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.repsy.os.server.protocols.cargo.ui.controllers;
 
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
@@ -5,11 +20,12 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
-import io.repsy.os.server.protocols.cargo.protocol.shared.auth.services.CargoAuthComponent;
+import io.repsy.os.server.protocols.cargo.shared.auth.services.CargoAuthComponent;
 import io.repsy.os.server.protocols.cargo.ui.facades.CargoApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoCreateForm;
 import io.repsy.os.shared.repo.dtos.RepoDescriptionForm;
 import io.repsy.os.shared.repo.dtos.RepoListInfo;
+import io.repsy.os.shared.repo.dtos.RepoPermissionInfo;
 import io.repsy.os.shared.repo.dtos.RepoRenameForm;
 import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
 import io.repsy.os.shared.repo.dtos.RepoSettingsInfo;
@@ -20,6 +36,7 @@ import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.validation.Valid;
@@ -27,8 +44,8 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PagedModel;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -83,6 +100,18 @@ public class CargoRepoController {
     return this.responseFactory.success("repoDeleted");
   }
 
+  @GetMapping("/{repoName}/permission")
+  public RestResponse<RepoPermissionInfo> getRepoPermission(
+      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
+      @PathVariable final String repoName) {
+
+    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
+    final var repoPermissionInfo =
+        this.cargoAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+
+    return this.responseFactory.success("repoPermissionsFetched", repoPermissionInfo);
+  }
+
   @GetMapping
   public RestResponse<List<RepoListInfo>> getRepos(
       @RequestHeader(AUTHORIZATION) final String authHeader) {
@@ -112,6 +141,17 @@ public class CargoRepoController {
     final var usageInfo = this.usageService.getRepoUsageInfo(repoName, RepoType.CARGO);
 
     return this.responseFactory.success("usageFetched", usageInfo);
+  }
+
+  @GetMapping("/info")
+  public RestResponse<List<RepoListInfo>> getRepoInfo(
+      @RequestHeader(AUTHORIZATION) final String authHeader) {
+
+    this.cargoAuthComponent.authenticateAndCreateToken(authHeader);
+
+    final var repositoryList = this.repoTxService.findAllByRepoType(RepoType.CARGO);
+
+    return this.responseFactory.success("reposFetched", repositoryList);
   }
 
   @GetMapping("/count")
@@ -168,7 +208,7 @@ public class CargoRepoController {
   }
 
   @GetMapping("/{repoName}/crates")
-  public RestResponse<Page<CrateListItem>> searchCrates(
+  public RestResponse<PagedModel<CrateListItem>> searchCrates(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final String repoName,
       @RequestParam(defaultValue = "") final String query,
@@ -180,7 +220,7 @@ public class CargoRepoController {
 
     final var crates = this.cargoApiFacade.search(repoInfo, query, pageable);
 
-    return this.responseFactory.success("cratesFetched", crates);
+    return this.responseFactory.success("cratesFetched", new PagedModel<>(crates));
   }
 
   @GetMapping("/{repoName}/crates/{name}")
@@ -212,6 +252,23 @@ public class CargoRepoController {
     final var version = this.cargoApiFacade.getCrateVersion(repoInfo, name, vers);
 
     return this.responseFactory.success("crateVersionFetched", version);
+  }
+
+  @GetMapping("/{repoName}/crates/{name}/versions")
+  public RestResponse<PagedModel<CrateVersionListItem>> getCrateVersions(
+      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
+      @PathVariable final String repoName,
+      @PathVariable final String name,
+      @RequestParam(defaultValue = "") final String query,
+      final Pageable pageable) {
+
+    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
+
+    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.READ);
+
+    final var versions = this.cargoApiFacade.getCrateVersions(repoInfo, name, query, pageable);
+
+    return this.responseFactory.success("crateVersionsFetched", new PagedModel<>(versions));
   }
 
   @DeleteMapping("/{repoName}/crates/{name}")

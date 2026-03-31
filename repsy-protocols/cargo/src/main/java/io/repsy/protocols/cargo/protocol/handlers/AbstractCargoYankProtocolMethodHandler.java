@@ -1,3 +1,18 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.repsy.protocols.cargo.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
@@ -51,25 +66,44 @@ public abstract class AbstractCargoYankProtocolMethodHandler<ID> implements Prot
 
   @Override
   public PathParser getPathParser() {
-    return request -> {
-      final var method = HttpMethod.valueOf(request.getMethod());
-      if (!this.getSupportedMethods().contains(method)) {
-        return Optional.empty();
-      }
 
-      final var parsedPathOpt = this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
+    return this::getPathParserCallback;
+  }
 
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
+  private Optional<ProtocolContext> getPathParserCallback(final HttpServletRequest request) {
 
-      if (!YANK_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
+    final var method = HttpMethod.valueOf(request.getMethod());
 
-      return parsedPathOpt;
-    };
+    if (!this.getSupportedMethods().contains(method)) {
+      return Optional.empty();
+    }
+
+    final var parsedPathOpt = this.basePathParser.parse(request);
+    if (parsedPathOpt.isEmpty()) {
+      return Optional.empty();
+    }
+
+    final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
+
+    if (!this.checkEndpointAndMethods(method, relativePath)) {
+      return Optional.empty();
+    }
+
+    return parsedPathOpt;
+  }
+
+  private boolean checkEndpointAndMethods(final HttpMethod method, final String relativePath) {
+
+    if (!YANK_PATTERN.matcher(relativePath).matches()) {
+      return false;
+    }
+
+    final var isYankPath = relativePath.endsWith("/yank");
+    if (isYankPath && !HttpMethod.DELETE.equals(method)) {
+      return false;
+    }
+
+    return isYankPath || HttpMethod.PUT.equals(method);
   }
 
   @Override

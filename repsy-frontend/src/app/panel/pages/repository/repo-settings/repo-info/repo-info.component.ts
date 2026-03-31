@@ -24,6 +24,7 @@ import { RepoDescriptionForm } from '../../../../shared/dto/repo/repo-descriptio
 import { RepoNameForm } from '../../../../shared/dto/repo/repo-name-form';
 import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
+import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerService } from '../../docker/service/docker.service';
 import { MavenService } from '../../maven/service/maven.service';
 import { NpmService } from '../../npm/service/npm.service';
@@ -49,6 +50,7 @@ export class RepoInfoComponent implements OnInit {
     private readonly npmService: NpmService,
     private readonly pypiService: PypiService,
     private readonly dockerService: DockerService,
+    private readonly cargoService: CargoService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
@@ -141,6 +143,8 @@ export class RepoInfoComponent implements OnInit {
         return this.pypiService.updateRepositoryName(form);
       case RepoType.DOCKER:
         return this.dockerService.updateRepositoryName(form);
+      case RepoType.CARGO:
+        return this.cargoService.updateRepositoryName(form);
       default:
         return Promise.reject('Unsupported repository type');
     }
@@ -156,6 +160,8 @@ export class RepoInfoComponent implements OnInit {
         return this.pypiService.updateRepoDescription(form);
       case RepoType.DOCKER:
         return this.dockerService.updateRepositoryDescription(form);
+      case RepoType.CARGO:
+        return this.cargoService.updateRepoDescription(form);
       default:
         return Promise.reject('Unsupported repository type');
     }

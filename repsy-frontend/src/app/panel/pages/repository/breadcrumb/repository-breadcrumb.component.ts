@@ -115,6 +115,8 @@ export class RepositoryBreadcrumbComponent implements OnInit, OnDestroy {
         return 'assets/icons/repo/pypi.svg';
       case 'docker':
         return 'assets/icons/repo/docker.svg';
+      case 'cargo':
+        return 'assets/icons/repo/cargo.svg';
       default:
         return '';
     }

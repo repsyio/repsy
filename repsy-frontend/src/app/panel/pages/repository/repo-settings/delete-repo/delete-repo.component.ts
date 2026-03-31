@@ -22,6 +22,7 @@ import { DangerModalService } from '../../../../shared/components/modals/danger-
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
+import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerService } from '../../docker/service/docker.service';
 import { MavenService } from '../../maven/service/maven.service';
 import { NpmService } from '../../npm/service/npm.service';
@@ -47,6 +48,7 @@ export class DeleteRepoComponent {
     private readonly npmService: NpmService,
     private readonly pypiService: PypiService,
     private readonly dockerService: DockerService,
+    private readonly cargoService: CargoService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
@@ -86,6 +88,8 @@ export class DeleteRepoComponent {
         return this.pypiService.deleteRepository(repoName);
       case RepoType.DOCKER:
         return this.dockerService.deleteRepository(repoName);
+      case RepoType.CARGO:
+        return this.cargoService.deleteRepository(repoName);
       default:
         return Promise.reject('Unsupported repository type');
     }

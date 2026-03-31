@@ -176,3 +176,7 @@ alter table "repo"
 alter table "repo"
   add constraint "ch_repo__type"
     check ("type" in ('MAVEN', 'NPM', 'PYPI', 'DOCKER', 'CARGO'));
+
+ALTER TABLE "public".cargo_crate_author DROP COLUMN "id";
+ALTER TABLE "public".cargo_crate_keyword DROP COLUMN "id";
+ALTER TABLE "public".cargo_crate_category DROP COLUMN "id";
