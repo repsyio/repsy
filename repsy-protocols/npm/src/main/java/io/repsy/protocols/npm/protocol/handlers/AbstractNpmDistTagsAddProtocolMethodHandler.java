@@ -96,8 +96,8 @@ public abstract class AbstractNpmDistTagsAddProtocolMethodHandler implements Pro
     final var matcher = DIST_TAGS_ADD_PATTERN.matcher(relativePath);
 
     if (!matcher.matches()) {
-      response.sendError(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Parser validation failed");
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+          .body("Parser validation failed");
     }
 
     final var packagePath = matcher.group(1);

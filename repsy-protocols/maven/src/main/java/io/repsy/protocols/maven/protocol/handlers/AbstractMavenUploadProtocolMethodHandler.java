@@ -80,8 +80,9 @@ public abstract class AbstractMavenUploadProtocolMethodHandler<ID>
       this.mavenProtocolFacade.upload(
           context, request.getInputStream(), request.getContentLengthLong());
     } catch (final UnAuthorizedException _) {
-      response.addHeader(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"");
-      response.setStatus(HttpStatus.UNAUTHORIZED.value());
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+          .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"")
+          .build();
     }
 
     return ResponseEntity.ok().build();
