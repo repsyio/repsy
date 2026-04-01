@@ -3,12 +3,10 @@ create table cargo_crate
     id              uuid                                       not null
         constraint pk_cargo_crate
             primary key,
-    repo_id         bigint                                     not null
+    repo_id         uuid                                     not null
         constraint fk_cargo_crate__repo_id
             references "repo"
-            on delete cascade
-        constraint ch_cargo_crate__repo_id
-            check (repo_id > 0),
+            on delete cascade,
     name            varchar(64)                                not null,
     original_name   varchar(64)  default ''::character varying not null,
     max_version     varchar(64)  default ''::character varying not null,
