@@ -39,6 +39,7 @@
     <module>pypi</module>
     <module>npm</module>
     <module>docker</module>
+    <module>golang</module>
     <module>shared</module>
   </modules>
 </project>

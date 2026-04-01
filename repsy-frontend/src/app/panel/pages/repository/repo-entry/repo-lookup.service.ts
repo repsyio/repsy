@@ -20,7 +20,7 @@ import { BehaviorSubject, map, Observable, of, tap } from 'rxjs';
 
 import { environment } from '../../../../../environments/environment';
 
-export type RepoType = 'maven' | 'npm' | 'pypi' | 'docker';
+export type RepoType = 'maven' | 'npm' | 'pypi' | 'docker' | 'golang';
 
 export interface RepoContext {
   repoName: string;

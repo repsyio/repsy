@@ -27,6 +27,7 @@ import { RepoPermissionInfo } from '../../../shared/dto/repo/repo-permission-inf
 import { RepoType } from '../../../shared/dto/repo/repo-type';
 import { DockerService } from '../docker/service/docker.service';
 import { MavenRepoSettingsForm } from '../maven/dto/maven-repo-settings-form';
+import { GolangService } from '../golang/service/golang.service';
 import { MavenService } from '../maven/service/maven.service';
 import { NpmService } from '../npm/service/npm.service';
 import { RepositorySettingsInfo } from '../pypi/dto/repository-settings-info';
@@ -79,6 +80,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
     private readonly npmService: NpmService,
     private readonly pypiService: PypiService,
     private readonly dockerService: DockerService,
+    private readonly golangService: GolangService,
     private readonly toastService: ToastService,
     private readonly router: Router,
     private readonly repoLookupService: RepoLookupService,
@@ -174,12 +176,16 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
       case RepoType.DOCKER: {
         return this.dockerService.repoChanges;
       }
+      case RepoType.GOLANG: {
+        return this.golangService.repoChanges;
+      }
       default:
         throw new Error('Unsupported repository type');
     }
   }
 
   private getRepoSettingsService(): Promise<RepositorySettingsInfo> {
+    console.log('Fetching settings for repo type:', this.repoType);
     switch (this.repoType) {
       case RepoType.MAVEN: {
         return this.mavenService.getRepoSettings();
@@ -192,6 +198,9 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
       }
       case RepoType.DOCKER: {
         return this.dockerService.fetchRepositorySettings();
+      }
+      case RepoType.GOLANG: {
+        return this.golangService.fetchRepositorySettings();
       }
       default:
         return Promise.reject('Unsupported repository type');

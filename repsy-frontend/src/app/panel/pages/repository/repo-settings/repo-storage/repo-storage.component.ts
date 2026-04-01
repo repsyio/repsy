@@ -22,6 +22,7 @@ import { ToastService } from '../../../../shared/components/toast/toast.service'
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
 import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
 import { DockerService } from '../../docker/service/docker.service';
+import { GolangService } from '../../golang/service/golang.service';
 import { MavenService } from '../../maven/service/maven.service';
 import { NpmService } from '../../npm/service/npm.service';
 import { PypiService } from '../../pypi/service/pypi.service';
@@ -43,6 +44,7 @@ export class RepoStorageComponent implements OnInit {
     private readonly npmService: NpmService,
     private readonly pypiService: PypiService,
     private readonly dockerService: DockerService,
+    private readonly golangService: GolangService,
     private readonly toastService: ToastService,
   ) {}
 
@@ -60,6 +62,8 @@ export class RepoStorageComponent implements OnInit {
         return this.pypiService.fetchRepositoryUsage();
       case RepoType.DOCKER:
         return this.dockerService.fetchRepositoryUsage();
+      case RepoType.GOLANG:
+        return this.golangService.fetchRepositoryUsage();
       default:
         return Promise.reject('Unsupported repository type');
     }

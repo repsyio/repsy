@@ -1,0 +1,130 @@
+@if (loading) {
+  <app-spinner />
+} @else {
+  @if (!this.error) {
+    <div animate.enter="fade-in-up">
+      <!-- Module Version Info Cards -->
+      <div class="space-y-4">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
+            <div class="text-[13px] text-[#FDFDFD]">
+              Module Path: <span class="text-[#9FA0A0]">{{ modulePath }}</span>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
+            <div class="text-[13px] text-[#FDFDFD]">
+              Version: <span class="text-[#9FA0A0]">{{ versionInfo.version }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
+            <div class="text-[13px] text-[#FDFDFD]">
+              Go Version: <span class="text-[#9FA0A0]">{{ versionInfo.goVersion ?? '-' }}</span>
+            </div>
+          </div>
+
+          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
+            <div class="text-[13px] text-[#FDFDFD]">
+              Published At: <span class="text-[#9FA0A0]">{{ versionInfo.createdAt | date: 'medium' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- go get command -->
+      <div class="relative mb-6 mt-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 44" fill="#9FA0A0" class="h-[20px] w-[20px] shrink-0">
+            <g transform="scale(0.423) translate(0, 20)">
+              <path d="M16.2 24.1c-.4 0-.5-.2-.3-.5l2.1-2.7c.2-.3.7-.5 1.1-.5h35.7c.4 0 .5.3.3.6l-1.7 2.6c-.2.3-.7.6-1 .6l-36.2-.1zM1 33.3c-.4 0-.5-.2-.3-.5l2.1-2.7c.2-.3.7-.5 1.1-.5h45.6c.4 0 .6.3.5.6l-.8 2.4c-.1.4-.5.6-.9.6L1 33.3zM25.3 42.5c-.4 0-.5-.3-.3-.6l1.4-2.5c.2-.3.6-.6 1-.6h20c.4 0 .6.3.6.7l-.2 2.4c0 .4-.4.7-.7.7l-21.8-.1z"/>
+            </g>
+            <g transform="scale(0.5) translate(-10, 10.5)">
+              <path fill-rule="evenodd" d="M88.4 20.5c-6.3-1.6-12.4.2-16.4 5.8-3.4 4.7-3.9 10.2-1.5 14.4 2.8 4.9 8.9 6.5 14.2 4.6 5.8-2.1 9.3-7.2 9.3-13.1.1-5.4-2.3-10.3-5.6-11.7zm-4.7 19.1c-3 .8-5.9-.1-7.4-2.9-1.3-2.4-.8-5.6 1.1-7.9 1.8-2.1 4.4-3.1 6.9-2.5 2.4.6 3.9 2.6 4.1 5.1.3 3.7-1.7 7.3-4.7 8.2z"/>
+              <path fill-rule="evenodd" d="M113.1 20.5c-6.3-1.6-12.4.2-16.4 5.8-3.4 4.7-3.9 10.2-1.5 14.4 2.8 4.9 8.9 6.5 14.2 4.6 5.8-2.1 9.3-7.2 9.3-13.1.1-5.4-2.3-10.3-5.6-11.7zm-4.7 19.1c-3 .8-5.9-.1-7.4-2.9-1.3-2.4-.8-5.6 1.1-7.9 1.8-2.1 4.4-3.1 6.9-2.5 2.4.6 3.9 2.6 4.1 5.1.3 3.7-1.7 7.3-4.7 8.2z"/>
+            </g>
+          </svg>
+          <span class="text-[14px] text-[#FDFDFD]">go get</span>
+          <app-copy-clipboard class="ml-auto" [text]="getCommand" />
+        </div>
+        <pre class="overflow-x-auto p-4"><code class="text-[13px] text-[#9C9C9D]">{{ getCommand }}</code></pre>
+      </div>
+
+      <!-- go env GOPROXY -->
+      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 44" fill="#9FA0A0" class="h-[20px] w-[20px] shrink-0">
+            <g transform="scale(0.423) translate(0, 20)">
+              <path d="M16.2 24.1c-.4 0-.5-.2-.3-.5l2.1-2.7c.2-.3.7-.5 1.1-.5h35.7c.4 0 .5.3.3.6l-1.7 2.6c-.2.3-.7.6-1 .6l-36.2-.1zM1 33.3c-.4 0-.5-.2-.3-.5l2.1-2.7c.2-.3.7-.5 1.1-.5h45.6c.4 0 .6.3.5.6l-.8 2.4c-.1.4-.5.6-.9.6L1 33.3zM25.3 42.5c-.4 0-.5-.3-.3-.6l1.4-2.5c.2-.3.6-.6 1-.6h20c.4 0 .6.3.6.7l-.2 2.4c0 .4-.4.7-.7.7l-21.8-.1z"/>
+            </g>
+            <g transform="scale(0.5) translate(-10, 10.5)">
+              <path fill-rule="evenodd" d="M88.4 20.5c-6.3-1.6-12.4.2-16.4 5.8-3.4 4.7-3.9 10.2-1.5 14.4 2.8 4.9 8.9 6.5 14.2 4.6 5.8-2.1 9.3-7.2 9.3-13.1.1-5.4-2.3-10.3-5.6-11.7zm-4.7 19.1c-3 .8-5.9-.1-7.4-2.9-1.3-2.4-.8-5.6 1.1-7.9 1.8-2.1 4.4-3.1 6.9-2.5 2.4.6 3.9 2.6 4.1 5.1.3 3.7-1.7 7.3-4.7 8.2z"/>
+              <path fill-rule="evenodd" d="M113.1 20.5c-6.3-1.6-12.4.2-16.4 5.8-3.4 4.7-3.9 10.2-1.5 14.4 2.8 4.9 8.9 6.5 14.2 4.6 5.8-2.1 9.3-7.2 9.3-13.1.1-5.4-2.3-10.3-5.6-11.7zm-4.7 19.1c-3 .8-5.9-.1-7.4-2.9-1.3-2.4-.8-5.6 1.1-7.9 1.8-2.1 4.4-3.1 6.9-2.5 2.4.6 3.9 2.6 4.1 5.1.3 3.7-1.7 7.3-4.7 8.2z"/>
+            </g>
+          </svg>
+          <span class="text-[14px] text-[#FDFDFD]">go env (GONOSUMDB, GOPROXY)</span>
+          <app-copy-clipboard class="ml-auto" [text]="goEnvCommand" />
+        </div>
+        <pre class="overflow-x-auto p-4"><code class="text-[13px] text-[#9C9C9D]">{{ goEnvCommand }}</code></pre>
+      </div>
+
+      <!-- GOPROXY Endpoints -->
+      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 44" fill="#9FA0A0" class="h-[20px] w-[20px] shrink-0">
+            <g transform="scale(0.423) translate(0, 20)">
+              <path d="M16.2 24.1c-.4 0-.5-.2-.3-.5l2.1-2.7c.2-.3.7-.5 1.1-.5h35.7c.4 0 .5.3.3.6l-1.7 2.6c-.2.3-.7.6-1 .6l-36.2-.1zM1 33.3c-.4 0-.5-.2-.3-.5l2.1-2.7c.2-.3.7-.5 1.1-.5h45.6c.4 0 .6.3.5.6l-.8 2.4c-.1.4-.5.6-.9.6L1 33.3zM25.3 42.5c-.4 0-.5-.3-.3-.6l1.4-2.5c.2-.3.6-.6 1-.6h20c.4 0 .6.3.6.7l-.2 2.4c0 .4-.4.7-.7.7l-21.8-.1z"/>
+            </g>
+            <g transform="scale(0.5) translate(-10, 10.5)">
+              <path fill-rule="evenodd" d="M88.4 20.5c-6.3-1.6-12.4.2-16.4 5.8-3.4 4.7-3.9 10.2-1.5 14.4 2.8 4.9 8.9 6.5 14.2 4.6 5.8-2.1 9.3-7.2 9.3-13.1.1-5.4-2.3-10.3-5.6-11.7zm-4.7 19.1c-3 .8-5.9-.1-7.4-2.9-1.3-2.4-.8-5.6 1.1-7.9 1.8-2.1 4.4-3.1 6.9-2.5 2.4.6 3.9 2.6 4.1 5.1.3 3.7-1.7 7.3-4.7 8.2z"/>
+              <path fill-rule="evenodd" d="M113.1 20.5c-6.3-1.6-12.4.2-16.4 5.8-3.4 4.7-3.9 10.2-1.5 14.4 2.8 4.9 8.9 6.5 14.2 4.6 5.8-2.1 9.3-7.2 9.3-13.1.1-5.4-2.3-10.3-5.6-11.7zm-4.7 19.1c-3 .8-5.9-.1-7.4-2.9-1.3-2.4-.8-5.6 1.1-7.9 1.8-2.1 4.4-3.1 6.9-2.5 2.4.6 3.9 2.6 4.1 5.1.3 3.7-1.7 7.3-4.7 8.2z"/>
+            </g>
+          </svg>
+          <span class="text-[14px] text-[#FDFDFD]">GOPROXY Endpoints</span>
+        </div>
+        <div class="space-y-0">
+          @for (endpoint of goproxyEndpoints; track endpoint.label) {
+            <div class="flex items-center gap-3 border-b border-[#2A2A2A] p-4 last:border-0">
+              <span class="w-10 shrink-0 text-[12px] font-medium text-[#9FA0A0]">{{ endpoint.label }}</span>
+              <span class="flex-1 overflow-x-auto text-[13px] text-[#9C9C9D]">{{ endpoint.url }}</span>
+              <app-copy-clipboard [text]="endpoint.url" />
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Delete -->
+      @if (canManage) {
+        <button (click)="deleteVersion()" [disabled]="loading" class="repsy-btn-danger group ml-auto w-full sm:w-auto">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 18 18"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            class="group-hover:fill-white"
+          >
+            <path
+              d="M17.3077 2.76833H14.0225C13.5249 2.76833 13.0846 2.45079 12.9277 1.98002L12.636 1.10404C12.4154 0.443114 11.7997 0 11.1037 0H6.89536C6.19936 0 5.58369 0.443095 5.36308 1.10494L5.0714 1.98002C4.91448 2.45171 4.47414 2.76923 3.9766 2.76923H0.692308C0.310154 2.76923 0 3.07938 0 3.46154C0 3.84369 0.310154 4.15385 0.692308 4.15385H1.89043L2.59846 14.7692C2.71938 16.5812 4.23601 18 6.05262 18H11.9483C13.764 18 15.2815 16.5803 15.4025 14.7692L16.1105 4.15385H17.3077C17.6898 4.15385 18 3.84369 18 3.46154C18 3.07938 17.6898 2.76833 17.3077 2.76833ZM6.67659 1.54158C6.70797 1.44742 6.79566 1.38371 6.89536 1.38371H11.1037C11.2034 1.38371 11.2911 1.44745 11.3225 1.54068L11.6142 2.41665C11.6548 2.5385 11.7055 2.65574 11.7628 2.76743H6.23538C6.29262 2.65482 6.3434 2.53853 6.38402 2.41576L6.67659 1.54158ZM14.0197 14.676C13.9477 15.7634 13.0375 16.6145 11.9474 16.6145H6.05172C4.96249 16.6145 4.05136 15.7634 3.97936 14.676L3.27787 4.15294H3.9766C4.07537 4.15294 4.17231 4.14092 4.26923 4.12985C4.308 4.13631 4.3431 4.15294 4.38371 4.15294H13.6145C13.6551 4.15294 13.6902 4.13631 13.7289 4.12985C13.8258 4.14092 13.9218 4.15294 14.0215 4.15294H14.7203L14.0197 14.676ZM11.5385 8.076V12.6914C11.5385 13.0735 11.2283 13.3837 10.8462 13.3837C10.464 13.3837 10.1538 13.0735 10.1538 12.6914V8.076C10.1538 7.69385 10.464 7.38369 10.8462 7.38369C11.2283 7.38369 11.5385 7.69385 11.5385 8.076ZM7.84615 8.076V12.6914C7.84615 13.0735 7.536 13.3837 7.15385 13.3837C6.77169 13.3837 6.46154 13.0735 6.46154 12.6914V8.076C6.46154 7.69385 6.77169 7.38369 7.15385 7.38369C7.536 7.38369 7.84615 7.69385 7.84615 8.076Z"
+              fill="currentColor"
+            />
+          </svg>
+          Delete Version
+        </button>
+      }
+    </div>
+  } @else {
+    <div animate.enter="fade-in-up" class="p-8 text-center">
+      <img
+        class="mx-auto mb-[70px]"
+        ngSrc="/assets/images/hippo-empty.svg"
+        alt="hippo-empty"
+        height="243"
+        width="510"
+      />
+      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+    </div>
+  }
+}

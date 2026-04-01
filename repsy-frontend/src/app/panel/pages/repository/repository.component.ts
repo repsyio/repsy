@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { CommonModule } from '@angular/common';
+import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
@@ -35,6 +35,7 @@ import { RepoType } from '../../shared/dto/repo/repo-type';
 import { ByteFormatter } from '../../shared/util/byte-formatter';
 import { ProfileService } from '../profile/service/profile.service';
 import { DockerService } from './docker/service/docker.service';
+import { GolangService } from './golang/service/golang.service';
 import { MavenService } from './maven/service/maven.service';
 import { NpmService } from './npm/service/npm.service';
 import { PypiService } from './pypi/service/pypi.service';
@@ -44,6 +45,7 @@ import { PypiService } from './pypi/service/pypi.service';
   standalone: true,
   imports: [
     CommonModule,
+    NgOptimizedImage,
     EmptyListComponent,
     SearchboxComponent,
     SelectorComponent,
@@ -65,7 +67,7 @@ export class RepositoryComponent {
   public paginatedRepos: RepoListItem[] = [];
   public createRepoModal: boolean;
   public repoOption = RepoType.ALL;
-  public repoOptions = [RepoType.ALL, RepoType.DOCKER, RepoType.MAVEN, RepoType.NPM, RepoType.PYPI];
+  public repoOptions = [RepoType.ALL, RepoType.DOCKER, RepoType.GOLANG, RepoType.MAVEN, RepoType.NPM, RepoType.PYPI];
   public loading = true;
   public operationLock = false;
   public username: string;
@@ -77,6 +79,7 @@ export class RepositoryComponent {
     private readonly npmService: NpmService,
     private readonly pypiService: PypiService,
     private readonly dockerService: DockerService,
+    private readonly golangService: GolangService,
     private readonly profileService: ProfileService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
@@ -160,6 +163,7 @@ export class RepositoryComponent {
     this.fetchRepositories(RepoType.NPM);
     this.fetchRepositories(RepoType.PYPI);
     this.fetchRepositories(RepoType.DOCKER);
+    this.fetchRepositories(RepoType.GOLANG);
   }
 
   private fetchRepositories(repoType: RepoType): void {
@@ -193,6 +197,8 @@ export class RepositoryComponent {
         return this.pypiService.fetchRepositories();
       case RepoType.DOCKER:
         return this.dockerService.fetchRepositories();
+      case RepoType.GOLANG:
+        return this.golangService.fetchRepositories();
       default:
         return Promise.reject('Unsupported repository type');
     }
@@ -208,6 +214,8 @@ export class RepositoryComponent {
         return this.pypiService.deleteRepository(repo.name);
       case RepoType.DOCKER:
         return this.dockerService.deleteRepository(repo.name);
+      case RepoType.GOLANG:
+        return this.golangService.deleteRepository(repo.name);
       default:
         return Promise.reject('Unsupported repository type');
     }

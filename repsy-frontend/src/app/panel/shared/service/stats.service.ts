@@ -188,4 +188,40 @@ export class StatsService {
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
     });
   }
+
+  public async getGolangRepoCount(): Promise<number> {
+    const url = `${this.apiBaseUrl}/api/go/repo/count`;
+
+    return new Promise<number>((resolve, reject) => {
+      return this.http
+        .get<RestResponse<number>>(url)
+        .toPromise()
+        .then((res: RestResponse<number>) => resolve(res.data))
+        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
+    });
+  }
+
+  public async fetchGolangRepositoryUsage(repo: string): Promise<RepoUsageInfo> {
+    return new Promise<RepoUsageInfo>((resolve, reject) => {
+      const url = `${this.apiBaseUrl}/api/go/repo/${repo}/usage`;
+
+      this.http
+        .get<RestResponse<RepoUsageInfo>>(url)
+        .toPromise()
+        .then((res: RestResponse<RepoUsageInfo>) => resolve(res.data))
+        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
+    });
+  }
+
+  public async getGolangRepoInfo(): Promise<RepoListInfo[]> {
+    const url = `${this.apiBaseUrl}/api/go/repo/info`;
+
+    return new Promise<RepoListInfo[]>((resolve, reject) => {
+      return this.http
+        .get<RestResponse<RepoListInfo[]>>(url)
+        .toPromise()
+        .then((res: RestResponse<RepoListInfo[]>) => resolve(res.data))
+        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
+    });
+  }
 }

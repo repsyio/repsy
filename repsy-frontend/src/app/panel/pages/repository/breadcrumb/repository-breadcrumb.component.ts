@@ -31,6 +31,7 @@ import { RepoLookupService } from '../repo-entry/repo-lookup.service';
 export class RepositoryBreadcrumbComponent implements OnInit, OnDestroy {
   public crumbs: string[] = [];
   public crumbLinks: string[] = [];
+  public crumbQueryParams: (Record<string, string> | null)[] = [];
   public repoIcon = '';
   private routerSubscription: Subscription | null = null;
 
@@ -60,6 +61,7 @@ export class RepositoryBreadcrumbComponent implements OnInit, OnDestroy {
 
     this.crumbs = [];
     this.crumbLinks = [];
+    this.crumbQueryParams = [];
 
     if (!currentRepo) {
       return;
@@ -71,8 +73,10 @@ export class RepositoryBreadcrumbComponent implements OnInit, OnDestroy {
 
     this.crumbs.push('Repositories');
     this.crumbLinks.push('/repositories');
+    this.crumbQueryParams.push(null);
     this.crumbs.push(repoName);
     this.crumbLinks.push(`/${repoName}`);
+    this.crumbQueryParams.push(null);
 
     const currentUrl = this.router.url;
     const urlTree = this.router.parseUrl(currentUrl);
@@ -83,6 +87,7 @@ export class RepositoryBreadcrumbComponent implements OnInit, OnDestroy {
     }
 
     const segments = primary.segments;
+    const queryParams = urlTree.queryParams as Record<string, string>;
 
     let currentLink = `/${repoName}`;
 
@@ -96,12 +101,27 @@ export class RepositoryBreadcrumbComponent implements OnInit, OnDestroy {
         continue;
       }
 
-      if (repoType === 'npm' && i === 2 && segments.at(-1).path !== 'settings') {
+      if (repoType === 'npm' && i === 2 && segments.at(-1)?.path !== 'settings') {
         path = `@${path}`;
+      }
+
+      if (repoType === 'golang' && path === 'modules' && queryParams['modulePath']) {
+        this.crumbs.push(queryParams['modulePath']);
+        this.crumbLinks.push(`/${repoName}/modules`);
+        this.crumbQueryParams.push({ modulePath: queryParams['modulePath'] });
+        continue;
+      }
+
+      if (repoType === 'golang' && path === 'version' && queryParams['version']) {
+        this.crumbs.push(queryParams['version']);
+        this.crumbLinks.push(currentLink);
+        this.crumbQueryParams.push(null);
+        continue;
       }
 
       this.crumbs.push(path);
       this.crumbLinks.push(currentLink);
+      this.crumbQueryParams.push(null);
     }
   }
 
@@ -115,6 +135,8 @@ export class RepositoryBreadcrumbComponent implements OnInit, OnDestroy {
         return 'assets/icons/repo/pypi.svg';
       case 'docker':
         return 'assets/icons/repo/docker.svg';
+      case 'golang':
+        return 'assets/icons/repo/golang.svg';
       default:
         return '';
     }

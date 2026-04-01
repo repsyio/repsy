@@ -338,6 +338,17 @@
       >
       </app-npm-config>
     }
+    @case (RepoType.GOLANG) {
+      <app-golang-config
+        (openChange)="openConfigure($event)"
+        [(open)]="showConfig"
+        [baseUrl]="this.environment.repoBaseUrl"
+        [username]="this.selectedDeployToken.username"
+        [repoName]="this.activeRepository.repoName"
+        [deployToken]="true"
+      >
+      </app-golang-config>
+    }
     @default {
       <p>No config available for this repository.</p>
     }

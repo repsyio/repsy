@@ -1,0 +1,37 @@
+-- Golang Protocol Support
+
+INSERT INTO "reserved_username" ("username") VALUES ('go') ON CONFLICT DO NOTHING;
+INSERT INTO "reserved_username" ("username") VALUES ('golang') ON CONFLICT DO NOTHING;
+
+-- Add GOLANG to repo type constraint
+ALTER TABLE "public"."repo" DROP CONSTRAINT IF EXISTS "ch_repo__type";
+ALTER TABLE "public"."repo" ADD CONSTRAINT "ch_repo__type" CHECK ("type" IN ('MAVEN', 'NPM', 'PYPI', 'DOCKER', 'GOLANG'));
+
+-- GO MODULE
+CREATE TABLE IF NOT EXISTS "go_module" (
+    "id"             uuid         PRIMARY KEY,
+    "repo_id"        uuid         NOT NULL,
+    "module_path"    varchar(500) NOT NULL,
+    "latest_version" varchar(100),
+    "created_at"     timestamp,
+    CONSTRAINT "fk_go_module__repo_id"
+    FOREIGN KEY ("repo_id") REFERENCES "repo" ("id") ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX "ux_go_module__repo_id_module_path" ON "go_module" ("repo_id", "module_path");
+CREATE INDEX        "idx_go_module__repo_id"             ON "go_module" ("repo_id");
+CREATE INDEX        "idx_go_module__module_path"         ON "go_module" ("module_path");
+
+-- GO MODULE VERSION
+CREATE TABLE IF NOT EXISTS "go_module_version" (
+    "id"         uuid         PRIMARY KEY,
+    "module_id"  uuid         NOT NULL,
+    "version"    varchar(100) NOT NULL,
+    "go_version" varchar(20),
+    "created_at" timestamp,
+    CONSTRAINT "fk_go_module_version__module_id"
+    FOREIGN KEY ("module_id") REFERENCES "go_module" ("id") ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX "ux_go_module_version__module_id_version" ON "go_module_version" ("module_id", "version");
+CREATE INDEX        "idx_go_module_version__module_id"         ON "go_module_version" ("module_id");

@@ -30,6 +30,7 @@ export class RepositoryCardComponent {
   @Input() npmRegistryCount: number;
   @Input() pypiRepoCount: number;
   @Input() dockerRepoCount: number;
+  @Input() golangRepoCount: number;
 
   routeMaven() {
     this.router.navigate(['/repositories'], {
@@ -52,6 +53,12 @@ export class RepositoryCardComponent {
   routeDocker() {
     this.router.navigate(['/repositories'], {
       state: { repoType: 'docker' },
+    });
+  }
+
+  routeGolang() {
+    this.router.navigate(['/repositories'], {
+      state: { repoType: 'golang' },
     });
   }
 }
