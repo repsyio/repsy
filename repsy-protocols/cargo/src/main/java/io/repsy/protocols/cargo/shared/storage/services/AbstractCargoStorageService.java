@@ -101,17 +101,6 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
   }
 
   @Override
-  public Resource getIndex(final UUID repoId, final String repoName, final String crateName) {
-
-    final var indexPath = this.getIndexPath(crateName);
-    final var storagePath = StoragePath.of(repoId, indexPath.toString());
-
-    return this.storageStrategy
-        .get(storagePath, repoName)
-        .orElseThrow(() -> new ItemNotFoundException("indexNotFound"));
-  }
-
-  @Override
   public long deleteCrate(
       final UUID repoId, final String repoName, final String crateName, final String versionName) {
 

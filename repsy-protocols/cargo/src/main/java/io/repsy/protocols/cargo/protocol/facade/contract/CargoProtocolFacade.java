@@ -46,4 +46,10 @@ public interface CargoProtocolFacade<ID> {
   CrateInfo getCrate(ProtocolContext context);
 
   CrateVersionInfo getCrateVersion(ProtocolContext context);
+
+  // List<CargoOwnerItem> listOwners(ProtocolContext context, @Nullable String authHeader);
+
+  //  void addOwners(ProtocolContext context, List<String> logins);
+  //
+  //  void removeOwners(ProtocolContext context, List<String> logins);
 }

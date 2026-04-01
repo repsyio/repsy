@@ -19,6 +19,8 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
+import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
+import io.repsy.protocols.cargo.protocol.facade.contract.CargoProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,19 +32,32 @@ import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import tools.jackson.databind.ObjectMapper;
 
 @NullMarked
-public abstract class AbstractCargoOwnersProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractCargoOwnersProtocolMethodHandler<ID>
+    implements ProtocolMethodHandler {
 
   private static final Pattern OWNERS_PATTERN = Pattern.compile(".*/api/v1/crates/[^/]+/owners$");
 
+  private static final String MSG_OWNERS_UPDATED =
+      "Ownership is managed at the repository level in this registry";
+
   private final PathParser basePathParser;
+  private final CargoProtocolFacade<ID> facade;
+  private final ObjectMapper objectMapper;
 
   public AbstractCargoOwnersProtocolMethodHandler(
-      final PathParser basePathParser, final CargoProtocolProvider provider) {
+      final PathParser basePathParser,
+      final CargoProtocolFacade<ID> facade,
+      final ObjectMapper objectMapper,
+      final CargoProtocolProvider provider) {
     this.basePathParser = basePathParser;
+    this.facade = facade;
+    this.objectMapper = objectMapper;
     provider.registerMethodHandler(this);
   }
 
@@ -85,8 +100,36 @@ public abstract class AbstractCargoOwnersProtocolMethodHandler implements Protoc
       final HttpServletRequest request,
       final HttpServletResponse response) {
 
-    return ResponseEntity.ok()
-        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-        .body(Map.of("users", List.of()));
+    try {
+      //      final var method = HttpMethod.valueOf(request.getMethod());
+      //
+      //      if (HttpMethod.GET.equals(method)) {
+      //        final var authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+      //        final var owners = this.facade.listOwners(context, authHeader);
+      //        return ResponseEntity.ok()
+      //            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+      //            .body(Map.of("users", owners));
+      //      }
+
+      //      final var body =
+      //          this.objectMapper.readValue(request.getInputStream(), CargoOwnersRequest.class);
+      //      final var logins =
+      // body.users().stream().map(CargoOwnersRequest.UserLogin::login).toList();
+      //
+      //      if (HttpMethod.PUT.equals(method)) {
+      //        this.facade.addOwners(context, logins);
+      //      } else {
+      //        this.facade.removeOwners(context, logins);
+      //      }
+
+      return ResponseEntity.ok()
+          .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+          .body(Map.of("ok", true, "msg", MSG_OWNERS_UPDATED));
+
+    } catch (final Exception e) {
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+          .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+          .body(CargoErrorResponse.of(e.getMessage()));
+    }
   }
 }

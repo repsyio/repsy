@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -94,8 +94,12 @@ public abstract class AbstractCargoSearchProtocolMethodHandler<ID>
       final var query = request.getParameter("q");
       final var perPage =
           Optional.ofNullable(request.getParameter("per_page")).map(Integer::parseInt).orElse(10);
+      final var page =
+          Optional.ofNullable(request.getParameter("page")).map(Integer::parseInt).orElse(1);
 
-      final var pageable = Pageable.ofSize(Math.min(perPage, 100));
+      final var clampedPerPage = Math.min(Math.max(perPage, 1), 100);
+      final var zeroBasedPage = Math.max(page - 1, 0);
+      final var pageable = PageRequest.of(zeroBasedPage, clampedPerPage);
       final var result = this.facade.search(context, query != null ? query : "", pageable);
 
       return ResponseEntity.ok()

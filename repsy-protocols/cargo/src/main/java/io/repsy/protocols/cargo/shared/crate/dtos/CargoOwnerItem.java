@@ -13,18 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.shared.constants;
+package io.repsy.protocols.cargo.shared.crate.dtos;
 
-import lombok.NoArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 @NullMarked
-@NoArgsConstructor
-public final class ErrorConstants {
-
-  public static final String REPO_NOT_FOUND = "repoNotFound";
-  public static final String UN_AUTHORIZED = "unAuthorized";
-  public static final String ACCESS_NOT_ALLOWED = "accessNotAllowed";
-  public static final String PACKAGE_NOT_FOUND = "packageNotFound";
-  public static final String PACKAGE_VERSION_NOT_FOUND = "packageVersionNotFound";
-}
+public record CargoOwnerItem(long id, String login, @Nullable String name) {}

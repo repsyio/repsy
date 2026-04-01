@@ -54,6 +54,30 @@ public class CargoAuthComponent extends ProtocolAuthService {
     super(userTxService, jwtUtils, deployTokenService);
   }
 
+  public void authorizeRequest(
+      final BaseRepoInfo<UUID> repoInfo,
+      final @Nullable String authHeader,
+      final Permission permission) {
+
+    final var authRequired = repoInfo.isPrivateRepo() || this.isWritePermissionRequired(permission);
+
+    if (!authRequired) {
+      if (authHeader != null) {
+        this.processAuthRequest(repoInfo, authHeader, permission);
+      }
+      return;
+    }
+
+    if (authHeader == null) {
+      if (repoInfo.isPrivateRepo()) {
+        throw new ItemNotFoundException("repoNotFound");
+      }
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    this.processAuthRequest(repoInfo, authHeader, permission);
+  }
+
   public String authenticateAndCreateToken(final String authHeader) {
 
     if (isBasicToken(authHeader)) {
@@ -70,110 +94,32 @@ public class CargoAuthComponent extends ProtocolAuthService {
     throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
   }
 
-  public void authorizeRequest(
-      final BaseRepoInfo<UUID> repoInfo,
-      final @Nullable String authHeader,
-      final Permission permission) {
-
-    final var authRequired = repoInfo.isPrivateRepo() || this.isWritePermissionRequired(permission);
-
-    if (authRequired) {
-      this.handleRequiredAuthentication(authHeader, repoInfo, permission);
-      return;
-    }
-
-    this.handleOptionalAuthentication(authHeader, repoInfo, permission);
-  }
-
-  private void handleRequiredAuthentication(
-      final @Nullable String authHeader,
-      final BaseRepoInfo<UUID> repoInfo,
-      final Permission permission) {
-
-    if (authHeader == null) {
-      this.throwAuthenticationError(repoInfo);
-      return;
-    }
-
-    this.processAuthRequest(repoInfo, authHeader, permission);
-  }
-
-  private void throwAuthenticationError(final BaseRepoInfo<UUID> repoInfo) {
-
-    if (repoInfo.isPrivateRepo()) {
-      throw new ItemNotFoundException("repoNotFound");
-    }
-
-    throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-  }
-
-  private void handleOptionalAuthentication(
-      final @Nullable String authHeader,
-      final BaseRepoInfo<UUID> repoInfo,
-      final Permission permission) {
-
-    if (authHeader == null) {
-      return;
-    }
-
-    this.processAuthRequest(repoInfo, authHeader, permission);
-  }
-
   private void processAuthRequest(
       final BaseRepoInfo<UUID> repoInfo, final String authHeader, final Permission permission) {
 
-    //    final var authType = this.extractAuthenticationTypeSafely(authHeader);
-    //
-    //    if (authType == AuthenticationType.DEPLOY_TOKEN) {
-    //      final var tokenId = this.jwtUtils.extractUserId(authHeader);
-    //      this.authorizeTokenRequestTokenId(repoInfo.getStorageKey(), tokenId, permission);
-    //      return;
-    //    }
+    // Cargo CLI sends tokens without a prefix — normalise to Bearer for uniform handling.
+    final var normalized =
+        (isBasicToken(authHeader) || isBearerToken(authHeader))
+            ? authHeader
+            : "Bearer " + authHeader;
 
-    final var normalizedHeader =
-        isBasicToken(authHeader) || isBearerToken(authHeader) ? authHeader : "Bearer " + authHeader;
+    final UserInfo userInfo;
 
-    final var userInfo = this.resolveUserInfo(repoInfo, normalizedHeader);
+    if (isBasicToken(normalized)) {
+      userInfo = this.resolveBasicAuthUser(normalized);
+    } else {
+      userInfo = this.resolveBearerAuthUser(repoInfo, normalized);
+    }
+
     this.authorizeUser(userInfo, permission);
   }
 
-  private @Nullable AuthenticationType extractAuthenticationTypeSafely(final String authHeader) {
-
-    try {
-      return this.jwtUtils.extractAuthenticationType(authHeader);
-    } catch (final IllegalArgumentException _) {
-      return null;
-    }
-  }
-
-  private @Nullable UserInfo resolveUserInfo(
-      final BaseRepoInfo<UUID> repoInfo, final String authHeader) {
-
-    if (isBasicToken(authHeader)) {
-      return this.resolveBasicAuthUser(repoInfo, authHeader);
-    }
-
-    if (isBearerToken(authHeader)) {
-      return this.resolveBearerAuthUser(repoInfo, authHeader);
-    }
-
-    if (repoInfo.isPrivateRepo()) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    return null;
-  }
-
-  private @Nullable UserInfo resolveBasicAuthUser(
-      final BaseRepoInfo<UUID> repoInfo, final String authHeader) {
+  private UserInfo resolveBasicAuthUser(final String authHeader) {
 
     final var credentials = extractCredentialsFromAuthHeader(authHeader);
 
     if (credentials == null) {
-      if (repoInfo.isPrivateRepo()) {
-        throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-      }
-      return null;
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
     final var userInfo = this.userTxService.getUserByUsername(credentials.getUsername());
@@ -249,10 +195,5 @@ public class CargoAuthComponent extends ProtocolAuthService {
             userInfo.getId(), userInfo.getUsername(), TIMEOUT_ACCESS_TOKEN);
 
     return Optional.of(token);
-  }
-
-  public boolean isWritePermissionRequired(final Permission permission) {
-
-    return permission == Permission.MANAGE || permission == Permission.WRITE;
   }
 }

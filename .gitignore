@@ -58,3 +58,5 @@ package-lock.json
 application-local.yml
 
 # Vercel
+
+.cursor

@@ -28,6 +28,7 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
@@ -77,39 +78,53 @@ public abstract class CargoCrateConverter {
   public abstract CrateIndexEntry toCrateIndexEntry(CargoCrateIndex index);
 
   @Named("authorsToStrings")
-  protected List<String> authorsToStrings(java.util.Set<CargoAuthor> authors) {
-    if (authors == null) return Collections.emptyList();
+  protected List<String> authorsToStrings(final Set<CargoAuthor> authors) {
+    if (authors == null) {
+      return Collections.emptyList();
+    }
     return authors.stream().map(CargoAuthor::getAuthor).toList();
   }
 
   @Named("keywordsToStrings")
-  protected List<String> keywordsToStrings(java.util.Set<CargoKeyword> keywords) {
-    if (keywords == null) return Collections.emptyList();
+  protected List<String> keywordsToStrings(final Set<CargoKeyword> keywords) {
+    if (keywords == null) {
+      return Collections.emptyList();
+    }
+
     return keywords.stream().map(CargoKeyword::getKeyword).toList();
   }
 
   @Named("categoriesToStrings")
-  protected List<String> categoriesToStrings(java.util.Set<CargoCategory> categories) {
-    if (categories == null) return Collections.emptyList();
+  protected List<String> categoriesToStrings(final Set<CargoCategory> categories) {
+    if (categories == null) {
+      return Collections.emptyList();
+    }
+
     return categories.stream().map(CargoCategory::getCategory).toList();
   }
 
   @Named("jsonToDeps")
-  protected List<CrateIndexDep> jsonToDeps(String json) {
-    if (json == null) return Collections.emptyList();
+  protected List<CrateIndexDep> jsonToDeps(final String json) {
+    if (json == null) {
+      return List.of();
+    }
+
     try {
-      return objectMapper.readValue(json, new TypeReference<>() {});
-    } catch (JacksonIOException e) {
-      return Collections.emptyList();
+      return this.objectMapper.readValue(json, new TypeReference<>() {});
+    } catch (final JacksonIOException e) {
+      return List.of();
     }
   }
 
   @Named("jsonToFeatures")
-  protected Map<String, List<String>> jsonToFeatures(String json) {
-    if (json == null) return Collections.emptyMap();
+  protected Map<String, List<String>> jsonToFeatures(final String json) {
+    if (json == null) {
+      return Collections.emptyMap();
+    }
+
     try {
-      return objectMapper.readValue(json, new TypeReference<>() {});
-    } catch (JacksonIOException e) {
+      return this.objectMapper.readValue(json, new TypeReference<>() {});
+    } catch (final JacksonIOException e) {
       return Collections.emptyMap();
     }
   }

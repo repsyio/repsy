@@ -13,14 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.maven.shared.constant;
+package io.repsy.protocols.cargo.shared.crate.dtos;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.List;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked
-public final class MavenConstants {
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record CargoOwnersRequest(List<CargoOwnersRequest.UserLogin> users) {
 
-  private MavenConstants() {}
-
-  public static final String URL_PROPERTY_KEY = "urlProperties";
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record UserLogin(String login) {}
 }

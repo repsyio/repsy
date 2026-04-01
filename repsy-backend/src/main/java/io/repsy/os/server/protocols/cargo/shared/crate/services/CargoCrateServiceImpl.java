@@ -251,7 +251,9 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
     final var order = pageable.getSort().iterator().next();
     Comparator<CrateVersionListItem> comparator =
         "version".equalsIgnoreCase(order.getProperty())
-            ? Comparator.comparing(CrateVersionListItem::version, new SemverComparator())
+            ? Comparator.comparing(
+                CrateVersionListItem::version,
+                new io.repsy.protocols.cargo.shared.crate.services.SemverComparator())
             : Comparator.comparing(CrateVersionListItem::createdAt);
 
     if (order.isDescending()) {
@@ -402,7 +404,10 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
   private void updateCrateMaxVersion(final CargoCrate crate, final String newVers) {
 
     final var currentMax = crate.getMaxVersion();
-    if (currentMax == null || new SemverComparator().compare(newVers, currentMax) > 0) {
+    if (currentMax == null
+        || new io.repsy.protocols.cargo.shared.crate.services.SemverComparator()
+                .compare(newVers, currentMax)
+            > 0) {
       crate.setMaxVersion(newVers);
     }
     crate.setLastUpdatedAt(Instant.now());
@@ -418,7 +423,10 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
     }
 
     final var maxVers =
-        remaining.stream().map(CargoCrateIndex::getVers).max(new SemverComparator()).orElse("");
+        remaining.stream()
+            .map(CargoCrateIndex::getVers)
+            .max(new io.repsy.protocols.cargo.shared.crate.services.SemverComparator())
+            .orElse("");
 
     crate.setMaxVersion(maxVers);
     this.crateRepository.save(crate);

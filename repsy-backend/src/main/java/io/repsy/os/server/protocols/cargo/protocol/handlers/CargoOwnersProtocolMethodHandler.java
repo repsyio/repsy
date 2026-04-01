@@ -17,18 +17,25 @@ package io.repsy.os.server.protocols.cargo.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
+import io.repsy.protocols.cargo.protocol.facade.contract.CargoProtocolFacade;
 import io.repsy.protocols.cargo.protocol.handlers.AbstractCargoOwnersProtocolMethodHandler;
+import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 @NullMarked
-public class CargoOwnersProtocolMethodHandler extends AbstractCargoOwnersProtocolMethodHandler {
+public class CargoOwnersProtocolMethodHandler
+    extends AbstractCargoOwnersProtocolMethodHandler<UUID> {
 
   public CargoOwnersProtocolMethodHandler(
       @Qualifier("osCargoPathParser") final PathParser basePathParser,
+      final CargoProtocolFacade<UUID> facade,
+      final ObjectMapper objectMapper,
       final CargoProtocolProvider provider) {
-    super(basePathParser, provider);
+
+    super(basePathParser, facade, objectMapper, provider);
   }
 }

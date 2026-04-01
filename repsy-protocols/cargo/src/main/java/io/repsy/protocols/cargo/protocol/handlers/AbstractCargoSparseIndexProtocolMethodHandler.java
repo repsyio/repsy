@@ -76,7 +76,10 @@ public abstract class AbstractCargoSparseIndexProtocolMethodHandler<ID>
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ);
+    return Map.of(
+        "permission", Permission.READ,
+        "skipPreProcessor", true,
+        "skipHeaderPreProcessor", true);
   }
 
   @Override
@@ -125,7 +128,8 @@ public abstract class AbstractCargoSparseIndexProtocolMethodHandler<ID>
           .body(body);
 
     } catch (final Exception e) {
-      log.warn("Cargo sparse index failed for {}: {}", request.getServletPath(), e.getMessage());
+      log.debug(
+          "Cargo sparse index lookup failed for {}: {}", request.getServletPath(), e.getMessage());
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
   }

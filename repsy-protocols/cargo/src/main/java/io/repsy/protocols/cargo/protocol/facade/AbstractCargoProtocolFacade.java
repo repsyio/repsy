@@ -27,21 +27,19 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -51,11 +49,16 @@ import tools.jackson.databind.ObjectMapper;
 @NullMarked
 public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFacade<ID> {
 
-  private static final int ONE = 1;
   private static final int TWO = 2;
   private static final int THREE = 3;
   private static final String USAGES = "usages";
   private static final String SHA256 = "SHA-256";
+
+  private static final Pattern CRATE_NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9_-]*$");
+  private static final int MAX_NAME_LENGTH = 64;
+  private static final Pattern SEMVER_PATTERN = Pattern.compile("^\\d+\\.\\d+\\.\\d+.*$");
+  private static final int MAX_KEYWORDS = 5;
+  private static final int MAX_KEYWORD_LENGTH = 20;
 
   private final CargoStorageService cargoStorageService;
   private final CargoCrateService<ID> cargoCrateService;
@@ -65,13 +68,9 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   public List<CrateIndexEntry> getIndexEntries(final ProtocolContext context) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var repoId = repoInfo.getStorageKey();
     final var crateName = extractLastSegment(context);
 
-    final var indexResource =
-        this.cargoStorageService.getIndex(repoId, repoInfo.getName(), crateName);
-
-    return this.parseIndexResource(indexResource);
+    return this.cargoCrateService.getIndexEntries(repoInfo, crateName);
   }
 
   @Override
@@ -101,6 +100,8 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
     final var jsonLength = readU32LittleEndian(inputStream);
     final var jsonBytes = inputStream.readNBytes((int) jsonLength);
     final var request = this.objectMapper.readValue(jsonBytes, CratePublishRequest.class);
+
+    validatePublishRequest(request);
 
     final var crateLength = readU32LittleEndian(inputStream);
     final var crateBytes = inputStream.readNBytes((int) crateLength);
@@ -147,7 +148,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var segments = splitPath(context);
-    final var crateName = segments[segments.length - THREE];
+    final var crateName = normalizeCrateName(segments[segments.length - THREE]);
     final var vers = segments[segments.length - TWO];
 
     this.cargoCrateService.yank(repoInfo, crateName, vers);
@@ -158,11 +159,23 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var segments = splitPath(context);
-    final var crateName = segments[segments.length - THREE];
+    final var crateName = normalizeCrateName(segments[segments.length - THREE]);
     final var vers = segments[segments.length - TWO];
 
     this.cargoCrateService.unyank(repoInfo, crateName, vers);
   }
+
+  //  @Override
+  //  public List<CargoOwnerItem> listOwners(
+  //      final ProtocolContext context, final @Nullable String authHeader) {
+  //    return List.of();
+  //  }
+  //
+  //  @Override
+  //  public void addOwners(final ProtocolContext context, final List<String> logins) {}
+  //
+  //  @Override
+  //  public void removeOwners(final ProtocolContext context, final List<String> logins) {}
 
   @Override
   public Page<CrateListItem> search(
@@ -244,26 +257,64 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
         packageName);
   }
 
-  private List<CrateIndexEntry> parseIndexResource(final Resource resource) {
+  private static void validatePublishRequest(final CratePublishRequest request) {
+    validateCrateName(request.name());
+    validateVersion(request.vers());
+    validateKeywords(request.keywords());
+  }
 
-    final var entries = new ArrayList<CrateIndexEntry>();
+  private static void validateCrateName(final @Nullable String name) {
 
-    try (final var reader =
-        new BufferedReader(
-            new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8))) {
-
-      String line;
-      while ((line = reader.readLine()) != null) {
-        if (!line.isBlank()) {
-          entries.add(this.objectMapper.readValue(line, CrateIndexEntry.class));
-        }
-      }
-
-    } catch (final IOException e) {
-      return List.of();
+    if (name == null || name.isBlank()) {
+      throw new IllegalArgumentException("crate name cannot be empty");
     }
 
-    return entries;
+    if (name.length() > MAX_NAME_LENGTH) {
+      throw new IllegalArgumentException(
+          "crate name `%s` must be at most %d characters".formatted(name, MAX_NAME_LENGTH));
+    }
+
+    if (!CRATE_NAME_PATTERN.matcher(name).matches()) {
+      throw new IllegalArgumentException(
+          "crate name `%s` must start with an alphanumeric character and contain only alphanumerics, `-`, or `_`"
+              .formatted(name));
+    }
+  }
+
+  private static void validateVersion(final @Nullable String vers) {
+
+    if (vers == null || vers.isBlank()) {
+      throw new IllegalArgumentException("version cannot be empty");
+    }
+
+    if (!SEMVER_PATTERN.matcher(vers).matches()) {
+      throw new IllegalArgumentException(
+          "version `%s` is not a valid semver format (expected MAJOR.MINOR.PATCH)".formatted(vers));
+    }
+  }
+
+  private static void validateKeywords(final @Nullable List<String> keywords) {
+
+    if (keywords == null) {
+      return;
+    }
+
+    if (keywords.size() > MAX_KEYWORDS) {
+      throw new IllegalArgumentException(
+          "a crate may have at most %d keywords, got %d".formatted(MAX_KEYWORDS, keywords.size()));
+    }
+
+    for (final var kw : keywords) {
+      validateKeyword(kw);
+    }
+  }
+
+  private static void validateKeyword(final String kw) {
+
+    if (kw.length() > MAX_KEYWORD_LENGTH) {
+      throw new IllegalArgumentException(
+          "keyword `%s` must be at most %d characters".formatted(kw, MAX_KEYWORD_LENGTH));
+    }
   }
 
   private static long readU32LittleEndian(final InputStream inputStream) throws IOException {
