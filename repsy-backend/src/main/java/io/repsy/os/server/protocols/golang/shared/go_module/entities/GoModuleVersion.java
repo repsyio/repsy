@@ -59,6 +59,18 @@ public class GoModuleVersion {
   @Column(name = "go_version")
   private @Nullable String goVersion;
 
+  /** h1: hash of the uploaded go.mod file. Null until .mod is uploaded. */
+  @Column(name = "mod_hash", length = 100)
+  private @Nullable String modHash;
+
+  /** h1: hash of the uploaded zip file. Null until .zip is uploaded. */
+  @Column(name = "zip_hash", length = 100)
+  private @Nullable String zipHash;
+
+  /** Publication status of this version record. */
+  @Column(name = "status", nullable = false, length = 20)
+  private String status = "PUBLISHED";
+
   @CreationTimestamp
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;

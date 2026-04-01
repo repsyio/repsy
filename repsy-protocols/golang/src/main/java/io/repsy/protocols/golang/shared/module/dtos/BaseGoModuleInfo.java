@@ -19,7 +19,6 @@ import java.time.Instant;
 import lombok.Data;
 import lombok.experimental.SuperBuilder;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 @Data
 @SuperBuilder
@@ -28,6 +27,5 @@ public class BaseGoModuleInfo<ID> {
 
   private final ID id;
   private final String modulePath;
-  private final @Nullable String latestVersion;
   private final Instant createdAt;
 }

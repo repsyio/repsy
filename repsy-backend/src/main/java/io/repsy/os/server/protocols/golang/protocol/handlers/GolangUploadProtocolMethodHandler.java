@@ -26,8 +26,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @NullMarked
-public class GolangUploadProtocolMethodHandler
-    extends AbstractGoUploadProtocolMethodHandler<UUID> {
+public class GolangUploadProtocolMethodHandler extends AbstractGoUploadProtocolMethodHandler<UUID> {
 
   public GolangUploadProtocolMethodHandler(
       @Qualifier("osGolangPathParser") final PathParser pathParser,

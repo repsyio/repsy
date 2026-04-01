@@ -34,8 +34,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
-public abstract class AbstractGoDownloadProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+public abstract class AbstractGoDownloadProtocolMethodHandler<ID> implements ProtocolMethodHandler {
 
   private final PathParser pathParser;
   private final GoProtocolFacade<ID> goProtocolFacade;
@@ -78,9 +77,7 @@ public abstract class AbstractGoDownloadProtocolMethodHandler<ID>
         return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
       }
 
-      return ResponseEntity.ok()
-          .contentType(this.resolveContentType(context))
-          .body(resource);
+      return ResponseEntity.ok().contentType(this.resolveContentType(context)).body(resource);
     } catch (final ItemNotFoundException _) {
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }

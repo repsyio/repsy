@@ -35,6 +35,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -53,6 +54,17 @@ public class GolangModuleController {
   private final @NonNull RepoTxService repoTxService;
   private final @NonNull GolangApiFacade golangApiFacade;
   private final @NonNull RestResponseFactory restResponseFactory;
+
+  /**
+   * Signals to the Go toolchain that this proxy does not relay checksum database requests.
+   * Returning 404 causes Go to contact sum.golang.org directly for public modules and to rely on
+   * GONOSUMDB for private modules.
+   */
+  @GetMapping("/{repoName}/sumdb/supported")
+  public @NonNull ResponseEntity<Void> checkSumdbSupported(
+      @PathVariable final @NonNull String repoName) {
+    return ResponseEntity.notFound().build();
+  }
 
   @GetMapping("/{repoName}")
   public @NonNull RestResponse<PagedModel<GoModuleListItem>> getModules(
@@ -98,8 +110,7 @@ public class GolangModuleController {
 
     this.golangAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
 
-    final var moduleInfo =
-        this.golangApiFacade.getModuleInfo(repoInfo.getStorageKey(), modulePath);
+    final var moduleInfo = this.golangApiFacade.getModuleInfo(repoInfo.getStorageKey(), modulePath);
 
     return this.restResponseFactory.success("moduleInfoFetched", moduleInfo);
   }

@@ -71,6 +71,11 @@ public abstract class AbstractGoUploadProtocolMethodHandler<ID> implements Proto
       final HttpServletResponse response)
       throws Exception {
 
+    final var sha256 = request.getHeader("Content-Sha256");
+    if (sha256 != null) {
+      context.addProperty("contentSha256", sha256);
+    }
+
     try {
       this.goProtocolFacade.upload(
           context, request.getInputStream(), request.getContentLengthLong());

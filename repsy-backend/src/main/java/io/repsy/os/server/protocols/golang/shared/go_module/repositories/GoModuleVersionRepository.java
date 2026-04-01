@@ -28,6 +28,9 @@ public interface GoModuleVersionRepository extends JpaRepository<GoModuleVersion
 
   Optional<GoModuleVersion> findByGoModuleIdAndVersion(UUID moduleId, String version);
 
+  Optional<GoModuleVersion> findFirstByGoModuleIdAndStatusOrderByCreatedAtDesc(
+      UUID moduleId, String status);
+
   @Query(
       """
       SELECT new io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem(

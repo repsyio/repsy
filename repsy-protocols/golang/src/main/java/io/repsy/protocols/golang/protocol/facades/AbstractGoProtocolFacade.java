@@ -18,13 +18,16 @@ package io.repsy.protocols.golang.protocol.facades;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
 import io.repsy.protocols.golang.shared.dto.GoVersionInfo;
 import io.repsy.protocols.golang.shared.module.services.GoModuleService;
+import io.repsy.protocols.golang.shared.module.validators.GoModFileValidator;
 import io.repsy.protocols.golang.shared.storage.services.GoStorageService;
+import io.repsy.protocols.golang.shared.utils.GoModuleHashCalculator;
 import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -32,9 +35,13 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import lombok.SneakyThrows;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 
@@ -44,15 +51,15 @@ public abstract class AbstractGoProtocolFacade<ID> implements GoProtocolFacade<I
   private static final String LIST_SUFFIX = "/@v/list";
   private static final String LATEST_SUFFIX = "/@latest";
   private static final String INFO_EXTENSION = ".info";
+  private static final String MOD_EXTENSION = ".mod";
   private static final String ZIP_EXTENSION = ".zip";
   private static final String USAGES = "usages";
+  private static final String CONTENT_SHA256_KEY = "contentSha256";
 
   private static final ObjectMapper OBJECT_MAPPER =
       new ObjectMapper()
           .registerModule(new JavaTimeModule())
           .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-
-  private static final String MOD_EXTENSION = ".mod";
 
   private final GoStorageService<ID> goStorageService;
   private final GoModuleService<ID> goModuleService;
@@ -87,39 +94,39 @@ public abstract class AbstractGoProtocolFacade<ID> implements GoProtocolFacade<I
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var path = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var storagePath = StoragePath.of(repoInfo.getStorageKey(), path);
+    final var modulePath = GoVersionUtils.extractModulePath(path);
 
-    if (path.endsWith(MOD_EXTENSION)) {
-      final var content = inputStream.readAllBytes();
-      final var usages =
-          this.goStorageService.writeInputStreamToPath(
-              storagePath, new ByteArrayInputStream(content), repoInfo.getName());
-
-      final var modulePath = GoVersionUtils.extractModulePath(path);
-      final var version = GoVersionUtils.extractVersionFromModPath(path);
-      if (modulePath != null) {
-        this.goModuleService.createOrUpdateModule(repoInfo, modulePath, version);
-        final var goVer = GoVersionUtils.extractGoVersionFromMod(content);
-        this.goModuleService.updateGoVersion(repoInfo, modulePath, version, goVer);
-      }
-
-      context.addProperty(USAGES, usages);
+    if (modulePath == null) {
       return;
     }
 
+    final var version = GoVersionUtils.extractVersionFromPath(path);
+    final var normalizedPath = modulePath.toLowerCase(Locale.ROOT);
+    final var content = inputStream.readAllBytes();
+
+    verifySha256(content, (String) context.getContextMap().get(CONTENT_SHA256_KEY));
+
+    final var modContent = extractGoMod(content, normalizedPath, version);
+    GoModFileValidator.validate(modContent);
+
+    this.goModuleService.publishModule(
+        repoInfo,
+        normalizedPath,
+        version,
+        GoVersionUtils.extractGoVersionFromMod(modContent),
+        GoModuleHashCalculator.hashMod(modContent),
+        GoModuleHashCalculator.hashZip(content));
+
+    this.writeModFile(repoInfo, normalizedPath, version, modContent);
+
+    final var zipStoragePath =
+        StoragePath.of(
+            repoInfo.getStorageKey(), "/" + normalizedPath + "/@v/" + version + ZIP_EXTENSION);
     final var usages =
-        this.goStorageService.writeInputStreamToPath(storagePath, inputStream, repoInfo.getName());
+        this.goStorageService.writeInputStreamToPath(
+            zipStoragePath, new ByteArrayInputStream(content), repoInfo.getName());
 
-    if (path.endsWith(ZIP_EXTENSION)) {
-      this.generateInfoFileIfAbsent(repoInfo, path);
-
-      final var modulePath = GoVersionUtils.extractModulePath(path);
-      final var version = GoVersionUtils.extractVersionFromZipPath(path);
-      if (modulePath != null) {
-        this.goModuleService.createOrUpdateModule(repoInfo, modulePath, version);
-      }
-    }
-
+    this.writeInfoFile(repoInfo, normalizedPath, version);
     context.addProperty(USAGES, usages);
   }
 
@@ -130,7 +137,9 @@ public abstract class AbstractGoProtocolFacade<ID> implements GoProtocolFacade<I
     final var versions =
         this.goStorageService.listDirectory(atVStoragePath).stream()
             .filter(item -> !item.isDirectory() && item.getName().endsWith(INFO_EXTENSION))
-            .map(item -> item.getName().substring(0, item.getName().length() - INFO_EXTENSION.length()))
+            .map(
+                item ->
+                    item.getName().substring(0, item.getName().length() - INFO_EXTENSION.length()))
             .sorted(GoVersionUtils.COMPARATOR)
             .collect(Collectors.joining("\n"));
 
@@ -138,38 +147,70 @@ public abstract class AbstractGoProtocolFacade<ID> implements GoProtocolFacade<I
   }
 
   private Resource handleLatestVersion(final BaseRepoInfo<ID> repoInfo, final String path) {
-    final var modulePath = path.substring(0, path.length() - LATEST_SUFFIX.length());
-    final var atVPath = modulePath + "/@v/";
-    final var atVStoragePath = StoragePath.of(repoInfo.getStorageKey(), atVPath);
-
+    final var modulePath = path.substring(1, path.length() - LATEST_SUFFIX.length());
     final var latestVersion =
-        this.goStorageService.listDirectory(atVStoragePath).stream()
-            .filter(item -> !item.isDirectory() && item.getName().endsWith(INFO_EXTENSION))
-            .map(item -> item.getName().substring(0, item.getName().length() - INFO_EXTENSION.length()))
-            .max(GoVersionUtils.COMPARATOR)
+        this.goModuleService
+            .findLatestPublishedVersion(repoInfo, modulePath)
             .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
 
-    final var infoPath = modulePath + "/@v/" + latestVersion + INFO_EXTENSION;
-    final var infoStoragePath = StoragePath.of(repoInfo.getStorageKey(), infoPath);
-    return this.goStorageService.getResource(repoInfo.getName(), infoStoragePath);
+    final var infoPath = "/" + modulePath + "/@v/" + latestVersion + INFO_EXTENSION;
+    return this.goStorageService.getResource(
+        repoInfo.getName(), StoragePath.of(repoInfo.getStorageKey(), infoPath));
+  }
+
+  private void writeModFile(
+      final BaseRepoInfo<ID> repoInfo,
+      final String modulePath,
+      final String version,
+      final byte[] modContent) {
+
+    final var modPath = "/" + modulePath + "/@v/" + version + MOD_EXTENSION;
+    this.goStorageService.writeInputStreamToPath(
+        StoragePath.of(repoInfo.getStorageKey(), modPath),
+        new ByteArrayInputStream(modContent),
+        repoInfo.getName());
   }
 
   @SneakyThrows
-  private void generateInfoFileIfAbsent(final BaseRepoInfo<ID> repoInfo, final String zipPath) {
-    final var infoPath = zipPath.substring(0, zipPath.length() - ZIP_EXTENSION.length()) + INFO_EXTENSION;
-    final var infoStoragePath = StoragePath.of(repoInfo.getStorageKey(), infoPath);
+  private void writeInfoFile(
+      final BaseRepoInfo<ID> repoInfo, final String modulePath, final String version) {
 
-    try {
-      this.goStorageService.getResource(repoInfo.getName(), infoStoragePath);
-    } catch (final ItemNotFoundException _) {
-      final var version = GoVersionUtils.extractVersionFromZipPath(zipPath);
-      final var versionInfo = GoVersionInfo.builder().version(version).time(Instant.now()).build();
-      final var infoJson = OBJECT_MAPPER.writeValueAsString(versionInfo);
+    final var versionInfo = GoVersionInfo.builder().version(version).time(Instant.now()).build();
+    final var infoJson = OBJECT_MAPPER.writeValueAsString(versionInfo);
+    final var infoPath = "/" + modulePath + "/@v/" + version + INFO_EXTENSION;
 
-      try (final var infoStream =
-          new ByteArrayInputStream(infoJson.getBytes(StandardCharsets.UTF_8))) {
-        this.goStorageService.writeInputStreamToPath(infoStoragePath, infoStream, repoInfo.getName());
+    try (final var infoStream =
+        new ByteArrayInputStream(infoJson.getBytes(StandardCharsets.UTF_8))) {
+      this.goStorageService.writeInputStreamToPath(
+          StoragePath.of(repoInfo.getStorageKey(), infoPath), infoStream, repoInfo.getName());
+    }
+  }
+
+  @SneakyThrows
+  private static byte[] extractGoMod(
+      final byte[] zipContent, final String modulePath, final String version) {
+
+    final var entryName = modulePath + "@" + version + "/go.mod";
+    try (final var zis = new ZipInputStream(new ByteArrayInputStream(zipContent))) {
+      ZipEntry entry;
+      while ((entry = zis.getNextEntry()) != null) {
+        if (entryName.equals(entry.getName())) {
+          return zis.readAllBytes();
+        }
+        zis.closeEntry();
       }
+    }
+    throw new BadRequestException("goModNotFoundInZip");
+  }
+
+  @SneakyThrows
+  private static void verifySha256(final byte[] content, final @Nullable String expected) {
+    if (expected == null) {
+      return;
+    }
+    final var computed = GoModuleHashCalculator.computeSha256Hex(content);
+    if (!computed.equals(expected.toLowerCase(Locale.ROOT))) {
+      throw new BadRequestException("sha256Mismatch");
     }
   }
 }

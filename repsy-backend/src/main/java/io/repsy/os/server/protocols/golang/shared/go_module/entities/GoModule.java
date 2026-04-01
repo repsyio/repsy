@@ -38,7 +38,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
@@ -58,11 +57,8 @@ public class GoModule {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private Repo repo;
 
-  @Column(name = "module_path", nullable = false)
+  @Column(name = "module_path", nullable = false, length = 1024)
   private String modulePath;
-
-  @Column(name = "latest_version")
-  private @Nullable String latestVersion;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false)

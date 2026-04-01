@@ -16,6 +16,7 @@
 package io.repsy.protocols.golang.shared.module.services;
 
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -23,15 +24,22 @@ import org.jspecify.annotations.Nullable;
 public interface GoModuleService<ID> {
 
   /**
-   * Creates a new module record if it does not exist, then creates a version record if it does not
-   * already exist. Updates the module's latest version pointer.
+   * Atomically creates (or reuses) the module record and creates a new version record with
+   * PUBLISHED status. Throws {@link
+   * io.repsy.core.error_handling.exceptions.ItemAlreadyExistException} if the version already
+   * exists.
    */
-  void createOrUpdateModule(BaseRepoInfo<ID> repoInfo, String modulePath, String version);
+  void publishModule(
+      BaseRepoInfo<ID> repoInfo,
+      String modulePath,
+      String version,
+      @Nullable String goVersion,
+      String modHash,
+      String zipHash);
 
   /**
-   * Sets the go toolchain version (from go.mod "go X.Y" directive) on an existing version record.
-   * No-op if the version record is not found.
+   * Returns the version string of the most recently uploaded PUBLISHED version for the given
+   * module, ordered by creation time descending.
    */
-  void updateGoVersion(
-      BaseRepoInfo<ID> repoInfo, String modulePath, String version, @Nullable String goVersion);
+  Optional<String> findLatestPublishedVersion(BaseRepoInfo<ID> repoInfo, String modulePath);
 }

@@ -39,8 +39,7 @@ public class GolangAuthListener {
   @EventListener
   public void onRegistrationCompleted(final @NonNull UserCreatedEvent<UUID> ignoredEvent) {
 
-    final var repoInfo =
-        this.repoTxService.createRepo(GO_REPO_NAME, RepoType.GOLANG, true, null);
+    final var repoInfo = this.repoTxService.createRepo(GO_REPO_NAME, RepoType.GOLANG, true, null);
 
     this.golangStorageService.createRepo(repoInfo.getStorageKey());
   }

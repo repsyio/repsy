@@ -21,14 +21,12 @@ import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleInfo;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleListItem;
-import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleRepository;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleVersionRepository;
 import io.repsy.os.server.protocols.golang.shared.go_module.services.GoModuleServiceImpl;
 import io.repsy.os.server.protocols.golang.shared.storage.services.GolangStorageService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
-import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -72,9 +70,7 @@ public class GolangApiFacade {
   }
 
   public @NonNull Page<GoModuleListItem> searchModules(
-      final @NonNull UUID repoId,
-      final @NonNull String search,
-      final @NonNull Pageable pageable) {
+      final @NonNull UUID repoId, final @NonNull String search, final @NonNull Pageable pageable) {
     return this.goModuleService.getModulesContainsPath(repoId, search, pageable);
   }
 
@@ -85,10 +81,12 @@ public class GolangApiFacade {
 
   @Transactional
   public void deleteModule(final @NonNull RepoInfo repoInfo, final @NonNull String modulePath) {
-    final var goModule = this.findModule(repoInfo.getStorageKey(), modulePath);
+    final var goModule =
+        this.goModuleRepository
+            .findByRepoIdAndModulePath(repoInfo.getStorageKey(), modulePath)
+            .orElseThrow(() -> new ItemNotFoundException("moduleNotFound"));
 
-    final var storagePath =
-        StoragePath.of(repoInfo.getStorageKey(), "/" + modulePath);
+    final var storagePath = StoragePath.of(repoInfo.getStorageKey(), "/" + modulePath);
     this.golangStorageService.deleteDirectory(storagePath);
 
     this.goModuleRepository.delete(goModule);
@@ -100,7 +98,10 @@ public class GolangApiFacade {
       final @NonNull String modulePath,
       final @NonNull String version) {
 
-    final var goModule = this.findModule(repoInfo.getStorageKey(), modulePath);
+    final var goModule =
+        this.goModuleRepository
+            .findByRepoIdAndModulePath(repoInfo.getStorageKey(), modulePath)
+            .orElseThrow(() -> new ItemNotFoundException("moduleNotFound"));
 
     final var moduleVersion =
         this.goModuleVersionRepository
@@ -112,28 +113,5 @@ public class GolangApiFacade {
     this.golangStorageService.deleteVersionFiles(versionStoragePath, repoInfo.getName());
 
     this.goModuleVersionRepository.delete(moduleVersion);
-
-    this.updateLatestVersionAfterDelete(goModule);
-  }
-
-  private @NonNull GoModule findModule(
-      final @NonNull UUID repoId, final @NonNull String modulePath) {
-    return this.goModuleRepository
-        .findByRepoIdAndModulePath(repoId, modulePath)
-        .orElseThrow(() -> new ItemNotFoundException("moduleNotFound"));
-  }
-
-  private void updateLatestVersionAfterDelete(final @NonNull GoModule goModule) {
-    final var versions =
-        this.goModuleVersionRepository.findAllByModuleId(goModule.getId());
-
-    final var newLatest =
-        versions.stream()
-            .map(v -> v.getVersion())
-            .max(GoVersionUtils.COMPARATOR)
-            .orElse(null);
-
-    goModule.setLatestVersion(newLatest);
-    this.goModuleRepository.save(goModule);
   }
 }

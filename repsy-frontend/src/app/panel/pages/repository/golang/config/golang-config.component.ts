@@ -70,13 +70,23 @@ go env -w GOPROXY="${repoUrlWithAuth},off"
 
 > Use \`,off\` as the fallback so Go fails loudly if a module is not in this registry instead of falling back to the internet.
 
-### 2. Disable checksum database for private modules
+### 2. Configure checksum database
+
+Repsy does not implement a checksum database, so private modules cannot be verified against \`sum.golang.org\`.
+Set \`GONOSUMDB\` to the module path prefix to skip checksum verification for private modules
+while keeping it enabled for public ones:
+
+\`\`\`bash
+go env -w GONOSUMDB="corp.internal"
+\`\`\`
+
+Or disable it for all modules:
 
 \`\`\`bash
 go env -w GONOSUMDB="*"
 \`\`\`
 
-> \`GONOSUMDB\` accepts module path prefixes (e.g. \`corp.internal\`) or \`*\` to disable for all modules. Do **not** set \`GOPRIVATE\` or \`GONOPROXY\` — they cause Go to skip the proxy and attempt VCS discovery directly.
+> Do **not** set \`GOPRIVATE\` or \`GONOPROXY\` — they cause Go to skip the proxy and attempt VCS discovery directly.
 
 ### 3. Download a module
 
@@ -88,31 +98,33 @@ go get corp.internal/yourmodule@v1.0.0
 
 ### Publishing a module
 
-Upload the \`.mod\` file first, then the \`.zip\`. Use \`-T\` (not \`-F\` or \`--data-binary\`):
+Upload a single \`.zip\` containing the module source. The zip must include \`go.mod\` and all source files
+prefixed with \`{modulePath}@{version}/\`.
+
+**1. Build the zip:**
 
 \`\`\`bash
 MODULE="corp.internal/yourmodule"
 VERSION="v1.0.0"
 
-curl -sf -u ${this.username}:${password} \\
-  -T go.mod \\
-  "${repoUrl}/\${MODULE}/@v/\${VERSION}.mod"
-
-curl -sf -u ${this.username}:${password} \\
-  -T "\${MODULE}@\${VERSION}.zip" \\
-  "${repoUrl}/\${MODULE}/@v/\${VERSION}.zip"
-\`\`\`
-
-**Zip format rules:**
-- All entries must be prefixed with \`modulepath@version/\`
-- No empty directories — add files only
-- Use individual file arguments, not \`zip -r\`:
-
-\`\`\`bash
 zip module.zip \\
   "\${MODULE}@\${VERSION}/go.mod" \\
   "\${MODULE}@\${VERSION}/yourfile.go"
 \`\`\`
+
+> Use individual file arguments, not \`zip -r\` (which adds directory entries). For larger modules:
+> \`find "\${MODULE}@\${VERSION}" -type f | xargs zip module.zip\`
+
+**2. Upload:**
+
+\`\`\`bash
+curl -sf -u ${this.username}:${password} \\
+  -T module.zip \\
+  -H "Content-Sha256: \$(sha256sum module.zip | cut -d' ' -f1)" \\
+  "${repoUrl}/\${MODULE}/@v/\${VERSION}"
+\`\`\`
+
+> \`Content-Sha256\` is optional but recommended — the server verifies the checksum before saving.
 `;
   }
 }

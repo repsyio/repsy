@@ -15,9 +15,11 @@
  */
 package io.repsy.os.server.protocols.golang.shared.go_module.services;
 
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleInfo;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleListItem;
+import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem;
 import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule;
 import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModuleVersion;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleRepository;
@@ -26,6 +28,8 @@ import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.golang.shared.module.services.GoModuleService;
 import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -41,14 +45,21 @@ import org.springframework.transaction.annotation.Transactional;
 @NullMarked
 public class GoModuleServiceImpl implements GoModuleService<UUID> {
 
+  private static final String STATUS_PUBLISHED = "PUBLISHED";
+
   private final RepoRepository repoRepository;
   private final GoModuleRepository goModuleRepository;
   private final GoModuleVersionRepository goModuleVersionRepository;
 
   @Override
   @Transactional
-  public void createOrUpdateModule(
-      final BaseRepoInfo<UUID> repoInfo, final String modulePath, final String version) {
+  public void publishModule(
+      final BaseRepoInfo<UUID> repoInfo,
+      final String modulePath,
+      final String version,
+      final @Nullable String goVersion,
+      final String modHash,
+      final String zipHash) {
 
     final var repo =
         this.repoRepository
@@ -71,40 +82,31 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
             .findByGoModuleIdAndVersion(goModule.getId(), version)
             .isPresent();
 
-    if (!versionExists) {
-      final var moduleVersion = new GoModuleVersion();
-      moduleVersion.setGoModule(goModule);
-      moduleVersion.setVersion(version);
-      this.goModuleVersionRepository.save(moduleVersion);
+    if (versionExists) {
+      throw new ItemAlreadyExistException("goModuleVersionAlreadyExists");
     }
 
-    final var currentLatest = goModule.getLatestVersion();
-    if (currentLatest == null
-        || GoVersionUtils.COMPARATOR.compare(version, currentLatest) > 0) {
-      goModule.setLatestVersion(version);
-      this.goModuleRepository.save(goModule);
-    }
+    final var moduleVersion = new GoModuleVersion();
+    moduleVersion.setGoModule(goModule);
+    moduleVersion.setVersion(version);
+    moduleVersion.setGoVersion(goVersion);
+    moduleVersion.setModHash(modHash);
+    moduleVersion.setZipHash(zipHash);
+    this.goModuleVersionRepository.save(moduleVersion);
   }
 
   @Override
-  @Transactional
-  public void updateGoVersion(
-      final BaseRepoInfo<UUID> repoInfo,
-      final String modulePath,
-      final String version,
-      final @Nullable String goVersion) {
+  public Optional<String> findLatestPublishedVersion(
+      final BaseRepoInfo<UUID> repoInfo, final String modulePath) {
 
-    this.goModuleRepository
+    return this.goModuleRepository
         .findByRepoIdAndModulePath(repoInfo.getStorageKey(), modulePath)
-        .ifPresent(
-            goModule ->
+        .flatMap(
+            module ->
                 this.goModuleVersionRepository
-                    .findByGoModuleIdAndVersion(goModule.getId(), version)
-                    .ifPresent(
-                        moduleVersion -> {
-                          moduleVersion.setGoVersion(goVersion);
-                          this.goModuleVersionRepository.save(moduleVersion);
-                        }));
+                    .findFirstByGoModuleIdAndStatusOrderByCreatedAtDesc(
+                        module.getId(), STATUS_PUBLISHED)
+                    .map(GoModuleVersion::getVersion));
   }
 
   public Page<GoModuleListItem> getModules(final UUID repoId, final Pageable pageable) {
@@ -122,15 +124,22 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
             .findByRepoIdAndModulePath(repoId, modulePath)
             .orElseThrow(() -> new ItemNotFoundException("moduleNotFound"));
 
-    final var versions =
-        this.goModuleVersionRepository.findAllByModuleId(goModule.getId());
+    final var versions = this.goModuleVersionRepository.findAllByModuleId(goModule.getId());
+    final var latestVersion = this.computeLatestVersion(versions);
 
     return GoModuleInfo.builder()
         .id(goModule.getId())
         .modulePath(goModule.getModulePath())
-        .latestVersion(goModule.getLatestVersion())
+        .latestVersion(latestVersion)
         .createdAt(goModule.getCreatedAt())
         .versions(versions)
         .build();
+  }
+
+  private @Nullable String computeLatestVersion(final List<GoModuleVersionListItem> versions) {
+    return versions.stream()
+        .map(GoModuleVersionListItem::getVersion)
+        .max(GoVersionUtils.COMPARATOR)
+        .orElse(null);
   }
 }

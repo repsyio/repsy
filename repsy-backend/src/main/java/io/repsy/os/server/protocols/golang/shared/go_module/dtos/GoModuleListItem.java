@@ -20,7 +20,6 @@ import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 @Data
 @AllArgsConstructor
@@ -29,6 +28,5 @@ public class GoModuleListItem {
 
   private final UUID id;
   private final String modulePath;
-  private final @Nullable String latestVersion;
   private final Instant createdAt;
 }

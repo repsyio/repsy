@@ -16,6 +16,5 @@
 
 export class ModuleListItem {
   public modulePath: string;
-  public latestVersion: string;
   public createdAt: string;
 }

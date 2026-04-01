@@ -15,8 +15,8 @@
  */
 package io.repsy.os.server.protocols.golang.shared.go_module.repositories;
 
-import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleListItem;
+import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -32,7 +32,7 @@ public interface GoModuleRepository extends JpaRepository<GoModule, UUID> {
   @Query(
       """
       SELECT new io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleListItem(
-          m.id, m.modulePath, m.latestVersion, m.createdAt
+          m.id, m.modulePath, m.createdAt
       )
       FROM GoModule m
       WHERE m.repo.id = :repoId
@@ -42,7 +42,7 @@ public interface GoModuleRepository extends JpaRepository<GoModule, UUID> {
   @Query(
       """
       SELECT new io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleListItem(
-          m.id, m.modulePath, m.latestVersion, m.createdAt
+          m.id, m.modulePath, m.createdAt
       )
       FROM GoModule m
       WHERE m.repo.id = :repoId

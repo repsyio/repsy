@@ -27,8 +27,7 @@ import org.springframework.stereotype.Component;
 public class GolangProtocolFacade extends AbstractGoProtocolFacade<UUID> {
 
   public GolangProtocolFacade(
-      final GolangStorageService golangStorageService,
-      final GoModuleServiceImpl goModuleService) {
+      final GolangStorageService golangStorageService, final GoModuleServiceImpl goModuleService) {
 
     super(golangStorageService, goModuleService);
   }

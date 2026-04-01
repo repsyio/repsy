@@ -26,12 +26,12 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public class GoVersionUtils {
 
-  private static final Pattern SEMVER_PATTERN =
-      Pattern.compile("v(\\d+)\\.(\\d+)\\.(\\d+).*");
+  private static final Pattern SEMVER_PATTERN = Pattern.compile("v(\\d+)\\.(\\d+)\\.(\\d+)(-.*)?");
 
   /**
-   * Comparator for Go semver strings (e.g. "v1.2.3"). Falls back to lexicographic
-   * comparison for non-standard version strings.
+   * Comparator for Go semver strings (e.g. "v1.2.3"). Pre-release versions (e.g. "v1.0.0-beta")
+   * sort after the corresponding release for the same major.minor.patch. Falls back to
+   * lexicographic comparison for non-standard version strings.
    */
   public static final Comparator<String> COMPARATOR =
       (v1, v2) -> {
@@ -49,12 +49,20 @@ public class GoVersionUtils {
           }
         }
 
-        return 0;
+        return comparePreRelease(m1.group(4), m2.group(4));
       };
 
   /**
-   * Extracts the version string from a Go module zip path.
-   * E.g. "/github.com/foo/bar/@v/v1.2.3.zip" → "v1.2.3"
+   * Extracts the version string from the last path segment (no extension stripping). E.g.
+   * "/corp.internal/payments/@v/v1.2.0" → "v1.2.0"
+   */
+  public static String extractVersionFromPath(final String path) {
+    return path.substring(path.lastIndexOf('/') + 1);
+  }
+
+  /**
+   * Extracts the version string from a Go module zip path. E.g. "/github.com/foo/bar/@v/v1.2.3.zip"
+   * → "v1.2.3"
    */
   public static String extractVersionFromZipPath(final String zipPath) {
     final var filename = zipPath.substring(zipPath.lastIndexOf('/') + 1);
@@ -62,9 +70,8 @@ public class GoVersionUtils {
   }
 
   /**
-   * Extracts the module path from a Go proxy URL path.
-   * E.g. "/github.com/foo/bar/@v/v1.2.3.zip" → "github.com/foo/bar"
-   * Returns null if the path does not contain "/@v/".
+   * Extracts the module path from a Go proxy URL path. E.g. "/github.com/foo/bar/@v/v1.2.3.zip" →
+   * "github.com/foo/bar" Returns null if the path does not contain "/@v/".
    */
   public static @Nullable String extractModulePath(final String path) {
     final int atVIndex = path.indexOf("/@v/");
@@ -75,8 +82,8 @@ public class GoVersionUtils {
   }
 
   /**
-   * Extracts the version from a Go .mod proxy path.
-   * E.g. "/github.com/foo/bar/@v/v1.2.3.mod" → "v1.2.3"
+   * Extracts the version from a Go .mod proxy path. E.g. "/github.com/foo/bar/@v/v1.2.3.mod" →
+   * "v1.2.3"
    */
   public static String extractVersionFromModPath(final String modPath) {
     final var filename = modPath.substring(modPath.lastIndexOf('/') + 1);
@@ -84,8 +91,8 @@ public class GoVersionUtils {
   }
 
   /**
-   * Parses the "go X.Y" directive from a go.mod file's raw bytes.
-   * Returns null if the directive is absent.
+   * Parses the "go X.Y" directive from a go.mod file's raw bytes. Returns null if the directive is
+   * absent.
    */
   public static @Nullable String extractGoVersionFromMod(final byte[] content) {
     final var text = new String(content, StandardCharsets.UTF_8);
@@ -95,8 +102,8 @@ public class GoVersionUtils {
   }
 
   /**
-   * Decodes Go's uppercase-escape encoding ("!x" → "X") used in module paths.
-   * E.g. "github.com/!burnt!sushi/toml" → "github.com/BurntSushi/toml"
+   * Decodes Go's uppercase-escape encoding ("!x" → "X") used in module paths. E.g.
+   * "github.com/!burnt!sushi/toml" → "github.com/BurntSushi/toml"
    */
   public static String decodeModulePath(final String encoded) {
     final var sb = new StringBuilder(encoded.length());
@@ -114,5 +121,23 @@ public class GoVersionUtils {
     }
 
     return sb.toString();
+  }
+
+  /**
+   * Pre-release versions sort after (are greater than) the corresponding release. Both null →
+   * equal; one null → null (release) is smaller; both non-null → lexicographic.
+   */
+  private static int comparePreRelease(final @Nullable String pre1, final @Nullable String pre2) {
+
+    if (pre1 == null && pre2 == null) {
+      return 0;
+    }
+    if (pre1 == null) {
+      return -1; // release < pre-release → pre-release sorts last
+    }
+    if (pre2 == null) {
+      return 1; // pre-release > release → pre-release sorts last
+    }
+    return pre1.compareTo(pre2);
   }
 }

@@ -94,8 +94,7 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
       for (final var item : items) {
         if (!item.isDirectory() && item.getName().startsWith(versionPrefix + ".")) {
           final var filePath =
-              StoragePath.of(
-                  atVVersionBasePath.getStorageKey(), atVDirPath + item.getName());
+              StoragePath.of(atVVersionBasePath.getStorageKey(), atVDirPath + item.getName());
           try {
             this.storageStrategy.deleteDirectory(filePath);
           } catch (final Exception _) {
