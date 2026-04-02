@@ -17,20 +17,44 @@ package io.repsy.protocols.cargo.shared.crate.dtos;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
-import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.SuperBuilder;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @NullMarked
-public record CrateInfo(
-    UUID id,
-    String name,
-    @JsonProperty("original_name") String originalName,
-    @JsonProperty("max_version") String maxVersion,
-    @JsonProperty("total_downloads") long totalDownloads,
-    @Nullable String description,
-    @Nullable String homepage,
-    @Nullable String repository,
-    List<String> authors,
-    List<String> keywords,
-    List<String> categories) {}
+@Getter
+@Setter
+@SuperBuilder
+@NoArgsConstructor
+@AllArgsConstructor
+public class BaseCrateInfo<ID> {
+
+  private ID id;
+
+  private String name;
+
+  @JsonProperty("original_name")
+  private String originalName;
+
+  @JsonProperty("max_version")
+  private String maxVersion;
+
+  @JsonProperty("total_downloads")
+  private long totalDownloads;
+
+  @Nullable private String description;
+
+  @Nullable private String homepage;
+
+  @Nullable private String repository;
+
+  private List<String> authors;
+
+  private List<String> keywords;
+
+  private List<String> categories;
+}

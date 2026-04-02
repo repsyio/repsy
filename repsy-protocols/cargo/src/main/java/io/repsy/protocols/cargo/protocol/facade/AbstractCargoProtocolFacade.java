@@ -17,13 +17,13 @@ package io.repsy.protocols.cargo.protocol.facade;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.cargo.protocol.facade.contract.CargoProtocolFacade;
+import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
+import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -187,7 +187,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   }
 
   @Override
-  public CrateInfo getCrate(final ProtocolContext context) {
+  public BaseCrateInfo getCrate(final ProtocolContext context) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var segments = splitPath(context);
@@ -197,7 +197,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   }
 
   @Override
-  public CrateVersionInfo getCrateVersion(final ProtocolContext context) {
+  public BaseCrateVersionInfo getCrateVersion(final ProtocolContext context) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var segments = splitPath(context);

@@ -22,9 +22,9 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
 import io.repsy.os.shared.repo.dtos.RepoSettingsInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateInfo;
+import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
+import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import java.util.UUID;
@@ -85,13 +85,13 @@ public class CargoApiFacade {
   }
 
   @Transactional(readOnly = true)
-  public CrateInfo getCrate(final RepoInfo repoInfo, final String name) {
+  public BaseCrateInfo<UUID> getCrate(final RepoInfo repoInfo, final String name) {
 
     return this.cargoCrateService.getCrate(repoInfo, name);
   }
 
   @Transactional(readOnly = true)
-  public CrateVersionInfo getCrateVersion(
+  public BaseCrateVersionInfo<UUID> getCrateVersion(
       final RepoInfo repoInfo, final String name, final String vers) {
 
     return this.cargoCrateService.getCrateVersion(repoInfo, name, vers);

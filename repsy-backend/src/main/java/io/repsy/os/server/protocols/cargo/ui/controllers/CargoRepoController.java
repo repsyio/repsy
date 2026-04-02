@@ -33,14 +33,15 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.RepoUsageInfo;
 import io.repsy.os.shared.usage.services.UsageService;
 import io.repsy.os.shared.utils.MultiPortNames;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateInfo;
+import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
+import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -224,7 +225,7 @@ public class CargoRepoController {
   }
 
   @GetMapping("/{repoName}/crates/{name}")
-  public RestResponse<CrateInfo> getCrate(
+  public RestResponse<BaseCrateInfo<UUID>> getCrate(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final String repoName,
       @PathVariable final String name) {
@@ -239,7 +240,7 @@ public class CargoRepoController {
   }
 
   @GetMapping("/{repoName}/crates/{name}/{vers}")
-  public RestResponse<CrateVersionInfo> getCrateVersion(
+  public RestResponse<BaseCrateVersionInfo<UUID>> getCrateVersion(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final String repoName,
       @PathVariable final String name,

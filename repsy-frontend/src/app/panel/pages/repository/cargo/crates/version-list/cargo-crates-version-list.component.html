@@ -7,8 +7,16 @@
   <div class="flex w-full flex-col items-start gap-4 sm:w-auto sm:flex-row sm:items-center">
     <app-searchbox class="w-full sm:max-w-[192px]" placeholder="version" (filter)="search($event)" />
     <div class="flex w-full gap-2 sm:w-auto">
-      <app-sort-selector [options]="sortOptions" [(selectedOption)]="sortOption" (choose)="sort($event)" class="w-full sm:w-auto" />
-      <button (click)="refreshPage()" class="flex h-[40px] w-[40px] items-center justify-center hover:brightness-0 hover:invert">
+      <app-sort-selector
+        [options]="sortOptions"
+        [(selectedOption)]="sortOption"
+        (choose)="sort($event)"
+        class="w-full sm:w-auto"
+      />
+      <button
+        (click)="refreshPage()"
+        class="flex h-[40px] w-[40px] items-center justify-center hover:brightness-0 hover:invert"
+      >
         <img ngSrc="/assets/icons/input/refresh.svg" alt="refresh" height="22" width="22" />
       </button>
     </div>
@@ -78,14 +86,24 @@
             </div>
           }
         </div>
-        <app-pagination (pageNumChange)="loadPage($event)" [pageNum]="pageNum" [totalPages]="pagedData.page.totalPages" />
+        <app-pagination
+          (pageNumChange)="loadPage($event)"
+          [pageNum]="pageNum"
+          [totalPages]="pagedData.page.totalPages"
+        />
       </div>
     } @else {
       <app-empty-list />
     }
   } @else {
     <div animate.enter="fade-in-up" class="p-8 text-center">
-      <img class="mx-auto mb-[70px]" ngSrc="/assets/images/hippo-empty.svg" alt="hippo-empty" height="243" width="510" />
+      <img
+        class="mx-auto mb-[70px]"
+        ngSrc="/assets/images/hippo-empty.svg"
+        alt="hippo-empty"
+        height="243"
+        width="510"
+      />
       <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
     </div>
   }

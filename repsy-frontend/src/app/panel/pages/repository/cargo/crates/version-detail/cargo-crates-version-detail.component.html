@@ -4,11 +4,15 @@
   @if (!this.error) {
     @if (crateVersion) {
       <div class="mb-4" animate.enter="fade-in-up">
-        <div class="mb-4 inline-flex gap-2 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[16px] py-[6px] text-[14px] text-[#FDFDFD]">
+        <div
+          class="mb-4 inline-flex gap-2 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[16px] py-[6px] text-[14px] text-[#FDFDFD]"
+        >
           <img ngSrc="/assets/icons/cursor/tick.svg" alt="tick" height="12" width="16" />
           {{ crateVersion.version }}
         </div>
-        <p class="font-courier mb-8 text-[12px] text-[#9C9C9D]">Uploaded at: {{ crateVersion.created_at | date: 'medium' }}</p>
+        <p class="font-courier mb-8 text-[12px] text-[#9C9C9D]">
+          Uploaded at: {{ crateVersion.created_at | date: 'medium' }}
+        </p>
 
         <h3 class="mb-2 text-[13px] text-white">Add Dependency:</h3>
         <div class="mb-8 inline-flex items-start gap-2 rounded-lg bg-[#101112] p-[14px]">
@@ -57,7 +61,11 @@
         </div>
 
         @if (activeRepo.canManage) {
-          <button (click)="deleteVersion()" [disabled]="loading" class="repsy-btn-danger group ml-auto w-full sm:w-auto">
+          <button
+            (click)="deleteVersion()"
+            [disabled]="loading"
+            class="repsy-btn-danger group ml-auto w-full sm:w-auto"
+          >
             <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
             Delete Version
           </button>
@@ -66,7 +74,13 @@
     }
   } @else {
     <div animate.enter="fade-in-up" class="p-8 text-center">
-      <img class="mx-auto mb-[70px]" ngSrc="/assets/images/hippo-empty.svg" alt="hippo-empty" height="243" width="510" />
+      <img
+        class="mx-auto mb-[70px]"
+        ngSrc="/assets/images/hippo-empty.svg"
+        alt="hippo-empty"
+        height="243"
+        width="510"
+      />
       <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
     </div>
   }

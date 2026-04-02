@@ -21,14 +21,15 @@ import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrate;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrateIndex;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrateMeta;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoKeyword;
+import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
+import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateInfo;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
@@ -48,7 +49,7 @@ public abstract class CargoCrateConverter {
   @Mapping(target = "originalName", source = "originalName")
   @Mapping(target = "maxVersion", source = "maxVersion")
   @Mapping(target = "totalDownloads", source = "totalDownloads")
-  public abstract CrateInfo toCrateInfo(CargoCrate crate);
+  public abstract BaseCrateInfo<UUID> toCrateInfo(CargoCrate crate);
 
   @Mapping(target = "crateId", source = "meta.crate.id")
   @Mapping(target = "name", source = "meta.crate.name")
@@ -62,7 +63,7 @@ public abstract class CargoCrateConverter {
   @Mapping(target = "deps", source = "index.deps", qualifiedByName = "jsonToDeps")
   @Mapping(target = "downloads", source = "meta.downloads")
   @Mapping(target = "createdAt", source = "meta.createdAt")
-  public abstract CrateVersionInfo toCrateVersionInfo(
+  public abstract BaseCrateVersionInfo<UUID> toCrateVersionInfo(
       CargoCrate crate, CargoCrateMeta meta, CargoCrateIndex index);
 
   @Mapping(target = "name", source = "name")

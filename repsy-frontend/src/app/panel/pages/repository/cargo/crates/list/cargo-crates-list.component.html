@@ -61,14 +61,33 @@
                 class="grid grid-cols-[2fr_1fr_1fr_3fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
                 <div class="flex items-center gap-2">
-                  <svg class="h-[16px] w-[16px] text-[#9FA0A0]" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2L8 4.3V9L12 11.3L16 9V4.3L12 2ZM6.1 8.8L2 11.2V16.1L6.1 18.5L10.2 16.1V11.2L6.1 8.8ZM17.9 8.8L13.8 11.2V16.1L17.9 18.5L22 16.1V11.2L17.9 8.8Z" />
+                  <svg
+                    class="h-[16px] w-[16px] text-[#9FA0A0]"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 2L8 4.3V9L12 11.3L16 9V4.3L12 2ZM6.1 8.8L2 11.2V16.1L6.1 18.5L10.2 16.1V11.2L6.1 8.8ZM17.9 8.8L13.8 11.2V16.1L17.9 18.5L22 16.1V11.2L17.9 8.8Z"
+                    />
                   </svg>
-                  <app-tooltip class="text-secondary-500 group-hover:underline" [text]="crate.name | ellipsis" [textHover]="crate.name" />
+                  <app-tooltip
+                    class="text-secondary-500 group-hover:underline"
+                    [text]="crate.name | ellipsis"
+                    [textHover]="crate.name"
+                  />
                 </div>
-                <app-tooltip class="text-[#FDFDFD]" [text]="crate.max_version | ellipsis" [textHover]="crate.max_version" />
+                <app-tooltip
+                  class="text-[#FDFDFD]"
+                  [text]="crate.max_version | ellipsis"
+                  [textHover]="crate.max_version"
+                />
                 <span class="text-[#FDFDFD]">{{ crate.total_downloads }}</span>
-                <app-tooltip class="text-[#9FA0A0]" [text]="(crate.description || '-') | ellipsis" [textHover]="crate.description || '-'" />
+                <app-tooltip
+                  class="text-[#9FA0A0]"
+                  [text]="crate.description || '-' | ellipsis"
+                  [textHover]="crate.description || '-'"
+                />
                 @if (activeRepo.canManage) {
                   <app-dropdown (click)="$event.stopPropagation()">
                     <button
@@ -111,24 +130,31 @@
               <div class="space-y-2">
                 <div class="flex justify-between gap-2">
                   <span class="text-sm text-[#9FA0A0]">Crate:</span>
-                  <span class="inline-flex items-center gap-2 text-secondary-500 text-right break-all">
-                    <svg class="h-[14px] w-[14px] text-[#9FA0A0]" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 2L8 4.3V9L12 11.3L16 9V4.3L12 2ZM6.1 8.8L2 11.2V16.1L6.1 18.5L10.2 16.1V11.2L6.1 8.8ZM17.9 8.8L13.8 11.2V16.1L17.9 18.5L22 16.1V11.2L17.9 8.8Z" />
+                  <span class="text-secondary-500 inline-flex items-center gap-2 text-right break-all">
+                    <svg
+                      class="h-[14px] w-[14px] text-[#9FA0A0]"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M12 2L8 4.3V9L12 11.3L16 9V4.3L12 2ZM6.1 8.8L2 11.2V16.1L6.1 18.5L10.2 16.1V11.2L6.1 8.8ZM17.9 8.8L13.8 11.2V16.1L17.9 18.5L22 16.1V11.2L17.9 8.8Z"
+                      />
                     </svg>
                     {{ crate.name }}
                   </span>
                 </div>
                 <div class="flex justify-between gap-2">
                   <span class="text-sm text-[#9FA0A0]">Latest:</span>
-                  <span class="text-[#FDFDFD] text-right break-all">{{ crate.max_version }}</span>
+                  <span class="text-right break-all text-[#FDFDFD]">{{ crate.max_version }}</span>
                 </div>
                 <div class="flex justify-between gap-2">
                   <span class="text-sm text-[#9FA0A0]">Downloads:</span>
-                  <span class="text-[#FDFDFD] text-right break-all">{{ crate.total_downloads }}</span>
+                  <span class="text-right break-all text-[#FDFDFD]">{{ crate.total_downloads }}</span>
                 </div>
                 <div class="flex justify-between gap-2">
                   <span class="text-sm text-[#9FA0A0]">Description:</span>
-                  <span class="text-[#9FA0A0] text-right break-all">{{ crate.description || '-' }}</span>
+                  <span class="text-right break-all text-[#9FA0A0]">{{ crate.description || '-' }}</span>
                 </div>
               </div>
             </div>
@@ -139,14 +165,24 @@
             }
           </div>
         }
-        <app-pagination (pageNumChange)="loadPage($event)" [pageNum]="pageNum" [totalPages]="pagedData.page.totalPages" />
+        <app-pagination
+          (pageNumChange)="loadPage($event)"
+          [pageNum]="pageNum"
+          [totalPages]="pagedData.page.totalPages"
+        />
       </div>
     } @else {
       <app-empty-list />
     }
   } @else {
     <div animate.enter="fade-in-up" class="p-8 text-center">
-      <img class="mx-auto mb-[70px]" ngSrc="/assets/images/hippo-empty.svg" alt="hippo-empty" height="243" width="510" />
+      <img
+        class="mx-auto mb-[70px]"
+        ngSrc="/assets/images/hippo-empty.svg"
+        alt="hippo-empty"
+        height="243"
+        width="510"
+      />
       <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
     </div>
   }

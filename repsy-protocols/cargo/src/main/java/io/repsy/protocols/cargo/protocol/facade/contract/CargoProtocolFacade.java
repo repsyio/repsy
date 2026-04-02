@@ -16,10 +16,10 @@
 package io.repsy.protocols.cargo.protocol.facade.contract;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
+import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
+import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -43,9 +43,9 @@ public interface CargoProtocolFacade<ID> {
 
   Page<CrateListItem> search(ProtocolContext context, String query, Pageable pageable);
 
-  CrateInfo getCrate(ProtocolContext context);
+  BaseCrateInfo getCrate(ProtocolContext context);
 
-  CrateVersionInfo getCrateVersion(ProtocolContext context);
+  BaseCrateVersionInfo getCrateVersion(ProtocolContext context);
 
   // List<CargoOwnerItem> listOwners(ProtocolContext context, @Nullable String authHeader);
 

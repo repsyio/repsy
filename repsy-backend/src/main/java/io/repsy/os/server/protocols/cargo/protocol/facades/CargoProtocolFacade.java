@@ -15,7 +15,6 @@
  */
 package io.repsy.os.server.protocols.cargo.protocol.facades;
 
-import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.protocols.cargo.protocol.facade.AbstractCargoProtocolFacade;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
@@ -28,45 +27,11 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class CargoProtocolFacade extends AbstractCargoProtocolFacade<UUID> {
 
-  // private final JwtUtils jwtUtils;
-
   public CargoProtocolFacade(
       final CargoStorageService cargoStorageService,
       final CargoCrateService<UUID> cargoCrateService,
-      final ObjectMapper objectMapper,
-      final JwtUtils jwtUtils) {
+      final ObjectMapper objectMapper) {
 
     super(cargoStorageService, cargoCrateService, objectMapper);
-    // this.jwtUtils = jwtUtils;
   }
-
-  //  @Override
-  //  public List<CargoOwnerItem> listOwners(
-  //      final ProtocolContext context, final @Nullable String authHeader) {
-  //
-  //    if (authHeader == null) {
-  //      return List.of();
-  //    }
-  //
-  //    try {
-  //      final String username;
-  //
-  //      if (isBasicToken(authHeader)) {
-  //        final var credentials = extractCredentialsFromAuthHeader(authHeader);
-  //        username = credentials != null ? credentials.getUsername() : null;
-  //      } else {
-  //        final var normalized = isBearerToken(authHeader) ? authHeader : "Bearer " + authHeader;
-  //        username = this.jwtUtils.verifyAndExtractUsername(normalized);
-  //      }
-  //
-  //      if (username == null || username.isBlank()) {
-  //        return List.of();
-  //      }
-  //
-  //      return List.of(new CargoOwnerItem(0, username, username));
-  //
-  //    } catch (final Exception e) {
-  //      return List.of();
-  //    }
-  //  }
 }

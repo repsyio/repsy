@@ -1,3 +1,18 @@
+///
+/// Copyright 2026 the original author or authors.
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+///      https://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+///
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -9,22 +24,15 @@ import { SpinnerComponent } from '../../../../../../shared/components/spinner/sp
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { CrateInfo } from '../../dto/crate-info';
 import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
+import { CrateInfo } from '../../dto/crate-info';
 import { CrateDependencyInfo, CrateVersionInfo } from '../../dto/crate-version-info';
 import { CargoService } from '../../service/cargo.service';
 
 @Component({
   selector: 'app-cargo-crates-version-detail',
   standalone: true,
-  imports: [
-    CommonModule,
-    SpinnerComponent,
-    CopyClipboardComponent,
-    NgOptimizedImage,
-    HighlightLineNumbers,
-    Highlight,
-  ],
+  imports: [CommonModule, SpinnerComponent, CopyClipboardComponent, NgOptimizedImage, HighlightLineNumbers, Highlight],
   templateUrl: './cargo-crates-version-detail.component.html',
 })
 export class CargoCratesVersionDetailComponent implements OnDestroy {

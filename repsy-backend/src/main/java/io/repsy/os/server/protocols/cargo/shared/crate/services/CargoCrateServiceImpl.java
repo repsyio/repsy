@@ -32,11 +32,11 @@ import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateRe
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoKeywordRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
+import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
@@ -189,14 +189,14 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
   }
 
   @Override
-  public CrateInfo getCrate(final BaseRepoInfo<UUID> repoInfo, final String name) {
+  public BaseCrateInfo<UUID> getCrate(final BaseRepoInfo<UUID> repoInfo, final String name) {
 
     final var crate = this.findCrate(repoInfo.getId(), name);
     return this.crateConverter.toCrateInfo(crate);
   }
 
   @Override
-  public CrateVersionInfo getCrateVersion(
+  public BaseCrateVersionInfo<UUID> getCrateVersion(
       final BaseRepoInfo<UUID> repoInfo, final String name, final String vers) {
 
     final var crate = this.findCrate(repoInfo.getId(), name);
