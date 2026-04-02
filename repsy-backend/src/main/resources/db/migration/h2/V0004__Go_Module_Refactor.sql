@@ -1,9 +1,6 @@
 -- Drop denormalized latest_version column
 ALTER TABLE go_module DROP COLUMN IF EXISTS latest_version;
 
--- Add publication status to every version record
-ALTER TABLE go_module_version ADD COLUMN IF NOT EXISTS "status" varchar(20) NOT NULL DEFAULT 'PUBLISHED';
-
 -- Fix created_at: NOT NULL + timezone-aware (H2 uses TIMESTAMP WITH TIME ZONE)
 ALTER TABLE go_module         ALTER COLUMN created_at TIMESTAMP WITH TIME ZONE NOT NULL;
 ALTER TABLE go_module_version ALTER COLUMN created_at TIMESTAMP WITH TIME ZONE NOT NULL;

@@ -67,10 +67,6 @@ public class GoModuleVersion {
   @Column(name = "zip_hash", length = 100)
   private @Nullable String zipHash;
 
-  /** Publication status of this version record. */
-  @Column(name = "status", nullable = false, length = 20)
-  private String status = "PUBLISHED";
-
   @CreationTimestamp
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;

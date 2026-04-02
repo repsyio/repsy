@@ -1,9 +1,6 @@
 -- Drop denormalized latest_version column; latest is now computed from go_module_version
 ALTER TABLE go_module DROP COLUMN IF EXISTS latest_version;
 
--- Add publication status to every version record (default PUBLISHED for all existing rows)
-ALTER TABLE go_module_version ADD COLUMN IF NOT EXISTS "status" varchar(20) NOT NULL DEFAULT 'PUBLISHED';
-
 -- Fix created_at: NOT NULL + timezone-aware
 ALTER TABLE go_module         ALTER COLUMN created_at SET NOT NULL;
 ALTER TABLE go_module         ALTER COLUMN created_at TYPE timestamptz USING created_at AT TIME ZONE 'UTC';

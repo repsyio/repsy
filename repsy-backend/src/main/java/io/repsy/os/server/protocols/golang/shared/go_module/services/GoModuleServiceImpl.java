@@ -45,8 +45,6 @@ import org.springframework.transaction.annotation.Transactional;
 @NullMarked
 public class GoModuleServiceImpl implements GoModuleService<UUID> {
 
-  private static final String STATUS_PUBLISHED = "PUBLISHED";
-
   private final RepoRepository repoRepository;
   private final GoModuleRepository goModuleRepository;
   private final GoModuleVersionRepository goModuleVersionRepository;
@@ -104,8 +102,7 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
         .flatMap(
             module ->
                 this.goModuleVersionRepository
-                    .findFirstByGoModuleIdAndStatusOrderByCreatedAtDesc(
-                        module.getId(), STATUS_PUBLISHED)
+                    .findFirstByGoModuleIdOrderByCreatedAtDesc(module.getId())
                     .map(GoModuleVersion::getVersion));
   }
 
