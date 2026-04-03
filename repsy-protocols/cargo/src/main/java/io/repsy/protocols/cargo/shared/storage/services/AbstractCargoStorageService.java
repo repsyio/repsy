@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.cargo.shared.storage.services;
 
+import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -24,6 +25,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -102,13 +104,14 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
 
   @Override
   public long deleteCrate(
-      final UUID repoId, final String repoName, final String crateName, final String versionName) {
+      final UUID repoId, final String repoName, final String crateName, final String versionName)
+      throws IOException {
 
     final var crateFileName = String.format("%s-%s.crate", crateName, versionName);
     final var cratePath = Paths.get("crates", crateName, crateFileName);
     final var storagePath = StoragePath.of(repoId, cratePath.toString());
 
-    final var usage = this.storageStrategy.calculatePathUsage(storagePath);
+    final var usage = this.storageStrategy.getFileUsage(storagePath, repoName);
     this.storageStrategy.delete(storagePath);
 
     return usage;
@@ -123,13 +126,41 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
     final var crateStoragePath = StoragePath.of(repoId, cratePath.toString());
     final var indexStoragePath = StoragePath.of(repoId, indexPath.toString());
 
-    final var crateUsage = this.storageStrategy.calculatePathUsage(crateStoragePath);
-    final var indexUsage = this.storageStrategy.calculatePathUsage(indexStoragePath);
+    try {
+      final var crateUsage = this.storageStrategy.calculatePathUsage(crateStoragePath);
+      final var indexUsage = this.storageStrategy.getFileUsage(indexStoragePath, repoName);
 
-    this.storageStrategy.delete(crateStoragePath);
-    this.storageStrategy.delete(indexStoragePath);
+      this.storageStrategy.deleteDirectory(crateStoragePath);
+      this.storageStrategy.delete(indexStoragePath);
 
-    return crateUsage + indexUsage;
+      return crateUsage + indexUsage;
+    } catch (final IOException e) {
+      throw new ErrorOccurredException("IOException Occurred! ", e);
+    }
+  }
+
+  @Override
+  public long rewriteIndex(
+      final UUID repoId,
+      final String repoName,
+      final String crateName,
+      final List<String> jsonLines)
+      throws IOException {
+
+    final var indexPath = this.getIndexPath(crateName);
+    final var indexStoragePath = StoragePath.of(repoId, indexPath.toString());
+
+    if (jsonLines.isEmpty()) {
+      final var indexSize = this.storageStrategy.getFileUsage(indexStoragePath, repoName);
+      this.storageStrategy.delete(indexStoragePath);
+      return -indexSize;
+    }
+
+    final var content = String.join("\n", jsonLines) + "\n";
+    final var indexData = content.getBytes(StandardCharsets.UTF_8);
+    try (final var bis = new ByteArrayInputStream(indexData)) {
+      return this.storageStrategy.write(repoName, indexStoragePath, bis).getDiskUsage();
+    }
   }
 
   private Path getIndexPath(final String name) {

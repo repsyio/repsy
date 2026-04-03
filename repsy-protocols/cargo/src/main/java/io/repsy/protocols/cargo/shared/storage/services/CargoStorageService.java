@@ -17,6 +17,7 @@ package io.repsy.protocols.cargo.shared.storage.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
@@ -35,9 +36,13 @@ public interface CargoStorageService {
 
   Resource getCrate(UUID repoId, String repoName, String crateName, String versionName);
 
-  long deleteCrate(UUID repoId, String repoName, String crateName, String versionName);
+  long deleteCrate(UUID repoId, String repoName, String crateName, String versionName)
+      throws IOException;
 
-  long deletePackage(UUID repoId, String repoName, String crateName);
+  long deletePackage(UUID repoId, String repoName, String crateName) throws IOException;
+
+  long rewriteIndex(UUID repoId, String repoName, String crateName, List<String> jsonLines)
+      throws IOException;
 
   void createRepo(UUID repoId);
 }

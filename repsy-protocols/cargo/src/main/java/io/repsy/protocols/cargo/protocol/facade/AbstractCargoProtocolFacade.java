@@ -165,18 +165,6 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
     this.cargoCrateService.unyank(repoInfo, crateName, vers);
   }
 
-  //  @Override
-  //  public List<CargoOwnerItem> listOwners(
-  //      final ProtocolContext context, final @Nullable String authHeader) {
-  //    return List.of();
-  //  }
-  //
-  //  @Override
-  //  public void addOwners(final ProtocolContext context, final List<String> logins) {}
-  //
-  //  @Override
-  //  public void removeOwners(final ProtocolContext context, final List<String> logins) {}
-
   @Override
   public Page<CrateListItem> search(
       final ProtocolContext context, final String query, final Pageable pageable) {
@@ -187,7 +175,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   }
 
   @Override
-  public BaseCrateInfo getCrate(final ProtocolContext context) {
+  public BaseCrateInfo<ID> getCrate(final ProtocolContext context) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var segments = splitPath(context);
@@ -197,7 +185,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   }
 
   @Override
-  public BaseCrateVersionInfo getCrateVersion(final ProtocolContext context) {
+  public BaseCrateVersionInfo<ID> getCrateVersion(final ProtocolContext context) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var segments = splitPath(context);

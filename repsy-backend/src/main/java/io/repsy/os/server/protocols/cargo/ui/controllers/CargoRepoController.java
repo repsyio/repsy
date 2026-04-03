@@ -40,6 +40,7 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.validation.Valid;
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -90,7 +91,8 @@ public class CargoRepoController {
 
   @DeleteMapping("/{repoName}")
   public RestResponse<Void> deleteRepo(
-      @RequestHeader(AUTHORIZATION) final String authHeader, @PathVariable final String repoName) {
+      @RequestHeader(AUTHORIZATION) final String authHeader, @PathVariable final String repoName)
+      throws IOException {
 
     final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
 
@@ -276,7 +278,8 @@ public class CargoRepoController {
   public RestResponse<Void> deleteCrate(
       @RequestHeader(AUTHORIZATION) final String authHeader,
       @PathVariable final String repoName,
-      @PathVariable final String name) {
+      @PathVariable final String name)
+      throws IOException {
 
     final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
 
@@ -292,7 +295,8 @@ public class CargoRepoController {
       @RequestHeader(AUTHORIZATION) final String authHeader,
       @PathVariable final String repoName,
       @PathVariable final String name,
-      @PathVariable final String vers) {
+      @PathVariable final String vers)
+      throws IOException {
 
     final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
 

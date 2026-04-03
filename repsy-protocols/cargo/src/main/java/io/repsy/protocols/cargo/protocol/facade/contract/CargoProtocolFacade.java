@@ -43,13 +43,7 @@ public interface CargoProtocolFacade<ID> {
 
   Page<CrateListItem> search(ProtocolContext context, String query, Pageable pageable);
 
-  BaseCrateInfo getCrate(ProtocolContext context);
+  BaseCrateInfo<ID> getCrate(ProtocolContext context);
 
-  BaseCrateVersionInfo getCrateVersion(ProtocolContext context);
-
-  // List<CargoOwnerItem> listOwners(ProtocolContext context, @Nullable String authHeader);
-
-  //  void addOwners(ProtocolContext context, List<String> logins);
-  //
-  //  void removeOwners(ProtocolContext context, List<String> logins);
+  BaseCrateVersionInfo<ID> getCrateVersion(ProtocolContext context);
 }

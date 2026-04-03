@@ -131,20 +131,24 @@ export class CargoCratesVersionListComponent implements OnDestroy {
   }
 
   public deleteVersion(version: CrateVersionListItem): void {
+    const isLastVersion = this.pagedData.page.totalElements === 1;
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
-      this.cargoService
-        .deleteCrateVersion(this.packageName, version.version)
+      const deleteAction = isLastVersion
+        ? this.cargoService.deleteCrate(this.packageName)
+        : this.cargoService.deleteCrateVersion(this.packageName, version.version);
+      deleteAction
         .then(() => {
-          this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
-            this.toastService.show('Version deleted successfully', 'success');
-          });
+          this.toastService.show('Version deleted successfully', 'success');
+          if (isLastVersion) {
+            this.router.navigate(['..'], { relativeTo: this.route });
+          } else {
+            this.fetchVersions();
+          }
         })
         .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
           this.loading = false;
+          this.toastService.show(err, 'error');
         });
     });
   }

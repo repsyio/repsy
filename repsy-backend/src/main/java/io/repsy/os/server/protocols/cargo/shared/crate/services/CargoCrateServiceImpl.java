@@ -34,6 +34,7 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
@@ -309,13 +310,37 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
   }
 
   private void createCrateIndex(final CargoCrate crate, final CratePublishRequest request) {
-
     final var index = new CargoCrateIndex();
 
     index.setCrate(crate);
     index.setName(crate.getName());
     index.setVers(request.vers());
-    index.setDeps(this.toJson(request.deps()));
+
+    final var mappedDeps =
+        request.deps() == null
+            ? null
+            : request.deps().stream()
+                .map(
+                    dep -> {
+                      boolean hasAlias = dep.explicitNameInToml() != null;
+
+                      final var indexName = hasAlias ? dep.explicitNameInToml() : dep.name();
+                      final var indexPackage = hasAlias ? dep.name() : null;
+
+                      return new CrateIndexDep(
+                          indexName,
+                          dep.versionReq(),
+                          dep.features(),
+                          dep.optional(),
+                          dep.defaultFeatures(),
+                          dep.target(),
+                          dep.kind(),
+                          dep.registry(),
+                          indexPackage);
+                    })
+                .toList();
+
+    index.setDeps(this.toJson(mappedDeps));
     index.setCksum(request.cksum());
     index.setFeatures(this.toJson(request.features()));
     index.setFeatures2(this.toJson(request.features2()));

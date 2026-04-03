@@ -27,6 +27,8 @@ import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
+import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +37,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Service
@@ -47,8 +50,9 @@ public class CargoApiFacade {
   private final CargoCrateServiceImpl cargoCrateService;
   private final CargoStorageService cargoStorageService;
   private final CargoCrateRepository crateRepository;
+  private final ObjectMapper objectMapper;
 
-  public void deleteRepo(final RepoInfo repoInfo) {
+  public void deleteRepo(final RepoInfo repoInfo) throws IOException {
 
     final var crates = this.crateRepository.findAllByRepoId(repoInfo.getStorageKey());
 
@@ -104,7 +108,7 @@ public class CargoApiFacade {
     return this.cargoCrateService.getCrateVersions(repoInfo, name, query, pageable);
   }
 
-  public BaseUsages deleteCrate(final RepoInfo repoInfo, final String name) {
+  public BaseUsages deleteCrate(final RepoInfo repoInfo, final String name) throws IOException {
 
     final var normalizedName = normalizeName(name);
 
@@ -118,17 +122,42 @@ public class CargoApiFacade {
   }
 
   public BaseUsages deleteCrateVersion(
-      final RepoInfo repoInfo, final String name, final String vers) {
+      final RepoInfo repoInfo, final String name, final String vers) throws IOException {
 
     final var normalizedName = normalizeName(name);
 
     this.cargoCrateService.deleteCrateVersion(repoInfo, normalizedName, vers);
 
-    final var usage =
+    final var remainingEntries = this.cargoCrateService.getIndexEntries(repoInfo, normalizedName);
+
+    if (remainingEntries.isEmpty()) {
+      final var usage =
+          this.cargoStorageService.deletePackage(
+              repoInfo.getStorageKey(), repoInfo.getName(), normalizedName);
+      return BaseUsages.builder().diskUsage(-1L * usage).build();
+    }
+
+    final List<String> jsonLines =
+        remainingEntries.stream()
+            .map(
+                entry -> {
+                  try {
+                    return this.objectMapper.writeValueAsString(entry);
+                  } catch (final Exception e) {
+                    throw new RuntimeException(e);
+                  }
+                })
+            .toList();
+
+    final var indexDelta =
+        this.cargoStorageService.rewriteIndex(
+            repoInfo.getStorageKey(), repoInfo.getName(), normalizedName, jsonLines);
+
+    final var crateFreed =
         this.cargoStorageService.deleteCrate(
             repoInfo.getStorageKey(), repoInfo.getName(), normalizedName, vers);
 
-    return BaseUsages.builder().diskUsage(-1L * usage).build();
+    return BaseUsages.builder().diskUsage(-1L * crateFreed + indexDelta).build();
   }
 
   public void createRepo(final UUID repoId) {
