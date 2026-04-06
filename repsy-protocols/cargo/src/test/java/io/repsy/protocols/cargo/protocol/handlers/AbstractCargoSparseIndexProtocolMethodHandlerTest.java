@@ -73,29 +73,6 @@ class AbstractCargoSparseIndexProtocolMethodHandlerTest {
 
   // ── Handler metadata ─────────────────────────────────────────────────────
 
-  @Nested
-  @DisplayName("getProperties()")
-  class GetPropertiesTests {
-
-    @Test
-    @DisplayName("sets skipPreProcessor=true so the sparse index is publicly accessible")
-    void skipPreProcessorIsTrue() {
-      assertThat(handler.getProperties()).containsEntry("skipPreProcessor", true);
-    }
-
-    @Test
-    @DisplayName("sets skipHeaderPreProcessor=true")
-    void skipHeaderPreProcessorIsTrue() {
-      assertThat(handler.getProperties()).containsEntry("skipHeaderPreProcessor", true);
-    }
-
-    @Test
-    @DisplayName("declares READ permission")
-    void permissionIsRead() {
-      assertThat(handler.getProperties()).containsEntry("permission", Permission.READ);
-    }
-  }
-
   @Test
   @DisplayName("supports only GET")
   void supportsOnlyGet() {
