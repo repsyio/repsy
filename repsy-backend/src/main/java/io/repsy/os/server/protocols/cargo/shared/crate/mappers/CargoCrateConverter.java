@@ -32,64 +32,72 @@ import java.util.Set;
 import java.util.UUID;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.MappingConstants;
+import org.mapstruct.Mappings;
 import org.mapstruct.Named;
-import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.core.exc.JacksonIOException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public abstract class CargoCrateConverter {
 
-  @Autowired private ObjectMapper objectMapper;
-
-  @Mapping(target = "authors", source = "authors", qualifiedByName = "authorsToStrings")
-  @Mapping(target = "keywords", source = "keywords", qualifiedByName = "keywordsToStrings")
-  @Mapping(target = "categories", source = "categories", qualifiedByName = "categoriesToStrings")
-  @Mapping(target = "originalName", source = "originalName")
-  @Mapping(target = "maxVersion", source = "maxVersion")
-  @Mapping(target = "totalDownloads", source = "totalDownloads")
+  @Mappings({
+    @Mapping(target = "authors", source = "authors", qualifiedByName = "authorsToStrings"),
+    @Mapping(target = "keywords", source = "keywords", qualifiedByName = "keywordsToStrings"),
+    @Mapping(target = "categories", source = "categories", qualifiedByName = "categoriesToStrings"),
+    @Mapping(target = "originalName", source = "originalName"),
+    @Mapping(target = "maxVersion", source = "maxVersion"),
+    @Mapping(target = "totalDownloads", source = "totalDownloads")
+  })
   public abstract BaseCrateInfo<UUID> toCrateInfo(CargoCrate crate);
 
-  @Mapping(target = "crateId", source = "meta.crate.id")
-  @Mapping(target = "name", source = "meta.crate.name")
-  @Mapping(target = "version", source = "meta.version")
-  @Mapping(target = "readme", source = "meta.readme")
-  @Mapping(target = "license", source = "meta.license")
-  @Mapping(target = "licenseFile", source = "meta.licenseFile")
-  @Mapping(target = "documentation", source = "meta.documentation")
-  @Mapping(target = "edition", source = "meta.edition")
-  @Mapping(target = "rustVersion", source = "meta.rustVersion")
-  @Mapping(target = "deps", source = "index.deps", qualifiedByName = "jsonToDeps")
-  @Mapping(target = "downloads", source = "meta.downloads")
-  @Mapping(target = "createdAt", source = "meta.createdAt")
+  @Mappings({
+    @Mapping(target = "crateId", source = "meta.crate.id"),
+    @Mapping(target = "name", source = "meta.crate.name"),
+    @Mapping(target = "version", source = "meta.version"),
+    @Mapping(target = "readme", source = "meta.readme"),
+    @Mapping(target = "license", source = "meta.license"),
+    @Mapping(target = "licenseFile", source = "meta.licenseFile"),
+    @Mapping(target = "documentation", source = "meta.documentation"),
+    @Mapping(target = "edition", source = "meta.edition"),
+    @Mapping(target = "rustVersion", source = "meta.rustVersion"),
+    @Mapping(target = "deps", source = "index.deps", qualifiedByName = "jsonToDeps"),
+    @Mapping(target = "downloads", source = "meta.downloads"),
+    @Mapping(target = "createdAt", source = "meta.createdAt")
+  })
   public abstract BaseCrateVersionInfo<UUID> toCrateVersionInfo(
       CargoCrate crate, CargoCrateMeta meta, CargoCrateIndex index);
 
-  @Mapping(target = "name", source = "name")
-  @Mapping(target = "vers", source = "vers")
-  @Mapping(target = "deps", source = "deps", qualifiedByName = "jsonToDeps")
-  @Mapping(target = "cksum", source = "cksum")
-  @Mapping(target = "features", source = "features", qualifiedByName = "jsonToFeatures")
-  @Mapping(target = "yanked", source = "yanked")
-  @Mapping(target = "links", source = "links")
-  @Mapping(target = "v", source = "v")
-  @Mapping(target = "features2", source = "features2", qualifiedByName = "jsonToFeatures")
-  @Mapping(target = "rustVersion", source = "rustVersion")
+  @Mappings({
+    @Mapping(target = "name", source = "name"),
+    @Mapping(target = "vers", source = "vers"),
+    @Mapping(target = "deps", source = "deps", qualifiedByName = "jsonToDeps"),
+    @Mapping(target = "cksum", source = "cksum"),
+    @Mapping(target = "features", source = "features", qualifiedByName = "jsonToFeatures"),
+    @Mapping(target = "yanked", source = "yanked"),
+    @Mapping(target = "links", source = "links"),
+    @Mapping(target = "v", source = "v"),
+    @Mapping(target = "features2", source = "features2", qualifiedByName = "jsonToFeatures"),
+    @Mapping(target = "rustVersion", source = "rustVersion")
+  })
   public abstract CrateIndexEntry toCrateIndexEntry(CargoCrateIndex index);
 
   @Named("authorsToStrings")
   protected List<String> authorsToStrings(final Set<CargoAuthor> authors) {
+
     if (authors == null) {
-      return Collections.emptyList();
+      return List.of();
     }
+
     return authors.stream().map(CargoAuthor::getAuthor).toList();
   }
 
   @Named("keywordsToStrings")
   protected List<String> keywordsToStrings(final Set<CargoKeyword> keywords) {
+
     if (keywords == null) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     return keywords.stream().map(CargoKeyword::getKeyword).toList();
@@ -97,8 +105,9 @@ public abstract class CargoCrateConverter {
 
   @Named("categoriesToStrings")
   protected List<String> categoriesToStrings(final Set<CargoCategory> categories) {
+
     if (categories == null) {
-      return Collections.emptyList();
+      return List.of();
     }
 
     return categories.stream().map(CargoCategory::getCategory).toList();
@@ -106,12 +115,14 @@ public abstract class CargoCrateConverter {
 
   @Named("jsonToDeps")
   protected List<CrateIndexDep> jsonToDeps(final String json) {
-    if (json == null) {
-      return List.of();
-    }
 
     try {
-      return this.objectMapper.readValue(json, new TypeReference<>() {});
+      if (json == null) {
+        return List.of();
+      }
+
+      final var objectMapper = new ObjectMapper();
+      return objectMapper.readValue(json, new TypeReference<>() {});
     } catch (final JacksonIOException e) {
       return List.of();
     }
@@ -119,12 +130,14 @@ public abstract class CargoCrateConverter {
 
   @Named("jsonToFeatures")
   protected Map<String, List<String>> jsonToFeatures(final String json) {
-    if (json == null) {
-      return Collections.emptyMap();
-    }
 
     try {
-      return this.objectMapper.readValue(json, new TypeReference<>() {});
+      if (json == null) {
+        return Collections.emptyMap();
+      }
+
+      final var objectMapper = new ObjectMapper();
+      return objectMapper.readValue(json, new TypeReference<>() {});
     } catch (final JacksonIOException e) {
       return Collections.emptyMap();
     }

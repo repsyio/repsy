@@ -20,7 +20,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
-import io.repsy.protocols.cargo.protocol.facade.contract.CargoProtocolFacade;
+import io.repsy.protocols.cargo.protocol.facades.contract.CargoProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -59,7 +59,7 @@ public abstract class AbstractCargoSearchProtocolMethodHandler<ID>
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ);
+    return Map.of("permission", Permission.READ, "writeOperation", false);
   }
 
   @Override
@@ -109,7 +109,7 @@ public abstract class AbstractCargoSearchProtocolMethodHandler<ID>
                   "crates", result.getContent(),
                   "meta", Map.of("total", result.getTotalElements())));
     } catch (final Exception e) {
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST)
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
           .body(CargoErrorResponse.of(e.getMessage()));
     }

@@ -39,6 +39,8 @@ public interface CargoCrateService<ID> {
 
   void deleteCrateVersion(BaseRepoInfo<ID> repoInfo, String name, String vers);
 
+  void incrementDownloadCount(BaseRepoInfo<ID> repoInfo, String crateName, String version);
+
   List<CrateIndexEntry> getIndexEntries(BaseRepoInfo<ID> repoInfo, String name);
 
   BaseCrateInfo<ID> getCrate(BaseRepoInfo<ID> repoInfo, String name);
@@ -46,6 +48,4 @@ public interface CargoCrateService<ID> {
   BaseCrateVersionInfo<ID> getCrateVersion(BaseRepoInfo<ID> repoInfo, String name, String vers);
 
   Page<CrateListItem> search(BaseRepoInfo<ID> repoInfo, String query, Pageable pageable);
-
-  void incrementDownloadCount(BaseRepoInfo<ID> repoInfo, String crateName, String version);
 }

@@ -20,7 +20,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
-import io.repsy.protocols.cargo.protocol.facade.contract.CargoProtocolFacade;
+import io.repsy.protocols.cargo.protocol.facades.contract.CargoProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -63,7 +63,7 @@ public abstract class AbstractCargoPublishProtocolMethodHandler<ID>
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE);
+    return Map.of("permission", Permission.WRITE, "writeOperation", true);
   }
 
   @Override

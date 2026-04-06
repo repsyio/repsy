@@ -38,6 +38,8 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
   private static final int ONE = 1;
   private static final int TWO = 2;
   private static final int THREE = 3;
+  private static final String CRATES_PATH = "crates";
+  private static final String CRATES_FILE_NAME_FMT = "%s-%s.crate";
   private final StorageStrategy storageStrategy;
 
   @Override
@@ -50,8 +52,8 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
       final String indexJsonLine)
       throws IOException {
 
-    final var crateFileName = String.format("%s-%s.crate", crateName, versionName);
-    final var cratePath = Paths.get("crates", crateName, crateFileName);
+    final var crateFileName = String.format(CRATES_FILE_NAME_FMT, crateName, versionName);
+    final var cratePath = Paths.get(CRATES_PATH, crateName, crateFileName);
     final var crateStoragePath = StoragePath.of(repoId, cratePath.toString());
 
     final BaseUsages crateUsages;
@@ -64,18 +66,7 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
     final var indexStoragePath = StoragePath.of(repoId, indexPath.toString());
 
     final var existingContent =
-        this.storageStrategy
-            .get(indexStoragePath, repoName)
-            .map(
-                resource -> {
-                  try {
-                    return new String(
-                        resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                  } catch (final IOException e) {
-                    return "";
-                  }
-                })
-            .orElse("");
+        this.storageStrategy.get(indexStoragePath, repoName).map(this::getContent).orElse("");
 
     final var newContent = existingContent + indexJsonLine + "\n";
     final var indexData = newContent.getBytes(StandardCharsets.UTF_8);
@@ -93,8 +84,8 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
   public Resource getCrate(
       final UUID repoId, final String repoName, final String crateName, final String versionName) {
 
-    final var crateFileName = String.format("%s-%s.crate", crateName, versionName);
-    final var cratePath = Paths.get("crates", crateName, crateFileName);
+    final var crateFileName = String.format(CRATES_FILE_NAME_FMT, crateName, versionName);
+    final var cratePath = Paths.get(CRATES_PATH, crateName, crateFileName);
     final var storagePath = StoragePath.of(repoId, cratePath.toString());
 
     return this.storageStrategy
@@ -107,8 +98,8 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
       final UUID repoId, final String repoName, final String crateName, final String versionName)
       throws IOException {
 
-    final var crateFileName = String.format("%s-%s.crate", crateName, versionName);
-    final var cratePath = Paths.get("crates", crateName, crateFileName);
+    final var crateFileName = String.format(CRATES_FILE_NAME_FMT, crateName, versionName);
+    final var cratePath = Paths.get(CRATES_PATH, crateName, crateFileName);
     final var storagePath = StoragePath.of(repoId, cratePath.toString());
 
     final var usage = this.storageStrategy.getFileUsage(storagePath, repoName);
@@ -120,7 +111,7 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
   @Override
   public long deletePackage(final UUID repoId, final String repoName, final String crateName) {
 
-    final var cratePath = Paths.get("crates", crateName);
+    final var cratePath = Paths.get(CRATES_PATH, crateName);
     final var indexPath = this.getIndexPath(crateName);
 
     final var crateStoragePath = StoragePath.of(repoId, cratePath.toString());
@@ -153,14 +144,21 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
     if (jsonLines.isEmpty()) {
       final var indexSize = this.storageStrategy.getFileUsage(indexStoragePath, repoName);
       this.storageStrategy.delete(indexStoragePath);
-      return -indexSize;
+      return -1L * indexSize;
     }
 
     final var content = String.join("\n", jsonLines) + "\n";
     final var indexData = content.getBytes(StandardCharsets.UTF_8);
+
     try (final var bis = new ByteArrayInputStream(indexData)) {
       return this.storageStrategy.write(repoName, indexStoragePath, bis).getDiskUsage();
     }
+  }
+
+  @Override
+  public void createRepo(final UUID repoId) {
+
+    this.storageStrategy.createDirectory(repoId.toString());
   }
 
   private Path getIndexPath(final String name) {
@@ -186,8 +184,11 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
     return basePath.resolve(part1).resolve(part2).resolve(name);
   }
 
-  @Override
-  public void createRepo(final UUID repoId) {
-    this.storageStrategy.createDirectory(repoId.toString());
+  private String getContent(final Resource resource) {
+    try {
+      return new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+    } catch (final IOException e) {
+      return "";
+    }
   }
 }

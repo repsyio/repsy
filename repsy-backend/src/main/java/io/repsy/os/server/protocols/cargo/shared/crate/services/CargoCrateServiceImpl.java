@@ -32,17 +32,18 @@ import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateRe
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoKeywordRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
+import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -82,31 +83,17 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
   @Transactional
   public void publish(final BaseRepoInfo<UUID> repoInfo, final CratePublishRequest request) {
 
-    final var repo =
-        this.repoRepository
-            .findById(repoInfo.getId())
-            .orElseThrow(() -> new ItemNotFoundException(ERR_REPO_NOT_FOUND));
+    final var repo = this.findRepoById(repoInfo.getId());
+    final var normalizedName = CrateUtils.normalizeCrateName(request.name());
 
-    final var normalizedName = normalizeName(request.name());
     final var existingCrate =
         this.crateRepository.findByRepoIdAndName(repoInfo.getId(), normalizedName);
-
-    if (existingCrate.isPresent()) {
-      final var versionExists =
-          this.crateIndexRepository
-              .findByCrateIdAndVers(existingCrate.get().getId(), request.vers())
-              .isPresent();
-      if (versionExists) {
-        throw new ItemAlreadyExistException(
-            "crate `%s@%s` already exists in this registry"
-                .formatted(request.name(), request.vers()));
-      }
-    }
 
     final CargoCrate crate;
 
     if (existingCrate.isPresent()) {
       crate = existingCrate.get();
+      this.checkExistsVersion(crate, request);
       crate.setLastUpdatedAt(Instant.now());
     } else {
       crate = this.createCrate(repo, request, normalizedName);
@@ -121,9 +108,6 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
 
     this.createCrateIndex(crate, request);
     this.createCrateMeta(crate, request);
-
-    log.info(
-        "Crate published: {} {} for repo {}", request.name(), request.vers(), repoInfo.getId());
   }
 
   @Override
@@ -132,9 +116,8 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
 
     final var index = this.findCrateIndex(repoInfo.getId(), name, vers);
     index.setYanked(true);
-    this.crateIndexRepository.save(index);
 
-    log.info("Crate yanked: {} {} for repo {}", name, vers, repoInfo.getId());
+    this.crateIndexRepository.save(index);
   }
 
   @Override
@@ -144,8 +127,6 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
     final var index = this.findCrateIndex(repoInfo.getId(), name, vers);
     index.setYanked(false);
     this.crateIndexRepository.save(index);
-
-    log.info("Crate unyanked: {} {} for repo {}", name, vers, repoInfo.getId());
   }
 
   @Override
@@ -154,8 +135,6 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
 
     final var crate = this.findCrate(repoInfo.getId(), name);
     this.crateRepository.delete(crate);
-
-    log.info("Crate deleted: {} for repo {}", name, repoInfo.getId());
   }
 
   @Override
@@ -165,24 +144,20 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
 
     final var crate = this.findCrate(repoInfo.getId(), name);
     final var index = this.findCrateIndex(repoInfo.getId(), name, vers);
-    final var meta =
-        this.crateMetaRepository
-            .findByCrateIdAndVersion(crate.getId(), vers)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_CRATE_VERSION_NOT_FOUND));
+    final var meta = this.findCrateMeta(crate.getId(), vers);
 
     this.crateIndexRepository.delete(index);
     this.crateMetaRepository.delete(meta);
 
     this.recalculateMaxVersion(crate);
-
-    log.info("Crate version deleted: {} {} for repo {}", name, vers, repoInfo.getId());
   }
 
   @Override
   public List<CrateIndexEntry> getIndexEntries(
       final BaseRepoInfo<UUID> repoInfo, final String name) {
 
-    final var normalizedName = normalizeName(name);
+    final var normalizedName = CrateUtils.normalizeCrateName(name);
+
     final var entries =
         this.crateIndexRepository.findAllByCrateRepoIdAndName(repoInfo.getId(), normalizedName);
 
@@ -201,16 +176,29 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
       final BaseRepoInfo<UUID> repoInfo, final String name, final String vers) {
 
     final var crate = this.findCrate(repoInfo.getId(), name);
-    final var index =
-        this.crateIndexRepository
-            .findByCrateIdAndVers(crate.getId(), vers)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_CRATE_VERSION_NOT_FOUND));
-    final var meta =
-        this.crateMetaRepository
-            .findByCrateIdAndVersion(crate.getId(), vers)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_CRATE_VERSION_NOT_FOUND));
+    final var index = this.findCrateIndex(crate.getId(), vers);
+    final var meta = this.findCrateMeta(crate.getId(), vers);
 
     return this.crateConverter.toCrateVersionInfo(crate, meta, index);
+  }
+
+  @Override
+  public Page<CrateListItem> search(
+      final BaseRepoInfo<UUID> repoInfo, final String query, final Pageable pageable) {
+
+    return this.crateRepository.findAllByRepoIdAndNameContaining(repoInfo.getId(), query, pageable);
+  }
+
+  @Transactional
+  @Override
+  public void incrementDownloadCount(
+      final BaseRepoInfo<UUID> repoInfo, final String crateName, final String version) {
+
+    final var crate = this.findCrate(repoInfo.getId(), crateName);
+    crate.setTotalDownloads(crate.getTotalDownloads() + 1);
+    this.crateRepository.save(crate);
+
+    this.crateMetaRepository.incrementDownloadCount(crate.getId(), version);
   }
 
   public Page<CrateVersionListItem> getCrateVersions(
@@ -230,7 +218,7 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
                     normalizedQuery.isBlank()
                         || item.getVersion().toLowerCase().contains(normalizedQuery))
             .map(item -> new CrateVersionListItem(item.getVersion(), item.getCreatedAt()))
-            .sorted(resolveVersionSort(pageable))
+            .sorted(CrateUtils.resolveVersionSort(pageable))
             .toList();
 
     final var start = (int) pageable.getOffset();
@@ -243,51 +231,19 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
     return new PageImpl<>(pageContent, pageable, sortedAndFiltered.size());
   }
 
-  private static Comparator<CrateVersionListItem> resolveVersionSort(final Pageable pageable) {
+  private void checkExistsVersion(
+      final CargoCrate existingCrate, final CratePublishRequest request) {
 
-    if (pageable.getSort().isUnsorted()) {
-      return Comparator.comparing(CrateVersionListItem::createdAt).reversed();
+    final var versionExists =
+        this.crateIndexRepository
+            .findByCrateIdAndVers(existingCrate.getId(), request.vers())
+            .isPresent();
+
+    if (versionExists) {
+      throw new ItemAlreadyExistException(
+          "crate `%s@%s` already exists in this registry"
+              .formatted(request.name(), request.vers()));
     }
-
-    final var order = pageable.getSort().iterator().next();
-    Comparator<CrateVersionListItem> comparator =
-        "version".equalsIgnoreCase(order.getProperty())
-            ? Comparator.comparing(
-                CrateVersionListItem::version,
-                new io.repsy.protocols.cargo.shared.crate.services.SemverComparator())
-            : Comparator.comparing(CrateVersionListItem::createdAt);
-
-    if (order.isDescending()) {
-      comparator = comparator.reversed();
-    }
-
-    return comparator;
-  }
-
-  @Override
-  public Page<CrateListItem> search(
-      final BaseRepoInfo<UUID> repoInfo, final String query, final Pageable pageable) {
-
-    return this.crateRepository.findAllByRepoIdAndNameContaining(repoInfo.getId(), query, pageable);
-  }
-
-  @Transactional
-  @Override
-  public void incrementDownloadCount(
-      final BaseRepoInfo<UUID> repoInfo, final String crateName, final String version) {
-
-    final var crate = this.findCrate(repoInfo.getId(), crateName);
-
-    crate.setTotalDownloads(crate.getTotalDownloads() + 1);
-    this.crateRepository.save(crate);
-
-    this.crateMetaRepository
-        .findByCrateIdAndVersion(crate.getId(), version)
-        .ifPresent(
-            meta -> {
-              meta.setDownloads(meta.getDownloads() + 1);
-              this.crateMetaRepository.save(meta);
-            });
   }
 
   private CargoCrate createCrate(
@@ -310,37 +266,13 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
   }
 
   private void createCrateIndex(final CargoCrate crate, final CratePublishRequest request) {
+
     final var index = new CargoCrateIndex();
 
     index.setCrate(crate);
     index.setName(crate.getName());
     index.setVers(request.vers());
-
-    final var mappedDeps =
-        request.deps() == null
-            ? null
-            : request.deps().stream()
-                .map(
-                    dep -> {
-                      boolean hasAlias = dep.explicitNameInToml() != null;
-
-                      final var indexName = hasAlias ? dep.explicitNameInToml() : dep.name();
-                      final var indexPackage = hasAlias ? dep.name() : null;
-
-                      return new CrateIndexDep(
-                          indexName,
-                          dep.versionReq(),
-                          dep.features(),
-                          dep.optional(),
-                          dep.defaultFeatures(),
-                          dep.target(),
-                          dep.kind(),
-                          dep.registry(),
-                          indexPackage);
-                    })
-                .toList();
-
-    index.setDeps(this.toJson(mappedDeps));
+    index.setDeps(this.toJson(this.mapDeps(request.deps())));
     index.setCksum(request.cksum());
     index.setFeatures(this.toJson(request.features()));
     index.setFeatures2(this.toJson(request.features2()));
@@ -350,6 +282,31 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
     index.setRustVersion(request.rustVersion());
 
     this.crateIndexRepository.save(index);
+  }
+
+  private @Nullable List<CrateIndexDep> mapDeps(final @Nullable List<CratePublishDep> deps) {
+
+    if (deps == null) {
+      return null;
+    }
+
+    return deps.stream().map(this::toIndexDep).toList();
+  }
+
+  private CrateIndexDep toIndexDep(final CratePublishDep dep) {
+
+    final boolean hasAlias = dep.explicitNameInToml() != null;
+
+    return new CrateIndexDep(
+        hasAlias ? dep.explicitNameInToml() : dep.name(),
+        dep.versionReq(),
+        dep.features(),
+        dep.optional(),
+        dep.defaultFeatures(),
+        dep.target(),
+        dep.kind(),
+        dep.registry(),
+        hasAlias ? dep.name() : null);
   }
 
   private void createCrateMeta(final CargoCrate crate, final CratePublishRequest request) {
@@ -369,7 +326,11 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
     this.crateMetaRepository.save(meta);
   }
 
-  private void syncAuthors(final CargoCrate crate, final List<String> authorStrings) {
+  private void syncAuthors(final CargoCrate crate, final @Nullable List<String> authorStrings) {
+
+    if (authorStrings == null) {
+      return;
+    }
 
     crate.getAuthors().clear();
 
@@ -377,18 +338,40 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
       final var author =
           this.authorRepository
               .findByAuthor(authorStr)
-              .orElseGet(
-                  () -> {
-                    final var newAuthor = new CargoAuthor();
-                    newAuthor.setAuthor(authorStr);
-                    return this.authorRepository.save(newAuthor);
-                  });
+              .orElseGet(() -> this.createAuthor(authorStr));
 
       crate.getAuthors().add(author);
     }
   }
 
-  private void syncKeywords(final CargoCrate crate, final List<String> keywordStrings) {
+  private CargoAuthor createAuthor(final String authorStr) {
+
+    final var newAuthor = new CargoAuthor();
+    newAuthor.setAuthor(authorStr);
+    return this.authorRepository.save(newAuthor);
+  }
+
+  private CargoKeyword createKeyword(final String keywordStr) {
+
+    final var newKeyword = new CargoKeyword();
+    newKeyword.setKeyword(keywordStr);
+
+    return this.keywordRepository.save(newKeyword);
+  }
+
+  private CargoCategory crateCategory(final String categoryStr) {
+
+    final var newCategory = new CargoCategory();
+    newCategory.setCategory(categoryStr);
+
+    return this.categoryRepository.save(newCategory);
+  }
+
+  private void syncKeywords(final CargoCrate crate, final @Nullable List<String> keywordStrings) {
+
+    if (keywordStrings == null) {
+      return;
+    }
 
     crate.getKeywords().clear();
 
@@ -396,18 +379,18 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
       final var keyword =
           this.keywordRepository
               .findByKeyword(keywordStr)
-              .orElseGet(
-                  () -> {
-                    final var newKeyword = new CargoKeyword();
-                    newKeyword.setKeyword(keywordStr);
-                    return this.keywordRepository.save(newKeyword);
-                  });
+              .orElseGet(() -> this.createKeyword(keywordStr));
 
       crate.getKeywords().add(keyword);
     }
   }
 
-  private void syncCategories(final CargoCrate crate, final List<String> categoryStrings) {
+  private void syncCategories(
+      final CargoCrate crate, final @Nullable List<String> categoryStrings) {
+
+    if (categoryStrings == null) {
+      return;
+    }
 
     crate.getCategories().clear();
 
@@ -415,12 +398,7 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
       final var category =
           this.categoryRepository
               .findByCategory(categoryStr)
-              .orElseGet(
-                  () -> {
-                    final var newCategory = new CargoCategory();
-                    newCategory.setCategory(categoryStr);
-                    return this.categoryRepository.save(newCategory);
-                  });
+              .orElseGet(() -> this.crateCategory(categoryStr));
 
       crate.getCategories().add(category);
     }
@@ -459,7 +437,7 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
 
   private CargoCrate findCrate(final UUID repoId, final String name) {
 
-    final var normalizedName = normalizeName(name);
+    final var normalizedName = CrateUtils.normalizeCrateName(name);
 
     return this.crateRepository
         .findByRepoIdAndName(repoId, normalizedName)
@@ -489,7 +467,24 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
     }
   }
 
-  private static String normalizeName(final String name) {
-    return name.toLowerCase().replace('-', '_');
+  private CargoCrateMeta findCrateMeta(final UUID crateId, final String vers) {
+
+    return this.crateMetaRepository
+        .findByCrateIdAndVersion(crateId, vers)
+        .orElseThrow(() -> new ItemNotFoundException(ERR_CRATE_VERSION_NOT_FOUND));
+  }
+
+  private CargoCrateIndex findCrateIndex(final UUID crateId, final String vers) {
+
+    return this.crateIndexRepository
+        .findByCrateIdAndVers(crateId, vers)
+        .orElseThrow(() -> new ItemNotFoundException(ERR_CRATE_VERSION_NOT_FOUND));
+  }
+
+  private Repo findRepoById(final UUID repoId) {
+
+    return this.repoRepository
+        .findById(repoId)
+        .orElseThrow(() -> new ItemNotFoundException(ERR_REPO_NOT_FOUND));
   }
 }

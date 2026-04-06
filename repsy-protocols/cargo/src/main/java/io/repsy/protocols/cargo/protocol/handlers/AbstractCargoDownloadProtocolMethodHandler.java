@@ -19,7 +19,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
-import io.repsy.protocols.cargo.protocol.facade.contract.CargoProtocolFacade;
+import io.repsy.protocols.cargo.protocol.facades.contract.CargoProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -65,7 +65,7 @@ public abstract class AbstractCargoDownloadProtocolMethodHandler<ID>
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ);
+    return Map.of("permission", Permission.READ, "writeOperation", false);
   }
 
   @Override
@@ -103,7 +103,7 @@ public abstract class AbstractCargoDownloadProtocolMethodHandler<ID>
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
           .body(resource);
     } catch (final Exception e) {
-      log.warn("Cargo download failed: {}", e.getMessage());
+      log.debug("Cargo download failed: {}", e.getMessage());
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
   }

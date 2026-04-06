@@ -21,6 +21,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -30,4 +32,9 @@ public interface CargoCrateMetaRepository extends JpaRepository<CargoCrateMeta, 
   Optional<CargoCrateMeta> findByCrateIdAndVersion(UUID crateId, String version);
 
   List<CargoCrateMeta> findAllByCrateId(UUID crateId);
+
+  @Modifying
+  @Query(
+      "update CargoCrateMeta m set m.downloads = m.downloads + 1 where m.crate.id = :crateId and m.version = :version")
+  void incrementDownloadCount(UUID crateId, String version);
 }

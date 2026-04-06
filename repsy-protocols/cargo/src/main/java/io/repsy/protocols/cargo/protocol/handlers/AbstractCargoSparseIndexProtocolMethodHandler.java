@@ -19,7 +19,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
-import io.repsy.protocols.cargo.protocol.facade.contract.CargoProtocolFacade;
+import io.repsy.protocols.cargo.protocol.facades.contract.CargoProtocolFacade;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -78,7 +78,8 @@ public abstract class AbstractCargoSparseIndexProtocolMethodHandler<ID>
   public Map<String, Object> getProperties() {
     return Map.of(
         "permission", Permission.READ,
-        "skipPreProcessor", true,
+        "writeOperation", false,
+        "skipPreProcessor", false,
         "skipHeaderPreProcessor", true);
   }
 

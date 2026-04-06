@@ -15,7 +15,7 @@
  */
 package io.repsy.os.server.protocols.cargo.protocol.facades;
 
-import io.repsy.protocols.cargo.protocol.facade.AbstractCargoProtocolFacade;
+import io.repsy.protocols.cargo.protocol.facades.AbstractCargoProtocolFacade;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import java.util.UUID;

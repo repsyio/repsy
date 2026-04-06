@@ -39,6 +39,7 @@ import lombok.ToString;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
@@ -71,12 +72,15 @@ public class CargoCrate {
   @Column(name = "total_downloads", nullable = false)
   private long totalDownloads;
 
+  @Nullable
   @Column(name = "description")
   private String description;
 
+  @Nullable
   @Column(name = "homepage", length = 255)
   private String homepage;
 
+  @Nullable
   @Column(name = "repository", length = 255)
   private String repository;
 

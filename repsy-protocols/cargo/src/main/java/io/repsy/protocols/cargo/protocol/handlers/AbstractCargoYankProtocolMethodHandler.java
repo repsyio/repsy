@@ -20,7 +20,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
-import io.repsy.protocols.cargo.protocol.facade.contract.CargoProtocolFacade;
+import io.repsy.protocols.cargo.protocol.facades.contract.CargoProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -61,7 +61,7 @@ public abstract class AbstractCargoYankProtocolMethodHandler<ID> implements Prot
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE);
+    return Map.of("permission", Permission.WRITE, "writeOperation", true);
   }
 
   @Override
@@ -125,6 +125,7 @@ public abstract class AbstractCargoYankProtocolMethodHandler<ID> implements Prot
       return ResponseEntity.ok()
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
           .body(Map.of("ok", true));
+
     } catch (final Exception e) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST)
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)

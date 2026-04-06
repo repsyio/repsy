@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.cargo.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
-import io.repsy.protocols.cargo.protocol.facade.contract.CargoProtocolFacade;
+import io.repsy.protocols.cargo.protocol.facades.contract.CargoProtocolFacade;
 import io.repsy.protocols.cargo.protocol.handlers.AbstractCargoSparseIndexProtocolMethodHandler;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;

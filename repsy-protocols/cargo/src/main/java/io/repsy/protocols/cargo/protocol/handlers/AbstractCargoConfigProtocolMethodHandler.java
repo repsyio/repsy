@@ -18,10 +18,10 @@ package io.repsy.protocols.cargo.protocol.handlers;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
-import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -38,11 +38,15 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @NullMarked
 public abstract class AbstractCargoConfigProtocolMethodHandler implements ProtocolMethodHandler {
 
-  public AbstractCargoConfigProtocolMethodHandler(final CargoProtocolProvider provider) {
+  private final PathParser basePathParser;
+
+  public AbstractCargoConfigProtocolMethodHandler(
+      final PathParser pathParser, final CargoProtocolProvider provider) {
+
+    this.basePathParser = pathParser;
+
     provider.registerMethodHandler(this);
   }
-
-  protected abstract Optional<ProtocolContext> getProtocolContext(RelativePath relativePath);
 
   @Override
   public List<HttpMethod> getSupportedMethods() {
@@ -67,7 +71,7 @@ public abstract class AbstractCargoConfigProtocolMethodHandler implements Protoc
       if (!request.getServletPath().endsWith("/config.json")) {
         return Optional.empty();
       }
-      return this.getProtocolContext(new RelativePath("/config.json"));
+      return this.basePathParser.parse(request);
     };
   }
 
@@ -84,32 +88,42 @@ public abstract class AbstractCargoConfigProtocolMethodHandler implements Protoc
           ServletUriComponentsBuilder.fromCurrentContextPath().path(basePath).toUriString();
 
       final var jsonConfig =
-          String.format(
-              """
-          {
-            "dl": "%s/api/v1/crates/{crate}/{version}/download",
-            "api": "%s"
-          }
-          """,
-              baseUrl, baseUrl);
+          this.isAuthRequired(context)
+              ? String.format(
+                  """
+              {
+                "dl": "%s/api/v1/crates/{crate}/{version}/download",
+                "api": "%s",
+                "auth-required": true
+              }
+              """,
+                  baseUrl, baseUrl)
+              : String.format(
+                  """
+              {
+                "dl": "%s/api/v1/crates/{crate}/{version}/download",
+                "api": "%s"
+              }
+              """,
+                  baseUrl, baseUrl);
 
       return ResponseEntity.ok()
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
           .body(jsonConfig);
 
     } catch (final Exception e) {
-      return this.buildCargoErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
+      return this.buildCargoErrorResponse(e.getMessage());
     }
   }
 
-  private ResponseEntity<Object> buildCargoErrorResponse(
-      final HttpStatus status, final String detail) {
-    return ResponseEntity.status(status)
-        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-        .body(CargoErrorResponse.of(detail));
+  protected boolean isAuthRequired(final ProtocolContext context) {
+    return ProtocolContextUtils.getRepoInfo(context).isPrivateRepo();
   }
 
-  protected ResponseEntity<Object> buildNotFoundErrorResponse(final String resourceName) {
-    return this.buildCargoErrorResponse(HttpStatus.NOT_FOUND, resourceName + " not found");
+  private ResponseEntity<Object> buildCargoErrorResponse(final String detail) {
+
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+        .body(CargoErrorResponse.of(detail));
   }
 }

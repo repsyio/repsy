@@ -21,8 +21,4 @@ import org.jspecify.annotations.NullMarked;
 
 @NullMarked
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record CargoOwnersRequest(List<CargoOwnersRequest.UserLogin> users) {
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  public record UserLogin(String login) {}
-}
+public record CargoOwnersRequest(List<String> users) {}

@@ -17,14 +17,12 @@ package io.repsy.os.server.protocols.cargo.protocol.pre_processors;
 
 import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 
-import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.cargo.shared.auth.services.CargoAuthComponent;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
-import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -49,6 +47,7 @@ public class CargoAuthPreProcessor extends ProtocolProcessor {
   private static final String AUTH_BEARER = "Bearer ";
   private static final String SKIP_PRE_PROCESSOR_KEY = "skipPreProcessor";
   private static final String PERMISSION_KEY = "permission";
+  private static final String WRITE_OPERATION_KEY = "writeOperation";
 
   private final CargoAuthComponent authComponent;
   private final CargoProtocolProvider provider;
@@ -72,73 +71,62 @@ public class CargoAuthPreProcessor extends ProtocolProcessor {
 
     final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
 
-    if (this.shouldSkipAuthentication(repoInfo, properties)) {
+    if (shouldSkipAuthentication(
+        SKIP_PRE_PROCESSOR_KEY, WRITE_OPERATION_KEY, repoInfo, properties)) {
       return ProcessorResult.next();
     }
 
-    final var authHeader = this.authComponent.emulateAuthHeader(request);
+    final var rawAuthHeader = this.authComponent.emulateAuthHeader(request);
 
-    if (authHeader == null) {
+    if (rawAuthHeader == null) {
       return ProcessorResult.of(
           ResponseEntity.status(HttpStatus.UNAUTHORIZED)
               .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"")
               .build());
     }
 
-    final var permission = (Permission) properties.get(PERMISSION_KEY);
+    // Cargo CLI sends the token as a raw value with no prefix — normalize to Bearer
+    final var authHeader = this.normalizeAuthHeader(rawAuthHeader);
 
-    try {
-      this.authenticateRequest(authHeader, repoInfo.getStorageKey(), permission);
-    } catch (final AccessNotAllowedException e) {
-      return ProcessorResult.of(
-          ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"")
-              .build());
-    }
+    this.authenticateRequest(authHeader, repoInfo.getId(), properties);
 
     return ProcessorResult.next();
   }
 
   private void authenticateRequest(
-      final String authHeader, final UUID repoId, final Permission permission) {
+      final String authHeader, final UUID repoId, final Map<String, Object> properties) {
 
-    // Cargo CLI sends the token as a raw value with no prefix (e.g. "Authorization: mytoken").
-    // Normalise to Bearer so downstream auth methods can handle it uniformly.
-    final var normalized = this.getNormalizedName(authHeader);
+    final var permission = (Permission) properties.get(PERMISSION_KEY);
 
-    switch (normalized) {
-      case final String h when h.startsWith(AUTH_BASIC) ->
-          this.authComponent.handleBasicAuth(h, permission, repoId);
-      case final String h when h.startsWith(AUTH_BEARER) ->
-          this.authComponent.handleBearerAuth(h, repoId, permission);
-      default -> throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    switch (authHeader) {
+      case final String header when header.startsWith(AUTH_BASIC) ->
+          this.authComponent.handleBasicAuth(header, permission, repoId);
+      case final String header when header.startsWith(AUTH_BEARER) ->
+          this.authComponent.handleBearerAuth(header, repoId, permission);
+      default -> throw new UnAuthorizedException("unAuthorized");
     }
   }
 
-  private String getNormalizedName(final String authHeader) {
-
+  private String normalizeAuthHeader(final String authHeader) {
     return (authHeader.startsWith(AUTH_BASIC) || authHeader.startsWith(AUTH_BEARER))
         ? authHeader
         : AUTH_BEARER + authHeader;
   }
 
-  private boolean shouldSkipAuthentication(
-      final RepoInfo repoInfo, final Map<String, Object> properties) {
+  public static boolean shouldSkipAuthentication(
+      final String skipKey,
+      final String writeKey,
+      final RepoInfo repoInfo,
+      final Map<String, Object> properties) {
 
-    final var skip = (boolean) properties.getOrDefault(SKIP_PRE_PROCESSOR_KEY, false);
-    if (skip) {
+    final var skipPreProcessor = (boolean) properties.getOrDefault(skipKey, false);
+
+    if (skipPreProcessor) {
       return true;
     }
 
-    final var permission = (Permission) properties.get(PERMISSION_KEY);
-    if (this.isWritePermissionRequired(permission)) {
-      return false;
-    }
+    final var writeOperation = (boolean) properties.getOrDefault(writeKey, false);
 
-    return !repoInfo.isPrivateRepo();
-  }
-
-  private boolean isWritePermissionRequired(final Permission permission) {
-    return permission == Permission.MANAGE || permission == Permission.WRITE;
+    return !repoInfo.isPrivateRepo() && !writeOperation;
   }
 }

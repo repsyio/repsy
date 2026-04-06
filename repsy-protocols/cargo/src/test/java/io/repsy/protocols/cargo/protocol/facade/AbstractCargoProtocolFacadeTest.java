@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.protocols.cargo.protocol.facades.AbstractCargoProtocolFacade;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;

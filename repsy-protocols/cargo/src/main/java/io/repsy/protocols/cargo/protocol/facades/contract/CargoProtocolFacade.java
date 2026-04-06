@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.cargo.protocol.facade.contract;
+package io.repsy.protocols.cargo.protocol.facades.contract;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
-import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
 import java.io.IOException;
@@ -42,8 +40,4 @@ public interface CargoProtocolFacade<ID> {
   void unyank(ProtocolContext context);
 
   Page<CrateListItem> search(ProtocolContext context, String query, Pageable pageable);
-
-  BaseCrateInfo<ID> getCrate(ProtocolContext context);
-
-  BaseCrateVersionInfo<ID> getCrateVersion(ProtocolContext context);
 }
