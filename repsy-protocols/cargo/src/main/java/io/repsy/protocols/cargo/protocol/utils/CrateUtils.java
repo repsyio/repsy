@@ -35,7 +35,7 @@ public class CrateUtils {
   private static final int MAX_KEYWORDS = 5;
   private static final int MAX_KEYWORD_LENGTH = 20;
 
-  public Pair<String, String> extractCrateNameAndVersion(final ProtocolContext context) {
+  public static Pair<String, String> extractCrateNameAndVersion(final ProtocolContext context) {
 
     final var segments = CrateUtils.splitPath(context);
 
@@ -45,37 +45,37 @@ public class CrateUtils {
     return Pair.of(crateName, versionName);
   }
 
-  public long readU32LittleEndian(final InputStream inputStream) throws IOException {
+  public static long readU32LittleEndian(final InputStream inputStream) throws IOException {
 
     final var bytes = inputStream.readNBytes(4);
 
     return Integer.toUnsignedLong(ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getInt());
   }
 
-  public String[] splitPath(final ProtocolContext context) {
+  public static String[] splitPath(final ProtocolContext context) {
 
     return ProtocolContextUtils.getRelativePath(context).getPath().split("/");
   }
 
-  public String extractLastSegment(final ProtocolContext context) {
+  public static String extractLastSegment(final ProtocolContext context) {
 
     final var segments = splitPath(context);
 
     return segments[segments.length - 1];
   }
 
-  public String normalizeCrateName(final String name) {
+  public static String normalizeCrateName(final String name) {
 
     return name.toLowerCase().replace('-', '_');
   }
 
-  public void validatePublishRequest(final CratePublishRequest request) {
+  public static void validatePublishRequest(final CratePublishRequest request) {
     validateCrateName(request.name());
     validateVersion(request.vers());
     validateKeywords(request.keywords());
   }
 
-  public void validateCrateName(final @Nullable String name) {
+  public static void validateCrateName(final @Nullable String name) {
 
     if (name == null || name.isBlank()) {
       throw new IllegalArgumentException("crate name cannot be empty");
@@ -93,7 +93,7 @@ public class CrateUtils {
     }
   }
 
-  public void validateVersion(final @Nullable String vers) {
+  public static void validateVersion(final @Nullable String vers) {
 
     if (vers == null || vers.isBlank()) {
       throw new IllegalArgumentException("version cannot be empty");
@@ -105,7 +105,7 @@ public class CrateUtils {
     }
   }
 
-  public void validateKeywords(final @Nullable List<String> keywords) {
+  public static void validateKeywords(final @Nullable List<String> keywords) {
 
     if (keywords == null) {
       return;
@@ -121,7 +121,7 @@ public class CrateUtils {
     }
   }
 
-  public void validateKeyword(final String kw) {
+  public static void validateKeyword(final String kw) {
 
     if (kw.length() > MAX_KEYWORD_LENGTH) {
       throw new IllegalArgumentException(
@@ -129,7 +129,7 @@ public class CrateUtils {
     }
   }
 
-  public String getIndexJsonLine(
+  public static String getIndexJsonLine(
       final CratePublishRequest request, final ObjectMapper objectMapper) {
 
     final var deps =
@@ -158,7 +158,7 @@ public class CrateUtils {
     return objectMapper.writeValueAsString(entry);
   }
 
-  public CrateIndexDep toIndexDep(final CratePublishDep dep) {
+  public static CrateIndexDep toIndexDep(final CratePublishDep dep) {
 
     final String packageName;
     final String name;
@@ -183,7 +183,7 @@ public class CrateUtils {
         packageName);
   }
 
-  public CratePublishRequest createCratePublishRequestWithChecksum(
+  public static CratePublishRequest createCratePublishRequestWithChecksum(
       final CratePublishRequest request, final String checksum) {
 
     return new CratePublishRequest(
@@ -208,7 +208,7 @@ public class CrateUtils {
         request.features2());
   }
 
-  public CratePublishRequest getPublishRequest(
+  public static CratePublishRequest getPublishRequest(
       final InputStream inputStream, final ObjectMapper objectMapper) throws IOException {
 
     final var jsonLength = CrateUtils.readU32LittleEndian(inputStream);
@@ -216,14 +216,14 @@ public class CrateUtils {
     return objectMapper.readValue(jsonBytes, CratePublishRequest.class);
   }
 
-  public byte[] getCrateBytes(final InputStream inputStream) throws IOException {
+  public static byte[] getCrateBytes(final InputStream inputStream) throws IOException {
 
     final var crateLength = CrateUtils.readU32LittleEndian(inputStream);
 
     return inputStream.readNBytes((int) crateLength);
   }
 
-  public Comparator<CrateVersionListItem> resolveVersionSort(final Pageable pageable) {
+  public static Comparator<CrateVersionListItem> resolveVersionSort(final Pageable pageable) {
 
     if (pageable.getSort().isUnsorted()) {
       return Comparator.comparing(CrateVersionListItem::createdAt).reversed();

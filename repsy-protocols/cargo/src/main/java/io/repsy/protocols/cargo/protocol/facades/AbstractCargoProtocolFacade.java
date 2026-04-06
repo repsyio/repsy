@@ -79,7 +79,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
       throws IOException {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var request = CrateUtils.getPublishRequest(inputStream, objectMapper);
+    final var request = CrateUtils.getPublishRequest(inputStream, this.objectMapper);
 
     CrateUtils.validatePublishRequest(request);
 
@@ -91,7 +91,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
         CrateUtils.createCratePublishRequestWithChecksum(request, checksum);
 
     // Upload to Storage
-    final var indexJsonLine = CrateUtils.getIndexJsonLine(requestWithChecksum, objectMapper);
+    final var indexJsonLine = CrateUtils.getIndexJsonLine(requestWithChecksum, this.objectMapper);
 
     final var usages =
         this.cargoStorageService.writeCrateAndIndex(
