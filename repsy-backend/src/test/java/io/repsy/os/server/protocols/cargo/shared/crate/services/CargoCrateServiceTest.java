@@ -408,23 +408,17 @@ class CargoCrateServiceTest {
       crate.setId(UUID.randomUUID());
       crate.setTotalDownloads(10L);
 
-      final var meta = new CargoCrateMeta();
-      meta.setDownloads(5L);
-
       when(CargoCrateServiceTest.this.crateRepository.findByRepoIdAndName(repoId, "test_crate"))
           .thenReturn(Optional.of(crate));
-      when(CargoCrateServiceTest.this.crateMetaRepository.findByCrateIdAndVersion(
-              crate.getId(), "1.0.0"))
-          .thenReturn(Optional.of(meta));
 
       CargoCrateServiceTest.this.cargoCrateService.incrementDownloadCount(
           repoInfo, "test-crate", "1.0.0");
 
       assertThat(crate.getTotalDownloads()).isEqualTo(11L);
-      assertThat(meta.getDownloads()).isEqualTo(6L);
 
       verify(CargoCrateServiceTest.this.crateRepository).save(crate);
-      verify(CargoCrateServiceTest.this.crateMetaRepository).save(meta);
+      verify(CargoCrateServiceTest.this.crateMetaRepository)
+          .incrementDownloadCount(crate.getId(), "1.0.0");
     }
   }
 
