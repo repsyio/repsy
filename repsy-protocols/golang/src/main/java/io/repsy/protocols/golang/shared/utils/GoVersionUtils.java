@@ -79,13 +79,36 @@ public class GoVersionUtils {
 
   /**
    * Parses the "go X.Y" directive from a go.mod file's raw bytes. Returns null if the directive is
-   * absent.
+   * absent. Trailing tokens on the same line (e.g. comments) are ignored so that valid go.mod files
+   * with inline annotations are handled correctly.
    */
   public static @Nullable String extractGoVersionFromMod(final byte[] content) {
     final var text = new String(content, StandardCharsets.UTF_8);
-    final var pattern = Pattern.compile("^go\\s+(\\S+)\\s*$", Pattern.MULTILINE);
+    final var pattern = Pattern.compile("^go\\s+(\\S+)", Pattern.MULTILINE);
     final var matcher = pattern.matcher(text);
     return matcher.find() ? matcher.group(1) : null;
+  }
+
+  /**
+   * Decodes Go's uppercase-escape encoding ("!x" → "X") used in module paths. E.g.
+   * "github.com/!burnt!sushi/toml" → "github.com/BurntSushi/toml"
+   */
+  public static String decodeModulePath(final String encoded) {
+    final var sb = new StringBuilder(encoded.length());
+    boolean escape = false;
+
+    for (final char c : encoded.toCharArray()) {
+      if (escape) {
+        sb.append(Character.toUpperCase(c));
+        escape = false;
+      } else if (c == '!') {
+        escape = true;
+      } else {
+        sb.append(c);
+      }
+    }
+
+    return sb.toString();
   }
 
   /**
@@ -98,10 +121,10 @@ public class GoVersionUtils {
       return 0;
     }
     if (pre1 == null) {
-      return -1; // release < pre-release → pre-release sorts last
+      return 1; // release > pre-release (SemVer: pre-release has lower precedence)
     }
     if (pre2 == null) {
-      return 1; // pre-release > release → pre-release sorts last
+      return -1; // pre-release < release (SemVer: pre-release has lower precedence)
     }
     return pre1.compareTo(pre2);
   }

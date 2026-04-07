@@ -126,16 +126,6 @@ export class GolangService {
     });
   }
 
-  public async fetchUsage(): Promise<RepoUsageInfo> {
-    return new Promise<RepoUsageInfo>((resolve, reject) => {
-      this.http
-        .get<RestResponse<RepoUsageInfo>>(`${this.apiBaseUrl}/api/go/repo/${this.activeRepo.repoName}/usage`)
-        .toPromise()
-        .then((res: RestResponse<RepoUsageInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
   public async updateRepoName(form: RepoNameForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       this.http

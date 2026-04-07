@@ -101,9 +101,9 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
         .findByRepoIdAndModulePath(repoInfo.getStorageKey(), modulePath)
         .flatMap(
             module ->
-                this.goModuleVersionRepository
-                    .findFirstByGoModuleIdOrderByCreatedAtDesc(module.getId())
-                    .map(GoModuleVersion::getVersion));
+                Optional.ofNullable(
+                    this.computeLatestVersion(
+                        this.goModuleVersionRepository.findAllByModuleId(module.getId()))));
   }
 
   public Page<GoModuleListItem> getModules(final UUID repoId, final Pageable pageable) {

@@ -21,25 +21,15 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @NullMarked
-public interface GoModuleService<ID> {
+public interface GoModuleService<I> {
 
-  /**
-   * Atomically creates (or reuses) the module record and creates a new version record with
-   * PUBLISHED status. Throws {@link
-   * io.repsy.core.error_handling.exceptions.ItemAlreadyExistException} if the version already
-   * exists.
-   */
   void publishModule(
-      BaseRepoInfo<ID> repoInfo,
+      BaseRepoInfo<I> repoInfo,
       String modulePath,
       String version,
       @Nullable String goVersion,
       String modHash,
       String zipHash);
 
-  /**
-   * Returns the version string of the most recently uploaded PUBLISHED version for the given
-   * module, ordered by creation time descending.
-   */
-  Optional<String> findLatestPublishedVersion(BaseRepoInfo<ID> repoInfo, String modulePath);
+  Optional<String> findLatestPublishedVersion(BaseRepoInfo<I> repoInfo, String modulePath);
 }

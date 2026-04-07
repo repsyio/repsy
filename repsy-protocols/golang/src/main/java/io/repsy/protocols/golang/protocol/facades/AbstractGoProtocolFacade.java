@@ -21,6 +21,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
 import io.repsy.protocols.golang.shared.dto.GoVersionInfo;
@@ -46,8 +47,9 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 
 @NullMarked
-public abstract class AbstractGoProtocolFacade<ID> implements GoProtocolFacade<ID> {
+public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I> {
 
+  private static final String PATH_SEPARATOR = "/";
   private static final String LIST_SUFFIX = "/@v/list";
   private static final String LATEST_SUFFIX = "/@latest";
   private static final String INFO_EXTENSION = ".info";
@@ -61,19 +63,19 @@ public abstract class AbstractGoProtocolFacade<ID> implements GoProtocolFacade<I
           .registerModule(new JavaTimeModule())
           .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-  private final GoStorageService<ID> goStorageService;
-  private final GoModuleService<ID> goModuleService;
+  private final GoStorageService<I> goStorageService;
+  private final GoModuleService<I> goModuleService;
 
   protected AbstractGoProtocolFacade(
-      final GoStorageService<ID> goStorageService, final GoModuleService<ID> goModuleService) {
+      final GoStorageService<I> goStorageService, final GoModuleService<I> goModuleService) {
     this.goStorageService = goStorageService;
     this.goModuleService = goModuleService;
   }
 
   @Override
   public Resource download(final ProtocolContext context) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var path = ProtocolContextUtils.getRelativePath(context).getPath();
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var path = decodePath(ProtocolContextUtils.getRelativePath(context).getPath());
 
     if (path.endsWith(LIST_SUFFIX)) {
       return this.handleVersionList(repoInfo, path);
@@ -92,16 +94,16 @@ public abstract class AbstractGoProtocolFacade<ID> implements GoProtocolFacade<I
   public void upload(
       final ProtocolContext context, final InputStream inputStream, final long contentLength) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var path = ProtocolContextUtils.getRelativePath(context).getPath();
     final var modulePath = GoVersionUtils.extractModulePath(path);
 
     if (modulePath == null) {
-      return;
+      throw new BadRequestException("invalidModulePath");
     }
 
     final var version = GoVersionUtils.extractVersionFromPath(path);
-    final var normalizedPath = modulePath.toLowerCase(Locale.ROOT);
+    final var normalizedPath = GoVersionUtils.decodeModulePath(modulePath).toLowerCase(Locale.ROOT);
     final var content = inputStream.readAllBytes();
 
     verifySha256(content, (String) context.getContextMap().get(CONTENT_SHA256_KEY));
@@ -117,20 +119,24 @@ public abstract class AbstractGoProtocolFacade<ID> implements GoProtocolFacade<I
         GoModuleHashCalculator.hashMod(modContent),
         GoModuleHashCalculator.hashZip(content));
 
-    this.writeModFile(repoInfo, normalizedPath, version, modContent);
+    final var modUsages = this.writeModFile(repoInfo, normalizedPath, version, modContent);
 
     final var zipStoragePath =
         StoragePath.of(
-            repoInfo.getStorageKey(), "/" + normalizedPath + "/@v/" + version + ZIP_EXTENSION);
-    final var usages =
+            repoInfo.getStorageKey(),
+            PATH_SEPARATOR + normalizedPath + "/@v/" + version + ZIP_EXTENSION);
+    final var zipUsages =
         this.goStorageService.writeInputStreamToPath(
             zipStoragePath, new ByteArrayInputStream(content), repoInfo.getName());
 
-    this.writeInfoFile(repoInfo, normalizedPath, version);
-    context.addProperty(USAGES, usages);
+    final var infoUsages = this.writeInfoFile(repoInfo, normalizedPath, version);
+
+    final var totalDiskUsage =
+        modUsages.getDiskUsage() + zipUsages.getDiskUsage() + infoUsages.getDiskUsage();
+    context.addProperty(USAGES, BaseUsages.ofDisk(totalDiskUsage));
   }
 
-  private Resource handleVersionList(final BaseRepoInfo<ID> repoInfo, final String path) {
+  private Resource handleVersionList(final BaseRepoInfo<I> repoInfo, final String path) {
     final var atVPath = path.substring(0, path.length() - "list".length());
     final var atVStoragePath = StoragePath.of(repoInfo.getStorageKey(), atVPath);
 
@@ -146,42 +152,42 @@ public abstract class AbstractGoProtocolFacade<ID> implements GoProtocolFacade<I
     return new ByteArrayResource(versions.getBytes(StandardCharsets.UTF_8));
   }
 
-  private Resource handleLatestVersion(final BaseRepoInfo<ID> repoInfo, final String path) {
+  private Resource handleLatestVersion(final BaseRepoInfo<I> repoInfo, final String path) {
     final var modulePath = path.substring(1, path.length() - LATEST_SUFFIX.length());
     final var latestVersion =
         this.goModuleService
             .findLatestPublishedVersion(repoInfo, modulePath)
             .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
 
-    final var infoPath = "/" + modulePath + "/@v/" + latestVersion + INFO_EXTENSION;
+    final var infoPath = PATH_SEPARATOR + modulePath + "/@v/" + latestVersion + INFO_EXTENSION;
     return this.goStorageService.getResource(
         repoInfo.getName(), StoragePath.of(repoInfo.getStorageKey(), infoPath));
   }
 
-  private void writeModFile(
-      final BaseRepoInfo<ID> repoInfo,
+  private BaseUsages writeModFile(
+      final BaseRepoInfo<I> repoInfo,
       final String modulePath,
       final String version,
       final byte[] modContent) {
 
-    final var modPath = "/" + modulePath + "/@v/" + version + MOD_EXTENSION;
-    this.goStorageService.writeInputStreamToPath(
+    final var modPath = PATH_SEPARATOR + modulePath + "/@v/" + version + MOD_EXTENSION;
+    return this.goStorageService.writeInputStreamToPath(
         StoragePath.of(repoInfo.getStorageKey(), modPath),
         new ByteArrayInputStream(modContent),
         repoInfo.getName());
   }
 
   @SneakyThrows
-  private void writeInfoFile(
-      final BaseRepoInfo<ID> repoInfo, final String modulePath, final String version) {
+  private BaseUsages writeInfoFile(
+      final BaseRepoInfo<I> repoInfo, final String modulePath, final String version) {
 
     final var versionInfo = GoVersionInfo.builder().version(version).time(Instant.now()).build();
     final var infoJson = OBJECT_MAPPER.writeValueAsString(versionInfo);
-    final var infoPath = "/" + modulePath + "/@v/" + version + INFO_EXTENSION;
+    final var infoPath = PATH_SEPARATOR + modulePath + "/@v/" + version + INFO_EXTENSION;
 
     try (final var infoStream =
         new ByteArrayInputStream(infoJson.getBytes(StandardCharsets.UTF_8))) {
-      this.goStorageService.writeInputStreamToPath(
+      return this.goStorageService.writeInputStreamToPath(
           StoragePath.of(repoInfo.getStorageKey(), infoPath), infoStream, repoInfo.getName());
     }
   }
@@ -201,6 +207,23 @@ public abstract class AbstractGoProtocolFacade<ID> implements GoProtocolFacade<I
       }
     }
     throw new BadRequestException("goModNotFoundInZip");
+  }
+
+  private static String decodePath(final String path) {
+    if (path.endsWith(LATEST_SUFFIX)) {
+      final var encoded = path.substring(1, path.length() - LATEST_SUFFIX.length());
+      return "/"
+          + GoVersionUtils.decodeModulePath(encoded).toLowerCase(Locale.ROOT)
+          + LATEST_SUFFIX;
+    }
+    final var atVIndex = path.indexOf("/@v/");
+    if (atVIndex < 0) {
+      return path;
+    }
+    final var encoded = path.substring(1, atVIndex);
+    return "/"
+        + GoVersionUtils.decodeModulePath(encoded).toLowerCase(Locale.ROOT)
+        + path.substring(atVIndex);
   }
 
   @SneakyThrows

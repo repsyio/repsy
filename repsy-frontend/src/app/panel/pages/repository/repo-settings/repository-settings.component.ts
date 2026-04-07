@@ -185,7 +185,6 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
   }
 
   private getRepoSettingsService(): Promise<RepositorySettingsInfo> {
-    console.log('Fetching settings for repo type:', this.repoType);
     switch (this.repoType) {
       case RepoType.MAVEN: {
         return this.mavenService.getRepoSettings();

@@ -66,7 +66,7 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
   public List<StorageItemInfo> listDirectory(final StoragePath storagePath) {
     try {
       return this.storageStrategy.listDirectoryContents(storagePath);
-    } catch (final Exception _) {
+    } catch (final ItemNotFoundException _) {
       return Collections.emptyList();
     }
   }
