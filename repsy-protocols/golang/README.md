@@ -243,9 +243,9 @@ go env -w GONOSUMDB="*"
 |---|---|
 | No `go mod upload` command | Repsy is a push registry. You build and upload `.mod` + `.zip` yourself. |
 | No upstream proxying | Repsy does not proxy to `proxy.golang.org`. Public modules must be fetched via `direct` or a separate proxy entry — but with `,off` as the fallback they will fail. Adjust `GOPROXY` per project as needed. |
-| Module path is case-sensitive | Go's uppercase-escape encoding (`!x` → `X`) is supported in URL paths, but module paths must match exactly between upload and `go get`. |
+| Module paths are lowercased | Repsy normalises all module paths to lowercase on upload and download. Go's uppercase-escape encoding (`!x` → `X`) is decoded first, then the result is lowercased. |
 | `.info` timestamp is server-side | The `Time` field in the generated `.info` file is set to the moment the `.zip` was uploaded, not the original commit timestamp. |
-| No version immutability enforcement | Re-uploading the same version overwrites the existing files. |
+| Version immutability enforced | Re-uploading the same version is rejected with `409 Conflict`. Bump the version to publish a new release. |
 | Checksum database not updated | Modules are not submitted to `sum.golang.org`. Consumers must set `GONOSUMDB`. |
 
 ---

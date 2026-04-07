@@ -33,9 +33,10 @@ public class GoVersionUtils {
   private static final int SEMVER_PRE_RELEASE_GROUP = 4;
 
   /**
-   * Comparator for Go semver strings (e.g. "v1.2.3"). Pre-release versions (e.g. "v1.0.0-beta")
-   * sort after the corresponding release for the same major.minor.patch. Falls back to
-   * lexicographic comparison for non-standard version strings.
+   * Comparator for Go semver strings (e.g. "v1.2.3"). Follows SemVer precedence: pre-release
+   * versions (e.g. "v1.0.0-beta") sort <em>before</em> the corresponding release for the same
+   * major.minor.patch (i.e. v1.0.0-beta &lt; v1.0.0). Falls back to lexicographic comparison for
+   * non-standard version strings.
    */
   public static final Comparator<String> COMPARATOR =
       (v1, v2) -> {
@@ -112,8 +113,9 @@ public class GoVersionUtils {
   }
 
   /**
-   * Pre-release versions sort after (are greater than) the corresponding release. Both null →
-   * equal; one null → null (release) is smaller; both non-null → lexicographic.
+   * Compares pre-release suffixes following SemVer precedence: a release (null suffix) is greater
+   * than any pre-release with the same major.minor.patch. Both null → equal; both non-null →
+   * lexicographic.
    */
   private static int comparePreRelease(final @Nullable String pre1, final @Nullable String pre2) {
 

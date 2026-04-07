@@ -113,7 +113,7 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
     }
     final var filePath = StoragePath.of(storageKey, atVDirPath + item.getName());
     try {
-      this.storageStrategy.deleteDirectory(filePath);
+      this.storageStrategy.delete(filePath);
     } catch (final Exception _) {
       // best-effort
     }
