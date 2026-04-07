@@ -28,6 +28,10 @@ public class GoVersionUtils {
 
   private static final Pattern SEMVER_PATTERN = Pattern.compile("v(\\d+)\\.(\\d+)\\.(\\d+)(-.*)?");
 
+  private static final int SEMVER_MAJOR_GROUP = 1;
+  private static final int SEMVER_PATCH_GROUP = 3;
+  private static final int SEMVER_PRE_RELEASE_GROUP = 4;
+
   /**
    * Comparator for Go semver strings (e.g. "v1.2.3"). Pre-release versions (e.g. "v1.0.0-beta")
    * sort after the corresponding release for the same major.minor.patch. Falls back to
@@ -42,14 +46,15 @@ public class GoVersionUtils {
           return v1.compareTo(v2);
         }
 
-        for (int i = 1; i <= 3; i++) {
+        for (int i = SEMVER_MAJOR_GROUP; i <= SEMVER_PATCH_GROUP; i++) {
           final int diff = Integer.parseInt(m1.group(i)) - Integer.parseInt(m2.group(i));
           if (diff != 0) {
             return diff;
           }
         }
 
-        return comparePreRelease(m1.group(4), m2.group(4));
+        return comparePreRelease(
+            m1.group(SEMVER_PRE_RELEASE_GROUP), m2.group(SEMVER_PRE_RELEASE_GROUP));
       };
 
   /**
@@ -60,14 +65,6 @@ public class GoVersionUtils {
     return path.substring(path.lastIndexOf('/') + 1);
   }
 
-  /**
-   * Extracts the version string from a Go module zip path. E.g. "/github.com/foo/bar/@v/v1.2.3.zip"
-   * → "v1.2.3"
-   */
-  public static String extractVersionFromZipPath(final String zipPath) {
-    final var filename = zipPath.substring(zipPath.lastIndexOf('/') + 1);
-    return filename.substring(0, filename.length() - ".zip".length());
-  }
 
   /**
    * Extracts the module path from a Go proxy URL path. E.g. "/github.com/foo/bar/@v/v1.2.3.zip" →
@@ -82,15 +79,6 @@ public class GoVersionUtils {
   }
 
   /**
-   * Extracts the version from a Go .mod proxy path. E.g. "/github.com/foo/bar/@v/v1.2.3.mod" →
-   * "v1.2.3"
-   */
-  public static String extractVersionFromModPath(final String modPath) {
-    final var filename = modPath.substring(modPath.lastIndexOf('/') + 1);
-    return filename.substring(0, filename.length() - ".mod".length());
-  }
-
-  /**
    * Parses the "go X.Y" directive from a go.mod file's raw bytes. Returns null if the directive is
    * absent.
    */
@@ -101,27 +89,6 @@ public class GoVersionUtils {
     return matcher.find() ? matcher.group(1) : null;
   }
 
-  /**
-   * Decodes Go's uppercase-escape encoding ("!x" → "X") used in module paths. E.g.
-   * "github.com/!burnt!sushi/toml" → "github.com/BurntSushi/toml"
-   */
-  public static String decodeModulePath(final String encoded) {
-    final var sb = new StringBuilder(encoded.length());
-    boolean escape = false;
-
-    for (final char c : encoded.toCharArray()) {
-      if (escape) {
-        sb.append(Character.toUpperCase(c));
-        escape = false;
-      } else if (c == '!') {
-        escape = true;
-      } else {
-        sb.append(c);
-      }
-    }
-
-    return sb.toString();
-  }
 
   /**
    * Pre-release versions sort after (are greater than) the corresponding release. Both null →

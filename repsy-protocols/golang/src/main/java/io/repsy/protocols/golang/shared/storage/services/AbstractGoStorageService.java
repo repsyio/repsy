@@ -80,6 +80,10 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
   public void deleteVersionFiles(final StoragePath atVVersionBasePath, final String repoName) {
     // atVVersionBasePath points to /{modulePath}/@v/{version} (no extension)
     // List the parent @v/ directory and delete files matching the version prefix
+    final var storageKey = atVVersionBasePath.getStorageKey();
+    if (storageKey == null) {
+      return;
+    }
     final var relativePath = atVVersionBasePath.getRelativePath().getPath();
     final var lastSlash = relativePath.lastIndexOf('/');
     if (lastSlash < 0) {
@@ -87,23 +91,31 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
     }
     final var versionPrefix = relativePath.substring(lastSlash + 1);
     final var atVDirPath = relativePath.substring(0, lastSlash + 1);
-    final var atVStoragePath = StoragePath.of(atVVersionBasePath.getStorageKey(), atVDirPath);
+    final var atVStoragePath = StoragePath.of(storageKey, atVDirPath);
 
     try {
       final var items = this.storageStrategy.listDirectoryContents(atVStoragePath);
       for (final var item : items) {
-        if (!item.isDirectory() && item.getName().startsWith(versionPrefix + ".")) {
-          final var filePath =
-              StoragePath.of(atVVersionBasePath.getStorageKey(), atVDirPath + item.getName());
-          try {
-            this.storageStrategy.deleteDirectory(filePath);
-          } catch (final Exception _) {
-            // best-effort
-          }
-        }
+        this.tryDeleteVersionFile(item, versionPrefix, atVDirPath, storageKey);
       }
     } catch (final Exception _) {
       // directory may not exist
+    }
+  }
+
+  private void tryDeleteVersionFile(
+      final StorageItemInfo item,
+      final String versionPrefix,
+      final String atVDirPath,
+      final UUID storageKey) {
+    if (item.isDirectory() || !item.getName().startsWith(versionPrefix + ".")) {
+      return;
+    }
+    final var filePath = StoragePath.of(storageKey, atVDirPath + item.getName());
+    try {
+      this.storageStrategy.deleteDirectory(filePath);
+    } catch (final Exception _) {
+      // best-effort
     }
   }
 
