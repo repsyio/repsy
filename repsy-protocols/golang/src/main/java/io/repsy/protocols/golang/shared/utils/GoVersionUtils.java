@@ -65,7 +65,6 @@ public class GoVersionUtils {
     return path.substring(path.lastIndexOf('/') + 1);
   }
 
-
   /**
    * Extracts the module path from a Go proxy URL path. E.g. "/github.com/foo/bar/@v/v1.2.3.zip" →
    * "github.com/foo/bar" Returns null if the path does not contain "/@v/".
@@ -88,7 +87,6 @@ public class GoVersionUtils {
     final var matcher = pattern.matcher(text);
     return matcher.find() ? matcher.group(1) : null;
   }
-
 
   /**
    * Pre-release versions sort after (are greater than) the corresponding release. Both null →
