@@ -103,7 +103,8 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     }
 
     final var version = GoVersionUtils.extractVersionFromPath(path);
-    // decodedPath preserves original casing for zip-entry lookup (e.g. "github.com/BurntSushi/toml")
+    // decodedPath preserves original casing for zip-entry lookup (e.g.
+    // "github.com/BurntSushi/toml")
     final var decodedPath = GoVersionUtils.decodeModulePath(modulePath);
     // normalizedPath is lowercased for storage and DB (canonical form)
     final var normalizedPath = decodedPath.toLowerCase(Locale.ROOT);
