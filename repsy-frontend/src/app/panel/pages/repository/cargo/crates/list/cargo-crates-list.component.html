@@ -43,13 +43,13 @@
     @if (crates?.length > 0) {
       <div class="text-body1">
         <div
-          class="hidden grid-cols-[2fr_1fr_1fr_3fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[2fr_2fr_2fr_1fr_30px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Crate</div>
           <div>Latest</div>
+          <div>Last Updated</div>
           <div>Downloads</div>
-          <div>Description</div>
           <div></div>
         </div>
         <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
@@ -58,7 +58,7 @@
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === crates.length - 1 }"
-                class="grid grid-cols-[2fr_1fr_1fr_3fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="grid grid-cols-[2fr_2fr_2fr_1fr_30px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
                 <div class="flex items-center gap-2">
                   <svg
@@ -82,12 +82,17 @@
                   [text]="crate.max_version | ellipsis"
                   [textHover]="crate.max_version"
                 />
+                @if (crate.last_updated_at) {
+                  <app-tooltip
+                    class="text-secondary-500 group-hover:underline"
+                    [text]="timeAgo(crate.last_updated_at)"
+                    [textHover]="crate.last_updated_at | date: 'medium'"
+                    [always]="true"
+                  />
+                } @else {
+                  <span class="text-[#9FA0A0]">—</span>
+                }
                 <span class="text-[#FDFDFD]">{{ crate.total_downloads }}</span>
-                <app-tooltip
-                  class="text-[#9FA0A0]"
-                  [text]="crate.description || '-' | ellipsis"
-                  [textHover]="crate.description || '-'"
-                />
                 @if (activeRepo.canManage) {
                   <app-dropdown (click)="$event.stopPropagation()">
                     <button
@@ -149,12 +154,12 @@
                   <span class="text-right break-all text-[#FDFDFD]">{{ crate.max_version }}</span>
                 </div>
                 <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Downloads:</span>
-                  <span class="text-right break-all text-[#FDFDFD]">{{ crate.total_downloads }}</span>
+                  <span class="text-sm text-[#9FA0A0]">Last Updated:</span>
+                  <span class="text-right break-all text-[#FDFDFD]">{{ crate.last_updated_at }}</span>
                 </div>
                 <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Description:</span>
-                  <span class="text-right break-all text-[#9FA0A0]">{{ crate.description || '-' }}</span>
+                  <span class="text-sm text-[#9FA0A0]">Downloads:</span>
+                  <span class="text-right break-all text-[#FDFDFD]">{{ crate.total_downloads }}</span>
                 </div>
               </div>
             </div>

@@ -36,6 +36,7 @@ import { Sort } from '../../../../../shared/dto/sort';
 import { CargoConfigComponent } from '../../config/cargo-config.component';
 import { CrateListItem } from '../../dto/crate-list-item';
 import { CargoService } from '../../service/cargo.service';
+import moment from 'moment';
 
 @Component({
   selector: 'app-cargo-crates-list',
@@ -160,5 +161,9 @@ export class CargoCratesListComponent implements OnDestroy {
 
   public get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
+  }
+
+  public timeAgo(date: Date | string): string {
+    return moment(date).fromNow();
   }
 }

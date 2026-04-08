@@ -18,4 +18,5 @@ export class CrateListItem {
   public max_version: string;
   public total_downloads: number;
   public description: string;
+  public last_updated_at?: string | Date;
 }
