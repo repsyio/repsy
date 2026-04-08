@@ -87,25 +87,7 @@ public abstract class AbstractCargoConfigProtocolMethodHandler implements Protoc
       final var baseUrl =
           ServletUriComponentsBuilder.fromCurrentContextPath().path(basePath).toUriString();
 
-      final var jsonConfig =
-          this.isAuthRequired(context)
-              ? String.format(
-                  """
-              {
-                "dl": "%s/api/v1/crates/{crate}/{version}/download",
-                "api": "%s",
-                "auth-required": true
-              }
-              """,
-                  baseUrl, baseUrl)
-              : String.format(
-                  """
-              {
-                "dl": "%s/api/v1/crates/{crate}/{version}/download",
-                "api": "%s"
-              }
-              """,
-                  baseUrl, baseUrl);
+      final var jsonConfig = this.getJsonConfig(context, baseUrl);
 
       return ResponseEntity.ok()
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -116,7 +98,31 @@ public abstract class AbstractCargoConfigProtocolMethodHandler implements Protoc
     }
   }
 
-  protected boolean isAuthRequired(final ProtocolContext context) {
+  private String getJsonConfig(final ProtocolContext context, final String baseUrl) {
+
+    if (this.isAuthRequired(context)) {
+      return String.format(
+          """
+          {
+            "dl": "%s/api/v1/crates/{crate}/{version}/download",
+            "api": "%s",
+            "auth-required": true
+          }
+          """,
+          baseUrl, baseUrl);
+    }
+
+    return String.format(
+        """
+        {
+          "dl": "%s/api/v1/crates/{crate}/{version}/download",
+          "api": "%s"
+        }
+        """,
+        baseUrl, baseUrl);
+  }
+
+  private boolean isAuthRequired(final ProtocolContext context) {
     return ProtocolContextUtils.getRepoInfo(context).isPrivateRepo();
   }
 

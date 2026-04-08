@@ -55,34 +55,21 @@ Configure Cargo to use this registry:
 \`\`\`toml
 [registries]
 repsy = { index = "sparse+${this.baseUrl}/cargo/${this.repoName}/" }
+
+[registry]
+global-credential-providers = ["cargo:token"]
 \`\`\`
 
 Authenticate:
 
 \`\`\`bash
-cargo login --registry repsy ${this.deployToken ? '<YOUR_DEPLOY_TOKEN>' : '<YOUR_PASSWORD>'}
+cargo login --registry repsy ${this.deployToken ? '<YOUR_DEPLOY_TOKEN>' : '<YOUR_DEPLOY_TOKEN_OR_JWT>'}
 \`\`\`
 
 Publish:
 
 \`\`\`bash
 cargo publish --registry repsy
-\`\`\`
-
-Quick validation checklist:
-
-\`\`\`bash
-# 1) Search in registry index
-cargo search <crate_name> --registry repsy
-
-# 2) Read crate metadata
-cargo info <crate_name> --registry repsy
-
-# 3) Library crate flow (most crates)
-cargo add <crate_name>@<version> --registry repsy
-
-# 4) Binary crate flow (only if crate defines [[bin]])
-cargo install <crate_name> --version <version> --registry repsy
 \`\`\`
 `;
   }

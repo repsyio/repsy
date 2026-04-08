@@ -31,7 +31,9 @@ import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
 import io.repsy.os.shared.repo.dtos.RepoSettingsInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.RepoUsageInfo;
+import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageService;
+import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
@@ -72,6 +74,7 @@ public class CargoRepoController {
   private final UsageService usageService;
   private final CargoApiFacade cargoApiFacade;
   private final RestResponseFactory responseFactory;
+  private final UsageUpdateService usageUpdateService;
 
   @PostMapping
   public RestResponse<Void> createRepo(
@@ -98,7 +101,11 @@ public class CargoRepoController {
 
     this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.MANAGE);
 
-    this.cargoApiFacade.deleteRepo(repoInfo);
+    final var usages = this.cargoApiFacade.deleteRepo(repoInfo);
+
+    final var usageChangedInfo = new UsageChangedInfo(repoInfo.getId(), usages);
+
+    this.usageUpdateService.updateUsage(usageChangedInfo);
 
     return this.responseFactory.success("repoDeleted");
   }
@@ -285,7 +292,11 @@ public class CargoRepoController {
 
     this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.MANAGE);
 
-    this.cargoApiFacade.deleteCrate(repoInfo, name);
+    final var usages = this.cargoApiFacade.deleteCrate(repoInfo, name);
+
+    final var usageChangedInfo = new UsageChangedInfo(repoInfo.getId(), usages);
+
+    this.usageUpdateService.updateUsage(usageChangedInfo);
 
     return this.responseFactory.success("crateDeleted");
   }
@@ -302,7 +313,11 @@ public class CargoRepoController {
 
     this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.MANAGE);
 
-    this.cargoApiFacade.deleteCrateVersion(repoInfo, name, vers);
+    final var usages = this.cargoApiFacade.deleteCrateVersion(repoInfo, name, vers);
+
+    final var usageChangedInfo = new UsageChangedInfo(repoInfo.getId(), usages);
+
+    this.usageUpdateService.updateUsage(usageChangedInfo);
 
     return this.responseFactory.success("crateVersionDeleted");
   }
