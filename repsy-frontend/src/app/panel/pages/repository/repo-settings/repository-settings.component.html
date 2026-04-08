@@ -14,11 +14,13 @@
       </div>
 
       <div>
-        <app-package-override
-          [parentForm]="repoType === 'maven' ? mavenSettingsForm : generalSettingsForm"
-          [repoType]="repoType"
-          (fetch)="getRepoSettings()"
-        />
+        @if (repoType !== 'cargo') {
+          <app-package-override
+            [parentForm]="repoType === 'maven' ? mavenSettingsForm : generalSettingsForm"
+            [repoType]="repoType"
+            (fetch)="getRepoSettings()"
+          />
+        }
       </div>
 
       <div>
