@@ -86,7 +86,7 @@ export class AuthService {
     }
 
     return new Observable<string>((observer: Subscriber<string>) => {
-      const url = environment.apiBaseUrl + '/api/auth/refresh-token';
+      const url = environment.apiBaseUrl + '/api/auth/tokens/refresh';
 
       this.http.post<RestResponse<LoginInfo>>(url, { refreshToken: this._refreshToken }).subscribe(
         (res: RestResponse<LoginInfo>) => {

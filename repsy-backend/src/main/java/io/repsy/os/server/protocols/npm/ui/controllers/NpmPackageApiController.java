@@ -89,8 +89,8 @@ public class NpmPackageApiController {
   }
 
   @DeleteMapping({
-    "/{repoName}/{packageName}/version/{versionName}",
-    "/{repoName}/{scope}/{packageName}/version/{versionName}",
+    "/{repoName}/{packageName}/versions/{versionName}",
+    "/{repoName}/{scope}/{packageName}/versions/{versionName}",
   })
   public @NonNull RestResponse<Void> deletePackageVersion(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
@@ -112,7 +112,7 @@ public class NpmPackageApiController {
     return this.restResponseFactory.success("packageVersionDeleted");
   }
 
-  @GetMapping("/{repoName}/search")
+  @GetMapping("/{repoName}")
   public @NonNull RestResponse<PagedModel<PackageListItem>> getPackages(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
@@ -130,7 +130,7 @@ public class NpmPackageApiController {
     return this.restResponseFactory.success(PACKAGES_FETCHED, new PagedModel<>(packages));
   }
 
-  @GetMapping("/{repoName}/{ignoredScope}/search")
+  @GetMapping("/{repoName}/{ignoredScope}")
   public @NonNull RestResponse<PagedModel<PackageListItem>> getPackages(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
@@ -150,8 +150,8 @@ public class NpmPackageApiController {
   }
 
   @GetMapping({
-    "/{repoName}/scope/search",
-    "/{repoName}/scope/{scope}/search",
+    "/{repoName}/scope",
+    "/{repoName}/scope/{scope}",
   })
   public @NonNull RestResponse<PagedModel<PackageListItem>> getPackagesFilterByScope(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
@@ -175,8 +175,8 @@ public class NpmPackageApiController {
   @GetMapping({
     "/{repoName}/{packageName}",
     "/{repoName}/{scope}/{packageName}",
-    "/{repoName}/{packageName}/version/{versionName}",
-    "/{repoName}/{scope}/{packageName}/version/{versionName}",
+    "/{repoName}/{packageName}/versions/{versionName}",
+    "/{repoName}/{scope}/{packageName}/versions/{versionName}",
   })
   public @NonNull RestResponse<PackageVersionDetail> getVersion(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
@@ -196,8 +196,8 @@ public class NpmPackageApiController {
   }
 
   @GetMapping({
-    "/{repoName}/package/{packageName}/versions/search",
-    "/{repoName}/{scope}/package/{packageName}/versions/search",
+    "/{repoName}/package/{packageName}/versions",
+    "/{repoName}/{scope}/package/{packageName}/versions",
   })
   public @NonNull RestResponse<PagedModel<PackageVersionListItem>> getVersions(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,

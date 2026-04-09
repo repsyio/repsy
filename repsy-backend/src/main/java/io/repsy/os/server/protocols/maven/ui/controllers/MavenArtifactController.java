@@ -126,7 +126,7 @@ public class MavenArtifactController {
 
   @GetMapping({
     "/{repoName}/{groupName}/{artifactName}",
-    "/{repoName}/{groupName}/{artifactName}/version/{versionName}"
+    "/{repoName}/{groupName}/{artifactName}/versions/{versionName}"
   })
   public @NonNull RestResponse<ArtifactVersionInfo> getArtifactVersion(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
@@ -167,7 +167,7 @@ public class MavenArtifactController {
         "artifactVersionsFetched", new PagedModel<>(artifactVersions));
   }
 
-  @GetMapping("/{repoName}/{groupName}/{artifactName}/versions/search")
+  @GetMapping(value = "/{repoName}/{groupName}/{artifactName}/versions", params = "version")
   public @NonNull RestResponse<PagedModel<ArtifactVersionListItem>> getArtifactVersionsLikeVersion(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
@@ -189,7 +189,7 @@ public class MavenArtifactController {
         "artifactVersionsFetched", new PagedModel<>(artifactVersions));
   }
 
-  @GetMapping("/{repoName}/search")
+  @GetMapping("/{repoName}")
   public @NonNull RestResponse<PagedModel<ArtifactListItem>> getArtifactsContainsGroupName(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
@@ -208,7 +208,7 @@ public class MavenArtifactController {
     return this.restResponseFactory.success("artifactsFetched", new PagedModel<>(artifacts));
   }
 
-  @GetMapping("/{repoName}/{groupName}/search")
+  @GetMapping("/{repoName}/{groupName}")
   public @NonNull RestResponse<PagedModel<ArtifactListItem>> getArtifactsContainsArtifactName(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,

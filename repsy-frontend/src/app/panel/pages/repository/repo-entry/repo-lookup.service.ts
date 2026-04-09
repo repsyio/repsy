@@ -35,7 +35,7 @@ interface RepoTypeResponse {
   providedIn: 'root',
 })
 export class RepoLookupService {
-  private readonly baseUrl = `${environment.apiBaseUrl}/api/repo`;
+  private readonly baseUrl = `${environment.apiBaseUrl}/api/repos`;
   private readonly cache = new Map<string, RepoType>();
 
   private readonly currentRepoSubject = new BehaviorSubject<RepoContext | null>(null);
@@ -76,7 +76,7 @@ export class RepoLookupService {
   }
 
   private fetchRepoType(repoName: string): Observable<RepoType> {
-    return this.http.get<RepoTypeResponse>(`${this.baseUrl}/${repoName}/type`).pipe(map((response) => response.data));
+    return this.http.get<RepoTypeResponse>(`${this.baseUrl}/${repoName}/format`).pipe(map((response) => response.data));
   }
 
   private buildCacheKey(repoName: string): string {

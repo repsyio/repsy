@@ -70,7 +70,7 @@ public class DockerImageController {
   private final @NonNull UsageUpdateService usageUpdateService;
   private final @NonNull RestResponseFactory restResponseFactory;
 
-  @GetMapping("/{repoName}/search")
+  @GetMapping("/{repoName}")
   public @NonNull RestResponse<PagedModel<ImageListItem>> getImages(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
@@ -88,7 +88,7 @@ public class DockerImageController {
     return this.restResponseFactory.success("imagesFetched", new PagedModel<>(packages));
   }
 
-  @GetMapping("/{repoName}/{imageName}/tags/search")
+  @GetMapping("/{repoName}/{imageName}/tags")
   public @NonNull RestResponse<PagedModel<ImageTagListItem>> getImageTags(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
@@ -160,7 +160,7 @@ public class DockerImageController {
     return this.restResponseFactory.success("tagDeleted");
   }
 
-  @GetMapping("/{repoName}/{imageName}/tags/{tagName}/manifests/search")
+  @GetMapping("/{repoName}/{imageName}/tags/{tagName}/manifests")
   public @NonNull RestResponse<PagedModel<ManifestListItem>> getTagManifests(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,

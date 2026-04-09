@@ -58,7 +58,7 @@ export class DockerService {
   }
 
   public selectRepository(repoName: string): Observable<RepoPermissionInfo> {
-    const url = `${this.apiBaseUrl}/api/docker/repo/${repoName}/permission`;
+    const url = `${this.apiBaseUrl}/api/docker/repos/${repoName}/permissions`;
 
     return new Observable<RepoPermissionInfo>((subscriber: Subscriber<RepoPermissionInfo>) => {
       this.http.get<RestResponse<RepoPermissionInfo>>(url).subscribe({
@@ -79,7 +79,7 @@ export class DockerService {
 
   public async createRepository(repoForm: RepoForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/docker/repo`;
+      const url = `${this.apiBaseUrl}/api/docker/repos`;
 
       this.http
         .post<RestResponse<void>>(url, repoForm)
@@ -91,7 +91,7 @@ export class DockerService {
 
   public async fetchRepositoryUsage(): Promise<RepoUsageInfo> {
     return new Promise<RepoUsageInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/docker/repo/${this.activeRepo.repoName}/usage`;
+      const url = `${this.apiBaseUrl}/api/docker/repos/${this.activeRepo.repoName}/usage`;
 
       this.http
         .get<RestResponse<RepoUsageInfo>>(url)
@@ -103,7 +103,7 @@ export class DockerService {
 
   public async fetchRepositories(): Promise<RepoListItem[]> {
     return new Promise<RepoListItem[]>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/docker/repo`;
+      const url = `${this.apiBaseUrl}/api/docker/repos`;
 
       this.http
         .get<RestResponse<RepoListItem[]>>(url)
@@ -115,7 +115,7 @@ export class DockerService {
 
   public async fetchRepositorySettings(): Promise<RepoSettingsInfo> {
     return new Promise<RepoSettingsInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/docker/repo/${this.activeRepo.repoName}/settings`;
+      const url = `${this.apiBaseUrl}/api/docker/repos/${this.activeRepo.repoName}/settings`;
 
       this.http
         .get<RestResponse<RepoSettingsInfo>>(url)
@@ -127,7 +127,7 @@ export class DockerService {
 
   public async updateRepoSettings(repoSettingsForm: RepoSettingsForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/docker/repo/${this.activeRepo.repoName}/settings`;
+      const url = `${this.apiBaseUrl}/api/docker/repos/${this.activeRepo.repoName}/settings`;
       this.http
         .put<RestResponse<void>>(url, repoSettingsForm)
         .toPromise()
@@ -138,7 +138,7 @@ export class DockerService {
 
   public async updateRepositoryName(repositoryNameForm: RepoNameForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/docker/repo/${this.activeRepo.repoName}/name`;
+      const url = `${this.apiBaseUrl}/api/docker/repos/${this.activeRepo.repoName}/name`;
 
       this.http
         .patch<RestResponse<void>>(url, repositoryNameForm)
@@ -155,7 +155,7 @@ export class DockerService {
   }
 
   public async updateRepositoryDescription(repoDescriptionForm: RepoDescriptionForm): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/docker/repo/${this.activeRepo.repoName}/description`;
+    const url = `${this.apiBaseUrl}/api/docker/repos/${this.activeRepo.repoName}/description`;
 
     return new Promise<void>((resolve, reject) => {
       return this.http
@@ -168,7 +168,7 @@ export class DockerService {
 
   public async deleteRepository(repo: string): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/docker/repo/${repo}`;
+      const url = `${this.apiBaseUrl}/api/docker/repos/${repo}`;
 
       this.http
         .delete<RestResponse<void>>(url)
@@ -191,7 +191,7 @@ export class DockerService {
         .set('sort', `${sortOption.column},${sortOption.type}`)
         .set('size', pageSize.toString());
 
-      const url = `${this.apiBaseUrl}/api/docker/images/${this.activeRepo.repoName}/search`;
+      const url = `${this.apiBaseUrl}/api/docker/images/${this.activeRepo.repoName}`;
 
       this.http
         .get<RestResponse<PagedData<ImageListItem>>>(url, { params })
@@ -215,7 +215,7 @@ export class DockerService {
         .set('sort', `${sortOption.column},${sortOption.type}`)
         .set('size', pageSize.toString());
 
-      const url = `${this.apiBaseUrl}/api/docker/images/${this.activeRepo.repoName}/${imageName}/tags/search`;
+      const url = `${this.apiBaseUrl}/api/docker/images/${this.activeRepo.repoName}/${imageName}/tags`;
 
       this.http
         .get<RestResponse<PagedData<TagListItem>>>(url, { params })
@@ -240,7 +240,7 @@ export class DockerService {
         .set('sort', `${sortOption.column},${sortOption.type}`)
         .set('size', pageSize.toString());
 
-      const url = `${this.apiBaseUrl}/api/docker/images/${this.activeRepo.repoName}/${imageName}/tags/${tagName}/manifests/search`;
+      const url = `${this.apiBaseUrl}/api/docker/images/${this.activeRepo.repoName}/${imageName}/tags/${tagName}/manifests`;
 
       this.http
         .get<RestResponse<PagedData<ManifestListItem>>>(url, { params })

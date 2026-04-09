@@ -64,7 +64,7 @@ export class MavenService {
   public async createRepository(form: RepoForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       return this.http
-        .post<RestResponse<null>>(`${this.apiBaseUrl}/api/mvn/repo`, form)
+        .post<RestResponse<null>>(`${this.apiBaseUrl}/api/mvn/repos`, form)
         .toPromise()
         .then(() => resolve())
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
@@ -96,7 +96,7 @@ export class MavenService {
   }
 
   public async deleteRepository(repo: string): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/mvn/repo/${repo}`;
+    const url = `${this.apiBaseUrl}/api/mvn/repos/${repo}`;
 
     return new Promise<void>((resolve, reject) => {
       return this.http
@@ -125,7 +125,7 @@ export class MavenService {
 
   public async fetchRepos(): Promise<RepoListItem[]> {
     return new Promise<RepoListItem[]>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/mvn/repo`;
+      const url = `${this.apiBaseUrl}/api/mvn/repos`;
 
       this.http
         .get<RestResponse<RepoListItem[]>>(url)
@@ -144,7 +144,7 @@ export class MavenService {
       `${this.apiBaseUrl}/api/mvn/artifacts/` +
       this.activeRepo.repoName +
       '/' +
-      `${groupName}/${artifactName}/version/${versionName}`;
+      `${groupName}/${artifactName}/versions/${versionName}`;
 
     return new Promise<ArtifactVersionInfo>((resolve, reject) => {
       this.http
@@ -199,7 +199,7 @@ export class MavenService {
       `${this.apiBaseUrl}/api/mvn/artifacts/` +
       this.activeRepo.repoName +
       '/' +
-      `${groupName}/${artifactName}/versions/search`;
+      `${groupName}/${artifactName}/versions`;
 
     return new Promise<PagedData<ArtifactVersionListItem>>((resolve, reject) => {
       this.http
@@ -244,7 +244,7 @@ export class MavenService {
       .set('size', pageSize.toString())
       .set('sort', `${sortOption.column},${sortOption.type}`);
 
-    const url = `${this.apiBaseUrl}/api/mvn/artifacts/` + `${this.activeRepo.repoName}/${groupName}/search`;
+    const url = `${this.apiBaseUrl}/api/mvn/artifacts/` + `${this.activeRepo.repoName}/${groupName}`;
 
     return new Promise<PagedData<ArtifactListItem>>((resolve, reject) => {
       this.http
@@ -258,7 +258,7 @@ export class MavenService {
   public async getPathContent(path: string): Promise<FsItemInfo[]> {
     const params = new HttpParams().set('path', path);
 
-    const url = `${this.apiBaseUrl}/api/mvn/repo/` + `${this.activeRepo.repoName}/content`;
+    const url = `${this.apiBaseUrl}/api/mvn/repos/` + `${this.activeRepo.repoName}/contents`;
 
     return new Promise<FsItemInfo[]>((resolve, reject) => {
       this.http
@@ -298,7 +298,7 @@ export class MavenService {
       .set('sort', `${sortOption.column},${sortOption.type}`)
       .set('size', pageSize.toString());
 
-    const url = `${this.apiBaseUrl}/api/mvn/artifacts/` + `${this.activeRepo.repoName}/search`;
+    const url = `${this.apiBaseUrl}/api/mvn/artifacts/` + `${this.activeRepo.repoName}`;
 
     return new Promise<PagedData<ArtifactListItem>>((resolve, reject) => {
       this.http
@@ -310,7 +310,7 @@ export class MavenService {
   }
 
   public async getRepoSettings(): Promise<MavenRepoSettingsInfo> {
-    const url = `${this.apiBaseUrl}/api/mvn/repo/` + `${this.activeRepo.repoName}/settings`;
+    const url = `${this.apiBaseUrl}/api/mvn/repos/` + `${this.activeRepo.repoName}/settings`;
 
     return new Promise<MavenRepoSettingsInfo>((resolve, reject) => {
       this.http
@@ -322,7 +322,7 @@ export class MavenService {
   }
 
   public async getRepoUsage(): Promise<RepoUsageInfo> {
-    const url = `${this.apiBaseUrl}/api/mvn/repo/` + `${this.activeRepo.repoName}/usage`;
+    const url = `${this.apiBaseUrl}/api/mvn/repos/` + `${this.activeRepo.repoName}/usage`;
 
     return new Promise<RepoUsageInfo>((resolve, reject) => {
       return this.http
@@ -334,7 +334,7 @@ export class MavenService {
   }
 
   public async updateRepositoryName(repositoryNameForm: RepoNameForm): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/mvn/repo/` + `${this.activeRepo.repoName}/name`;
+    const url = `${this.apiBaseUrl}/api/mvn/repos/` + `${this.activeRepo.repoName}/name`;
 
     return new Promise<void>((resolve, reject) => {
       return this.http
@@ -352,7 +352,7 @@ export class MavenService {
   }
 
   public async updateRepoDescription(repoDescriptionForm: RepoDescriptionForm): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/mvn/repo/` + `${this.activeRepo.repoName}/description`;
+    const url = `${this.apiBaseUrl}/api/mvn/repos/` + `${this.activeRepo.repoName}/description`;
 
     return new Promise<void>((resolve, reject) => {
       return this.http
@@ -364,7 +364,7 @@ export class MavenService {
   }
 
   public async updateRepoSettings(form: RepoSettingsForm): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/mvn/repo/${this.activeRepo.repoName}/settings`;
+    const url = `${this.apiBaseUrl}/api/mvn/repos/${this.activeRepo.repoName}/settings`;
 
     return new Promise<void>((resolve, reject) => {
       return this.http
@@ -376,7 +376,7 @@ export class MavenService {
   }
 
   public getRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
-    const url = `${this.apiBaseUrl}/api/mvn/repo/${repoName}/permission`;
+    const url = `${this.apiBaseUrl}/api/mvn/repos/${repoName}/permissions`;
 
     return new Observable<RepoPermissionInfo>((subscriber: Subscriber<RepoPermissionInfo>) => {
       this.http.get<RestResponse<RepoPermissionInfo>>(url).subscribe(

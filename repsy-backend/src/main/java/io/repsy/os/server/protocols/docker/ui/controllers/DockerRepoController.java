@@ -57,7 +57,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestApiPort(MultiPortNames.PORT_API)
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/docker/repo")
+@RequestMapping("/api/docker/repos")
 public class DockerRepoController {
 
   private final @NonNull DockerAuthComponent dockerAuthComponent;
@@ -96,7 +96,7 @@ public class DockerRepoController {
     return this.responseFactory.success("repoDeleted");
   }
 
-  @GetMapping("/{repoName}/permission")
+  @GetMapping("/{repoName}/permissions")
   public @NonNull RestResponse<RepoPermissionInfo> getRepoPermission(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName) {
@@ -109,7 +109,7 @@ public class DockerRepoController {
     return this.responseFactory.success("repoPermissionsFetched", repoPermissionInfo);
   }
 
-  @GetMapping("/{repoName}/content")
+  @GetMapping("/{repoName}/contents")
   public @NonNull RestResponse<List<StorageItemInfo>> getPathContent(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
@@ -133,17 +133,6 @@ public class DockerRepoController {
     final var repos = this.repoTxService.findAllByRepoType(RepoType.DOCKER);
 
     return this.responseFactory.success("reposFetched", repos);
-  }
-
-  @GetMapping("/info")
-  public @NonNull RestResponse<List<RepoListInfo>> getRepoInfo(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
-
-    this.dockerAuthComponent.authenticateUser(authHeader);
-
-    final var repositoryList = this.repoTxService.findAllByRepoType(RepoType.DOCKER);
-
-    return this.responseFactory.success("reposFetched", repositoryList);
   }
 
   @GetMapping("/{repoName}/settings")
