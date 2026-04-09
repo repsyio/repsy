@@ -115,6 +115,16 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
     return this.goModuleRepository.findAllByRepoIdContainsModulePath(repoId, search, pageable);
   }
 
+  public Page<GoModuleVersionListItem> getModuleVersions(
+      final UUID repoId, final String modulePath, final String search, final Pageable pageable) {
+    final var goModule =
+        this.goModuleRepository
+            .findByRepoIdAndModulePath(repoId, modulePath)
+            .orElseThrow(() -> new ItemNotFoundException("moduleNotFound"));
+    return this.goModuleVersionRepository.findAllByModuleIdContainsVersion(
+        goModule.getId(), search, pageable);
+  }
+
   public GoModuleInfo getModuleInfo(final UUID repoId, final String modulePath) {
     final var goModule =
         this.goModuleRepository

@@ -30,6 +30,8 @@ export class GolangConfigComponent implements OnInit, OnChanges {
   @Input() baseUrl: string;
   @Input() username = '<username>';
   @Input() repoName = '<repo_name>';
+  @Input() modulePath = '<module_path>';
+  @Input() moduleVersion = '<version>';
   @Input() deployToken: boolean;
   @Input() open: boolean;
   @Output() openChange = new EventEmitter<boolean>();
@@ -41,7 +43,7 @@ export class GolangConfigComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['username'] || changes['repoName'] || changes['deployToken']) {
+    if (changes['username'] || changes['repoName'] || changes['modulePath'] || changes['moduleVersion'] || changes['deployToken']) {
       this.updateMarkdown();
     }
   }
@@ -77,7 +79,7 @@ Set \`GONOSUMDB\` to the module path prefix to skip checksum verification for pr
 while keeping it enabled for public ones:
 
 \`\`\`bash
-go env -w GONOSUMDB="corp.internal"
+go env -w GONOSUMDB="${this.modulePath}"
 \`\`\`
 
 Or disable it for all modules:
@@ -91,7 +93,7 @@ go env -w GONOSUMDB="*"
 ### 3. Download a module
 
 \`\`\`bash
-go get corp.internal/yourmodule@v1.0.0
+go get ${this.modulePath}@${this.moduleVersion}
 \`\`\`
 
 ---
@@ -104,8 +106,8 @@ prefixed with \`{modulePath}@{version}/\`.
 **1. Build the zip:**
 
 \`\`\`bash
-MODULE="corp.internal/yourmodule"
-VERSION="v1.0.0"
+MODULE="${this.modulePath}"
+VERSION="${this.moduleVersion}"
 
 zip module.zip \\
   "\${MODULE}@\${VERSION}/go.mod" \\

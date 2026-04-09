@@ -23,6 +23,7 @@ import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.server.protocols.golang.shared.auth.services.GolangAuthComponent;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleInfo;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleListItem;
+import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem;
 import io.repsy.os.server.protocols.golang.ui.facades.GolangApiFacade;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
@@ -98,6 +99,26 @@ public class GolangModuleController {
         this.golangApiFacade.searchModules(repoInfo.getStorageKey(), search, pageable);
 
     return this.restResponseFactory.success("modulesFetched", new PagedModel<>(modules));
+  }
+
+  @GetMapping("/{repoName}/versions")
+  public @NonNull RestResponse<PagedModel<GoModuleVersionListItem>> getModuleVersions(
+      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
+      @PathVariable final @NonNull String repoName,
+      @RequestParam final @NonNull String modulePath,
+      @RequestParam(required = false, defaultValue = "") final @NonNull String search,
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
+          final @NonNull Pageable pageable) {
+
+    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.GOLANG);
+
+    this.golangAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+
+    final var versions =
+        this.golangApiFacade.getModuleVersions(
+            repoInfo.getStorageKey(), modulePath, search, pageable);
+
+    return this.restResponseFactory.success("moduleVersionsFetched", new PagedModel<>(versions));
   }
 
   @GetMapping("/{repoName}/info")

@@ -32,8 +32,10 @@ import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-tok
 import { RepositorySettingsInfo } from '../../pypi/dto/repository-settings-info';
 import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
 import { DeployTokenForm } from '../../repo-settings/deploy-token/form/deploy-token-form';
+import { Sort } from '../../../../shared/dto/sort';
 import { ModuleInfo } from '../dto/module-info';
 import { ModuleListItem } from '../dto/module-list-item';
+import { ModuleVersionListItem } from '../dto/module-version-list-item';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 
 @Injectable({
@@ -152,11 +154,11 @@ export class GolangService {
     });
   }
 
-  public async fetchModules(pageIndex: number, pageSize: number): Promise<PagedData<ModuleListItem>> {
+  public async fetchModules(sortOption: Sort, pageIndex: number, pageSize: number): Promise<PagedData<ModuleListItem>> {
     const params = new HttpParams()
       .set('page', pageIndex.toString())
       .set('size', pageSize.toString())
-      .set('sort', 'id,DESC');
+      .set('sort', `${sortOption.column},${sortOption.type}`);
 
     return new Promise<PagedData<ModuleListItem>>((resolve, reject) => {
       this.http
@@ -167,12 +169,12 @@ export class GolangService {
     });
   }
 
-  public async searchModules(search: string, pageIndex: number, pageSize: number): Promise<PagedData<ModuleListItem>> {
+  public async searchModules(search: string, sortOption: Sort, pageIndex: number, pageSize: number): Promise<PagedData<ModuleListItem>> {
     const params = new HttpParams()
       .set('search', search)
       .set('page', pageIndex.toString())
       .set('size', pageSize.toString())
-      .set('sort', 'id,DESC');
+      .set('sort', `${sortOption.column},${sortOption.type}`);
 
     return new Promise<PagedData<ModuleListItem>>((resolve, reject) => {
       this.http
@@ -191,6 +193,32 @@ export class GolangService {
         .delete<RestResponse<null>>(`${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}`, { params })
         .toPromise()
         .then(() => resolve())
+        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
+    });
+  }
+
+  public async fetchModuleVersions(
+    modulePath: string,
+    search: string,
+    sortOption: Sort,
+    pageIndex: number,
+    pageSize: number,
+  ): Promise<PagedData<ModuleVersionListItem>> {
+    const params = new HttpParams()
+      .set('modulePath', modulePath)
+      .set('search', search)
+      .set('page', pageIndex.toString())
+      .set('size', pageSize.toString())
+      .set('sort', `${sortOption.column},${sortOption.type}`);
+
+    return new Promise<PagedData<ModuleVersionListItem>>((resolve, reject) => {
+      this.http
+        .get<RestResponse<PagedData<ModuleVersionListItem>>>(
+          `${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}/versions`,
+          { params },
+        )
+        .toPromise()
+        .then((res: RestResponse<PagedData<ModuleVersionListItem>>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
     });
   }

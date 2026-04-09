@@ -18,7 +18,7 @@
               {{ crumbs[i] }}
             </div>
           } @else {
-            <a class="text-[#9FA0A0] hover:text-[#FDFDFD]" [routerLink]="crumbLink">
+            <a class="text-[#9FA0A0] hover:text-[#FDFDFD]" [routerLink]="crumbLink" [queryParams]="crumbQueryParams[i]">
               @if (i === 1) {
                 <img width="20" height="20" [ngSrc]="repoIcon" alt="icon" class="inline-block h-[20px] w-[20px]" />
               }

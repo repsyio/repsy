@@ -20,6 +20,8 @@ import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModuleVer
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -40,4 +42,16 @@ public interface GoModuleVersionRepository extends JpaRepository<GoModuleVersion
       ORDER BY v.createdAt DESC
       """)
   List<GoModuleVersionListItem> findAllByModuleId(@Param("moduleId") UUID moduleId);
+
+  @Query(
+      """
+      SELECT new io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem(
+          v.id, v.version, v.goVersion, v.createdAt
+      )
+      FROM GoModuleVersion v
+      WHERE v.goModule.id = :moduleId
+        AND LOWER(v.version) LIKE LOWER(CONCAT('%', :search, '%'))
+      """)
+  Page<GoModuleVersionListItem> findAllByModuleIdContainsVersion(
+      @Param("moduleId") UUID moduleId, @Param("search") String search, Pageable pageable);
 }

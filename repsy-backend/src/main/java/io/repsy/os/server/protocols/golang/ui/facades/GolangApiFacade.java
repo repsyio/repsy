@@ -21,6 +21,7 @@ import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleInfo;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleListItem;
+import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleRepository;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleVersionRepository;
 import io.repsy.os.server.protocols.golang.shared.go_module.services.GoModuleServiceImpl;
@@ -72,6 +73,14 @@ public class GolangApiFacade {
   public @NonNull Page<GoModuleListItem> searchModules(
       final @NonNull UUID repoId, final @NonNull String search, final @NonNull Pageable pageable) {
     return this.goModuleService.getModulesContainsPath(repoId, search, pageable);
+  }
+
+  public @NonNull Page<GoModuleVersionListItem> getModuleVersions(
+      final @NonNull UUID repoId,
+      final @NonNull String modulePath,
+      final @NonNull String search,
+      final @NonNull Pageable pageable) {
+    return this.goModuleService.getModuleVersions(repoId, modulePath, search, pageable);
   }
 
   public @NonNull GoModuleInfo getModuleInfo(

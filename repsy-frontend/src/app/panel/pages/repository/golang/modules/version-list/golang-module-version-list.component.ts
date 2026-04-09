@@ -27,11 +27,15 @@ import { DropdownComponent } from '../../../../../shared/components/dropdown/dro
 import { EllipsisPipe } from '../../../../../shared/components/ellipsis/ellipsis.pipe';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { PaginationComponent } from '../../../../../shared/components/pagination/pagination.component';
+import { SearchboxComponent } from '../../../../../shared/components/searchbox/searchbox.component';
+import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
+import { PagedData } from '../../../../../shared/dto/paged-data';
 import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
+import { Sort } from '../../../../../shared/dto/sort';
 import { GolangConfigComponent } from '../../config/golang-config.component';
-import { ModuleInfo } from '../../dto/module-info';
 import { ModuleVersionListItem } from '../../dto/module-version-list-item';
 import { GolangService } from '../../service/golang.service';
 
@@ -44,6 +48,9 @@ import { GolangService } from '../../service/golang.service';
     GolangConfigComponent,
     DropdownComponent,
     EmptyListComponent,
+    PaginationComponent,
+    SearchboxComponent,
+    SortSelectorComponent,
     TooltipComponent,
     EllipsisPipe,
     NgOptimizedImage,
@@ -54,11 +61,19 @@ import { GolangService } from '../../service/golang.service';
 export class GolangModuleVersionListComponent implements OnDestroy {
   public loading = true;
   public showConfig = false;
+  public pageNum = 0;
+  public pageSize = 10;
+  public searchText = '';
   public error: string;
   public modulePath: string;
-  public moduleInfo: ModuleInfo;
+  public pagedData: PagedData<ModuleVersionListItem>;
   public versions: ModuleVersionListItem[];
   public activeRepo: RepoPermissionInfo;
+  public sortOption: Sort = { name: 'Newest', column: 'id', type: 'DESC' };
+  public sortOptions: Sort[] = [
+    { name: 'Newest', column: 'id', type: 'DESC' },
+    { name: 'Oldest', column: 'id', type: 'ASC' },
+  ];
   public readonly baseUrl: string;
   public readonly username: string;
 
@@ -74,6 +89,7 @@ export class GolangModuleVersionListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
+    this.pagedData = new PagedData<ModuleVersionListItem>();
     this.activeRepo = new RepoPermissionInfo();
 
     this.repositoryChanges$ = this.golangService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
@@ -84,7 +100,7 @@ export class GolangModuleVersionListComponent implements OnDestroy {
           this.router.navigate(['/' + this.activeRepo.repoName]);
           return;
         }
-        this.fetchModuleInfo();
+        this.fetchVersions();
       }
     });
   }
@@ -93,8 +109,24 @@ export class GolangModuleVersionListComponent implements OnDestroy {
     this.repositoryChanges$.unsubscribe();
   }
 
+  public loadPage(pageNum: number): void {
+    this.pageNum = pageNum;
+    this.fetchVersions();
+  }
+
   public refreshPage(): void {
-    this.fetchModuleInfo();
+    this.fetchVersions();
+  }
+
+  public search(text: string): void {
+    this.pageNum = 0;
+    this.searchText = text;
+    this.fetchVersions();
+  }
+
+  public sort(option: Sort): void {
+    this.sortOption = option;
+    this.fetchVersions();
   }
 
   public openConfig(open: boolean): void {
@@ -129,13 +161,13 @@ export class GolangModuleVersionListComponent implements OnDestroy {
     });
   }
 
-  private fetchModuleInfo(): void {
+  private fetchVersions(): void {
     this.loading = true;
     this.golangService
-      .fetchModuleInfo(this.modulePath)
-      .then((info: ModuleInfo) => {
-        this.moduleInfo = info;
-        this.versions = info.versions;
+      .fetchModuleVersions(this.modulePath, this.searchText, this.sortOption, this.pageNum, this.pageSize)
+      .then((pagedData: PagedData<ModuleVersionListItem>) => {
+        this.pagedData.page = pagedData.page;
+        this.versions = pagedData.content;
       })
       .catch((err: string) => {
         this.error = err;

@@ -29,10 +29,12 @@ import { EmptyListComponent } from '../../../../../shared/components/empty-list/
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { PaginationComponent } from '../../../../../shared/components/pagination/pagination.component';
 import { SearchboxComponent } from '../../../../../shared/components/searchbox/searchbox.component';
+import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
+import { Sort } from '../../../../../shared/dto/sort';
 import { GolangConfigComponent } from '../../config/golang-config.component';
 import { ModuleListItem } from '../../dto/module-list-item';
 import { GolangService } from '../../service/golang.service';
@@ -47,6 +49,7 @@ import { GolangService } from '../../service/golang.service';
     GolangConfigComponent,
     PaginationComponent,
     SearchboxComponent,
+    SortSelectorComponent,
     DropdownComponent,
     TooltipComponent,
     EllipsisPipe,
@@ -64,6 +67,11 @@ export class GolangModulesListComponent implements OnDestroy {
   public error: string;
   public pagedData: PagedData<ModuleListItem>;
   public activeRepo: RepoPermissionInfo;
+  public sortOption: Sort = { name: 'Newest', column: 'id', type: 'DESC' };
+  public sortOptions: Sort[] = [
+    { name: 'Newest', column: 'id', type: 'DESC' },
+    { name: 'Oldest', column: 'id', type: 'ASC' },
+  ];
 
   public modules: ModuleListItem[];
 
@@ -109,6 +117,11 @@ export class GolangModulesListComponent implements OnDestroy {
     this.fetchModules();
   }
 
+  public sort(option: Sort): void {
+    this.sortOption = option;
+    this.fetchModules();
+  }
+
   public openConfig(open: boolean) {
     this.showConfig = open;
   }
@@ -139,8 +152,8 @@ export class GolangModulesListComponent implements OnDestroy {
     this.loading = true;
 
     const fetch = this.searchText
-      ? this.golangService.searchModules(this.searchText, this.pageNum, this.pageSize)
-      : this.golangService.fetchModules(this.pageNum, this.pageSize);
+      ? this.golangService.searchModules(this.searchText, this.sortOption, this.pageNum, this.pageSize)
+      : this.golangService.fetchModules(this.sortOption, this.pageNum, this.pageSize);
 
     fetch
       .then((pagedData: PagedData<ModuleListItem>) => {

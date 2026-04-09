@@ -13,6 +13,13 @@
     <app-searchbox class="w-full sm:max-w-[192px]" placeholder="module" (filter)="search($event)" />
 
     <div class="flex w-full gap-2 sm:w-auto">
+      <app-sort-selector
+        [(selectedOption)]="sortOption"
+        [options]="sortOptions"
+        (choose)="sort($event)"
+        class="w-full sm:w-auto"
+      />
+
       <button
         (click)="refreshPage()"
         class="hover:text-secondary-500 flex h-[40px] w-[40px] items-center justify-center text-neutral-200"
