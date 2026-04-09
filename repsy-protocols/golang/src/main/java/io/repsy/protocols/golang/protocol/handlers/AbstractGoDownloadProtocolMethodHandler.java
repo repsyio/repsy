@@ -21,6 +21,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
 import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
+import io.repsy.protocols.golang.shared.exceptions.GoVersionGoneException;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -78,6 +79,8 @@ public abstract class AbstractGoDownloadProtocolMethodHandler<ID> implements Pro
       }
 
       return ResponseEntity.ok().contentType(this.resolveContentType(context)).body(resource);
+    } catch (final GoVersionGoneException _) {
+      return ResponseEntity.status(HttpStatus.GONE).build();
     } catch (final ItemNotFoundException _) {
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }

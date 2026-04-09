@@ -32,4 +32,10 @@ public interface GoModuleService<I> {
       String zipHash);
 
   Optional<String> findLatestPublishedVersion(BaseRepoInfo<I> repoInfo, String modulePath);
+
+  /**
+   * Returns {@code true} if the given version exists in the repository but has been soft-deleted.
+   * Used to return 410 Gone instead of 404 Not Found for deleted versions.
+   */
+  boolean isVersionDeleted(BaseRepoInfo<I> repoInfo, String modulePath, String version);
 }

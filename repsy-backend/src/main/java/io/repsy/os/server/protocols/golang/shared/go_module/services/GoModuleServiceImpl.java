@@ -94,6 +94,18 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
   }
 
   @Override
+  public boolean isVersionDeleted(
+      final BaseRepoInfo<UUID> repoInfo, final String modulePath, final String version) {
+    return this.goModuleRepository
+        .findByRepoIdAndModulePath(repoInfo.getStorageKey(), modulePath)
+        .map(
+            module ->
+                this.goModuleVersionRepository.existsByGoModuleIdAndVersionAndDeletedTrue(
+                    module.getId(), version))
+        .orElse(false);
+  }
+
+  @Override
   public Optional<String> findLatestPublishedVersion(
       final BaseRepoInfo<UUID> repoInfo, final String modulePath) {
 

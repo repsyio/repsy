@@ -26,7 +26,13 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public class GoVersionUtils {
 
-  private static final Pattern SEMVER_PATTERN = Pattern.compile("v(\\d+)\\.(\\d+)\\.(\\d+)(-.*)?");
+  // Captures: major, minor, patch, pre-release (before '+'), build metadata (ignored)
+  private static final Pattern SEMVER_PATTERN =
+      Pattern.compile("v(\\d+)\\.(\\d+)\\.(\\d+)(-[^+]*)?(\\+.*)?");
+
+  // Pseudo-version pre-release contains a 14-digit timestamp followed by a 12+ hex commit hash
+  // e.g. "-20230101000000-abcdef123456" or "-0.20230101000000-abcdef123456"
+  private static final Pattern PSEUDO_PRE_PATTERN = Pattern.compile(".*?(\\d{14})-[0-9a-f]{12,}$");
 
   private static final int SEMVER_MAJOR_GROUP = 1;
   private static final int SEMVER_PATCH_GROUP = 3;
@@ -113,20 +119,34 @@ public class GoVersionUtils {
   }
 
   /**
-   * Compares pre-release suffixes following SemVer precedence: a release (null suffix) is greater
-   * than any pre-release with the same major.minor.patch. Both null → equal; both non-null →
-   * lexicographic.
+   * Compares pre-release suffixes following SemVer and Go module precedence:
+   *
+   * <ul>
+   *   <li>A release (null suffix) is greater than any pre-release with the same major.minor.patch.
+   *   <li>Pseudo-versions (e.g. {@code -20230101000000-abcdef123456}) are compared by their
+   *       embedded timestamp, not lexicographically.
+   *   <li>All other pre-release strings fall back to lexicographic comparison.
+   * </ul>
    */
   private static int comparePreRelease(final @Nullable String pre1, final @Nullable String pre2) {
-
-    if (pre1 == null && pre2 == null) {
-      return 0;
-    }
     if (pre1 == null) {
-      return 1; // release > pre-release (SemVer: pre-release has lower precedence)
+      return pre2 == null
+          ? 0
+          : 1; // release > pre-release (SemVer: pre-release has lower precedence)
     }
     if (pre2 == null) {
-      return -1; // pre-release < release (SemVer: pre-release has lower precedence)
+      return -1; // pre-release < release
+    }
+    return compareBothPresent(pre1, pre2);
+  }
+
+  // Compares two non-null pre-release strings: pseudo-versions by timestamp, others
+  // lexicographically.
+  private static int compareBothPresent(final String pre1, final String pre2) {
+    final var ps1 = PSEUDO_PRE_PATTERN.matcher(pre1);
+    final var ps2 = PSEUDO_PRE_PATTERN.matcher(pre2);
+    if (ps1.matches() && ps2.matches()) {
+      return ps1.group(1).compareTo(ps2.group(1));
     }
     return pre1.compareTo(pre2);
   }

@@ -121,6 +121,8 @@ public class GolangApiFacade {
         StoragePath.of(repoInfo.getStorageKey(), "/" + modulePath + "/@v/" + version);
     this.golangStorageService.deleteVersionFiles(versionStoragePath, repoInfo.getName());
 
-    this.goModuleVersionRepository.delete(moduleVersion);
+    // Soft-delete: keep the DB record so GOPROXY requests return 410 Gone instead of 404
+    moduleVersion.setDeleted(true);
+    this.goModuleVersionRepository.save(moduleVersion);
   }
 }

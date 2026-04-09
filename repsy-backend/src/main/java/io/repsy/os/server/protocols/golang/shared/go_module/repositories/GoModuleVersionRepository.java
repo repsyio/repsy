@@ -32,6 +32,8 @@ public interface GoModuleVersionRepository extends JpaRepository<GoModuleVersion
 
   Optional<GoModuleVersion> findFirstByGoModuleIdOrderByCreatedAtDesc(UUID moduleId);
 
+  boolean existsByGoModuleIdAndVersionAndDeletedTrue(UUID moduleId, String version);
+
   @Query(
       """
       SELECT new io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem(
@@ -39,6 +41,7 @@ public interface GoModuleVersionRepository extends JpaRepository<GoModuleVersion
       )
       FROM GoModuleVersion v
       WHERE v.goModule.id = :moduleId
+        AND v.deleted = false
       ORDER BY v.createdAt DESC
       """)
   List<GoModuleVersionListItem> findAllByModuleId(@Param("moduleId") UUID moduleId);
@@ -50,6 +53,7 @@ public interface GoModuleVersionRepository extends JpaRepository<GoModuleVersion
       )
       FROM GoModuleVersion v
       WHERE v.goModule.id = :moduleId
+        AND v.deleted = false
         AND LOWER(v.version) LIKE LOWER(CONCAT('%', :search, '%'))
       """)
   Page<GoModuleVersionListItem> findAllByModuleIdContainsVersion(

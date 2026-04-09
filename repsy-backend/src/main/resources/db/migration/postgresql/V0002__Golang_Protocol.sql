@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS "go_module_version" (
     "go_version" varchar(20),
     "mod_hash"   varchar(100),
     "zip_hash"   varchar(100),
+    "deleted"    boolean      NOT NULL DEFAULT false,
     "created_at" timestamptz  NOT NULL DEFAULT now(),
     CONSTRAINT "fk_go_module_version__module_id"
     FOREIGN KEY ("module_id") REFERENCES "go_module" ("id") ON DELETE CASCADE
