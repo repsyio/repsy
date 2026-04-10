@@ -1,9 +1,4 @@
-<app-golang-config
-  [baseUrl]="baseUrl"
-  [username]="username"
-  [repoName]="activeRepo.repoName"
-  [(open)]="showConfig"
-/>
+<app-golang-config [baseUrl]="baseUrl" [username]="username" [repoName]="activeRepo.repoName" [(open)]="showConfig" />
 
 <div
   [ngClass]="{ 'pointer-events-none opacity-50 select-none': loading || this.error }"

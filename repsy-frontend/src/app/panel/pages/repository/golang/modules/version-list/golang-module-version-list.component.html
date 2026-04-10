@@ -177,11 +177,7 @@
       <app-empty-list />
     }
     <!-- Pagination -->
-    <app-pagination
-      (pageNumChange)="loadPage($event)"
-      [(pageNum)]="pageNum"
-      [totalPages]="pagedData.page.totalPages"
-    />
+    <app-pagination (pageNumChange)="loadPage($event)" [(pageNum)]="pageNum" [totalPages]="pagedData.page.totalPages" />
   } @else {
     <div animate.enter="fade-in-up" class="p-8 text-center">
       <img

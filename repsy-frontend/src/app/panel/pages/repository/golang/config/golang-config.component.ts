@@ -43,7 +43,13 @@ export class GolangConfigComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['username'] || changes['repoName'] || changes['modulePath'] || changes['moduleVersion'] || changes['deployToken']) {
+    if (
+      changes['username'] ||
+      changes['repoName'] ||
+      changes['modulePath'] ||
+      changes['moduleVersion'] ||
+      changes['deployToken']
+    ) {
       this.updateMarkdown();
     }
   }

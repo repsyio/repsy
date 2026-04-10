@@ -162,14 +162,21 @@ export class GolangService {
 
     return new Promise<PagedData<ModuleListItem>>((resolve, reject) => {
       this.http
-        .get<RestResponse<PagedData<ModuleListItem>>>(`${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}`, { params })
+        .get<RestResponse<PagedData<ModuleListItem>>>(`${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}`, {
+          params,
+        })
         .toPromise()
         .then((res: RestResponse<PagedData<ModuleListItem>>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
     });
   }
 
-  public async searchModules(search: string, sortOption: Sort, pageIndex: number, pageSize: number): Promise<PagedData<ModuleListItem>> {
+  public async searchModules(
+    search: string,
+    sortOption: Sort,
+    pageIndex: number,
+    pageSize: number,
+  ): Promise<PagedData<ModuleListItem>> {
     const params = new HttpParams()
       .set('search', search)
       .set('page', pageIndex.toString())
@@ -178,7 +185,10 @@ export class GolangService {
 
     return new Promise<PagedData<ModuleListItem>>((resolve, reject) => {
       this.http
-        .get<RestResponse<PagedData<ModuleListItem>>>(`${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}/search`, { params })
+        .get<RestResponse<PagedData<ModuleListItem>>>(
+          `${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}/search`,
+          { params },
+        )
         .toPromise()
         .then((res: RestResponse<PagedData<ModuleListItem>>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
@@ -240,7 +250,9 @@ export class GolangService {
 
     return new Promise<void>((resolve, reject) => {
       this.http
-        .delete<RestResponse<null>>(`${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}/versions`, { params })
+        .delete<RestResponse<null>>(`${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}/versions`, {
+          params,
+        })
         .toPromise()
         .then(() => resolve())
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
@@ -252,7 +264,10 @@ export class GolangService {
 
     return new Promise<PagedData<DeployTokenInfo>>((resolve, reject) => {
       this.http
-        .get<RestResponse<PagedData<DeployTokenInfo>>>(`${this.apiBaseUrl}/api/go/deploy-tokens/${this.activeRepo.repoName}`, { params })
+        .get<RestResponse<PagedData<DeployTokenInfo>>>(
+          `${this.apiBaseUrl}/api/go/deploy-tokens/${this.activeRepo.repoName}`,
+          { params },
+        )
         .toPromise()
         .then((res: RestResponse<PagedData<DeployTokenInfo>>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));

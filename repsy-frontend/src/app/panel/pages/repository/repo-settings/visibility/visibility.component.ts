@@ -27,7 +27,7 @@ import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form'
 import { MavenService } from '../../maven/service/maven.service';
 import { NpmService } from '../../npm/service/npm.service';
 import { PypiService } from '../../pypi/service/pypi.service';
-import {GolangService} from "../../golang/service/golang.service";
+import { GolangService } from '../../golang/service/golang.service';
 
 @Component({
   selector: 'app-visibility',

@@ -72,9 +72,18 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
         this.getCommand = `GONOSUMDB=* GOPROXY=${this.repoBaseUrl}/${this.activeRepo.repoName},off go get ${this.modulePath}@${this.versionName}`;
         this.goEnvCommand = `go env -w GONOSUMDB="*" GOPROXY="${this.repoBaseUrl}/${this.activeRepo.repoName},off"`;
         this.goproxyEndpoints = [
-          { label: '.info', url: `${this.repoBaseUrl}/${this.activeRepo.repoName}/${this.modulePath}/@v/${this.versionName}.info` },
-          { label: '.mod', url: `${this.repoBaseUrl}/${this.activeRepo.repoName}/${this.modulePath}/@v/${this.versionName}.mod` },
-          { label: '.zip', url: `${this.repoBaseUrl}/${this.activeRepo.repoName}/${this.modulePath}/@v/${this.versionName}.zip` },
+          {
+            label: '.info',
+            url: `${this.repoBaseUrl}/${this.activeRepo.repoName}/${this.modulePath}/@v/${this.versionName}.info`,
+          },
+          {
+            label: '.mod',
+            url: `${this.repoBaseUrl}/${this.activeRepo.repoName}/${this.modulePath}/@v/${this.versionName}.mod`,
+          },
+          {
+            label: '.zip',
+            url: `${this.repoBaseUrl}/${this.activeRepo.repoName}/${this.modulePath}/@v/${this.versionName}.zip`,
+          },
         ];
         this.fetchVersion();
       }
