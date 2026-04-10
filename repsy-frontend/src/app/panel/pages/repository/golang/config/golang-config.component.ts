@@ -112,27 +112,26 @@ prefixed with \`{modulePath}@{version}/\`.
 **1. Build the zip:**
 
 \`\`\`bash
-MODULE="${this.modulePath}"
-VERSION="${this.moduleVersion}"
+VERSION=${this.moduleVersion}
+MODULE_PATH=${this.modulePath}
+STAGING=\$(mktemp -d)
+MODULE_VERSION_DIR="\${STAGING}/\${MODULE_PATH}@\${VERSION}"
 
-zip module.zip \\
-  "\${MODULE}@\${VERSION}/go.mod" \\
-  "\${MODULE}@\${VERSION}/yourfile.go"
+mkdir -p "\${MODULE_VERSION_DIR}"
+cp -r . "\${MODULE_VERSION_DIR}/"
+(cd "\${STAGING}" && find "\${MODULE_PATH}@\${VERSION}" -type f | xargs zip "\${OLDPWD}/module.zip")
 \`\`\`
-
-> Use individual file arguments, not \`zip -r\` (which adds directory entries). For larger modules:
-> \`find "\${MODULE}@\${VERSION}" -type f | xargs zip module.zip\`
 
 **2. Upload:**
 
 \`\`\`bash
-curl -sf -u ${this.username}:${password} \\
+curl -u ${this.username}:${password} \\
   -T module.zip \\
   -H "Content-Sha256: \$(sha256sum module.zip | cut -d' ' -f1)" \\
-  "${repoUrl}/\${MODULE}/@v/\${VERSION}"
+  "${repoUrl}/\${MODULE_PATH}/@v/\${VERSION}.zip"
 \`\`\`
 
-> \`Content-Sha256\` is optional but recommended — the server verifies the checksum before saving.
+> \`Content-Sha256\` is optional — if provided, the server verifies the checksum before saving. Omit the \`-H\` line to skip verification.
 `;
   }
 }
