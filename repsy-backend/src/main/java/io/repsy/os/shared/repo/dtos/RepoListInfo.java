@@ -20,4 +20,5 @@ import lombok.Builder;
 import org.jspecify.annotations.NonNull;
 
 @Builder
-public record RepoListInfo(@NonNull String name, long diskUsage, @NonNull Instant createdAt) {}
+public record RepoListInfo(
+    @NonNull String name, boolean privateRepo, long diskUsage, @NonNull Instant createdAt) {}

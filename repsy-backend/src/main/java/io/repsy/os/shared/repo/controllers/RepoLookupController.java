@@ -30,13 +30,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RestApiPort(MultiPortNames.PORT_API)
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/repo")
+@RequestMapping("/api/repos")
 public class RepoLookupController {
 
   private final @NonNull RestResponseFactory responseFactory;
   private final @NonNull RepoTxService repoTxService;
 
-  @GetMapping("/{repoName}/type")
+  @GetMapping("/{repoName}/format")
   public @NonNull RestResponse<String> getRepoType(@PathVariable @NonNull final String repoName) {
 
     final var repo = this.repoTxService.getRepoByName(repoName);

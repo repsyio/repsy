@@ -101,7 +101,7 @@ export class UserService {
   public async resetPassword(userId: string): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       this.http
-        .post<RestResponse<string>>(`${this.baseUrl}/${userId}/reset-password`, {})
+        .post<RestResponse<string>>(`${this.baseUrl}/${userId}/actions/reset-password`, {})
         .toPromise()
         .then((res: RestResponse<string>) => {
           resolve(res.data);

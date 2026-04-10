@@ -54,7 +54,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestApiPort(MultiPortNames.PORT_API)
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/npm/registry")
+@RequestMapping("/api/npm/registries")
 public class NpmRepoController {
 
   private final @NonNull NpmAuthComponentImpl npmAuthComponent;
@@ -141,17 +141,6 @@ public class NpmRepoController {
     final var repoUsageInfo = this.usageService.getRepoUsageInfo(repoName, RepoType.NPM);
 
     return this.restResponseFactory.success("repoUsageFetched", repoUsageInfo);
-  }
-
-  @GetMapping("/info")
-  public @NonNull RestResponse<List<RepoListInfo>> getRegistryInfo(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
-
-    this.npmAuthComponent.authenticateUser(authHeader);
-
-    final var registryList = this.repoTxService.findAllByRepoType(RepoType.NPM);
-
-    return this.restResponseFactory.success("reposFetched", registryList);
   }
 
   @GetMapping("/count")

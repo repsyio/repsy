@@ -54,7 +54,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestApiPort(MultiPortNames.PORT_API)
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/pypi/repo")
+@RequestMapping("/api/pypi/repos")
 public class PypiRepoController {
 
   private final @NonNull PypiAuthComponent pypiAuthComponent;
@@ -93,7 +93,7 @@ public class PypiRepoController {
     return this.restResponseFactory.success("repositoryDeleted");
   }
 
-  @GetMapping("/{repoName}/permission")
+  @GetMapping("/{repoName}/permissions")
   public @NonNull RestResponse<RepoPermissionInfo> getRepoPermission(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName) {
@@ -141,17 +141,6 @@ public class PypiRepoController {
     final var info = this.usageService.getRepoUsageInfo(repoName, RepoType.PYPI);
 
     return this.restResponseFactory.success("usageFetched", info);
-  }
-
-  @GetMapping("/info")
-  public @NonNull RestResponse<List<RepoListInfo>> getRepoDetail(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
-
-    this.pypiAuthComponent.authenticateUser(authHeader);
-
-    final var repositoryList = this.repoTxService.findAllByRepoType(RepoType.PYPI);
-
-    return this.restResponseFactory.success("reposFetched", repositoryList);
   }
 
   @GetMapping("/count")

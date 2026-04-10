@@ -95,7 +95,7 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
         this.error = err;
         this.toastService.show(err, 'error');
         this.loading = false;
-      })
+      });
   }
 
   public deleteVersion() {

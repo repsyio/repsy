@@ -88,7 +88,7 @@ final class UserController {
     return this.resp.success("userDeleted");
   }
 
-  @PostMapping("/{userId}/reset-password")
+  @PostMapping("/{userId}/actions/reset-password")
   public @NonNull RestResponse<String> resetPassword(@PathVariable final @NonNull UUID userId) {
 
     final var newPassword = this.userTxService.resetUserPassword(userId);

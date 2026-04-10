@@ -443,15 +443,16 @@ public class ManifestTxService implements ManifestService<UUID> {
         this.tagRepository.findByImageRepoIdAndImageIdAndName(
             repoId, image.getId(), tagForm.getTag());
 
-    if (tagOpt.isPresent()) {
-      final var existingTag = tagOpt.get();
-      existingTag.setDigest(tagForm.getManifestDigest());
-      existingTag.setMediaType(tagForm.getCalculatedMediaType());
-      existingTag.setPlatform(tagForm.getPlatform());
-      return this.tagRepository.save(existingTag);
+    if (tagOpt.isEmpty()) {
+      return this.createTag(tagForm, image);
     }
 
-    return this.createTag(tagForm, image);
+    final var existingTag = tagOpt.get();
+    existingTag.setDigest(tagForm.getManifestDigest());
+    existingTag.setMediaType(tagForm.getCalculatedMediaType());
+    existingTag.setPlatform(tagForm.getPlatform());
+
+    return this.tagRepository.save(existingTag);
   }
 
   private Tag createTag(final TagForm tagForm, final Image image) {
@@ -491,7 +492,19 @@ public class ManifestTxService implements ManifestService<UUID> {
     final var manifestOpt =
         this.manifestRepository.findByRepoIdAndImageIdAndTagId(repoId, imageId, tagId);
 
-    return manifestOpt.orElseGet(() -> this.createManifestByTagForm(form));
+    if (manifestOpt.isPresent()) {
+      return manifestOpt.get();
+    }
+
+    final var manifestOptByDigest =
+        this.manifestRepository.findByRepoIdAndImageIdAndDigestList(
+            repoId, imageId, form.getManifestDigest());
+
+    if (!manifestOptByDigest.isEmpty()) {
+      return manifestOptByDigest.getFirst();
+    }
+
+    return this.createManifestByTagForm(form);
   }
 
   private TagDetail mapToTagDetailWithConfigDigest(final Tag tag) {
@@ -601,9 +614,11 @@ public class ManifestTxService implements ManifestService<UUID> {
       final TagForm tagForm,
       final TagPlatform tagPlatform) {
 
+    final var allLayers = new HashSet<>(layers);
+    allLayers.add(configLayer);
+
     manifest.getLayers().clear();
-    manifest.getLayers().addAll(layers);
-    manifest.getLayers().add(configLayer);
+    manifest.getLayers().addAll(allLayers);
     manifest.setLastUpdatedAt(Instant.now());
     manifest.setDigest(tagForm.getManifestDigest());
     manifest.setMediaType(tagForm.getManifestInfo().getMediaType());
@@ -611,7 +626,6 @@ public class ManifestTxService implements ManifestService<UUID> {
     manifest.setConfigSize(configLayer.getSize());
     manifest.setConfigDigest(tagForm.getManifestInfo().getConfig().getDigest());
     manifest.setConfigMediaType(tagForm.getManifestInfo().getConfig().getMediaType());
-    manifest.setLayers(layers);
     manifest.setTagPlatform(tagPlatform);
 
     this.manifestRepository.save(manifest);

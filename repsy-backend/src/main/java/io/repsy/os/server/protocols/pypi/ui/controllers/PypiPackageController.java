@@ -79,7 +79,7 @@ public class PypiPackageController {
     return this.restResponseFactory.success("packageDeleted");
   }
 
-  @DeleteMapping("/{repoName}/{packageName}/release/{releaseVersion}")
+  @DeleteMapping("/{repoName}/{packageName}/releases/{releaseVersion}")
   public @NonNull RestResponse<Void> deletePackageRelease(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
@@ -114,7 +114,7 @@ public class PypiPackageController {
     return this.restResponseFactory.success("packagesFetched", new PagedModel<>(packageList));
   }
 
-  @GetMapping("/{repoName}/search")
+  @GetMapping(value = "/{repoName}", params = "name")
   public @NonNull RestResponse<PagedModel<PackageListItem>> getPackagesLikeName(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
@@ -150,7 +150,7 @@ public class PypiPackageController {
     return this.restResponseFactory.success("releasesFetched", new PagedModel<>(releases));
   }
 
-  @GetMapping("/{repoName}/{packageName}/releases/search")
+  @GetMapping(value = "/{repoName}/{packageName}/releases", params = "version")
   public @NonNull RestResponse<PagedModel<ReleaseListItem>> getPackageReleasesLikeVersion(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
@@ -172,7 +172,7 @@ public class PypiPackageController {
 
   @GetMapping({
     "/{repoName}/{packageName}",
-    "/{repoName}/{packageName}/release/{releaseVersion}",
+    "/{repoName}/{packageName}/releases/{releaseVersion}",
   })
   public @NonNull RestResponse<ReleaseDetail> getPackageRelease(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,

@@ -57,7 +57,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestApiPort(MultiPortNames.PORT_API)
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/mvn/repo")
+@RequestMapping("/api/mvn/repos")
 public class MavenRepoController {
 
   private final @NonNull MavenAuthComponent mavenAuthComponent;
@@ -96,7 +96,7 @@ public class MavenRepoController {
     return this.responseFactory.success("repoDeleted");
   }
 
-  @GetMapping("/{repoName}/permission")
+  @GetMapping("/{repoName}/permissions")
   public @NonNull RestResponse<RepoPermissionInfo> getRepoPermission(
       @PathVariable final @NonNull String repoName,
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader) {
@@ -109,7 +109,7 @@ public class MavenRepoController {
     return this.responseFactory.success("repoPermissionsFetched", repoPermissionInfo);
   }
 
-  @GetMapping("/{repoName}/content")
+  @GetMapping("/{repoName}/contents")
   public @NonNull RestResponse<List<StorageItemInfo>> getPathContent(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,

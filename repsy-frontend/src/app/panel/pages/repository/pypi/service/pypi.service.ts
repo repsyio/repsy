@@ -57,7 +57,7 @@ export class PypiService {
   }
 
   public selectRepository(repoName: string): Observable<RepoPermissionInfo> {
-    const url = `${this.apiBaseUrl}/api/pypi/repo/${repoName}/permission`;
+    const url = `${this.apiBaseUrl}/api/pypi/repos/${repoName}/permissions`;
 
     return new Observable<RepoPermissionInfo>((subscriber: Subscriber<RepoPermissionInfo>) => {
       this.http.get<RestResponse<RepoPermissionInfo>>(url).subscribe({
@@ -78,7 +78,7 @@ export class PypiService {
 
   public async createRepository(repositoryCreateForm: RepoForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/pypi/repo`;
+      const url = `${this.apiBaseUrl}/api/pypi/repos`;
 
       this.http
         .post<RestResponse<void>>(url, repositoryCreateForm)
@@ -90,7 +90,7 @@ export class PypiService {
 
   public async fetchRepositoryUsage(): Promise<RepoUsageInfo> {
     return new Promise<RepoUsageInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/pypi/repo/${this.activeRepo.repoName}/usage`;
+      const url = `${this.apiBaseUrl}/api/pypi/repos/${this.activeRepo.repoName}/usage`;
 
       this.http
         .get<RestResponse<RepoUsageInfo>>(url)
@@ -102,7 +102,7 @@ export class PypiService {
 
   public async fetchRepositories(): Promise<RepoListItem[]> {
     return new Promise<RepoListItem[]>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/pypi/repo`;
+      const url = `${this.apiBaseUrl}/api/pypi/repos`;
 
       this.http
         .get<RestResponse<RepoListItem[]>>(url)
@@ -114,7 +114,7 @@ export class PypiService {
 
   public async fetchRepositorySettings(): Promise<RepositorySettingsInfo> {
     return new Promise<RepositorySettingsInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/pypi/repo/${this.activeRepo.repoName}/settings`;
+      const url = `${this.apiBaseUrl}/api/pypi/repos/${this.activeRepo.repoName}/settings`;
 
       this.http
         .get<RestResponse<RepositorySettingsInfo>>(url)
@@ -126,7 +126,7 @@ export class PypiService {
 
   public async updateRepoSettings(repoSettingsForm: RepoSettingsForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/pypi/repo/${this.activeRepo.repoName}/settings`;
+      const url = `${this.apiBaseUrl}/api/pypi/repos/${this.activeRepo.repoName}/settings`;
 
       this.http
         .put<RestResponse<void>>(url, repoSettingsForm)
@@ -138,7 +138,7 @@ export class PypiService {
 
   public async updateRepositoryName(repositoryNameForm: RepoNameForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/pypi/repo/${this.activeRepo.repoName}/name`;
+      const url = `${this.apiBaseUrl}/api/pypi/repos/${this.activeRepo.repoName}/name`;
 
       this.http
         .patch<RestResponse<void>>(url, repositoryNameForm)
@@ -155,7 +155,7 @@ export class PypiService {
   }
 
   public async updateRepoDescription(repositoryDescriptionForm: RepoDescriptionForm): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/pypi/repo/${this.activeRepo.repoName}/description`;
+    const url = `${this.apiBaseUrl}/api/pypi/repos/${this.activeRepo.repoName}/description`;
 
     return new Promise<void>((resolve, reject) => {
       return this.http
@@ -168,7 +168,7 @@ export class PypiService {
 
   public async deleteRepository(repo: string): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/pypi/repo/${repo}`;
+      const url = `${this.apiBaseUrl}/api/pypi/repos/${repo}`;
 
       this.http
         .delete<RestResponse<void>>(url)
@@ -208,7 +208,7 @@ export class PypiService {
         .set('sort', `${sortOption.column},${sortOption.type}`)
         .set('size', pageSize.toString());
 
-      const url = `${this.apiBaseUrl}/api/pypi/packages/${this.activeRepo.repoName}/search`;
+      const url = `${this.apiBaseUrl}/api/pypi/packages/${this.activeRepo.repoName}`;
 
       this.http
         .get<RestResponse<PagedData<PackageListItem>>>(url, { params })
@@ -253,7 +253,7 @@ export class PypiService {
         .set('sort', `${sortOption.column},${sortOption.type}`)
         .set('size', pageSize.toString());
 
-      const url = `${this.apiBaseUrl}/api/pypi/packages/${this.activeRepo.repoName}/${packageName}/releases/search`;
+      const url = `${this.apiBaseUrl}/api/pypi/packages/${this.activeRepo.repoName}/${packageName}/releases`;
 
       this.http
         .get<RestResponse<PagedData<ReleaseListItem>>>(url, { params })
@@ -278,7 +278,7 @@ export class PypiService {
   public async fetchRelease(packageName: string, release: string): Promise<ReleaseInfo> {
     return new Promise<ReleaseInfo>((resolve, reject) => {
       const url =
-        this.apiBaseUrl + '/api/pypi/packages/' + this.activeRepo.repoName + '/' + packageName + '/release/' + release;
+        this.apiBaseUrl + '/api/pypi/packages/' + this.activeRepo.repoName + '/' + packageName + '/releases/' + release;
 
       this.http
         .get<RestResponse<ReleaseInfo>>(url)
@@ -296,7 +296,7 @@ export class PypiService {
         this.activeRepo.repoName +
         '/' +
         packageName +
-        '/release/' +
+        '/releases/' +
         releaseVersion;
 
       this.http
