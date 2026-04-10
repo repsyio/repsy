@@ -27,7 +27,6 @@ public class GoModFileValidator {
 
   private static final Pattern MODULE_DIRECTIVE =
       Pattern.compile("^module\\s+\\S+", Pattern.MULTILINE);
-  private static final Pattern GO_DIRECTIVE = Pattern.compile("^go\\s+\\S+", Pattern.MULTILINE);
   private static final Pattern MODULE_PATH =
       Pattern.compile("^module\\s+(\\S+)", Pattern.MULTILINE);
 
@@ -40,10 +39,6 @@ public class GoModFileValidator {
 
     if (!MODULE_DIRECTIVE.matcher(text).find()) {
       throw new BadRequestException("goModMissingModuleDirective");
-    }
-
-    if (!GO_DIRECTIVE.matcher(text).find()) {
-      throw new BadRequestException("goModMissingGoDirective");
     }
 
     validateModulePath(text);
