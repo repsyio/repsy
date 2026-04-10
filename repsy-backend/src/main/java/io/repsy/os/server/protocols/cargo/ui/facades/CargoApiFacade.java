@@ -54,18 +54,11 @@ public class CargoApiFacade {
 
   public BaseUsages deleteRepo(final RepoInfo repoInfo) throws IOException {
 
-    final var crates = this.crateRepository.findAllByRepoId(repoInfo.getStorageKey());
+    // final var crates = this.crateRepository.findAllByRepoId(repoInfo.getStorageKey());
 
-    long free = 0L;
+    final var free = this.cargoStorageService.deleteRepo(repoInfo.getStorageKey());
 
-    for (final var crate : crates) {
-      free +=
-          this.cargoStorageService.deletePackage(
-              repoInfo.getStorageKey(), repoInfo.getName(), crate.getName());
-    }
-
-    this.crateRepository.deleteAll(crates);
-
+    // this.crateRepository.deleteAll(crates);
     this.repoTxService.deleteRepo(repoInfo.getStorageKey());
 
     return BaseUsages.builder().diskUsage(-1L * free).build();

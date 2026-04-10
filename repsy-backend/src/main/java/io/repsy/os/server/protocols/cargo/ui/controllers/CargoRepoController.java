@@ -31,25 +31,17 @@ import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
 import io.repsy.os.shared.repo.dtos.RepoSettingsInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.RepoUsageInfo;
-import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
-import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
-import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PagedModel;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -59,13 +51,12 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestApiPort(MultiPortNames.PORT_API)
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/cargo/repo")
+@RequestMapping("/api/cargo/repos")
 @NullMarked
 public class CargoRepoController {
 
@@ -103,14 +94,10 @@ public class CargoRepoController {
 
     final var usages = this.cargoApiFacade.deleteRepo(repoInfo);
 
-    final var usageChangedInfo = new UsageChangedInfo(repoInfo.getId(), usages);
-
-    this.usageUpdateService.updateUsage(usageChangedInfo);
-
     return this.responseFactory.success("repoDeleted");
   }
 
-  @GetMapping("/{repoName}/permission")
+  @GetMapping("/{repoName}/permissions")
   public RestResponse<RepoPermissionInfo> getRepoPermission(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final String repoName) {
@@ -125,6 +112,8 @@ public class CargoRepoController {
   @GetMapping
   public RestResponse<List<RepoListInfo>> getRepos(
       @RequestHeader(AUTHORIZATION) final String authHeader) {
+
+    this.cargoAuthComponent.authenticateUser(authHeader);
 
     final var repos = this.repoTxService.findAllByRepoType(RepoType.CARGO);
 
@@ -148,6 +137,8 @@ public class CargoRepoController {
   public RestResponse<RepoUsageInfo> getUsage(
       @RequestHeader(AUTHORIZATION) final String authHeader, @PathVariable final String repoName) {
 
+    this.cargoAuthComponent.authenticateUser(authHeader);
+
     final var usageInfo = this.usageService.getRepoUsageInfo(repoName, RepoType.CARGO);
 
     return this.responseFactory.success("usageFetched", usageInfo);
@@ -166,6 +157,8 @@ public class CargoRepoController {
 
   @GetMapping("/count")
   public RestResponse<Long> getRepoCount(@RequestHeader(AUTHORIZATION) final String authHeader) {
+
+    this.cargoAuthComponent.authenticateUser(authHeader);
 
     final var repoCount = this.repoTxService.getRepoCount(RepoType.CARGO);
 
@@ -215,110 +208,5 @@ public class CargoRepoController {
     this.cargoApiFacade.updateSettings(repoInfo, form);
 
     return this.responseFactory.success("settingsUpdated");
-  }
-
-  @GetMapping("/{repoName}/crates")
-  public RestResponse<PagedModel<CrateListItem>> searchCrates(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final String repoName,
-      @RequestParam(defaultValue = "") final String query,
-      final Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
-
-    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.READ);
-
-    final var crates = this.cargoApiFacade.search(repoInfo, query, pageable);
-
-    return this.responseFactory.success("cratesFetched", new PagedModel<>(crates));
-  }
-
-  @GetMapping("/{repoName}/crates/{name}")
-  public RestResponse<BaseCrateInfo<UUID>> getCrate(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final String repoName,
-      @PathVariable final String name) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
-
-    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.READ);
-
-    final var crate = this.cargoApiFacade.getCrate(repoInfo, name);
-
-    return this.responseFactory.success("crateFetched", crate);
-  }
-
-  @GetMapping("/{repoName}/crates/{name}/{vers}")
-  public RestResponse<BaseCrateVersionInfo<UUID>> getCrateVersion(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final String repoName,
-      @PathVariable final String name,
-      @PathVariable final String vers) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
-
-    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.READ);
-
-    final var version = this.cargoApiFacade.getCrateVersion(repoInfo, name, vers);
-
-    return this.responseFactory.success("crateVersionFetched", version);
-  }
-
-  @GetMapping("/{repoName}/crates/{name}/versions")
-  public RestResponse<PagedModel<CrateVersionListItem>> getCrateVersions(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final String repoName,
-      @PathVariable final String name,
-      @RequestParam(defaultValue = "") final String query,
-      final Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
-
-    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.READ);
-
-    final var versions = this.cargoApiFacade.getCrateVersions(repoInfo, name, query, pageable);
-
-    return this.responseFactory.success("crateVersionsFetched", new PagedModel<>(versions));
-  }
-
-  @DeleteMapping("/{repoName}/crates/{name}")
-  public RestResponse<Void> deleteCrate(
-      @RequestHeader(AUTHORIZATION) final String authHeader,
-      @PathVariable final String repoName,
-      @PathVariable final String name)
-      throws IOException {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
-
-    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.MANAGE);
-
-    final var usages = this.cargoApiFacade.deleteCrate(repoInfo, name);
-
-    final var usageChangedInfo = new UsageChangedInfo(repoInfo.getId(), usages);
-
-    this.usageUpdateService.updateUsage(usageChangedInfo);
-
-    return this.responseFactory.success("crateDeleted");
-  }
-
-  @DeleteMapping("/{repoName}/crates/{name}/{vers}")
-  public RestResponse<Void> deleteCrateVersion(
-      @RequestHeader(AUTHORIZATION) final String authHeader,
-      @PathVariable final String repoName,
-      @PathVariable final String name,
-      @PathVariable final String vers)
-      throws IOException {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.CARGO);
-
-    this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.MANAGE);
-
-    final var usages = this.cargoApiFacade.deleteCrateVersion(repoInfo, name, vers);
-
-    final var usageChangedInfo = new UsageChangedInfo(repoInfo.getId(), usages);
-
-    this.usageUpdateService.updateUsage(usageChangedInfo);
-
-    return this.responseFactory.success("crateVersionDeleted");
   }
 }

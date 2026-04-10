@@ -50,7 +50,9 @@ export class CargoConfigComponent implements OnInit, OnChanges {
 
   private updateMarkdown(): void {
     this.markdown = `
-Configure Cargo to use this registry:
+**Configure Cargo to use this registry:**
+
+Create or edit \`$HOME/.cargo/config.toml\` file
 
 \`\`\`toml
 [registries]
@@ -60,16 +62,25 @@ repsy = { index = "sparse+${this.baseUrl}/cargo/${this.repoName}/" }
 global-credential-providers = ["cargo:token"]
 \`\`\`
 
-Authenticate:
+**Authenticate:**
+
+You should use a Deploy Token. If you do not have one, go to \`settings > Deploy Tokens\` to create it.
 
 \`\`\`bash
-cargo login --registry repsy ${this.deployToken ? '<YOUR_DEPLOY_TOKEN>' : '<YOUR_DEPLOY_TOKEN_OR_JWT>'}
+cargo login --registry repsy ${this.deployToken ? '<YOUR_DEPLOY_TOKEN>' : '<YOUR_DEPLOY_TOKEN>'}
 \`\`\`
 
-Publish:
+**Publish:**
 
 \`\`\`bash
 cargo publish --registry repsy
+\`\`\`
+
+If you have uncommitted changes in your project but want to proceed with the publishing process,
+you can use the \`--allow-dirty\` flag.
+
+\`\`\`bash
+cargo publish --registry repsy --allow-dirty
 \`\`\`
 `;
   }

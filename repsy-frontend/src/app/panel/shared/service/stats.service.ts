@@ -84,7 +84,7 @@ export class StatsService {
   }
 
   public async getCargoRepoCount(): Promise<number> {
-    const url = `${this.apiBaseUrl}/api/cargo/repo/count`;
+    const url = `${this.apiBaseUrl}/api/cargo/repos/count`;
 
     return new Promise<number>((resolve, reject) => {
       return this.http
@@ -155,7 +155,7 @@ export class StatsService {
 
   public async fetchCargoRepositoryUsage(repo: string): Promise<RepoUsageInfo> {
     return new Promise<RepoUsageInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/cargo/repo/${repo}/usage`;
+      const url = `${this.apiBaseUrl}/api/cargo/repos/${repo}/usage`;
 
       this.http
         .get<RestResponse<RepoUsageInfo>>(url)
@@ -214,7 +214,7 @@ export class StatsService {
   }
 
   public async getCargoRepoInfo(): Promise<RepoListInfo[]> {
-    const url = `${this.apiBaseUrl}/api/cargo/repo/info`;
+    const url = `${this.apiBaseUrl}/api/cargo/repos/info`;
 
     return new Promise<RepoListInfo[]>((resolve, reject) => {
       return this.http

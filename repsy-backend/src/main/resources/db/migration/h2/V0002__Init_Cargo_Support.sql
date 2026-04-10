@@ -15,6 +15,10 @@ create table cargo_crate
     last_updated_at timestamp
 );
 
+alter table cargo_crate
+    add constraint fk_cargo_crate__repo_id
+        foreign key (repo_id) references repo (id) on delete cascade;
+
 create unique index ux_cargo_crate__repo_id_name
     on cargo_crate (repo_id, name);
 

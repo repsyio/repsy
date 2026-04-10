@@ -161,6 +161,17 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
     this.storageStrategy.createDirectory(repoId.toString());
   }
 
+  @Override
+  public long deleteRepo(final UUID repoUuid) {
+
+    final var storagePath = StoragePath.of(repoUuid);
+    final var usage = this.storageStrategy.calculatePathUsage(storagePath);
+
+    this.storageStrategy.deleteDirectory(storagePath);
+
+    return usage;
+  }
+
   private Path getIndexPath(final String name) {
 
     final var len = name.length();
