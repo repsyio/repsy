@@ -17,6 +17,7 @@ package io.repsy.protocols.golang.shared.utils;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
+import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
@@ -64,12 +65,20 @@ public class GoVersionUtils {
             m1.group(SEMVER_PRE_RELEASE_GROUP), m2.group(SEMVER_PRE_RELEASE_GROUP));
       };
 
+  private static final Set<String> VERSIONED_EXTENSIONS = Set.of(".zip", ".mod", ".info");
+
   /**
-   * Extracts the version string from the last path segment (no extension stripping). E.g.
-   * "/corp.internal/payments/@v/v1.2.0" → "v1.2.0"
+   * Extracts the version string from the last path segment, stripping any known extension (.zip,
+   * .mod, .info). E.g. "/corp.internal/payments/@v/v1.2.0.zip" → "v1.2.0"
    */
   public static String extractVersionFromPath(final String path) {
-    return path.substring(path.lastIndexOf('/') + 1);
+    final var segment = path.substring(path.lastIndexOf('/') + 1);
+    for (final var ext : VERSIONED_EXTENSIONS) {
+      if (segment.endsWith(ext)) {
+        return segment.substring(0, segment.length() - ext.length());
+      }
+    }
+    return segment;
   }
 
   /**
