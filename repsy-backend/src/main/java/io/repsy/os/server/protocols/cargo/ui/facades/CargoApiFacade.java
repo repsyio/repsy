@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.cargo.ui.facades;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.services.CargoCrateServiceImpl;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
@@ -49,16 +48,12 @@ public class CargoApiFacade {
   private final RepoTxService repoTxService;
   private final CargoCrateServiceImpl cargoCrateService;
   private final CargoStorageService cargoStorageService;
-  private final CargoCrateRepository crateRepository;
   private final ObjectMapper objectMapper;
 
   public BaseUsages deleteRepo(final RepoInfo repoInfo) throws IOException {
 
-    // final var crates = this.crateRepository.findAllByRepoId(repoInfo.getStorageKey());
-
     final var free = this.cargoStorageService.deleteRepo(repoInfo.getStorageKey());
 
-    // this.crateRepository.deleteAll(crates);
     this.repoTxService.deleteRepo(repoInfo.getStorageKey());
 
     return BaseUsages.builder().diskUsage(-1L * free).build();
