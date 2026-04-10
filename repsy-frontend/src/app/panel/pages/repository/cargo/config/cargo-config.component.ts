@@ -56,7 +56,7 @@ Create or edit \`$HOME/.cargo/config.toml\` file
 
 \`\`\`toml
 [registries]
-repsy = { index = "sparse+${this.baseUrl}/cargo/${this.repoName}/" }
+repsy = { index = "sparse+${this.baseUrl}/${this.repoName}/" }
 
 [registry]
 global-credential-providers = ["cargo:token"]
