@@ -60,7 +60,7 @@ export class GolangService {
   public async createRepository(form: RepoForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       return this.http
-        .post<RestResponse<null>>(`${this.apiBaseUrl}/api/go/repo`, form)
+        .post<RestResponse<null>>(`${this.apiBaseUrl}/api/go/repos`, form)
         .toPromise()
         .then(() => resolve())
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
@@ -68,7 +68,7 @@ export class GolangService {
   }
 
   public getRepository(repoName: string): Observable<RepoPermissionInfo> {
-    const url = `${this.apiBaseUrl}/api/go/repo/${repoName}/permission`;
+    const url = `${this.apiBaseUrl}/api/go/repos/${repoName}/permissions`;
 
     return new Observable<RepoPermissionInfo>((observer: Subscriber<RepoPermissionInfo>) => {
       this.http.get<RestResponse<RepoPermissionInfo>>(url).subscribe(
@@ -89,7 +89,7 @@ export class GolangService {
   public async deleteRepository(repoName: string): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       return this.http
-        .delete<RestResponse<null>>(`${this.apiBaseUrl}/api/go/repo/${repoName}`)
+        .delete<RestResponse<null>>(`${this.apiBaseUrl}/api/go/repos/${repoName}`)
         .toPromise()
         .then(() => resolve())
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
@@ -99,7 +99,7 @@ export class GolangService {
   public async fetchRepositories(): Promise<RepoListItem[]> {
     return new Promise<RepoListItem[]>((resolve, reject) => {
       this.http
-        .get<RestResponse<RepoListItem[]>>(`${this.apiBaseUrl}/api/go/repo`)
+        .get<RestResponse<RepoListItem[]>>(`${this.apiBaseUrl}/api/go/repos`)
         .toPromise()
         .then((res: RestResponse<RepoListItem[]>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
@@ -108,7 +108,7 @@ export class GolangService {
 
   public async fetchRepositorySettings(): Promise<RepositorySettingsInfo> {
     return new Promise<RepositorySettingsInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/go/repo/${this.activeRepo.repoName}/settings`;
+      const url = `${this.apiBaseUrl}/api/go/repos/${this.activeRepo.repoName}/settings`;
 
       this.http
         .get<RestResponse<RepositorySettingsInfo>>(url)
@@ -121,7 +121,7 @@ export class GolangService {
   public async fetchRepositoryUsage(): Promise<RepoUsageInfo> {
     return new Promise<RepoUsageInfo>((resolve, reject) => {
       this.http
-        .get<RestResponse<RepoUsageInfo>>(`${this.apiBaseUrl}/api/go/repo/${this.activeRepo.repoName}/usage`)
+        .get<RestResponse<RepoUsageInfo>>(`${this.apiBaseUrl}/api/go/repos/${this.activeRepo.repoName}/usage`)
         .toPromise()
         .then((res: RestResponse<RepoUsageInfo>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
@@ -131,7 +131,7 @@ export class GolangService {
   public async updateRepoName(form: RepoNameForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       this.http
-        .patch<RestResponse<void>>(`${this.apiBaseUrl}/api/go/repo/${this.activeRepo.repoName}/name`, form)
+        .patch<RestResponse<void>>(`${this.apiBaseUrl}/api/go/repos/${this.activeRepo.repoName}/name`, form)
         .toPromise()
         .then(() => {
           if (this.activeRepo) {
@@ -147,7 +147,7 @@ export class GolangService {
   public async updateRepoDescription(form: RepoDescriptionForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       this.http
-        .patch<RestResponse<void>>(`${this.apiBaseUrl}/api/go/repo/${this.activeRepo.repoName}/description`, form)
+        .patch<RestResponse<void>>(`${this.apiBaseUrl}/api/go/repos/${this.activeRepo.repoName}/description`, form)
         .toPromise()
         .then(() => resolve())
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
@@ -291,7 +291,7 @@ export class GolangService {
 
   public async updateRepoSettings(repoSettingsForm: RepoSettingsForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/go/repo/${this.activeRepo.repoName}/settings`;
+      const url = `${this.apiBaseUrl}/api/go/repos/${this.activeRepo.repoName}/settings`;
       this.http
         .put<RestResponse<void>>(url, repoSettingsForm)
         .toPromise()
@@ -302,7 +302,7 @@ export class GolangService {
 
   public async updateRepositoryName(repositoryNameForm: RepoNameForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/go/repo/${this.activeRepo.repoName}/name`;
+      const url = `${this.apiBaseUrl}/api/go/repos/${this.activeRepo.repoName}/name`;
 
       this.http
         .patch<RestResponse<void>>(url, repositoryNameForm)

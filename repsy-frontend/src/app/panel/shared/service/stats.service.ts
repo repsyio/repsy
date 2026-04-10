@@ -190,7 +190,7 @@ export class StatsService {
   }
 
   public async getGolangRepoCount(): Promise<number> {
-    const url = `${this.apiBaseUrl}/api/go/repo/count`;
+    const url = `${this.apiBaseUrl}/api/go/repos/count`;
 
     return new Promise<number>((resolve, reject) => {
       return this.http
@@ -203,7 +203,7 @@ export class StatsService {
 
   public async fetchGolangRepositoryUsage(repo: string): Promise<RepoUsageInfo> {
     return new Promise<RepoUsageInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/go/repo/${repo}/usage`;
+      const url = `${this.apiBaseUrl}/api/go/repos/${repo}/usage`;
 
       this.http
         .get<RestResponse<RepoUsageInfo>>(url)
@@ -214,7 +214,7 @@ export class StatsService {
   }
 
   public async getGolangRepoInfo(): Promise<RepoListInfo[]> {
-    const url = `${this.apiBaseUrl}/api/go/repo/info`;
+    const url = `${this.apiBaseUrl}/api/go/repos/info`;
 
     return new Promise<RepoListInfo[]>((resolve, reject) => {
       return this.http
