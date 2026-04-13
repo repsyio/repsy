@@ -65,16 +65,8 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
     final var indexPath = this.getIndexPath(crateName);
     final var indexStoragePath = StoragePath.of(repoId, indexPath.toString());
 
-    final var existingContent =
-        this.storageStrategy.get(indexStoragePath, repoName).map(this::getContent).orElse("");
-
-    final var newContent = existingContent + indexJsonLine + "\n";
-    final var indexData = newContent.getBytes(StandardCharsets.UTF_8);
-
-    final BaseUsages indexUsages;
-    try (final var bis = new ByteArrayInputStream(indexData)) {
-      indexUsages = this.storageStrategy.write(repoName, indexStoragePath, bis);
-    }
+    final var indexLine = (indexJsonLine + "\n").getBytes(StandardCharsets.UTF_8);
+    final var indexUsages = this.storageStrategy.append(repoName, indexStoragePath, indexLine);
 
     crateUsages.setDiskUsage(crateUsages.getDiskUsage() + indexUsages.getDiskUsage());
     return crateUsages;
@@ -193,13 +185,5 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
     final var part2 = name.substring(2, 4);
 
     return basePath.resolve(part1).resolve(part2).resolve(name);
-  }
-
-  private String getContent(final Resource resource) {
-    try {
-      return new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-    } catch (final IOException e) {
-      return "";
-    }
   }
 }

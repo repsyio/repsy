@@ -27,7 +27,6 @@ import io.repsy.protocols.cargo.protocol.facades.contract.CargoProtocolFacade;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -45,12 +44,12 @@ import tools.jackson.databind.ObjectMapper;
 class AbstractCargoSparseIndexProtocolMethodHandlerTest {
 
   @Mock private PathParser basePathParser;
-  @Mock private CargoProtocolFacade<UUID> facade;
+  @Mock private CargoProtocolFacade facade;
   @Mock private ObjectMapper objectMapper;
   @Mock private CargoProtocolProvider provider;
   @Mock private HttpServletRequest request;
 
-  private AbstractCargoSparseIndexProtocolMethodHandler<UUID> handler;
+  private AbstractCargoSparseIndexProtocolMethodHandler handler;
 
   @BeforeEach
   void setUp() {
@@ -59,11 +58,11 @@ class AbstractCargoSparseIndexProtocolMethodHandlerTest {
 
   // ── Concrete subclass for testing the abstract handler ───────────────────
 
-  static class TestHandler extends AbstractCargoSparseIndexProtocolMethodHandler<UUID> {
+  static class TestHandler extends AbstractCargoSparseIndexProtocolMethodHandler {
 
     TestHandler(
         final PathParser p,
-        final CargoProtocolFacade<UUID> f,
+        final CargoProtocolFacade f,
         final ObjectMapper o,
         final CargoProtocolProvider pr) {
       super(p, f, o, pr);

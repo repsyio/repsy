@@ -38,18 +38,17 @@ import org.springframework.http.ResponseEntity;
 
 @Slf4j
 @NullMarked
-public abstract class AbstractCargoPublishProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+public abstract class AbstractCargoPublishProtocolMethodHandler implements ProtocolMethodHandler {
 
   private static final String PUBLISH_SUCCESS =
       "{\"warnings\":{\"invalid_categories\":[],\"invalid_badges\":[],\"other\":[]}}";
 
   private final PathParser basePathParser;
-  private final CargoProtocolFacade<ID> facade;
+  private final CargoProtocolFacade facade;
 
   public AbstractCargoPublishProtocolMethodHandler(
       final PathParser basePathParser,
-      final CargoProtocolFacade<ID> facade,
+      final CargoProtocolFacade facade,
       final CargoProtocolProvider provider) {
     this.basePathParser = basePathParser;
     this.facade = facade;

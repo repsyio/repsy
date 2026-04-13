@@ -40,7 +40,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @NullMarked
-public abstract class AbstractCargoSparseIndexProtocolMethodHandler<ID>
+public abstract class AbstractCargoSparseIndexProtocolMethodHandler
     implements ProtocolMethodHandler {
 
   private final ObjectMapper objectMapper;
@@ -55,11 +55,11 @@ public abstract class AbstractCargoSparseIndexProtocolMethodHandler<ID>
   private static final Pattern EXCLUDED_PATTERN = Pattern.compile("^/(?:api/|config\\.json|me).*");
 
   private final PathParser basePathParser;
-  private final CargoProtocolFacade<ID> facade;
+  private final CargoProtocolFacade facade;
 
   protected AbstractCargoSparseIndexProtocolMethodHandler(
       final PathParser basePathParser,
-      final CargoProtocolFacade<ID> facade,
+      final CargoProtocolFacade facade,
       final ObjectMapper objectMapper,
       final CargoProtocolProvider provider) {
 

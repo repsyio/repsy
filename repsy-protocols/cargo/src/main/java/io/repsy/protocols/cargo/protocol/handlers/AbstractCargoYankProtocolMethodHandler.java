@@ -37,17 +37,17 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
-public abstract class AbstractCargoYankProtocolMethodHandler<ID> implements ProtocolMethodHandler {
+public abstract class AbstractCargoYankProtocolMethodHandler implements ProtocolMethodHandler {
 
   private static final Pattern YANK_PATTERN =
       Pattern.compile(".*/api/v1/crates/[^/]+/[^/]+/(yank|unyank)$");
 
   private final PathParser basePathParser;
-  private final CargoProtocolFacade<ID> facade;
+  private final CargoProtocolFacade facade;
 
   public AbstractCargoYankProtocolMethodHandler(
       final PathParser basePathParser,
-      final CargoProtocolFacade<ID> facade,
+      final CargoProtocolFacade facade,
       final CargoProtocolProvider provider) {
     this.basePathParser = basePathParser;
     this.facade = facade;

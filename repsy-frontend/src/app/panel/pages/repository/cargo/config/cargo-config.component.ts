@@ -67,7 +67,7 @@ global-credential-providers = ["cargo:token"]
 You should use a Deploy Token. If you do not have one, go to \`settings > Deploy Tokens\` to create it.
 
 \`\`\`bash
-cargo login --registry repsy ${this.deployToken ? '<YOUR_DEPLOY_TOKEN>' : '<YOUR_DEPLOY_TOKEN>'}
+cargo login --registry repsy <YOUR_DEPLOY_TOKEN>
 \`\`\`
 
 **Publish:**

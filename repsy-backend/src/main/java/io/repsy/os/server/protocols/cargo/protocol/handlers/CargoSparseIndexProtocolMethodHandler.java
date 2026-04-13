@@ -19,7 +19,6 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.facades.contract.CargoProtocolFacade;
 import io.repsy.protocols.cargo.protocol.handlers.AbstractCargoSparseIndexProtocolMethodHandler;
-import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -28,11 +27,11 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 @NullMarked
 public class CargoSparseIndexProtocolMethodHandler
-    extends AbstractCargoSparseIndexProtocolMethodHandler<UUID> {
+    extends AbstractCargoSparseIndexProtocolMethodHandler {
 
   public CargoSparseIndexProtocolMethodHandler(
       @Qualifier("osCargoPathParser") final PathParser basePathParser,
-      final CargoProtocolFacade<UUID> facade,
+      final CargoProtocolFacade facade,
       final ObjectMapper objectMapper,
       final CargoProtocolProvider provider) {
 

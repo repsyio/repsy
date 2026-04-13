@@ -37,15 +37,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
-public abstract class AbstractCargoSearchProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+public abstract class AbstractCargoSearchProtocolMethodHandler implements ProtocolMethodHandler {
 
   private final PathParser basePathParser;
-  private final CargoProtocolFacade<ID> facade;
+  private final CargoProtocolFacade facade;
 
   public AbstractCargoSearchProtocolMethodHandler(
       final PathParser basePathParser,
-      final CargoProtocolFacade<ID> facade,
+      final CargoProtocolFacade facade,
       final CargoProtocolProvider provider) {
     this.basePathParser = basePathParser;
     this.facade = facade;

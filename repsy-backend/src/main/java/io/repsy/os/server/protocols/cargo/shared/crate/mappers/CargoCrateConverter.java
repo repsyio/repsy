@@ -15,32 +15,20 @@
  */
 package io.repsy.os.server.protocols.cargo.shared.crate.mappers;
 
-import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoAuthor;
-import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCategory;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrate;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrateIndex;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrateMeta;
-import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoKeyword;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 import org.mapstruct.Mappings;
-import org.mapstruct.Named;
-import tools.jackson.core.exc.JacksonIOException;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
 
-@Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
-public abstract class CargoCrateConverter {
+@Mapper(componentModel = MappingConstants.ComponentModel.SPRING, uses = CargoJsonConverter.class)
+public interface CargoCrateConverter {
 
   @Mappings({
     @Mapping(target = "authors", source = "authors", qualifiedByName = "authorsToStrings"),
@@ -50,7 +38,7 @@ public abstract class CargoCrateConverter {
     @Mapping(target = "maxVersion", source = "maxVersion"),
     @Mapping(target = "totalDownloads", source = "totalDownloads")
   })
-  public abstract BaseCrateInfo<UUID> toCrateInfo(CargoCrate crate);
+  BaseCrateInfo<UUID> toCrateInfo(CargoCrate crate);
 
   @Mappings({
     @Mapping(target = "crateId", source = "meta.crate.id"),
@@ -66,7 +54,7 @@ public abstract class CargoCrateConverter {
     @Mapping(target = "downloads", source = "meta.downloads"),
     @Mapping(target = "createdAt", source = "meta.createdAt")
   })
-  public abstract BaseCrateVersionInfo<UUID> toCrateVersionInfo(
+  BaseCrateVersionInfo<UUID> toCrateVersionInfo(
       CargoCrate crate, CargoCrateMeta meta, CargoCrateIndex index);
 
   @Mappings({
@@ -81,65 +69,5 @@ public abstract class CargoCrateConverter {
     @Mapping(target = "features2", source = "features2", qualifiedByName = "jsonToFeatures"),
     @Mapping(target = "rustVersion", source = "rustVersion")
   })
-  public abstract CrateIndexEntry toCrateIndexEntry(CargoCrateIndex index);
-
-  @Named("authorsToStrings")
-  protected List<String> authorsToStrings(final Set<CargoAuthor> authors) {
-
-    if (authors == null) {
-      return List.of();
-    }
-
-    return authors.stream().map(CargoAuthor::getAuthor).toList();
-  }
-
-  @Named("keywordsToStrings")
-  protected List<String> keywordsToStrings(final Set<CargoKeyword> keywords) {
-
-    if (keywords == null) {
-      return List.of();
-    }
-
-    return keywords.stream().map(CargoKeyword::getKeyword).toList();
-  }
-
-  @Named("categoriesToStrings")
-  protected List<String> categoriesToStrings(final Set<CargoCategory> categories) {
-
-    if (categories == null) {
-      return List.of();
-    }
-
-    return categories.stream().map(CargoCategory::getCategory).toList();
-  }
-
-  @Named("jsonToDeps")
-  protected List<CrateIndexDep> jsonToDeps(final String json) {
-
-    try {
-      if (json == null) {
-        return List.of();
-      }
-
-      final var objectMapper = new ObjectMapper();
-      return objectMapper.readValue(json, new TypeReference<>() {});
-    } catch (final JacksonIOException e) {
-      return List.of();
-    }
-  }
-
-  @Named("jsonToFeatures")
-  protected Map<String, List<String>> jsonToFeatures(final String json) {
-
-    try {
-      if (json == null) {
-        return Collections.emptyMap();
-      }
-
-      final var objectMapper = new ObjectMapper();
-      return objectMapper.readValue(json, new TypeReference<>() {});
-    } catch (final JacksonIOException e) {
-      return Collections.emptyMap();
-    }
-  }
+  CrateIndexEntry toCrateIndexEntry(CargoCrateIndex index);
 }

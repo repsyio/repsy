@@ -31,6 +31,7 @@ import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
 import io.repsy.os.shared.repo.dtos.RepoSettingsInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.RepoUsageInfo;
+import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
@@ -93,6 +94,10 @@ public class CargoRepoController {
     this.cargoAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.MANAGE);
 
     final var usages = this.cargoApiFacade.deleteRepo(repoInfo);
+
+    final var usageChangedInfo = new UsageChangedInfo(repoInfo.getId(), usages);
+
+    this.usageUpdateService.updateUsage(usageChangedInfo);
 
     return this.responseFactory.success("repoDeleted");
   }

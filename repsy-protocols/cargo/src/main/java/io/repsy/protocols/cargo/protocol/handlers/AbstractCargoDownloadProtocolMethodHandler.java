@@ -38,18 +38,17 @@ import org.springframework.http.ResponseEntity;
 
 @Slf4j
 @NullMarked
-public abstract class AbstractCargoDownloadProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+public abstract class AbstractCargoDownloadProtocolMethodHandler implements ProtocolMethodHandler {
 
   private static final Pattern DOWNLOAD_PATTERN =
       Pattern.compile(".*/api/v1/crates/[^/]+/[^/]+/download$");
 
   private final PathParser basePathParser;
-  private final CargoProtocolFacade<ID> facade;
+  private final CargoProtocolFacade facade;
 
   public AbstractCargoDownloadProtocolMethodHandler(
       final PathParser basePathParser,
-      final CargoProtocolFacade<ID> facade,
+      final CargoProtocolFacade facade,
       final CargoProtocolProvider provider) {
 
     this.basePathParser = basePathParser;

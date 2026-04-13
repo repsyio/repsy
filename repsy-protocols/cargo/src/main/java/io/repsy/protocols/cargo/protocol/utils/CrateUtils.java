@@ -60,14 +60,14 @@ public class CrateUtils {
     return Pair.of(crateName, versionName);
   }
 
-  public static long readU32LittleEndian(final InputStream inputStream) throws IOException {
+  private static long readU32LittleEndian(final InputStream inputStream) throws IOException {
 
     final var bytes = inputStream.readNBytes(4);
 
     return Integer.toUnsignedLong(ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getInt());
   }
 
-  public static String[] splitPath(final ProtocolContext context) {
+  private static String[] splitPath(final ProtocolContext context) {
 
     return ProtocolContextUtils.getRelativePath(context).getPath().split("/");
   }
@@ -90,7 +90,7 @@ public class CrateUtils {
     validateKeywords(request.keywords());
   }
 
-  public static void validateCrateName(final @Nullable String name) {
+  private static void validateCrateName(final @Nullable String name) {
 
     if (name == null || name.isBlank()) {
       throw new IllegalArgumentException("crate name cannot be empty");
@@ -108,7 +108,7 @@ public class CrateUtils {
     }
   }
 
-  public static void validateVersion(final @Nullable String vers) {
+  private static void validateVersion(final @Nullable String vers) {
 
     if (vers == null || vers.isBlank()) {
       throw new IllegalArgumentException("version cannot be empty");
@@ -120,7 +120,7 @@ public class CrateUtils {
     }
   }
 
-  public static void validateKeywords(final @Nullable List<String> keywords) {
+  private static void validateKeywords(final @Nullable List<String> keywords) {
 
     if (keywords == null) {
       return;
@@ -136,7 +136,7 @@ public class CrateUtils {
     }
   }
 
-  public static void validateKeyword(final String kw) {
+  private static void validateKeyword(final String kw) {
 
     if (kw.length() > MAX_KEYWORD_LENGTH) {
       throw new IllegalArgumentException(
@@ -173,7 +173,7 @@ public class CrateUtils {
     return objectMapper.writeValueAsString(entry);
   }
 
-  public static CrateIndexDep toIndexDep(final CratePublishDep dep) {
+  private static CrateIndexDep toIndexDep(final CratePublishDep dep) {
 
     final String packageName;
     final String name;

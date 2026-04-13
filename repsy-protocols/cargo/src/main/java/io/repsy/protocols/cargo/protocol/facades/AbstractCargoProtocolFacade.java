@@ -36,7 +36,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @NullMarked
 @RequiredArgsConstructor
-public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFacade<ID> {
+public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFacade {
 
   private static final String USAGES = "usages";
 
@@ -90,7 +90,6 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
     final var requestWithChecksum =
         CrateUtils.createCratePublishRequestWithChecksum(request, checksum);
 
-    // Upload to Storage
     final var indexJsonLine = CrateUtils.getIndexJsonLine(requestWithChecksum, this.objectMapper);
 
     final var usages =
@@ -102,7 +101,6 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
             crateBytes,
             indexJsonLine);
 
-    // Insert to DB
     this.cargoCrateService.publish(repoInfo, requestWithChecksum);
 
     context.addProperty(USAGES, usages);

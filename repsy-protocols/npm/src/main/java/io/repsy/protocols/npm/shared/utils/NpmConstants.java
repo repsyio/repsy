@@ -15,9 +15,12 @@
  */
 package io.repsy.protocols.npm.shared.utils;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class NpmConstants {
 
   public static final String DIST_TAGS = "dist-tags";

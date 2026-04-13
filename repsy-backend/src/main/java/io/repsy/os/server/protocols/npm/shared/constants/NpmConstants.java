@@ -15,11 +15,12 @@
  */
 package io.repsy.os.server.protocols.npm.shared.constants;
 
+import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class NpmConstants {
 
   public static final String EMAIL = "email";

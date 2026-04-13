@@ -27,7 +27,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 @NullMarked
-public interface CargoProtocolFacade<ID> {
+public interface CargoProtocolFacade {
 
   List<CrateIndexEntry> getIndexEntries(ProtocolContext context);
 
