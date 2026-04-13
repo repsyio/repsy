@@ -17,18 +17,15 @@ package io.repsy.os.server.protocols.golang.shared.go_module.dtos;
 
 import java.time.Instant;
 import java.util.UUID;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-@Data
-@AllArgsConstructor
-@NullMarked
-public class GoModuleVersionListItem {
+public interface GoModuleVersionListItem {
+  @NonNull UUID getId();
 
-  private final UUID id;
-  private final String version;
-  private final @Nullable String goVersion;
-  private final Instant createdAt;
+  @NonNull String getVersion();
+
+  @Nullable String getGoVersion();
+
+  @NonNull Instant getCreatedAt();
 }

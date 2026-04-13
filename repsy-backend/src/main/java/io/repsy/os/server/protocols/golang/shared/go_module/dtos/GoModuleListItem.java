@@ -17,16 +17,12 @@ package io.repsy.os.server.protocols.golang.shared.go_module.dtos;
 
 import java.time.Instant;
 import java.util.UUID;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.NonNull;
 
-@Data
-@AllArgsConstructor
-@NullMarked
-public class GoModuleListItem {
+public interface GoModuleListItem {
+  @NonNull UUID getId();
 
-  private final UUID id;
-  private final String modulePath;
-  private final Instant createdAt;
+  @NonNull String getModulePath();
+
+  @NonNull Instant getCreatedAt();
 }

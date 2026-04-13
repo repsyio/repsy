@@ -19,35 +19,34 @@ import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleListIte
 import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
+@Repository
+@NullMarked
 public interface GoModuleRepository extends JpaRepository<GoModule, UUID> {
 
   Optional<GoModule> findByRepoIdAndModulePath(UUID repoId, String modulePath);
 
   @Query(
       """
-      SELECT new io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleListItem(
-          m.id, m.modulePath, m.createdAt
-      )
-      FROM GoModule m
-      WHERE m.repo.id = :repoId
+      select m.id as id, m.modulePath as modulePath, m.createdAt as createdAt
+      from GoModule m
+      where m.repo.id = :repoId
       """)
-  Page<GoModuleListItem> findAllByRepoId(@Param("repoId") UUID repoId, Pageable pageable);
+  Page<GoModuleListItem> findAllByRepoId(UUID repoId, Pageable pageable);
 
   @Query(
       """
-      SELECT new io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleListItem(
-          m.id, m.modulePath, m.createdAt
-      )
-      FROM GoModule m
-      WHERE m.repo.id = :repoId
-        AND LOWER(m.modulePath) LIKE LOWER(CONCAT('%', :search, '%'))
+      select m.id as id, m.modulePath as modulePath, m.createdAt as createdAt
+      from GoModule m
+      where m.repo.id = :repoId
+        and lower(m.modulePath) like lower(concat('%', :search, '%'))
       """)
   Page<GoModuleListItem> findAllByRepoIdContainsModulePath(
-      @Param("repoId") UUID repoId, @Param("search") String search, Pageable pageable);
+      UUID repoId, String search, Pageable pageable);
 }

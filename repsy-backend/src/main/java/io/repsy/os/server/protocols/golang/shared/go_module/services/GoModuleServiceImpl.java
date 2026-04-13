@@ -113,9 +113,8 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
         .findByRepoIdAndModulePath(repoInfo.getStorageKey(), modulePath)
         .flatMap(
             module ->
-                Optional.ofNullable(
-                    this.computeLatestVersion(
-                        this.goModuleVersionRepository.findAllByModuleId(module.getId()))));
+                this.computeLatestVersion(
+                    this.goModuleVersionRepository.findAllByModuleId(module.getId())));
   }
 
   public Page<GoModuleListItem> getModules(final UUID repoId, final Pageable pageable) {
@@ -144,21 +143,19 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
             .orElseThrow(() -> new ItemNotFoundException("moduleNotFound"));
 
     final var versions = this.goModuleVersionRepository.findAllByModuleId(goModule.getId());
-    final var latestVersion = this.computeLatestVersion(versions);
 
     return GoModuleInfo.builder()
         .id(goModule.getId())
         .modulePath(goModule.getModulePath())
-        .latestVersion(latestVersion)
+        .latestVersion(this.computeLatestVersion(versions).orElse(null))
         .createdAt(goModule.getCreatedAt())
         .versions(versions)
         .build();
   }
 
-  private @Nullable String computeLatestVersion(final List<GoModuleVersionListItem> versions) {
+  private Optional<String> computeLatestVersion(final List<GoModuleVersionListItem> versions) {
     return versions.stream()
         .map(GoModuleVersionListItem::getVersion)
-        .max(GoVersionUtils.COMPARATOR)
-        .orElse(null);
+        .max(GoVersionUtils.COMPARATOR);
   }
 }

@@ -20,42 +20,39 @@ import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModuleVer
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
+@Repository
+@NullMarked
 public interface GoModuleVersionRepository extends JpaRepository<GoModuleVersion, UUID> {
 
   Optional<GoModuleVersion> findByGoModuleIdAndVersion(UUID moduleId, String version);
-
-  Optional<GoModuleVersion> findFirstByGoModuleIdOrderByCreatedAtDesc(UUID moduleId);
 
   boolean existsByGoModuleIdAndVersionAndDeletedTrue(UUID moduleId, String version);
 
   @Query(
       """
-      SELECT new io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem(
-          v.id, v.version, v.goVersion, v.createdAt
-      )
-      FROM GoModuleVersion v
-      WHERE v.goModule.id = :moduleId
-        AND v.deleted = false
-      ORDER BY v.createdAt DESC
+      select v.id as id, v.version as version, v.goVersion as goVersion, v.createdAt as createdAt
+      from GoModuleVersion v
+      where v.goModule.id = :moduleId
+        and v.deleted = false
+      order by v.createdAt desc
       """)
-  List<GoModuleVersionListItem> findAllByModuleId(@Param("moduleId") UUID moduleId);
+  List<GoModuleVersionListItem> findAllByModuleId(UUID moduleId);
 
   @Query(
       """
-      SELECT new io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem(
-          v.id, v.version, v.goVersion, v.createdAt
-      )
-      FROM GoModuleVersion v
-      WHERE v.goModule.id = :moduleId
-        AND v.deleted = false
-        AND LOWER(v.version) LIKE LOWER(CONCAT('%', :search, '%'))
+      select v.id as id, v.version as version, v.goVersion as goVersion, v.createdAt as createdAt
+      from GoModuleVersion v
+      where v.goModule.id = :moduleId
+        and v.deleted = false
+        and lower(v.version) like lower(concat('%', :search, '%'))
       """)
   Page<GoModuleVersionListItem> findAllByModuleIdContainsVersion(
-      @Param("moduleId") UUID moduleId, @Param("search") String search, Pageable pageable);
+      UUID moduleId, String search, Pageable pageable);
 }
