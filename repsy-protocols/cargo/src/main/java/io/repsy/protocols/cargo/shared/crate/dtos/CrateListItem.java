@@ -24,6 +24,6 @@ import org.jspecify.annotations.Nullable;
 public record CrateListItem(
     String name,
     @JsonProperty("max_version") String maxVersion,
-    @JsonProperty("total_downloads") long totalDownloads,
+    @JsonProperty("downloads") long totalDownloads,
     @Nullable String description,
-    @JsonProperty("last_updated_at") @Nullable Instant lastUpdatedAt) {}
+    @JsonProperty("updated_at") @Nullable Instant lastUpdatedAt) {}

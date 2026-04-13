@@ -61,16 +61,13 @@
                 class="grid grid-cols-[2fr_2fr_2fr_1fr_30px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
                 <div class="flex items-center gap-2">
-                  <svg
-                    class="h-[16px] w-[16px] text-[#9FA0A0]"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M12 2L8 4.3V9L12 11.3L16 9V4.3L12 2ZM6.1 8.8L2 11.2V16.1L6.1 18.5L10.2 16.1V11.2L6.1 8.8ZM17.9 8.8L13.8 11.2V16.1L17.9 18.5L22 16.1V11.2L17.9 8.8Z"
-                    />
-                  </svg>
+                  <img
+                    src="/assets/icons/repo/cargo.svg"
+                    alt="Cargo"
+                    class="h-[20px] w-[20px] group-hover:opacity-90"
+                    width="20"
+                    height="20"
+                  />
                   <app-tooltip
                     class="text-secondary-500 group-hover:underline"
                     [text]="crate.name | ellipsis"
@@ -82,17 +79,17 @@
                   [text]="crate.max_version | ellipsis"
                   [textHover]="crate.max_version"
                 />
-                @if (crate.last_updated_at) {
+                @if (crate.updated_at) {
                   <app-tooltip
                     class="text-secondary-500 group-hover:underline"
-                    [text]="timeAgo(crate.last_updated_at)"
-                    [textHover]="crate.last_updated_at | date: 'medium'"
+                    [text]="timeAgo(crate.updated_at)"
+                    [textHover]="crate.updated_at | date: 'medium'"
                     [always]="true"
                   />
                 } @else {
                   <span class="text-[#9FA0A0]">—</span>
                 }
-                <span class="text-[#FDFDFD]">{{ crate.total_downloads }}</span>
+                <span class="text-[#FDFDFD]">{{ crate.downloads }}</span>
                 @if (activeRepo.canManage) {
                   <app-dropdown (click)="$event.stopPropagation()">
                     <button
@@ -155,11 +152,11 @@
                 </div>
                 <div class="flex justify-between gap-2">
                   <span class="text-sm text-[#9FA0A0]">Last Updated:</span>
-                  <span class="text-right break-all text-[#FDFDFD]">{{ crate.last_updated_at }}</span>
+                  <span class="text-right break-all text-[#FDFDFD]">{{ crate.updated_at }}</span>
                 </div>
                 <div class="flex justify-between gap-2">
                   <span class="text-sm text-[#9FA0A0]">Downloads:</span>
-                  <span class="text-right break-all text-[#FDFDFD]">{{ crate.total_downloads }}</span>
+                  <span class="text-right break-all text-[#FDFDFD]">{{ crate.downloads }}</span>
                 </div>
               </div>
             </div>

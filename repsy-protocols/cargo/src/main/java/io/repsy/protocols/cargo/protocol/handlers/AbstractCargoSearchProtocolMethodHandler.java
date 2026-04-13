@@ -96,7 +96,7 @@ public abstract class AbstractCargoSearchProtocolMethodHandler implements Protoc
       final var page =
           Optional.ofNullable(request.getParameter("page")).map(Integer::parseInt).orElse(1);
 
-      final var clampedPerPage = Math.min(Math.max(perPage, 1), 100);
+      final var clampedPerPage = Math.clamp(perPage, 1, 100);
       final var zeroBasedPage = Math.max(page - 1, 0);
       final var pageable = PageRequest.of(zeroBasedPage, clampedPerPage);
       final var result = this.facade.search(context, query != null ? query : "", pageable);

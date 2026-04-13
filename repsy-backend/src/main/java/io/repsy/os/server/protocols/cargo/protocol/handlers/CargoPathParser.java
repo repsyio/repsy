@@ -45,8 +45,8 @@ public class CargoPathParser implements PathParser {
   private static final String REPO_NAME_REGEX = "(?<repoName>[a-zA-Z0-9_\\-]+)";
   private static final String RELATIVE_PATH_REGEX = "(?<relativePath>/.*)?";
   private static final Pattern NORMAL_PATTERN =
-      Pattern.compile("^/cargo/" + REPO_NAME_REGEX + RELATIVE_PATH_REGEX);
-  private static final Pattern REGISTRY_LEVEL_PATTERN = Pattern.compile("^/cargo(?:/me)?/?$");
+      Pattern.compile("^/" + REPO_NAME_REGEX + RELATIVE_PATH_REGEX);
+  private static final Pattern REGISTRY_LEVEL_PATTERN = Pattern.compile("^/(?:/me)?/?$");
 
   private final RepoTxService repoTxService;
 

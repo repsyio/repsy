@@ -33,6 +33,8 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
+import org.semver4j.Semver;
+import org.semver4j.SemverException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.util.Pair;
 import tools.jackson.databind.ObjectMapper;
@@ -44,7 +46,6 @@ public class CrateUtils {
   private static final int THREE = 3;
 
   private static final Pattern CRATE_NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9_-]*$");
-  private static final Pattern SEMVER_PATTERN = Pattern.compile("^\\d+\\.\\d+\\.\\d+.*$");
 
   private static final int MAX_NAME_LENGTH = 64;
   private static final int MAX_KEYWORDS = 5;
@@ -114,7 +115,9 @@ public class CrateUtils {
       throw new IllegalArgumentException("version cannot be empty");
     }
 
-    if (!SEMVER_PATTERN.matcher(vers).matches()) {
+    try {
+      new Semver(vers);
+    } catch (final SemverException ex) {
       throw new IllegalArgumentException(
           "version `%s` is not a valid semver format (expected MAJOR.MINOR.PATCH)".formatted(vers));
     }

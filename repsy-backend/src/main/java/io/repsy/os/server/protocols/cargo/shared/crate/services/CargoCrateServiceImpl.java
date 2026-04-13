@@ -42,6 +42,7 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
+import io.repsy.protocols.cargo.shared.crate.services.SemverComparator;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.time.Instant;
 import java.util.List;
@@ -407,10 +408,7 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
   private void updateCrateMaxVersion(final CargoCrate crate, final String newVers) {
 
     final var currentMax = crate.getMaxVersion();
-    if (currentMax == null
-        || new io.repsy.protocols.cargo.shared.crate.services.SemverComparator()
-                .compare(newVers, currentMax)
-            > 0) {
+    if (currentMax == null || new SemverComparator().compare(newVers, currentMax) > 0) {
       crate.setMaxVersion(newVers);
     }
     crate.setLastUpdatedAt(Instant.now());
