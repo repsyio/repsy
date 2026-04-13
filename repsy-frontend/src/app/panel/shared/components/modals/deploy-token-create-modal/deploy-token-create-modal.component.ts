@@ -20,6 +20,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import moment, { Moment } from 'moment';
 
 import { DockerService } from '../../../../pages/repository/docker/service/docker.service';
+import { GolangService } from '../../../../pages/repository/golang/service/golang.service';
 import { MavenService } from '../../../../pages/repository/maven/service/maven.service';
 import { NpmService } from '../../../../pages/repository/npm/service/npm.service';
 import { PypiService } from '../../../../pages/repository/pypi/service/pypi.service';
@@ -59,6 +60,7 @@ export class DeployTokenCreateModalComponent implements OnInit {
 
   constructor(
     private readonly dockerService: DockerService,
+    private readonly golangService: GolangService,
     private readonly npmService: NpmService,
     private readonly mavenService: MavenService,
     private readonly pypiService: PypiService,
@@ -171,6 +173,8 @@ export class DeployTokenCreateModalComponent implements OnInit {
         return this.pypiService.createDeployToken(form);
       case RepoType.CARGO:
         return this.cargoService.createDeployToken(form);
+      case RepoType.GOLANG:
+        return this.golangService.createDeployToken(form);
       default:
         return Promise.reject('Unsupported repository type: ' + this.repoType);
     }

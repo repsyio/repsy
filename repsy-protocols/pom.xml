@@ -40,6 +40,7 @@
     <module>npm</module>
     <module>docker</module>
     <module>cargo</module>
+    <module>golang</module>
     <module>shared</module>
   </modules>
 </project>

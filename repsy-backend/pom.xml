@@ -79,6 +79,12 @@
 
     <dependency>
       <groupId>io.repsy.protocols</groupId>
+      <artifactId>golang</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.protocols</groupId>
       <artifactId>cargo</artifactId>
       <version>${project.version}</version>
     </dependency>

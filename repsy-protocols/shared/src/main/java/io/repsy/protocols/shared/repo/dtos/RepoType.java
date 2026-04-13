@@ -21,8 +21,9 @@ public enum RepoType {
   MAVEN("mvn__"),
   NPM("npm__"),
   PYPI("pypi__"),
+  DOCKER("docker__"),
   CARGO("cargo__"),
-  DOCKER("docker__");
+  GOLANG("go__");
 
   private final @NonNull String prefix;
 

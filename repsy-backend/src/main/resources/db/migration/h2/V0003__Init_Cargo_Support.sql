@@ -166,4 +166,4 @@ drop constraint "ch_repo__type";
 
 alter table "public"."repo"
     add constraint "ch_repo__type"
-        check ("type" in ('MAVEN', 'NPM', 'PYPI', 'DOCKER', 'CARGO'));
+        check ("type" in ('MAVEN', 'NPM', 'PYPI', 'DOCKER', 'GOLANG' ,'CARGO'));

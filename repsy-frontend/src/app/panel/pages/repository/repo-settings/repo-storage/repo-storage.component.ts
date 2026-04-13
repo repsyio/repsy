@@ -23,6 +23,7 @@ import { RepoType } from '../../../../shared/dto/repo/repo-type';
 import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
 import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerService } from '../../docker/service/docker.service';
+import { GolangService } from '../../golang/service/golang.service';
 import { MavenService } from '../../maven/service/maven.service';
 import { NpmService } from '../../npm/service/npm.service';
 import { PypiService } from '../../pypi/service/pypi.service';
@@ -45,6 +46,7 @@ export class RepoStorageComponent implements OnInit {
     private readonly pypiService: PypiService,
     private readonly dockerService: DockerService,
     private readonly cargoService: CargoService,
+    private readonly golangService: GolangService,
     private readonly toastService: ToastService,
   ) {}
 
@@ -64,6 +66,8 @@ export class RepoStorageComponent implements OnInit {
         return this.dockerService.fetchRepositoryUsage();
       case RepoType.CARGO:
         return this.cargoService.fetchRepositoryUsage();
+      case RepoType.GOLANG:
+        return this.golangService.fetchRepositoryUsage();
       default:
         return Promise.reject('Unsupported repository type');
     }

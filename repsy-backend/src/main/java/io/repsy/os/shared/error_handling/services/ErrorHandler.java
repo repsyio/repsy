@@ -28,6 +28,7 @@ import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
+import io.repsy.protocols.golang.shared.exceptions.GoVersionGoneException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ValidationException;
@@ -326,6 +327,24 @@ public class ErrorHandler {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(messageText, ex.getMessage()));
+  }
+
+  @ExceptionHandler(GoVersionGoneException.class)
+  @Nullable ResponseEntity<RestResponse<String>> handleException(
+      final @NonNull GoVersionGoneException ex,
+      final @NonNull HttpServletRequest request,
+      final @Nullable HttpServletResponse response) {
+
+    if (response == null) {
+      log.debug("Go version gone", ex);
+      return null;
+    }
+
+    log.info(exceptionToString(ex, request));
+
+    return ResponseEntity.status(HttpStatus.GONE)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(this.resp.error("versionGone", ex.getMessage()));
   }
 
   @ExceptionHandler(NoResourceFoundException.class)
