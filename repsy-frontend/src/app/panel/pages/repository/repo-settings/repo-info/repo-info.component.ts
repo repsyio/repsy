@@ -166,6 +166,8 @@ export class RepoInfoComponent implements OnInit {
         return this.dockerService.updateRepositoryDescription(form);
       case RepoType.CARGO:
         return this.cargoService.updateRepoDescription(form);
+      case RepoType.GOLANG:
+        return this.golangService.updateRepoDescription(form);
       default:
         return Promise.reject('Unsupported repository type');
     }

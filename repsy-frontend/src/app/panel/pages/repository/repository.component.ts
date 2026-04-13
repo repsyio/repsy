@@ -68,7 +68,15 @@ export class RepositoryComponent {
   public paginatedRepos: RepoListItem[] = [];
   public createRepoModal: boolean;
   public repoOption = RepoType.ALL;
-  public repoOptions = [RepoType.ALL, RepoType.DOCKER, RepoType.MAVEN, RepoType.NPM, RepoType.PYPI, RepoType.CARGO, RepoType.GOLANG];
+  public repoOptions = [
+    RepoType.ALL,
+    RepoType.DOCKER,
+    RepoType.MAVEN,
+    RepoType.NPM,
+    RepoType.PYPI,
+    RepoType.CARGO,
+    RepoType.GOLANG,
+  ];
   public loading = true;
   public operationLock = false;
   public username: string;

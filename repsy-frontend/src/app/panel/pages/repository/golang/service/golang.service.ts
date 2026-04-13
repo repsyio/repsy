@@ -128,22 +128,6 @@ export class GolangService {
     });
   }
 
-  public async updateRepoName(form: RepoNameForm): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      this.http
-        .patch<RestResponse<void>>(`${this.apiBaseUrl}/api/go/repos/${this.activeRepo.repoName}/name`, form)
-        .toPromise()
-        .then(() => {
-          if (this.activeRepo) {
-            this.activeRepo.repoName = form.name;
-            this.repoSub.next(this.activeRepo);
-          }
-          resolve();
-        })
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
   public async updateRepoDescription(form: RepoDescriptionForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       this.http
