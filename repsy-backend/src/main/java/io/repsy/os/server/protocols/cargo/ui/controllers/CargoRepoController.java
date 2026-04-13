@@ -99,6 +99,8 @@ public class CargoRepoController {
 
     this.usageUpdateService.updateUsage(usageChangedInfo);
 
+    this.repoTxService.deleteRepo(repoInfo.getId());
+
     return this.responseFactory.success("repoDeleted");
   }
 

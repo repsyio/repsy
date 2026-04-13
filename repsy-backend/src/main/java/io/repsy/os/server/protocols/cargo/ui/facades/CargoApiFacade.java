@@ -35,6 +35,7 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
@@ -50,11 +51,10 @@ public class CargoApiFacade {
   private final CargoStorageService cargoStorageService;
   private final ObjectMapper objectMapper;
 
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public BaseUsages deleteRepo(final RepoInfo repoInfo) throws IOException {
 
-    final var free = this.cargoStorageService.deleteRepo(repoInfo.getStorageKey());
-
-    this.repoTxService.deleteRepo(repoInfo.getStorageKey());
+    final var free = this.cargoStorageService.deleteRepo(repoInfo.getId());
 
     return BaseUsages.builder().diskUsage(-1L * free).build();
   }
