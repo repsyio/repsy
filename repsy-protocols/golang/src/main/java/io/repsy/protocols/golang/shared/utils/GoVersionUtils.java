@@ -69,7 +69,7 @@ public class GoVersionUtils {
 
   /**
    * Extracts the version string from the last path segment, stripping any known extension (.zip,
-   * .mod, .info). E.g. "/corp.internal/payments/@v/v1.2.0.zip" → "v1.2.0"
+   * .mod, .info). E.g. "/io.repsy/hello-world/@v/v1.2.0.zip" → "v1.2.0"
    */
   public static String extractVersionFromPath(final String path) {
     final var segment = path.substring(path.lastIndexOf('/') + 1);

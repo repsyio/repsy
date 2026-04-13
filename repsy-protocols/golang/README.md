@@ -24,8 +24,8 @@ A Go module path must contain at least one dot in its first path segment (a Go t
 **Recommended patterns:**
 
 ```
-corp.internal/payments
-corp.internal/platform/auth
+io.repsy/hello-world
+io.repsy/platform/auth
 mycompany.dev/payments
 ```
 
@@ -52,9 +52,9 @@ Repsy extracts `go.mod` from the zip, validates it, and stores both files.
 The zip must follow the Go module zip layout exactly:
 
 ```
-corp.internal/payments@v1.2.0/go.mod
-corp.internal/payments@v1.2.0/payments.go
-corp.internal/payments@v1.2.0/internal/calc.go
+io.repsy/hello-world@v1.2.0/go.mod
+io.repsy/hello-world@v1.2.0/hello-world.go
+io.repsy/hello-world@v1.2.0/internal/calc.go
 ```
 
 Rules:
@@ -63,12 +63,12 @@ Rules:
 - Do **not** use `zip -r` (it adds directory entries). Add files individually:
 
 ```bash
-MODULE="corp.internal/payments"
+MODULE="io.repsy/hello-world"
 VERSION="v1.2.0"
 
 zip module.zip \
   "${MODULE}@${VERSION}/go.mod" \
-  "${MODULE}@${VERSION}/payments.go" \
+  "${MODULE}@${VERSION}/hello-world.go" \
   "${MODULE}@${VERSION}/internal/calc.go"
 ```
 
@@ -88,7 +88,7 @@ REPSY_URL=https://repsy.example.com
 REPO=my-go-repo
 USER=alice
 PASS=secret          # or deploy token value
-MODULE=corp.internal/payments
+MODULE=io.repsy/hello-world
 VERSION=v1.2.0
 
 curl -sf \
@@ -143,7 +143,7 @@ go env -w GONOSUMDB="*"
 ### Fetch a module
 
 ```bash
-go get corp.internal/payments@v1.2.0
+go get io.repsy/hello-world@v1.2.0
 ```
 
 ---
@@ -188,7 +188,7 @@ REPSY_URL="${REPSY_URL:?}"
 REPO="${REPO:?}"
 REPSY_USER="${REPSY_USER:?}"
 REPSY_TOKEN="${REPSY_TOKEN:?}"
-MODULE="${MODULE:?}"    # e.g. corp.internal/payments
+MODULE="${MODULE:?}"    # e.g. io.repsy/hello-world
 VERSION="${VERSION:?}"  # e.g. v1.2.0
 
 # Build zip (files only, no -r)
@@ -224,7 +224,7 @@ Google Artifact Registry.
 For private modules, set `GONOSUMDB` to skip checksum verification:
 
 ```bash
-go env -w GONOSUMDB="corp.internal"
+go env -w GONOSUMDB="io.repsy"
 ```
 
 Public modules are still verified against `sum.golang.org`.
@@ -267,20 +267,20 @@ go env -w GONOSUMDB="*"
 
 ---
 
-### `dial tcp: lookup corp.internal: no such host`
+### `dial tcp: lookup io.repsy: no such host`
 
 The module path domain does not resolve, which is expected. This error means Go is attempting VCS discovery instead of using the proxy. See above — check that `GOPRIVATE` / `GONOPROXY` are not set.
 
 ---
 
-### `verifying corp.internal/payments@v1.2.0: checksum mismatch` or `not found in sum.golang.org`
+### `verifying io.repsy/hello-world@v1.2.0: checksum mismatch` or `not found in sum.golang.org`
 
 Private modules are not indexed in the public checksum database.
 
 ```bash
 go env -w GONOSUMDB="*"
 # or scope to a prefix:
-go env -w GONOSUMDB="corp.internal"
+go env -w GONOSUMDB="io.repsy"
 ```
 
 ---
@@ -304,7 +304,7 @@ The uploaded zip does not match Go's module zip specification. Inspect the struc
 
 ```bash
 unzip -l module.zip | head -20
-# All entries must be prefixed with: corp.internal/payments@v1.2.0/
+# All entries must be prefixed with: io.repsy/hello-world@v1.2.0/
 # No directory-only entries should appear
 ```
 
