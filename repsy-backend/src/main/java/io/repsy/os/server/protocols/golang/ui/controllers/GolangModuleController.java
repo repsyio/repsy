@@ -68,7 +68,7 @@ public class GolangModuleController {
   }
 
   @GetMapping("/{repoName}")
-  public @NonNull RestResponse<PagedModel<GoModuleListItem>> getAll(
+  public @NonNull RestResponse<PagedModel<GoModuleListItem>> list(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
@@ -102,7 +102,7 @@ public class GolangModuleController {
   }
 
   @GetMapping("/{repoName}/versions")
-  public @NonNull RestResponse<PagedModel<GoModuleVersionListItem>> getVersions(
+  public @NonNull RestResponse<PagedModel<GoModuleVersionListItem>> listVersions(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestParam final @NonNull String modulePath,

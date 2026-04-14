@@ -71,7 +71,7 @@ public class DockerImageController {
   private final @NonNull RestResponseFactory restResponseFactory;
 
   @GetMapping("/{repoName}")
-  public @NonNull RestResponse<PagedModel<ImageListItem>> getAll(
+  public @NonNull RestResponse<PagedModel<ImageListItem>> list(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestParam(required = false, defaultValue = "") final @NonNull String name,
@@ -89,7 +89,7 @@ public class DockerImageController {
   }
 
   @GetMapping("/{repoName}/{imageName}/tags")
-  public @NonNull RestResponse<PagedModel<ImageTagListItem>> getTags(
+  public @NonNull RestResponse<PagedModel<ImageTagListItem>> listTags(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable final @NonNull String imageName,
@@ -161,7 +161,7 @@ public class DockerImageController {
   }
 
   @GetMapping("/{repoName}/{imageName}/tags/{tagName}/manifests")
-  public @NonNull RestResponse<PagedModel<ManifestListItem>> getTagManifests(
+  public @NonNull RestResponse<PagedModel<ManifestListItem>> listTagManifests(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable final @NonNull String imageName,

@@ -113,7 +113,7 @@ public class NpmPackageApiController {
   }
 
   @GetMapping("/{repoName}")
-  public @NonNull RestResponse<PagedModel<PackageListItem>> getAll(
+  public @NonNull RestResponse<PagedModel<PackageListItem>> list(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestParam(required = false) final @Nullable String scope,
@@ -131,7 +131,7 @@ public class NpmPackageApiController {
   }
 
   @GetMapping("/{repoName}/{ignoredScope}")
-  public @NonNull RestResponse<PagedModel<PackageListItem>> getAll(
+  public @NonNull RestResponse<PagedModel<PackageListItem>> list(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable final @NonNull String ignoredScope,
@@ -153,7 +153,7 @@ public class NpmPackageApiController {
     "/{repoName}/scope",
     "/{repoName}/scope/{scope}",
   })
-  public @NonNull RestResponse<PagedModel<PackageListItem>> getAllFilterByScope(
+  public @NonNull RestResponse<PagedModel<PackageListItem>> listFilterByScope(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable(required = false) final @Nullable String scope,
@@ -199,7 +199,7 @@ public class NpmPackageApiController {
     "/{repoName}/package/{packageName}/versions",
     "/{repoName}/{scope}/package/{packageName}/versions",
   })
-  public @NonNull RestResponse<PagedModel<PackageVersionListItem>> getVersions(
+  public @NonNull RestResponse<PagedModel<PackageVersionListItem>> listVersions(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable(required = false) final @Nullable String scope,
@@ -223,7 +223,7 @@ public class NpmPackageApiController {
     "/{repoName}/package/{packageName}/tags",
     "/{repoName}/{scope}/package/{packageName}/tags",
   })
-  public @NonNull RestResponse<List<PackageDistributionTagMapListItem>> getTags(
+  public @NonNull RestResponse<List<PackageDistributionTagMapListItem>> listTags(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable(required = false) final @Nullable String scope,

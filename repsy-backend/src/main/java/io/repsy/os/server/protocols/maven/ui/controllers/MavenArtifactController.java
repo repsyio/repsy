@@ -147,7 +147,7 @@ public class MavenArtifactController {
   }
 
   @GetMapping("/{repoName}/{groupName}/{artifactName}/versions")
-  public @NonNull RestResponse<PagedModel<ArtifactVersionListItem>> getVersions(
+  public @NonNull RestResponse<PagedModel<ArtifactVersionListItem>> listVersions(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable final @NonNull String groupName,
@@ -168,7 +168,7 @@ public class MavenArtifactController {
   }
 
   @GetMapping(value = "/{repoName}/{groupName}/{artifactName}/versions", params = "version")
-  public @NonNull RestResponse<PagedModel<ArtifactVersionListItem>> getVersionsLikeVersion(
+  public @NonNull RestResponse<PagedModel<ArtifactVersionListItem>> listVersionsLikeVersion(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable final @NonNull String groupName,
@@ -190,7 +190,7 @@ public class MavenArtifactController {
   }
 
   @GetMapping("/{repoName}")
-  public @NonNull RestResponse<PagedModel<ArtifactListItem>> getAllContainsGroupName(
+  public @NonNull RestResponse<PagedModel<ArtifactListItem>> listContainsGroupName(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestParam(required = false, defaultValue = "") final @NonNull String groupName,
@@ -209,7 +209,7 @@ public class MavenArtifactController {
   }
 
   @GetMapping("/{repoName}/{groupName}")
-  public @NonNull RestResponse<PagedModel<ArtifactListItem>> getAllContainsArtifactName(
+  public @NonNull RestResponse<PagedModel<ArtifactListItem>> listContainsArtifactName(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable final @NonNull String groupName,

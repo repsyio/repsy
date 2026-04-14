@@ -107,7 +107,7 @@ public class CargoDeployTokenController {
   }
 
   @GetMapping("/{repoName}")
-  public RestResponse<PagedModel<DeployTokenInfoListItem>> getAll(
+  public RestResponse<PagedModel<DeployTokenInfoListItem>> list(
       @RequestHeader(HttpHeaders.AUTHORIZATION) final String authHeader,
       @PathVariable final String repoName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {

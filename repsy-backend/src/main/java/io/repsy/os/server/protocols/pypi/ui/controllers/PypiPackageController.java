@@ -98,7 +98,7 @@ public class PypiPackageController {
   }
 
   @GetMapping("/{repoName}")
-  public @NonNull RestResponse<PagedModel<PackageListItem>> getAll(
+  public @NonNull RestResponse<PagedModel<PackageListItem>> list(
       @RequestHeader(AUTHORIZATION) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
@@ -115,7 +115,7 @@ public class PypiPackageController {
   }
 
   @GetMapping(value = "/{repoName}", params = "name")
-  public @NonNull RestResponse<PagedModel<PackageListItem>> getAllLikeName(
+  public @NonNull RestResponse<PagedModel<PackageListItem>> listLikeName(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestParam(required = false, defaultValue = "") final @NonNull String name,
@@ -133,7 +133,7 @@ public class PypiPackageController {
   }
 
   @GetMapping("/{repoName}/{packageName}/releases")
-  public @NonNull RestResponse<PagedModel<ReleaseListItem>> getReleases(
+  public @NonNull RestResponse<PagedModel<ReleaseListItem>> listReleases(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable final @NonNull String packageName,
@@ -151,7 +151,7 @@ public class PypiPackageController {
   }
 
   @GetMapping(value = "/{repoName}/{packageName}/releases", params = "version")
-  public @NonNull RestResponse<PagedModel<ReleaseListItem>> getReleasesLikeVersion(
+  public @NonNull RestResponse<PagedModel<ReleaseListItem>> listReleasesLikeVersion(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable final @NonNull String packageName,

@@ -108,7 +108,7 @@ public class CargoCrateController {
   }
 
   @GetMapping("/{repoName}/{crateName}/versions")
-  public RestResponse<PagedModel<CrateVersionListItem>> getVersions(
+  public RestResponse<PagedModel<CrateVersionListItem>> listVersions(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final String repoName,
       @PathVariable final String crateName,

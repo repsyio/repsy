@@ -105,7 +105,7 @@ public class GolangDeployTokenController {
   }
 
   @GetMapping("/{repoName}")
-  public @NonNull RestResponse<PagedModel<DeployTokenInfoListItem>> getAll(
+  public @NonNull RestResponse<PagedModel<DeployTokenInfoListItem>> list(
       @RequestHeader(HttpHeaders.AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC)

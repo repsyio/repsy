@@ -87,7 +87,7 @@ public class KeyStoreController {
   }
 
   @GetMapping("/{repoName}")
-  public @NonNull RestResponse<PagedModel<KeyStoreItem>> findAll(
+  public @NonNull RestResponse<PagedModel<KeyStoreItem>> list(
       @RequestHeader(AUTHORIZATION) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
