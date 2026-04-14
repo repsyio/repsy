@@ -68,7 +68,7 @@ public class MavenArtifactController {
   private final @NonNull RestResponseFactory restResponseFactory;
 
   @DeleteMapping("/{repoName}/{groupName}/{artifactName}")
-  public @NonNull RestResponse<DeletedItem> deleteArtifact(
+  public @NonNull RestResponse<DeletedItem> delete(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable final @NonNull String groupName,
@@ -86,7 +86,7 @@ public class MavenArtifactController {
   }
 
   @DeleteMapping("/{repoName}/{groupName}/{artifactName}/versions/{versionName}")
-  public @NonNull RestResponse<DeletedItem> deleteArtifactVersion(
+  public @NonNull RestResponse<DeletedItem> deleteVersion(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable final @NonNull String groupName,
@@ -128,7 +128,7 @@ public class MavenArtifactController {
     "/{repoName}/{groupName}/{artifactName}",
     "/{repoName}/{groupName}/{artifactName}/versions/{versionName}"
   })
-  public @NonNull RestResponse<ArtifactVersionInfo> getArtifactVersion(
+  public @NonNull RestResponse<ArtifactVersionInfo> getVersion(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable final @NonNull String groupName,
@@ -147,7 +147,7 @@ public class MavenArtifactController {
   }
 
   @GetMapping("/{repoName}/{groupName}/{artifactName}/versions")
-  public @NonNull RestResponse<PagedModel<ArtifactVersionListItem>> getArtifactVersions(
+  public @NonNull RestResponse<PagedModel<ArtifactVersionListItem>> getVersions(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable final @NonNull String groupName,
@@ -168,7 +168,7 @@ public class MavenArtifactController {
   }
 
   @GetMapping(value = "/{repoName}/{groupName}/{artifactName}/versions", params = "version")
-  public @NonNull RestResponse<PagedModel<ArtifactVersionListItem>> getArtifactVersionsLikeVersion(
+  public @NonNull RestResponse<PagedModel<ArtifactVersionListItem>> getVersionsLikeVersion(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable final @NonNull String groupName,
@@ -190,7 +190,7 @@ public class MavenArtifactController {
   }
 
   @GetMapping("/{repoName}")
-  public @NonNull RestResponse<PagedModel<ArtifactListItem>> getArtifactsContainsGroupName(
+  public @NonNull RestResponse<PagedModel<ArtifactListItem>> getAllContainsGroupName(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestParam(required = false, defaultValue = "") final @NonNull String groupName,
@@ -209,7 +209,7 @@ public class MavenArtifactController {
   }
 
   @GetMapping("/{repoName}/{groupName}")
-  public @NonNull RestResponse<PagedModel<ArtifactListItem>> getArtifactsContainsArtifactName(
+  public @NonNull RestResponse<PagedModel<ArtifactListItem>> getAllContainsArtifactName(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable final @NonNull String groupName,

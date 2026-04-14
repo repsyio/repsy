@@ -64,7 +64,7 @@ public class PypiRepoController {
   private final @NonNull RestResponseFactory restResponseFactory;
 
   @PostMapping
-  public @NonNull RestResponse<Void> createRepo(
+  public @NonNull RestResponse<Void> create(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestBody final @NonNull RepoCreateForm form) {
 
@@ -80,7 +80,7 @@ public class PypiRepoController {
   }
 
   @DeleteMapping("/{repoName}")
-  public @NonNull RestResponse<Void> deleteRepo(
+  public @NonNull RestResponse<Void> delete(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName) {
 
@@ -94,7 +94,7 @@ public class PypiRepoController {
   }
 
   @GetMapping("/{repoName}/permissions")
-  public @NonNull RestResponse<RepoPermissionInfo> getRepoPermission(
+  public @NonNull RestResponse<RepoPermissionInfo> getPermission(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName) {
 
@@ -107,7 +107,7 @@ public class PypiRepoController {
   }
 
   @GetMapping
-  public @NonNull RestResponse<List<RepoListInfo>> getRepos(
+  public @NonNull RestResponse<List<RepoListInfo>> getAll(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
     this.pypiAuthComponent.authenticateUser(authHeader);
@@ -118,7 +118,7 @@ public class PypiRepoController {
   }
 
   @GetMapping("/{repoName}/settings")
-  public @NonNull RestResponse<RepoSettingsInfo> getRepoSettings(
+  public @NonNull RestResponse<RepoSettingsInfo> getSettings(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName) {
 
@@ -144,7 +144,7 @@ public class PypiRepoController {
   }
 
   @GetMapping("/count")
-  public @NonNull RestResponse<Long> getRepoCount(
+  public @NonNull RestResponse<Long> getCount(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
     this.pypiAuthComponent.authenticateUser(authHeader);
@@ -155,7 +155,7 @@ public class PypiRepoController {
   }
 
   @PatchMapping("/{repoName}/name")
-  public @NonNull RestResponse<Void> updateRepoName(
+  public @NonNull RestResponse<Void> rename(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestBody @Valid final @NonNull RepoRenameForm form) {
@@ -170,7 +170,7 @@ public class PypiRepoController {
   }
 
   @PatchMapping("/{repoName}/description")
-  public @NonNull RestResponse<Void> updateRepoDescription(
+  public @NonNull RestResponse<Void> updateDescription(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestBody @Valid final @NonNull RepoDescriptionForm form) {
@@ -185,7 +185,7 @@ public class PypiRepoController {
   }
 
   @PutMapping("/{repoName}/settings")
-  public @NonNull RestResponse<Void> updateRepoSettings(
+  public @NonNull RestResponse<Void> updateSettings(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestBody @Valid final @NonNull RepoSettingsForm form) {

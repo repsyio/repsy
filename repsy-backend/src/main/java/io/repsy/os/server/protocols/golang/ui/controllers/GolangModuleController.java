@@ -68,7 +68,7 @@ public class GolangModuleController {
   }
 
   @GetMapping("/{repoName}")
-  public @NonNull RestResponse<PagedModel<GoModuleListItem>> getModules(
+  public @NonNull RestResponse<PagedModel<GoModuleListItem>> getAll(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
@@ -84,7 +84,7 @@ public class GolangModuleController {
   }
 
   @GetMapping("/{repoName}/search")
-  public @NonNull RestResponse<PagedModel<GoModuleListItem>> searchModules(
+  public @NonNull RestResponse<PagedModel<GoModuleListItem>> search(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestParam(required = false, defaultValue = "") final @NonNull String search,
@@ -102,7 +102,7 @@ public class GolangModuleController {
   }
 
   @GetMapping("/{repoName}/versions")
-  public @NonNull RestResponse<PagedModel<GoModuleVersionListItem>> getModuleVersions(
+  public @NonNull RestResponse<PagedModel<GoModuleVersionListItem>> getVersions(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestParam final @NonNull String modulePath,
@@ -122,7 +122,7 @@ public class GolangModuleController {
   }
 
   @GetMapping("/{repoName}/info")
-  public @NonNull RestResponse<GoModuleInfo> getModuleInfo(
+  public @NonNull RestResponse<GoModuleInfo> getInfo(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestParam final @NonNull String modulePath) {
@@ -137,7 +137,7 @@ public class GolangModuleController {
   }
 
   @DeleteMapping("/{repoName}")
-  public @NonNull RestResponse<Void> deleteModule(
+  public @NonNull RestResponse<Void> delete(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestParam final @NonNull String modulePath) {
@@ -152,7 +152,7 @@ public class GolangModuleController {
   }
 
   @DeleteMapping("/{repoName}/versions")
-  public @NonNull RestResponse<Void> deleteModuleVersion(
+  public @NonNull RestResponse<Void> deleteVersion(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestParam final @NonNull String modulePath,

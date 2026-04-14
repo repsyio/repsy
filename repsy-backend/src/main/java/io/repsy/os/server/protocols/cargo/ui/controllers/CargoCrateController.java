@@ -61,7 +61,7 @@ public class CargoCrateController {
   private final UsageUpdateService usageUpdateService;
 
   @GetMapping("/{repoName}")
-  public RestResponse<PagedModel<CrateListItem>> searchCrates(
+  public RestResponse<PagedModel<CrateListItem>> search(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final String repoName,
       @RequestParam(defaultValue = "") final String query,
@@ -77,7 +77,7 @@ public class CargoCrateController {
   }
 
   @GetMapping("/{repoName}/{crateName}")
-  public RestResponse<BaseCrateInfo<UUID>> getCrate(
+  public RestResponse<BaseCrateInfo<UUID>> get(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final String repoName,
       @PathVariable final String crateName) {
@@ -92,7 +92,7 @@ public class CargoCrateController {
   }
 
   @GetMapping("/{repoName}/{crateName}/{vers}")
-  public RestResponse<BaseCrateVersionInfo<UUID>> getCrateVersion(
+  public RestResponse<BaseCrateVersionInfo<UUID>> getVersion(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final String repoName,
       @PathVariable final String crateName,
@@ -108,7 +108,7 @@ public class CargoCrateController {
   }
 
   @GetMapping("/{repoName}/{crateName}/versions")
-  public RestResponse<PagedModel<CrateVersionListItem>> getCrateVersions(
+  public RestResponse<PagedModel<CrateVersionListItem>> getVersions(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final String repoName,
       @PathVariable final String crateName,
@@ -125,7 +125,7 @@ public class CargoCrateController {
   }
 
   @DeleteMapping("/{repoName}/{crateName}")
-  public RestResponse<Void> deleteCrate(
+  public RestResponse<Void> delete(
       @RequestHeader(AUTHORIZATION) final String authHeader,
       @PathVariable final String repoName,
       @PathVariable final String crateName)
@@ -145,7 +145,7 @@ public class CargoCrateController {
   }
 
   @DeleteMapping("/{repoName}/{crateName}/{vers}")
-  public RestResponse<Void> deleteCrateVersion(
+  public RestResponse<Void> deleteVersion(
       @RequestHeader(AUTHORIZATION) final String authHeader,
       @PathVariable final String repoName,
       @PathVariable final String crateName,

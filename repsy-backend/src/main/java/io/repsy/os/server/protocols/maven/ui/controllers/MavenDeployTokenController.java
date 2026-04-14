@@ -59,7 +59,7 @@ public class MavenDeployTokenController {
   private final @NonNull RestResponseFactory restResponseFactory;
 
   @PostMapping("/{repoName}")
-  public @NonNull RestResponse<TokenInfo> createDeployToken(
+  public @NonNull RestResponse<TokenInfo> create(
       @RequestHeader(HttpHeaders.AUTHORIZATION) final String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestBody @Valid final @NonNull DeployTokenForm deployTokenForm) {
@@ -75,7 +75,7 @@ public class MavenDeployTokenController {
   }
 
   @DeleteMapping("/{repoName}/{tokenId}")
-  public @NonNull RestResponse<Void> revokeDeployToken(
+  public @NonNull RestResponse<Void> revoke(
       @RequestHeader(HttpHeaders.AUTHORIZATION) final String authHeader,
       @PathVariable final @NonNull UUID tokenId,
       @PathVariable final @NonNull String repoName) {
@@ -90,7 +90,7 @@ public class MavenDeployTokenController {
   }
 
   @PutMapping("/{repoName}/{tokenId}")
-  public @NonNull RestResponse<String> rotateDeployToken(
+  public @NonNull RestResponse<String> rotate(
       @RequestHeader(HttpHeaders.AUTHORIZATION) final String authHeader,
       @PathVariable final @NonNull UUID tokenId,
       @PathVariable final @NonNull String repoName) {
@@ -106,7 +106,7 @@ public class MavenDeployTokenController {
   }
 
   @GetMapping("/{repoName}")
-  public @NonNull RestResponse<PagedModel<DeployTokenInfoListItem>> getDeployTokens(
+  public @NonNull RestResponse<PagedModel<DeployTokenInfoListItem>> getAll(
       @RequestHeader(HttpHeaders.AUTHORIZATION) final String authHeader,
       @PathVariable final @NonNull String repoName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC)

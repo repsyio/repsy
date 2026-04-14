@@ -67,7 +67,7 @@ public class GolangRepoController {
   private final @NonNull RestResponseFactory responseFactory;
 
   @PostMapping
-  public @NonNull RestResponse<Void> createRepo(
+  public @NonNull RestResponse<Void> create(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestBody @Valid final @NonNull RepoCreateForm form) {
 
@@ -83,7 +83,7 @@ public class GolangRepoController {
   }
 
   @DeleteMapping("/{repoName}")
-  public @NonNull RestResponse<Void> deleteRepo(
+  public @NonNull RestResponse<Void> delete(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName) {
 
@@ -97,7 +97,7 @@ public class GolangRepoController {
   }
 
   @GetMapping("/{repoName}/permissions")
-  public @NonNull RestResponse<RepoPermissionInfo> getRepoPermission(
+  public @NonNull RestResponse<RepoPermissionInfo> getPermission(
       @PathVariable final @NonNull String repoName,
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader) {
 
@@ -124,7 +124,7 @@ public class GolangRepoController {
   }
 
   @GetMapping
-  public @NonNull RestResponse<List<RepoListInfo>> getRepos(
+  public @NonNull RestResponse<List<RepoListInfo>> getAll(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
     this.golangAuthComponent.authenticateUser(authHeader);
@@ -147,7 +147,7 @@ public class GolangRepoController {
   }
 
   @GetMapping("info")
-  public @NonNull RestResponse<List<RepoListInfo>> getRepoDetail(
+  public @NonNull RestResponse<List<RepoListInfo>> getDetail(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
     this.golangAuthComponent.authenticateUser(authHeader);
@@ -158,7 +158,7 @@ public class GolangRepoController {
   }
 
   @GetMapping("/count")
-  public @NonNull RestResponse<Long> getRepoCount(
+  public @NonNull RestResponse<Long> getCount(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
     this.golangAuthComponent.authenticateUser(authHeader);
@@ -169,7 +169,7 @@ public class GolangRepoController {
   }
 
   @PatchMapping("/{repoName}/name")
-  public @NonNull RestResponse<Void> renameRepo(
+  public @NonNull RestResponse<Void> rename(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestBody @Valid final @NonNull RepoRenameForm form) {
@@ -184,7 +184,7 @@ public class GolangRepoController {
   }
 
   @PatchMapping("/{repoName}/description")
-  public @NonNull RestResponse<Void> updateRepoDescription(
+  public @NonNull RestResponse<Void> updateDescription(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestBody @Valid final @NonNull RepoDescriptionForm form) {
@@ -199,7 +199,7 @@ public class GolangRepoController {
   }
 
   @GetMapping("/{repoName}/settings")
-  public @NonNull RestResponse<RepoSettingsInfo> getRepoSettings(
+  public @NonNull RestResponse<RepoSettingsInfo> getSettings(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName) {
 
@@ -213,7 +213,7 @@ public class GolangRepoController {
   }
 
   @PutMapping("/{repoName}/settings")
-  public @NonNull RestResponse<Void> updateRepoSettings(
+  public @NonNull RestResponse<Void> updateSettings(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestBody @Valid final @NonNull RepoSettingsForm form) {

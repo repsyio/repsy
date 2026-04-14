@@ -67,7 +67,7 @@ public class DockerRepoController {
   private final @NonNull RestResponseFactory responseFactory;
 
   @PostMapping
-  public @NonNull RestResponse<Void> createRepo(
+  public @NonNull RestResponse<Void> create(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestBody @Valid final @NonNull RepoCreateForm form) {
 
@@ -83,7 +83,7 @@ public class DockerRepoController {
   }
 
   @DeleteMapping("/{repoName}")
-  public @NonNull RestResponse<Void> deleteRepo(
+  public @NonNull RestResponse<Void> delete(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName) {
 
@@ -97,7 +97,7 @@ public class DockerRepoController {
   }
 
   @GetMapping("/{repoName}/permissions")
-  public @NonNull RestResponse<RepoPermissionInfo> getRepoPermission(
+  public @NonNull RestResponse<RepoPermissionInfo> getPermission(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName) {
 
@@ -125,7 +125,7 @@ public class DockerRepoController {
   }
 
   @GetMapping
-  public @NonNull RestResponse<List<RepoListInfo>> getRepos(
+  public @NonNull RestResponse<List<RepoListInfo>> getAll(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
     this.dockerAuthComponent.authenticateUser(authHeader);
@@ -162,7 +162,7 @@ public class DockerRepoController {
   }
 
   @GetMapping("/count")
-  public @NonNull RestResponse<Long> getRepoCount(
+  public @NonNull RestResponse<Long> getCount(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
     this.dockerAuthComponent.authenticateUser(authHeader);
@@ -173,7 +173,7 @@ public class DockerRepoController {
   }
 
   @PatchMapping("/{repoName}/name")
-  public @NonNull RestResponse<Void> renameRepo(
+  public @NonNull RestResponse<Void> rename(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestBody @Valid final @NonNull RepoRenameForm form) {
@@ -188,7 +188,7 @@ public class DockerRepoController {
   }
 
   @PatchMapping("/{repoName}/description")
-  public @NonNull RestResponse<Void> updateRepoDescription(
+  public @NonNull RestResponse<Void> updateDescription(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestBody @Valid final @NonNull RepoDescriptionForm form) {

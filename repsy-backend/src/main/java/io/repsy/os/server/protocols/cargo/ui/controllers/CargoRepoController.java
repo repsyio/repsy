@@ -69,7 +69,7 @@ public class CargoRepoController {
   private final UsageUpdateService usageUpdateService;
 
   @PostMapping
-  public RestResponse<Void> createRepo(
+  public RestResponse<Void> create(
       @RequestHeader(AUTHORIZATION) final String authHeader,
       @RequestBody @Valid final RepoCreateForm form) {
 
@@ -85,7 +85,7 @@ public class CargoRepoController {
   }
 
   @DeleteMapping("/{repoName}")
-  public RestResponse<Void> deleteRepo(
+  public RestResponse<Void> delete(
       @RequestHeader(AUTHORIZATION) final String authHeader, @PathVariable final String repoName)
       throws IOException {
 
@@ -105,7 +105,7 @@ public class CargoRepoController {
   }
 
   @GetMapping("/{repoName}/permissions")
-  public RestResponse<RepoPermissionInfo> getRepoPermission(
+  public RestResponse<RepoPermissionInfo> getPermission(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final String repoName) {
 
@@ -117,7 +117,7 @@ public class CargoRepoController {
   }
 
   @GetMapping
-  public RestResponse<List<RepoListInfo>> getRepos(
+  public RestResponse<List<RepoListInfo>> getAll(
       @RequestHeader(AUTHORIZATION) final String authHeader) {
 
     this.cargoAuthComponent.authenticateUser(authHeader);
@@ -152,7 +152,7 @@ public class CargoRepoController {
   }
 
   @GetMapping("/info")
-  public RestResponse<List<RepoListInfo>> getRepoInfo(
+  public RestResponse<List<RepoListInfo>> getInfo(
       @RequestHeader(AUTHORIZATION) final String authHeader) {
 
     this.cargoAuthComponent.authenticateAndCreateToken(authHeader);
@@ -163,7 +163,7 @@ public class CargoRepoController {
   }
 
   @GetMapping("/count")
-  public RestResponse<Long> getRepoCount(@RequestHeader(AUTHORIZATION) final String authHeader) {
+  public RestResponse<Long> getCount(@RequestHeader(AUTHORIZATION) final String authHeader) {
 
     this.cargoAuthComponent.authenticateUser(authHeader);
 
@@ -173,7 +173,7 @@ public class CargoRepoController {
   }
 
   @PatchMapping("/{repoName}/name")
-  public RestResponse<Void> renameRepo(
+  public RestResponse<Void> rename(
       @RequestHeader(AUTHORIZATION) final String authHeader,
       @PathVariable final String repoName,
       @RequestBody @Valid final RepoRenameForm form) {
@@ -188,7 +188,7 @@ public class CargoRepoController {
   }
 
   @PatchMapping("/{repoName}/description")
-  public RestResponse<Void> updateRepoDescription(
+  public RestResponse<Void> updateDescription(
       @RequestHeader(AUTHORIZATION) final String authHeader,
       @PathVariable final String repoName,
       @RequestBody @Valid final RepoDescriptionForm form) {

@@ -71,7 +71,7 @@ public class NpmPackageApiController {
     "/{repoName}/{packageName}",
     "/{repoName}/{scope}/{packageName}",
   })
-  public @NonNull RestResponse<Void> deletePackage(
+  public @NonNull RestResponse<Void> delete(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable(required = false) final @Nullable String scope,
@@ -92,7 +92,7 @@ public class NpmPackageApiController {
     "/{repoName}/{packageName}/versions/{versionName}",
     "/{repoName}/{scope}/{packageName}/versions/{versionName}",
   })
-  public @NonNull RestResponse<Void> deletePackageVersion(
+  public @NonNull RestResponse<Void> deleteVersion(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable(required = false) final @Nullable String scope,
@@ -113,7 +113,7 @@ public class NpmPackageApiController {
   }
 
   @GetMapping("/{repoName}")
-  public @NonNull RestResponse<PagedModel<PackageListItem>> getPackages(
+  public @NonNull RestResponse<PagedModel<PackageListItem>> getAll(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestParam(required = false) final @Nullable String scope,
@@ -131,7 +131,7 @@ public class NpmPackageApiController {
   }
 
   @GetMapping("/{repoName}/{ignoredScope}")
-  public @NonNull RestResponse<PagedModel<PackageListItem>> getPackages(
+  public @NonNull RestResponse<PagedModel<PackageListItem>> getAll(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable final @NonNull String ignoredScope,
@@ -153,7 +153,7 @@ public class NpmPackageApiController {
     "/{repoName}/scope",
     "/{repoName}/scope/{scope}",
   })
-  public @NonNull RestResponse<PagedModel<PackageListItem>> getPackagesFilterByScope(
+  public @NonNull RestResponse<PagedModel<PackageListItem>> getAllFilterByScope(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName,
       @PathVariable(required = false) final @Nullable String scope,

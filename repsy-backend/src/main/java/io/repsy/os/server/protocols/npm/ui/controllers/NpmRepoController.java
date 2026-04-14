@@ -54,7 +54,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestApiPort(MultiPortNames.PORT_API)
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/npm/registries")
+@RequestMapping("/api/npm/repos")
 public class NpmRepoController {
 
   private final @NonNull NpmAuthComponentImpl npmAuthComponent;
@@ -64,7 +64,7 @@ public class NpmRepoController {
   private final @NonNull RestResponseFactory restResponseFactory;
 
   @PostMapping
-  public @NonNull RestResponse<Void> createRegistry(
+  public @NonNull RestResponse<Void> create(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestBody final @NonNull RepoCreateForm form) {
 
@@ -80,7 +80,7 @@ public class NpmRepoController {
   }
 
   @DeleteMapping("/{repoName}")
-  public @NonNull RestResponse<Void> deleteRegistry(
+  public @NonNull RestResponse<Void> delete(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName) {
 
@@ -94,7 +94,7 @@ public class NpmRepoController {
   }
 
   @GetMapping("/{repoName}/permission")
-  public @NonNull RestResponse<RepoPermissionInfo> getRegistryPermission(
+  public @NonNull RestResponse<RepoPermissionInfo> getPermission(
       @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName) {
 
@@ -107,7 +107,7 @@ public class NpmRepoController {
   }
 
   @GetMapping
-  public @NonNull RestResponse<List<RepoListInfo>> getRegistries(
+  public @NonNull RestResponse<List<RepoListInfo>> getAll(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
     this.npmAuthComponent.authenticateUser(authHeader);
@@ -118,7 +118,7 @@ public class NpmRepoController {
   }
 
   @GetMapping("/{repoName}/settings")
-  public @NonNull RestResponse<RepoSettingsInfo> getRegistrySettings(
+  public @NonNull RestResponse<RepoSettingsInfo> getSettings(
       @RequestHeader(AUTHORIZATION) final @Nullable String authHeader,
       @PathVariable final @NonNull String repoName) {
 
@@ -132,7 +132,7 @@ public class NpmRepoController {
   }
 
   @GetMapping("/{repoName}/usage")
-  public @NonNull RestResponse<RepoUsageInfo> getRegistryUsage(
+  public @NonNull RestResponse<RepoUsageInfo> getUsage(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName) {
 
@@ -144,7 +144,7 @@ public class NpmRepoController {
   }
 
   @GetMapping("/count")
-  public @NonNull RestResponse<Long> getRepoCount(
+  public @NonNull RestResponse<Long> getCount(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
     this.npmAuthComponent.authenticateUser(authHeader);
@@ -155,7 +155,7 @@ public class NpmRepoController {
   }
 
   @PatchMapping("/{repoName}/name")
-  public @NonNull RestResponse<Void> updateRegistryName(
+  public @NonNull RestResponse<Void> rename(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestBody @Valid final @NonNull RepoRenameForm renameForm) {
@@ -170,7 +170,7 @@ public class NpmRepoController {
   }
 
   @PatchMapping("/{repoName}/description")
-  public @NonNull RestResponse<Void> updateRegistryDescription(
+  public @NonNull RestResponse<Void> updateDescription(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestBody @Valid final @NonNull RepoDescriptionForm form) {
@@ -185,7 +185,7 @@ public class NpmRepoController {
   }
 
   @PutMapping("/{repoName}/settings")
-  public @NonNull RestResponse<Void> updateRegistrySettings(
+  public @NonNull RestResponse<Void> updateSettings(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull String repoName,
       @RequestBody @Valid final @NonNull RepoSettingsForm settingsForm) {

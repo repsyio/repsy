@@ -60,7 +60,7 @@ public class CargoDeployTokenController {
   private final RestResponseFactory restResponseFactory;
 
   @PostMapping("/{repoName}")
-  public RestResponse<TokenInfo> createDeployToken(
+  public RestResponse<TokenInfo> create(
       @RequestHeader(HttpHeaders.AUTHORIZATION) final String authHeader,
       @PathVariable final String repoName,
       @RequestBody @Valid final DeployTokenForm deployTokenForm) {
@@ -76,7 +76,7 @@ public class CargoDeployTokenController {
   }
 
   @DeleteMapping("/{repoName}/{tokenId}")
-  public RestResponse<Void> revokeDeployToken(
+  public RestResponse<Void> revoke(
       @RequestHeader(HttpHeaders.AUTHORIZATION) final String authHeader,
       @PathVariable final UUID tokenId,
       @PathVariable final String repoName) {
@@ -91,7 +91,7 @@ public class CargoDeployTokenController {
   }
 
   @PutMapping("/{repoName}/{tokenId}")
-  public RestResponse<String> rotateDeployToken(
+  public RestResponse<String> rotate(
       @RequestHeader(HttpHeaders.AUTHORIZATION) final String authHeader,
       @PathVariable final UUID tokenId,
       @PathVariable final String repoName) {
@@ -107,7 +107,7 @@ public class CargoDeployTokenController {
   }
 
   @GetMapping("/{repoName}")
-  public RestResponse<PagedModel<DeployTokenInfoListItem>> getDeployTokens(
+  public RestResponse<PagedModel<DeployTokenInfoListItem>> getAll(
       @RequestHeader(HttpHeaders.AUTHORIZATION) final String authHeader,
       @PathVariable final String repoName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
