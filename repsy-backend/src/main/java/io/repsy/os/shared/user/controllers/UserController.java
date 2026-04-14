@@ -50,7 +50,7 @@ final class UserController {
   private final @NonNull RestResponseFactory resp;
 
   @GetMapping
-  public @NonNull RestResponse<PagedModel<UserResponse>> getUsers(
+  public @NonNull RestResponse<PagedModel<UserResponse>> list(
       @RequestParam(required = false, defaultValue = "") final @NonNull String search,
       @RequestParam(defaultValue = "0") final int page,
       @RequestParam(defaultValue = "10") final int size) {
