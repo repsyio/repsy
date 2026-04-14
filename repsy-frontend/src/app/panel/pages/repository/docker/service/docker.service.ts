@@ -103,7 +103,7 @@ export class DockerService {
 
   public async fetchRepositories(): Promise<RepoListItem[]> {
     return new Promise<RepoListItem[]>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/docker/repos`;
+      const url = `${this.apiBaseUrl}/api/docker/repos/info`;
 
       this.http
         .get<RestResponse<RepoListItem[]>>(url)

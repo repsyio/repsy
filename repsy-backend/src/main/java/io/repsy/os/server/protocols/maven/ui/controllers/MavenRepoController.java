@@ -123,16 +123,6 @@ public class MavenRepoController {
     return this.responseFactory.success("itemsFetched", items);
   }
 
-  @GetMapping
-  public @NonNull RestResponse<List<RepoListInfo>> getAll(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
-    this.mavenAuthComponent.authenticateUser(authHeader);
-
-    final var repos = this.repoTxService.findAllByRepoType(RepoType.MAVEN);
-
-    return this.responseFactory.success("reposFetched", repos);
-  }
-
   @GetMapping("/{repoName}/settings")
   public @NonNull RestResponse<RepoSettingsInfo> getSettings(
       @PathVariable final @NonNull String repoName,
@@ -159,7 +149,7 @@ public class MavenRepoController {
     return this.responseFactory.success("usageFetched", usageInfo);
   }
 
-  @GetMapping("info")
+  @GetMapping("/info")
   public @NonNull RestResponse<List<RepoListInfo>> getInfo(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 

@@ -102,7 +102,7 @@ export class PypiService {
 
   public async fetchRepositories(): Promise<RepoListItem[]> {
     return new Promise<RepoListItem[]>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/pypi/repos`;
+      const url = `${this.apiBaseUrl}/api/pypi/repos/info`;
 
       this.http
         .get<RestResponse<RepoListItem[]>>(url)

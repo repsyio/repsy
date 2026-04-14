@@ -89,7 +89,7 @@ export class CargoService {
 
   public async fetchRepositories(): Promise<RepoListItem[]> {
     return new Promise<RepoListItem[]>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/cargo/repos`;
+      const url = `${this.apiBaseUrl}/api/cargo/repos/info`;
 
       this.http
         .get<RestResponse<RepoListItem[]>>(url)

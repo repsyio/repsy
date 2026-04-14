@@ -27,6 +27,7 @@ import { DockerService } from '../../docker/service/docker.service';
 import { MavenService } from '../../maven/service/maven.service';
 import { NpmService } from '../../npm/service/npm.service';
 import { PypiService } from '../../pypi/service/pypi.service';
+import {GolangService} from "../../golang/service/golang.service";
 
 @Component({
   selector: 'app-delete-repo',
@@ -49,6 +50,7 @@ export class DeleteRepoComponent {
     private readonly pypiService: PypiService,
     private readonly dockerService: DockerService,
     private readonly cargoService: CargoService,
+    private readonly golangService: GolangService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
@@ -90,6 +92,8 @@ export class DeleteRepoComponent {
         return this.dockerService.deleteRepository(repoName);
       case RepoType.CARGO:
         return this.cargoService.deleteRepository(repoName);
+      case RepoType.GOLANG:
+        return this.golangService.deleteRepository(repoName);
       default:
         return Promise.reject('Unsupported repository type');
     }

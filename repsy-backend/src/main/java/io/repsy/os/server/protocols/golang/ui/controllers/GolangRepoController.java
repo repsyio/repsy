@@ -123,15 +123,15 @@ public class GolangRepoController {
     return this.responseFactory.success("itemsFetched", items);
   }
 
-  @GetMapping
-  public @NonNull RestResponse<List<RepoListInfo>> getAll(
+  @GetMapping("/info")
+  public @NonNull RestResponse<List<RepoListInfo>> getInfo(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
     this.golangAuthComponent.authenticateUser(authHeader);
 
-    final var repos = this.repoTxService.findAllByRepoType(RepoType.GOLANG);
+    final var repositoryList = this.repoTxService.findAllByRepoType(RepoType.GOLANG);
 
-    return this.responseFactory.success("reposFetched", repos);
+    return this.responseFactory.success("reposFetched", repositoryList);
   }
 
   @GetMapping("/{repoName}/usage")
@@ -144,17 +144,6 @@ public class GolangRepoController {
     final var usageInfo = this.usageService.getRepoUsageInfo(repoName, RepoType.GOLANG);
 
     return this.responseFactory.success("usageFetched", usageInfo);
-  }
-
-  @GetMapping("info")
-  public @NonNull RestResponse<List<RepoListInfo>> getDetail(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
-
-    this.golangAuthComponent.authenticateUser(authHeader);
-
-    final var repositoryList = this.repoTxService.findAllByRepoType(RepoType.GOLANG);
-
-    return this.responseFactory.success("reposFetched", repositoryList);
   }
 
   @GetMapping("/count")

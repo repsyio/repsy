@@ -157,7 +157,7 @@ export class NpmService {
 
   public async fetchRegistries(): Promise<RepoListItem[]> {
     return new Promise<RepoListItem[]>((resolve, reject) => {
-      const url = `${this.apiBaseUrl + '/api/npm/repos'}`;
+      const url = `${this.apiBaseUrl + '/api/npm/repos/info'}`;
 
       this.http
         .get<RestResponse<RepoListItem[]>>(url)

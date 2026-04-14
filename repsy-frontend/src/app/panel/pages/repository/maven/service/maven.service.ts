@@ -125,7 +125,7 @@ export class MavenService {
 
   public async fetchRepos(): Promise<RepoListItem[]> {
     return new Promise<RepoListItem[]>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/mvn/repos`;
+      const url = `${this.apiBaseUrl}/api/mvn/repos/info`;
 
       this.http
         .get<RestResponse<RepoListItem[]>>(url)

@@ -116,15 +116,15 @@ public class CargoRepoController {
     return this.responseFactory.success("repoPermissionsFetched", repoPermissionInfo);
   }
 
-  @GetMapping
-  public RestResponse<List<RepoListInfo>> getAll(
+  @GetMapping("/info")
+  public RestResponse<List<RepoListInfo>> getInfo(
       @RequestHeader(AUTHORIZATION) final String authHeader) {
 
-    this.cargoAuthComponent.authenticateUser(authHeader);
+    this.cargoAuthComponent.authenticateAndCreateToken(authHeader);
 
-    final var repos = this.repoTxService.findAllByRepoType(RepoType.CARGO);
+    final var repositoryList = this.repoTxService.findAllByRepoType(RepoType.CARGO);
 
-    return this.responseFactory.success("reposFetched", repos);
+    return this.responseFactory.success("reposFetched", repositoryList);
   }
 
   @GetMapping("/{repoName}/settings")
@@ -149,17 +149,6 @@ public class CargoRepoController {
     final var usageInfo = this.usageService.getRepoUsageInfo(repoName, RepoType.CARGO);
 
     return this.responseFactory.success("usageFetched", usageInfo);
-  }
-
-  @GetMapping("/info")
-  public RestResponse<List<RepoListInfo>> getInfo(
-      @RequestHeader(AUTHORIZATION) final String authHeader) {
-
-    this.cargoAuthComponent.authenticateAndCreateToken(authHeader);
-
-    final var repositoryList = this.repoTxService.findAllByRepoType(RepoType.CARGO);
-
-    return this.responseFactory.success("reposFetched", repositoryList);
   }
 
   @GetMapping("/count")

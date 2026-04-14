@@ -106,8 +106,8 @@ public class NpmRepoController {
     return this.restResponseFactory.success("repoPermissionsFetched", repoPermissionInfo);
   }
 
-  @GetMapping
-  public @NonNull RestResponse<List<RepoListInfo>> getAll(
+  @GetMapping("/info")
+  public @NonNull RestResponse<List<RepoListInfo>> getInfo(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
     this.npmAuthComponent.authenticateUser(authHeader);

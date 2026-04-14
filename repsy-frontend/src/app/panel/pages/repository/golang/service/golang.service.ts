@@ -99,7 +99,7 @@ export class GolangService {
   public async fetchRepositories(): Promise<RepoListItem[]> {
     return new Promise<RepoListItem[]>((resolve, reject) => {
       this.http
-        .get<RestResponse<RepoListItem[]>>(`${this.apiBaseUrl}/api/go/repos`)
+        .get<RestResponse<RepoListItem[]>>(`${this.apiBaseUrl}/api/go/repos/info`)
         .toPromise()
         .then((res: RestResponse<RepoListItem[]>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
