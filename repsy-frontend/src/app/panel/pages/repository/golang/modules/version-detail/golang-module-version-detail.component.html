@@ -2,82 +2,58 @@
   <app-spinner />
 } @else {
   @if (!this.error) {
-    <div animate.enter="fade-in-up">
-      <!-- Module Version Info Cards -->
-      <div class="space-y-4">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-            <div class="text-[13px] text-[#FDFDFD]">
-              Module Path: <span class="text-[#9FA0A0]">{{ modulePath }}</span>
-            </div>
-          </div>
-
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-            <div class="text-[13px] text-[#FDFDFD]">
-              Version: <span class="text-[#9FA0A0]">{{ versionInfo.version }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-            <div class="text-[13px] text-[#FDFDFD]">
-              Go Version: <span class="text-[#9FA0A0]">{{ versionInfo.goVersion ?? '-' }}</span>
-            </div>
-          </div>
-
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-            <div class="text-[13px] text-[#FDFDFD]">
-              Published At: <span class="text-[#9FA0A0]">{{ versionInfo.createdAt | date: 'medium' }}</span>
-            </div>
-          </div>
-        </div>
+    <div class="mb-4" animate.enter="fade-in-up">
+      <!-- Version badge -->
+      <div
+        class="mb-4 inline-flex gap-2 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[16px] py-[6px] text-[14px] text-[#FDFDFD]"
+      >
+        <img ngSrc="/assets/icons/cursor/tick.svg" alt="tick" height="12" width="16" />
+        {{ versionInfo.version }}
       </div>
+      <p class="font-courier mb-8 text-[12px] text-[#9C9C9D]">
+        Published at: {{ versionInfo.createdAt | date: 'medium' }}
+      </p>
 
       <!-- go get command -->
-      <div class="relative mt-6 mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 20 64 24"
-            fill="#9FA0A0"
-            class="h-[20px] w-[34px] shrink-0"
-          >
-            <path
-              d="M4.8,27.3c-0.1,0-0.2-0.1-0.1-0.2l0.7-0.8c0.1-0.1,0.2-0.2,0.3-0.2h11.1c0.1,0,0.2,0.1,0.1,0.2l-0.5,0.8c-0.1,0.1-0.2,0.2-0.3,0.2L4.8,27.3L4.8,27.3z M0.1,30.2C0,30.2,0,30.1,0,30l0.7-0.8C0.7,29.1,0.9,29,1,29h14.2c0.1,0,0.2,0.1,0.2,0.2l-0.2,0.7c0,0.1-0.2,0.2-0.3,0.2L0.1,30.2z M7.7,33c-0.1,0-0.2-0.1-0.1-0.2L8,32.1c0.1-0.1,0.2-0.2,0.3-0.2h6.2c0.1,0,0.2,0.1,0.2,0.2l-0.1,0.7c0,0.1-0.1,0.2-0.2,0.2L7.7,33L7.7,33z M40,26.7l-5.2,1.4c-0.5,0.1-0.5,0.2-0.9-0.3c-0.5-0.5-0.8-0.9-1.5-1.2c-2-1-3.9-0.7-5.6,0.5c-2.1,1.4-3.2,3.4-3.2,5.9c0,2.5,1.7,4.5,4.2,4.9c2.1,0.3,3.9-0.5,5.3-2.1c0.3-0.3,0.5-0.7,0.8-1.2h-6c-0.7,0-0.8-0.4-0.6-0.9c0.4-1,1.2-2.6,1.6-3.4c0.1-0.2,0.3-0.5,0.8-0.5H41c-0.1,0.8-0.1,1.7-0.2,2.5c-0.3,2.2-1.2,4.3-2.6,6.1c-2.2,3-5.2,4.8-8.9,5.3c-3.1,0.4-5.9-0.2-8.4-2.1c-2.3-1.7-3.6-4.1-4-6.9c-0.4-3.4,0.6-6.4,2.6-9.1c2.2-2.9,5.1-4.7,8.7-5.4c2.9-0.5,5.7-0.2,8.3,1.5c1.7,1.1,2.8,2.6,3.6,4.4C40.5,26.5,40.4,26.6,40,26.7L40,26.7z"
-            />
-            <path
-              fill-rule="evenodd"
-              d="M50.3,44c-2.8-0.1-5.4-0.9-7.6-2.7c-1.8-1.6-3-3.6-3.4-6c-0.6-3.5,0.4-6.6,2.5-9.4c2.3-3,5-4.5,8.7-5.2c3.2-0.6,6.2-0.2,8.9,1.6c2.5,1.7,4,4,4.4,6.9c0.5,4.2-0.7,7.6-3.6,10.6c-2.1,2.1-4.6,3.4-7.5,4C52,43.8,51.1,43.9,50.3,44L50.3,44z M57.7,31.4c0-0.4,0-0.7-0.1-1c-0.6-3.1-3.4-4.8-6.4-4.1c-2.9,0.7-4.8,2.5-5.5,5.4c-0.6,2.4,0.6,4.9,2.9,5.9c1.7,0.7,3.4,0.7,5.1-0.2C56.2,36,57.6,34,57.7,31.4L57.7,31.4z"
-            />
-          </svg>
-          <span class="text-[14px] text-[#FDFDFD]">go get</span>
-          <app-copy-clipboard class="ml-auto" [text]="getCommand" />
-        </div>
-        <pre class="overflow-x-auto p-4"><code class="text-[13px] text-[#9C9C9D]">{{ getCommand }}</code></pre>
+      <h3 class="mb-2 text-[13px] text-white">go get:</h3>
+      <div class="mb-8 inline-flex items-start gap-2 overflow-x-auto rounded-lg bg-[#101112] p-[14px]">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 20 64 24"
+          fill="#9FA0A0"
+          class="h-5 w-[34px] shrink-0"
+        >
+          <path
+            d="M4.8,27.3c-0.1,0-0.2-0.1-0.1-0.2l0.7-0.8c0.1-0.1,0.2-0.2,0.3-0.2h11.1c0.1,0,0.2,0.1,0.1,0.2l-0.5,0.8c-0.1,0.1-0.2,0.2-0.3,0.2L4.8,27.3L4.8,27.3z M0.1,30.2C0,30.2,0,30.1,0,30l0.7-0.8C0.7,29.1,0.9,29,1,29h14.2c0.1,0,0.2,0.1,0.2,0.2l-0.2,0.7c0,0.1-0.2,0.2-0.3,0.2L0.1,30.2z M7.7,33c-0.1,0-0.2-0.1-0.1-0.2L8,32.1c0.1-0.1,0.2-0.2,0.3-0.2h6.2c0.1,0,0.2,0.1,0.2,0.2l-0.1,0.7c0,0.1-0.1,0.2-0.2,0.2L7.7,33L7.7,33z M40,26.7l-5.2,1.4c-0.5,0.1-0.5,0.2-0.9-0.3c-0.5-0.5-0.8-0.9-1.5-1.2c-2-1-3.9-0.7-5.6,0.5c-2.1,1.4-3.2,3.4-3.2,5.9c0,2.5,1.7,4.5,4.2,4.9c2.1,0.3,3.9-0.5,5.3-2.1c0.3-0.3,0.5-0.7,0.8-1.2h-6c-0.7,0-0.8-0.4-0.6-0.9c0.4-1,1.2-2.6,1.6-3.4c0.1-0.2,0.3-0.5,0.8-0.5H41c-0.1,0.8-0.1,1.7-0.2,2.5c-0.3,2.2-1.2,4.3-2.6,6.1c-2.2,3-5.2,4.8-8.9,5.3c-3.1,0.4-5.9-0.2-8.4-2.1c-2.3-1.7-3.6-4.1-4-6.9c-0.4-3.4,0.6-6.4,2.6-9.1c2.2-2.9,5.1-4.7,8.7-5.4c2.9-0.5,5.7-0.2,8.3,1.5c1.7,1.1,2.8,2.6,3.6,4.4C40.5,26.5,40.4,26.6,40,26.7L40,26.7z"
+          />
+          <path
+            fill-rule="evenodd"
+            d="M50.3,44c-2.8-0.1-5.4-0.9-7.6-2.7c-1.8-1.6-3-3.6-3.4-6c-0.6-3.5,0.4-6.6,2.5-9.4c2.3-3,5-4.5,8.7-5.2c3.2-0.6,6.2-0.2,8.9,1.6c2.5,1.7,4,4,4.4,6.9c0.5,4.2-0.7,7.6-3.6,10.6c-2.1,2.1-4.6,3.4-7.5,4C52,43.8,51.1,43.9,50.3,44L50.3,44z M57.7,31.4c0-0.4,0-0.7-0.1-1c-0.6-3.1-3.4-4.8-6.4-4.1c-2.9,0.7-4.8,2.5-5.5,5.4c-0.6,2.4,0.6,4.9,2.9,5.9c1.7,0.7,3.4,0.7,5.1-0.2C56.2,36,57.6,34,57.7,31.4L57.7,31.4z"
+          />
+        </svg>
+        <span class="break-all text-[13px] text-[#9C9C9D]">{{ getCommand }}</span>
+        <app-copy-clipboard [text]="getCommand" />
       </div>
 
-      <!-- go env GOPROXY -->
-      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 20 64 24"
-            fill="#9FA0A0"
-            class="h-[20px] w-[34px] shrink-0"
-          >
-            <path
-              d="M4.8,27.3c-0.1,0-0.2-0.1-0.1-0.2l0.7-0.8c0.1-0.1,0.2-0.2,0.3-0.2h11.1c0.1,0,0.2,0.1,0.1,0.2l-0.5,0.8c-0.1,0.1-0.2,0.2-0.3,0.2L4.8,27.3L4.8,27.3z M0.1,30.2C0,30.2,0,30.1,0,30l0.7-0.8C0.7,29.1,0.9,29,1,29h14.2c0.1,0,0.2,0.1,0.2,0.2l-0.2,0.7c0,0.1-0.2,0.2-0.3,0.2L0.1,30.2z M7.7,33c-0.1,0-0.2-0.1-0.1-0.2L8,32.1c0.1-0.1,0.2-0.2,0.3-0.2h6.2c0.1,0,0.2,0.1,0.2,0.2l-0.1,0.7c0,0.1-0.1,0.2-0.2,0.2L7.7,33L7.7,33z M40,26.7l-5.2,1.4c-0.5,0.1-0.5,0.2-0.9-0.3c-0.5-0.5-0.8-0.9-1.5-1.2c-2-1-3.9-0.7-5.6,0.5c-2.1,1.4-3.2,3.4-3.2,5.9c0,2.5,1.7,4.5,4.2,4.9c2.1,0.3,3.9-0.5,5.3-2.1c0.3-0.3,0.5-0.7,0.8-1.2h-6c-0.7,0-0.8-0.4-0.6-0.9c0.4-1,1.2-2.6,1.6-3.4c0.1-0.2,0.3-0.5,0.8-0.5H41c-0.1,0.8-0.1,1.7-0.2,2.5c-0.3,2.2-1.2,4.3-2.6,6.1c-2.2,3-5.2,4.8-8.9,5.3c-3.1,0.4-5.9-0.2-8.4-2.1c-2.3-1.7-3.6-4.1-4-6.9c-0.4-3.4,0.6-6.4,2.6-9.1c2.2-2.9,5.1-4.7,8.7-5.4c2.9-0.5,5.7-0.2,8.3,1.5c1.7,1.1,2.8,2.6,3.6,4.4C40.5,26.5,40.4,26.6,40,26.7L40,26.7z"
-            />
-            <path
-              fill-rule="evenodd"
-              d="M50.3,44c-2.8-0.1-5.4-0.9-7.6-2.7c-1.8-1.6-3-3.6-3.4-6c-0.6-3.5,0.4-6.6,2.5-9.4c2.3-3,5-4.5,8.7-5.2c3.2-0.6,6.2-0.2,8.9,1.6c2.5,1.7,4,4,4.4,6.9c0.5,4.2-0.7,7.6-3.6,10.6c-2.1,2.1-4.6,3.4-7.5,4C52,43.8,51.1,43.9,50.3,44L50.3,44z M57.7,31.4c0-0.4,0-0.7-0.1-1c-0.6-3.1-3.4-4.8-6.4-4.1c-2.9,0.7-4.8,2.5-5.5,5.4c-0.6,2.4,0.6,4.9,2.9,5.9c1.7,0.7,3.4,0.7,5.1-0.2C56.2,36,57.6,34,57.7,31.4L57.7,31.4z"
-            />
-          </svg>
-          <span class="text-[14px] text-[#FDFDFD]">go env (GONOSUMDB, GOPROXY)</span>
-          <app-copy-clipboard class="ml-auto" [text]="goEnvCommand" />
-        </div>
-        <pre class="overflow-x-auto p-4"><code class="text-[13px] text-[#9C9C9D]">{{ goEnvCommand }}</code></pre>
+      <!-- go env command -->
+      <h3 class="mb-2 text-[13px] text-white">go env (GONOSUMDB, GOPROXY):</h3>
+      <div class="mb-8 inline-flex items-start gap-2 overflow-x-auto rounded-lg bg-[#101112] p-[14px]">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 20 64 24"
+          fill="#9FA0A0"
+          class="h-5 w-[34px] shrink-0"
+        >
+          <path
+            d="M4.8,27.3c-0.1,0-0.2-0.1-0.1-0.2l0.7-0.8c0.1-0.1,0.2-0.2,0.3-0.2h11.1c0.1,0,0.2,0.1,0.1,0.2l-0.5,0.8c-0.1,0.1-0.2,0.2-0.3,0.2L4.8,27.3L4.8,27.3z M0.1,30.2C0,30.2,0,30.1,0,30l0.7-0.8C0.7,29.1,0.9,29,1,29h14.2c0.1,0,0.2,0.1,0.2,0.2l-0.2,0.7c0,0.1-0.2,0.2-0.3,0.2L0.1,30.2z M7.7,33c-0.1,0-0.2-0.1-0.1-0.2L8,32.1c0.1-0.1,0.2-0.2,0.3-0.2h6.2c0.1,0,0.2,0.1,0.2,0.2l-0.1,0.7c0,0.1-0.1,0.2-0.2,0.2L7.7,33L7.7,33z M40,26.7l-5.2,1.4c-0.5,0.1-0.5,0.2-0.9-0.3c-0.5-0.5-0.8-0.9-1.5-1.2c-2-1-3.9-0.7-5.6,0.5c-2.1,1.4-3.2,3.4-3.2,5.9c0,2.5,1.7,4.5,4.2,4.9c2.1,0.3,3.9-0.5,5.3-2.1c0.3-0.3,0.5-0.7,0.8-1.2h-6c-0.7,0-0.8-0.4-0.6-0.9c0.4-1,1.2-2.6,1.6-3.4c0.1-0.2,0.3-0.5,0.8-0.5H41c-0.1,0.8-0.1,1.7-0.2,2.5c-0.3,2.2-1.2,4.3-2.6,6.1c-2.2,3-5.2,4.8-8.9,5.3c-3.1,0.4-5.9-0.2-8.4-2.1c-2.3-1.7-3.6-4.1-4-6.9c-0.4-3.4,0.6-6.4,2.6-9.1c2.2-2.9,5.1-4.7,8.7-5.4c2.9-0.5,5.7-0.2,8.3,1.5c1.7,1.1,2.8,2.6,3.6,4.4C40.5,26.5,40.4,26.6,40,26.7L40,26.7z"
+          />
+          <path
+            fill-rule="evenodd"
+            d="M50.3,44c-2.8-0.1-5.4-0.9-7.6-2.7c-1.8-1.6-3-3.6-3.4-6c-0.6-3.5,0.4-6.6,2.5-9.4c2.3-3,5-4.5,8.7-5.2c3.2-0.6,6.2-0.2,8.9,1.6c2.5,1.7,4,4,4.4,6.9c0.5,4.2-0.7,7.6-3.6,10.6c-2.1,2.1-4.6,3.4-7.5,4C52,43.8,51.1,43.9,50.3,44L50.3,44z M57.7,31.4c0-0.4,0-0.7-0.1-1c-0.6-3.1-3.4-4.8-6.4-4.1c-2.9,0.7-4.8,2.5-5.5,5.4c-0.6,2.4,0.6,4.9,2.9,5.9c1.7,0.7,3.4,0.7,5.1-0.2C56.2,36,57.6,34,57.7,31.4L57.7,31.4z"
+          />
+        </svg>
+        <span class="break-all text-[13px] text-[#9C9C9D]">{{ goEnvCommand }}</span>
+        <app-copy-clipboard [text]="goEnvCommand" />
       </div>
 
       <!-- GOPROXY Endpoints -->
@@ -107,6 +83,24 @@
               <app-copy-clipboard [text]="endpoint.url" />
             </div>
           }
+        </div>
+      </div>
+
+      <!-- Module path header block -->
+      <div class="mb-8 rounded-lg bg-[#101112] p-[22px] text-[24px]">
+        <h3 class="text-neutral-200">{{ modulePath }}</h3>
+      </div>
+
+      <!-- Metadata -->
+      <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Metadata</h2>
+      <div class="mb-8 flex flex-col gap-2 text-[14px]">
+        <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+          <span class="text-white">Module Path: </span>
+          <span class="text-[#9C9C9D]">{{ modulePath }}</span>
+        </div>
+        <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+          <span class="text-white">Go Version: </span>
+          <span class="text-[#9C9C9D]">{{ versionInfo.goVersion || 'Not specified' }}</span>
         </div>
       </div>
 

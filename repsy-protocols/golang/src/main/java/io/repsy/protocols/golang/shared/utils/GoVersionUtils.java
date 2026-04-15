@@ -55,7 +55,7 @@ public class GoVersionUtils {
         }
 
         for (int i = SEMVER_MAJOR_GROUP; i <= SEMVER_PATCH_GROUP; i++) {
-          final int diff = Integer.parseInt(m1.group(i)) - Integer.parseInt(m2.group(i));
+          final int diff = Long.compare(Long.parseLong(m1.group(i)), Long.parseLong(m2.group(i)));
           if (diff != 0) {
             return diff;
           }
