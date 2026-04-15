@@ -141,8 +141,8 @@ class AbstractCargoProtocolFacadeTest {
 
   static CratePublishRequest minimalRequest(final String name, final String vers) {
     return new CratePublishRequest(
-        name, vers, null, null, List.of(), null, null, null, null, null, List.of(), List.of(), null,
-        null, null, null, null, null, null);
+        name, vers, true, null, null, List.of(), null, null, null, null, null, List.of(), List.of(),
+        null, null, null, null, null, null, null);
   }
 
   static InputStream stream(final byte[] bytes) {
@@ -188,6 +188,7 @@ class AbstractCargoProtocolFacadeTest {
           new CratePublishRequest(
               "my_crate",
               "1.0.0",
+              true,
               null,
               null,
               List.of(),
@@ -265,6 +266,7 @@ class AbstractCargoProtocolFacadeTest {
           new CratePublishRequest(
               "my_crate",
               "1.0.0",
+              true,
               null,
               null,
               List.of(),
@@ -304,6 +306,7 @@ class AbstractCargoProtocolFacadeTest {
           new CratePublishRequest(
               "my_crate",
               "1.0.0",
+              true,
               List.of(dep),
               null,
               List.of(),
@@ -345,6 +348,7 @@ class AbstractCargoProtocolFacadeTest {
           new CratePublishRequest(
               "my_crate",
               "1.0.0",
+              true,
               List.of(dep),
               null,
               List.of(),
@@ -478,6 +482,7 @@ class AbstractCargoProtocolFacadeTest {
             new CratePublishRequest(
                 "my_crate",
                 "1.0.0",
+                true,
                 null,
                 null,
                 List.of(),
@@ -505,6 +510,7 @@ class AbstractCargoProtocolFacadeTest {
             new CratePublishRequest(
                 "my_crate",
                 "1.0.0",
+                true,
                 null,
                 null,
                 List.of(),
@@ -532,6 +538,7 @@ class AbstractCargoProtocolFacadeTest {
             new CratePublishRequest(
                 "my_crate",
                 "1.0.0",
+                true,
                 null,
                 null,
                 List.of(),
@@ -559,6 +566,7 @@ class AbstractCargoProtocolFacadeTest {
             new CratePublishRequest(
                 "my_crate",
                 "1.0.0",
+                true,
                 null,
                 null,
                 List.of(),

@@ -357,7 +357,8 @@ class CargoCrateServiceTest {
                   null,
                   List.of(),
                   List.of(),
-                  List.of()));
+                  List.of(),
+                  true));
 
       final var result =
           CargoCrateServiceTest.this.cargoCrateService.getCrate(repoInfo, "test-crate");
@@ -432,6 +433,7 @@ class CargoCrateServiceTest {
     return new CratePublishRequest(
         name,
         version,
+        true,
         List.of(),
         null,
         List.of("Author1", "Author2"),
