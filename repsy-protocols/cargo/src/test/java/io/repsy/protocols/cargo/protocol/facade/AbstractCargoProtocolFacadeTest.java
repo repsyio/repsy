@@ -50,6 +50,8 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -151,6 +153,19 @@ class AbstractCargoProtocolFacadeTest {
 
   // =========================================================================
 
+  static byte[] minimalCrateBytes() {
+    try {
+      final var baos = new ByteArrayOutputStream();
+      try (final var gzip = new GzipCompressorOutputStream(baos);
+          final var tar = new TarArchiveOutputStream(gzip)) {
+        tar.finish();
+      }
+      return baos.toByteArray();
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
   @Nested
   @DisplayName("publish()")
   class PublishTests {
@@ -166,7 +181,7 @@ class AbstractCargoProtocolFacadeTest {
     @Test
     @DisplayName("calls crate service and storage service on a valid request")
     void callsDownstreamServicesOnSuccess() throws Exception {
-      final var crateBytes = "fake-crate-data".getBytes(StandardCharsets.UTF_8);
+      final var crateBytes = minimalCrateBytes();
       when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
           .thenReturn(minimalRequest("my_crate", "1.0.0"));
 
@@ -181,7 +196,7 @@ class AbstractCargoProtocolFacadeTest {
     @Test
     @DisplayName("computes SHA-256 of crate bytes and overwrites any client-supplied cksum")
     void serverChecksumOverwritesClientValue() throws Exception {
-      final var crateBytes = "deterministic-payload".getBytes(StandardCharsets.UTF_8);
+      final var crateBytes = minimalCrateBytes();
       final var expectedCksum = sha256Hex(crateBytes);
       // Client deliberately sends an incorrect cksum — server must ignore and recompute.
       final var requestWithWrongCksum =
@@ -223,8 +238,7 @@ class AbstractCargoProtocolFacadeTest {
           .thenReturn(minimalRequest("My-Crate", "1.0.0"));
 
       facade.publish(
-          context("/api/v1/crates/new"),
-          stream(publishPayload("{}", "bytes".getBytes(StandardCharsets.UTF_8))));
+          context("/api/v1/crates/new"), stream(publishPayload("{}", minimalCrateBytes())));
 
       verify(storageService).writeCrateAndIndex(any(), any(), eq("my_crate"), any(), any(), any());
     }
@@ -236,8 +250,7 @@ class AbstractCargoProtocolFacadeTest {
           .thenReturn(minimalRequest("my_crate", "1.0.0"));
 
       facade.publish(
-          context("/api/v1/crates/new"),
-          stream(publishPayload("{}", "bytes".getBytes(StandardCharsets.UTF_8))));
+          context("/api/v1/crates/new"), stream(publishPayload("{}", minimalCrateBytes())));
 
       final var captor = ArgumentCaptor.forClass(Object.class);
       verify(objectMapper).writeValueAsString(captor.capture());
@@ -251,8 +264,7 @@ class AbstractCargoProtocolFacadeTest {
           .thenReturn(minimalRequest("my_crate", "1.0.0")); // features2 = null
 
       facade.publish(
-          context("/api/v1/crates/new"),
-          stream(publishPayload("{}", "bytes".getBytes(StandardCharsets.UTF_8))));
+          context("/api/v1/crates/new"), stream(publishPayload("{}", minimalCrateBytes())));
 
       final var captor = ArgumentCaptor.forClass(Object.class);
       verify(objectMapper).writeValueAsString(captor.capture());
@@ -288,8 +300,7 @@ class AbstractCargoProtocolFacadeTest {
           .thenReturn(requestWithFeatures2);
 
       facade.publish(
-          context("/api/v1/crates/new"),
-          stream(publishPayload("{}", "bytes".getBytes(StandardCharsets.UTF_8))));
+          context("/api/v1/crates/new"), stream(publishPayload("{}", minimalCrateBytes())));
 
       final var captor = ArgumentCaptor.forClass(Object.class);
       verify(objectMapper).writeValueAsString(captor.capture());
@@ -328,8 +339,7 @@ class AbstractCargoProtocolFacadeTest {
           .thenReturn(request);
 
       facade.publish(
-          context("/api/v1/crates/new"),
-          stream(publishPayload("{}", "bytes".getBytes(StandardCharsets.UTF_8))));
+          context("/api/v1/crates/new"), stream(publishPayload("{}", minimalCrateBytes())));
 
       final var captor = ArgumentCaptor.forClass(Object.class);
       verify(objectMapper).writeValueAsString(captor.capture());
@@ -370,8 +380,7 @@ class AbstractCargoProtocolFacadeTest {
           .thenReturn(request);
 
       facade.publish(
-          context("/api/v1/crates/new"),
-          stream(publishPayload("{}", "bytes".getBytes(StandardCharsets.UTF_8))));
+          context("/api/v1/crates/new"), stream(publishPayload("{}", minimalCrateBytes())));
 
       final var captor = ArgumentCaptor.forClass(Object.class);
       verify(objectMapper).writeValueAsString(captor.capture());
@@ -388,8 +397,7 @@ class AbstractCargoProtocolFacadeTest {
           .thenReturn(minimalRequest("my_crate", "1.0.0")); // deps = null
 
       facade.publish(
-          context("/api/v1/crates/new"),
-          stream(publishPayload("{}", "bytes".getBytes(StandardCharsets.UTF_8))));
+          context("/api/v1/crates/new"), stream(publishPayload("{}", minimalCrateBytes())));
 
       final var captor = ArgumentCaptor.forClass(Object.class);
       verify(objectMapper).writeValueAsString(captor.capture());
@@ -591,7 +599,7 @@ class AbstractCargoProtocolFacadeTest {
           throws Exception {
         when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
             .thenReturn(request);
-        final var payload = publishPayload("{}", "bytes".getBytes(StandardCharsets.UTF_8));
+        final var payload = publishPayload("{}", minimalCrateBytes());
         assertThatThrownBy(() -> facade.publish(context("/api/v1/crates/new"), stream(payload)))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining(messagePart);
@@ -604,7 +612,7 @@ class AbstractCargoProtocolFacadeTest {
         lenient()
             .when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any(), any()))
             .thenReturn(usages);
-        final var payload = publishPayload("{}", "bytes".getBytes(StandardCharsets.UTF_8));
+        final var payload = publishPayload("{}", minimalCrateBytes());
         assertThatCode(() -> facade.publish(context("/api/v1/crates/new"), stream(payload)))
             .doesNotThrowAnyException();
       }
