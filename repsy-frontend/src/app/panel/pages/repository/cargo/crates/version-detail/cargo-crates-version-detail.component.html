@@ -14,19 +14,21 @@
           Uploaded at: {{ crateVersion.created_at | date: 'medium' }}
         </p>
 
-        <h3 class="mb-2 text-[13px] text-white">Add Dependency:</h3>
-        <div class="mb-8 inline-flex items-start gap-2 rounded-lg bg-[#101112] p-[14px]">
-          <img class="h-5 w-5" ngSrc="/assets/icons/repo/cargo.svg" alt="Cargo" height="20" width="20" />
-          <span class="text-[13px] break-all text-[#9C9C9D]">{{ addDependencyCommand }}</span>
-          <app-copy-clipboard [text]="addDependencyCommand" />
-        </div>
-
-        <h3 class="mb-2 text-[13px] text-white">Install Binary (if available):</h3>
-        <div class="mb-8 inline-flex items-start gap-2 rounded-lg bg-[#101112] p-[14px]">
-          <img class="h-5 w-5" ngSrc="/assets/icons/repo/cargo.svg" alt="Cargo" height="20" width="20" />
-          <span class="text-[13px] break-all text-[#9C9C9D]">{{ installBinaryCommand }}</span>
-          <app-copy-clipboard [text]="installBinaryCommand" />
-        </div>
+        @if (crateVersion.hasLib) {
+          <h3 class="mb-2 text-[13px] text-white">Add Dependency:</h3>
+          <div class="mb-8 inline-flex items-start gap-2 rounded-lg bg-[#101112] p-[14px]">
+            <img class="h-5 w-5" ngSrc="/assets/icons/repo/cargo.svg" alt="Cargo" height="20" width="20" />
+            <span class="text-[13px] break-all text-[#9C9C9D]">{{ addDependencyCommand }}</span>
+            <app-copy-clipboard [text]="addDependencyCommand" />
+          </div>
+        } @else {
+          <h3 class="mb-2 text-[13px] text-white">Install Binary:</h3>
+          <div class="mb-8 inline-flex items-start gap-2 rounded-lg bg-[#101112] p-[14px]">
+            <img class="h-5 w-5" ngSrc="/assets/icons/repo/cargo.svg" alt="Cargo" height="20" width="20" />
+            <span class="text-[13px] break-all text-[#9C9C9D]">{{ installBinaryCommand }}</span>
+            <app-copy-clipboard [text]="installBinaryCommand" />
+          </div>
+        }
 
         <h3 class="mb-2 text-[13px] text-white">Cargo.toml:</h3>
         <div class="relative mb-6 overflow-x-auto rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">

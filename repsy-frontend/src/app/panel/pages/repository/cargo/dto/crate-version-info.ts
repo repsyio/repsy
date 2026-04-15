@@ -22,6 +22,7 @@ export class CrateVersionInfo {
   public license_file: string;
   public documentation: string;
   public edition: string;
+  public hasLib: boolean;
   public rust_version: string;
   public deps: CrateDependencyInfo[];
   public downloads: number;

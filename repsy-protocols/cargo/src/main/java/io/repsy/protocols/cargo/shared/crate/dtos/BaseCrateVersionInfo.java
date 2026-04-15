@@ -60,6 +60,8 @@ public class BaseCrateVersionInfo<ID> {
 
   private long downloads;
 
+  private boolean hasLib;
+
   @JsonProperty("created_at")
   private Instant createdAt;
 }

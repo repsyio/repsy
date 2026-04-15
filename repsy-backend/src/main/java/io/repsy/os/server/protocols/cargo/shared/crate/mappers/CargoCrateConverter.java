@@ -52,6 +52,7 @@ public interface CargoCrateConverter {
     @Mapping(target = "rustVersion", source = "meta.rustVersion"),
     @Mapping(target = "deps", source = "index.deps", qualifiedByName = "jsonToDeps"),
     @Mapping(target = "downloads", source = "meta.downloads"),
+    @Mapping(target = "hasLib", source = "crate.hasLib"),
     @Mapping(target = "createdAt", source = "meta.createdAt")
   })
   BaseCrateVersionInfo<UUID> toCrateVersionInfo(

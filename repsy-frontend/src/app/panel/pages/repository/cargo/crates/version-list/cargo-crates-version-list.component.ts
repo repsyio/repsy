@@ -175,6 +175,10 @@ export class CargoCratesVersionListComponent implements OnDestroy {
         this.error = null;
       })
       .catch((err: string) => {
+        if (err === 'Crate is not Found.') {
+          this.router.navigateByUrl(`/${this.activeRepo.repoName}`);
+          return;
+        }
         this.error = err;
         this.toastService.show(err, 'error');
       })

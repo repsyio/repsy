@@ -57,4 +57,6 @@ public class BaseCrateInfo<ID> {
   private List<String> keywords;
 
   private List<String> categories;
+
+  private boolean hasLib;
 }

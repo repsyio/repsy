@@ -12,6 +12,7 @@ create table "public"."cargo_crate"
     "homepage"        varchar(255),
     "repository"      varchar(255),
     "created_at"      timestamp    not null,
+    "has_lib"         boolean      not null,
     "last_updated_at" timestamp
 );
 

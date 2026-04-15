@@ -100,6 +100,8 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
       crate = this.createCrate(repo, request, normalizedName);
     }
 
+    crate.setHasLib(request.hasLib());
+
     this.updateCrateMaxVersion(crate, request.vers());
     this.syncAuthors(crate, request.authors());
     this.syncKeywords(crate, request.keywords());

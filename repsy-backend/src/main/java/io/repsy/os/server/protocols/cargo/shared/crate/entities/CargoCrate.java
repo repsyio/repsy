@@ -72,6 +72,9 @@ public class CargoCrate {
   @Column(name = "total_downloads", nullable = false)
   private long totalDownloads;
 
+  @Column(name = "has_lib", nullable = false)
+  private boolean hasLib;
+
   @Nullable
   @Column(name = "description")
   private String description;

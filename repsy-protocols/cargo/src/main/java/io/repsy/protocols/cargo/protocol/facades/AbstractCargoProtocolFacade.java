@@ -85,10 +85,11 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
 
     final var crateBytes = CrateUtils.getCrateBytes(inputStream);
     final var checksum = CargoDigestCalculator.computeDigest(crateBytes);
+    final var hasLib = CrateUtils.isLib(crateBytes);
     final var crateName = CrateUtils.normalizeCrateName(request.name());
 
     final var requestWithChecksum =
-        CrateUtils.createCratePublishRequestWithChecksum(request, checksum);
+        CrateUtils.createCratePublishRequestWithChecksum(request, checksum, hasLib);
 
     final var indexJsonLine = CrateUtils.getIndexJsonLine(requestWithChecksum, this.objectMapper);
 

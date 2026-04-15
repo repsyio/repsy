@@ -27,6 +27,7 @@ import org.jspecify.annotations.Nullable;
 public record CratePublishRequest(
     String name,
     String vers,
+    @Nullable Boolean hasLib,
     @Nullable List<CratePublishDep> deps,
     @Nullable Map<String, List<String>> features,
     @Nullable List<String> authors,

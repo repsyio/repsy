@@ -23,6 +23,7 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.cargo.shared.crate.services.SemverComparator;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -31,7 +32,11 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.jspecify.annotations.Nullable;
 import org.semver4j.Semver;
 import org.semver4j.SemverException;
@@ -202,11 +207,12 @@ public class CrateUtils {
   }
 
   public static CratePublishRequest createCratePublishRequestWithChecksum(
-      final CratePublishRequest request, final String checksum) {
+      final CratePublishRequest request, final String checksum, final boolean hasLib) {
 
     return new CratePublishRequest(
         request.name(),
         request.vers(),
+        hasLib,
         request.deps(),
         request.features(),
         request.authors(),
@@ -258,5 +264,31 @@ public class CrateUtils {
     }
 
     return comparator;
+  }
+
+  @SneakyThrows
+  public static boolean isLib(final byte[] crateBytes) {
+    try (final var tar =
+        new TarArchiveInputStream(
+            new GzipCompressorInputStream(new ByteArrayInputStream(crateBytes)))) {
+
+      TarArchiveEntry entry;
+
+      while ((entry = tar.getNextEntry()) != null) {
+        final var entryName = entry.getName();
+
+        if (entryName.endsWith("/src/lib.rs")) {
+          return true;
+        }
+
+        if (entryName.endsWith("/Cargo.toml")) {
+          final var toml = new String(tar.readAllBytes());
+          if (toml.lines().anyMatch(line -> line.trim().equals("[lib]"))) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
   }
 }
