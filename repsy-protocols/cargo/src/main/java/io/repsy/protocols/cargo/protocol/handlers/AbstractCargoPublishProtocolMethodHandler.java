@@ -28,7 +28,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -36,7 +35,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-@Slf4j
 @NullMarked
 public abstract class AbstractCargoPublishProtocolMethodHandler implements ProtocolMethodHandler {
 
@@ -73,8 +71,8 @@ public abstract class AbstractCargoPublishProtocolMethodHandler implements Proto
       }
 
       final var parsedPathOpt = this.basePathParser.parse(request);
+
       if (parsedPathOpt.isEmpty()) {
-        log.warn("Cargo publish: basePathParser returned empty for {}", request.getServletPath());
         return Optional.empty();
       }
 

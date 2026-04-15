@@ -49,6 +49,7 @@ public abstract class AbstractCargoYankProtocolMethodHandler implements Protocol
       final PathParser basePathParser,
       final CargoProtocolFacade facade,
       final CargoProtocolProvider provider) {
+
     this.basePathParser = basePathParser;
     this.facade = facade;
     provider.registerMethodHandler(this);
