@@ -6,13 +6,21 @@
           <!-- Last breadcrumb item (No link) -->
           @if (last) {
             <div class="text-[#FDFDFD]">
-              @if (i === 1) {
+              @if (repoIcon.includes('cargo')) {
                 <img
-                  width="20"
-                  height="20"
+                  width="23"
+                  height="23"
                   [ngSrc]="repoIcon"
                   alt="icon"
-                  class="inline-block h-[20px] w-[20px] brightness-0 invert"
+                  class="inline-block h-[23px] w-[23px] brightness-0 invert"
+                />
+              } @else {
+                <img
+                  width="25"
+                  height="25"
+                  [ngSrc]="repoIcon"
+                  alt="icon"
+                  class="inline-block h-[25px] w-[25px] brightness-0 invert"
                 />
               }
               {{ crumbs[i] }}
