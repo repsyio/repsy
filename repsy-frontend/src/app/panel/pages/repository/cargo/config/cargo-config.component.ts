@@ -58,6 +58,9 @@ Create or edit \`$HOME/.cargo/config.toml\` file
 [registries]
 repsy = { index = "sparse+${this.baseUrl}/${this.repoName}/" }
 
+# Public repo (download only): Skip the [registry] section below.
+# If you previously used this repo as private, clear your Cargo cache first.
+
 [registry]
 global-credential-providers = ["cargo:token"]
 \`\`\`
