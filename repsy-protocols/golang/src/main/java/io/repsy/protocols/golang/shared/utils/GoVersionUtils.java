@@ -87,7 +87,7 @@ public class GoVersionUtils {
    */
   public static @Nullable String extractModulePath(final String path) {
     final int atVIndex = path.indexOf("/@v/");
-    if (atVIndex < 0) {
+    if (atVIndex <= 1) {
       return null;
     }
     return path.substring(1, atVIndex); // strip leading '/'

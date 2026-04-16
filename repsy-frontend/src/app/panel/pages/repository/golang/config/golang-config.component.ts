@@ -76,6 +76,8 @@ export class GolangConfigComponent implements OnInit, OnChanges {
 go env -w GOPROXY="${repoUrlWithAuth},off"
 \`\`\`
 
+> Credentials in the GOPROXY URL are only required for private registries. Omit them if your registry is public.
+
 > Use \`,off\` as the fallback so Go fails loudly if a module is not in this registry instead of falling back to the internet.
 
 ### 2. Configure checksum database
@@ -123,6 +125,8 @@ cp -r . "\${MODULE_VERSION_DIR}/"
 \`\`\`
 
 **2. Upload:**
+
+> The -u flag is only required for private registries. Omit it if your registry is public.
 
 \`\`\`bash
 curl -u ${this.username}:${password} \\
