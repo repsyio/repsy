@@ -18,25 +18,24 @@ package io.repsy.libs.protocol.router;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.Getter;
-import org.jspecify.annotations.NonNull;
 
 @Getter
 public final class ProtocolContext {
 
-  private final @NonNull Map<@NonNull String, @NonNull Object> contextMap;
+  private final Map<String, Object> contextMap;
 
   public ProtocolContext() {
 
     this.contextMap = new HashMap<>();
   }
 
-  public void addProperty(final @NonNull String key, final @NonNull Object value) {
+  public void addProperty(final String key, final Object value) {
 
     this.contextMap.put(key, value);
   }
 
   @SuppressWarnings("unchecked")
-  public @NonNull <T> T getProperty(final @NonNull String key) {
+  public <T> T getProperty(final String key) {
 
     return (T) this.contextMap.get(key);
   }

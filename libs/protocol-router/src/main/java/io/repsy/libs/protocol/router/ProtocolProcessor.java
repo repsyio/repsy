@@ -18,29 +18,31 @@ package io.repsy.libs.protocol.router;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
-import org.jspecify.annotations.NonNull;
 
 public abstract class ProtocolProcessor implements Comparable<ProtocolProcessor> {
   protected abstract int getPriority();
 
-  protected abstract @NonNull ProcessorResult process(
-      @NonNull ProtocolContext context,
-      @NonNull HttpServletRequest request,
-      @NonNull HttpServletResponse response,
-      @NonNull Map<@NonNull String, @NonNull Object> properties);
+  protected abstract ProcessorResult process(
+      ProtocolContext context,
+      HttpServletRequest request,
+      HttpServletResponse response,
+      Map<String, Object> properties);
 
   @Override
-  public int compareTo(final @NonNull ProtocolProcessor processor) {
+  public int compareTo(final ProtocolProcessor processor) {
+
     return Integer.compare(this.getPriority(), processor.getPriority());
   }
 
   @Override
   public boolean equals(final Object obj) {
+
     return obj instanceof final ProtocolProcessor pp && this.compareTo(pp) == 0;
   }
 
   @Override
   public int hashCode() {
+
     return this.getPriority();
   }
 }

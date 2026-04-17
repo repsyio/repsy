@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
-import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -34,30 +33,27 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @Controller
 public class ProtocolRouterController {
 
-  private static final @NonNull String ROBOTS_TXT_CONTENT =
+  private static final String ROBOTS_TXT_CONTENT =
       """
     User-agent: *
     Disallow: /
   """;
 
-  private static final @NonNull
-      Map<@NonNull String, @NonNull Supplier<@NonNull ResponseEntity<@NonNull Object>>>
-      STATIC_CONTENT_HANDLERS =
-          Map.of(
-              "/robots.txt",
-              ProtocolRouterController::handleRobotsTxt,
-              "/favicon.ico",
-              ProtocolRouterController::handleFavicon);
+  private static final Map<String, Supplier<ResponseEntity<Object>>> STATIC_CONTENT_HANDLERS =
+      Map.of(
+          "/robots.txt",
+          ProtocolRouterController::handleRobotsTxt,
+          "/favicon.ico",
+          ProtocolRouterController::handleFavicon);
 
-  private final @NonNull
-      Map<@NonNull HttpMethod, @NonNull List<@NonNull SpecifiedProtocolMethodHandler>>
-      methodHandlersMap = new HashMap<>();
-  private final @NonNull Map<@NonNull String, @NonNull ProtocolProvider> providerMap =
+  private final Map<HttpMethod, List<SpecifiedProtocolMethodHandler>> methodHandlersMap =
       new HashMap<>();
+  private final Map<String, ProtocolProvider> providerMap = new HashMap<>();
 
   public ProtocolRouterController(
-      final @NonNull List<@NonNull ProtocolProvider> protocolProviders,
-      final @NonNull List<@NonNull ProtocolMethodHandler> ignoredAllHandlers) {
+      final List<ProtocolProvider> protocolProviders,
+      final List<ProtocolMethodHandler> ignoredAllHandlers) {
+
     for (final var provider : protocolProviders) {
       this.providerMap.put(provider.getProtocolType(), provider);
       this.registerHandlers(provider);
@@ -65,9 +61,8 @@ public class ProtocolRouterController {
   }
 
   @RequestMapping("/**")
-  public @NonNull ResponseEntity<@NonNull Object> route(
-      final @NonNull HttpServletRequest request, final @NonNull HttpServletResponse response)
-      throws Exception {
+  public ResponseEntity<Object> route(
+      final HttpServletRequest request, final HttpServletResponse response) throws Exception {
 
     // Handle static content (robots.txt, favicon.ico)
     final var staticContentResponseOptional = this.handleStaticContent(request);
@@ -112,7 +107,8 @@ public class ProtocolRouterController {
     throw new ItemNotFoundException("unknownPath");
   }
 
-  private void registerHandlers(final @NonNull ProtocolProvider provider) {
+  private void registerHandlers(final ProtocolProvider provider) {
+
     for (final var entry : provider.getMethodHandlersMap().entrySet()) {
       this.methodHandlersMap
           .computeIfAbsent(entry.getKey(), _ -> new ArrayList<>())
@@ -120,8 +116,7 @@ public class ProtocolRouterController {
     }
   }
 
-  private @NonNull Optional<@NonNull ResponseEntity<@NonNull Object>> handleStaticContent(
-      final @NonNull HttpServletRequest request) {
+  private Optional<ResponseEntity<Object>> handleStaticContent(final HttpServletRequest request) {
 
     final var path = request.getServletPath();
     final var handler = STATIC_CONTENT_HANDLERS.get(path);
@@ -129,11 +124,11 @@ public class ProtocolRouterController {
     return Optional.ofNullable(handler).map(Supplier::get);
   }
 
-  private static @NonNull ResponseEntity<@NonNull Object> handleRobotsTxt() {
+  private static ResponseEntity<Object> handleRobotsTxt() {
     return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(ROBOTS_TXT_CONTENT);
   }
 
-  private static @NonNull ResponseEntity<@NonNull Object> handleFavicon() {
+  private static ResponseEntity<Object> handleFavicon() {
     return ResponseEntity.noContent().build();
   }
 }

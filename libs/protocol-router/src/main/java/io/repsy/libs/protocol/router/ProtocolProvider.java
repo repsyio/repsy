@@ -23,21 +23,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
-import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpMethod;
 
 public abstract class ProtocolProvider {
-  private final @NonNull
-      Map<@NonNull HttpMethod, @NonNull List<@NonNull SpecifiedProtocolMethodHandler>>
-      methodHandlersMap = new HashMap<>();
-  private final @NonNull SortedSet<@NonNull ProtocolProcessor> preProcessors = new TreeSet<>();
-  private final @NonNull SortedSet<@NonNull ProtocolProcessor> postProcessors = new TreeSet<>();
 
-  public @NonNull ProcessorResult preProcess(
-      final @NonNull ProtocolContext context,
-      final @NonNull HttpServletRequest request,
-      final @NonNull HttpServletResponse response,
-      final @NonNull Map<@NonNull String, @NonNull Object> properties) {
+  private final Map<HttpMethod, List<SpecifiedProtocolMethodHandler>> methodHandlersMap =
+      new HashMap<>();
+
+  private final SortedSet<ProtocolProcessor> preProcessors = new TreeSet<>();
+  private final SortedSet<ProtocolProcessor> postProcessors = new TreeSet<>();
+
+  public ProcessorResult preProcess(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final Map<String, Object> properties) {
 
     for (final var processor : this.preProcessors) {
       final var result = processor.process(context, request, response, properties);
@@ -51,10 +51,10 @@ public abstract class ProtocolProvider {
   }
 
   public ProcessorResult postProcess(
-      final @NonNull ProtocolContext context,
-      final @NonNull HttpServletRequest request,
-      final @NonNull HttpServletResponse response,
-      final @NonNull Map<@NonNull String, @NonNull Object> properties) {
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final Map<String, Object> properties) {
 
     for (final var processor : this.postProcessors) {
       final var result = processor.process(context, request, response, properties);
@@ -67,7 +67,7 @@ public abstract class ProtocolProvider {
     return ProcessorResult.next();
   }
 
-  public void registerMethodHandler(final @NonNull ProtocolMethodHandler methodHandler) {
+  public void registerMethodHandler(final ProtocolMethodHandler methodHandler) {
     final var supportedMethods = methodHandler.getSupportedMethods();
     final var protocolType = this.getProtocolType();
 
@@ -77,18 +77,17 @@ public abstract class ProtocolProvider {
     }
   }
 
-  public void registerPreProcessor(final @NonNull ProtocolProcessor protocolProcessor) {
+  public void registerPreProcessor(final ProtocolProcessor protocolProcessor) {
     this.preProcessors.add(protocolProcessor);
   }
 
-  public void registerPostProcessor(final @NonNull ProtocolProcessor protocolProcessor) {
+  public void registerPostProcessor(final ProtocolProcessor protocolProcessor) {
     this.postProcessors.add(protocolProcessor);
   }
 
-  @NonNull Map<@NonNull HttpMethod, @NonNull List<@NonNull SpecifiedProtocolMethodHandler>>
-      getMethodHandlersMap() {
+  Map<HttpMethod, List<SpecifiedProtocolMethodHandler>> getMethodHandlersMap() {
     return this.methodHandlersMap;
   }
 
-  public abstract @NonNull String getProtocolType();
+  public abstract String getProtocolType();
 }
