@@ -17,7 +17,6 @@ package io.repsy.os.shared.repo.services;
 
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
-import io.repsy.os.shared.repo.dtos.MavenRepoSettingsForm;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.dtos.RepoListInfo;
 import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
@@ -98,15 +97,6 @@ public class RepoTxService {
     final var repo = this.findRepoById(repoId);
     repo.setPrivateRepo(settings.isPrivateRepo());
     repo.setAllowOverride(settings.isAllowOverride());
-    this.repoRepository.save(repo);
-  }
-
-  @Transactional
-  public void updateMavenSettings(
-      final @NonNull UUID repoId, final @NonNull MavenRepoSettingsForm settings) {
-    final var repo = this.findRepoById(repoId);
-    repo.setPrivateRepo(settings.isPrivateRepo());
-    repo.setAllowOverride(settings.isAllowOverride());
     repo.setReleases(settings.isReleases());
     repo.setSnapshots(settings.isSnapshots());
     this.repoRepository.save(repo);
@@ -145,6 +135,8 @@ public class RepoTxService {
     final var repoInfo = this.getRepo(repoId);
     return RepoSettingsInfo.builder()
         .privateRepo(repoInfo.isPrivateRepo())
+        .releases(repoInfo.getReleases())
+        .snapshots(repoInfo.getSnapshots())
         .searchable(repoInfo.isSearchable())
         .allowOverride(repoInfo.isAllowOverride())
         .build();

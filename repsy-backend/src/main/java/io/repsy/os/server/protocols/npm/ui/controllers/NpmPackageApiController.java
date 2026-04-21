@@ -15,30 +15,26 @@
  */
 package io.repsy.os.server.protocols.npm.ui.controllers;
 
-import static org.springframework.http.HttpHeaders.AUTHORIZATION;
-
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.server.protocols.npm.shared.auth.services.NpmAuthComponentImpl;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionDetail;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmPackageServiceImpl;
 import io.repsy.os.server.protocols.npm.ui.facades.NpmApiFacade;
+import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
 import io.repsy.protocols.shared.repo.dtos.Permission;
-import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -47,7 +43,6 @@ import org.springframework.data.web.PagedModel;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -56,30 +51,25 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/npm/packages")
+@NullMarked
 public class NpmPackageApiController {
 
-  private static final @NonNull String PACKAGES_FETCHED = "packagesFetched";
+  private static final String PACKAGES_FETCHED = "packagesFetched";
 
-  private final @NonNull NpmAuthComponentImpl npmAuthComponent;
-  private final @NonNull UsageUpdateService usageUpdateService;
-  private final @NonNull RepoTxService repoTxService;
-  private final @NonNull NpmPackageServiceImpl npmPackageService;
-  private final @NonNull NpmApiFacade npmFacade;
-  private final @NonNull RestResponseFactory restResponseFactory;
+  private final UsageUpdateService usageUpdateService;
+  private final NpmPackageServiceImpl npmPackageService;
+  private final NpmApiFacade npmFacade;
+  private final RestResponseFactory restResponseFactory;
 
   @DeleteMapping({
     "/{repoName}/{packageName}",
     "/{repoName}/{scope}/{packageName}",
   })
-  public @NonNull RestResponse<Void> delete(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @PathVariable final @NonNull String repoName,
+  @RepoOperation(permission = Permission.MANAGE)
+  public RestResponse<Void> delete(
+      final RepoInfo repoInfo,
       @PathVariable(required = false) final @Nullable String scope,
-      @PathVariable final @NonNull String packageName) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.NPM);
-
-    this.npmAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.MANAGE);
+      @PathVariable final String packageName) {
 
     final var usages = this.npmFacade.deletePackage(repoInfo, scope, packageName);
 
@@ -92,17 +82,13 @@ public class NpmPackageApiController {
     "/{repoName}/{packageName}/versions/{versionName}",
     "/{repoName}/{scope}/{packageName}/versions/{versionName}",
   })
-  public @NonNull RestResponse<Void> deleteVersion(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @PathVariable final @NonNull String repoName,
+  @RepoOperation(permission = Permission.MANAGE)
+  public RestResponse<Void> deleteVersion(
+      final RepoInfo repoInfo,
       @PathVariable(required = false) final @Nullable String scope,
-      @PathVariable final @NonNull String packageName,
-      @PathVariable final @NonNull String versionName)
+      @PathVariable final String packageName,
+      @PathVariable final String versionName)
       throws IOException {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.NPM);
-
-    this.npmAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.MANAGE);
 
     final var usages =
         this.npmFacade.deletePackageVersion(repoInfo, scope, packageName, versionName);
@@ -113,16 +99,11 @@ public class NpmPackageApiController {
   }
 
   @GetMapping("/{repoName}")
-  public @NonNull RestResponse<PagedModel<PackageListItem>> list(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
+  @RepoOperation
+  public RestResponse<PagedModel<PackageListItem>> list(
+      final RepoInfo repoInfo,
       @RequestParam(required = false) final @Nullable String scope,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.NPM);
-
-    this.npmAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     final var packages =
         this.npmPackageService.getPackagesContainsScope(repoInfo.getStorageKey(), scope, pageable);
@@ -131,17 +112,12 @@ public class NpmPackageApiController {
   }
 
   @GetMapping("/{repoName}/{ignoredScope}")
-  public @NonNull RestResponse<PagedModel<PackageListItem>> list(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @PathVariable final @NonNull String ignoredScope,
-      @RequestParam(required = false, defaultValue = "") final @NonNull String name,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.NPM);
-
-    this.npmAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+  @RepoOperation
+  public RestResponse<PagedModel<PackageListItem>> list(
+      final RepoInfo repoInfo,
+      @PathVariable final String ignoredScope,
+      @RequestParam(required = false, defaultValue = "") final String name,
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     final var packages =
         this.npmPackageService.getPackagesContainsName(repoInfo.getStorageKey(), name, pageable);
@@ -153,17 +129,12 @@ public class NpmPackageApiController {
     "/{repoName}/scope",
     "/{repoName}/scope/{scope}",
   })
-  public @NonNull RestResponse<PagedModel<PackageListItem>> listFilterByScope(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
+  @RepoOperation
+  public RestResponse<PagedModel<PackageListItem>> listFilterByScope(
+      final RepoInfo repoInfo,
       @PathVariable(required = false) final @Nullable String scope,
-      @RequestParam(required = false, defaultValue = "") final @NonNull String name,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.NPM);
-
-    this.npmAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+      @RequestParam(required = false, defaultValue = "") final String name,
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     final var packages =
         this.npmPackageService.getPackagesByScopeContainsName(
@@ -178,17 +149,13 @@ public class NpmPackageApiController {
     "/{repoName}/{packageName}/versions/{versionName}",
     "/{repoName}/{scope}/{packageName}/versions/{versionName}",
   })
-  public @NonNull RestResponse<PackageVersionDetail> getVersion(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
+  @RepoOperation
+  public RestResponse<PackageVersionDetail> getVersion(
+      final RepoInfo repoInfo,
       @PathVariable(required = false) final @Nullable String scope,
-      @PathVariable final @NonNull String packageName,
+      @PathVariable final String packageName,
       @PathVariable final @Nullable String versionName)
       throws IOException {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.NPM);
-
-    this.npmAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
 
     final var version = this.npmFacade.getVersion(repoInfo, scope, packageName, versionName);
 
@@ -199,18 +166,13 @@ public class NpmPackageApiController {
     "/{repoName}/package/{packageName}/versions",
     "/{repoName}/{scope}/package/{packageName}/versions",
   })
-  public @NonNull RestResponse<PagedModel<PackageVersionListItem>> listVersions(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
+  @RepoOperation
+  public RestResponse<PagedModel<PackageVersionListItem>> listVersions(
+      final RepoInfo repoInfo,
       @PathVariable(required = false) final @Nullable String scope,
-      @PathVariable final @NonNull String packageName,
-      @RequestParam(required = false, defaultValue = "") final @NonNull String version,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.NPM);
-
-    this.npmAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+      @PathVariable final String packageName,
+      @RequestParam(required = false, defaultValue = "") final String version,
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     final var versions =
         this.npmPackageService.getVersionsContainsVersion(
@@ -223,15 +185,11 @@ public class NpmPackageApiController {
     "/{repoName}/package/{packageName}/tags",
     "/{repoName}/{scope}/package/{packageName}/tags",
   })
-  public @NonNull RestResponse<List<PackageDistributionTagMapListItem>> listTags(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
+  @RepoOperation
+  public RestResponse<List<PackageDistributionTagMapListItem>> listTags(
+      final RepoInfo repoInfo,
       @PathVariable(required = false) final @Nullable String scope,
-      @PathVariable final @NonNull String packageName) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.NPM);
-
-    this.npmAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+      @PathVariable final String packageName) {
 
     final var tags =
         this.npmPackageService.getDistributionTags(repoInfo.getStorageKey(), scope, packageName);
@@ -239,7 +197,7 @@ public class NpmPackageApiController {
     return this.restResponseFactory.success("packageTagsFetched", tags);
   }
 
-  public void updateUsage(final @NonNull RepoInfo repoInfo, final @NonNull BaseUsages usages) {
+  private void updateUsage(final RepoInfo repoInfo, final BaseUsages usages) {
 
     final var usageUpdatedInfo = new UsageChangedInfo(repoInfo.getStorageKey(), usages);
 

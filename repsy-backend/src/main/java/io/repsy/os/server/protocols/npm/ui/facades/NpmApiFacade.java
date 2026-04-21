@@ -20,8 +20,8 @@ import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionDe
 import io.repsy.os.server.protocols.npm.shared.npm_package.mappers.NpmPackageConverter;
 import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmPackageServiceImpl;
 import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;
+import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.services.RepoTxService;
 import java.io.IOException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -33,18 +33,17 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class NpmApiFacade {
+public class NpmApiFacade implements ProtocolApiFacade {
 
-  private final @NonNull RepoTxService repoTxService;
   private final @NonNull NpmPackageServiceImpl npmPackageService;
   private final @NonNull NpmStorageService npmStorageService;
   private final @NonNull NpmPackageConverter npmPackageConverter;
 
-  public void deleteRegistry(final @NonNull RepoInfo repoInfo) {
+  public BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
 
-    this.npmStorageService.deleteRepo(repoInfo.getStorageKey());
+    final var free = this.npmStorageService.deleteRepo(repoInfo.getStorageKey());
 
-    this.repoTxService.deleteRepo(repoInfo.getStorageKey());
+    return BaseUsages.ofDisk(-1 * free);
   }
 
   public @NonNull PackageVersionDetail getVersion(

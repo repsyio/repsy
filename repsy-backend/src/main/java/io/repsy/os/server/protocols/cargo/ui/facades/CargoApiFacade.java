@@ -17,10 +17,12 @@ package io.repsy.os.server.protocols.cargo.ui.facades;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.server.protocols.cargo.shared.crate.services.CargoCrateServiceImpl;
+import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
 import io.repsy.os.shared.repo.dtos.RepoSettingsInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
@@ -44,7 +46,7 @@ import tools.jackson.databind.ObjectMapper;
 @Transactional
 @RequiredArgsConstructor
 @NullMarked
-public class CargoApiFacade {
+public class CargoApiFacade implements ProtocolApiFacade {
 
   private final RepoTxService repoTxService;
   private final CargoCrateServiceImpl cargoCrateService;
@@ -103,7 +105,7 @@ public class CargoApiFacade {
 
   public BaseUsages deleteCrate(final RepoInfo repoInfo, final String name) throws IOException {
 
-    final var normalizedName = normalizeName(name);
+    final var normalizedName = CrateUtils.normalizeCrateName(name);
 
     this.cargoCrateService.deleteCrate(repoInfo, normalizedName);
 
@@ -117,7 +119,7 @@ public class CargoApiFacade {
   public BaseUsages deleteCrateVersion(
       final RepoInfo repoInfo, final String name, final String vers) throws IOException {
 
-    final var normalizedName = normalizeName(name);
+    final var normalizedName = CrateUtils.normalizeCrateName(name);
 
     this.cargoCrateService.deleteCrateVersion(repoInfo, normalizedName, vers);
 
@@ -156,9 +158,5 @@ public class CargoApiFacade {
   public void createRepo(final UUID repoId) {
 
     this.cargoStorageService.createRepo(repoId);
-  }
-
-  private static String normalizeName(final String name) {
-    return name.toLowerCase().replace('-', '_');
   }
 }

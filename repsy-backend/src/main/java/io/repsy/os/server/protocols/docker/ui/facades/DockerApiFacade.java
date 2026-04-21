@@ -27,6 +27,7 @@ import io.repsy.os.server.protocols.docker.shared.tag.dtos.TagDetail;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
 import io.repsy.os.server.protocols.docker.ui.utils.RepoUtils;
+import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
 import io.repsy.os.shared.repo.dtos.RepoSettingsInfo;
@@ -53,7 +54,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class DockerApiFacade {
+public class DockerApiFacade implements ProtocolApiFacade {
 
   private static final @NonNull String BLOBS_PATH = "blobs";
   private static final @NonNull String MANIFESTS_PATH = "manifests";
@@ -64,7 +65,7 @@ public class DockerApiFacade {
   private final @NonNull ManifestTxService manifestService;
   private final @NonNull DockerStorageService dockerStorageService;
 
-  public void deleteRepo(final @NonNull RepoInfo repoInfo) {
+  public @NonNull BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
 
     RepoUtils.validateRepoName(repoInfo.getName());
 
@@ -77,9 +78,9 @@ public class DockerApiFacade {
 
     this.layerTxService.deleteAllLayers(repoInfo.getStorageKey());
 
-    this.dockerStorageService.deleteRepo(repoInfo.getStorageKey());
+    final var free = this.dockerStorageService.deleteRepo(repoInfo.getStorageKey());
 
-    this.repoTxService.deleteRepo(repoInfo.getStorageKey());
+    return BaseUsages.builder().diskUsage(-1L * free).build();
   }
 
   @Transactional(readOnly = true)

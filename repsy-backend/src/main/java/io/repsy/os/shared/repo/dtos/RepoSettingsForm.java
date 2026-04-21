@@ -27,4 +27,6 @@ import lombok.NoArgsConstructor;
 public class RepoSettingsForm {
   private boolean privateRepo;
   private boolean allowOverride;
+  private boolean releases;
+  private boolean snapshots;
 }

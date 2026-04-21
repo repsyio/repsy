@@ -15,27 +15,23 @@
  */
 package io.repsy.os.server.protocols.pypi.ui.controllers;
 
-import static org.springframework.http.HttpHeaders.AUTHORIZATION;
-
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.server.protocols.pypi.shared.auth.services.PypiAuthComponent;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PackageListItem;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseDetail;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseListItem;
 import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPackageServiceImpl;
 import io.repsy.os.server.protocols.pypi.ui.facades.PypiApiFacade;
+import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.Permission;
-import io.repsy.protocols.shared.repo.dtos.RepoType;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -44,7 +40,6 @@ import org.springframework.data.web.PagedModel;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -53,24 +48,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/pypi/packages")
+@NullMarked
 public class PypiPackageController {
 
-  private final @NonNull PypiAuthComponent pypiAuthComponent;
-  private final @NonNull UsageUpdateService usageUpdateService;
-  private final @NonNull RepoTxService repoTxService;
-  private final @NonNull PypiApiFacade pypiApiFacade;
-  private final @NonNull PypiPackageServiceImpl pypiPackageService;
-  private final @NonNull RestResponseFactory restResponseFactory;
+  private final UsageUpdateService usageUpdateService;
+  private final PypiApiFacade pypiApiFacade;
+  private final PypiPackageServiceImpl pypiPackageService;
+  private final RestResponseFactory restResponseFactory;
 
   @DeleteMapping("/{repoName}/{packageName}")
-  public @NonNull RestResponse<Void> delete(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @PathVariable final @NonNull String packageName) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.PYPI);
-
-    this.pypiAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.MANAGE);
+  @RepoOperation(permission = Permission.MANAGE)
+  public RestResponse<Void> delete(
+      final RepoInfo repoInfo, @PathVariable final String packageName) {
 
     final var usages = this.pypiApiFacade.deletePackage(repoInfo, packageName);
 
@@ -80,15 +69,11 @@ public class PypiPackageController {
   }
 
   @DeleteMapping("/{repoName}/{packageName}/releases/{releaseVersion}")
-  public @NonNull RestResponse<Void> deleteRelease(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @PathVariable final @NonNull String packageName,
-      @PathVariable final @NonNull String releaseVersion) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.PYPI);
-
-    this.pypiAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.MANAGE);
+  @RepoOperation(permission = Permission.MANAGE)
+  public RestResponse<Void> deleteRelease(
+      final RepoInfo repoInfo,
+      @PathVariable final String packageName,
+      @PathVariable final String releaseVersion) {
 
     final var usages = this.pypiApiFacade.deleteRelease(repoInfo, packageName, releaseVersion);
 
@@ -98,15 +83,10 @@ public class PypiPackageController {
   }
 
   @GetMapping("/{repoName}")
-  public @NonNull RestResponse<PagedModel<PackageListItem>> list(
-      @RequestHeader(AUTHORIZATION) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.PYPI);
-
-    this.pypiAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+  @RepoOperation
+  public RestResponse<PagedModel<PackageListItem>> list(
+      final RepoInfo repoInfo,
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     final var packageList =
         this.pypiPackageService.getPackageList(repoInfo.getStorageKey(), pageable);
@@ -115,16 +95,11 @@ public class PypiPackageController {
   }
 
   @GetMapping(value = "/{repoName}", params = "name")
-  public @NonNull RestResponse<PagedModel<PackageListItem>> listLikeName(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @RequestParam(required = false, defaultValue = "") final @NonNull String name,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.PYPI);
-
-    this.pypiAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+  @RepoOperation
+  public RestResponse<PagedModel<PackageListItem>> listLikeName(
+      final RepoInfo repoInfo,
+      @RequestParam(required = false, defaultValue = "") final String name,
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     final var packageList =
         this.pypiPackageService.getPackagesContainsName(repoInfo.getStorageKey(), name, pageable);
@@ -133,16 +108,11 @@ public class PypiPackageController {
   }
 
   @GetMapping("/{repoName}/{packageName}/releases")
-  public @NonNull RestResponse<PagedModel<ReleaseListItem>> listReleases(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @PathVariable final @NonNull String packageName,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.PYPI);
-
-    this.pypiAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+  @RepoOperation
+  public RestResponse<PagedModel<ReleaseListItem>> listReleases(
+      final RepoInfo repoInfo,
+      @PathVariable final String packageName,
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     final var releases =
         this.pypiPackageService.getReleaseList(repoInfo.getStorageKey(), packageName, pageable);
@@ -151,17 +121,12 @@ public class PypiPackageController {
   }
 
   @GetMapping(value = "/{repoName}/{packageName}/releases", params = "version")
-  public @NonNull RestResponse<PagedModel<ReleaseListItem>> listReleasesLikeVersion(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @PathVariable final @NonNull String packageName,
-      @RequestParam(required = false, defaultValue = "") final @NonNull String version,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.PYPI);
-
-    this.pypiAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+  @RepoOperation
+  public RestResponse<PagedModel<ReleaseListItem>> listReleasesLikeVersion(
+      final RepoInfo repoInfo,
+      @PathVariable final String packageName,
+      @RequestParam(required = false, defaultValue = "") final String version,
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     final var releases =
         this.pypiPackageService.getReleasesContainsVersion(
@@ -174,15 +139,11 @@ public class PypiPackageController {
     "/{repoName}/{packageName}",
     "/{repoName}/{packageName}/releases/{releaseVersion}",
   })
-  public @NonNull RestResponse<ReleaseDetail> getRelease(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @PathVariable final @NonNull String packageName,
+  @RepoOperation
+  public RestResponse<ReleaseDetail> getRelease(
+      final RepoInfo repoInfo,
+      @PathVariable final String packageName,
       @PathVariable final @Nullable String releaseVersion) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.PYPI);
-
-    this.pypiAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
 
     final var details =
         this.pypiApiFacade.getReleaseDetail(repoInfo.getStorageKey(), packageName, releaseVersion);
@@ -190,7 +151,8 @@ public class PypiPackageController {
     return this.restResponseFactory.success("releaseDetailFetched", details);
   }
 
-  public void updateUsage(final @NonNull RepoInfo repoInfo, final @NonNull BaseUsages usages) {
+  private void updateUsage(final RepoInfo repoInfo, final BaseUsages usages) {
+
     final var usageUpdatedInfo = new UsageChangedInfo(repoInfo.getStorageKey(), usages);
 
     this.usageUpdateService.updateUsage(usageUpdatedInfo);

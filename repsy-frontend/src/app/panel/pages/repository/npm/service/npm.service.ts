@@ -58,7 +58,7 @@ export class NpmService {
   }
 
   public getRegistry(registryName: string): Observable<RepoPermissionInfo> {
-    const url = `${this.apiBaseUrl}/api/npm/repos/${registryName}/permission`;
+    const url = `${this.apiBaseUrl}/api/repos/${registryName}/permissions`;
 
     return new Observable<RepoPermissionInfo>((observer: Subscriber<RepoPermissionInfo>) => {
       this.http.get<RestResponse<RepoPermissionInfo>>(url).subscribe(
@@ -79,7 +79,7 @@ export class NpmService {
 
   public async fetchRegistrySettings(): Promise<RepositorySettingsInfo> {
     return new Promise<RepositorySettingsInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/npm/repos/${this.activeRegistry.repoName}/settings`;
+      const url = `${this.apiBaseUrl}/api/repos/${this.activeRegistry.repoName}/settings`;
 
       this.http
         .get<RestResponse<RepositorySettingsInfo>>(url)
@@ -91,7 +91,7 @@ export class NpmService {
 
   public async updateRepoSettings(repoSettingsForm: RepoSettingsForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/npm/repos/${this.activeRegistry.repoName}/settings`;
+      const url = `${this.apiBaseUrl}/api/repos/${this.activeRegistry.repoName}/settings`;
 
       this.http
         .put<RestResponse<void>>(url, repoSettingsForm)
@@ -103,7 +103,7 @@ export class NpmService {
 
   public async updateRegistryName(repoNameForm: RepoNameForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/npm/repos/${this.activeRegistry.repoName}/name`;
+      const url = `${this.apiBaseUrl}/api/repos/${this.activeRegistry.repoName}/name`;
 
       this.http
         .patch<RestResponse<void>>(url, repoNameForm)
@@ -121,7 +121,7 @@ export class NpmService {
 
   public async updateRegistryDescription(registryNameForm: RepoDescriptionForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/npm/repos/${this.activeRegistry.repoName}/description`;
+      const url = `${this.apiBaseUrl}/api/repos/${this.activeRegistry.repoName}/description`;
 
       this.http
         .patch<RestResponse<void>>(url, registryNameForm)
@@ -133,7 +133,7 @@ export class NpmService {
 
   public async deleteRegistry(repo: string): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/npm/repos/${repo}`;
+      const url = `${this.apiBaseUrl}/api/repos/${repo}`;
 
       this.http
         .delete<RestResponse<void>>(url)
@@ -145,7 +145,7 @@ export class NpmService {
 
   public async createRegistry(registryCreateForm: RepoForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/npm/repos`;
+      const url = `${this.apiBaseUrl}/api/repos/NPM`;
 
       this.http
         .post<RestResponse<void>>(url, registryCreateForm)
@@ -157,7 +157,7 @@ export class NpmService {
 
   public async fetchRegistries(): Promise<RepoListItem[]> {
     return new Promise<RepoListItem[]>((resolve, reject) => {
-      const url = `${this.apiBaseUrl + '/api/npm/repos/info'}`;
+      const url = `${this.apiBaseUrl + '/api/repos/NPM/info'}`;
 
       this.http
         .get<RestResponse<RepoListItem[]>>(url)
@@ -222,7 +222,7 @@ export class NpmService {
 
   public async fetchRegistryUsage(): Promise<RepoUsageInfo> {
     return new Promise<RepoUsageInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/npm/repos/${this.activeRegistry.repoName}/usage`;
+      const url = `${this.apiBaseUrl}/api/repos/${this.activeRegistry.repoName}/usage`;
 
       this.http
         .get<RestResponse<RepoUsageInfo>>(url)
@@ -438,7 +438,7 @@ export class NpmService {
   public async getDeployTokens(pageNumber: number, pageSize: number): Promise<PagedData<DeployTokenInfo>> {
     const params = new HttpParams().set('page', pageNumber.toString()).set('size', pageSize.toString());
 
-    const url = `${this.apiBaseUrl}/api/npm/deploy-tokens/` + this.activeRegistry.repoName;
+    const url = `${this.apiBaseUrl}/api/repos/` + this.activeRegistry.repoName + '/deploy-tokens';
 
     return new Promise<PagedData<DeployTokenInfo>>((resolve, reject) => {
       this.http
@@ -450,7 +450,7 @@ export class NpmService {
   }
 
   public async rotateDeployToken(tokenUuid: string): Promise<string> {
-    const url = `${this.apiBaseUrl}/api/npm/deploy-tokens/${this.activeRegistry.repoName}/` + tokenUuid;
+    const url = `${this.apiBaseUrl}/api/repos/${this.activeRegistry.repoName}/deploy-tokens/` + tokenUuid;
 
     return new Promise<string>((resolve, reject) => {
       this.http
@@ -462,7 +462,7 @@ export class NpmService {
   }
 
   public async createDeployToken(form: DeployTokenForm): Promise<TokenCreateInfo> {
-    const url = `${this.apiBaseUrl}/api/npm/deploy-tokens/${this.activeRegistry.repoName}`;
+    const url = `${this.apiBaseUrl}/api/repos/${this.activeRegistry.repoName}/deploy-tokens`;
 
     return new Promise<TokenCreateInfo>((resolve, reject) => {
       this.http
@@ -473,8 +473,8 @@ export class NpmService {
     });
   }
 
-  public async revokeDeployToken(tokenUuid: string): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/npm/deploy-tokens/${this.activeRegistry.repoName}/` + tokenUuid;
+  public async revokeDeployToken(tokenId: string): Promise<void> {
+    const url = `${this.apiBaseUrl}/api/repos/${this.activeRegistry.repoName}/deploy-tokens/` + tokenId;
 
     return new Promise((resolve, reject) => {
       this.http

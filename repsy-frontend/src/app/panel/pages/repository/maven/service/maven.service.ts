@@ -41,6 +41,8 @@ import { ArtifactVersionListItem } from '../dto/artifact-version-list-item';
 import { DeletedItem } from '../dto/deleted-item';
 import { FsItemInfo } from '../dto/fs-item-info';
 import { MavenRepoSettingsInfo } from '../dto/maven-repo-settings-info';
+import { RepoSettingsInfo } from '../../docker/dto/repo-settings-info';
+import { RepositorySettingsInfo } from '../../pypi/dto/repository-settings-info';
 
 @Injectable({
   providedIn: 'root',
@@ -64,7 +66,7 @@ export class MavenService {
   public async createRepository(form: RepoForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       return this.http
-        .post<RestResponse<null>>(`${this.apiBaseUrl}/api/mvn/repos`, form)
+        .post<RestResponse<null>>(`${this.apiBaseUrl}/api/repos/MAVEN`, form)
         .toPromise()
         .then(() => resolve())
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
@@ -96,7 +98,7 @@ export class MavenService {
   }
 
   public async deleteRepository(repo: string): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/mvn/repos/${repo}`;
+    const url = `${this.apiBaseUrl}/api/repos/${repo}`;
 
     return new Promise<void>((resolve, reject) => {
       return this.http
@@ -125,7 +127,7 @@ export class MavenService {
 
   public async fetchRepos(): Promise<RepoListItem[]> {
     return new Promise<RepoListItem[]>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/mvn/repos/info`;
+      const url = `${this.apiBaseUrl}/api/repos/MAVEN/info`;
 
       this.http
         .get<RestResponse<RepoListItem[]>>(url)
@@ -258,7 +260,7 @@ export class MavenService {
   public async getPathContent(path: string): Promise<FsItemInfo[]> {
     const params = new HttpParams().set('path', path);
 
-    const url = `${this.apiBaseUrl}/api/mvn/repos/` + `${this.activeRepo.repoName}/contents`;
+    const url = `${this.apiBaseUrl}/api/repos/` + `${this.activeRepo.repoName}/contents`;
 
     return new Promise<FsItemInfo[]>((resolve, reject) => {
       this.http
@@ -309,20 +311,20 @@ export class MavenService {
     });
   }
 
-  public async getRepoSettings(): Promise<MavenRepoSettingsInfo> {
-    const url = `${this.apiBaseUrl}/api/mvn/repos/` + `${this.activeRepo.repoName}/settings`;
+  public async getRepoSettings(): Promise<RepositorySettingsInfo> {
+    const url = `${this.apiBaseUrl}/api/repos/` + `${this.activeRepo.repoName}/settings`;
 
-    return new Promise<MavenRepoSettingsInfo>((resolve, reject) => {
+    return new Promise<RepositorySettingsInfo>((resolve, reject) => {
       this.http
-        .get<RestResponse<MavenRepoSettingsInfo>>(url)
+        .get<RestResponse<RepositorySettingsInfo>>(url)
         .toPromise()
-        .then((res: RestResponse<MavenRepoSettingsInfo>) => resolve(res.data))
+        .then((res: RestResponse<RepositorySettingsInfo>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
     });
   }
 
   public async getRepoUsage(): Promise<RepoUsageInfo> {
-    const url = `${this.apiBaseUrl}/api/mvn/repos/` + `${this.activeRepo.repoName}/usage`;
+    const url = `${this.apiBaseUrl}/api/repos/` + `${this.activeRepo.repoName}/usage`;
 
     return new Promise<RepoUsageInfo>((resolve, reject) => {
       return this.http
@@ -334,7 +336,7 @@ export class MavenService {
   }
 
   public async updateRepositoryName(repositoryNameForm: RepoNameForm): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/mvn/repos/` + `${this.activeRepo.repoName}/name`;
+    const url = `${this.apiBaseUrl}/api/repos/` + `${this.activeRepo.repoName}/name`;
 
     return new Promise<void>((resolve, reject) => {
       return this.http
@@ -352,7 +354,7 @@ export class MavenService {
   }
 
   public async updateRepoDescription(repoDescriptionForm: RepoDescriptionForm): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/mvn/repos/` + `${this.activeRepo.repoName}/description`;
+    const url = `${this.apiBaseUrl}/api/repos/` + `${this.activeRepo.repoName}/description`;
 
     return new Promise<void>((resolve, reject) => {
       return this.http
@@ -364,7 +366,7 @@ export class MavenService {
   }
 
   public async updateRepoSettings(form: RepoSettingsForm): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/mvn/repos/${this.activeRepo.repoName}/settings`;
+    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/settings`;
 
     return new Promise<void>((resolve, reject) => {
       return this.http
@@ -376,7 +378,7 @@ export class MavenService {
   }
 
   public getRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
-    const url = `${this.apiBaseUrl}/api/mvn/repos/${repoName}/permissions`;
+    const url = `${this.apiBaseUrl}/api/repos/${repoName}/permissions`;
 
     return new Observable<RepoPermissionInfo>((subscriber: Subscriber<RepoPermissionInfo>) => {
       this.http.get<RestResponse<RepoPermissionInfo>>(url).subscribe(
@@ -398,7 +400,7 @@ export class MavenService {
   public async getDeployTokens(pageNumber: number, pageSize: number): Promise<PagedData<DeployTokenInfo>> {
     const params = new HttpParams().set('page', pageNumber.toString()).set('size', pageSize.toString());
 
-    const url = `${this.apiBaseUrl}/api/mvn/deploy-tokens/` + this.activeRepo.repoName;
+    const url = `${this.apiBaseUrl}/api/repos/` + this.activeRepo.repoName + '/deploy-tokens';
 
     return new Promise<PagedData<DeployTokenInfo>>((resolve, reject) => {
       this.http
@@ -410,7 +412,7 @@ export class MavenService {
   }
 
   public async rotateDeployToken(tokenUuid: string): Promise<string> {
-    const url = `${this.apiBaseUrl}/api/mvn/deploy-tokens/${this.activeRepo.repoName}/` + tokenUuid;
+    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens/` + tokenUuid;
 
     return new Promise<string>((resolve, reject) => {
       this.http
@@ -422,7 +424,7 @@ export class MavenService {
   }
 
   public async createDeployToken(form: DeployTokenForm): Promise<TokenCreateInfo> {
-    const url = `${this.apiBaseUrl}/api/mvn/deploy-tokens/${this.activeRepo.repoName}`;
+    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens`;
 
     return new Promise<TokenCreateInfo>((resolve, reject) => {
       this.http
@@ -434,7 +436,7 @@ export class MavenService {
   }
 
   public async revokeDeployToken(tokenId: string): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/mvn/deploy-tokens/${this.activeRepo.repoName}/` + tokenId;
+    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens/` + tokenId;
 
     return new Promise((resolve, reject) => {
       this.http

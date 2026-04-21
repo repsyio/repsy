@@ -15,6 +15,6 @@
 ///
 
 export interface SignatureItem {
-  uuid: string;
+  id: string;
   url: string;
 }

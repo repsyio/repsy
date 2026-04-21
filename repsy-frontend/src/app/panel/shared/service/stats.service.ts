@@ -36,7 +36,7 @@ export class StatsService {
   ) {}
 
   public async getMavenRepoCount(): Promise<number> {
-    const url = `${this.apiBaseUrl}/api/mvn/repos/count`;
+    const url = `${this.apiBaseUrl}/api/repos/MAVEN/count`;
 
     return new Promise<number>((resolve, reject) => {
       return this.http
@@ -48,7 +48,7 @@ export class StatsService {
   }
 
   public async getNpmRegistryCount(): Promise<number> {
-    const url = `${this.apiBaseUrl}/api/npm/repos/count`;
+    const url = `${this.apiBaseUrl}/api/repos/NPM/count`;
 
     return new Promise<number>((resolve, reject) => {
       return this.http
@@ -60,7 +60,7 @@ export class StatsService {
   }
 
   public async getPypiRepoCount(): Promise<number> {
-    const url = `${this.apiBaseUrl}/api/pypi/repos/count`;
+    const url = `${this.apiBaseUrl}/api/repos/PYPI/count`;
 
     return new Promise<number>((resolve, reject) => {
       return this.http
@@ -72,7 +72,7 @@ export class StatsService {
   }
 
   public async getDockerRepoCount(): Promise<number> {
-    const url = `${this.apiBaseUrl}/api/docker/repos/count`;
+    const url = `${this.apiBaseUrl}/api/repos/DOCKER/count`;
 
     return new Promise<number>((resolve, reject) => {
       return this.http
@@ -84,7 +84,7 @@ export class StatsService {
   }
 
   public async getCargoRepoCount(): Promise<number> {
-    const url = `${this.apiBaseUrl}/api/cargo/repos/count`;
+    const url = `${this.apiBaseUrl}/api/repos/CARGO/count`;
 
     return new Promise<number>((resolve, reject) => {
       return this.http
@@ -107,7 +107,7 @@ export class StatsService {
 
   public async fetchMavenRepositoryUsage(repo: string): Promise<RepoUsageInfo> {
     return new Promise<RepoUsageInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/mvn/repos/${repo}/usage`;
+      const url = `${this.apiBaseUrl}/api/repos/${repo}/usage`;
 
       this.http
         .get<RestResponse<RepoUsageInfo>>(url)
@@ -119,7 +119,7 @@ export class StatsService {
 
   public async fetchNpmRepositoryUsage(repo: string): Promise<RepoUsageInfo> {
     return new Promise<RepoUsageInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/npm/repos/${repo}/usage`;
+      const url = `${this.apiBaseUrl}/api/repos/${repo}/usage`;
 
       this.http
         .get<RestResponse<RepoUsageInfo>>(url)
@@ -131,7 +131,7 @@ export class StatsService {
 
   public async fetchPypiRepositoryUsage(repo: string): Promise<RepoUsageInfo> {
     return new Promise<RepoUsageInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/pypi/repos/${repo}/usage`;
+      const url = `${this.apiBaseUrl}/api/repos/${repo}/usage`;
 
       this.http
         .get<RestResponse<RepoUsageInfo>>(url)
@@ -143,7 +143,7 @@ export class StatsService {
 
   public async fetchDockerRepositoryUsage(repo: string): Promise<RepoUsageInfo> {
     return new Promise<RepoUsageInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/docker/repos/${repo}/usage`;
+      const url = `${this.apiBaseUrl}/api/repos/${repo}/usage`;
 
       this.http
         .get<RestResponse<RepoUsageInfo>>(url)
@@ -155,7 +155,7 @@ export class StatsService {
 
   public async fetchCargoRepositoryUsage(repo: string): Promise<RepoUsageInfo> {
     return new Promise<RepoUsageInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/cargo/repos/${repo}/usage`;
+      const url = `${this.apiBaseUrl}/api/repos/${repo}/usage`;
 
       this.http
         .get<RestResponse<RepoUsageInfo>>(url)
@@ -166,7 +166,7 @@ export class StatsService {
   }
 
   public async getMavenRepoInfo(): Promise<RepoListInfo[]> {
-    const url = `${this.apiBaseUrl}/api/mvn/repos/info`;
+    const url = `${this.apiBaseUrl}/api/repos/MAVEN/info`;
 
     return new Promise<RepoListInfo[]>((resolve, reject) => {
       return this.http
@@ -178,7 +178,7 @@ export class StatsService {
   }
 
   public async getNpmRepoInfo(): Promise<RepoListInfo[]> {
-    const url = `${this.apiBaseUrl}/api/npm/repos/info`;
+    const url = `${this.apiBaseUrl}/api/repos/NPM/info`;
 
     return new Promise<RepoListInfo[]>((resolve, reject) => {
       return this.http
@@ -190,7 +190,7 @@ export class StatsService {
   }
 
   public async getPypiRepoInfo(): Promise<RepoListInfo[]> {
-    const url = `${this.apiBaseUrl}/api/pypi/repos/info`;
+    const url = `${this.apiBaseUrl}/api/repos/PYPI/info`;
 
     return new Promise<RepoListInfo[]>((resolve, reject) => {
       return this.http
@@ -202,7 +202,7 @@ export class StatsService {
   }
 
   public async getDockerRepoInfo(): Promise<RepoListInfo[]> {
-    const url = `${this.apiBaseUrl}/api/docker/repos/info`;
+    const url = `${this.apiBaseUrl}/api/repos/DOCKER/info`;
 
     return new Promise<RepoListInfo[]>((resolve, reject) => {
       return this.http
@@ -214,7 +214,7 @@ export class StatsService {
   }
 
   public async getGolangRepoCount(): Promise<number> {
-    const url = `${this.apiBaseUrl}/api/go/repos/count`;
+    const url = `${this.apiBaseUrl}/api/repos/GOLANG/count`;
 
     return new Promise<number>((resolve, reject) => {
       return this.http
@@ -227,7 +227,7 @@ export class StatsService {
 
   public async fetchGolangRepositoryUsage(repo: string): Promise<RepoUsageInfo> {
     return new Promise<RepoUsageInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/go/repos/${repo}/usage`;
+      const url = `${this.apiBaseUrl}/api/repos/${repo}/usage`;
 
       this.http
         .get<RestResponse<RepoUsageInfo>>(url)
@@ -238,7 +238,7 @@ export class StatsService {
   }
 
   public async getGolangRepoInfo(): Promise<RepoListInfo[]> {
-    const url = `${this.apiBaseUrl}/api/go/repos/info`;
+    const url = `${this.apiBaseUrl}/api/repos/GOLANG/info`;
 
     return new Promise<RepoListInfo[]>((resolve, reject) => {
       return this.http
@@ -250,7 +250,7 @@ export class StatsService {
   }
 
   public async getCargoRepoInfo(): Promise<RepoListInfo[]> {
-    const url = `${this.apiBaseUrl}/api/cargo/repos/info`;
+    const url = `${this.apiBaseUrl}/api/repos/CARGO/info`;
 
     return new Promise<RepoListInfo[]>((resolve, reject) => {
       return this.http

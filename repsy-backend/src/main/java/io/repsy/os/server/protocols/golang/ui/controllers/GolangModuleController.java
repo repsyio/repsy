@@ -15,23 +15,19 @@
  */
 package io.repsy.os.server.protocols.golang.ui.controllers;
 
-import static org.springframework.http.HttpHeaders.AUTHORIZATION;
-
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
-import io.repsy.os.server.protocols.golang.shared.auth.services.GolangAuthComponent;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleInfo;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleListItem;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem;
 import io.repsy.os.server.protocols.golang.ui.facades.GolangApiFacade;
-import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
+import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.Permission;
-import io.repsy.protocols.shared.repo.dtos.RepoType;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -40,7 +36,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -49,12 +44,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/go/modules")
+@NullMarked
 public class GolangModuleController {
 
-  private final @NonNull GolangAuthComponent golangAuthComponent;
-  private final @NonNull RepoTxService repoTxService;
-  private final @NonNull GolangApiFacade golangApiFacade;
-  private final @NonNull RestResponseFactory restResponseFactory;
+  private final GolangApiFacade golangApiFacade;
+  private final RestResponseFactory restResponseFactory;
 
   /**
    * Signals to the Go toolchain that this proxy does not relay checksum database requests.
@@ -62,21 +56,15 @@ public class GolangModuleController {
    * GONOSUMDB for private modules.
    */
   @GetMapping("/{repoName}/sumdb/supported")
-  public @NonNull ResponseEntity<Void> checkSumdbSupported(
-      @PathVariable final @NonNull String repoName) {
+  public ResponseEntity<Void> checkSumdbSupported(@PathVariable final String repoName) {
     return ResponseEntity.notFound().build();
   }
 
   @GetMapping("/{repoName}")
-  public @NonNull RestResponse<PagedModel<GoModuleListItem>> list(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.GOLANG);
-
-    this.golangAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+  @RepoOperation
+  public RestResponse<PagedModel<GoModuleListItem>> list(
+      final RepoInfo repoInfo,
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     final var modules = this.golangApiFacade.getModules(repoInfo.getStorageKey(), pageable);
 
@@ -84,16 +72,11 @@ public class GolangModuleController {
   }
 
   @GetMapping("/{repoName}/search")
-  public @NonNull RestResponse<PagedModel<GoModuleListItem>> search(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @RequestParam(required = false, defaultValue = "") final @NonNull String search,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.GOLANG);
-
-    this.golangAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+  @RepoOperation
+  public RestResponse<PagedModel<GoModuleListItem>> search(
+      final RepoInfo repoInfo,
+      @RequestParam(required = false, defaultValue = "") final String search,
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     final var modules =
         this.golangApiFacade.searchModules(repoInfo.getStorageKey(), search, pageable);
@@ -102,17 +85,12 @@ public class GolangModuleController {
   }
 
   @GetMapping("/{repoName}/versions")
-  public @NonNull RestResponse<PagedModel<GoModuleVersionListItem>> listVersions(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @RequestParam final @NonNull String modulePath,
-      @RequestParam(required = false, defaultValue = "") final @NonNull String search,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.GOLANG);
-
-    this.golangAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+  @RepoOperation
+  public RestResponse<PagedModel<GoModuleVersionListItem>> listVersions(
+      final RepoInfo repoInfo,
+      @RequestParam final String modulePath,
+      @RequestParam(required = false, defaultValue = "") final String search,
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     final var versions =
         this.golangApiFacade.getModuleVersions(
@@ -122,14 +100,9 @@ public class GolangModuleController {
   }
 
   @GetMapping("/{repoName}/info")
-  public @NonNull RestResponse<GoModuleInfo> getInfo(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @RequestParam final @NonNull String modulePath) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.GOLANG);
-
-    this.golangAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+  @RepoOperation
+  public RestResponse<GoModuleInfo> getInfo(
+      final RepoInfo repoInfo, @RequestParam final String modulePath) {
 
     final var moduleInfo = this.golangApiFacade.getModuleInfo(repoInfo.getStorageKey(), modulePath);
 
@@ -137,14 +110,8 @@ public class GolangModuleController {
   }
 
   @DeleteMapping("/{repoName}")
-  public @NonNull RestResponse<Void> delete(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @RequestParam final @NonNull String modulePath) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.GOLANG);
-
-    this.golangAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.MANAGE);
+  @RepoOperation(permission = Permission.MANAGE)
+  public RestResponse<Void> delete(final RepoInfo repoInfo, @RequestParam final String modulePath) {
 
     this.golangApiFacade.deleteModule(repoInfo, modulePath);
 
@@ -152,15 +119,11 @@ public class GolangModuleController {
   }
 
   @DeleteMapping("/{repoName}/versions")
-  public @NonNull RestResponse<Void> deleteVersion(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @RequestParam final @NonNull String modulePath,
-      @RequestParam final @NonNull String version) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.GOLANG);
-
-    this.golangAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.MANAGE);
+  @RepoOperation(permission = Permission.MANAGE)
+  public RestResponse<Void> deleteVersion(
+      final RepoInfo repoInfo,
+      @RequestParam final String modulePath,
+      @RequestParam final String version) {
 
     this.golangApiFacade.deleteModuleVersion(repoInfo, modulePath, version);
 

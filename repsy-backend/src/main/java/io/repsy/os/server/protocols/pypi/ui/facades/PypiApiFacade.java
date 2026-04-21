@@ -19,8 +19,8 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseDetail;
 import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPackageServiceImpl;
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
+import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.pypi.shared.utils.PackageUtils;
 import io.repsy.protocols.pypi.shared.utils.ReleaseVersion;
 import java.util.UUID;
@@ -33,17 +33,16 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class PypiApiFacade {
+public class PypiApiFacade implements ProtocolApiFacade {
 
-  private final @NonNull RepoTxService repoTxService;
   private final @NonNull PypiStorageService pypiStorageService;
   private final @NonNull PypiPackageServiceImpl pypiPackageService;
 
-  public void deleteRepo(final @NonNull RepoInfo repoInfo) {
+  public BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
 
-    this.pypiStorageService.deleteRepo(repoInfo.getStorageKey());
+    final var free = this.pypiStorageService.deleteRepo(repoInfo.getStorageKey());
 
-    this.repoTxService.deleteRepo(repoInfo.getStorageKey());
+    return BaseUsages.ofDisk(-1 * free);
   }
 
   public @NonNull BaseUsages deletePackage(

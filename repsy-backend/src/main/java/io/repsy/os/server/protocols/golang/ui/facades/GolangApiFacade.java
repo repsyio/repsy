@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.golang.ui.facades;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -26,6 +27,7 @@ import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModul
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleVersionRepository;
 import io.repsy.os.server.protocols.golang.shared.go_module.services.GoModuleServiceImpl;
 import io.repsy.os.server.protocols.golang.shared.storage.services.GolangStorageService;
+import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import java.util.List;
@@ -40,7 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class GolangApiFacade {
+public class GolangApiFacade implements ProtocolApiFacade {
 
   private final @NonNull RepoTxService repoTxService;
   private final @NonNull GolangStorageService golangStorageService;
@@ -54,9 +56,11 @@ public class GolangApiFacade {
   }
 
   @Transactional
-  public void deleteRepo(final @NonNull RepoInfo repoInfo) {
-    this.golangStorageService.deleteRepo(repoInfo.getStorageKey());
-    this.repoTxService.deleteRepo(repoInfo.getStorageKey());
+  public BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
+
+    final var free = this.golangStorageService.deleteRepo(repoInfo.getStorageKey());
+
+    return BaseUsages.ofDisk(-1 * free);
   }
 
   public @NonNull List<StorageItemInfo> getItems(

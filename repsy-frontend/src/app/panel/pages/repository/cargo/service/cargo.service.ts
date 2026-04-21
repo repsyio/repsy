@@ -56,7 +56,7 @@ export class CargoService {
   }
 
   public selectRepository(repoName: string): Observable<RepoPermissionInfo> {
-    const url = `${this.apiBaseUrl}/api/cargo/repos/${repoName}/permissions`;
+    const url = `${this.apiBaseUrl}/api/repos/${repoName}/permissions`;
 
     return new Observable<RepoPermissionInfo>((subscriber: Subscriber<RepoPermissionInfo>) => {
       this.http.get<RestResponse<RepoPermissionInfo>>(url).subscribe({
@@ -77,7 +77,7 @@ export class CargoService {
 
   public async createRepository(repoForm: RepoForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/cargo/repos`;
+      const url = `${this.apiBaseUrl}/api/repos/CARGO`;
 
       this.http
         .post<RestResponse<void>>(url, repoForm)
@@ -89,7 +89,7 @@ export class CargoService {
 
   public async fetchRepositories(): Promise<RepoListItem[]> {
     return new Promise<RepoListItem[]>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/cargo/repos/info`;
+      const url = `${this.apiBaseUrl}/api/repos/CARGO/info`;
 
       this.http
         .get<RestResponse<RepoListItem[]>>(url)
@@ -101,7 +101,7 @@ export class CargoService {
 
   public async fetchRepositoryUsage(): Promise<RepoUsageInfo> {
     return new Promise<RepoUsageInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/cargo/repos/${this.activeRepo.repoName}/usage`;
+      const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/usage`;
 
       this.http
         .get<RestResponse<RepoUsageInfo>>(url)
@@ -113,7 +113,7 @@ export class CargoService {
 
   public async fetchRepositorySettings(): Promise<RepoSettingsForm> {
     return new Promise<RepoSettingsForm>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/cargo/repos/${this.activeRepo.repoName}/settings`;
+      const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/settings`;
 
       this.http
         .get<RestResponse<RepoSettingsForm>>(url)
@@ -125,7 +125,7 @@ export class CargoService {
 
   public async updateRepoSettings(repoSettingsForm: RepoSettingsForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/cargo/repos/${this.activeRepo.repoName}/settings`;
+      const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/settings`;
       this.http
         .put<RestResponse<void>>(url, repoSettingsForm)
         .toPromise()
@@ -136,7 +136,7 @@ export class CargoService {
 
   public async updateRepositoryName(repositoryNameForm: RepoNameForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/cargo/repos/${this.activeRepo.repoName}/name`;
+      const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/name`;
 
       this.http
         .patch<RestResponse<void>>(url, repositoryNameForm)
@@ -153,7 +153,7 @@ export class CargoService {
   }
 
   public async updateRepoDescription(repositoryDescriptionForm: RepoDescriptionForm): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/cargo/repos/${this.activeRepo.repoName}/description`;
+    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/description`;
 
     return new Promise<void>((resolve, reject) => {
       return this.http
@@ -166,7 +166,7 @@ export class CargoService {
 
   public async deleteRepository(repo: string): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/cargo/repos/${repo}`;
+      const url = `${this.apiBaseUrl}/api/repos/${repo}`;
 
       this.http
         .delete<RestResponse<void>>(url)
@@ -272,7 +272,7 @@ export class CargoService {
 
   public async getDeployTokens(pageNumber: number, pageSize: number): Promise<PagedData<DeployTokenInfo>> {
     const params = new HttpParams().set('page', pageNumber.toString()).set('size', pageSize.toString());
-    const url = `${this.apiBaseUrl}/api/cargo/deploy-tokens/${this.activeRepo.repoName}`;
+    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens`;
 
     return new Promise<PagedData<DeployTokenInfo>>((resolve, reject) => {
       this.http
@@ -284,7 +284,7 @@ export class CargoService {
   }
 
   public async rotateDeployToken(tokenId: string): Promise<string> {
-    const url = `${this.apiBaseUrl}/api/cargo/deploy-tokens/${this.activeRepo.repoName}/${tokenId}`;
+    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens/${tokenId}`;
 
     return new Promise<string>((resolve, reject) => {
       this.http
@@ -296,7 +296,7 @@ export class CargoService {
   }
 
   public async createDeployToken(form: DeployTokenForm): Promise<TokenCreateInfo> {
-    const url = `${this.apiBaseUrl}/api/cargo/deploy-tokens/${this.activeRepo.repoName}`;
+    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens`;
 
     return new Promise<TokenCreateInfo>((resolve, reject) => {
       this.http
@@ -308,7 +308,7 @@ export class CargoService {
   }
 
   public async revokeDeployToken(tokenId: string): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/cargo/deploy-tokens/${this.activeRepo.repoName}/${tokenId}`;
+    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens/${tokenId}`;
 
     return new Promise((resolve, reject) => {
       this.http
