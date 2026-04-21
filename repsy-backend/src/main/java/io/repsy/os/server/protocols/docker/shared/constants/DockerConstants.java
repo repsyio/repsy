@@ -15,11 +15,12 @@
  */
 package io.repsy.os.server.protocols.docker.shared.constants;
 
+import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
 
+@UtilityClass
 @NullMarked
 public final class DockerConstants {
-  private DockerConstants() {}
 
   public static final String BLOBS = "/blobs";
   public static final String MANIFESTS = "/manifests";
