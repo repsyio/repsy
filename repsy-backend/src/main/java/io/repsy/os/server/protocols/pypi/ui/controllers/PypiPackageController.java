@@ -49,6 +49,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/pypi/packages")
 @NullMarked
+@SuppressWarnings("java:S6856")
 public class PypiPackageController {
 
   private final UsageUpdateService usageUpdateService;

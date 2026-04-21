@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.shared.protocols.ui.controllers;
+package io.repsy.os.server.protocols.shared.controllers;
 
 import static io.repsy.protocols.shared.repo.dtos.Permission.MANAGE;
 import static org.springframework.data.domain.Sort.Direction.DESC;
@@ -49,6 +49,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/repos/{repoName}/deploy-tokens")
 @NullMarked
+@SuppressWarnings("java:S6856")
 public class ProtocolDeployTokenController {
 
   private final DeployTokenService deployTokenService;

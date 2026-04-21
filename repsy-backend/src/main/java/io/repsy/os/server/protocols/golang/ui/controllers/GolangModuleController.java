@@ -45,6 +45,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/go/modules")
 @NullMarked
+@SuppressWarnings("java:S6856")
 public class GolangModuleController {
 
   private final GolangApiFacade golangApiFacade;

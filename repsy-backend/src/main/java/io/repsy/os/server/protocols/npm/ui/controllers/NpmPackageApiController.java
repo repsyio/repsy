@@ -52,6 +52,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/npm/packages")
 @NullMarked
+@SuppressWarnings("java:S6856")
 public class NpmPackageApiController {
 
   private static final String PACKAGES_FETCHED = "packagesFetched";

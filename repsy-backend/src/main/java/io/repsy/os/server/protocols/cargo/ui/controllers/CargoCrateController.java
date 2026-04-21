@@ -47,6 +47,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/cargo/crates")
 @NullMarked
+@SuppressWarnings("java:S6856")
 public class CargoCrateController {
 
   private final CargoApiFacade cargoApiFacade;

@@ -45,6 +45,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/mvn/key-stores")
 @NullMarked
+@SuppressWarnings("java:S6856")
 public class KeyStoreController {
 
   private final KeyStoreService keyStoreService;

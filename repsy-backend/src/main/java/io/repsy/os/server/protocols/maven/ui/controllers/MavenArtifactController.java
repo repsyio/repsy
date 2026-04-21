@@ -53,6 +53,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/mvn/artifacts")
 @NullMarked
+@SuppressWarnings("java:S6856")
 public class MavenArtifactController {
 
   private final UsageUpdateService usageUpdateService;

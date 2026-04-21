@@ -52,6 +52,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/docker/images")
+@SuppressWarnings("java:S6856")
 public class DockerImageController {
 
   private final @NonNull ImageTxService imageService;

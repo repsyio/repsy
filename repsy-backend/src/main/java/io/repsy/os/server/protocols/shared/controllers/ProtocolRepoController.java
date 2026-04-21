@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.shared.protocols.ui.controllers;
+package io.repsy.os.server.protocols.shared.controllers;
 
 import static io.repsy.protocols.shared.repo.dtos.Permission.MANAGE;
 
@@ -62,6 +62,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/repos")
 @NullMarked
+@SuppressWarnings("java:S6856")
 public class ProtocolRepoController {
 
   private final RepoTxService repoTxService;
