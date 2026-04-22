@@ -229,6 +229,13 @@
       <artifactId>passay</artifactId>
       <version>1.6.6</version>
     </dependency>
+
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+      <version>2.8.9</version>
+    </dependency>
+
     <!-- Runtime ########################################################### -->
 
     <dependency>
@@ -294,6 +301,73 @@
           </execution>
         </executions>
       </plugin>
+
+      <plugin>
+        <groupId>org.openapitools</groupId>
+        <artifactId>openapi-generator-maven-plugin</artifactId>
+        <version>7.17.0</version>
+        <executions>
+          <execution>
+            <id>open-api</id>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+            <configuration>
+              <inputSpec>
+                ${project.basedir}/src/main/resources/openapi/openapi.yaml
+              </inputSpec>
+              <generatorName>spring</generatorName>
+              <generateApis>false</generateApis>
+              <generateModels>true</generateModels>
+              <generateModelDocumentation>false</generateModelDocumentation>
+              <generateModelTests>false</generateModelTests>
+              <generateSupportingFiles>false</generateSupportingFiles>
+              <output>${project.build.directory}/generated-sources/openapi</output>
+              <modelPackage>io.repsy.os.generated.model</modelPackage>
+              <skip>${openapi.generator.skip}</skip>
+              <configOptions>
+                <useSpringBoot3>true</useSpringBoot3>
+                <openApiNullable>false</openApiNullable>
+                <useOptional>false</useOptional>
+              </configOptions>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>download-spec</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <version>3.1.0</version>
+            <executions>
+              <execution>
+                <id>download-openapi-spec</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <configuration>
+                  <executable>curl</executable>
+                  <arguments>
+                    <argument>-s</argument>
+                    <argument>-f</argument>
+                    <argument>-o</argument>
+                    <argument>${project.basedir}/src/main/resources/openapi/openapi.yaml</argument>
+                    <argument>http://localhost:9090/v3/api-docs.yaml</argument>
+                  </arguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
