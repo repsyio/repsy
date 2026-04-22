@@ -14,7 +14,7 @@
       </div>
 
       <div>
-        @if (repoType !== 'cargo') {
+        @if (repoType !== 'cargo' && repoType !== 'golang') {
           <app-package-override
             [parentForm]="repoType === 'maven' ? mavenSettingsForm : generalSettingsForm"
             [repoType]="repoType"

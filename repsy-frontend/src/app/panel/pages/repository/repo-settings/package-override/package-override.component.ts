@@ -72,12 +72,7 @@ export class PackageOverrideComponent implements OnInit {
           this.fetch.emit();
         })
         .catch((err: string) => this.toastService.show(err, 'error'));
-    } else if (
-      this.repoType === RepoType.NPM ||
-      this.repoType === RepoType.PYPI ||
-      this.repoType === RepoType.DOCKER ||
-      this.repoType === RepoType.CARGO
-    ) {
+    } else if (this.repoType === RepoType.NPM || this.repoType === RepoType.PYPI || this.repoType === RepoType.DOCKER) {
       const form = new RepoSettingsForm();
       form.allowOverride = this.allowOverride;
       form.privateRepo = this.parentForm.get('privateRepository')?.value;
