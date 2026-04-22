@@ -66,13 +66,13 @@ public class ProtocolEndpointDispatcher implements WebMvcConfigurer {
 
     registry
         .addInterceptor(this.authInterceptor)
-        .addPathPatterns("/api/repos/**/")
-        .addPathPatterns("/api/npm/packages/**/")
-        .addPathPatterns("/api/pypi/packages/**/")
-        .addPathPatterns("/api/mvn/artifacts/**/")
-        .addPathPatterns("/api/mvn/key-stores/**/")
-        .addPathPatterns("/api/cargo/crates/**/")
-        .addPathPatterns("/api/go/modules/**/")
-        .addPathPatterns("/api/docker/images/**/");
+        .addPathPatterns("/api/repos/**")
+        .addPathPatterns("/api/npm/packages/**")
+        .addPathPatterns("/api/pypi/packages/**")
+        .addPathPatterns("/api/mvn/artifacts/**")
+        .addPathPatterns("/api/mvn/key-stores/**")
+        .addPathPatterns("/api/cargo/crates/**")
+        .addPathPatterns("/api/go/modules/**")
+        .addPathPatterns("/api/docker/images/**");
   }
 }
