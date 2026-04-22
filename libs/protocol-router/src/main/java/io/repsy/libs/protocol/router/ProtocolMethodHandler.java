@@ -19,21 +19,18 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
-import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
 public interface ProtocolMethodHandler {
 
-  @NonNull List<@NonNull HttpMethod> getSupportedMethods();
+  List<HttpMethod> getSupportedMethods();
 
-  @NonNull Map<@NonNull String, @NonNull Object> getProperties();
+  Map<String, Object> getProperties();
 
-  @NonNull PathParser getPathParser();
+  PathParser getPathParser();
 
-  @NonNull ResponseEntity<@NonNull Object> handle(
-      @NonNull ProtocolContext parsedPath,
-      @NonNull HttpServletRequest request,
-      @NonNull HttpServletResponse response)
+  ResponseEntity<Object> handle(
+      ProtocolContext parsedPath, HttpServletRequest request, HttpServletResponse response)
       throws Exception;
 }

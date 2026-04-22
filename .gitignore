@@ -56,5 +56,3 @@ docker-compose.yml
 # Since we use pnpm by default
 package-lock.json
 application-local.yml
-
-# Vercel

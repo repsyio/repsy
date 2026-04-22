@@ -15,6 +15,9 @@
  */
 package io.repsy.libs.storage.gateway.filesystem.service;
 
+import static java.nio.file.StandardOpenOption.APPEND;
+import static java.nio.file.StandardOpenOption.CREATE;
+
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
@@ -179,13 +182,31 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     final long bytesWritten;
     try (final InputStream is = inputStream;
         final OutputStream os =
-            Files.newOutputStream(
-                physicalPath, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+            Files.newOutputStream(physicalPath, CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 
       bytesWritten = is.transferTo(os);
     }
 
     return BaseUsages.builder().diskUsage(bytesWritten - existingFileLength).build();
+  }
+
+  @Override
+  @SneakyThrows
+  public @NonNull BaseUsages append(
+      final @NonNull String repoName, final @NonNull StoragePath storagePath, final byte[] data) {
+
+    final Path physicalPath = this.toPhysicalPath(storagePath);
+    final Path directory = physicalPath.getParent();
+
+    if (!Files.exists(directory)) {
+      Files.createDirectories(directory);
+    }
+
+    try (final var os = Files.newOutputStream(physicalPath, CREATE, APPEND)) {
+      os.write(data);
+    }
+
+    return BaseUsages.builder().diskUsage(data.length).build();
   }
 
   @Override

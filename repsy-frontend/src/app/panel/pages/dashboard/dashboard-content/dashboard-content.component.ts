@@ -53,6 +53,8 @@ export class DashboardContentComponent {
   public npmRegistryCount = 0;
   public pypiRepoCount = 0;
   public dockerRepoCount = 0;
+  public cargoRepoCount = 0;
+  public golangRepoCount = 0;
   public repositories: Repository[] = [];
   public repoListInfos: RepoListInfo[] = [];
   public createRepoModal: boolean;
@@ -124,6 +126,15 @@ export class DashboardContentComponent {
       this.dockerRepoCount = c;
       this.cdRef.markForCheck();
     });
+    this.statsService.getCargoRepoCount().then((c) => {
+      this.cargoRepoCount = c;
+      this.cdRef.markForCheck();
+    });
+
+    this.statsService.getGolangRepoCount().then((c) => {
+      this.golangRepoCount = c;
+      this.cdRef.markForCheck();
+    });
   }
 
   private fetchRepoInfos() {
@@ -146,6 +157,16 @@ export class DashboardContentComponent {
       RepoType.DOCKER,
       this.statsService.getDockerRepoInfo.bind(this.statsService),
       this.statsService.fetchDockerRepositoryUsage.bind(this.statsService),
+    );
+    this.fetchRepoInfo(
+      RepoType.CARGO,
+      this.statsService.getCargoRepoInfo.bind(this.statsService),
+      this.statsService.fetchCargoRepositoryUsage.bind(this.statsService),
+    );
+    this.fetchRepoInfo(
+      RepoType.GOLANG,
+      this.statsService.getGolangRepoInfo.bind(this.statsService),
+      this.statsService.fetchGolangRepositoryUsage.bind(this.statsService),
     );
   }
 }

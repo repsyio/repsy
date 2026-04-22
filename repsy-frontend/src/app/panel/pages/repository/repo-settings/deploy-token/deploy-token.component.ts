@@ -32,8 +32,12 @@ import { PagedData } from '../../../../shared/dto/paged-data';
 import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
 import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
+import { CargoConfigComponent } from '../../cargo/config/cargo-config.component';
+import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerConfigComponent } from '../../docker/config/docker-config.component';
 import { DockerService } from '../../docker/service/docker.service';
+import { GolangConfigComponent } from '../../golang/config/golang-config.component';
+import { GolangService } from '../../golang/service/golang.service';
 import { MavenConfigComponent } from '../../maven/config/maven-config.component';
 import { MavenService } from '../../maven/service/maven.service';
 import { NpmConfigComponent } from '../../npm/config/npm-config.component';
@@ -54,6 +58,8 @@ import { TokenCreateInfo } from './dto/token-create-info';
     DeployTokenInfoModalComponent,
     TooltipComponent,
     DockerConfigComponent,
+    CargoConfigComponent,
+    GolangConfigComponent,
     NgClass,
     MavenConfigComponent,
     PypiConfigComponent,
@@ -86,6 +92,8 @@ export class DeployTokenComponent implements OnInit {
     private readonly npmService: NpmService,
     private readonly pypiService: PypiService,
     private readonly dockerService: DockerService,
+    private readonly golangService: GolangService,
+    private readonly cargoService: CargoService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
   ) {
@@ -116,6 +124,12 @@ export class DeployTokenComponent implements OnInit {
       case RepoType.NPM: {
         return this.npmService.fetchRegistryUsage();
       }
+      case RepoType.CARGO: {
+        return this.cargoService.fetchRepositoryUsage();
+      }
+      case RepoType.GOLANG: {
+        return this.golangService.fetchRepositoryUsage();
+      }
       default:
         return Promise.reject('Unsupported repository type');
     }
@@ -135,6 +149,12 @@ export class DeployTokenComponent implements OnInit {
       }
       case RepoType.NPM: {
         return this.npmService.getDeployTokens(pageNum, pageSize);
+      }
+      case RepoType.GOLANG: {
+        return this.golangService.getDeployTokens(pageNum, pageSize);
+      }
+      case RepoType.CARGO: {
+        return this.cargoService.getDeployTokens(pageNum, pageSize);
       }
       default:
         return Promise.reject('Unsupported repository type');
@@ -174,6 +194,12 @@ export class DeployTokenComponent implements OnInit {
       }
       case RepoType.NPM: {
         return this.npmService.rotateDeployToken(tokenUuid);
+      }
+      case RepoType.CARGO: {
+        return this.cargoService.rotateDeployToken(tokenUuid);
+      }
+      case RepoType.GOLANG: {
+        return this.golangService.rotateDeployToken(tokenUuid);
       }
       default:
         return Promise.reject('Unsupported repository type');
@@ -217,6 +243,12 @@ export class DeployTokenComponent implements OnInit {
       }
       case RepoType.NPM: {
         return this.npmService.revokeDeployToken(tokenId);
+      }
+      case RepoType.CARGO: {
+        return this.cargoService.revokeDeployToken(tokenId);
+      }
+      case RepoType.GOLANG: {
+        return this.golangService.revokeDeployToken(tokenId);
       }
       default:
         return Promise.reject('Unsupported repository type');

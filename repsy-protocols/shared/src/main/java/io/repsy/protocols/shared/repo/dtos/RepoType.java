@@ -15,13 +15,17 @@
  */
 package io.repsy.protocols.shared.repo.dtos;
 
+import java.util.Arrays;
+import java.util.Optional;
 import org.jspecify.annotations.NonNull;
 
 public enum RepoType {
   MAVEN("mvn__"),
   NPM("npm__"),
   PYPI("pypi__"),
-  DOCKER("docker__");
+  DOCKER("docker__"),
+  CARGO("cargo__"),
+  GOLANG("go__");
 
   private final @NonNull String prefix;
 
@@ -35,5 +39,9 @@ public enum RepoType {
 
   public @NonNull String withPrefix(final @NonNull String repoName) {
     return this.prefix + repoName;
+  }
+
+  public static Optional<RepoType> fromString(final String value) {
+    return Arrays.stream(values()).filter(t -> t.name().equalsIgnoreCase(value)).findFirst();
   }
 }

@@ -50,7 +50,7 @@ final class UserController {
   private final @NonNull RestResponseFactory resp;
 
   @GetMapping
-  public @NonNull RestResponse<PagedModel<UserResponse>> getUsers(
+  public @NonNull RestResponse<PagedModel<UserResponse>> list(
       @RequestParam(required = false, defaultValue = "") final @NonNull String search,
       @RequestParam(defaultValue = "0") final int page,
       @RequestParam(defaultValue = "10") final int size) {
@@ -88,7 +88,7 @@ final class UserController {
     return this.resp.success("userDeleted");
   }
 
-  @PostMapping("/{userId}/reset-password")
+  @PostMapping("/{userId}/actions/reset-password")
   public @NonNull RestResponse<String> resetPassword(@PathVariable final @NonNull UUID userId) {
 
     final var newPassword = this.userTxService.resetUserPassword(userId);

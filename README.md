@@ -1,7 +1,7 @@
 <a href="https://repsy.io" target="_blank"><img src="./repsy-frontend/src/assets/images/repsy.png" alt="Repsy Logo" width="200"/></a>
 # Repsy: The Open Source Universal Package Repository
 
-**Repsy** is an open-source, universal package repository that makes it easy to host, manage, and distribute your packages across multiple ecosystems — all in one place. With support for popular formats including Docker, Maven, NPM, PyPI, and more, Repsy helps streamline your development workflows and supports teams of any size.
+**Repsy** is an open-source, universal package repository that makes it easy to host, manage, and distribute your packages across multiple ecosystems — all in one place. With support for popular formats including Golang, Cargo (Rust), Docker, Maven, NPM, PyPI, and more, Repsy helps streamline your development workflows and supports teams of any size.
 ## Table of Contents
 
 - [Features](#features)
@@ -20,7 +20,7 @@
 ## Features
 
 - **Repository Management**: Create, manage, and organize repositories
-- **Multi-Protocol Support**: Maven, npm, PyPI, Docker registries
+- **Multi-Protocol Support**: Golang, Cargo (Rust), Maven, npm, PyPI, Docker registries
 - **User Authentication**: Secure JWT-based authentication
 - **Deploy Tokens**: Secure token-based deployment mechanism
 - **Real-time Dashboard**: Monitor repository activity
@@ -37,7 +37,7 @@ docker run -d \
   --name repsy \
   -p 8080:8080 \
   -p 9090:9090 \
-  repo.repsy.io/repsy/os/repsy:26.03.0
+  repo.repsy.io/repsy/os/repsy:26.04.0
 ```
 
 Access the application:
@@ -66,7 +66,7 @@ docker run -d \
   -p 9090:9090 \
   -e ADMIN_INITIAL_PASSWORD=YourSecurePassword123 \
   -v repsy-data:/app/data \
-  repo.repsy.io/repsy/os/repsy:26.03.0
+  repo.repsy.io/repsy/os/repsy:26.04.0
 ```
 
 > The `-v repsy-data:/app/data` flag persists the H2 database across container restarts. Setting `STORAGE_BASE_PATH=/app/data/storage` ensures artifact file storage is also kept inside the same volume. Without it, artifacts default to `~/.repsy` on the host and are **not** covered by the volume mount.
@@ -97,7 +97,7 @@ docker run -d \
   -e DB_USERNAME=repsy \
   -e DB_PASSWORD=repsy123 \
   -e ADMIN_INITIAL_PASSWORD=YourSecurePassword123 \
-  repo.repsy.io/repsy/os/repsy:26.03.0
+  repo.repsy.io/repsy/os/repsy:26.04.0
 ```
 
 ### Option 3: Docker Compose with PostgreSQL
@@ -119,7 +119,7 @@ services:
 
   repsy:
     container_name: repsy
-    image: repo.repsy.io/repsy/os/repsy:26.03.0
+    image: repo.repsy.io/repsy/os/repsy:26.04.0
     depends_on:
       - postgres
     ports:
@@ -199,7 +199,7 @@ Access at:
     - **Username**: `admin`
     - **Password**: the value you set for `ADMIN_INITIAL_PASSWORD`
 
-For detailed information on creating repositories, managing deploy tokens, and using different protocols (Maven, npm, PyPI, Docker), see the [documentation](https://docs.repsy.io).
+For detailed information on creating repositories, managing deploy tokens, and using different protocols (Golang, Cargo(Rust), Maven, npm, PyPI, Docker), see the [documentation](https://docs.repsy.io).
 
 ## Troubleshooting
 
@@ -276,7 +276,7 @@ docker run -d \
   -e ADMIN_INITIAL_PASSWORD=YourSecurePassword123 \
   -e STORAGE_BASE_PATH=/app/data/storage \
   -v repsy-data:/app/data \
-  repo.repsy.io/repsy/os/repsy:26.03.0
+  repo.repsy.io/repsy/os/repsy:26.04.0
 ```
 
 ## Development

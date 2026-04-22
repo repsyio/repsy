@@ -1,0 +1,191 @@
+<app-cargo-config [baseUrl]="baseUrl" [username]="username" [repoName]="activeRepo.repoName" [(open)]="showConfig" />
+
+<div
+  [ngClass]="{ 'pointer-events-none opacity-50 select-none': loading || this.error }"
+  class="mb-7 flex flex-col flex-col-reverse items-start justify-between gap-4 md:items-start lg:flex-row lg:items-center"
+>
+  <div class="flex w-full flex-col items-start gap-4 sm:w-auto sm:flex-row sm:items-center">
+    <app-searchbox class="w-full sm:max-w-[192px]" placeholder="crate" (filter)="search($event)" />
+    <div class="flex w-full gap-2 sm:w-auto">
+      <app-sort-selector
+        [options]="sortOptions"
+        [(selectedOption)]="sortOption"
+        (choose)="sort($event)"
+        class="w-full sm:w-auto"
+      />
+      <button
+        (click)="refreshPage()"
+        class="hover:text-secondary-500 flex h-[40px] w-[40px] items-center justify-center text-neutral-200"
+      >
+        <img ngSrc="/assets/icons/input/refresh.svg" alt="refresh" height="22" width="22" />
+      </button>
+    </div>
+  </div>
+
+  <div class="flex w-full items-center justify-end gap-2 sm:w-auto">
+    <button (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
+      <img ngSrc="/assets/icons/input/configure.svg" alt="configure" height="16" width="16" />
+      Configure
+    </button>
+    @if (canManage) {
+      <button [routerLink]="'/' + activeRepo.repoName + '/settings'" class="repsy-btn-ghost w-full sm:w-auto">
+        <img ngSrc="/assets/icons/input/settings.svg" alt="settings" height="18" width="18" />
+        Settings
+      </button>
+    }
+  </div>
+</div>
+
+@if (loading) {
+  <app-spinner />
+} @else {
+  @if (!this.error) {
+    @if (crates?.length > 0) {
+      <div class="text-body1">
+        <div
+          class="hidden grid-cols-[2fr_2fr_2fr_1fr_30px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          animate.enter="fade-in-up"
+        >
+          <div>Crate</div>
+          <div>Latest</div>
+          <div>Last Updated</div>
+          <div>Downloads</div>
+          <div></div>
+        </div>
+        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
+          @for (crate of crates; track crate.name; let i = $index) {
+            <div role="button" [routerLink]="'/' + activeRepo.repoName + '/' + crate.name">
+              <div
+                animate.enter="fade-in-down"
+                [ngClass]="{ 'rounded-b-[12px]': i === crates.length - 1 }"
+                class="grid grid-cols-[2fr_2fr_2fr_1fr_30px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+              >
+                <div class="flex items-center gap-2">
+                  <img
+                    src="/assets/icons/repo/cargo.svg"
+                    alt="Cargo"
+                    class="h-[20px] w-[20px] group-hover:opacity-90"
+                    width="20"
+                    height="20"
+                  />
+                  <app-tooltip
+                    class="text-secondary-500 group-hover:underline"
+                    [text]="crate.name | ellipsis"
+                    [textHover]="crate.name"
+                  />
+                </div>
+                <app-tooltip
+                  class="text-[#FDFDFD]"
+                  [text]="crate.max_version | ellipsis"
+                  [textHover]="crate.max_version"
+                />
+                @if (crate.updated_at) {
+                  <app-tooltip
+                    class="text-secondary-500 group-hover:underline"
+                    [text]="timeAgo(crate.updated_at)"
+                    [textHover]="crate.updated_at | date: 'medium'"
+                    [always]="true"
+                  />
+                } @else {
+                  <span class="text-[#9FA0A0]">—</span>
+                }
+                <span class="text-[#FDFDFD]">{{ crate.downloads }}</span>
+                @if (activeRepo.canManage) {
+                  <app-dropdown (click)="$event.stopPropagation()">
+                    <button
+                      (click)="deleteCrate(crate)"
+                      [disabled]="loading"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                    >
+                      <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+                      Delete
+                    </button>
+                  </app-dropdown>
+                }
+              </div>
+              @if (i !== crates.length - 1) {
+                <div class="h-[1px] w-full bg-[#404141]"></div>
+              }
+            </div>
+          }
+        </div>
+
+        @for (crate of crates; track crate.name; let i = $index) {
+          <div animate.enter="fade-in-down" class="lg:hidden">
+            <div
+              class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+              role="button"
+              [routerLink]="'/' + activeRepo.repoName + '/' + crate.name"
+            >
+              @if (activeRepo.canManage) {
+                <app-dropdown class="relative left-4 ml-auto" (click)="$event.stopPropagation()">
+                  <button
+                    (click)="deleteCrate(crate)"
+                    [disabled]="loading"
+                    class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                  >
+                    <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+                    Delete
+                  </button>
+                </app-dropdown>
+              }
+              <div class="space-y-2">
+                <div class="flex justify-between gap-2">
+                  <span class="text-sm text-[#9FA0A0]">Crate:</span>
+                  <span class="text-secondary-500 inline-flex items-center gap-2 text-right break-all">
+                    <svg
+                      class="h-[14px] w-[14px] text-[#9FA0A0]"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M12 2L8 4.3V9L12 11.3L16 9V4.3L12 2ZM6.1 8.8L2 11.2V16.1L6.1 18.5L10.2 16.1V11.2L6.1 8.8ZM17.9 8.8L13.8 11.2V16.1L17.9 18.5L22 16.1V11.2L17.9 8.8Z"
+                      />
+                    </svg>
+                    {{ crate.name }}
+                  </span>
+                </div>
+                <div class="flex justify-between gap-2">
+                  <span class="text-sm text-[#9FA0A0]">Latest:</span>
+                  <span class="text-right break-all text-[#FDFDFD]">{{ crate.max_version }}</span>
+                </div>
+                <div class="flex justify-between gap-2">
+                  <span class="text-sm text-[#9FA0A0]">Last Updated:</span>
+                  <span class="text-right break-all text-[#FDFDFD]">{{ crate.updated_at }}</span>
+                </div>
+                <div class="flex justify-between gap-2">
+                  <span class="text-sm text-[#9FA0A0]">Downloads:</span>
+                  <span class="text-right break-all text-[#FDFDFD]">{{ crate.downloads }}</span>
+                </div>
+              </div>
+            </div>
+            @if (i !== crates.length - 1) {
+              <div class="px-2 py-4">
+                <div class="h-[1px] bg-[#404141]"></div>
+              </div>
+            }
+          </div>
+        }
+        <app-pagination
+          (pageNumChange)="loadPage($event)"
+          [pageNum]="pageNum"
+          [totalPages]="pagedData.page.totalPages"
+        />
+      </div>
+    } @else {
+      <app-empty-list />
+    }
+  } @else {
+    <div animate.enter="fade-in-up" class="p-8 text-center">
+      <img
+        class="mx-auto mb-[70px]"
+        ngSrc="/assets/images/hippo-empty.svg"
+        alt="hippo-empty"
+        height="243"
+        width="510"
+      />
+      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+    </div>
+  }
+}

@@ -1,6 +1,6 @@
-<div class="h-[295px] w-full rounded-[12px] border border-[#404141] bg-[#101112]">
+<div class="min-h-[295px] w-full rounded-[12px] border border-[#404141] bg-[#101112]">
   <!-- Repository List -->
-  <div class="flex flex-col gap-[20px] space-y-1 p-[20px]">
+  <div class="flex flex-col gap-[12px] p-[20px]">
     <!-- Docker Row -->
     <a
       href="javascript:void(0)"
@@ -47,6 +47,28 @@
       <div class="h-[22.73px] w-[22.49px]">
         <img ngSrc="/assets/icons/pypi/pypi2-light.svg" alt="Python" height="46" width="46" />
       </div>
+    </a>
+
+    <!-- Golang Row -->
+    <a
+      href="javascript:void(0)"
+      (click)="routeGolang()"
+      class="flex h-[43px] items-center justify-between rounded-[12px] border border-[#101112] bg-linear-to-b from-[rgba(17,16,16,0.6)] to-[#1D1C1C] px-[20px] hover:border-[#404141]"
+    >
+      <div class="text-[13px] text-[#FDFDFD]">{{ golangRepoCount }} / Repositories are in use.</div>
+      <div class="h-[23px] w-[32px]">
+        <img ngSrc="/assets/icons/golang/golang-light.svg" alt="Go" height="23" width="60" />
+      </div>
+    </a>
+
+    <!-- Cargo Row -->
+    <a
+      href="javascript:void(0)"
+      (click)="routeCargo()"
+      class="flex h-[43px] items-center justify-between rounded-[12px] border border-[#101112] bg-linear-to-b from-[rgba(17,16,16,0.6)] to-[#1D1C1C] px-[20px] hover:border-[#404141]"
+    >
+      <div class="text-[13px] text-[#FDFDFD]">{{ cargoRepoCount }} / Repositories are in use.</div>
+      <img src="assets/icons/cargo/cargo_light.svg" width="23" height="60" />
     </a>
   </div>
 </div>

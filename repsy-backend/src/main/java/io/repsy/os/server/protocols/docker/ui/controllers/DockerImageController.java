@@ -15,13 +15,10 @@
  */
 package io.repsy.os.server.protocols.docker.ui.controllers;
 
-import static org.springframework.http.HttpHeaders.AUTHORIZATION;
-
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.server.protocols.docker.shared.auth.services.DockerAuthComponent;
 import io.repsy.os.server.protocols.docker.shared.image.dtos.ImageListItem;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.layer.dtos.ManifestListItem;
@@ -30,18 +27,16 @@ import io.repsy.os.server.protocols.docker.shared.tag.dtos.TagDetail;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
 import io.repsy.os.server.protocols.docker.shared.tag.services.TagDeletionComponent;
 import io.repsy.os.server.protocols.docker.ui.facades.DockerApiFacade;
+import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
-import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -49,7 +44,6 @@ import org.springframework.data.web.PagedModel;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -58,11 +52,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/docker/images")
+@SuppressWarnings("java:S6856")
 public class DockerImageController {
 
-  private final @NonNull DockerAuthComponent dockerAuthComponent;
-
-  private final @NonNull RepoTxService repoTxService;
   private final @NonNull ImageTxService imageService;
   private final @NonNull ManifestTxService manifestService;
   private final @NonNull DockerApiFacade dockerApiFacade;
@@ -70,17 +62,12 @@ public class DockerImageController {
   private final @NonNull UsageUpdateService usageUpdateService;
   private final @NonNull RestResponseFactory restResponseFactory;
 
-  @GetMapping("/{repoName}/search")
-  public @NonNull RestResponse<PagedModel<ImageListItem>> getImages(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @RequestParam(required = false, defaultValue = "") final @NonNull String name,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.DOCKER);
-
-    this.dockerAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+  @GetMapping("/{repoName}")
+  @RepoOperation
+  public RestResponse<PagedModel<ImageListItem>> list(
+      final RepoInfo repoInfo,
+      @RequestParam(required = false, defaultValue = "") final String name,
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     final var packages =
         this.imageService.findAllByRepoIdAndContainsName(repoInfo.getStorageKey(), name, pageable);
@@ -88,18 +75,13 @@ public class DockerImageController {
     return this.restResponseFactory.success("imagesFetched", new PagedModel<>(packages));
   }
 
-  @GetMapping("/{repoName}/{imageName}/tags/search")
-  public @NonNull RestResponse<PagedModel<ImageTagListItem>> getImageTags(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @PathVariable final @NonNull String imageName,
-      @RequestParam(required = false, defaultValue = "") final @NonNull String name,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.DOCKER);
-
-    this.dockerAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+  @GetMapping("/{repoName}/{imageName}/tags")
+  @RepoOperation
+  public RestResponse<PagedModel<ImageTagListItem>> listTags(
+      final RepoInfo repoInfo,
+      @PathVariable final String imageName,
+      @RequestParam(required = false, defaultValue = "") final String name,
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     final var imageTags =
         this.manifestService.getImageTagsContainsName(
@@ -109,14 +91,8 @@ public class DockerImageController {
   }
 
   @DeleteMapping("/{repoName}/{imageName}")
-  public @NonNull RestResponse<Void> deleteImage(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @PathVariable final @NonNull String imageName) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.DOCKER);
-
-    this.dockerAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.MANAGE);
+  @RepoOperation(permission = Permission.MANAGE)
+  public RestResponse<Void> delete(final RepoInfo repoInfo, @PathVariable final String imageName) {
 
     final var usages = this.dockerApiFacade.deleteImage(repoInfo, imageName);
 
@@ -126,15 +102,11 @@ public class DockerImageController {
   }
 
   @GetMapping({"/{repoName}/{imageName}", "/{repoName}/{imageName}/tags/{tagName}"})
-  public @NonNull RestResponse<TagDetail> getTagDetail(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @PathVariable final @NonNull String imageName,
-      @PathVariable final @NonNull String tagName) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.DOCKER);
-
-    this.dockerAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+  @RepoOperation
+  public RestResponse<TagDetail> getTagDetail(
+      final RepoInfo repoInfo,
+      @PathVariable final String imageName,
+      @PathVariable final String tagName) {
 
     final var tagDetail =
         this.dockerApiFacade.getTagDetail(repoInfo.getStorageKey(), imageName, tagName);
@@ -143,15 +115,11 @@ public class DockerImageController {
   }
 
   @DeleteMapping("/{repoName}/{imageName}/tags/{tagName}")
-  public @NonNull RestResponse<Void> deleteTag(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @PathVariable final @NonNull String imageName,
-      @PathVariable final @NonNull String tagName) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.DOCKER);
-
-    this.dockerAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.MANAGE);
+  @RepoOperation(permission = Permission.MANAGE)
+  public RestResponse<Void> deleteTag(
+      final RepoInfo repoInfo,
+      @PathVariable final String imageName,
+      @PathVariable final String tagName) {
 
     final var usages = this.tagDeletionComponent.deleteTag(repoInfo, imageName, tagName);
 
@@ -160,19 +128,14 @@ public class DockerImageController {
     return this.restResponseFactory.success("tagDeleted");
   }
 
-  @GetMapping("/{repoName}/{imageName}/tags/{tagName}/manifests/search")
-  public @NonNull RestResponse<PagedModel<ManifestListItem>> getTagManifests(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @PathVariable final @NonNull String imageName,
-      @PathVariable final @NonNull String tagName,
-      @RequestParam(required = false, defaultValue = "") final @NonNull String name,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.DOCKER);
-
-    this.dockerAuthComponent.authorizeUserRequest(repoInfo, authHeader, Permission.READ);
+  @GetMapping("/{repoName}/{imageName}/tags/{tagName}/manifests")
+  @RepoOperation
+  public RestResponse<PagedModel<ManifestListItem>> listTagManifests(
+      final RepoInfo repoInfo,
+      @PathVariable final String imageName,
+      @PathVariable final String tagName,
+      @RequestParam(required = false, defaultValue = "") final String name,
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     final var tagLayers =
         this.dockerApiFacade.getTagManifestsLikeName(repoInfo, imageName, tagName, name, pageable);
@@ -181,16 +144,12 @@ public class DockerImageController {
   }
 
   @GetMapping("/{repoName}/{imageName}/manifests/{reference}")
-  public @NonNull RestResponse<String> getManifest(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @PathVariable final @NonNull String imageName,
-      @PathVariable @NonNull final String reference)
+  @RepoOperation
+  public RestResponse<String> getManifest(
+      final RepoInfo repoInfo,
+      @PathVariable final String imageName,
+      @PathVariable final String reference)
       throws IOException {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.DOCKER);
-
-    this.dockerAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.READ, false);
 
     final var tag =
         this.manifestService.findActiveTagByRepoAndDigest(
@@ -205,16 +164,12 @@ public class DockerImageController {
   }
 
   @GetMapping("/{repoName}/{ignoredImageName}/configs/{digest}")
-  public @NonNull RestResponse<String> getConfig(
-      @RequestHeader(value = AUTHORIZATION, required = false) final @Nullable String authHeader,
-      @PathVariable final @NonNull String repoName,
-      @PathVariable final @NonNull String ignoredImageName,
-      @PathVariable @NonNull final String digest)
+  @RepoOperation
+  public RestResponse<String> getConfig(
+      final RepoInfo repoInfo,
+      @PathVariable final String ignoredImageName,
+      @PathVariable final String digest)
       throws IOException {
-
-    final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.DOCKER);
-
-    this.dockerAuthComponent.authorizeRequest(repoInfo, authHeader, Permission.READ, false);
 
     final var layer = this.dockerApiFacade.findLayerByDigestAndRepoAndImageName(repoInfo, digest);
 
@@ -223,7 +178,7 @@ public class DockerImageController {
     return this.restResponseFactory.success("configFetched", config);
   }
 
-  public void updateUsage(final @NonNull RepoInfo repoInfo, final @NonNull BaseUsages usages) {
+  private void updateUsage(final RepoInfo repoInfo, final BaseUsages usages) {
 
     final var usageUpdatedInfo = new UsageChangedInfo(repoInfo.getStorageKey(), usages);
 

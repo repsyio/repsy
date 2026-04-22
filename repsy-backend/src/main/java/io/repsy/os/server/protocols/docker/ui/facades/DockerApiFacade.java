@@ -15,11 +15,9 @@
  */
 package io.repsy.os.server.protocols.docker.ui.facades;
 
-import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.layer.dtos.ManifestListItem;
@@ -29,6 +27,7 @@ import io.repsy.os.server.protocols.docker.shared.tag.dtos.TagDetail;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
 import io.repsy.os.server.protocols.docker.ui.utils.RepoUtils;
+import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
 import io.repsy.os.shared.repo.dtos.RepoSettingsInfo;
@@ -55,7 +54,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 @RequiredArgsConstructor
-public class DockerApiFacade {
+public class DockerApiFacade implements ProtocolApiFacade {
 
   private static final @NonNull String BLOBS_PATH = "blobs";
   private static final @NonNull String MANIFESTS_PATH = "manifests";
@@ -66,7 +65,7 @@ public class DockerApiFacade {
   private final @NonNull ManifestTxService manifestService;
   private final @NonNull DockerStorageService dockerStorageService;
 
-  public void deleteRepo(final @NonNull RepoInfo repoInfo) {
+  public @NonNull BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
 
     RepoUtils.validateRepoName(repoInfo.getName());
 
@@ -79,20 +78,9 @@ public class DockerApiFacade {
 
     this.layerTxService.deleteAllLayers(repoInfo.getStorageKey());
 
-    this.dockerStorageService.deleteRepo(repoInfo.getStorageKey());
+    final var free = this.dockerStorageService.deleteRepo(repoInfo.getStorageKey());
 
-    this.repoTxService.deleteRepo(repoInfo.getStorageKey());
-  }
-
-  @Transactional(readOnly = true)
-  public @NonNull List<StorageItemInfo> getItems(
-      final @NonNull RepoInfo repoInfo, final @NonNull RelativePath relativePath) {
-
-    this.validateParams(repoInfo.getName(), relativePath.getPath());
-
-    final var info = this.repoTxService.getRepo(repoInfo.getStorageKey());
-
-    return this.dockerStorageService.getItems(info.getStorageKey(), relativePath);
+    return BaseUsages.builder().diskUsage(-1L * free).build();
   }
 
   @Transactional(readOnly = true)
@@ -115,19 +103,6 @@ public class DockerApiFacade {
     RepoUtils.validateRepoName(repoInfo.getName());
 
     this.repoTxService.updateSettings(repoInfo.getStorageKey(), settings);
-  }
-
-  private void validateParams(final @NonNull String repoName, final @NonNull String path) {
-
-    RepoUtils.validateRepoName(repoName);
-
-    final var segments = path.split("/", -1);
-
-    for (final var segment : segments) {
-      if (segment.equals("..")) {
-        throw new AccessNotAllowedException("invalidRequest");
-      }
-    }
   }
 
   public @NonNull BaseUsages deleteImage(

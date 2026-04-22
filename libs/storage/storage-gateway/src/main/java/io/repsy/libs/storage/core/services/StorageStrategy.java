@@ -45,6 +45,8 @@ public interface StorageStrategy {
   @NonNull BaseUsages write(
       @NonNull String repoName, @NonNull StoragePath storagePath, @NonNull InputStream inputStream);
 
+  BaseUsages append(String repoName, StoragePath path, byte[] data);
+
   @NonNull Optional<Resource> get(@NonNull StoragePath path, @NonNull String repoName)
       throws IsADirectoryException;
 

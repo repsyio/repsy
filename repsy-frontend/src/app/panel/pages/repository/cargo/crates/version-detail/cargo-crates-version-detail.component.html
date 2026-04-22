@@ -1,0 +1,89 @@
+@if (loading) {
+  <app-spinner />
+} @else {
+  @if (!this.error) {
+    @if (crateVersion) {
+      <div class="mb-4" animate.enter="fade-in-up">
+        <div
+          class="mb-4 inline-flex gap-2 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[16px] py-[6px] text-[14px] text-[#FDFDFD]"
+        >
+          <img ngSrc="/assets/icons/cursor/tick.svg" alt="tick" height="12" width="16" />
+          {{ crateVersion.version }}
+        </div>
+        <p class="font-courier mb-8 text-[12px] text-[#9C9C9D]">
+          Uploaded at: {{ crateVersion.created_at | date: 'medium' }}
+        </p>
+
+        @if (crateVersion.hasLib) {
+          <h3 class="mb-2 text-[13px] text-white">Add Dependency:</h3>
+          <div class="mb-8 inline-flex items-start gap-2 rounded-lg bg-[#101112] p-[14px]">
+            <img class="h-5 w-5" ngSrc="/assets/icons/repo/cargo.svg" alt="Cargo" height="20" width="20" />
+            <span class="text-[13px] break-all text-[#9C9C9D]">{{ addDependencyCommand }}</span>
+            <app-copy-clipboard [text]="addDependencyCommand" />
+          </div>
+        } @else {
+          <h3 class="mb-2 text-[13px] text-white">Install Binary:</h3>
+          <div class="mb-8 inline-flex items-start gap-2 rounded-lg bg-[#101112] p-[14px]">
+            <img class="h-5 w-5" ngSrc="/assets/icons/repo/cargo.svg" alt="Cargo" height="20" width="20" />
+            <span class="text-[13px] break-all text-[#9C9C9D]">{{ installBinaryCommand }}</span>
+            <app-copy-clipboard [text]="installBinaryCommand" />
+          </div>
+        }
+
+        <h3 class="mb-2 text-[13px] text-white">Cargo.toml:</h3>
+        <div class="relative mb-6 overflow-x-auto rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+          <div class="flex items-center justify-between gap-2 border-b border-[#2A2A2A] p-4">
+            <span class="text-[14px] text-[#FDFDFD]">Cargo.toml</span>
+            <app-copy-clipboard [text]="cargoToml" />
+          </div>
+          <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <code [highlight]="cargoToml" language="toml" lineNumbers>
+        </code>
+      </pre>
+        </div>
+
+        <div class="mb-8 rounded-lg bg-[#101112] p-[22px] text-[24px]">
+          <h3 class="text-neutral-200">{{ packageName }}</h3>
+        </div>
+
+        <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Metadata</h2>
+        <div class="mb-8 flex flex-col gap-2 text-[14px]">
+          <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+            <span class="text-white">Crate: </span>
+            <span class="text-[#9C9C9D]">{{ crateVersion.name }}</span>
+          </div>
+          <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+            <span class="text-white">Downloads: </span>
+            <span class="text-[#9C9C9D]">{{ crateVersion.downloads }}</span>
+          </div>
+          <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+            <span class="text-white">Rust Version: </span>
+            <span class="text-[#9C9C9D]">{{ crateVersion.rust_version || 'Not specified' }}</span>
+          </div>
+        </div>
+
+        @if (activeRepo.canManage) {
+          <button
+            (click)="deleteVersion()"
+            [disabled]="loading"
+            class="repsy-btn-danger group ml-auto w-full sm:w-auto"
+          >
+            <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+            Delete Version
+          </button>
+        }
+      </div>
+    }
+  } @else {
+    <div animate.enter="fade-in-up" class="p-8 text-center">
+      <img
+        class="mx-auto mb-[70px]"
+        ngSrc="/assets/images/hippo-empty.svg"
+        alt="hippo-empty"
+        height="243"
+        width="510"
+      />
+      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+    </div>
+  }
+}

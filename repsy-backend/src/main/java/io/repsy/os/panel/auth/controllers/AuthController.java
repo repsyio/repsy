@@ -50,7 +50,7 @@ class AuthController {
     return this.resp.success("loginSucceeded", loginInfo);
   }
 
-  @PostMapping("/refresh-token")
+  @PostMapping("/tokens/refresh")
   public @NonNull RestResponse<LoginInfo> refreshToken(
       @RequestBody @Valid final @NonNull RefreshTokenForm form) {
 

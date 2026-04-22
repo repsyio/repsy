@@ -29,16 +29,18 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestApiPort(MultiPortNames.PORT_API)
 @RestController
-@RequestMapping("/api/usage")
+@RequestMapping("/api/usages")
 @RequiredArgsConstructor
 public class UsageController {
 
   private final @NonNull RestResponseFactory responseFactory;
   private final @NonNull UsageService usageService;
 
-  @GetMapping("/total")
+  @GetMapping
   public @NonNull RestResponse<TotalUsageInfo> getTotalUsage() {
+
     final var totalUsageInfo = this.usageService.getTotalUsageInfo();
+
     return this.responseFactory.success("usageFetched", totalUsageInfo);
   }
 }

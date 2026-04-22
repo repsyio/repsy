@@ -15,12 +15,12 @@
  */
 package io.repsy.os.shared.constants;
 
+import lombok.NoArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked
+@NoArgsConstructor
 public final class ErrorConstants {
-
-  private ErrorConstants() {}
 
   public static final String REPO_NOT_FOUND = "repoNotFound";
   public static final String UN_AUTHORIZED = "unAuthorized";

@@ -22,11 +22,13 @@ import { ToastService } from '../../../../shared/components/toast/toast.service'
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
+import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerService } from '../../docker/service/docker.service';
 import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form';
 import { MavenService } from '../../maven/service/maven.service';
 import { NpmService } from '../../npm/service/npm.service';
 import { PypiService } from '../../pypi/service/pypi.service';
+import { GolangService } from '../../golang/service/golang.service';
 
 @Component({
   selector: 'app-visibility',
@@ -45,6 +47,8 @@ export class VisibilityComponent {
     private readonly npmService: NpmService,
     private readonly pypiService: PypiService,
     private readonly dockerService: DockerService,
+    private readonly cargoService: CargoService,
+    private readonly golangService: GolangService,
     private readonly toastService: ToastService,
   ) {}
 
@@ -87,6 +91,10 @@ export class VisibilityComponent {
         return this.pypiService.updateRepoSettings(form);
       case RepoType.DOCKER:
         return this.dockerService.updateRepoSettings(form);
+      case RepoType.GOLANG:
+        return this.golangService.updateRepoSettings(form);
+      case RepoType.CARGO:
+        return this.cargoService.updateRepoSettings(form);
       default:
         return Promise.reject('Unsupported repository type');
     }

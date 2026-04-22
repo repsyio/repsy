@@ -25,8 +25,10 @@ import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { RepoPermissionInfo } from '../../../shared/dto/repo/repo-permission-info';
 import { RepoType } from '../../../shared/dto/repo/repo-type';
+import { CargoService } from '../cargo/service/cargo.service';
 import { DockerService } from '../docker/service/docker.service';
 import { MavenRepoSettingsForm } from '../maven/dto/maven-repo-settings-form';
+import { GolangService } from '../golang/service/golang.service';
 import { MavenService } from '../maven/service/maven.service';
 import { NpmService } from '../npm/service/npm.service';
 import { RepositorySettingsInfo } from '../pypi/dto/repository-settings-info';
@@ -79,6 +81,8 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
     private readonly npmService: NpmService,
     private readonly pypiService: PypiService,
     private readonly dockerService: DockerService,
+    private readonly cargoService: CargoService,
+    private readonly golangService: GolangService,
     private readonly toastService: ToastService,
     private readonly router: Router,
     private readonly repoLookupService: RepoLookupService,
@@ -174,6 +178,12 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
       case RepoType.DOCKER: {
         return this.dockerService.repoChanges;
       }
+      case RepoType.GOLANG: {
+        return this.golangService.repoChanges;
+      }
+      case RepoType.CARGO: {
+        return this.cargoService.repoChanges;
+      }
       default:
         throw new Error('Unsupported repository type');
     }
@@ -192,6 +202,12 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
       }
       case RepoType.DOCKER: {
         return this.dockerService.fetchRepositorySettings();
+      }
+      case RepoType.GOLANG: {
+        return this.golangService.fetchRepositorySettings();
+      }
+      case RepoType.CARGO: {
+        return this.cargoService.fetchRepositorySettings();
       }
       default:
         return Promise.reject('Unsupported repository type');

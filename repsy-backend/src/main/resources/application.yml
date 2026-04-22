@@ -76,3 +76,9 @@ os:
         pypi:
           base-path: ${storage-gateway.fs.base-path}/pypi
           trash-path: ${storage-gateway.fs.base-path}/pypi/trash
+        cargo:
+          base-path: ${storage-gateway.fs.base-path}/cargo
+          trash-path: ${storage-gateway.fs.base-path}/cargo/trash
+        golang:
+          base-path: ${storage-gateway.fs.base-path}/golang
+          trash-path: ${storage-gateway.fs.base-path}/golang/trash

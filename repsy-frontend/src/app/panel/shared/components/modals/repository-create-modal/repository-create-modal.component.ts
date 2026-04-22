@@ -19,7 +19,9 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
+import { CargoService } from '../../../../pages/repository/cargo/service/cargo.service';
 import { DockerService } from '../../../../pages/repository/docker/service/docker.service';
+import { GolangService } from '../../../../pages/repository/golang/service/golang.service';
 import { MavenService } from '../../../../pages/repository/maven/service/maven.service';
 import { NpmService } from '../../../../pages/repository/npm/service/npm.service';
 import { PypiService } from '../../../../pages/repository/pypi/service/pypi.service';
@@ -42,7 +44,7 @@ export class RepositoryCreateModalComponent implements OnInit {
   @Input() public open: boolean;
   @Input() selectedOption: RepoType;
 
-  public options = [RepoType.DOCKER, RepoType.MAVEN, RepoType.NPM, RepoType.PYPI];
+  public options = [RepoType.DOCKER, RepoType.MAVEN, RepoType.NPM, RepoType.PYPI, RepoType.CARGO, RepoType.GOLANG];
   public form: FormGroup;
 
   public loading = false;
@@ -52,6 +54,8 @@ export class RepositoryCreateModalComponent implements OnInit {
     private readonly npmService: NpmService,
     private readonly pypiService: PypiService,
     private readonly dockerService: DockerService,
+    private readonly cargoService: CargoService,
+    private readonly golangService: GolangService,
     private readonly fb: FormBuilder,
     private readonly router: Router,
     private readonly toastService: ToastService,
@@ -113,6 +117,10 @@ export class RepositoryCreateModalComponent implements OnInit {
         return this.pypiService.createRepository(form);
       case RepoType.DOCKER:
         return this.dockerService.createRepository(form);
+      case RepoType.GOLANG:
+        return this.golangService.createRepository(form);
+      case RepoType.CARGO:
+        return this.cargoService.createRepository(form);
       default:
         return Promise.reject('Unsupported repository type');
     }

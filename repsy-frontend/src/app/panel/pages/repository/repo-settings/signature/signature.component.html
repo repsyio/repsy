@@ -54,7 +54,7 @@
         </div>
       }
 
-      @for (keyStore of keyStores; track keyStore.uuid) {
+      @for (keyStore of keyStores; track keyStore.id) {
         <div class="flex min-w-0 justify-between gap-2">
           <div
             class="flex w-full min-w-0 justify-between gap-2 rounded-lg border border-neutral-400 px-[20px] py-[12px]"
@@ -65,7 +65,7 @@
           </div>
 
           <button
-            (click)="deleteKeyStore(keyStore.uuid)"
+            (click)="deleteKeyStore(keyStore.id)"
             class="hover:text-error-500 flex h-[50px] min-w-[50px] flex-shrink-0 items-center justify-center rounded-lg border border-neutral-400 font-bold text-white"
           >
             <svg

@@ -17,21 +17,21 @@ package io.repsy.libs.protocol.router;
 
 import lombok.Builder;
 import lombok.Data;
-import org.jspecify.annotations.NonNull;
 import org.springframework.http.ResponseEntity;
 
 @Builder
 @Data
 public class ProcessorResult {
+
   private boolean isEmpty;
-  private @NonNull ResponseEntity<Object> result;
+  private ResponseEntity<Object> result;
 
   public static ProcessorResult next() {
 
     return ProcessorResult.builder().isEmpty(true).result(ResponseEntity.ofNullable(null)).build();
   }
 
-  public static ProcessorResult of(final @NonNull ResponseEntity<Object> result) {
+  public static ProcessorResult of(final ResponseEntity<Object> result) {
 
     return ProcessorResult.builder().isEmpty(false).result(result).build();
   }

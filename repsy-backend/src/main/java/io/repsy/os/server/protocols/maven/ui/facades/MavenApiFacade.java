@@ -16,14 +16,16 @@
 package io.repsy.os.server.protocols.maven.ui.facades;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactVersionInfo;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactServiceImpl;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
-import io.repsy.os.shared.repo.dtos.MavenRepoSettingsForm;
+import io.repsy.os.server.protocols.shared.services.ProtocolApiFacadeMavenAdapter;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
 import io.repsy.os.shared.repo.dtos.RepoSettingsInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.repo.utils.RepoUtils;
@@ -44,18 +46,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class MavenApiFacade {
+public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
 
   private final @NonNull RepoTxService repoTxService;
   private final @NonNull ArtifactServiceImpl artifactService;
   private final @NonNull MavenStorageService mavenStorageService;
 
   @Transactional
-  public void deleteRepo(final @NonNull RepoInfo repoInfo) {
+  public BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
 
-    this.mavenStorageService.deleteRepo(repoInfo.getStorageKey());
+    final var free = this.mavenStorageService.deleteRepo(repoInfo.getStorageKey());
 
-    this.repoTxService.deleteRepo(repoInfo.getStorageKey());
+    return BaseUsages.ofDisk(-1 * free);
   }
 
   public @NonNull List<StorageItemInfo> getItems(
@@ -85,9 +87,9 @@ public class MavenApiFacade {
 
   @Transactional
   public void updateSettings(
-      final @NonNull RepoInfo repoInfo, final @NonNull MavenRepoSettingsForm settings) {
+      final @NonNull RepoInfo repoInfo, final @NonNull RepoSettingsForm settings) {
 
-    this.repoTxService.updateMavenSettings(repoInfo.getStorageKey(), settings);
+    this.repoTxService.updateSettings(repoInfo.getStorageKey(), settings);
   }
 
   private void validateParams(final @NonNull String repoName, final @NonNull String path) {
