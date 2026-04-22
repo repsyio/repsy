@@ -15,8 +15,8 @@
  */
 package io.repsy.protocols.shared.repo.dtos;
 
-import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import java.util.Arrays;
+import java.util.Optional;
 import org.jspecify.annotations.NonNull;
 
 public enum RepoType {
@@ -41,10 +41,7 @@ public enum RepoType {
     return this.prefix + repoName;
   }
 
-  public static RepoType fromString(final String value) {
-    return Arrays.stream(values())
-        .filter(t -> t.name().equalsIgnoreCase(value))
-        .findFirst()
-        .orElseThrow(() -> new ItemNotFoundException("unknownRepoType"));
+  public static Optional<RepoType> fromString(final String value) {
+    return Arrays.stream(values()).filter(t -> t.name().equalsIgnoreCase(value)).findFirst();
   }
 }

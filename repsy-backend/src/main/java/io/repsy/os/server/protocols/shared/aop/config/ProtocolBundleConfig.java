@@ -36,6 +36,7 @@ public class ProtocolBundleConfig {
       @Qualifier("dockerAuthComponent") final ProtocolAuthService docker,
       @Qualifier("pypiAuthComponent") final ProtocolAuthService pypi,
       @Qualifier("golangAuthComponent") final ProtocolAuthService golang) {
+
     return Map.of(
         RepoType.CARGO, cargo,
         RepoType.MAVEN, maven,
@@ -53,6 +54,7 @@ public class ProtocolBundleConfig {
       @Qualifier("dockerApiFacade") final ProtocolApiFacade docker,
       @Qualifier("pypiApiFacade") final ProtocolApiFacade pypi,
       @Qualifier("golangApiFacade") final ProtocolApiFacade golang) {
+
     return Map.of(
         RepoType.CARGO, cargo,
         RepoType.MAVEN, maven,

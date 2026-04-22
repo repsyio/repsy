@@ -22,6 +22,8 @@ import io.repsy.os.shared.repo.dtos.RepoPermissionInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -52,7 +54,7 @@ public class ResolverUtils {
     return uriVariables.get(REPO_NAME);
   }
 
-  public static @Nullable RepoType extractRepoType(final Map<String, String> uriVariables) {
+  public static Optional<RepoType> extractRepoType(final Map<String, String> uriVariables) {
 
     final var repoType = uriVariables.get(REPO_TYPE);
 

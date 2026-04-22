@@ -19,6 +19,7 @@ import static io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils.REPO_I
 import static io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils.REPO_PERMISSION_INFO;
 import static org.springframework.web.servlet.HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
@@ -56,7 +57,7 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
       return true;
     }
 
-    this.getRepoOperation(methodHandler);
+    this.checkRepoOperationAnnotationExists(methodHandler);
 
     final var repoInfoOpt = this.getRepoInfo(request);
 
@@ -78,13 +79,13 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
   private void authenticateUser(final HttpServletRequest request) {
 
     final var uriVariables = this.getUriVariables(request);
-    final var repoType = ResolverUtils.extractRepoType(uriVariables);
+    final var repoTypeOpt = ResolverUtils.extractRepoType(uriVariables);
 
-    if (repoType == null) {
-      return;
+    if (repoTypeOpt.isEmpty()) {
+      throw new ItemNotFoundException("repoTypeNotFound");
     }
 
-    final var authComponent = this.authComponents.get(repoType);
+    final var authComponent = this.authComponents.get(repoTypeOpt.get());
     final var authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
     authComponent.authenticateUser(authHeader);
@@ -119,13 +120,12 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
     return uriVariables;
   }
 
-  private void getRepoOperation(final HandlerMethod handler) {
+  private void checkRepoOperationAnnotationExists(final HandlerMethod handler) {
 
     final var annotation = handler.getMethodAnnotation(RepoOperation.class);
 
     if (annotation == null) {
-      log.warn("Annotation is not found!");
-      throw new IllegalArgumentException();
+      throw new IllegalArgumentException("RepoOperation Annotations is missing.");
     }
   }
 
@@ -150,9 +150,13 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
       return;
     }
 
-    final var type = RepoType.fromString(scope.name());
+    final var typeOpt = RepoType.fromString(scope.name());
 
-    if (repoInfo.getType() == type) {
+    if (typeOpt.isEmpty()) {
+      throw new ItemNotFoundException("repoTypeNotFound");
+    }
+
+    if (repoInfo.getType() == typeOpt.get()) {
       return;
     }
 
