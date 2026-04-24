@@ -405,20 +405,31 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     }
 
     final var fileName = gav.getName();
+
     if (fileName != null && !fileName.endsWith(".pom")) {
       return;
     }
+
+    this.checkForDB(gav);
+    this.checkForStorage(repoInfo, storagePath);
+  }
+
+  private void checkForDB(final Gav gav) {
 
     final var artifactName = gav.getArtifactId();
     final var groupName = gav.getGroupId();
     final var version = gav.getVersion();
 
-    if (this.artifactRepository.existsByArtifactNameAndGroupNameAndVersion(
+    if (this.artifactRepository.existsByArtifactNameAndGroupNameAndArtifactVersionsVersionName(
         artifactName, groupName, version)) {
       throw new AccessNotAllowedException("artifactOverrideIsProhibited");
     }
+  }
+
+  private void checkForStorage(final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath) {
 
     final var storageFileName = storagePath.getRelativePath().getFileName();
+
     if (storageFileName.contains("maven-metadata.xml")) {
       return;
     }

@@ -59,14 +59,6 @@ public interface ArtifactRepository extends JpaRepository<Artifact, UUID> {
   Optional<Artifact> findByRepoIdAndGroupNameAndArtifactName(
       UUID repoId, String groupName, String artifactName);
 
-  @Query(
-      """
-    select case when count(av) > 0 then true else false end
-    from ArtifactVersion av
-    where av.artifact.artifactName = :artifactName
-      and av.artifact.groupName = :groupName
-      and av.versionName = :version
-    """)
-  boolean existsByArtifactNameAndGroupNameAndVersion(
+  boolean existsByArtifactNameAndGroupNameAndArtifactVersionsVersionName(
       String artifactName, String groupName, String version);
 }
