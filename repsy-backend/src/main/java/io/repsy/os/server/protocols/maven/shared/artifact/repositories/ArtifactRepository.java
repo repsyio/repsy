@@ -20,7 +20,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -28,36 +28,45 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
+@NullMarked
 public interface ArtifactRepository extends JpaRepository<Artifact, UUID> {
 
   @Query(
       """
           select a.groupName from Artifact a where a.repo.id = :repoId
           """)
-  @NonNull List<String> findGroupNamesByRepoId(UUID repoId);
+  List<String> findGroupNamesByRepoId(UUID repoId);
 
-  long countByRepoIdAndGroupName(UUID repoId, @NonNull String groupName);
+  long countByRepoIdAndGroupName(UUID repoId, String groupName);
 
   @Query(
       """
           select a from Artifact a
           where a.repo.id = :repoId and a.groupName like %:groupName%""")
-  @NonNull Page<ArtifactListItem> findAllByRepoIdAndContainsGroupName(
-      UUID repoId, @NonNull String groupName, @NonNull Pageable pageable);
+  Page<ArtifactListItem> findAllByRepoIdAndContainsGroupName(
+      UUID repoId, String groupName, Pageable pageable);
 
   @Query(
       """
           select a from Artifact a
           where a.repo.id = :repoId and a.groupName = :groupName and a.artifactName
           like %:artifactName%""")
-  @NonNull Page<ArtifactListItem> findAllByRepoIdContainsArtifactName(
-      UUID repoId,
-      @NonNull String groupName,
-      @NonNull String artifactName,
-      @NonNull Pageable pageable);
+  Page<ArtifactListItem> findAllByRepoIdContainsArtifactName(
+      UUID repoId, String groupName, String artifactName, Pageable pageable);
 
-  @NonNull List<Artifact> findAllByRepoIdAndGroupName(UUID repoId, @NonNull String groupName);
+  List<Artifact> findAllByRepoIdAndGroupName(UUID repoId, String groupName);
 
-  @NonNull Optional<Artifact> findByRepoIdAndGroupNameAndArtifactName(
-      UUID repoId, @NonNull String groupName, @NonNull String artifactName);
+  Optional<Artifact> findByRepoIdAndGroupNameAndArtifactName(
+      UUID repoId, String groupName, String artifactName);
+
+  @Query(
+      """
+    select case when count(av) > 0 then true else false end
+    from ArtifactVersion av
+    where av.artifact.artifactName = :artifactName
+      and av.artifact.groupName = :groupName
+      and av.versionName = :version
+    """)
+  boolean existsByArtifactNameAndGroupNameAndVersion(
+      String artifactName, String groupName, String version);
 }
