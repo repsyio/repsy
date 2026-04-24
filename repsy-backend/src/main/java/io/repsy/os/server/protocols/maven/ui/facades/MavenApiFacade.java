@@ -20,13 +20,13 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
-import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactVersionInfo;
+import io.repsy.os.generated.model.ArtifactVersionInfo;
+import io.repsy.os.generated.model.RepoSettingsForm;
+import io.repsy.os.generated.model.RepoSettingsInfo;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactServiceImpl;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacadeMavenAdapter;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
-import io.repsy.os.shared.repo.dtos.RepoSettingsInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.repo.utils.RepoUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -125,7 +125,10 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
         this.artifactService.getArtifactVersionPomFilename(
             repoInfo,
             artifactBasePath,
-            artifactVersionInfo.getType(),
+            artifactVersionInfo.getType() != null
+                ? io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.valueOf(
+                    artifactVersionInfo.getType().name())
+                : null,
             artifactVersionInfo.getArtifactName(),
             artifactVersionInfo.getVersionName());
 

@@ -22,19 +22,19 @@ import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
+import io.repsy.os.generated.model.RepoCreateForm;
+import io.repsy.os.generated.model.RepoDescriptionForm;
+import io.repsy.os.generated.model.RepoListInfo;
+import io.repsy.os.generated.model.RepoPermissionInfo;
+import io.repsy.os.generated.model.RepoRenameForm;
+import io.repsy.os.generated.model.RepoSettingsForm;
+import io.repsy.os.generated.model.RepoSettingsInfo;
+import io.repsy.os.generated.model.RepoUsageInfo;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacadeMavenAdapter;
-import io.repsy.os.shared.repo.dtos.RepoCreateForm;
-import io.repsy.os.shared.repo.dtos.RepoDescriptionForm;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.dtos.RepoListInfo;
-import io.repsy.os.shared.repo.dtos.RepoPermissionInfo;
-import io.repsy.os.shared.repo.dtos.RepoRenameForm;
-import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
-import io.repsy.os.shared.repo.dtos.RepoSettingsInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
-import io.repsy.os.shared.usage.dtos.RepoUsageInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -79,7 +79,10 @@ public class ProtocolRepoController {
 
     final var repoInfo =
         this.repoTxService.createRepo(
-            form.getName(), repoType, form.isPrivateRepo(), form.getDescription());
+            form.getName(),
+            repoType,
+            Boolean.TRUE.equals(form.getPrivateRepo()),
+            form.getDescription());
 
     facade.createRepo(repoInfo.getStorageKey());
 

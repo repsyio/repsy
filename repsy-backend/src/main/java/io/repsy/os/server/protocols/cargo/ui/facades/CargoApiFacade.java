@@ -16,17 +16,18 @@
 package io.repsy.os.server.protocols.cargo.ui.facades;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.os.generated.model.CrateListItem;
+import io.repsy.os.generated.model.CrateVersionListItem;
+import io.repsy.os.generated.model.RepoSettingsForm;
+import io.repsy.os.generated.model.RepoSettingsInfo;
+import io.repsy.os.server.protocols.cargo.shared.crate.mappers.CargoCrateConverter;
 import io.repsy.os.server.protocols.cargo.shared.crate.services.CargoCrateServiceImpl;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
-import io.repsy.os.shared.repo.dtos.RepoSettingsInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import java.io.IOException;
 import java.util.List;
@@ -50,6 +51,7 @@ public class CargoApiFacade implements ProtocolApiFacade {
 
   private final RepoTxService repoTxService;
   private final CargoCrateServiceImpl cargoCrateService;
+  private final CargoCrateConverter cargoCrateConverter;
   private final CargoStorageService cargoStorageService;
   private final ObjectMapper objectMapper;
 
@@ -80,7 +82,9 @@ public class CargoApiFacade implements ProtocolApiFacade {
   public Page<CrateListItem> search(
       final RepoInfo repoInfo, final String query, final Pageable pageable) {
 
-    return this.cargoCrateService.search(repoInfo, query, pageable);
+    return this.cargoCrateService
+        .search(repoInfo, query, pageable)
+        .map(this.cargoCrateConverter::toCrateListItemDto);
   }
 
   @Transactional(readOnly = true)
@@ -100,7 +104,9 @@ public class CargoApiFacade implements ProtocolApiFacade {
   public Page<CrateVersionListItem> getCrateVersions(
       final RepoInfo repoInfo, final String name, final String query, final Pageable pageable) {
 
-    return this.cargoCrateService.getCrateVersions(repoInfo, name, query, pageable);
+    return this.cargoCrateService
+        .getCrateVersions(repoInfo, name, query, pageable)
+        .map(this.cargoCrateConverter::toCrateVersionListItemDto);
   }
 
   public BaseUsages deleteCrate(final RepoInfo repoInfo, final String name) throws IOException {

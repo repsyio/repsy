@@ -17,10 +17,10 @@ package io.repsy.os.shared.repo.services;
 
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.os.generated.model.RepoListInfo;
+import io.repsy.os.generated.model.RepoSettingsForm;
+import io.repsy.os.generated.model.RepoSettingsInfo;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.dtos.RepoListInfo;
-import io.repsy.os.shared.repo.dtos.RepoSettingsForm;
-import io.repsy.os.shared.repo.dtos.RepoSettingsInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.mappers.RepoConverter;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
@@ -95,10 +95,10 @@ public class RepoTxService {
   @Transactional
   public void updateSettings(final @NonNull UUID repoId, final @NonNull RepoSettingsForm settings) {
     final var repo = this.findRepoById(repoId);
-    repo.setPrivateRepo(settings.isPrivateRepo());
-    repo.setAllowOverride(settings.isAllowOverride());
-    repo.setReleases(settings.isReleases());
-    repo.setSnapshots(settings.isSnapshots());
+    repo.setPrivateRepo(settings.getPrivateRepo());
+    repo.setAllowOverride(settings.getAllowOverride());
+    repo.setReleases(settings.getReleases());
+    repo.setSnapshots(settings.getSnapshots());
     this.repoRepository.save(repo);
   }
 

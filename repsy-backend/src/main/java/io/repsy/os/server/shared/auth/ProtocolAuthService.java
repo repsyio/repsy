@@ -22,16 +22,15 @@ import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromBasi
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBearerToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.removeBasicPrefix;
-import static io.repsy.os.shared.repo.dtos.RepoPermissionInfo.buildPublicReadOnlyPermissions;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
+import io.repsy.os.generated.model.RepoPermissionInfo;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.PermissionInfo;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.dtos.RepoPermissionInfo;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
@@ -122,7 +121,14 @@ public class ProtocolAuthService {
 
     // Auth header is null
     if (this.isPublicReadAccess(repoInfo, permission)) {
-      return buildPublicReadOnlyPermissions(repoInfo);
+      return RepoPermissionInfo.builder()
+          .repoName(repoInfo.getName())
+          .description(repoInfo.getDescription())
+          ._private(false)
+          .canRead(true)
+          .canWrite(false)
+          .canManage(false)
+          .build();
     }
 
     throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
@@ -242,7 +248,14 @@ public class ProtocolAuthService {
     final var userInfo = this.authenticateUser(authHeader);
     final var permissionInfo = this.authorizeUser(userInfo, permission);
 
-    return RepoPermissionInfo.buildRepoPermissionInfo(repoInfo, permissionInfo);
+    return RepoPermissionInfo.builder()
+        .repoName(repoInfo.getName())
+        .description(repoInfo.getDescription())
+        ._private(repoInfo.isPrivateRepo())
+        .canRead(permissionInfo.isCanRead())
+        .canWrite(permissionInfo.isCanWrite())
+        .canManage(permissionInfo.isCanManage())
+        .build();
   }
 
   private @NonNull UserInfo authenticateWithBasic(final @NonNull String authHeader) {

@@ -17,7 +17,8 @@ package io.repsy.os.server.protocols.maven.shared.keystore.services;
 
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
-import io.repsy.os.server.protocols.maven.shared.keystore.dtos.KeyStoreForm;
+import io.repsy.os.generated.model.KeyStoreForm;
+import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactConverter;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.KeyStoreItem;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.KeyStore;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.KeyStoreRepository;
@@ -43,14 +44,15 @@ public class KeyStoreService {
 
   private final @NonNull KeyStoreRepository keyStoreRepository;
   private final @NonNull RepoRepository repoRepository;
+  private final @NonNull ArtifactConverter artifactConverter;
 
   public void create(final @NonNull RepoInfo repoInfo, final @NonNull KeyStoreForm form) {
 
-    if (this.hasWellKnownHosts(form.url())) {
+    if (this.hasWellKnownHosts(form.getUrl())) {
       throw new ItemAlreadyExistException("wellknownKeyStoreHost");
     }
 
-    if (this.keyStoreRepository.existsByUrlAndRepoId(form.url(), repoInfo.getStorageKey())) {
+    if (this.keyStoreRepository.existsByUrlAndRepoId(form.getUrl(), repoInfo.getStorageKey())) {
       throw new ItemAlreadyExistException("keyStoreUrlAlreadyExists");
     }
 
@@ -61,7 +63,7 @@ public class KeyStoreService {
 
     final var keyStore = new KeyStore();
 
-    keyStore.setUrl(form.url());
+    keyStore.setUrl(form.getUrl());
     keyStore.setRepo(repo);
 
     this.keyStoreRepository.save(keyStore);
@@ -81,7 +83,7 @@ public class KeyStoreService {
     this.keyStoreRepository.delete(keyStore);
   }
 
-  public @NonNull Page<KeyStoreItem> findAll(
+  public @NonNull Page<io.repsy.os.generated.model.KeyStoreItem> findAll(
       final @NonNull RepoInfo repoInfo, final @NonNull Pageable pageable) {
 
     final var keyStores =
@@ -91,7 +93,7 @@ public class KeyStoreService {
       Page.empty();
     }
 
-    return keyStores;
+    return keyStores.map(this.artifactConverter::toKeyStoreItemDto);
   }
 
   public @NonNull List<KeyStoreItem> findByRepoId(final UUID repoId) {

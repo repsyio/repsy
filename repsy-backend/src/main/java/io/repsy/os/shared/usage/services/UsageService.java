@@ -18,10 +18,10 @@ package io.repsy.os.shared.usage.services;
 import static io.repsy.os.shared.utils.UsageUtils.humanReadable;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.os.generated.model.RepoUsageInfo;
+import io.repsy.os.generated.model.TotalUsageInfo;
+import io.repsy.os.generated.model.UsageInfo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
-import io.repsy.os.shared.usage.dtos.RepoUsageInfo;
-import io.repsy.os.shared.usage.dtos.TotalUsageInfo;
-import io.repsy.os.shared.usage.dtos.UsageInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

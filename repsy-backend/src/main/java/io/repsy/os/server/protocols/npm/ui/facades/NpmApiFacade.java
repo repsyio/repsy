@@ -16,7 +16,7 @@
 package io.repsy.os.server.protocols.npm.ui.facades;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionDetail;
+import io.repsy.os.generated.model.PackageVersionDetail;
 import io.repsy.os.server.protocols.npm.shared.npm_package.mappers.NpmPackageConverter;
 import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmPackageServiceImpl;
 import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;

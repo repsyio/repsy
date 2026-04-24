@@ -17,8 +17,8 @@ package io.repsy.os.panel.auth.services;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.events.UserLoginEvent;
-import io.repsy.os.panel.auth.dtos.LoginForm;
-import io.repsy.os.panel.shared.auth.dtos.LoginInfo;
+import io.repsy.os.generated.model.LoginForm;
+import io.repsy.os.generated.model.LoginInfo;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.user.dtos.UserInfo;

@@ -30,4 +30,11 @@ public interface ImageConverter {
     @Mapping(target = "repoName", source = "repo.name")
   })
   ImageInfo toImageInfo(Image image);
+
+  @Mapping(
+      target = "updatedAt",
+      expression =
+          "java(source.getUpdatedAt() != null ? source.getUpdatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
+  io.repsy.os.generated.model.ImageListItem toDto(
+      io.repsy.os.server.protocols.docker.shared.image.dtos.ImageListItem source);
 }

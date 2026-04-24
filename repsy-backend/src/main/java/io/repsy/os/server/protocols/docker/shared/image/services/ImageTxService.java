@@ -17,7 +17,6 @@ package io.repsy.os.server.protocols.docker.shared.image.services;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.docker.shared.image.dtos.ImageInfo;
-import io.repsy.os.server.protocols.docker.shared.image.dtos.ImageListItem;
 import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import io.repsy.os.server.protocols.docker.shared.image.mappers.ImageConverter;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
@@ -97,7 +96,7 @@ public class ImageTxService implements ImageService<UUID> {
     this.imageRepository.delete(image);
   }
 
-  public Page<ImageListItem> findAllByRepoIdAndContainsName(
+  public Page<io.repsy.os.generated.model.ImageListItem> findAllByRepoIdAndContainsName(
       final UUID repoId, final String imageName, final Pageable pageable) {
 
     final var repo =
@@ -105,7 +104,9 @@ public class ImageTxService implements ImageService<UUID> {
             .findById(repoId)
             .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
 
-    return this.imageRepository.findAllByRepoIdAndContainsName(repo.getId(), imageName, pageable);
+    return this.imageRepository
+        .findAllByRepoIdAndContainsName(repo.getId(), imageName, pageable)
+        .map(this.imageConverter::toDto);
   }
 
   @Override

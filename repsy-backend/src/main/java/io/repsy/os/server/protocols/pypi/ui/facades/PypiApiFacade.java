@@ -16,7 +16,7 @@
 package io.repsy.os.server.protocols.pypi.ui.facades;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseDetail;
+import io.repsy.os.generated.model.ReleaseDetail;
 import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPackageServiceImpl;
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;

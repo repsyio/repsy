@@ -17,11 +17,11 @@ package io.repsy.os.server.protocols.golang.shared.go_module.services;
 
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
-import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleInfo;
-import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleListItem;
+import io.repsy.os.generated.model.GoModuleInfo;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem;
 import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule;
 import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModuleVersion;
+import io.repsy.os.server.protocols.golang.shared.go_module.mappers.GoModuleMapper;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleRepository;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleVersionRepository;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
@@ -48,6 +48,7 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
   private final RepoRepository repoRepository;
   private final GoModuleRepository goModuleRepository;
   private final GoModuleVersionRepository goModuleVersionRepository;
+  private final GoModuleMapper goModuleMapper;
 
   @Override
   @Transactional
@@ -117,23 +118,29 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
                     this.goModuleVersionRepository.findAllByModuleId(module.getId())));
   }
 
-  public Page<GoModuleListItem> getModules(final UUID repoId, final Pageable pageable) {
-    return this.goModuleRepository.findAllByRepoId(repoId, pageable);
+  public Page<io.repsy.os.generated.model.GoModuleListItem> getModules(
+      final UUID repoId, final Pageable pageable) {
+    return this.goModuleRepository
+        .findAllByRepoId(repoId, pageable)
+        .map(this.goModuleMapper::toDto);
   }
 
-  public Page<GoModuleListItem> getModulesContainsPath(
+  public Page<io.repsy.os.generated.model.GoModuleListItem> getModulesContainsPath(
       final UUID repoId, final String search, final Pageable pageable) {
-    return this.goModuleRepository.findAllByRepoIdContainsModulePath(repoId, search, pageable);
+    return this.goModuleRepository
+        .findAllByRepoIdContainsModulePath(repoId, search, pageable)
+        .map(this.goModuleMapper::toDto);
   }
 
-  public Page<GoModuleVersionListItem> getModuleVersions(
+  public Page<io.repsy.os.generated.model.GoModuleVersionListItem> getModuleVersions(
       final UUID repoId, final String modulePath, final String search, final Pageable pageable) {
     final var goModule =
         this.goModuleRepository
             .findByRepoIdAndModulePath(repoId, modulePath)
             .orElseThrow(() -> new ItemNotFoundException("moduleNotFound"));
-    return this.goModuleVersionRepository.findAllByModuleIdContainsVersion(
-        goModule.getId(), search, pageable);
+    return this.goModuleVersionRepository
+        .findAllByModuleIdContainsVersion(goModule.getId(), search, pageable)
+        .map(this.goModuleMapper::toVersionDto);
   }
 
   public GoModuleInfo getModuleInfo(final UUID repoId, final String modulePath) {
@@ -144,13 +151,7 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
 
     final var versions = this.goModuleVersionRepository.findAllByModuleId(goModule.getId());
 
-    return GoModuleInfo.builder()
-        .id(goModule.getId())
-        .modulePath(goModule.getModulePath())
-        .latestVersion(this.computeLatestVersion(versions).orElse(null))
-        .createdAt(goModule.getCreatedAt())
-        .versions(versions)
-        .build();
+    return this.goModuleMapper.toGoModuleInfo(goModule, versions);
   }
 
   private Optional<String> computeLatestVersion(final List<GoModuleVersionListItem> versions) {

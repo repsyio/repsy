@@ -17,11 +17,11 @@ package io.repsy.os.shared.user.services;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.os.generated.model.UserCreateForm;
+import io.repsy.os.generated.model.UserResponse;
+import io.repsy.os.generated.model.UserUpdateForm;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
-import io.repsy.os.shared.user.dtos.UserCreateForm;
 import io.repsy.os.shared.user.dtos.UserInfo;
-import io.repsy.os.shared.user.dtos.UserResponse;
-import io.repsy.os.shared.user.dtos.UserUpdateForm;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.mappers.UserConverter;
@@ -117,18 +117,18 @@ public class UserTxService {
 
   @Transactional
   public @NonNull UserResponse createUserWithRole(final @NonNull UserCreateForm dto) {
-    if (this.userRepository.existsByUsername(dto.username())) {
+    if (this.userRepository.existsByUsername(dto.getUsername())) {
       throw new BadRequestException(ERR_USERNAME_IN_USE);
     }
 
     final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = this.hashPassword(dto.password(), salt);
+    final var hash = this.hashPassword(dto.getPassword(), salt);
 
     final var user = new User();
-    user.setUsername(dto.username());
+    user.setUsername(dto.getUsername());
     user.setHash(hash);
     user.setSalt(salt);
-    user.setRole(dto.role());
+    user.setRole(dto.getRole() != null ? UserRole.valueOf(dto.getRole().name()) : null);
 
     final var savedUser = this.userRepository.save(user);
     return this.userConverter.toUserResponseDto(savedUser);
@@ -140,14 +140,14 @@ public class UserTxService {
 
     final var user = this.findUserById(userId);
 
-    if (!user.getUsername().equals(dto.username())) {
-      if (this.userRepository.existsByUsername(dto.username())) {
+    if (!user.getUsername().equals(dto.getUsername())) {
+      if (this.userRepository.existsByUsername(dto.getUsername())) {
         throw new BadRequestException(ERR_USERNAME_IN_USE);
       }
-      user.setUsername(dto.username());
+      user.setUsername(dto.getUsername());
     }
 
-    user.setRole(dto.role());
+    user.setRole(UserRole.valueOf(dto.getRole().name()));
 
     return this.userConverter.toUserResponseDto(this.userRepository.save(user));
   }

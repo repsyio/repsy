@@ -20,10 +20,8 @@ import io.repsy.os.server.protocols.npm.shared.constants.NpmConstants;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageDistributionTagListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageInfo;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageKeywordListItem;
-import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageMaintainerListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionInfo;
-import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.NpmPackage;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageDistTag;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageKeyword;
@@ -343,30 +341,34 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
     distTagOptional.ifPresent(this.packageDistTagRepository::delete);
   }
 
-  public Page<PackageListItem> getPackagesContainsScope(
+  public Page<io.repsy.os.generated.model.PackageListItem> getPackagesContainsScope(
       final UUID repoId, final @Nullable String scope, final Pageable pageable) {
 
-    return this.npmPackageRepository.findAllByRepoIdAndLatestVersionContainsScope(
-        repoId, scope, pageable);
+    return this.npmPackageRepository
+        .findAllByRepoIdAndLatestVersionContainsScope(repoId, scope, pageable)
+        .map(this.npmPackageConverter::toPackageListItemDto);
   }
 
-  public Page<PackageListItem> getPackagesContainsName(
+  public Page<io.repsy.os.generated.model.PackageListItem> getPackagesContainsName(
       final UUID repoId, final String name, final Pageable pageable) {
 
-    return this.npmPackageRepository.findAllByRepoIdAndLatestVersionContainsName(
-        repoId, name, pageable);
+    return this.npmPackageRepository
+        .findAllByRepoIdAndLatestVersionContainsName(repoId, name, pageable)
+        .map(this.npmPackageConverter::toPackageListItemDto);
   }
 
-  public Page<PackageListItem> getPackagesByScopeContainsName(
+  public Page<io.repsy.os.generated.model.PackageListItem> getPackagesByScopeContainsName(
       final UUID repoId, final @Nullable String scope, final String name, final Pageable pageable) {
 
     if (scope == null) {
-      return this.npmPackageRepository.findAllByRepoIdAndLatestVersionAndScopeIsNullContainsName(
-          repoId, name, pageable);
+      return this.npmPackageRepository
+          .findAllByRepoIdAndLatestVersionAndScopeIsNullContainsName(repoId, name, pageable)
+          .map(this.npmPackageConverter::toPackageListItemDto);
     }
 
-    return this.npmPackageRepository.findAllByRepoIdAndLatestVersionAndScopeContainsName(
-        repoId, scope, name, pageable);
+    return this.npmPackageRepository
+        .findAllByRepoIdAndLatestVersionAndScopeContainsName(repoId, scope, name, pageable)
+        .map(this.npmPackageConverter::toPackageListItemDto);
   }
 
   public PackageVersionInfo getPackageVersion(final UUID packageId, final String versionName) {
@@ -392,7 +394,7 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
     return this.packageDistTagRepository.findAllByPackageVersionId(versionId);
   }
 
-  public Page<PackageVersionListItem> getVersionsContainsVersion(
+  public Page<io.repsy.os.generated.model.PackageVersionListItem> getVersionsContainsVersion(
       final UUID repoId,
       final @Nullable String scopeName,
       final String packageName,
@@ -401,8 +403,9 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
 
     final var npmPackage = this.findPackageByRepoIdAndScopeAndName(repoId, scopeName, packageName);
 
-    return this.packageVersionRepository.findAllByNpmPackageIdContainsVersion(
-        npmPackage.getId(), version, pageable);
+    return this.packageVersionRepository
+        .findAllByNpmPackageIdContainsVersion(npmPackage.getId(), version, pageable)
+        .map(this.npmPackageConverter::toPackageVersionListItemDto);
   }
 
   private void deprecatePackage(

@@ -15,20 +15,34 @@
  */
 package io.repsy.os.shared.user.mappers;
 
+import io.repsy.os.generated.model.UserResponse;
 import io.repsy.os.shared.user.dtos.UserInfo;
-import io.repsy.os.shared.user.dtos.UserResponse;
 import io.repsy.os.shared.user.entities.User;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 import org.mapstruct.Mappings;
 
+@NullMarked
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface UserConverter {
 
-  @NonNull UserInfo toUserInfo(@NonNull User user);
+ UserInfo toUserInfo(User user);
 
-  @Mappings(@Mapping(target = "id", expression = "java(user.getId().toString())"))
-  @NonNull UserResponse toUserResponseDto(@NonNull User user);
+  @Mappings({
+    @Mapping(target = "id", expression = "java(user.getId().toString())"),
+    @Mapping(
+        target = "role",
+        expression = "java(io.repsy.os.generated.model.UserRole.valueOf(user.getRole().name()))"),
+    @Mapping(
+        target = "createdAt",
+        expression =
+            "java(user.getCreatedAt() != null ? user.getCreatedAt().atOffset(java.time.ZoneOffset.UTC) : null)"),
+    @Mapping(
+        target = "lastLoginAt",
+        expression =
+            "java(user.getLastLoginAt() != null ? user.getLastLoginAt().atOffset(java.time.ZoneOffset.UTC) : null)")
+  })
+  UserResponse toUserResponseDto(User user);
 }

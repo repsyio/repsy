@@ -17,8 +17,8 @@ package io.repsy.os.server.protocols.shared.aop.utils;
 
 import static org.springframework.web.context.request.RequestAttributes.SCOPE_REQUEST;
 
+import io.repsy.os.generated.model.RepoPermissionInfo;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.dtos.RepoPermissionInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.Map;
 import java.util.Objects;

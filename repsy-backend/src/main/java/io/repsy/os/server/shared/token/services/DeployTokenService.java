@@ -16,10 +16,10 @@
 package io.repsy.os.server.shared.token.services;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
-import io.repsy.os.server.shared.token.dtos.DeployTokenForm;
+import io.repsy.os.generated.model.DeployTokenForm;
+import io.repsy.os.generated.model.TokenInfo;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfoListItem;
-import io.repsy.os.server.shared.token.dtos.TokenInfo;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.mappers.DeployTokenConverter;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;

@@ -15,17 +15,26 @@
  */
 package io.repsy.os.server.protocols.maven.shared.artifact.mappers;
 
-import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactVersionInfo;
+import io.repsy.os.generated.model.ArtifactVersionInfo;
+import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactListItem;
+import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactVersionListItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.VersionDeveloperInfo;
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.VersionLicenseInfo;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
+import io.repsy.os.server.protocols.maven.shared.keystore.dtos.KeyStoreItem;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface ArtifactConverter {
+
+  io.repsy.os.generated.model.VersionDeveloperInfo toVersionDeveloperInfoDto(
+      VersionDeveloperInfo source);
+
+  io.repsy.os.generated.model.VersionLicenseInfo toVersionLicenseInfoDto(VersionLicenseInfo source);
 
   default @NonNull ArtifactVersionInfo toArtifactVersionInfo(
       final @NonNull Artifact artifact,
@@ -48,12 +57,40 @@ public interface ArtifactConverter {
         .hasDocuments(version.isHasDocuments())
         .hasModules(version.isHasModules())
         .hasSources(version.isHasSources())
-        .type(version.getType())
-        .createdAt(version.getCreatedAt())
-        .lastUpdatedAt(version.getLastUpdatedAt())
+        .type(
+            version.getType() != null
+                ? ArtifactVersionInfo.TypeEnum.valueOf(version.getType().name())
+                : null)
+        .createdAt(
+            version.getCreatedAt() != null
+                ? version.getCreatedAt().atOffset(java.time.ZoneOffset.UTC)
+                : null)
+        .lastUpdatedAt(
+            version.getLastUpdatedAt() != null
+                ? version.getLastUpdatedAt().atOffset(java.time.ZoneOffset.UTC)
+                : null)
         .scmUrl(version.getSourceCodeUrl())
-        .developers(developers)
-        .licenses(licenses)
+        .developers(
+            developers == null
+                ? null
+                : developers.stream().map(this::toVersionDeveloperInfoDto).toList())
+        .licenses(
+            licenses == null ? null : licenses.stream().map(this::toVersionLicenseInfoDto).toList())
         .build();
   }
+
+  @Mapping(
+      target = "lastUpdatedAt",
+      expression =
+          "java(source.getLastUpdatedAt() != null ? source.getLastUpdatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
+  io.repsy.os.generated.model.ArtifactListItem toArtifactListItemDto(ArtifactListItem source);
+
+  @Mapping(
+      target = "lastUpdatedAt",
+      expression =
+          "java(source.getLastUpdatedAt() != null ? source.getLastUpdatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
+  io.repsy.os.generated.model.ArtifactVersionListItem toArtifactVersionListItemDto(
+      ArtifactVersionListItem source);
+
+  io.repsy.os.generated.model.KeyStoreItem toKeyStoreItemDto(KeyStoreItem source);
 }

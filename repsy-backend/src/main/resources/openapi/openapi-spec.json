@@ -151,7 +151,17 @@
           }
         },
         "summary": "Update repository settings"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/repos/{repoName}/deploy-tokens/{tokenId}": {
       "put": {
@@ -229,7 +239,17 @@
           }
         },
         "summary": "Delete a deploy token"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/profile/username": {
       "put": {
@@ -318,7 +338,7 @@
         "tags": [
           "user-controller"
         ],
-        "operationId": "list",
+        "operationId": "listUsers",
         "parameters": [
           {
             "name": "search",
@@ -431,7 +451,7 @@
         "tags": [
           "protocol-repo-controller"
         ],
-        "operationId": "create",
+        "operationId": "createRepo",
         "parameters": [
           {
             "name": "facade",
@@ -480,7 +500,7 @@
         "tags": [
           "protocol-deploy-token-controller"
         ],
-        "operationId": "list_1",
+        "operationId": "listDeployTokens",
         "parameters": [
           {
             "name": "pageable",
@@ -517,7 +537,7 @@
         "tags": [
           "protocol-deploy-token-controller"
         ],
-        "operationId": "create_1",
+        "operationId": "createDeployToken",
         "parameters": [
           {
             "name": "repoInfo",
@@ -551,14 +571,24 @@
           }
         },
         "summary": "Create a deploy token for a repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/mvn/key-stores/{repoName}": {
       "get": {
         "tags": [
           "key-store-controller"
         ],
-        "operationId": "list_2",
+        "operationId": "listMavenKeyStores",
         "parameters": [
           {
             "name": "repoInfo",
@@ -595,7 +625,7 @@
         "tags": [
           "key-store-controller"
         ],
-        "operationId": "create_2",
+        "operationId": "createMavenKeyStore",
         "parameters": [
           {
             "name": "repoInfo",
@@ -629,7 +659,17 @@
           }
         },
         "summary": "Add a key store to a Maven repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/auth/tokens/refresh": {
       "post": {
@@ -732,7 +772,17 @@
           }
         },
         "summary": "Rename a repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/repos/{repoName}/description": {
       "patch": {
@@ -773,7 +823,17 @@
           }
         },
         "summary": "Update repository description"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/usages": {
       "get": {
@@ -887,7 +947,17 @@
           }
         },
         "summary": "Get storage usage for a repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/repos/{repoName}/permissions": {
       "get": {
@@ -918,7 +988,17 @@
           }
         },
         "summary": "Get permissions for a repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/repos/{repoName}/format": {
       "get": {
@@ -949,7 +1029,17 @@
           }
         },
         "summary": "Get the format of a repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/repos/{repoName}/contents": {
       "get": {
@@ -996,14 +1086,24 @@
           }
         },
         "summary": "List contents of a repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/pypi/packages/{repoName}": {
       "get": {
         "tags": [
           "pypi-package-controller"
         ],
-        "operationId": "list_3",
+        "operationId": "listPypiPackages",
         "parameters": [
           {
             "name": "repoInfo",
@@ -1044,7 +1144,17 @@
           }
         },
         "summary": "List PyPI packages in a repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/pypi/packages/{repoName}/{packageName}/releases": {
       "get": {
@@ -1100,7 +1210,17 @@
           }
         },
         "summary": "List releases of a PyPI package"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/pypi/packages/{repoName}/{packageName}/releases/{releaseVersion}": {
       "get": {
@@ -1192,14 +1312,24 @@
           }
         },
         "summary": "Delete a specific PyPI package release"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/pypi/packages/{repoName}/{packageName}": {
       "get": {
         "tags": [
           "pypi-package-controller"
         ],
-        "operationId": "getRelease_1",
+        "operationId": "getPypiPackage",
         "parameters": [
           {
             "name": "repoInfo",
@@ -1236,7 +1366,7 @@
         "tags": [
           "pypi-package-controller"
         ],
-        "operationId": "delete",
+        "operationId": "deletePypiPackage",
         "parameters": [
           {
             "name": "repoInfo",
@@ -1268,14 +1398,24 @@
           }
         },
         "summary": "Delete a repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/profile": {
       "get": {
         "tags": [
           "profile-controller"
         ],
-        "operationId": "get",
+        "operationId": "getProfile",
         "parameters": [
           {
             "name": "Authorization",
@@ -1335,7 +1475,7 @@
         "tags": [
           "npm-package-api-controller"
         ],
-        "operationId": "list_4",
+        "operationId": "listNpmPackages",
         "parameters": [
           {
             "name": "repoInfo",
@@ -1375,7 +1515,17 @@
           }
         },
         "summary": "List npm packages in a repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/npm/packages/{repoName}/{packageName}/versions/{versionName}": {
       "get": {
@@ -1467,14 +1617,24 @@
           }
         },
         "summary": "Delete a specific npm package version"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/npm/packages/{repoName}/{scope}/{packageName}/versions/{versionName}": {
       "get": {
         "tags": [
           "npm-package-api-controller"
         ],
-        "operationId": "getVersion_1",
+        "operationId": "getNpmScopedPackageVersion",
         "parameters": [
           {
             "name": "repoInfo",
@@ -1527,7 +1687,7 @@
         "tags": [
           "npm-package-api-controller"
         ],
-        "operationId": "deleteVersion_1",
+        "operationId": "deleteNpmScopedPackageVersion",
         "parameters": [
           {
             "name": "repoInfo",
@@ -1575,14 +1735,24 @@
           }
         },
         "summary": "Delete a specific scoped npm package version"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/npm/packages/{repoName}/{packageName}": {
       "get": {
         "tags": [
           "npm-package-api-controller"
         ],
-        "operationId": "getVersion_2",
+        "operationId": "getNpmPackage",
         "parameters": [
           {
             "name": "repoInfo",
@@ -1619,7 +1789,7 @@
         "tags": [
           "npm-package-api-controller"
         ],
-        "operationId": "delete_1",
+        "operationId": "deleteNpmPackage",
         "parameters": [
           {
             "name": "repoInfo",
@@ -1651,14 +1821,24 @@
           }
         },
         "summary": "Delete an npm package"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/npm/packages/{repoName}/{scope}/{packageName}": {
       "get": {
         "tags": [
           "npm-package-api-controller"
         ],
-        "operationId": "getVersion_3",
+        "operationId": "getNpmScopedPackage",
         "parameters": [
           {
             "name": "repoInfo",
@@ -1703,7 +1883,7 @@
         "tags": [
           "npm-package-api-controller"
         ],
-        "operationId": "delete_2",
+        "operationId": "deleteScopedNpmPackage",
         "parameters": [
           {
             "name": "repoInfo",
@@ -1743,14 +1923,24 @@
           }
         },
         "summary": "Delete a scoped npm package"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/npm/packages/{repoName}/{ignoredScope}": {
       "get": {
         "tags": [
           "npm-package-api-controller"
         ],
-        "operationId": "list_5",
+        "operationId": "listScopedNpmPackages",
         "parameters": [
           {
             "name": "repoInfo",
@@ -1799,7 +1989,17 @@
           }
         },
         "summary": "List artifact groups in a Maven repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/npm/packages/{repoName}/scope": {
       "get": {
@@ -1847,14 +2047,24 @@
           }
         },
         "summary": "List npm scopes in a repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/npm/packages/{repoName}/scope/{scope}": {
       "get": {
         "tags": [
           "npm-package-api-controller"
         ],
-        "operationId": "listFilterByScope_1",
+        "operationId": "listNpmPackagesByScope",
         "parameters": [
           {
             "name": "repoInfo",
@@ -1903,7 +2113,17 @@
           }
         },
         "summary": "Get npm packages in a scope"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/npm/packages/{repoName}/package/{packageName}/versions": {
       "get": {
@@ -1959,14 +2179,24 @@
           }
         },
         "summary": "List versions of a Maven artifact"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/npm/packages/{repoName}/{scope}/package/{packageName}/versions": {
       "get": {
         "tags": [
           "npm-package-api-controller"
         ],
-        "operationId": "listVersions_1",
+        "operationId": "listNpmScopedPackageVersions",
         "parameters": [
           {
             "name": "repoInfo",
@@ -2023,7 +2253,17 @@
           }
         },
         "summary": "List versions of a scoped npm package"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/npm/packages/{repoName}/package/{packageName}/tags": {
       "get": {
@@ -2062,14 +2302,24 @@
           }
         },
         "summary": "List dist-tags for an npm package"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/npm/packages/{repoName}/{scope}/package/{packageName}/tags": {
       "get": {
         "tags": [
           "npm-package-api-controller"
         ],
-        "operationId": "listTags_1",
+        "operationId": "listNpmScopedPackageTags",
         "parameters": [
           {
             "name": "repoInfo",
@@ -2109,7 +2359,17 @@
           }
         },
         "summary": "List dist-tags for a scoped npm package"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/mvn/artifacts/{repoName}": {
       "get": {
@@ -2157,7 +2417,17 @@
           }
         },
         "summary": "List artifact groups in a Maven repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/mvn/artifacts/{repoName}/{groupName}": {
       "get": {
@@ -2250,14 +2520,24 @@
           }
         },
         "summary": "Delete a Maven artifact group"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/mvn/artifacts/{repoName}/{groupName}/{artifactName}/versions": {
       "get": {
         "tags": [
           "maven-artifact-controller"
         ],
-        "operationId": "listVersions_2",
+        "operationId": "listMavenArtifactVersions",
         "parameters": [
           {
             "name": "repoInfo",
@@ -2314,14 +2594,24 @@
           }
         },
         "summary": "List versions of a Maven artifact"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/mvn/artifacts/{repoName}/{groupName}/{artifactName}": {
       "get": {
         "tags": [
           "maven-artifact-controller"
         ],
-        "operationId": "getVersion_4",
+        "operationId": "getMavenArtifact",
         "parameters": [
           {
             "name": "repoInfo",
@@ -2366,7 +2656,7 @@
         "tags": [
           "maven-artifact-controller"
         ],
-        "operationId": "delete_3",
+        "operationId": "deleteMavenArtifact",
         "parameters": [
           {
             "name": "repoInfo",
@@ -2406,14 +2696,24 @@
           }
         },
         "summary": "Delete a Maven artifact"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/mvn/artifacts/{repoName}/{groupName}/{artifactName}/versions/{versionName}": {
       "get": {
         "tags": [
           "maven-artifact-controller"
         ],
-        "operationId": "getVersion_5",
+        "operationId": "getMavenArtifactVersion",
         "parameters": [
           {
             "name": "repoInfo",
@@ -2466,7 +2766,7 @@
         "tags": [
           "maven-artifact-controller"
         ],
-        "operationId": "deleteVersion_2",
+        "operationId": "deleteMavenArtifactVersion",
         "parameters": [
           {
             "name": "repoInfo",
@@ -2514,14 +2814,24 @@
           }
         },
         "summary": "Delete a specific Maven artifact version"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/go/modules/{repoName}": {
       "get": {
         "tags": [
           "golang-module-controller"
         ],
-        "operationId": "list_6",
+        "operationId": "listGolangModules",
         "parameters": [
           {
             "name": "repoInfo",
@@ -2558,7 +2868,7 @@
         "tags": [
           "golang-module-controller"
         ],
-        "operationId": "delete_4",
+        "operationId": "deleteGolangModule",
         "parameters": [
           {
             "name": "repoInfo",
@@ -2590,14 +2900,24 @@
           }
         },
         "summary": "Delete a Go module"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/go/modules/{repoName}/versions": {
       "get": {
         "tags": [
           "golang-module-controller"
         ],
-        "operationId": "listVersions_3",
+        "operationId": "listGolangModuleVersions",
         "parameters": [
           {
             "name": "repoInfo",
@@ -2651,7 +2971,7 @@
         "tags": [
           "golang-module-controller"
         ],
-        "operationId": "deleteVersion_3",
+        "operationId": "deleteGolangModuleVersion",
         "parameters": [
           {
             "name": "repoInfo",
@@ -2691,7 +3011,17 @@
           }
         },
         "summary": "Delete Go module versions"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/go/modules/{repoName}/sumdb/supported": {
       "get": {
@@ -2722,7 +3052,7 @@
         "tags": [
           "golang-module-controller"
         ],
-        "operationId": "search",
+        "operationId": "searchGolangModules",
         "parameters": [
           {
             "name": "repoInfo",
@@ -2763,14 +3093,24 @@
           }
         },
         "summary": "Search Go modules in a repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/go/modules/{repoName}/info": {
       "get": {
         "tags": [
           "golang-module-controller"
         ],
-        "operationId": "getInfo_1",
+        "operationId": "getGolangModuleInfo",
         "parameters": [
           {
             "name": "repoInfo",
@@ -2802,14 +3142,24 @@
           }
         },
         "summary": "Get Go module info"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/docker/images/{repoName}": {
       "get": {
         "tags": [
           "docker-image-controller"
         ],
-        "operationId": "list_7",
+        "operationId": "listDockerImages",
         "parameters": [
           {
             "name": "repoInfo",
@@ -2850,14 +3200,24 @@
           }
         },
         "summary": "List Go modules in a repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/docker/images/{repoName}/{imageName}/tags": {
       "get": {
         "tags": [
           "docker-image-controller"
         ],
-        "operationId": "listTags_2",
+        "operationId": "listDockerImageTags",
         "parameters": [
           {
             "name": "repoInfo",
@@ -2906,7 +3266,17 @@
           }
         },
         "summary": "List tags of a Docker image"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/docker/images/{repoName}/{imageName}/tags/{tagName}/manifests": {
       "get": {
@@ -2970,7 +3340,17 @@
           }
         },
         "summary": "List manifests for a Docker image tag"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/docker/images/{repoName}/{imageName}/manifests/{reference}": {
       "get": {
@@ -3017,7 +3397,17 @@
           }
         },
         "summary": "Get a Docker image manifest"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/docker/images/{repoName}/{imageName}": {
       "get": {
@@ -3061,7 +3451,7 @@
         "tags": [
           "docker-image-controller"
         ],
-        "operationId": "delete_5",
+        "operationId": "deleteDockerImage",
         "parameters": [
           {
             "name": "repoInfo",
@@ -3093,14 +3483,24 @@
           }
         },
         "summary": "Delete a Docker image"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/docker/images/{repoName}/{imageName}/tags/{tagName}": {
       "get": {
         "tags": [
           "docker-image-controller"
         ],
-        "operationId": "getTagDetail_1",
+        "operationId": "getDockerImageTag",
         "parameters": [
           {
             "name": "repoInfo",
@@ -3185,7 +3585,17 @@
           }
         },
         "summary": "Delete a Docker image tag"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/docker/images/{repoName}/{ignoredImageName}/configs/{digest}": {
       "get": {
@@ -3232,14 +3642,24 @@
           }
         },
         "summary": "Get Docker image config by digest"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/cargo/crates/{repoName}": {
       "get": {
         "tags": [
           "cargo-crate-controller"
         ],
-        "operationId": "search_1",
+        "operationId": "searchCargoCrates",
         "parameters": [
           {
             "name": "repoInfo",
@@ -3280,14 +3700,24 @@
           }
         },
         "summary": "List crates in a Cargo repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/cargo/crates/{repoName}/{crateName}": {
       "get": {
         "tags": [
           "cargo-crate-controller"
         ],
-        "operationId": "get_1",
+        "operationId": "getCargoCrate",
         "parameters": [
           {
             "name": "repoInfo",
@@ -3324,7 +3754,7 @@
         "tags": [
           "cargo-crate-controller"
         ],
-        "operationId": "delete_6",
+        "operationId": "deleteCargoCrate",
         "parameters": [
           {
             "name": "repoInfo",
@@ -3356,14 +3786,24 @@
           }
         },
         "summary": "Delete a Cargo crate"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/cargo/crates/{repoName}/{crateName}/{vers}": {
       "get": {
         "tags": [
           "cargo-crate-controller"
         ],
-        "operationId": "getVersion_6",
+        "operationId": "getCargoCrateVersion",
         "parameters": [
           {
             "name": "repoInfo",
@@ -3408,7 +3848,7 @@
         "tags": [
           "cargo-crate-controller"
         ],
-        "operationId": "deleteVersion_4",
+        "operationId": "deleteCargoCrateVersion",
         "parameters": [
           {
             "name": "repoInfo",
@@ -3448,14 +3888,24 @@
           }
         },
         "summary": "Delete a specific Cargo crate version"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/cargo/crates/{repoName}/{crateName}/versions": {
       "get": {
         "tags": [
           "cargo-crate-controller"
         ],
-        "operationId": "listVersions_4",
+        "operationId": "listCargoCrateVersions",
         "parameters": [
           {
             "name": "repoInfo",
@@ -3504,14 +3954,24 @@
           }
         },
         "summary": "List versions of a Cargo crate"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/repos/{repoName}": {
       "delete": {
         "tags": [
           "protocol-repo-controller"
         ],
-        "operationId": "delete_7",
+        "operationId": "deleteRepo",
         "parameters": [
           {
             "name": "repoInfo",
@@ -3543,14 +4003,24 @@
           }
         },
         "summary": "Delete a repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "/api/mvn/key-stores/{repoName}/{keyStoreId}": {
       "delete": {
         "tags": [
           "key-store-controller"
         ],
-        "operationId": "delete_8",
+        "operationId": "deleteMavenKeyStore",
         "parameters": [
           {
             "name": "repoInfo",
@@ -3583,7 +4053,17 @@
           }
         },
         "summary": "Remove a key store from a Maven repository"
-      }
+      },
+      "parameters": [
+        {
+          "name": "repoName",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
     }
   },
   "components": {
@@ -3708,10 +4188,12 @@
             "nullable": false
           },
           "releases": {
-            "type": "boolean"
+            "type": "boolean",
+            "nullable": false
           },
           "snapshots": {
-            "type": "boolean"
+            "type": "boolean",
+            "nullable": false
           }
         },
         "required": [
@@ -3825,8 +4307,7 @@
           "username": {
             "type": "string",
             "maxLength": 25,
-            "minLength": 3,
-            "pattern": "^[a-z0-9_\\-]+$"
+            "minLength": 3
           },
           "password": {
             "type": "string",
@@ -3854,8 +4335,7 @@
             "pattern": "^[a-zA-Z0-9_\\-]+$"
           },
           "description": {
-            "type": "string",
-            "maxLength": 500
+            "type": "string"
           },
           "privateRepo": {
             "type": "boolean",
@@ -3877,8 +4357,7 @@
           "username": {
             "type": "string",
             "maxLength": 150,
-            "minLength": 0,
-            "pattern": "^[a-z0-9_\\-]+$"
+            "minLength": 0
           },
           "description": {
             "type": "string",
@@ -3937,14 +4416,9 @@
         "type": "object",
         "properties": {
           "url": {
-            "type": "string",
-            "format": "uri",
-            "minLength": 1
+            "type": "string"
           }
-        },
-        "required": [
-          "url"
-        ]
+        }
       },
       "KeyStoreItem": {
         "type": "object",
@@ -3981,13 +4455,9 @@
         "type": "object",
         "properties": {
           "refreshToken": {
-            "type": "string",
-            "minLength": 1
+            "type": "string"
           }
-        },
-        "required": [
-          "refreshToken"
-        ]
+        }
       },
       "LoginForm": {
         "type": "object",
@@ -5903,13 +6373,30 @@
         }
       },
       "ResponseType": {
-        "$ref": "#/components/schemas/ResponseType"
+        "type": "string",
+        "enum": [
+          "ERROR",
+          "SUCCESS",
+          "WARNING"
+        ]
       },
       "UserRole": {
-        "$ref": "#/components/schemas/UserRole"
+        "type": "string",
+        "enum": [
+          "USER",
+          "ADMIN"
+        ]
       },
       "RepoType": {
-        "$ref": "#/components/schemas/RepoType"
+        "type": "string",
+        "enum": [
+          "MAVEN",
+          "NPM",
+          "PYPI",
+          "DOCKER",
+          "CARGO",
+          "GOLANG"
+        ]
       }
     }
   }

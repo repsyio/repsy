@@ -15,8 +15,8 @@
  */
 package io.repsy.os.server.protocols.shared.aop.resolvers;
 
+import io.repsy.os.generated.model.RepoPermissionInfo;
 import io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils;
-import io.repsy.os.shared.repo.dtos.RepoPermissionInfo;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;

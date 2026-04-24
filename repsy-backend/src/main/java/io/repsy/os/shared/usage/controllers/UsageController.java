@@ -18,7 +18,7 @@ package io.repsy.os.shared.usage.controllers;
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
-import io.repsy.os.shared.usage.dtos.TotalUsageInfo;
+import io.repsy.os.generated.model.TotalUsageInfo;
 import io.repsy.os.shared.usage.services.UsageService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import lombok.RequiredArgsConstructor;

@@ -19,10 +19,8 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.docker.shared.image.dtos.ImageInfo;
 import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
-import io.repsy.os.server.protocols.docker.shared.layer.dtos.ManifestListItem;
 import io.repsy.os.server.protocols.docker.shared.layer.entities.Layer;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
-import io.repsy.os.server.protocols.docker.shared.tag.dtos.ImageTagListItem;
 import io.repsy.os.server.protocols.docker.shared.tag.dtos.TagDetail;
 import io.repsy.os.server.protocols.docker.shared.tag.dtos.manifest.ManifestDetail;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Manifest;
@@ -235,10 +233,12 @@ public class ManifestTxService implements ManifestService<UUID> {
         .orElseThrow(() -> new ItemNotFoundException("tagNotFound"));
   }
 
-  public Page<ManifestListItem> findManifestsByTagIdContainsName(
+  public Page<io.repsy.os.generated.model.ManifestListItem> findManifestsByTagIdContainsName(
       final UUID tagId, final String name, final Pageable pageable) {
 
-    return this.manifestRepository.findByTagIdAndNameContainsName(tagId, name, pageable);
+    return this.manifestRepository
+        .findByTagIdAndNameContainsName(tagId, name, pageable)
+        .map(this.manifestConverter::toManifestDto);
   }
 
   public Tag findTag(final UUID repoId, final UUID imageId, final String tagName) {
@@ -248,37 +248,18 @@ public class ManifestTxService implements ManifestService<UUID> {
         .orElseThrow(() -> new ItemNotFoundException("tagNotFound"));
   }
 
-  public Page<ImageTagListItem> getImageTagsContainsName(
+  public Page<io.repsy.os.generated.model.ImageTagListItem> getImageTagsContainsName(
       final UUID repoId, final String imageName, final String tagName, final Pageable pageable) {
 
-    return this.tagRepository.findAllByImageRepoIdAndImageNameContainsName(
-        repoId, imageName, tagName, pageable);
+    return this.tagRepository
+        .findAllByImageRepoIdAndImageNameContainsName(repoId, imageName, tagName, pageable)
+        .map(this.manifestConverter::toTagDto);
   }
 
-  public TagDetail getTagDetail(final UUID repoId, final UUID imageId, final String tagName) {
+  public io.repsy.os.generated.model.TagDetail getTagDetail(
+      final UUID repoId, final UUID imageId, final String tagName) {
 
-    final var tag = this.findTag(repoId, imageId, tagName);
-
-    final var tagDetail = TagDetail.of(tag);
-
-    if (!MediaTypes.isIndex(tag.getMediaType())) {
-      // Single platform manifest. Must have only one platform and one manifest
-      final var platformIterator = tag.getTagPlatforms().iterator();
-
-      if (platformIterator.hasNext()) {
-        final var tagPlatform = platformIterator.next();
-
-        final var manifestIterator = tagPlatform.getManifests().iterator();
-
-        if (manifestIterator.hasNext()) {
-          final var manifest = manifestIterator.next();
-
-          tagDetail.setConfigDigest(manifest.getConfigDigest());
-        }
-      }
-    }
-
-    return tagDetail;
+    return this.manifestConverter.toTagDetail(this.findTag(repoId, imageId, tagName));
   }
 
   private void createManifest(

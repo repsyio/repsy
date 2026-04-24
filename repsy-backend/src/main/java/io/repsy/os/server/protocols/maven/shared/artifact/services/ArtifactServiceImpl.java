@@ -25,9 +25,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
-import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactListItem;
-import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactVersionInfo;
-import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactVersionListItem;
+import io.repsy.os.generated.model.ArtifactVersionInfo;
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.VersionDeveloperInfo;
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.VersionLicenseInfo;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
@@ -334,42 +332,48 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     };
   }
 
-  public Page<ArtifactVersionListItem> getArtifactVersions(
+  public Page<io.repsy.os.generated.model.ArtifactVersionListItem> getArtifactVersions(
       final UUID repoId,
       final String groupName,
       final String artifactName,
-      final Pageable pageable) {
-
-    return this.artifactVersionRepository.findAllByRepoIdAndGroupNameAndArtifactName(
-        repoId, groupName, artifactName, pageable);
-  }
-
-  public Page<ArtifactVersionListItem> getArtifactVersionsContainsVersion(
-      final UUID repoId,
-      final String groupName,
-      final String artifactName,
-      final String version,
       final Pageable pageable) {
 
     return this.artifactVersionRepository
-        .findAllByRepoIdAndGroupNameAndArtifactNameContainsVersionName(
-            repoId, groupName, artifactName, version, pageable);
+        .findAllByRepoIdAndGroupNameAndArtifactName(repoId, groupName, artifactName, pageable)
+        .map(this.artifactConverter::toArtifactVersionListItemDto);
   }
 
-  public Page<ArtifactListItem> getArtifactsContainsGroupName(
+  public Page<io.repsy.os.generated.model.ArtifactVersionListItem>
+      getArtifactVersionsContainsVersion(
+          final UUID repoId,
+          final String groupName,
+          final String artifactName,
+          final String version,
+          final Pageable pageable) {
+
+    return this.artifactVersionRepository
+        .findAllByRepoIdAndGroupNameAndArtifactNameContainsVersionName(
+            repoId, groupName, artifactName, version, pageable)
+        .map(this.artifactConverter::toArtifactVersionListItemDto);
+  }
+
+  public Page<io.repsy.os.generated.model.ArtifactListItem> getArtifactsContainsGroupName(
       final UUID repoId, final String groupName, final Pageable pageable) {
 
-    return this.artifactRepository.findAllByRepoIdAndContainsGroupName(repoId, groupName, pageable);
+    return this.artifactRepository
+        .findAllByRepoIdAndContainsGroupName(repoId, groupName, pageable)
+        .map(this.artifactConverter::toArtifactListItemDto);
   }
 
-  public Page<ArtifactListItem> getArtifactsContainsArtifactName(
+  public Page<io.repsy.os.generated.model.ArtifactListItem> getArtifactsContainsArtifactName(
       final UUID repoId,
       final String groupName,
       final String artifactName,
       final Pageable pageable) {
 
-    return this.artifactRepository.findAllByRepoIdContainsArtifactName(
-        repoId, groupName, artifactName, pageable);
+    return this.artifactRepository
+        .findAllByRepoIdContainsArtifactName(repoId, groupName, artifactName, pageable)
+        .map(this.artifactConverter::toArtifactListItemDto);
   }
 
   public List<Artifact> getArtifacts(final UUID repoId, final String groupName) {

@@ -20,10 +20,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import freemarker.template.Configuration;
 import freemarker.template.TemplateException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.os.generated.model.ReleaseDetail;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PackageInfo;
-import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PackageListItem;
-import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseDetail;
-import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseListItem;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.PypiPackage;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.Release;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.ReleaseClassifier;
@@ -189,7 +187,7 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
     return this.pypiPackageConverter.toReleaseDetail(release, classifiers, projectURLs);
   }
 
-  public Page<ReleaseListItem> getReleaseList(
+  public Page<io.repsy.os.generated.model.ReleaseListItem> getReleaseList(
       final UUID repoId, final String packageName, final Pageable pageable) {
 
     final var pythonPypiPackage =
@@ -197,10 +195,12 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
             .findByRepoIdAndNormalizedName(repoId, PackageUtils.normalizePackageName(packageName))
             .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
 
-    return this.releaseRepository.findAllByPypiPackageId(pythonPypiPackage.getId(), pageable);
+    return this.releaseRepository
+        .findAllByPypiPackageId(pythonPypiPackage.getId(), pageable)
+        .map(this.pypiPackageConverter::toReleaseListItemDto);
   }
 
-  public Page<ReleaseListItem> getReleasesContainsVersion(
+  public Page<io.repsy.os.generated.model.ReleaseListItem> getReleasesContainsVersion(
       final UUID repoId, final String packageName, final String version, final Pageable pageable) {
 
     final var pythonPypiPackage =
@@ -208,18 +208,24 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
             .findByRepoIdAndNormalizedName(repoId, PackageUtils.normalizePackageName(packageName))
             .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
 
-    return this.releaseRepository.findAllByPypiPackageIdContainsName(
-        pythonPypiPackage.getId(), version, pageable);
+    return this.releaseRepository
+        .findAllByPypiPackageIdContainsName(pythonPypiPackage.getId(), version, pageable)
+        .map(this.pypiPackageConverter::toReleaseListItemDto);
   }
 
-  public Page<PackageListItem> getPackageList(final UUID repoId, final Pageable pageable) {
-    return this.pypiPackageRepository.findAllByRepoId(repoId, pageable);
+  public Page<io.repsy.os.generated.model.PackageListItem> getPackageList(
+      final UUID repoId, final Pageable pageable) {
+    return this.pypiPackageRepository
+        .findAllByRepoId(repoId, pageable)
+        .map(this.pypiPackageConverter::toPackageListItemDto);
   }
 
-  public Page<PackageListItem> getPackagesContainsName(
+  public Page<io.repsy.os.generated.model.PackageListItem> getPackagesContainsName(
       final UUID repoId, final String name, final Pageable pageable) {
 
-    return this.pypiPackageRepository.findAllByRepoIdContainsName(repoId, name, pageable);
+    return this.pypiPackageRepository
+        .findAllByRepoIdContainsName(repoId, name, pageable)
+        .map(this.pypiPackageConverter::toPackageListItemDto);
   }
 
   public ByteArrayResource getPackageList(final UUID repoId, final String repoName)

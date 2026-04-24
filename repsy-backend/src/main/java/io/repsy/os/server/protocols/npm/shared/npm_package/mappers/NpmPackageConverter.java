@@ -15,12 +15,14 @@
  */
 package io.repsy.os.server.protocols.npm.shared.npm_package.mappers;
 
+import io.repsy.os.generated.model.PackageVersionDetail;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageDistributionTagListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageInfo;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageKeywordListItem;
+import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageMaintainerListItem;
-import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionDetail;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionInfo;
+import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.NpmPackage;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageVersion;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -29,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.NullMarked;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
@@ -49,6 +52,15 @@ public interface NpmPackageConverter {
     versionMetadata.put("deprecated", packageVersion.isDeprecated());
     return versionMetadata;
   }
+
+  io.repsy.os.generated.model.PackageKeywordListItem toKeywordListItemDto(
+      PackageKeywordListItem source);
+
+  io.repsy.os.generated.model.PackageMaintainerListItem toMaintainerListItemDto(
+      PackageMaintainerListItem source);
+
+  io.repsy.os.generated.model.PackageDistributionTagListItem toDistributionTagListItemDto(
+      PackageDistributionTagListItem source);
 
   default PackageVersionDetail toPackageVersionDetail(
       final PackageInfo packageInfo,
@@ -76,10 +88,20 @@ public interface NpmPackageConverter {
         .deprecated(packageVersionInfo.isDeprecated())
         .deprecationMessage(packageVersionInfo.getDeprecationMessage())
         .deleted(packageVersionInfo.isDeleted())
-        .createdAt(packageVersionInfo.getCreatedAt())
-        .keywords(keywords)
-        .maintainers(maintainers)
-        .distributionTags(distributionTags)
+        .createdAt(
+            packageVersionInfo.getCreatedAt() != null
+                ? packageVersionInfo.getCreatedAt().atOffset(java.time.ZoneOffset.UTC)
+                : null)
+        .keywords(
+            keywords == null ? null : keywords.stream().map(this::toKeywordListItemDto).toList())
+        .maintainers(
+            maintainers == null
+                ? null
+                : maintainers.stream().map(this::toMaintainerListItemDto).toList())
+        .distributionTags(
+            distributionTags == null
+                ? null
+                : distributionTags.stream().map(this::toDistributionTagListItemDto).toList())
         .readme(readmeFileContent)
         .build();
   }
@@ -117,4 +139,19 @@ public interface NpmPackageConverter {
         .createdAt(npmPackage.getCreatedAt())
         .build();
   }
+
+  @Mapping(target = "latestVersion", source = "latest")
+  @Mapping(target = "stableVersion", ignore = true)
+  @Mapping(
+      target = "updatedAt",
+      expression =
+          "java(source.getUpdatedAt() != null ? source.getUpdatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
+  io.repsy.os.generated.model.PackageListItem toPackageListItemDto(PackageListItem source);
+
+  @Mapping(
+      target = "createdAt",
+      expression =
+          "java(source.getCreatedAt() != null ? source.getCreatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
+  io.repsy.os.generated.model.PackageVersionListItem toPackageVersionListItemDto(
+      PackageVersionListItem source);
 }
