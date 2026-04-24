@@ -28,7 +28,7 @@ import org.mapstruct.Mappings;
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface UserConverter {
 
- UserInfo toUserInfo(User user);
+  UserInfo toUserInfo(User user);
 
   @Mappings({
     @Mapping(target = "id", expression = "java(user.getId().toString())"),
