@@ -59,6 +59,6 @@ public interface ArtifactRepository extends JpaRepository<Artifact, UUID> {
   Optional<Artifact> findByRepoIdAndGroupNameAndArtifactName(
       UUID repoId, String groupName, String artifactName);
 
-  boolean existsByArtifactNameAndGroupNameAndArtifactVersionsVersionName(
-      String artifactName, String groupName, String version);
+  boolean existsByRepoIdAndArtifactNameAndGroupNameAndArtifactVersionsVersionName(
+      UUID repoId, String artifactName, String groupName, String version);
 }

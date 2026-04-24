@@ -166,14 +166,8 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       return;
     }
 
-    final var repoInfo = (RepoInfo) baseRepoInfo;
-
-    if (gav.getExtension() != null && "jar".equals(gav.getExtension())) {
-      return;
-    }
-
-    this.checkAllowOverride(repoInfo, gav, storagePath);
-    this.handleDeployTypeRules(repoInfo, artifactPair);
+    this.checkAllowOverride(baseRepoInfo, gav, storagePath);
+    this.handleDeployTypeRules(baseRepoInfo, artifactPair);
   }
 
   @Override
@@ -406,22 +400,26 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
 
     final var fileName = gav.getName();
 
-    if (fileName != null && !fileName.endsWith(".pom")) {
+    if (fileName == null) {
       return;
     }
 
-    this.checkForDB(gav);
     this.checkForStorage(repoInfo, storagePath);
+
+    if (fileName.endsWith(POM_SUFFIX)) {
+      this.checkForDB(repoInfo.getId(), gav);
+    }
   }
 
-  private void checkForDB(final Gav gav) {
+  private void checkForDB(final UUID repoId, final Gav gav) {
 
     final var artifactName = gav.getArtifactId();
     final var groupName = gav.getGroupId();
     final var version = gav.getVersion();
 
-    if (this.artifactRepository.existsByArtifactNameAndGroupNameAndArtifactVersionsVersionName(
-        artifactName, groupName, version)) {
+    if (this.artifactRepository
+        .existsByRepoIdAndArtifactNameAndGroupNameAndArtifactVersionsVersionName(
+            repoId, artifactName, groupName, version)) {
       throw new AccessNotAllowedException("artifactOverrideIsProhibited");
     }
   }
@@ -430,7 +428,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
 
     final var storageFileName = storagePath.getRelativePath().getFileName();
 
-    if (storageFileName.contains("maven-metadata.xml")) {
+    if (storageFileName.contains(METADATA_FILENAME)) {
       return;
     }
 
@@ -657,7 +655,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   }
 
   private void checkVersionTypeRules(
-      final RepoInfo repoInfo, final @Nullable ArtifactVersionType versionType) {
+      final BaseRepoInfo<UUID> repoInfo, final @Nullable ArtifactVersionType versionType) {
 
     if (versionType == null) {
       return;
@@ -828,7 +826,8 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   }
 
   private void handleDeployTypeRules(
-      final RepoInfo repoInfo, final MutablePair<ArtifactDeployType, ArtifactVersionType> result) {
+      final BaseRepoInfo<UUID> repoInfo,
+      final MutablePair<ArtifactDeployType, ArtifactVersionType> result) {
 
     final var deployType = result.getKey();
     final var versionType = result.getValue();
