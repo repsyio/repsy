@@ -15,7 +15,7 @@
  */
 package io.repsy.os.server.protocols.maven.shared.artifact.mappers;
 
-import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactVersionInfo;
+import io.repsy.os.generated.model.ArtifactVersionInfo;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -43,7 +43,10 @@ public class ArtifactVersionToArtifactVersionInfoConverter
     return ArtifactVersionInfo.builder()
         .artifactGroupName(source.getArtifact().getGroupName())
         .artifactName(source.getArtifact().getArtifactName())
-        .type(source.getType())
+        .type(
+            source.getType() != null
+                ? ArtifactVersionInfo.TypeEnum.valueOf(source.getType().name())
+                : null)
         .versionName(source.getVersionName())
         .lastUpdatedAt(source.getLastUpdatedAt())
         .signed(source.isSigned())

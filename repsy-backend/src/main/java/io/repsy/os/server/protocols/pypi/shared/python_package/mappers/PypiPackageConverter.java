@@ -21,6 +21,9 @@ import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseClass
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseListItem;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseProjectURLInfo;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.Release;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.jspecify.annotations.NullMarked;
 import org.mapstruct.Mapper;
@@ -30,6 +33,11 @@ import org.mapstruct.MappingConstants;
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 @NullMarked
 public interface PypiPackageConverter {
+
+  default Instant map(final LocalDateTime localDateTime) {
+    return localDateTime != null ? localDateTime.toInstant(ZoneOffset.UTC) : null;
+  }
+
   io.repsy.os.generated.model.ReleaseClassifierInfo toReleaseClassifierInfoDto(
       ReleaseClassifierInfo source);
 
@@ -55,10 +63,7 @@ public interface PypiPackageConverter {
         .license(release.getLicense())
         .description(release.getDescription())
         .descriptionContentType(release.getDescriptionContentType())
-        .createdAt(
-            release.getCreatedAt() != null
-                ? release.getCreatedAt().atOffset(java.time.ZoneOffset.UTC)
-                : null)
+        .createdAt(release.getCreatedAt())
         .classifiers(
             classifiers == null
                 ? null
@@ -70,15 +75,9 @@ public interface PypiPackageConverter {
         .build();
   }
 
-  @Mapping(
-      target = "updatedAt",
-      expression =
-          "java(source.getUpdatedAt() != null ? source.getUpdatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
+  @Mapping(target = "updatedAt", source = "updatedAt")
   io.repsy.os.generated.model.PackageListItem toPackageListItemDto(PackageListItem source);
 
-  @Mapping(
-      target = "createdAt",
-      expression =
-          "java(source.getCreatedAt() != null ? source.getCreatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
+  @Mapping(target = "createdAt", source = "createdAt")
   io.repsy.os.generated.model.ReleaseListItem toReleaseListItemDto(ReleaseListItem source);
 }

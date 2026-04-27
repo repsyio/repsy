@@ -326,7 +326,7 @@
                         </goals>
                         <configuration>
                             <inputSpec>
-                                ${project.basedir}/src/main/resources/openapi/openapi-spec.json
+                                ${project.basedir}/src/main/resources/openapi/openapi-spec.yaml
                             </inputSpec>
                             <generatorName>spring</generatorName>
                             <generateApis>false</generateApis>
@@ -339,7 +339,7 @@
                             <skip>${openapi.generator.skip}</skip>
                             <skipValidateSpec>true</skipValidateSpec>
                             <typeMappings>
-                                <typeMapping>date-time=Instant</typeMapping>
+                                <typeMapping>DateTime=Instant</typeMapping>
                             </typeMappings>
                             <importMappings>
                                 <importMapping>Instant=java.time.Instant</importMapping>

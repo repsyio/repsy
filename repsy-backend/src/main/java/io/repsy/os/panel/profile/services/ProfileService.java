@@ -26,7 +26,6 @@ import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.services.UserTxService;
-import java.time.ZoneOffset;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -64,10 +63,8 @@ public class ProfileService {
         .id(user.getId())
         .username(user.getUsername())
         .role(UserRole.valueOf(user.getRole().name()))
-        .createdAt(
-            user.getCreatedAt() != null ? user.getCreatedAt().atOffset(ZoneOffset.UTC) : null)
-        .lastLoginAt(
-            user.getLastLoginAt() != null ? user.getLastLoginAt().atOffset(ZoneOffset.UTC) : null)
+        .createdAt(user.getCreatedAt())
+        .lastLoginAt(user.getLastLoginAt())
         .build();
   }
 

@@ -34,10 +34,7 @@ public interface DeployTokenConverter {
     @Mapping(
         target = "readOnly",
         expression = "java(Boolean.TRUE.equals(deployTokenForm.getReadOnly()))"),
-    @Mapping(
-        target = "expirationDate",
-        expression =
-            "java(deployTokenForm.getExpirationDate() != null ? deployTokenForm.getExpirationDate().toInstant() : null)")
+    @Mapping(target = "expirationDate", source = "expirationDate")
   })
   RepoDeployToken toDeployToken(DeployTokenForm deployTokenForm);
 

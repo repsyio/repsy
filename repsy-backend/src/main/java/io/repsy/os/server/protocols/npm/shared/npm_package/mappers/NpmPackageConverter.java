@@ -26,6 +26,9 @@ import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionLi
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.NpmPackage;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageVersion;
 import io.repsy.os.shared.repo.entities.Repo;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +40,10 @@ import org.mapstruct.MappingConstants;
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 @NullMarked
 public interface NpmPackageConverter {
+
+  default Instant map(final LocalDateTime localDateTime) {
+    return localDateTime != null ? localDateTime.toInstant(ZoneOffset.UTC) : null;
+  }
 
   default Map<String, Object> setVersionMetaData(final PackageVersion packageVersion) {
     final Map<String, Object> versionMetadata = new HashMap<>();
@@ -88,10 +95,7 @@ public interface NpmPackageConverter {
         .deprecated(packageVersionInfo.isDeprecated())
         .deprecationMessage(packageVersionInfo.getDeprecationMessage())
         .deleted(packageVersionInfo.isDeleted())
-        .createdAt(
-            packageVersionInfo.getCreatedAt() != null
-                ? packageVersionInfo.getCreatedAt().atOffset(java.time.ZoneOffset.UTC)
-                : null)
+        .createdAt(packageVersionInfo.getCreatedAt())
         .keywords(
             keywords == null ? null : keywords.stream().map(this::toKeywordListItemDto).toList())
         .maintainers(
@@ -142,16 +146,10 @@ public interface NpmPackageConverter {
 
   @Mapping(target = "latestVersion", source = "latest")
   @Mapping(target = "stableVersion", ignore = true)
-  @Mapping(
-      target = "updatedAt",
-      expression =
-          "java(source.getUpdatedAt() != null ? source.getUpdatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
+  @Mapping(target = "updatedAt", source = "updatedAt")
   io.repsy.os.generated.model.PackageListItem toPackageListItemDto(PackageListItem source);
 
-  @Mapping(
-      target = "createdAt",
-      expression =
-          "java(source.getCreatedAt() != null ? source.getCreatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
+  @Mapping(target = "createdAt", source = "createdAt")
   io.repsy.os.generated.model.PackageVersionListItem toPackageVersionListItemDto(
       PackageVersionListItem source);
 }

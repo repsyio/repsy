@@ -308,10 +308,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
               .orElseThrow(() -> new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND));
     }
 
-    final var developers = this.getVersionDevelopers(version.getId());
-    final var licenses = this.getVersionLicenses(version.getId());
-
-    return this.artifactConverter.toArtifactVersionInfo(artifact, version, developers, licenses);
+    return this.artifactConverter.toArtifactVersionInfo(artifact, version);
   }
 
   /** Get the artifact version's pom filename */

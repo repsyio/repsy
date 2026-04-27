@@ -13,21 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.shared.repo.mappers;
+package io.repsy.os.shared.repo.dtos;
 
-import io.repsy.os.generated.model.RepoListInfo;
-import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.entities.Repo;
-import org.jspecify.annotations.NullMarked;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
+import java.time.Instant;
+import lombok.Builder;
+import org.jspecify.annotations.NonNull;
 
-@NullMarked
-@Mapper(componentModel = "spring")
-public interface RepoConverter {
-
-  @Mapping(target = "storageKey", source = "id")
-  RepoInfo toRepoInfo(Repo repo);
-
-  RepoListInfo toRepoListInfo(Repo repo);
-}
+@Builder
+public record RepoListInfo(
+    @NonNull String name, boolean privateRepo, long diskUsage, @NonNull Instant createdAt) {}

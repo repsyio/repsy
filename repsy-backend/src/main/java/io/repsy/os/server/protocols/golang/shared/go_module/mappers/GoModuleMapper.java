@@ -17,29 +17,20 @@ package io.repsy.os.server.protocols.golang.shared.go_module.mappers;
 
 import java.util.List;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface GoModuleMapper {
 
-  @Mapping(
-      target = "createdAt",
-      expression =
-          "java(source.getCreatedAt() != null ? source.getCreatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
   io.repsy.os.generated.model.GoModuleListItem toDto(
       io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleListItem source);
 
-  @Mapping(
-      target = "createdAt",
-      expression =
-          "java(source.getCreatedAt() != null ? source.getCreatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
   io.repsy.os.generated.model.GoModuleVersionListItem toVersionDto(
       io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem source);
 
   default io.repsy.os.generated.model.GoModuleInfo toGoModuleInfo(
-      io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule goModule,
-      List<io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem>
+      final io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule goModule,
+      final List<io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem>
           versions) {
 
     final String latestVersion =
@@ -54,10 +45,7 @@ public interface GoModuleMapper {
         .id(goModule.getId())
         .modulePath(goModule.getModulePath())
         .latestVersion(latestVersion)
-        .createdAt(
-            goModule.getCreatedAt() != null
-                ? goModule.getCreatedAt().atOffset(java.time.ZoneOffset.UTC)
-                : null)
+        .createdAt(goModule.getCreatedAt())
         .versions(versions.stream().map(this::toVersionDto).toList())
         .build();
   }

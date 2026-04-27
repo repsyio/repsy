@@ -74,18 +74,11 @@ public interface CargoCrateConverter {
 
   @Mappings({
     @Mapping(target = "downloads", source = "totalDownloads"),
-    @Mapping(
-        target = "updatedAt",
-        expression =
-            "java(source.lastUpdatedAt() != null ? source.lastUpdatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
+    @Mapping(target = "updatedAt", source = "lastUpdatedAt")
   })
   io.repsy.os.generated.model.CrateListItem toCrateListItemDto(
       io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem source);
 
-  @Mapping(
-      target = "createdAt",
-      expression =
-          "java(source.createdAt() != null ? source.createdAt().atOffset(java.time.ZoneOffset.UTC) : null)")
   io.repsy.os.generated.model.CrateVersionListItem toCrateVersionListItemDto(
       io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem source);
 }

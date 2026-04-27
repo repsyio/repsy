@@ -13,21 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.shared.repo.mappers;
+package io.repsy.os.shared.repo.dtos;
 
-import io.repsy.os.generated.model.RepoListInfo;
-import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.entities.Repo;
-import org.jspecify.annotations.NullMarked;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@NullMarked
-@Mapper(componentModel = "spring")
-public interface RepoConverter {
-
-  @Mapping(target = "storageKey", source = "id")
-  RepoInfo toRepoInfo(Repo repo);
-
-  RepoListInfo toRepoListInfo(Repo repo);
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class RepoDescriptionForm {
+  @NotNull
+  @Size(max = 500)
+  private String description;
 }

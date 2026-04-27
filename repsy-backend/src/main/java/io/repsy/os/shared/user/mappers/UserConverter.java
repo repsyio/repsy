@@ -34,15 +34,7 @@ public interface UserConverter {
     @Mapping(target = "id", expression = "java(user.getId().toString())"),
     @Mapping(
         target = "role",
-        expression = "java(io.repsy.os.generated.model.UserRole.valueOf(user.getRole().name()))"),
-    @Mapping(
-        target = "createdAt",
-        expression =
-            "java(user.getCreatedAt() != null ? user.getCreatedAt().atOffset(java.time.ZoneOffset.UTC) : null)"),
-    @Mapping(
-        target = "lastLoginAt",
-        expression =
-            "java(user.getLastLoginAt() != null ? user.getLastLoginAt().atOffset(java.time.ZoneOffset.UTC) : null)")
+        expression = "java(io.repsy.os.generated.model.UserRole.valueOf(user.getRole().name()))")
   })
   UserResponse toUserResponseDto(User user);
 }

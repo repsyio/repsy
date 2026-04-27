@@ -18,6 +18,9 @@ package io.repsy.os.server.protocols.docker.shared.tag.mappers;
 import io.repsy.os.server.protocols.docker.shared.tag.dtos.manifest.ManifestDetail;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Manifest;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import org.jspecify.annotations.NullMarked;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -27,32 +30,22 @@ import org.mapstruct.MappingConstants;
 @NullMarked
 public interface ManifestConverter {
 
+  default Instant map(final LocalDateTime localDateTime) {
+    return localDateTime != null ? localDateTime.toInstant(ZoneOffset.UTC) : null;
+  }
+
   ManifestDetail toManifestDetail(Manifest manifest);
 
-  @Mapping(
-      target = "lastUpdatedAt",
-      expression =
-          "java(source.getLastUpdatedAt() != null ? source.getLastUpdatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
+  @Mapping(target = "lastUpdatedAt", source = "lastUpdatedAt")
   io.repsy.os.generated.model.ImageTagListItem toTagDto(
       io.repsy.os.server.protocols.docker.shared.tag.dtos.ImageTagListItem source);
 
-  @Mapping(
-      target = "createdAt",
-      expression =
-          "java(source.getCreatedAt() != null ? source.getCreatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
+  @Mapping(target = "createdAt", source = "createdAt")
   io.repsy.os.generated.model.ManifestListItem toManifestDto(
       io.repsy.os.server.protocols.docker.shared.layer.dtos.ManifestListItem source);
 
-  @Mapping(
-      target = "createdAt",
-      expression =
-          "java(tag.getCreatedAt() != null ? tag.getCreatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
-  @Mapping(
-      target = "lastUpdatedAt",
-      expression =
-          "java(tag.getLastUpdatedAt() != null ? tag.getLastUpdatedAt().atOffset(java.time.ZoneOffset.UTC) : null)")
   @Mapping(target = "configDigest", ignore = true)
-  @Mapping(target = "imageName", ignore = true)
+  @Mapping(target = "imageName", source = "image.name")
   io.repsy.os.generated.model.TagDetail toTagDetailBase(Tag tag);
 
   default io.repsy.os.generated.model.TagDetail toTagDetail(final Tag tag) {
