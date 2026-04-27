@@ -128,7 +128,7 @@ public class UserTxService {
     user.setUsername(dto.getUsername());
     user.setHash(hash);
     user.setSalt(salt);
-    user.setRole(dto.getRole() != null ? UserRole.valueOf(dto.getRole().name()) : null);
+    user.setRole(UserRole.valueOf(dto.getRole().name()));
 
     final var savedUser = this.userRepository.save(user);
     return this.userConverter.toUserResponseDto(savedUser);

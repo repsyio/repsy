@@ -2686,6 +2686,7 @@ components:
       required:
         - password
         - username
+        - role
     ProtocolApiFacade: {}
     RepoCreateForm:
       type: object
