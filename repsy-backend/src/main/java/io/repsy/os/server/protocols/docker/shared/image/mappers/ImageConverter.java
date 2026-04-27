@@ -30,7 +30,7 @@ import org.mapstruct.Mappings;
 public interface ImageConverter {
 
   default Instant map(final LocalDateTime localDateTime) {
-    return localDateTime != null ? localDateTime.toInstant(ZoneOffset.UTC) : null;
+    return localDateTime.toInstant(ZoneOffset.UTC);
   }
 
   @Mappings({

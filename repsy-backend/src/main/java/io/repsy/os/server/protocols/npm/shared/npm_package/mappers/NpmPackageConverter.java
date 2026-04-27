@@ -32,6 +32,7 @@ import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import org.jspecify.annotations.NullMarked;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -42,7 +43,11 @@ import org.mapstruct.MappingConstants;
 public interface NpmPackageConverter {
 
   default Instant map(final LocalDateTime localDateTime) {
-    return localDateTime != null ? localDateTime.toInstant(ZoneOffset.UTC) : null;
+    return localDateTime.toInstant(ZoneOffset.UTC);
+  }
+
+  default <S, T> List<T> mapList(final List<S> source, final Function<S, T> mapper) {
+    return source.stream().map(mapper).toList();
   }
 
   default Map<String, Object> setVersionMetaData(final PackageVersion packageVersion) {
@@ -96,16 +101,9 @@ public interface NpmPackageConverter {
         .deprecationMessage(packageVersionInfo.getDeprecationMessage())
         .deleted(packageVersionInfo.isDeleted())
         .createdAt(packageVersionInfo.getCreatedAt())
-        .keywords(
-            keywords == null ? null : keywords.stream().map(this::toKeywordListItemDto).toList())
-        .maintainers(
-            maintainers == null
-                ? null
-                : maintainers.stream().map(this::toMaintainerListItemDto).toList())
-        .distributionTags(
-            distributionTags == null
-                ? null
-                : distributionTags.stream().map(this::toDistributionTagListItemDto).toList())
+        .keywords(mapList(keywords, this::toKeywordListItemDto))
+        .maintainers(mapList(maintainers, this::toMaintainerListItemDto))
+        .distributionTags(mapList(distributionTags, this::toDistributionTagListItemDto))
         .readme(readmeFileContent)
         .build();
   }

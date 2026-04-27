@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.function.Function;
 import org.jspecify.annotations.NullMarked;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -35,7 +36,11 @@ import org.mapstruct.MappingConstants;
 public interface PypiPackageConverter {
 
   default Instant map(final LocalDateTime localDateTime) {
-    return localDateTime != null ? localDateTime.toInstant(ZoneOffset.UTC) : null;
+    return localDateTime.toInstant(ZoneOffset.UTC);
+  }
+
+  default <S, T> List<T> mapList(final List<S> source, final Function<S, T> mapper) {
+    return source.stream().map(mapper).toList();
   }
 
   io.repsy.os.generated.model.ReleaseClassifierInfo toReleaseClassifierInfoDto(
@@ -64,14 +69,8 @@ public interface PypiPackageConverter {
         .description(release.getDescription())
         .descriptionContentType(release.getDescriptionContentType())
         .createdAt(release.getCreatedAt())
-        .classifiers(
-            classifiers == null
-                ? null
-                : classifiers.stream().map(this::toReleaseClassifierInfoDto).toList())
-        .projectUrls(
-            projectURLs == null
-                ? null
-                : projectURLs.stream().map(this::toReleaseProjectURLInfoDto).toList())
+        .classifiers(mapList(classifiers, this::toReleaseClassifierInfoDto))
+        .projectUrls(mapList(projectURLs, this::toReleaseProjectURLInfoDto))
         .build();
   }
 
