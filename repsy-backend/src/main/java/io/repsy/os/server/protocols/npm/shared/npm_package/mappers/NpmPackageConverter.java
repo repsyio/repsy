@@ -29,9 +29,7 @@ import io.repsy.os.shared.repo.entities.Repo;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 import org.jspecify.annotations.NullMarked;
 import org.mapstruct.Mapper;
@@ -86,9 +84,9 @@ public interface NpmPackageConverter {
         .deprecationMessage(packageVersionInfo.getDeprecationMessage())
         .deleted(packageVersionInfo.isDeleted())
         .createdAt(packageVersionInfo.getCreatedAt())
-        .keywords(mapList(keywords, this::toKeywordListItemDto))
-        .maintainers(mapList(maintainers, this::toMaintainerListItemDto))
-        .distributionTags(mapList(distributionTags, this::toDistributionTagListItemDto))
+        .keywords(this.mapList(keywords, this::toKeywordListItemDto))
+        .maintainers(this.mapList(maintainers, this::toMaintainerListItemDto))
+        .distributionTags(this.mapList(distributionTags, this::toDistributionTagListItemDto))
         .readme(readmeFileContent)
         .build();
   }

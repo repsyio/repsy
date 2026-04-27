@@ -69,8 +69,8 @@ public interface PypiPackageConverter {
         .description(release.getDescription())
         .descriptionContentType(release.getDescriptionContentType())
         .createdAt(release.getCreatedAt())
-        .classifiers(mapList(classifiers, this::toReleaseClassifierInfoDto))
-        .projectUrls(mapList(projectURLs, this::toReleaseProjectURLInfoDto))
+        .classifiers(this.mapList(classifiers, this::toReleaseClassifierInfoDto))
+        .projectUrls(this.mapList(projectURLs, this::toReleaseProjectURLInfoDto))
         .build();
   }
 
