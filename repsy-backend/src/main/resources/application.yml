@@ -82,11 +82,3 @@ os:
         golang:
           base-path: ${storage-gateway.fs.base-path}/golang
           trash-path: ${storage-gateway.fs.base-path}/golang/trash
-
-springdoc:
-  api-docs:
-    enabled: true
-    path: /v3/api-docs
-  swagger-ui:
-    enabled: true
-  packages-to-scan: io.repsy.os

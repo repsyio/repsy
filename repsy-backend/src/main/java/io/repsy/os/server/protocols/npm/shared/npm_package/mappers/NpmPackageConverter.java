@@ -50,21 +50,6 @@ public interface NpmPackageConverter {
     return source.stream().map(mapper).toList();
   }
 
-  default Map<String, Object> setVersionMetaData(final PackageVersion packageVersion) {
-    final Map<String, Object> versionMetadata = new HashMap<>();
-    versionMetadata.put("author_name", packageVersion.getAuthorName());
-    versionMetadata.put("author_email", packageVersion.getAuthorEmail());
-    versionMetadata.put("author_url", packageVersion.getAuthorUrl());
-    versionMetadata.put("bugs_url", packageVersion.getBugsUrl());
-    versionMetadata.put("bugs_email", packageVersion.getBugsEmail());
-    versionMetadata.put("repository_type", packageVersion.getRepositoryType());
-    versionMetadata.put("repository_url", packageVersion.getRepositoryUrl());
-    versionMetadata.put("homepage", packageVersion.getHomepage());
-    versionMetadata.put("license", packageVersion.getLicense());
-    versionMetadata.put("deprecated", packageVersion.isDeprecated());
-    return versionMetadata;
-  }
-
   io.repsy.os.generated.model.PackageKeywordListItem toKeywordListItemDto(
       PackageKeywordListItem source);
 

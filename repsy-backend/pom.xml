@@ -14,10 +14,6 @@
 
     <artifactId>repsy-backend</artifactId>
 
-    <properties>
-        <openapi.generator.skip>false</openapi.generator.skip>
-    </properties>
-
     <dependencies>
         <!-- Compile ########################################################### -->
 
@@ -336,8 +332,6 @@
                             <generateSupportingFiles>false</generateSupportingFiles>
                             <output>${project.build.directory}/generated-sources/openapi</output>
                             <modelPackage>io.repsy.os.generated.model</modelPackage>
-                            <skip>${openapi.generator.skip}</skip>
-                            <skipValidateSpec>true</skipValidateSpec>
                             <typeMappings>
                                 <typeMapping>DateTime=Instant</typeMapping>
                             </typeMappings>
@@ -350,10 +344,14 @@
                                 <useOptional>false</useOptional>
                                 <useBeanValidation>true</useBeanValidation>
                                 <generatedConstructorWithRequiredArgs>false</generatedConstructorWithRequiredArgs>
-                                <additionalModelTypeAnnotations>@lombok.Builder
-@lombok.NoArgsConstructor
-@lombok.AllArgsConstructor</additionalModelTypeAnnotations>
-                                <additionalEnumTypeAnnotations>@lombok.Getter</additionalEnumTypeAnnotations>
+                                <additionalModelTypeAnnotations>
+                                    @lombok.Builder
+                                    @lombok.NoArgsConstructor
+                                    @lombok.AllArgsConstructor
+                                </additionalModelTypeAnnotations>
+                                <additionalEnumTypeAnnotations>
+                                    @lombok.Getter
+                                </additionalEnumTypeAnnotations>
                             </configOptions>
                         </configuration>
                     </execution>
@@ -363,36 +361,5 @@
     </build>
 
     <profiles>
-        <profile>
-            <id>download-spec</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>exec-maven-plugin</artifactId>
-                        <version>3.1.0</version>
-                        <executions>
-                            <execution>
-                                <id>download-openapi-spec</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>exec</goal>
-                                </goals>
-                                <configuration>
-                                    <executable>curl</executable>
-                                    <arguments>
-                                        <argument>-s</argument>
-                                        <argument>-f</argument>
-                                        <argument>-o</argument>
-                                        <argument>${project.basedir}/src/main/resources/openapi/openapi.yaml</argument>
-                                        <argument>http://localhost:9090/v3/api-docs.yaml</argument>
-                                    </arguments>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
     </profiles>
 </project>
