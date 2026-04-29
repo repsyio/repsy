@@ -90,6 +90,12 @@
         </dependency>
 
         <dependency>
+            <groupId>io.repsy.protocols</groupId>
+            <artifactId>nuget</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>io.repsy.libs</groupId>
             <artifactId>storage-gateway-fs</artifactId>
             <version>${project.version}</version>
