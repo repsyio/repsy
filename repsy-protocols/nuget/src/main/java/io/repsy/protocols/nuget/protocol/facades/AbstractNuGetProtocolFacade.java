@@ -23,11 +23,13 @@ import io.repsy.protocols.nuget.shared.dtos.NuGetSearchResponse;
 import io.repsy.protocols.nuget.shared.dtos.NuGetAutocompleteResponse;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
+import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
@@ -57,9 +59,36 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   @Override
   public void publish(final ProtocolContext context, final InputStream inputStream)
       throws IOException {
-    // TODO: Parse .nupkg ZIP, extract .nuspec XML, parse metadata, call packageService.publish
-    // For now, stub implementation logs that publish was called
-    log.debug("NuGet package publish called - implementation pending");
+    try {
+      final var nuspecXml = NuGetPackageUtils.extractNuspecFromNupkg(inputStream);
+      final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+
+      final var packageId = extractXmlTag(nuspecXml, "id");
+      final var version = extractXmlTag(nuspecXml, "version");
+
+      if (packageId == null || packageId.isEmpty() || version == null || version.isEmpty()) {
+        throw new IOException("Missing id or version in nuspec");
+      }
+
+      this.packageService.publish(repoInfo, packageId, version, nuspecXml);
+      log.info("Published NuGet package {} {}", packageId, version);
+    } catch (final IOException e) {
+      log.error("Failed to publish nupkg", e);
+      throw e;
+    }
+  }
+
+  private String extractXmlTag(final String xml, final String tagName) {
+    try {
+      final var patternStr = String.format("<%s>([^<]+)</%s>", tagName, tagName);
+      final var matcher = Pattern.compile(patternStr).matcher(xml);
+      if (matcher.find()) {
+        return matcher.group(1).trim();
+      }
+    } catch (final Exception e) {
+      log.debug("Failed to extract {} from nuspec", tagName, e);
+    }
+    return null;
   }
 
   @Override

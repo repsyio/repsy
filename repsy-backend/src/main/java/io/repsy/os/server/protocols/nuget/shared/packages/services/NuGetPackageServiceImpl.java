@@ -24,8 +24,10 @@ import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
+import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,7 +61,36 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final String nuspecXml)
       throws IOException {
     log.debug("Publishing NuGet package {} version {}", packageId, version);
-    // TODO: Parse nuspecXml, create package version, call storage service
+
+    final var repo = this.repoRepository
+        .findById(repoInfo.getId())
+        .orElseThrow(() -> new IllegalArgumentException("Repository not found"));
+
+    // Find or create package
+    var pkg = this.packageRepository.findByRepoIdAndPackageIdIgnoreCase(
+        repoInfo.getId(), packageId.toLowerCase(Locale.ROOT));
+
+    final var nugetPackage = pkg.orElseGet(() -> {
+      final var newPkg = new NuGetPackage();
+      newPkg.setRepo(repo);
+      newPkg.setPackageId(packageId.toLowerCase(Locale.ROOT));
+      newPkg.setCreatedAt(Instant.now());
+      newPkg.setUpdatedAt(Instant.now());
+      return this.packageRepository.save(newPkg);
+    });
+
+    // Create package version
+    final var pkgVersion = new NuGetPackageVersion();
+    pkgVersion.setNugetPackage(nugetPackage);
+    pkgVersion.setVersion(version);
+    pkgVersion.setPrerelease(version.contains("-"));
+    pkgVersion.setListed(true);
+    pkgVersion.setPublishedAt(Instant.now());
+    pkgVersion.setDownloadCount(0);
+    pkgVersion.setCreatedAt(Instant.now());
+
+    this.packageVersionRepository.save(pkgVersion);
+    log.info("Published NuGet package {} version {}", packageId, version);
   }
 
   @Override
@@ -86,7 +117,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
     try {
       final var pkg = this.packageRepository.findByRepoIdAndPackageIdIgnoreCase(
-          repoInfo.getId(), query.toLowerCase());
+          repoInfo.getId(), query.toLowerCase(Locale.ROOT));
 
       if (pkg.isEmpty()) {
         return new PageImpl<>(List.of(), pageable, 0);
@@ -122,7 +153,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
           .findAll()
           .stream()
           .filter(p -> p.getRepo().getId().equals(repoInfo.getId()))
-          .filter(p -> p.getPackageId().toLowerCase().startsWith(query.toLowerCase()))
+          .filter(p -> p.getPackageId().toLowerCase(Locale.ROOT).startsWith(query.toLowerCase(Locale.ROOT)))
           .limit(take)
           .skip(skip)
           .map(NuGetPackage::getPackageId)
@@ -150,7 +181,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
   private NuGetPackage findPackage(final UUID repoId, final String packageId) {
     return this.packageRepository
-        .findByRepoIdAndPackageIdIgnoreCase(repoId, packageId.toLowerCase())
+        .findByRepoIdAndPackageIdIgnoreCase(repoId, packageId.toLowerCase(Locale.ROOT))
         .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
   }
 }
