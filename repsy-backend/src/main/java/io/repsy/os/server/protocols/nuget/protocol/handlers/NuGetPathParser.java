@@ -19,7 +19,6 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.server.core.UrlParserProperties;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -42,33 +41,38 @@ public class NuGetPathParser implements PathParser {
 
   private static final String REPO_NAME = "repoName";
   private static final String RELATIVE_PATH = "relativePath";
-  private static final String REPO_NAME_REGEX = "(?<repoName>[a-zA-Z0-9_\\-]+)";
+
+  private static final String REPO_NAME_REGEX = "(?<repoName>(?!v3(/|$))[a-zA-Z0-9_\\-]+)";
+
   private static final String RELATIVE_PATH_REGEX = "(?<relativePath>/.*)?";
+
   private static final Pattern NORMAL_PATTERN =
       Pattern.compile("^/" + REPO_NAME_REGEX + RELATIVE_PATH_REGEX);
+
   private static final Pattern REGISTRY_LEVEL_PATTERN = Pattern.compile("^/v3/index\\.json$");
 
   private final RepoTxService repoTxService;
 
   @Override
   public Optional<ProtocolContext> parse(final HttpServletRequest request) {
-    final var path = request.getServletPath();
+    final String path = request.getServletPath();
 
     if (REGISTRY_LEVEL_PATTERN.matcher(path).matches()) {
-      return Optional.of(ProtocolContextUtils.createWithEmptyRepo("", new RelativePath(path)));
+      final var context = new ProtocolContext();
+      context.addProperty("relativePath", new RelativePath(path));
+      return Optional.of(context);
     }
 
-    final var matcher = NORMAL_PATTERN.matcher(path);
-
+    final Matcher matcher = NORMAL_PATTERN.matcher(path);
     if (!matcher.matches()) {
       return Optional.empty();
     }
 
-    final var repoName = matcher.group(REPO_NAME).toLowerCase(Locale.getDefault());
+    final String repoName = matcher.group(REPO_NAME).toLowerCase(Locale.getDefault());
 
-    final var repoInfoOpt = this.repoTxService.getRepoByNameAndType(repoName, RepoType.NUGET);
-
-    return repoInfoOpt.flatMap(repoInfo -> this.createProtocolContext(repoInfo, repoName, matcher));
+    return this.repoTxService
+        .getRepoByNameAndType(repoName, RepoType.NUGET)
+        .flatMap(repoInfo -> this.createProtocolContext(repoInfo, repoName, matcher));
   }
 
   private Optional<ProtocolContext> createProtocolContext(
@@ -84,6 +88,7 @@ public class NuGetPathParser implements PathParser {
             .build();
 
     context.addProperty("urlProperties", urlProperties);
+    context.addProperty("repoInfo", repoInfo);
 
     return Optional.of(context);
   }

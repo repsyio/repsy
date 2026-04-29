@@ -15,8 +15,6 @@
  */
 package io.repsy.protocols.nuget.protocol.handlers;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
@@ -40,7 +38,8 @@ import org.springframework.http.ResponseEntity;
 public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
     implements ProtocolMethodHandler {
 
-  private static final Pattern VERSIONS_PATTERN = Pattern.compile(".*/v3/package/.+/index\\.json$");
+  private static final Pattern VERSIONS_PATTERN =
+      Pattern.compile("^.*/v3/package/[^/]+/index\\.json$", Pattern.CASE_INSENSITIVE);
 
   private final PathParser basePathParser;
   private final NuGetProtocolFacade facade;
@@ -69,16 +68,19 @@ public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
   @Override
   public PathParser getPathParser() {
     return request -> {
-      if (!HttpMethod.GET.name().equals(request.getMethod())) {
+      final var contextOpt = this.basePathParser.parse(request);
+
+      if (contextOpt.isEmpty()) {
         return Optional.empty();
       }
 
-      final var path = request.getServletPath();
-      if (!VERSIONS_PATTERN.matcher(path).matches()) {
+      final var relativePath = request.getRequestURI();
+
+      if (!VERSIONS_PATTERN.matcher(relativePath).matches()) {
         return Optional.empty();
       }
 
-      return this.basePathParser.parse(request);
+      return contextOpt;
     };
   }
 
@@ -98,7 +100,4 @@ public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
       return ResponseEntity.notFound().build();
     }
   }
-
-  @JsonInclude(Include.NON_NULL)
-  public record VersionsResponse(List<String> versions) {}
 }

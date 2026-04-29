@@ -23,7 +23,6 @@ import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPack
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -57,16 +56,13 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final BaseRepoInfo<UUID> repoInfo,
       final String packageId,
       final String version,
-      final String nuspecXml)
-      throws IOException {
-    log.debug("Publishing NuGet package {} version {}", packageId, version);
+      final String nuspecXml) {
 
     final var repo =
         this.repoRepository
             .findById(repoInfo.getId())
             .orElseThrow(() -> new IllegalArgumentException("Repository not found"));
 
-    // Find or create package
     var pkg =
         this.packageRepository.findByRepoIdAndPackageIdIgnoreCase(
             repoInfo.getId(), packageId.toLowerCase(Locale.ROOT));
@@ -82,7 +78,6 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
               return this.packageRepository.save(newPkg);
             });
 
-    // Create package version
     final var pkgVersion = new NuGetPackageVersion();
     pkgVersion.setNugetPackage(nugetPackage);
     pkgVersion.setVersion(version);

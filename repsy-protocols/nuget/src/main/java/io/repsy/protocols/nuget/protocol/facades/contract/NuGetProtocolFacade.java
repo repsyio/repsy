@@ -34,7 +34,7 @@ public interface NuGetProtocolFacade {
 
   List<String> getPackageVersions(ProtocolContext context);
 
-  Resource downloadNupkg(ProtocolContext context);
+  Resource downloadNuPackage(ProtocolContext context);
 
   Resource downloadNuspec(ProtocolContext context);
 

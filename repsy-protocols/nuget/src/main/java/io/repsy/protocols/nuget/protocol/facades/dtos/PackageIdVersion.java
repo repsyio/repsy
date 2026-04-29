@@ -13,12 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.nuget.shared.dtos;
+package io.repsy.protocols.nuget.protocol.facades.dtos;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.List;
-import org.jspecify.annotations.NullMarked;
-
-@NullMarked
-public record NuGetServiceIndexResponse(
-    String version, @JsonProperty("resources") List<NuGetServiceIndexResource> resources) {}
+public record PackageIdVersion(String id, String version) {}

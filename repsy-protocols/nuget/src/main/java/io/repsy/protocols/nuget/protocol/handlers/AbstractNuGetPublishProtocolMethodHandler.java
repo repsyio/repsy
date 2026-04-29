@@ -85,13 +85,34 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler implements Proto
       final HttpServletResponse response) {
 
     try {
-      this.facade.publish(context, request.getInputStream());
+
+      final var contentType = request.getContentType();
+
+      if (contentType == null || !contentType.toLowerCase().contains("multipart/form-data")) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(NuGetErrorResponse.of("Content-Type must be multipart/form-data"));
+      }
+
+      final var parts = request.getParts();
+
+      if (parts == null || parts.isEmpty()) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(NuGetErrorResponse.of("Missing package content."));
+      }
+
+      final var nupkgPart = parts.iterator().next();
+
+      try (final var inputStream = nupkgPart.getInputStream()) {
+        this.facade.publish(context, inputStream);
+      }
+
       return ResponseEntity.status(HttpStatus.CREATED).build();
+
     } catch (final IllegalArgumentException e) {
-      log.debug("NuGet publish validation error: {}", e.getMessage());
+      log.debug("NuGet validation error: {}", e.getMessage());
       return ResponseEntity.badRequest().body(NuGetErrorResponse.of(e.getMessage()));
     } catch (final Exception e) {
-      log.debug("NuGet publish failed: {}", e.getMessage());
+      log.error("NuGet publish failed: ", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
           .body(NuGetErrorResponse.of("Publish failed"));
     }

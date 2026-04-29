@@ -15,60 +15,65 @@
  */
 package io.repsy.protocols.nuget.shared.utils;
 
-import java.io.BufferedInputStream;
+import io.repsy.libs.protocol.router.ProtocolContext;
+import io.repsy.protocols.nuget.protocol.facades.dtos.PackageIdVersion;
+import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 @Slf4j
 @NullMarked
 @UtilityClass
 public final class NuGetPackageUtils {
 
-  private static final int BUFFER = 4096;
+  private static final int THREE = 3;
+  private static final int FOUR = 4;
 
-  public static String extractNuspecFromNupkg(final InputStream nupkgInputStream)
-      throws IOException {
-    try (final var zis = new ZipInputStream(new BufferedInputStream(nupkgInputStream))) {
+  public static @Nullable String extractXmlTag(final String xml, final String tagName) {
+    try {
+      final var patternStr = String.format("<%s>([^<]+)</%s>", tagName, tagName);
+      final var matcher = Pattern.compile(patternStr).matcher(xml);
+      if (matcher.find()) {
+        return matcher.group(1).trim();
+      }
+    } catch (final Exception e) {
+      log.debug("Failed to extract {} from nuspec", tagName, e);
+    }
+    return null;
+  }
+
+  public static String extractNuspec(final InputStream inputStream) throws IOException {
+
+    try (final var zipIn = new ZipInputStream(inputStream)) {
       ZipEntry entry;
-      while ((entry = zis.getNextEntry()) != null) {
-        if (entry.getName().endsWith(".nuspec")) {
-          return readNuspecContent(zis);
+      while ((entry = zipIn.getNextEntry()) != null) {
+        if (!entry.isDirectory() && entry.getName().toLowerCase().endsWith(".nuspec")) {
+          return new String(zipIn.readAllBytes(), StandardCharsets.UTF_8);
         }
       }
-      throw new IOException("No .nuspec file found in nupkg");
     }
+    throw new IllegalArgumentException(
+        "The uploaded file is not a valid NuGet package (.nuspec not found).");
   }
 
-  private static String readNuspecContent(final ZipInputStream zis) throws IOException {
-    final var sb = new StringBuilder();
-    final var buffer = new byte[BUFFER];
-    int bytesRead;
-
-    while ((bytesRead = zis.read(buffer)) != -1) {
-      sb.append(new String(buffer, 0, bytesRead, StandardCharsets.UTF_8));
-    }
-
-    return sb.toString();
+  public static String extractPackageId(final ProtocolContext context) {
+    final var path = ProtocolContextUtils.getRelativePath(context).getPath();
+    final var parts = path.split("/");
+    return parts.length > THREE ? parts[THREE] : "";
   }
 
-  //  public static byte[] extractBytesFromNupkg(final InputStream nupkgInputStream)
-  //      throws IOException {
-  //    final var buffer = new byte[8192];
-  //    final var result = new java.io.ByteArrayOutputStream();
-  //    int bytesRead;
-  //
-  //    try (final var buffered = new BufferedInputStream(nupkgInputStream)) {
-  //      while ((bytesRead = buffered.read(buffer)) != -1) {
-  //        result.write(buffer, 0, bytesRead);
-  //      }
-  //    }
-  //
-  //    return result.toByteArray();
-  //  }
+  public static PackageIdVersion extractPackageIdAndVersion(final ProtocolContext context) {
+    final var path = ProtocolContextUtils.getRelativePath(context).getPath();
+    final var parts = path.split("/");
+    return new PackageIdVersion(
+        parts.length > THREE ? parts[THREE] : "", parts.length > FOUR ? parts[FOUR] : "");
+  }
 }

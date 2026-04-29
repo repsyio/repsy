@@ -68,12 +68,13 @@ public abstract class AbstractNuGetServiceIndexProtocolMethodHandler
   @Override
   public PathParser getPathParser() {
     return request -> {
+      final var uri = request.getRequestURI();
+
       if (!HttpMethod.GET.name().equals(request.getMethod())) {
         return Optional.empty();
       }
 
-      final var path = request.getServletPath();
-      if (!path.endsWith("/v3/index.json")) {
+      if (!uri.toLowerCase().endsWith("/v3/index.json")) {
         return Optional.empty();
       }
 

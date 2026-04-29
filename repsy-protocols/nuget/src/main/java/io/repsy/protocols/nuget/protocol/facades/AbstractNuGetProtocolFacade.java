@@ -15,6 +15,11 @@
  */
 package io.repsy.protocols.nuget.protocol.facades;
 
+import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.extractNuspec;
+import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.extractPackageId;
+import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.extractPackageIdAndVersion;
+import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.extractXmlTag;
+
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
 import io.repsy.protocols.nuget.shared.dtos.NuGetAutocompleteResponse;
@@ -23,17 +28,16 @@ import io.repsy.protocols.nuget.shared.dtos.NuGetServiceIndexResource;
 import io.repsy.protocols.nuget.shared.dtos.NuGetServiceIndexResponse;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
-import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
 @Slf4j
@@ -41,24 +45,28 @@ import org.springframework.core.io.Resource;
 @RequiredArgsConstructor
 public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFacade {
 
-  private static final int THREE = 3;
-  private static final int FOUR = 4;
   private final NuGetStorageService storageService;
   private final NuGetPackageService<ID> packageService;
 
   @Override
   public NuGetServiceIndexResponse getServiceIndex(final ProtocolContext context) {
-    final var baseUrl = this.buildBaseUrl(context);
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoName = repoInfo.getName();
+    final var baseUrl = "http://localhost:9090/" + repoName;
+
     final var resources = new ArrayList<NuGetServiceIndexResource>();
 
     resources.add(
         new NuGetServiceIndexResource(baseUrl + "/v3/package", "PackageBaseAddress/3.0.0", null));
+
     resources.add(
         new NuGetServiceIndexResource(
-            baseUrl + "/v3/registration", "RegistrationBaseUrl/3.0.0", null));
+            baseUrl + "/v3/registration", "RegistrationsBaseUrl/3.0.0", null));
+
     resources.add(
         new NuGetServiceIndexResource(
             baseUrl + "/v3/search", "SearchQueryService/3.0.0-beta", null));
+
     resources.add(
         new NuGetServiceIndexResource(
             baseUrl + "/v3/autocomplete", "SearchAutocompleteService/3.0.0-beta", null));
@@ -67,61 +75,67 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   }
 
   @Override
-  public void publish(final ProtocolContext context, final InputStream inputStream)
+  public void publish(final ProtocolContext context, final InputStream pureZipStream)
       throws IOException {
-    try {
-      final var nuspecXml = NuGetPackageUtils.extractNuspecFromNupkg(inputStream);
-      final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final byte[] nupkgBytes = pureZipStream.readAllBytes();
 
-      final var packageId = this.extractXmlTag(nuspecXml, "id");
-      final var version = this.extractXmlTag(nuspecXml, "version");
-
-      if (packageId == null || packageId.isEmpty() || version == null || version.isEmpty()) {
-        throw new IOException("Missing id or version in nuspec");
-      }
-
-      this.packageService.publish(repoInfo, packageId, version, nuspecXml);
-      log.info("Published NuGet package {} {}", packageId, version);
-    } catch (final IOException e) {
-      log.error("Failed to publish nupkg", e);
-      throw e;
+    if (nupkgBytes.length == 0) {
+      throw new IllegalArgumentException("NuGet package stream is empty.");
     }
-  }
 
-  private @Nullable String extractXmlTag(final String xml, final String tagName) {
-    try {
-      final var patternStr = String.format("<%s>([^<]+)</%s>", tagName, tagName);
-      final var matcher = Pattern.compile(patternStr).matcher(xml);
-      if (matcher.find()) {
-        return matcher.group(1).trim();
-      }
-    } catch (final Exception e) {
-      log.debug("Failed to extract {} from nuspec", tagName, e);
+    final String nuspecXml = extractNuspec(new ByteArrayInputStream(nupkgBytes));
+    final byte[] nuspecBytes = nuspecXml.getBytes(StandardCharsets.UTF_8);
+
+    final var packageId = extractXmlTag(nuspecXml, "id");
+    final var version = extractXmlTag(nuspecXml, "version");
+
+    if (packageId == null || packageId.isBlank() || version == null || version.isBlank()) {
+      throw new IllegalArgumentException("Missing 'id' or 'version' in nuspec.");
     }
-    return null;
+
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+
+    this.storageService.writePackage(
+        repoInfo.getStorageKey(), packageId, version, nupkgBytes, nuspecBytes);
+
+    this.packageService.publish(repoInfo, packageId, version, nuspecXml);
+
+    log.info("Successfully published and stored NuGet package {} {}", packageId, version);
   }
 
   @Override
   public List<String> getPackageVersions(final ProtocolContext context) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var packageId = this.extractPackageId(context);
+    final var packageId = extractPackageId(context);
     return this.packageService.getVersions(repoInfo, packageId);
   }
 
   @Override
-  public Resource downloadNupkg(final ProtocolContext context) {
+  public Resource downloadNuPackage(final ProtocolContext context) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var packageIdVersion = this.extractPackageIdAndVersion(context);
-    return this.storageService.getNupkg(
-        repoInfo.getStorageKey(), packageIdVersion.id(), packageIdVersion.version());
+    final var packageId = extractPackageId(context);
+    final var packageIdVersion = extractPackageIdAndVersion(context);
+    final var resource =
+        this.storageService.getNupkg(
+            repoInfo.getStorageKey(), packageIdVersion.id(), packageIdVersion.version());
+
+    this.packageService.incrementDownloadCount(repoInfo, packageId, packageIdVersion.version());
+
+    return resource;
   }
 
   @Override
   public Resource downloadNuspec(final ProtocolContext context) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var packageIdVersion = this.extractPackageIdAndVersion(context);
-    return this.storageService.getNuspec(
-        repoInfo.getStorageKey(), packageIdVersion.id(), packageIdVersion.version());
+    final var packageId = extractPackageId(context);
+    final var packageIdVersion = extractPackageIdAndVersion(context);
+    final var resource =
+        this.storageService.getNuspec(
+            repoInfo.getStorageKey(), packageIdVersion.id(), packageIdVersion.version());
+
+    this.packageService.incrementDownloadCount(repoInfo, packageId, packageIdVersion.version());
+
+    return resource;
   }
 
   @Override
@@ -149,25 +163,4 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
     final var results = this.packageService.autocomplete(repoInfo, q, skip, take, prerelease);
     return new NuGetAutocompleteResponse(results.size(), results);
   }
-
-  private String extractPackageId(final ProtocolContext context) {
-    final var path = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var parts = path.split("/");
-    return parts.length > THREE ? parts[THREE] : "";
-  }
-
-  private PackageIdVersion extractPackageIdAndVersion(final ProtocolContext context) {
-    final var path = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var parts = path.split("/");
-    return new PackageIdVersion(
-        parts.length > THREE ? parts[THREE] : "", parts.length > FOUR ? parts[FOUR] : "");
-  }
-
-  private String buildBaseUrl(final ProtocolContext context) {
-    // TODO: Extract actual base URL from HTTP request in handler
-    // For now return default; should be implemented at handler level with HttpServletRequest
-    return "http://localhost:8080";
-  }
-
-  private record PackageIdVersion(String id, String version) {}
 }

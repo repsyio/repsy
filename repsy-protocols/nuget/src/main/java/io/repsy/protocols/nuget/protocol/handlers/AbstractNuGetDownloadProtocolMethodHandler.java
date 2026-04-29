@@ -94,7 +94,9 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
 
     try {
       final var resource =
-          this.isNupkg ? this.facade.downloadNupkg(context) : this.facade.downloadNuspec(context);
+          this.isNupkg
+              ? this.facade.downloadNuPackage(context)
+              : this.facade.downloadNuspec(context);
       final var contentType =
           this.isNupkg ? MediaType.APPLICATION_OCTET_STREAM : MediaType.APPLICATION_XML;
 
