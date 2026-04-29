@@ -1,0 +1,4071 @@
+---
+openapi: 3.1.0
+info:
+  title: OpenAPI definition
+  version: v0
+paths:
+  "/api/users/{userId}":
+    put:
+      tags:
+        - user-controller
+      operationId: updateUser
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UserUpdateForm"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseUserResponse"
+      summary: Update a user
+    delete:
+      tags:
+        - user-controller
+      operationId: deleteUser
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a user
+  "/api/repos/{repoName}/settings":
+    get:
+      tags:
+        - protocol-repo-controller
+      operationId: getSettings
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseRepoSettingsInfo"
+      summary: Get settings for a repository
+    put:
+      tags:
+        - protocol-repo-controller
+      operationId: updateSettings
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RepoSettingsForm"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Update repository settings
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/deploy-tokens/{tokenId}":
+    put:
+      tags:
+        - protocol-deploy-token-controller
+      operationId: rotate
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: tokenId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseString"
+      summary: Regenerate a deploy token
+    delete:
+      tags:
+        - protocol-deploy-token-controller
+      operationId: revoke
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: tokenId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a deploy token
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/profile/username":
+    put:
+      tags:
+        - profile-controller
+      operationId: updateUsername
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UpdateUsernameForm"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseLoginInfo"
+      summary: Update the current user's username
+  "/api/profile/password":
+    put:
+      tags:
+        - profile-controller
+      operationId: updatePassword
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PasswordForm"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Update the current user's password
+  "/api/users":
+    get:
+      tags:
+        - user-controller
+      operationId: listUsers
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 10
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelUserResponse"
+      summary: List all users
+    post:
+      tags:
+        - user-controller
+      operationId: createUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UserCreateForm"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseUserResponse"
+      summary: Create a new user
+  "/api/users/{userId}/actions/reset-password":
+    post:
+      tags:
+        - user-controller
+      operationId: resetPassword
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseString"
+      summary: Reset a user's password
+  "/api/repos/{repoType}":
+    post:
+      tags:
+        - protocol-repo-controller
+      operationId: createRepo
+      parameters:
+        - name: facade
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/ProtocolApiFacade"
+        - name: repoType
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoType"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RepoCreateForm"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Create a new repository
+  "/api/repos/{repoName}/deploy-tokens":
+    get:
+      tags:
+        - protocol-deploy-token-controller
+      operationId: listDeployTokens
+      parameters:
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelDeployTokenInfoListItem"
+      summary: List deploy tokens for a repository
+    post:
+      tags:
+        - protocol-deploy-token-controller
+      operationId: createDeployToken
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/DeployTokenForm"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseTokenInfo"
+      summary: Create a deploy token for a repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/mvn/key-stores/{repoName}":
+    get:
+      tags:
+        - key-store-controller
+      operationId: listMavenKeyStores
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelKeyStoreItem"
+      summary: List key stores for a Maven repository
+    post:
+      tags:
+        - key-store-controller
+      operationId: createMavenKeyStore
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/KeyStoreForm"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseKeyStoreItem"
+      summary: Add a key store to a Maven repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/auth/tokens/refresh":
+    post:
+      tags:
+        - auth-controller
+      operationId: refreshToken
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RefreshTokenForm"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseLoginInfo"
+      summary: Refresh access token using a refresh token
+  "/api/auth/login":
+    post:
+      tags:
+        - auth-controller
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/LoginForm"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseLoginInfo"
+      summary: Authenticate user and return JWT tokens
+  "/api/repos/{repoName}/name":
+    patch:
+      tags:
+        - protocol-repo-controller
+      operationId: rename
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RepoRenameForm"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Rename a repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/description":
+    patch:
+      tags:
+        - protocol-repo-controller
+      operationId: updateDescription
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RepoDescriptionForm"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Update repository description
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/usages":
+    get:
+      tags:
+        - usage-controller
+      operationId: getTotalUsage
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseTotalUsageInfo"
+      summary: Get total usage statistics
+  "/api/repos/{repoType}/info":
+    get:
+      tags:
+        - protocol-repo-controller
+      operationId: getInfo
+      parameters:
+        - name: repoType
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoType"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseListRepoListInfo"
+      summary: Get repository list info by type
+  "/api/repos/{repoType}/count":
+    get:
+      tags:
+        - protocol-repo-controller
+      operationId: getCount
+      parameters:
+        - name: repoType
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoType"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseLong"
+      summary: Get repository count by type
+  "/api/repos/{repoName}/usage":
+    get:
+      tags:
+        - protocol-repo-controller
+      operationId: getUsage
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseRepoUsageInfo"
+      summary: Get storage usage for a repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/permissions":
+    get:
+      tags:
+        - protocol-repo-controller
+      operationId: getPermission
+      parameters:
+        - name: repoPermissionInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoPermissionInfo"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseRepoPermissionInfo"
+      summary: Get permissions for a repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/format":
+    get:
+      tags:
+        - protocol-repo-controller
+      operationId: getRepoType
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseString"
+      summary: Get the format of a repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/contents":
+    get:
+      tags:
+        - protocol-repo-controller
+      operationId: getPathContent
+      parameters:
+        - name: facade
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/ProtocolApiFacadeMavenAdapter"
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseListStorageItemInfo"
+      summary: List contents of a repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/pypi/packages/{repoName}":
+    get:
+      tags:
+        - pypi-package-controller
+      operationId: listPypiPackages
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
+      summary: List PyPI packages in a repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/pypi/packages/{repoName}/{packageName}/releases":
+    get:
+      tags:
+        - pypi-package-controller
+      operationId: listReleases
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+        - name: version
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelReleaseListItem"
+      summary: List releases of a PyPI package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/pypi/packages/{repoName}/{packageName}/releases/{releaseVersion}":
+    get:
+      tags:
+        - pypi-package-controller
+      operationId: getRelease
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: releaseVersion
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseReleaseDetail"
+      summary: Get a specific PyPI package release
+    delete:
+      tags:
+        - pypi-package-controller
+      operationId: deleteRelease
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: releaseVersion
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a specific PyPI package release
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/pypi/packages/{repoName}/{packageName}":
+    get:
+      tags:
+        - pypi-package-controller
+      operationId: getPypiPackage
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseReleaseDetail"
+      summary: Get a PyPI package
+    delete:
+      tags:
+        - pypi-package-controller
+      operationId: deletePypiPackage
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/profile":
+    get:
+      tags:
+        - profile-controller
+      operationId: getProfile
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseProfileInfo"
+      summary: Get the current user's profile
+    delete:
+      tags:
+        - profile-controller
+      operationId: deleteProfile
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete the current user's account
+  "/api/npm/packages/{repoName}":
+    get:
+      tags:
+        - npm-package-api-controller
+      operationId: listNpmPackages
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
+      summary: List npm packages in a repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/npm/packages/{repoName}/{packageName}/versions/{versionName}":
+    get:
+      tags:
+        - npm-package-api-controller
+      operationId: getVersion
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
+      summary: Get a specific npm package version
+    delete:
+      tags:
+        - npm-package-api-controller
+      operationId: deleteVersion
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a specific npm package version
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/npm/packages/{repoName}/{scope}/{packageName}/versions/{versionName}":
+    get:
+      tags:
+        - npm-package-api-controller
+      operationId: getNpmScopedPackageVersion
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: scope
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
+      summary: Get a specific scoped npm package version
+    delete:
+      tags:
+        - npm-package-api-controller
+      operationId: deleteNpmScopedPackageVersion
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: scope
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a specific scoped npm package version
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/npm/packages/{repoName}/{packageName}":
+    get:
+      tags:
+        - npm-package-api-controller
+      operationId: getNpmPackage
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
+      summary: Get an npm package
+    delete:
+      tags:
+        - npm-package-api-controller
+      operationId: deleteNpmPackage
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete an npm package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/npm/packages/{repoName}/{scope}/{packageName}":
+    get:
+      tags:
+        - npm-package-api-controller
+      operationId: getNpmScopedPackage
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: scope
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
+      summary: Get a scoped npm package
+    delete:
+      tags:
+        - npm-package-api-controller
+      operationId: deleteScopedNpmPackage
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: scope
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a scoped npm package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/npm/packages/{repoName}/{ignoredScope}":
+    get:
+      tags:
+        - npm-package-api-controller
+      operationId: listScopedNpmPackages
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: ignoredScope
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
+      summary: List artifact groups in a Maven repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/npm/packages/{repoName}/scope":
+    get:
+      tags:
+        - npm-package-api-controller
+      operationId: listFilterByScope
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
+      summary: List npm scopes in a repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/npm/packages/{repoName}/scope/{scope}":
+    get:
+      tags:
+        - npm-package-api-controller
+      operationId: listNpmPackagesByScope
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: scope
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
+      summary: Get npm packages in a scope
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/npm/packages/{repoName}/package/{packageName}/versions":
+    get:
+      tags:
+        - npm-package-api-controller
+      operationId: listVersions
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelPackageVersionListItem"
+      summary: List versions of a Maven artifact
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/npm/packages/{repoName}/{scope}/package/{packageName}/versions":
+    get:
+      tags:
+        - npm-package-api-controller
+      operationId: listNpmScopedPackageVersions
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: scope
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelPackageVersionListItem"
+      summary: List versions of a scoped npm package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/npm/packages/{repoName}/package/{packageName}/tags":
+    get:
+      tags:
+        - npm-package-api-controller
+      operationId: listTags
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseListPackageDistributionTagMapListItem"
+      summary: List dist-tags for an npm package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/npm/packages/{repoName}/{scope}/package/{packageName}/tags":
+    get:
+      tags:
+        - npm-package-api-controller
+      operationId: listNpmScopedPackageTags
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: scope
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: packageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseListPackageDistributionTagMapListItem"
+      summary: List dist-tags for a scoped npm package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/mvn/artifacts/{repoName}":
+    get:
+      tags:
+        - maven-artifact-controller
+      operationId: listContainsGroupName
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: groupName
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelArtifactListItem"
+      summary: List artifact groups in a Maven repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/mvn/artifacts/{repoName}/{groupName}":
+    get:
+      tags:
+        - maven-artifact-controller
+      operationId: listContainsArtifactName
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: groupName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifactName
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelArtifactListItem"
+      summary: List artifacts in a Maven group
+    delete:
+      tags:
+        - maven-artifact-controller
+      operationId: deleteGroup
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: groupName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseDeletedItem"
+      summary: Delete a Maven artifact group
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/mvn/artifacts/{repoName}/{groupName}/{artifactName}/versions":
+    get:
+      tags:
+        - maven-artifact-controller
+      operationId: listMavenArtifactVersions
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: groupName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+        - name: version
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelArtifactVersionListItem"
+      summary: List versions of a Maven artifact
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/mvn/artifacts/{repoName}/{groupName}/{artifactName}":
+    get:
+      tags:
+        - maven-artifact-controller
+      operationId: getMavenArtifact
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: groupName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseArtifactVersionInfo"
+      summary: Get a Maven artifact
+    delete:
+      tags:
+        - maven-artifact-controller
+      operationId: deleteMavenArtifact
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: groupName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseDeletedItem"
+      summary: Delete a Maven artifact
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/mvn/artifacts/{repoName}/{groupName}/{artifactName}/versions/{versionName}":
+    get:
+      tags:
+        - maven-artifact-controller
+      operationId: getMavenArtifactVersion
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: groupName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseArtifactVersionInfo"
+      summary: Get a specific version of a Maven artifact
+    delete:
+      tags:
+        - maven-artifact-controller
+      operationId: deleteMavenArtifactVersion
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: groupName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseDeletedItem"
+      summary: Delete a specific Maven artifact version
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/go/modules/{repoName}":
+    get:
+      tags:
+        - golang-module-controller
+      operationId: listGolangModules
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelGoModuleListItem"
+      summary: List crates in a Cargo repository
+    delete:
+      tags:
+        - golang-module-controller
+      operationId: deleteGolangModule
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: modulePath
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a Go module
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/go/modules/{repoName}/versions":
+    get:
+      tags:
+        - golang-module-controller
+      operationId: listGolangModuleVersions
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: modulePath
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelGoModuleVersionListItem"
+      summary: List versions of a Go module
+    delete:
+      tags:
+        - golang-module-controller
+      operationId: deleteGolangModuleVersion
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: modulePath
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete Go module versions
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/go/modules/{repoName}/sumdb/supported":
+    get:
+      tags:
+        - golang-module-controller
+      operationId: checkSumdbSupported
+      parameters:
+        - name: repoName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+      summary: Check if sum database is supported
+  "/api/go/modules/{repoName}/search":
+    get:
+      tags:
+        - golang-module-controller
+      operationId: searchGolangModules
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelGoModuleListItem"
+      summary: Search Go modules in a repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/go/modules/{repoName}/info":
+    get:
+      tags:
+        - golang-module-controller
+      operationId: getGolangModuleInfo
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: modulePath
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseGoModuleInfo"
+      summary: Get Go module info
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/docker/images/{repoName}":
+    get:
+      tags:
+        - docker-image-controller
+      operationId: listDockerImages
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelImageListItem"
+      summary: List Go modules in a repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/docker/images/{repoName}/{imageName}/tags":
+    get:
+      tags:
+        - docker-image-controller
+      operationId: listDockerImageTags
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: imageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelImageTagListItem"
+      summary: List tags of a Docker image
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/docker/images/{repoName}/{imageName}/tags/{tagName}/manifests":
+    get:
+      tags:
+        - docker-image-controller
+      operationId: listTagManifests
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: imageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tagName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelManifestListItem"
+      summary: List manifests for a Docker image tag
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/docker/images/{repoName}/{imageName}/manifests/{reference}":
+    get:
+      tags:
+        - docker-image-controller
+      operationId: getManifest
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: imageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: reference
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseString"
+      summary: Get a Docker image manifest
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/docker/images/{repoName}/{imageName}":
+    get:
+      tags:
+        - docker-image-controller
+      operationId: getTagDetail
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: imageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseTagDetail"
+      summary: Get a Docker image
+    delete:
+      tags:
+        - docker-image-controller
+      operationId: deleteDockerImage
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: imageName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a Docker image
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/docker/images/{repoName}/{imageName}/tags/{tagName}":
+    get:
+      tags:
+        - docker-image-controller
+      operationId: getDockerImageTag
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: imageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tagName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseTagDetail"
+      summary: Get a specific Docker image tag
+    delete:
+      tags:
+        - docker-image-controller
+      operationId: deleteTag
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: imageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: tagName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a Docker image tag
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/docker/images/{repoName}/{ignoredImageName}/configs/{digest}":
+    get:
+      tags:
+        - docker-image-controller
+      operationId: getConfig
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: ignoredImageName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: digest
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseString"
+      summary: Get Docker image config by digest
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/cargo/crates/{repoName}":
+    get:
+      tags:
+        - cargo-crate-controller
+      operationId: searchCargoCrates
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelCrateListItem"
+      summary: List crates in a Cargo repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/cargo/crates/{repoName}/{crateName}":
+    get:
+      tags:
+        - cargo-crate-controller
+      operationId: getCargoCrate
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: crateName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseBaseCrateInfoUUID"
+      summary: Get a Cargo crate
+    delete:
+      tags:
+        - cargo-crate-controller
+      operationId: deleteCargoCrate
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: crateName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a Cargo crate
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/cargo/crates/{repoName}/{crateName}/{vers}":
+    get:
+      tags:
+        - cargo-crate-controller
+      operationId: getCargoCrateVersion
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: crateName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: vers
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseBaseCrateVersionInfoUUID"
+      summary: Get a specific Cargo crate version
+    delete:
+      tags:
+        - cargo-crate-controller
+      operationId: deleteCargoCrateVersion
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: crateName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: vers
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a specific Cargo crate version
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/cargo/crates/{repoName}/{crateName}/versions":
+    get:
+      tags:
+        - cargo-crate-controller
+      operationId: listCargoCrateVersions
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: crateName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelCrateVersionListItem"
+      summary: List versions of a Cargo crate
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}":
+    delete:
+      tags:
+        - protocol-repo-controller
+      operationId: deleteRepo
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: facade
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/ProtocolApiFacade"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/mvn/key-stores/{repoName}/{keyStoreId}":
+    delete:
+      tags:
+        - key-store-controller
+      operationId: deleteMavenKeyStore
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: keyStoreId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseKeyStoreItem"
+      summary: Remove a key store from a Maven repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+components:
+  schemas:
+    UserUpdateForm:
+      type: object
+      properties:
+        username:
+          type: string
+          maxLength: 25
+          minLength: 3
+        role:
+          "$ref": "#/components/schemas/UserRole"
+      required:
+        - username
+        - role
+    RestResponseUserResponse:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/UserResponse"
+        errorCode:
+          type: string
+        text:
+          type: string
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        role:
+          "$ref": "#/components/schemas/UserRole"
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - username
+        - role
+        - createdAt
+        - lastLoginAt
+    RepoInfo:
+      type: object
+      properties:
+        storageKey:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        diskUsage:
+          type: integer
+          format: int64
+        privateRepo:
+          type: boolean
+          nullable: false
+        snapshots:
+          type: boolean
+          nullable: false
+        releases:
+          type: boolean
+          nullable: false
+        allowOverride:
+          type: boolean
+          nullable: false
+        searchable:
+          type: boolean
+          nullable: false
+        type:
+          "$ref": "#/components/schemas/RepoType"
+    RepoSettingsForm:
+      type: object
+      properties:
+        privateRepo:
+          type: boolean
+          nullable: false
+        allowOverride:
+          type: boolean
+          nullable: false
+        releases:
+          type: boolean
+          nullable: false
+        snapshots:
+          type: boolean
+          nullable: false
+    RestResponseVoid:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data: {}
+        errorCode:
+          type: string
+        text:
+          type: string
+    RestResponseString:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          type: string
+        errorCode:
+          type: string
+        text:
+          type: string
+    UpdateUsernameForm:
+      type: object
+      properties:
+        username:
+          type: string
+          maxLength: 25
+          minLength: 3
+          pattern: "^[a-z0-9_\\-]+$"
+      required:
+        - username
+    LoginInfo:
+      type: object
+      properties:
+        username:
+          type: string
+        token:
+          type: string
+        refreshToken:
+          type: string
+    RestResponseLoginInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/LoginInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    PasswordForm:
+      type: object
+      properties:
+        password:
+          type: string
+          maxLength: 50
+          minLength: 6
+          pattern: "^(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?=\\S+$).+$"
+      required:
+        - password
+    UserCreateForm:
+      type: object
+      properties:
+        username:
+          type: string
+          maxLength: 25
+          minLength: 3
+        password:
+          type: string
+          maxLength: 50
+          minLength: 6
+          pattern: "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=\\S+$).+$"
+        role:
+          "$ref": "#/components/schemas/UserRole"
+      required:
+        - password
+        - username
+        - role
+    ProtocolApiFacade: {}
+    RepoCreateForm:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 25
+          minLength: 0
+          pattern: "^[a-zA-Z0-9_\\-]+$"
+        description:
+          type: string
+        privateRepo:
+          type: boolean
+          nullable: false
+      required:
+        - name
+    DeployTokenForm:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 80
+          minLength: 1
+        username:
+          type: string
+          maxLength: 150
+          minLength: 0
+        description:
+          type: string
+          maxLength: 500
+          minLength: 0
+        read_only:
+          type: boolean
+          nullable: false
+        expiration_date:
+          type: string
+          format: date-time
+      required:
+        - name
+    RestResponseTokenInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/TokenInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    TokenInfo:
+      type: object
+      properties:
+        token:
+          type: string
+        username:
+          type: string
+    KeyStoreForm:
+      type: object
+      properties:
+        url:
+          type: string
+    KeyStoreItem:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+      required:
+        - id
+        - url
+    RestResponseKeyStoreItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/KeyStoreItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RefreshTokenForm:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+    LoginForm:
+      type: object
+      properties:
+        username:
+          type: string
+          maxLength: 150
+          minLength: 3
+          pattern: "^[a-zA-Z0-9@_\\-.]+$"
+        password:
+          type: string
+          maxLength: 50
+          minLength: 6
+          pattern: "^(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?=\\S+$).+$"
+      required:
+        - username
+        - password
+    RepoRenameForm:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 25
+          minLength: 0
+          pattern: "^[a-zA-Z0-9_\\-]+$"
+      required:
+        - name
+    RepoDescriptionForm:
+      type: object
+      properties:
+        description:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+        - description
+    PageMetadata:
+      type: object
+      properties:
+        size:
+          type: integer
+          format: int64
+        number:
+          type: integer
+          format: int64
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int64
+    PagedModelUserResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/UserResponse"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelUserResponse:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelUserResponse"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RestResponseTotalUsageInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/TotalUsageInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    TotalUsageInfo:
+      type: object
+      properties:
+        diskUsed:
+          "$ref": "#/components/schemas/UsageInfo"
+        reposCount:
+          type: integer
+          format: int64
+    UsageInfo:
+      type: object
+      properties:
+        value:
+          type: integer
+          format: int64
+        text:
+          type: string
+    RepoListInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        privateRepo:
+          type: boolean
+          nullable: false
+        diskUsage:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - name
+        - createdAt
+    RestResponseListRepoListInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RepoListInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RestResponseLong:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          type: integer
+          format: int64
+        errorCode:
+          type: string
+        text:
+          type: string
+    RepoUsageInfo:
+      type: object
+      properties:
+        diskUsed:
+          "$ref": "#/components/schemas/UsageInfo"
+    RestResponseRepoUsageInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/RepoUsageInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RepoSettingsInfo:
+      type: object
+      properties:
+        privateRepo:
+          type: boolean
+          nullable: false
+        releases:
+          type: boolean
+        snapshots:
+          type: boolean
+        allowOverride:
+          type: boolean
+          nullable: false
+        searchable:
+          type: boolean
+          nullable: false
+      required:
+        - privateRepo
+        - allowOverride
+        - searchable
+    RestResponseRepoSettingsInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/RepoSettingsInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RepoPermissionInfo:
+      type: object
+      properties:
+        repoName:
+          type: string
+        description:
+          type: string
+        canRead:
+          type: boolean
+          nullable: false
+        canWrite:
+          type: boolean
+          nullable: false
+        canManage:
+          type: boolean
+          nullable: false
+        private:
+          type: boolean
+          nullable: false
+      required:
+        - canRead
+        - canWrite
+        - canManage
+        - private
+    RestResponseRepoPermissionInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/RepoPermissionInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    Pageable:
+      type: object
+      properties:
+        page:
+          type: integer
+          format: int32
+          minimum: 0
+        size:
+          type: integer
+          format: int32
+          minimum: 1
+        sort:
+          type: array
+          items:
+            type: string
+    DeployTokenInfoListItem:
+      type: object
+      properties:
+        name:
+          type: string
+        username:
+          type: string
+        description:
+          type: string
+        id:
+          type: string
+        read_only:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        expiration_date:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - read_only
+        - created_at
+    PagedModelDeployTokenInfoListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/DeployTokenInfoListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelDeployTokenInfoListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelDeployTokenInfoListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    ProtocolApiFacadeMavenAdapter: {}
+    RestResponseListStorageItemInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          type: array
+          items:
+            "$ref": "#/components/schemas/StorageItemInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    StorageItemInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        size:
+          type: integer
+          format: int64
+        directory:
+          type: boolean
+        path:
+          type: string
+    PackageListItem:
+      type: object
+      properties:
+        name:
+          type: string
+        stableVersion:
+          type: string
+        latestVersion:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+    PagedModelPackageListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PackageListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelPackageListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelPackageListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    PagedModelReleaseListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ReleaseListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    ReleaseListItem:
+      type: object
+      properties:
+        version:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        finalRelease:
+          type: boolean
+        preRelease:
+          type: boolean
+        postRelease:
+          type: boolean
+        devRelease:
+          type: boolean
+    RestResponsePagedModelReleaseListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelReleaseListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    ReleaseClassifierInfo:
+      type: object
+      properties:
+        value:
+          type: string
+        classifier:
+          type: string
+    ReleaseDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        packageName:
+          type: string
+        stableVersion:
+          type: string
+        version:
+          type: string
+        finalRelease:
+          type: boolean
+        preRelease:
+          type: boolean
+        postRelease:
+          type: boolean
+        devRelease:
+          type: boolean
+        requiresPython:
+          type: string
+        summary:
+          type: string
+        homePage:
+          type: string
+        author:
+          type: string
+        authorEmail:
+          type: string
+        license:
+          type: string
+        description:
+          type: string
+        descriptionContentType:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        classifiers:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ReleaseClassifierInfo"
+        projectUrls:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ReleaseProjectURLInfo"
+    ReleaseProjectURLInfo:
+      type: object
+      properties:
+        label:
+          type: string
+        url:
+          type: string
+    RestResponseReleaseDetail:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/ReleaseDetail"
+        errorCode:
+          type: string
+        text:
+          type: string
+    ProfileInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        role:
+          "$ref": "#/components/schemas/UserRole"
+        diskUsage:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - username
+        - role
+        - diskUsage
+        - createdAt
+        - lastLoginAt
+    RestResponseProfileInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/ProfileInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    PackageDistributionTagListItem:
+      type: object
+      properties:
+        tagName:
+          type: string
+    PackageKeywordListItem:
+      type: object
+      properties:
+        keyword:
+          type: string
+    PackageMaintainerListItem:
+      type: object
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+        email:
+          type: string
+    PackageVersionDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        scopeName:
+          type: string
+        packageName:
+          type: string
+        versionName:
+          type: string
+        authorName:
+          type: string
+        authorEmail:
+          type: string
+        authorUrl:
+          type: string
+        bugsUrl:
+          type: string
+        bugsEmail:
+          type: string
+        description:
+          type: string
+        homepage:
+          type: string
+        license:
+          type: string
+        repositoryType:
+          type: string
+        repositoryUrl:
+          type: string
+        deprecated:
+          type: boolean
+        deprecationMessage:
+          type: string
+        readme:
+          type: string
+        keywords:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PackageKeywordListItem"
+        maintainers:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PackageMaintainerListItem"
+        distributionTags:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PackageDistributionTagListItem"
+        deleted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    RestResponsePackageVersionDetail:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PackageVersionDetail"
+        errorCode:
+          type: string
+        text:
+          type: string
+    PackageVersionListItem:
+      type: object
+      properties:
+        version:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        deprecated:
+          type: boolean
+    PagedModelPackageVersionListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PackageVersionListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelPackageVersionListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelPackageVersionListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    PackageDistributionTagMapListItem:
+      type: object
+      properties:
+        version:
+          type: string
+        tag:
+          type: string
+    RestResponseListPackageDistributionTagMapListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PackageDistributionTagMapListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    PagedModelKeyStoreItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/KeyStoreItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelKeyStoreItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelKeyStoreItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    ArtifactListItem:
+      type: object
+      properties:
+        lastUpdatedAt:
+          type: string
+          format: date-time
+        artifactName:
+          type: string
+        groupName:
+          type: string
+        packaging:
+          type: string
+        latest:
+          type: string
+    PagedModelArtifactListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ArtifactListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelArtifactListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelArtifactListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    ArtifactVersionListItem:
+      type: object
+      properties:
+        signed:
+          type: boolean
+        lastUpdatedAt:
+          type: string
+          format: date-time
+        versionName:
+          type: string
+    PagedModelArtifactVersionListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ArtifactVersionListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelArtifactVersionListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelArtifactVersionListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    ArtifactVersionInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        versionName:
+          type: string
+        artifactName:
+          type: string
+        artifactGroupName:
+          type: string
+        artifactVersionName:
+          type: string
+        description:
+          type: string
+        prefix:
+          type: string
+        url:
+          type: string
+        organization:
+          type: string
+        packaging:
+          type: string
+        sourceCodeUrl:
+          type: string
+        type:
+          type: string
+          enum:
+            - SNAPSHOT
+            - RELEASE
+            - PLUGIN
+        hasDocuments:
+          type: boolean
+        hasSources:
+          type: boolean
+        hasModules:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        lastUpdatedAt:
+          type: string
+          format: date-time
+        pomFile:
+          type: string
+        licenses:
+          type: array
+          items:
+            "$ref": "#/components/schemas/VersionLicenseInfo"
+        scmUrl:
+          type: string
+        developers:
+          type: array
+          items:
+            "$ref": "#/components/schemas/VersionDeveloperInfo"
+        signed:
+          type: boolean
+    RestResponseArtifactVersionInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/ArtifactVersionInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    VersionDeveloperInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+    VersionLicenseInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+    GoModuleListItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        modulePath:
+          type: string
+    PagedModelGoModuleListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/GoModuleListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelGoModuleListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelGoModuleListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    GoModuleVersionListItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        goVersion:
+          type: string
+    PagedModelGoModuleVersionListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/GoModuleVersionListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelGoModuleVersionListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelGoModuleVersionListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    GoModuleInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        modulePath:
+          type: string
+        latestVersion:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        versions:
+          type: array
+          items:
+            "$ref": "#/components/schemas/GoModuleVersionListItem"
+    RestResponseGoModuleInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/GoModuleInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    ImageListItem:
+      type: object
+      properties:
+        name:
+          type: string
+        size:
+          type: integer
+          format: int64
+        digest:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+    PagedModelImageListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ImageListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelImageListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelImageListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    ImageTagListItem:
+      type: object
+      properties:
+        name:
+          type: string
+        platform:
+          type: string
+        lastUpdatedAt:
+          type: string
+          format: date-time
+    PagedModelImageTagListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ImageTagListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelImageTagListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelImageTagListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    ManifestListItem:
+      type: object
+      properties:
+        name:
+          type: string
+        digest:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        platform:
+          type: string
+        configDigest:
+          type: string
+    PagedModelManifestListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/ManifestListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelManifestListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelManifestListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RestResponseTagDetail:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/TagDetail"
+        errorCode:
+          type: string
+        text:
+          type: string
+    TagDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        digest:
+          type: string
+        configDigest:
+          type: string
+        imageName:
+          type: string
+        name:
+          type: string
+        platform:
+          type: string
+        mediaType:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        lastUpdatedAt:
+          type: string
+          format: date-time
+    CrateListItem:
+      type: object
+      properties:
+        name:
+          type: string
+        max_version:
+          type: string
+        downloads:
+          type: integer
+          format: int64
+        description:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+    PagedModelCrateListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/CrateListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelCrateListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelCrateListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    BaseCrateInfoUUID:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        homepage:
+          type: string
+        repository:
+          type: string
+        authors:
+          type: array
+          items:
+            type: string
+        keywords:
+          type: array
+          items:
+            type: string
+        categories:
+          type: array
+          items:
+            type: string
+        hasLib:
+          type: boolean
+        original_name:
+          type: string
+        max_version:
+          type: string
+        total_downloads:
+          type: integer
+          format: int64
+    RestResponseBaseCrateInfoUUID:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/BaseCrateInfoUUID"
+        errorCode:
+          type: string
+        text:
+          type: string
+    BaseCrateVersionInfoUUID:
+      type: object
+      properties:
+        crateId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        version:
+          type: string
+        readme:
+          type: string
+        license:
+          type: string
+        documentation:
+          type: string
+        edition:
+          type: string
+        deps:
+          type: array
+          items:
+            "$ref": "#/components/schemas/CrateIndexDep"
+        downloads:
+          type: integer
+          format: int64
+        hasLib:
+          type: boolean
+        license_file:
+          type: string
+        rust_version:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    CrateIndexDep:
+      type: object
+      properties:
+        name:
+          type: string
+        req:
+          type: string
+        features:
+          type: array
+          items:
+            type: string
+        optional:
+          type: boolean
+        default_features:
+          type: boolean
+        target:
+          type: string
+        kind:
+          type: string
+        registry:
+          type: string
+        package:
+          type: string
+    RestResponseBaseCrateVersionInfoUUID:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/BaseCrateVersionInfoUUID"
+        errorCode:
+          type: string
+        text:
+          type: string
+    CrateVersionListItem:
+      type: object
+      properties:
+        version:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    PagedModelCrateVersionListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/CrateVersionListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelCrateVersionListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelCrateVersionListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RestResponseDeletedItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          type: string
+          enum:
+            - VERSION
+            - ARTIFACT
+            - GROUP
+        errorCode:
+          type: string
+        text:
+          type: string
+    ResponseType:
+      type: string
+      enum:
+        - ERROR
+        - SUCCESS
+        - WARNING
+    UserRole:
+      type: string
+      enum:
+        - USER
+        - ADMIN
+    RepoType:
+      type: string
+      enum:
+        - MAVEN
+        - NPM
+        - PYPI
+        - DOCKER
+        - CARGO
+        - GOLANG

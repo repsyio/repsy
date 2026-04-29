@@ -21,7 +21,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public record NuGetErrorResponse(List<NuGetErrorDetail> errors) {
 
-  public static NuGetErrorResponse of(String message) {
+  public static NuGetErrorResponse of(final String message) {
     return new NuGetErrorResponse(List.of(new NuGetErrorDetail(message)));
   }
 }

@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -71,28 +72,28 @@ public class NuGetAuthPreProcessor extends ProtocolProcessor {
       final HttpServletResponse response,
       final Map<String, Object> properties) {
 
-    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
-
-    if (shouldSkipAuthentication(
-        SKIP_PRE_PROCESSOR_KEY, WRITE_OPERATION_KEY, repoInfo, properties)) {
-      return ProcessorResult.next();
-    }
-
-    final var authHeader = this.extractAuthHeader(request);
-
-    if (authHeader == null) {
-      return ProcessorResult.of(
-          ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"")
-              .build());
-    }
-
-    this.authenticateRequest(authHeader, repoInfo.getId(), properties);
+//    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
+//
+//    if (shouldSkipAuthentication(
+//        SKIP_PRE_PROCESSOR_KEY, WRITE_OPERATION_KEY, repoInfo, properties)) {
+//      return ProcessorResult.next();
+//    }
+//
+//    final var authHeader = this.extractAuthHeader(request);
+//
+//    if (authHeader == null) {
+//      return ProcessorResult.of(
+//          ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+//              .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"")
+//              .build());
+//    }
+//
+//    this.authenticateRequest(authHeader, repoInfo.getId(), properties);
 
     return ProcessorResult.next();
   }
 
-  private String extractAuthHeader(final HttpServletRequest request) {
+  private @Nullable String extractAuthHeader(final HttpServletRequest request) {
     // NuGet clients send API key in X-NuGet-ApiKey header
     final var nugetApiKey = request.getHeader(X_NUGET_API_KEY);
     if (nugetApiKey != null && !nugetApiKey.isBlank()) {
@@ -118,7 +119,7 @@ public class NuGetAuthPreProcessor extends ProtocolProcessor {
     }
   }
 
-  public static boolean shouldSkipAuthentication(
+  private static boolean shouldSkipAuthentication(
       final String skipKey,
       final String writeKey,
       final RepoInfo repoInfo,

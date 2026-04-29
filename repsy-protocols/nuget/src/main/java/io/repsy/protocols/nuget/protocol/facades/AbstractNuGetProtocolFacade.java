@@ -17,10 +17,10 @@ package io.repsy.protocols.nuget.protocol.facades;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
+import io.repsy.protocols.nuget.shared.dtos.NuGetAutocompleteResponse;
+import io.repsy.protocols.nuget.shared.dtos.NuGetSearchResponse;
 import io.repsy.protocols.nuget.shared.dtos.NuGetServiceIndexResource;
 import io.repsy.protocols.nuget.shared.dtos.NuGetServiceIndexResponse;
-import io.repsy.protocols.nuget.shared.dtos.NuGetSearchResponse;
-import io.repsy.protocols.nuget.shared.dtos.NuGetAutocompleteResponse;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
 import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
@@ -33,6 +33,7 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
 @Slf4j
@@ -40,18 +41,27 @@ import org.springframework.core.io.Resource;
 @RequiredArgsConstructor
 public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFacade {
 
+  private static final int THREE = 3;
+  private static final int FOUR = 4;
   private final NuGetStorageService storageService;
   private final NuGetPackageService<ID> packageService;
 
   @Override
   public NuGetServiceIndexResponse getServiceIndex(final ProtocolContext context) {
-    final var baseUrl = buildBaseUrl(context);
+    final var baseUrl = this.buildBaseUrl(context);
     final var resources = new ArrayList<NuGetServiceIndexResource>();
 
-    resources.add(new NuGetServiceIndexResource(baseUrl + "/v3/package", "PackageBaseAddress/3.0.0", null));
-    resources.add(new NuGetServiceIndexResource(baseUrl + "/v3/registration", "RegistrationBaseUrl/3.0.0", null));
-    resources.add(new NuGetServiceIndexResource(baseUrl + "/v3/search", "SearchQueryService/3.0.0-beta", null));
-    resources.add(new NuGetServiceIndexResource(baseUrl + "/v3/autocomplete", "SearchAutocompleteService/3.0.0-beta", null));
+    resources.add(
+        new NuGetServiceIndexResource(baseUrl + "/v3/package", "PackageBaseAddress/3.0.0", null));
+    resources.add(
+        new NuGetServiceIndexResource(
+            baseUrl + "/v3/registration", "RegistrationBaseUrl/3.0.0", null));
+    resources.add(
+        new NuGetServiceIndexResource(
+            baseUrl + "/v3/search", "SearchQueryService/3.0.0-beta", null));
+    resources.add(
+        new NuGetServiceIndexResource(
+            baseUrl + "/v3/autocomplete", "SearchAutocompleteService/3.0.0-beta", null));
 
     return new NuGetServiceIndexResponse("3.0.0", resources);
   }
@@ -63,8 +73,8 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
       final var nuspecXml = NuGetPackageUtils.extractNuspecFromNupkg(inputStream);
       final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
-      final var packageId = extractXmlTag(nuspecXml, "id");
-      final var version = extractXmlTag(nuspecXml, "version");
+      final var packageId = this.extractXmlTag(nuspecXml, "id");
+      final var version = this.extractXmlTag(nuspecXml, "version");
 
       if (packageId == null || packageId.isEmpty() || version == null || version.isEmpty()) {
         throw new IOException("Missing id or version in nuspec");
@@ -78,7 +88,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
     }
   }
 
-  private String extractXmlTag(final String xml, final String tagName) {
+  private @Nullable String extractXmlTag(final String xml, final String tagName) {
     try {
       final var patternStr = String.format("<%s>([^<]+)</%s>", tagName, tagName);
       final var matcher = Pattern.compile(patternStr).matcher(xml);
@@ -94,14 +104,14 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   @Override
   public List<String> getPackageVersions(final ProtocolContext context) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var packageId = extractPackageId(context);
+    final var packageId = this.extractPackageId(context);
     return this.packageService.getVersions(repoInfo, packageId);
   }
 
   @Override
   public Resource downloadNupkg(final ProtocolContext context) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var packageIdVersion = extractPackageIdAndVersion(context);
+    final var packageIdVersion = this.extractPackageIdAndVersion(context);
     return this.storageService.getNupkg(
         repoInfo.getStorageKey(), packageIdVersion.id(), packageIdVersion.version());
   }
@@ -109,7 +119,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   @Override
   public Resource downloadNuspec(final ProtocolContext context) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var packageIdVersion = extractPackageIdAndVersion(context);
+    final var packageIdVersion = this.extractPackageIdAndVersion(context);
     return this.storageService.getNuspec(
         repoInfo.getStorageKey(), packageIdVersion.id(), packageIdVersion.version());
   }
@@ -143,15 +153,14 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   private String extractPackageId(final ProtocolContext context) {
     final var path = ProtocolContextUtils.getRelativePath(context).getPath();
     final var parts = path.split("/");
-    return parts.length > 3 ? parts[3] : "";
+    return parts.length > THREE ? parts[THREE] : "";
   }
 
   private PackageIdVersion extractPackageIdAndVersion(final ProtocolContext context) {
     final var path = ProtocolContextUtils.getRelativePath(context).getPath();
     final var parts = path.split("/");
     return new PackageIdVersion(
-        parts.length > 3 ? parts[3] : "",
-        parts.length > 4 ? parts[4] : "");
+        parts.length > THREE ? parts[THREE] : "", parts.length > FOUR ? parts[FOUR] : "");
   }
 
   private String buildBaseUrl(final ProtocolContext context) {

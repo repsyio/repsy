@@ -19,7 +19,6 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
-import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -35,23 +34,22 @@ import org.springframework.http.ResponseEntity;
 
 @Slf4j
 @NullMarked
-public abstract class AbstractNuGetRegistrationProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractNuGetRegistrationProtocolMethodHandler
+    implements ProtocolMethodHandler {
 
-  private static final Pattern INDEX_PATTERN = Pattern.compile(".*/v3/registration/.+/index\\.json$");
+  private static final Pattern INDEX_PATTERN =
+      Pattern.compile(".*/v3/registration/.+/index\\.json$");
   private static final Pattern LEAF_PATTERN = Pattern.compile(".*/v3/registration/.+/.+\\.json$");
 
   private final PathParser basePathParser;
-  private final NuGetProtocolFacade facade;
   private final boolean isIndex;
 
   protected AbstractNuGetRegistrationProtocolMethodHandler(
       final PathParser basePathParser,
-      final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider,
       final boolean isIndex) {
 
     this.basePathParser = basePathParser;
-    this.facade = facade;
     this.isIndex = isIndex;
 
     provider.registerMethodHandler(this);
@@ -64,9 +62,7 @@ public abstract class AbstractNuGetRegistrationProtocolMethodHandler implements 
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ,
-        "writeOperation", false);
+    return Map.of("permission", Permission.READ, "writeOperation", false);
   }
 
   @Override
@@ -77,7 +73,7 @@ public abstract class AbstractNuGetRegistrationProtocolMethodHandler implements 
       }
 
       final var path = request.getServletPath();
-      final var pattern = isIndex ? INDEX_PATTERN : LEAF_PATTERN;
+      final var pattern = this.isIndex ? INDEX_PATTERN : LEAF_PATTERN;
 
       if (!pattern.matcher(path).matches()) {
         return Optional.empty();
@@ -93,10 +89,10 @@ public abstract class AbstractNuGetRegistrationProtocolMethodHandler implements 
       final HttpServletRequest request,
       final HttpServletResponse response) {
 
-    if (isIndex) {
-      return handleRegistrationIndex(context, request);
+    if (this.isIndex) {
+      return this.handleRegistrationIndex(context, request);
     } else {
-      return handleRegistrationLeaf(context, request);
+      return this.handleRegistrationLeaf(context, request);
     }
   }
 
@@ -105,9 +101,7 @@ public abstract class AbstractNuGetRegistrationProtocolMethodHandler implements 
     // Return empty registration index for now
     return ResponseEntity.ok()
         .contentType(MediaType.APPLICATION_JSON)
-        .body(Map.of(
-            "count", 0,
-            "items", List.of()));
+        .body(Map.of("count", 0, "items", List.of()));
   }
 
   private ResponseEntity<Object> handleRegistrationLeaf(

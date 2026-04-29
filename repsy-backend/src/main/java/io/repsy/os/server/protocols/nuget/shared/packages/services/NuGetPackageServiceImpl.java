@@ -24,7 +24,6 @@ import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
-import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -62,22 +61,26 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       throws IOException {
     log.debug("Publishing NuGet package {} version {}", packageId, version);
 
-    final var repo = this.repoRepository
-        .findById(repoInfo.getId())
-        .orElseThrow(() -> new IllegalArgumentException("Repository not found"));
+    final var repo =
+        this.repoRepository
+            .findById(repoInfo.getId())
+            .orElseThrow(() -> new IllegalArgumentException("Repository not found"));
 
     // Find or create package
-    var pkg = this.packageRepository.findByRepoIdAndPackageIdIgnoreCase(
-        repoInfo.getId(), packageId.toLowerCase(Locale.ROOT));
+    var pkg =
+        this.packageRepository.findByRepoIdAndPackageIdIgnoreCase(
+            repoInfo.getId(), packageId.toLowerCase(Locale.ROOT));
 
-    final var nugetPackage = pkg.orElseGet(() -> {
-      final var newPkg = new NuGetPackage();
-      newPkg.setRepo(repo);
-      newPkg.setPackageId(packageId.toLowerCase(Locale.ROOT));
-      newPkg.setCreatedAt(Instant.now());
-      newPkg.setUpdatedAt(Instant.now());
-      return this.packageRepository.save(newPkg);
-    });
+    final var nugetPackage =
+        pkg.orElseGet(
+            () -> {
+              final var newPkg = new NuGetPackage();
+              newPkg.setRepo(repo);
+              newPkg.setPackageId(packageId.toLowerCase(Locale.ROOT));
+              newPkg.setCreatedAt(Instant.now());
+              newPkg.setUpdatedAt(Instant.now());
+              return this.packageRepository.save(newPkg);
+            });
 
     // Create package version
     final var pkgVersion = new NuGetPackageVersion();
@@ -116,21 +119,23 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     final var pageable = PageRequest.of(page, take);
 
     try {
-      final var pkg = this.packageRepository.findByRepoIdAndPackageIdIgnoreCase(
-          repoInfo.getId(), query.toLowerCase(Locale.ROOT));
+      final var pkg =
+          this.packageRepository.findByRepoIdAndPackageIdIgnoreCase(
+              repoInfo.getId(), query.toLowerCase(Locale.ROOT));
 
       if (pkg.isEmpty()) {
         return new PageImpl<>(List.of(), pageable, 0);
       }
 
-      final var versions = this.packageVersionRepository
-          .findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(pkg.get().getId());
+      final var versions =
+          this.packageVersionRepository.findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(
+              pkg.get().getId());
 
-      final var searchResults = versions
-          .stream()
-          .filter(v -> !v.isPrerelease() || prerelease)
-          .map(NuGetPackageVersion::getVersion)
-          .toList();
+      final var searchResults =
+          versions.stream()
+              .filter(v -> !v.isPrerelease() || prerelease)
+              .map(NuGetPackageVersion::getVersion)
+              .toList();
 
       return new PageImpl<>(searchResults, pageable, searchResults.size());
     } catch (final Exception e) {
@@ -149,11 +154,13 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
     try {
       // Simple autocomplete: find packages matching prefix (case-insensitive)
-      return this.packageRepository
-          .findAll()
-          .stream()
+      return this.packageRepository.findAll().stream()
           .filter(p -> p.getRepo().getId().equals(repoInfo.getId()))
-          .filter(p -> p.getPackageId().toLowerCase(Locale.ROOT).startsWith(query.toLowerCase(Locale.ROOT)))
+          .filter(
+              p ->
+                  p.getPackageId()
+                      .toLowerCase(Locale.ROOT)
+                      .startsWith(query.toLowerCase(Locale.ROOT)))
           .limit(take)
           .skip(skip)
           .map(NuGetPackage::getPackageId)

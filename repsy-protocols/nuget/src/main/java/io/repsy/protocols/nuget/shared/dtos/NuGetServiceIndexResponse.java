@@ -19,4 +19,5 @@ import java.util.List;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked
-public record NuGetServiceIndexResponse(String version, List<NuGetServiceIndexResource> resources) {}
+public record NuGetServiceIndexResponse(
+    String version, List<NuGetServiceIndexResource> resources) {}

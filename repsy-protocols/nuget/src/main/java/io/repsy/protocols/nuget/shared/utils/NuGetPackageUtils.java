@@ -21,16 +21,16 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 
 @Slf4j
 @NullMarked
-public class NuGetPackageUtils {
+@UtilityClass
+public final class NuGetPackageUtils {
 
-  private NuGetPackageUtils() {
-    // Utility class
-  }
+  private static final int BUFFER = 4096;
 
   public static String extractNuspecFromNupkg(final InputStream nupkgInputStream)
       throws IOException {
@@ -47,7 +47,7 @@ public class NuGetPackageUtils {
 
   private static String readNuspecContent(final ZipInputStream zis) throws IOException {
     final var sb = new StringBuilder();
-    final var buffer = new byte[4096];
+    final var buffer = new byte[BUFFER];
     int bytesRead;
 
     while ((bytesRead = zis.read(buffer)) != -1) {
@@ -57,18 +57,18 @@ public class NuGetPackageUtils {
     return sb.toString();
   }
 
-  public static byte[] extractBytesFromNupkg(final InputStream nupkgInputStream)
-      throws IOException {
-    final var buffer = new byte[8192];
-    final var result = new java.io.ByteArrayOutputStream();
-    int bytesRead;
-
-    try (final var buffered = new BufferedInputStream(nupkgInputStream)) {
-      while ((bytesRead = buffered.read(buffer)) != -1) {
-        result.write(buffer, 0, bytesRead);
-      }
-    }
-
-    return result.toByteArray();
-  }
+  //  public static byte[] extractBytesFromNupkg(final InputStream nupkgInputStream)
+  //      throws IOException {
+  //    final var buffer = new byte[8192];
+  //    final var result = new java.io.ByteArrayOutputStream();
+  //    int bytesRead;
+  //
+  //    try (final var buffered = new BufferedInputStream(nupkgInputStream)) {
+  //      while ((bytesRead = buffered.read(buffer)) != -1) {
+  //        result.write(buffer, 0, bytesRead);
+  //      }
+  //    }
+  //
+  //    return result.toByteArray();
+  //  }
 }

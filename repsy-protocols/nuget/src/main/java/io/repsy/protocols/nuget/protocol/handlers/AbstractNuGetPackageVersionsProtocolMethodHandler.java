@@ -15,6 +15,8 @@
  */
 package io.repsy.protocols.nuget.protocol.handlers;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
@@ -32,12 +34,11 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonInclude.Include;
 
 @Slf4j
 @NullMarked
-public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
+    implements ProtocolMethodHandler {
 
   private static final Pattern VERSIONS_PATTERN = Pattern.compile(".*/v3/package/.+/index\\.json$");
 
@@ -62,9 +63,7 @@ public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler implemen
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ,
-        "writeOperation", false);
+    return Map.of("permission", Permission.READ, "writeOperation", false);
   }
 
   @Override
@@ -90,7 +89,7 @@ public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler implemen
       final HttpServletResponse response) {
 
     try {
-      final var versions = facade.getPackageVersions(context);
+      final var versions = this.facade.getPackageVersions(context);
       return ResponseEntity.ok()
           .contentType(MediaType.APPLICATION_JSON)
           .body(Map.of("versions", versions));

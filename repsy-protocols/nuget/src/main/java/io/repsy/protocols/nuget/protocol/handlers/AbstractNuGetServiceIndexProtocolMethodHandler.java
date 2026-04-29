@@ -34,7 +34,8 @@ import org.springframework.http.ResponseEntity;
 
 @Slf4j
 @NullMarked
-public abstract class AbstractNuGetServiceIndexProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractNuGetServiceIndexProtocolMethodHandler
+    implements ProtocolMethodHandler {
 
   private final PathParser basePathParser;
   private final NuGetProtocolFacade facade;
@@ -89,9 +90,7 @@ public abstract class AbstractNuGetServiceIndexProtocolMethodHandler implements 
     try {
       final var serviceIndex = this.facade.getServiceIndex(context);
 
-      return ResponseEntity.ok()
-          .contentType(MediaType.APPLICATION_JSON)
-          .body(serviceIndex);
+      return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(serviceIndex);
     } catch (final Exception e) {
       log.debug("NuGet service index failed: {}", e.getMessage());
       return ResponseEntity.internalServerError().build();

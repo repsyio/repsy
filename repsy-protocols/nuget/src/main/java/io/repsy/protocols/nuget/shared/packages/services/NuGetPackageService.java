@@ -15,13 +15,11 @@
  */
 package io.repsy.protocols.nuget.shared.packages.services;
 
-import io.repsy.protocols.nuget.shared.dtos.NuGetSearchResponse;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.util.List;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 @NullMarked
 public interface NuGetPackageService<ID> {

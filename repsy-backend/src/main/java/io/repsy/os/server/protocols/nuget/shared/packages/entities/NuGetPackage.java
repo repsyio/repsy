@@ -37,7 +37,6 @@ import lombok.ToString;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity

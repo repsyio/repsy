@@ -57,9 +57,7 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler implements Protoc
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ,
-        "writeOperation", false);
+    return Map.of("permission", Permission.READ, "writeOperation", false);
   }
 
   @Override
@@ -93,11 +91,9 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler implements Protoc
       final var skip = skipStr != null ? Integer.parseInt(skipStr) : 0;
       final var take = takeStr != null ? Integer.parseInt(takeStr) : 20;
 
-      final var results = facade.search(context, q != null ? q : "", skip, take, prerelease);
+      final var results = this.facade.search(context, q != null ? q : "", skip, take, prerelease);
 
-      return ResponseEntity.ok()
-          .contentType(MediaType.APPLICATION_JSON)
-          .body(results);
+      return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(results);
     } catch (final Exception e) {
       log.debug("NuGet search failed: {}", e.getMessage());
       return ResponseEntity.internalServerError().build();

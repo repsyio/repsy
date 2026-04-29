@@ -15,7 +15,6 @@
  */
 package io.repsy.os.server.protocols.nuget.shared.packages.mappers;
 
-import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
 import org.jspecify.annotations.NullMarked;
 import org.mapstruct.Mapper;
 

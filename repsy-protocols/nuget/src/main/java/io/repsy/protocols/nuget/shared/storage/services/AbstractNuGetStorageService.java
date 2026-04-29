@@ -48,11 +48,27 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
     final var normalizedVersion = version.toLowerCase(Locale.ROOT);
 
     final var nupkgPath =
-        PACKAGES_PATH + "/" + normalizedId + "/" + normalizedVersion + "/" + normalizedId + "."
-            + normalizedVersion + ".nupkg";
+        PACKAGES_PATH
+            + "/"
+            + normalizedId
+            + "/"
+            + normalizedVersion
+            + "/"
+            + normalizedId
+            + "."
+            + normalizedVersion
+            + ".nupkg";
     final var nuspecPath =
-        PACKAGES_PATH + "/" + normalizedId + "/" + normalizedVersion + "/" + normalizedId + "."
-            + normalizedVersion + ".nuspec";
+        PACKAGES_PATH
+            + "/"
+            + normalizedId
+            + "/"
+            + normalizedVersion
+            + "/"
+            + normalizedId
+            + "."
+            + normalizedVersion
+            + ".nuspec";
 
     final var nupkgStoragePath = StoragePath.of(repoId, nupkgPath);
     final var nuspecStoragePath = StoragePath.of(repoId, nuspecPath);
@@ -78,8 +94,16 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
     final var normalizedVersion = version.toLowerCase(Locale.ROOT);
 
     final var nupkgPath =
-        PACKAGES_PATH + "/" + normalizedId + "/" + normalizedVersion + "/" + normalizedId + "."
-            + normalizedVersion + ".nupkg";
+        PACKAGES_PATH
+            + "/"
+            + normalizedId
+            + "/"
+            + normalizedVersion
+            + "/"
+            + normalizedId
+            + "."
+            + normalizedVersion
+            + ".nupkg";
     final var nupkgStoragePath = StoragePath.of(repoId, nupkgPath);
 
     return this.storageStrategy
@@ -94,8 +118,16 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
     final var normalizedVersion = version.toLowerCase(Locale.ROOT);
 
     final var nuspecPath =
-        PACKAGES_PATH + "/" + normalizedId + "/" + normalizedVersion + "/" + normalizedId + "."
-            + normalizedVersion + ".nuspec";
+        PACKAGES_PATH
+            + "/"
+            + normalizedId
+            + "/"
+            + normalizedVersion
+            + "/"
+            + normalizedId
+            + "."
+            + normalizedVersion
+            + ".nuspec";
     final var nuspecStoragePath = StoragePath.of(repoId, nuspecPath);
 
     return this.storageStrategy
@@ -109,14 +141,13 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
   }
 
   @Override
-  public long deletePackageVersion(final UUID repoId, final String packageId, final String version)
-      throws IOException {
+  public long deletePackageVersion(
+      final UUID repoId, final String packageId, final String version) {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
     final var normalizedVersion = version.toLowerCase(Locale.ROOT);
 
-    final var versionPath =
-        PACKAGES_PATH + "/" + normalizedId + "/" + normalizedVersion;
+    final var versionPath = PACKAGES_PATH + "/" + normalizedId + "/" + normalizedVersion;
     final var versionStoragePath = StoragePath.of(repoId, versionPath);
 
     final var usage = this.storageStrategy.calculatePathUsage(versionStoragePath);
@@ -126,7 +157,7 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
   }
 
   @Override
-  public long deletePackage(final UUID repoId, final String packageId) throws IOException {
+  public long deletePackage(final UUID repoId, final String packageId) {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
     final var packagePath = PACKAGES_PATH + "/" + normalizedId;

@@ -17,12 +17,9 @@ package io.repsy.protocols.nuget.shared.dtos;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
-import org.jspecify.annotations.Nullable;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 @NullMarked
 @JsonInclude(Include.NON_NULL)
-public record NuGetServiceIndexResource(
-    String id,
-    String type,
-    @Nullable String comment) {}
+public record NuGetServiceIndexResource(String id, String type, @Nullable String comment) {}

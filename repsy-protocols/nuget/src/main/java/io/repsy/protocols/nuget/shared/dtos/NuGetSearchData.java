@@ -16,8 +16,8 @@
 package io.repsy.protocols.nuget.shared.dtos;
 
 import java.util.List;
-import org.jspecify.annotations.Nullable;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 @NullMarked
 public record NuGetSearchData(

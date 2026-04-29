@@ -58,9 +58,7 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler implements Proto
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.WRITE,
-        "writeOperation", true);
+    return Map.of("permission", Permission.WRITE, "writeOperation", true);
   }
 
   @Override
@@ -71,7 +69,8 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler implements Proto
       }
 
       final var path = request.getServletPath();
-      if (!path.endsWith("/v3/package")) {
+      final var normalizedPath = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+      if (!normalizedPath.endsWith("/v3/package")) {
         return Optional.empty();
       }
 

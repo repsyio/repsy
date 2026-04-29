@@ -16,9 +16,9 @@
 package io.repsy.protocols.nuget.protocol.facades.contract;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.protocols.nuget.shared.dtos.NuGetServiceIndexResponse;
-import io.repsy.protocols.nuget.shared.dtos.NuGetSearchResponse;
 import io.repsy.protocols.nuget.shared.dtos.NuGetAutocompleteResponse;
+import io.repsy.protocols.nuget.shared.dtos.NuGetSearchResponse;
+import io.repsy.protocols.nuget.shared.dtos.NuGetServiceIndexResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -38,7 +38,9 @@ public interface NuGetProtocolFacade {
 
   Resource downloadNuspec(ProtocolContext context);
 
-  NuGetSearchResponse search(ProtocolContext context, String q, int skip, int take, boolean prerelease);
+  NuGetSearchResponse search(
+      ProtocolContext context, String q, int skip, int take, boolean prerelease);
 
-  NuGetAutocompleteResponse autocomplete(ProtocolContext context, String q, int skip, int take, boolean prerelease);
+  NuGetAutocompleteResponse autocomplete(
+      ProtocolContext context, String q, int skip, int take, boolean prerelease);
 }

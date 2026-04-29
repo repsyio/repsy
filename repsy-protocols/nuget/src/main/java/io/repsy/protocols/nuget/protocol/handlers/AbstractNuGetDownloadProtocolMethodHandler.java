@@ -31,7 +31,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
@@ -39,10 +38,8 @@ import org.springframework.http.ResponseEntity;
 @NullMarked
 public abstract class AbstractNuGetDownloadProtocolMethodHandler implements ProtocolMethodHandler {
 
-  private static final Pattern NUPKG_PATTERN =
-      Pattern.compile(".*/v3/package/.+/.+/.+\\.nupkg$");
-  private static final Pattern NUSPEC_PATTERN =
-      Pattern.compile(".*/v3/package/.+/.+/.+\\.nuspec$");
+  private static final Pattern NUPKG_PATTERN = Pattern.compile(".*/v3/package/.+/.+/.+\\.nupkg$");
+  private static final Pattern NUSPEC_PATTERN = Pattern.compile(".*/v3/package/.+/.+/.+\\.nuspec$");
 
   private final PathParser basePathParser;
   private final NuGetProtocolFacade facade;
@@ -68,9 +65,7 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ,
-        "writeOperation", false);
+    return Map.of("permission", Permission.READ, "writeOperation", false);
   }
 
   @Override
@@ -81,7 +76,7 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
       }
 
       final var path = request.getServletPath();
-      final var pattern = isNupkg ? NUPKG_PATTERN : NUSPEC_PATTERN;
+      final var pattern = this.isNupkg ? NUPKG_PATTERN : NUSPEC_PATTERN;
 
       if (!pattern.matcher(path).matches()) {
         return Optional.empty();
@@ -98,8 +93,10 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
       final HttpServletResponse response) {
 
     try {
-      final var resource = isNupkg ? facade.downloadNupkg(context) : facade.downloadNuspec(context);
-      final var contentType = isNupkg ? MediaType.APPLICATION_OCTET_STREAM : MediaType.APPLICATION_XML;
+      final var resource =
+          this.isNupkg ? this.facade.downloadNupkg(context) : this.facade.downloadNuspec(context);
+      final var contentType =
+          this.isNupkg ? MediaType.APPLICATION_OCTET_STREAM : MediaType.APPLICATION_XML;
 
       return ResponseEntity.ok()
           .header(HttpHeaders.CONTENT_TYPE, contentType.toString())
