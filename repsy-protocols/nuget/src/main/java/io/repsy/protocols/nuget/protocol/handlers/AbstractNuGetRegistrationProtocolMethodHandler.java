@@ -93,9 +93,26 @@ public abstract class AbstractNuGetRegistrationProtocolMethodHandler implements 
       final HttpServletRequest request,
       final HttpServletResponse response) {
 
-    // TODO: Implement registration endpoints (return placeholder for now)
+    if (isIndex) {
+      return handleRegistrationIndex(context, request);
+    } else {
+      return handleRegistrationLeaf(context, request);
+    }
+  }
+
+  private ResponseEntity<Object> handleRegistrationIndex(
+      final ProtocolContext context, final HttpServletRequest request) {
+    // Return empty registration index for now
     return ResponseEntity.ok()
         .contentType(MediaType.APPLICATION_JSON)
-        .body(Map.of("count", 0, "items", List.of()));
+        .body(Map.of(
+            "count", 0,
+            "items", List.of()));
+  }
+
+  private ResponseEntity<Object> handleRegistrationLeaf(
+      final ProtocolContext context, final HttpServletRequest request) {
+    // Return not found for unimplemented registration leaf
+    return ResponseEntity.notFound().build();
   }
 }

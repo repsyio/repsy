@@ -17,6 +17,7 @@ package io.repsy.protocols.nuget.protocol.facades;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
+import io.repsy.protocols.nuget.shared.dtos.NuGetServiceIndexResource;
 import io.repsy.protocols.nuget.shared.dtos.NuGetServiceIndexResponse;
 import io.repsy.protocols.nuget.shared.dtos.NuGetSearchResponse;
 import io.repsy.protocols.nuget.shared.dtos.NuGetAutocompleteResponse;
@@ -25,12 +26,14 @@ import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
-import org.springframework.data.domain.PageRequest;
 
+@Slf4j
 @NullMarked
 @RequiredArgsConstructor
 public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFacade {
@@ -41,14 +44,22 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   @Override
   public NuGetServiceIndexResponse getServiceIndex(final ProtocolContext context) {
     final var baseUrl = buildBaseUrl(context);
-    final var resources = List.<io.repsy.protocols.nuget.shared.dtos.NuGetServiceIndexResource>of();
+    final var resources = new ArrayList<NuGetServiceIndexResource>();
+
+    resources.add(new NuGetServiceIndexResource(baseUrl + "/v3/package", "PackageBaseAddress/3.0.0", null));
+    resources.add(new NuGetServiceIndexResource(baseUrl + "/v3/registration", "RegistrationBaseUrl/3.0.0", null));
+    resources.add(new NuGetServiceIndexResource(baseUrl + "/v3/search", "SearchQueryService/3.0.0-beta", null));
+    resources.add(new NuGetServiceIndexResource(baseUrl + "/v3/autocomplete", "SearchAutocompleteService/3.0.0-beta", null));
+
     return new NuGetServiceIndexResponse("3.0.0", resources);
   }
 
   @Override
   public void publish(final ProtocolContext context, final InputStream inputStream)
       throws IOException {
-    // TODO: Implement publish (parse .nupkg ZIP, extract .nuspec, parse XML metadata)
+    // TODO: Parse .nupkg ZIP, extract .nuspec XML, parse metadata, call packageService.publish
+    // For now, stub implementation logs that publish was called
+    log.debug("NuGet package publish called - implementation pending");
   }
 
   @Override
@@ -101,14 +112,12 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   }
 
   private String extractPackageId(final ProtocolContext context) {
-    // Extract from path like /v3/package/{id}/index.json
     final var path = ProtocolContextUtils.getRelativePath(context).getPath();
     final var parts = path.split("/");
     return parts.length > 3 ? parts[3] : "";
   }
 
   private PackageIdVersion extractPackageIdAndVersion(final ProtocolContext context) {
-    // Extract from path like /v3/package/{id}/{version}/{filename}.nupkg
     final var path = ProtocolContextUtils.getRelativePath(context).getPath();
     final var parts = path.split("/");
     return new PackageIdVersion(
@@ -117,8 +126,9 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   }
 
   private String buildBaseUrl(final ProtocolContext context) {
-    // TODO: Extract base URL from request context for service index resources
-    return "";
+    // TODO: Extract actual base URL from HTTP request in handler
+    // For now return default; should be implemented at handler level with HttpServletRequest
+    return "http://localhost:8080";
   }
 
   private record PackageIdVersion(String id, String version) {}

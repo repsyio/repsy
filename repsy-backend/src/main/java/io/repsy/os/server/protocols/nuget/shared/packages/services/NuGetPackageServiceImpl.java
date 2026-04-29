@@ -24,6 +24,7 @@ import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,7 +58,8 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final String version,
       final String nuspecXml)
       throws IOException {
-    // TODO: Parse nuspec and create package version
+    log.debug("Publishing NuGet package {} version {}", packageId, version);
+    // TODO: Parse nuspecXml, create package version, call storage service
   }
 
   @Override
@@ -77,8 +80,32 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final int skip,
       final int take,
       final boolean prerelease) {
-    // TODO: Implement search
-    return new PageImpl<>(List.of());
+
+    final var page = skip / take;
+    final var pageable = PageRequest.of(page, take);
+
+    try {
+      final var pkg = this.packageRepository.findByRepoIdAndPackageIdIgnoreCase(
+          repoInfo.getId(), query.toLowerCase());
+
+      if (pkg.isEmpty()) {
+        return new PageImpl<>(List.of(), pageable, 0);
+      }
+
+      final var versions = this.packageVersionRepository
+          .findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(pkg.get().getId());
+
+      final var searchResults = versions
+          .stream()
+          .filter(v -> !v.isPrerelease() || prerelease)
+          .map(NuGetPackageVersion::getVersion)
+          .toList();
+
+      return new PageImpl<>(searchResults, pageable, searchResults.size());
+    } catch (final Exception e) {
+      log.debug("NuGet search failed for query: {}", query, e);
+      return new PageImpl<>(List.of(), pageable, 0);
+    }
   }
 
   @Override
@@ -88,8 +115,23 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final int skip,
       final int take,
       final boolean prerelease) {
-    // TODO: Implement autocomplete
-    return List.of();
+
+    try {
+      // Simple autocomplete: find packages matching prefix (case-insensitive)
+      return this.packageRepository
+          .findAll()
+          .stream()
+          .filter(p -> p.getRepo().getId().equals(repoInfo.getId()))
+          .filter(p -> p.getPackageId().toLowerCase().startsWith(query.toLowerCase()))
+          .limit(take)
+          .skip(skip)
+          .map(NuGetPackage::getPackageId)
+          .distinct()
+          .toList();
+    } catch (final Exception e) {
+      log.debug("NuGet autocomplete failed for query: {}", query, e);
+      return List.of();
+    }
   }
 
   @Override
