@@ -23,11 +23,14 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.cargo.shared.crate.services.SemverComparator;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -282,9 +285,17 @@ public class CrateUtils {
         }
 
         if (entryName.endsWith("/Cargo.toml")) {
-          final var toml = new String(tar.readAllBytes());
-          if (toml.lines().anyMatch(line -> line.trim().equals("[lib]"))) {
-            return true;
+          final var tomlBytes = tar.readAllBytes();
+          try (final var reader =
+              new BufferedReader(
+                  new InputStreamReader(
+                      new ByteArrayInputStream(tomlBytes), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+              if (line.trim().equals("[lib]")) {
+                return true;
+              }
+            }
           }
         }
       }

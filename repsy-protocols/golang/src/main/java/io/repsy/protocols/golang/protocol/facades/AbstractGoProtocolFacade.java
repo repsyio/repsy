@@ -231,7 +231,9 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
       ZipEntry entry;
       while ((entry = zis.getNextEntry()) != null) {
         if (entryName.equals(entry.getName())) {
-          return zis.readAllBytes();
+          final var modBytes = zis.readAllBytes();
+          zis.closeEntry();
+          return modBytes;
         }
         zis.closeEntry();
       }
