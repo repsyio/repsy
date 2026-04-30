@@ -139,6 +139,8 @@ export class RepositoryBreadcrumbComponent implements OnInit, OnDestroy {
         return 'assets/icons/repo/golang.svg';
       case 'cargo':
         return 'assets/icons/repo/cargo.svg';
+      case 'nuget':
+        return 'assets/icons/nuget/nuget.svg';
       default:
         return '';
     }

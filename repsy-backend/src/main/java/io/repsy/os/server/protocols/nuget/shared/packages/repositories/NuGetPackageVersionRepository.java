@@ -20,7 +20,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -29,8 +34,20 @@ public interface NuGetPackageVersionRepository extends JpaRepository<NuGetPackag
 
   Optional<NuGetPackageVersion> findByNugetPackageIdAndVersion(UUID packageId, String version);
 
+  Optional<NuGetPackageVersion> findByNugetPackageIdAndVersionIgnoreCase(
+      UUID packageId, String version);
+
+  @Modifying
+  @Query("UPDATE NuGetPackageVersion v SET v.downloadCount = v.downloadCount + 1 WHERE v.id = :id")
+  void incrementDownloadCount(@Param("id") UUID id);
+
   List<NuGetPackageVersion> findByNugetPackageIdOrderByPublishedAtDesc(UUID packageId);
 
   List<NuGetPackageVersion> findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(
       UUID packageId);
+
+  Page<NuGetPackageVersion> findByNugetPackageIdOrderByPublishedAtDesc(
+      UUID packageId, Pageable pageable);
+
+  boolean existsByNugetPackageId(UUID packageId);
 }

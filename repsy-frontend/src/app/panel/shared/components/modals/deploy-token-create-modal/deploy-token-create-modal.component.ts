@@ -25,6 +25,7 @@ import { MavenService } from '../../../../pages/repository/maven/service/maven.s
 import { NpmService } from '../../../../pages/repository/npm/service/npm.service';
 import { PypiService } from '../../../../pages/repository/pypi/service/pypi.service';
 import { CargoService } from '../../../../pages/repository/cargo/service/cargo.service';
+import { NugetService } from '../../../../pages/repository/nuget/service/nuget.service';
 import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dto/token-create-info';
 import { DeployTokenForm } from '../../../../pages/repository/repo-settings/deploy-token/form/deploy-token-form';
 import { RepoType } from '../../../dto/repo/repo-type';
@@ -65,6 +66,7 @@ export class DeployTokenCreateModalComponent implements OnInit {
     private readonly mavenService: MavenService,
     private readonly pypiService: PypiService,
     private readonly cargoService: CargoService,
+    private readonly nugetService: NugetService,
     private readonly fb: FormBuilder,
     private readonly toastService: ToastService,
   ) {
@@ -175,6 +177,8 @@ export class DeployTokenCreateModalComponent implements OnInit {
         return this.cargoService.createDeployToken(form);
       case RepoType.GOLANG:
         return this.golangService.createDeployToken(form);
+      case RepoType.NUGET:
+        return this.nugetService.createDeployToken(form);
       default:
         return Promise.reject('Unsupported repository type: ' + this.repoType);
     }

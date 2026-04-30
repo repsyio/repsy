@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.shared.aop.config;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.util.HashMap;
 import java.util.Map;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -35,15 +36,18 @@ public class ProtocolBundleConfig {
       @Qualifier("npmAuthComponentImpl") final ProtocolAuthService npm,
       @Qualifier("dockerAuthComponent") final ProtocolAuthService docker,
       @Qualifier("pypiAuthComponent") final ProtocolAuthService pypi,
-      @Qualifier("golangAuthComponent") final ProtocolAuthService golang) {
+      @Qualifier("golangAuthComponent") final ProtocolAuthService golang,
+      @Qualifier("nuGetAuthComponent") final ProtocolAuthService nuget) {
 
-    return Map.of(
-        RepoType.CARGO, cargo,
-        RepoType.MAVEN, maven,
-        RepoType.NPM, npm,
-        RepoType.DOCKER, docker,
-        RepoType.PYPI, pypi,
-        RepoType.GOLANG, golang);
+    final var map = new HashMap<RepoType, ProtocolAuthService>();
+    map.put(RepoType.CARGO, cargo);
+    map.put(RepoType.MAVEN, maven);
+    map.put(RepoType.NPM, npm);
+    map.put(RepoType.DOCKER, docker);
+    map.put(RepoType.PYPI, pypi);
+    map.put(RepoType.GOLANG, golang);
+    map.put(RepoType.NUGET, nuget);
+    return map;
   }
 
   @Bean
@@ -53,14 +57,17 @@ public class ProtocolBundleConfig {
       @Qualifier("npmApiFacade") final ProtocolApiFacade npm,
       @Qualifier("dockerApiFacade") final ProtocolApiFacade docker,
       @Qualifier("pypiApiFacade") final ProtocolApiFacade pypi,
-      @Qualifier("golangApiFacade") final ProtocolApiFacade golang) {
+      @Qualifier("golangApiFacade") final ProtocolApiFacade golang,
+      @Qualifier("nugetApiFacade") final ProtocolApiFacade nuget) {
 
-    return Map.of(
-        RepoType.CARGO, cargo,
-        RepoType.MAVEN, maven,
-        RepoType.NPM, npm,
-        RepoType.DOCKER, docker,
-        RepoType.PYPI, pypi,
-        RepoType.GOLANG, golang);
+    final var map = new HashMap<RepoType, ProtocolApiFacade>();
+    map.put(RepoType.CARGO, cargo);
+    map.put(RepoType.MAVEN, maven);
+    map.put(RepoType.NPM, npm);
+    map.put(RepoType.DOCKER, docker);
+    map.put(RepoType.PYPI, pypi);
+    map.put(RepoType.GOLANG, golang);
+    map.put(RepoType.NUGET, nuget);
+    return map;
   }
 }

@@ -21,6 +21,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +41,7 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
       final UUID repoId,
       final String packageId,
       final String version,
-      final byte[] nupkgBytes,
+      final InputStream nupkgStream,
       final byte[] nuspecBytes)
       throws IOException {
 
@@ -73,10 +74,8 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
     final var nupkgStoragePath = StoragePath.of(repoId, nupkgPath);
     final var nuspecStoragePath = StoragePath.of(repoId, nuspecPath);
 
-    final BaseUsages nupkgUsages;
-    try (final var bis = new ByteArrayInputStream(nupkgBytes)) {
-      nupkgUsages = this.storageStrategy.write(repoId.toString(), nupkgStoragePath, bis);
-    }
+    final var nupkgUsages =
+        this.storageStrategy.write(repoId.toString(), nupkgStoragePath, nupkgStream);
 
     final BaseUsages nuspecUsages;
     try (final var bis = new ByteArrayInputStream(nuspecBytes)) {

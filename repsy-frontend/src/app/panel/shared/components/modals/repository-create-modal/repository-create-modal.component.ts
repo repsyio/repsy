@@ -23,6 +23,7 @@ import { CargoService } from '../../../../pages/repository/cargo/service/cargo.s
 import { DockerService } from '../../../../pages/repository/docker/service/docker.service';
 import { GolangService } from '../../../../pages/repository/golang/service/golang.service';
 import { MavenService } from '../../../../pages/repository/maven/service/maven.service';
+import { NugetService } from '../../../../pages/repository/nuget/service/nuget.service';
 import { NpmService } from '../../../../pages/repository/npm/service/npm.service';
 import { PypiService } from '../../../../pages/repository/pypi/service/pypi.service';
 import { RepoForm } from '../../../dto/repo/repo-form';
@@ -44,7 +45,15 @@ export class RepositoryCreateModalComponent implements OnInit {
   @Input() public open: boolean;
   @Input() selectedOption: RepoType;
 
-  public options = [RepoType.DOCKER, RepoType.MAVEN, RepoType.NPM, RepoType.PYPI, RepoType.CARGO, RepoType.GOLANG];
+  public options = [
+    RepoType.DOCKER,
+    RepoType.MAVEN,
+    RepoType.NPM,
+    RepoType.PYPI,
+    RepoType.CARGO,
+    RepoType.GOLANG,
+    RepoType.NUGET,
+  ];
   public form: FormGroup;
 
   public loading = false;
@@ -56,6 +65,7 @@ export class RepositoryCreateModalComponent implements OnInit {
     private readonly dockerService: DockerService,
     private readonly cargoService: CargoService,
     private readonly golangService: GolangService,
+    private readonly nugetService: NugetService,
     private readonly fb: FormBuilder,
     private readonly router: Router,
     private readonly toastService: ToastService,
@@ -121,6 +131,8 @@ export class RepositoryCreateModalComponent implements OnInit {
         return this.golangService.createRepository(form);
       case RepoType.CARGO:
         return this.cargoService.createRepository(form);
+      case RepoType.NUGET:
+        return this.nugetService.createRepository(form);
       default:
         return Promise.reject('Unsupported repository type');
     }

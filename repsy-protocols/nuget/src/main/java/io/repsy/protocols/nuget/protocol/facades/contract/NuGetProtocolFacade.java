@@ -17,6 +17,8 @@ package io.repsy.protocols.nuget.protocol.facades.contract;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.nuget.shared.dtos.NuGetAutocompleteResponse;
+import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationIndexResponse;
+import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafResponse;
 import io.repsy.protocols.nuget.shared.dtos.NuGetSearchResponse;
 import io.repsy.protocols.nuget.shared.dtos.NuGetServiceIndexResponse;
 import java.io.IOException;
@@ -28,7 +30,7 @@ import org.springframework.core.io.Resource;
 @NullMarked
 public interface NuGetProtocolFacade {
 
-  NuGetServiceIndexResponse getServiceIndex(ProtocolContext context);
+  NuGetServiceIndexResponse getServiceIndex(ProtocolContext context, String baseUrl);
 
   void publish(ProtocolContext context, InputStream inputStream) throws IOException;
 
@@ -39,8 +41,14 @@ public interface NuGetProtocolFacade {
   Resource downloadNuspec(ProtocolContext context);
 
   NuGetSearchResponse search(
-      ProtocolContext context, String q, int skip, int take, boolean prerelease);
+      ProtocolContext context, String q, int skip, int take, boolean prerelease, String baseUrl);
 
   NuGetAutocompleteResponse autocomplete(
       ProtocolContext context, String q, int skip, int take, boolean prerelease);
+
+  NuGetRegistrationIndexResponse getRegistrationIndex(ProtocolContext context, String baseUrl);
+
+  NuGetRegistrationLeafResponse getRegistrationLeaf(ProtocolContext context, String baseUrl);
+
+  void unlistVersion(ProtocolContext context);
 }

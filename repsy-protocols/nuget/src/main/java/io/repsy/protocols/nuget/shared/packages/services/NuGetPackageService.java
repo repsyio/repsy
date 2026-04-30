@@ -15,11 +15,15 @@
  */
 package io.repsy.protocols.nuget.shared.packages.services;
 
+import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
+import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @NullMarked
 public interface NuGetPackageService<ID> {
@@ -29,11 +33,27 @@ public interface NuGetPackageService<ID> {
 
   List<String> getVersions(BaseRepoInfo<ID> repoInfo, String packageId);
 
-  Page<String> search(
+  List<NuGetVersionInfo> getVersionInfos(BaseRepoInfo<ID> repoInfo, String packageId);
+
+  List<NuGetVersionInfo> getAllVersionInfos(BaseRepoInfo<ID> repoInfo, String packageId);
+
+  Page<NuGetVersionInfo> getVersionInfosPage(
+      BaseRepoInfo<ID> repoInfo, String packageId, Pageable pageable);
+
+  Optional<NuGetVersionInfo> findVersionInfo(
+      BaseRepoInfo<ID> repoInfo, String packageId, String version);
+
+  Page<NuGetPackageSearchResult> search(
       BaseRepoInfo<ID> repoInfo, String query, int skip, int take, boolean prerelease);
 
   List<String> autocomplete(
       BaseRepoInfo<ID> repoInfo, String query, int skip, int take, boolean prerelease);
 
   void incrementDownloadCount(BaseRepoInfo<ID> repoInfo, String packageId, String version);
+
+  void unlistVersion(BaseRepoInfo<ID> repoInfo, String packageId, String version);
+
+  void deletePackage(BaseRepoInfo<ID> repoInfo, String packageId);
+
+  void deleteVersion(BaseRepoInfo<ID> repoInfo, String packageId, String version);
 }

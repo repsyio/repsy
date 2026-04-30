@@ -15,12 +15,15 @@
  */
 package io.repsy.protocols.nuget.protocol.handlers;
 
+import static io.repsy.protocols.nuget.shared.utils.NuGetUrlBuilder.buildBaseUrl;
+
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -91,7 +94,11 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler implements Protoc
       final var skip = skipStr != null ? Integer.parseInt(skipStr) : 0;
       final var take = takeStr != null ? Integer.parseInt(takeStr) : 20;
 
-      final var results = this.facade.search(context, q != null ? q : "", skip, take, prerelease);
+      final var repoName = ProtocolContextUtils.<Object>getRepoInfo(context).getName();
+      final var baseUrl = buildBaseUrl(request, repoName);
+
+      final var results =
+          this.facade.search(context, q != null ? q : "", skip, take, prerelease, baseUrl);
 
       return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(results);
     } catch (final Exception e) {

@@ -95,6 +95,18 @@ export class StatsService {
     });
   }
 
+  public async getNugetRepoCount(): Promise<number> {
+    const url = `${this.apiBaseUrl}/api/repos/NUGET/count`;
+
+    return new Promise<number>((resolve, reject) => {
+      return this.http
+        .get<RestResponse<number>>(url)
+        .toPromise()
+        .then((res: RestResponse<number>) => resolve(res.data))
+        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
+    });
+  }
+
   public async getTotalUsage(): Promise<TotalUsageInfo> {
     return new Promise<TotalUsageInfo>((resolve, reject) => {
       return this.http
@@ -154,6 +166,18 @@ export class StatsService {
   }
 
   public async fetchCargoRepositoryUsage(repo: string): Promise<RepoUsageInfo> {
+    return new Promise<RepoUsageInfo>((resolve, reject) => {
+      const url = `${this.apiBaseUrl}/api/repos/${repo}/usage`;
+
+      this.http
+        .get<RestResponse<RepoUsageInfo>>(url)
+        .toPromise()
+        .then((res: RestResponse<RepoUsageInfo>) => resolve(res.data))
+        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
+    });
+  }
+
+  public async fetchNugetRepositoryUsage(repo: string): Promise<RepoUsageInfo> {
     return new Promise<RepoUsageInfo>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/${repo}/usage`;
 
@@ -251,6 +275,18 @@ export class StatsService {
 
   public async getCargoRepoInfo(): Promise<RepoListInfo[]> {
     const url = `${this.apiBaseUrl}/api/repos/CARGO/info`;
+
+    return new Promise<RepoListInfo[]>((resolve, reject) => {
+      return this.http
+        .get<RestResponse<RepoListInfo[]>>(url)
+        .toPromise()
+        .then((res: RestResponse<RepoListInfo[]>) => resolve(res.data))
+        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
+    });
+  }
+
+  public async getNugetRepoInfo(): Promise<RepoListInfo[]> {
+    const url = `${this.apiBaseUrl}/api/repos/NUGET/info`;
 
     return new Promise<RepoListInfo[]>((resolve, reject) => {
       return this.http

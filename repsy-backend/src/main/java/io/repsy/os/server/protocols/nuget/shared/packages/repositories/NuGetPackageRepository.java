@@ -16,9 +16,12 @@
 package io.repsy.os.server.protocols.nuget.shared.packages.repositories;
 
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -27,4 +30,10 @@ import org.springframework.stereotype.Repository;
 public interface NuGetPackageRepository extends JpaRepository<NuGetPackage, UUID> {
 
   Optional<NuGetPackage> findByRepoIdAndPackageIdIgnoreCase(UUID repoId, String packageId);
+
+  Page<NuGetPackage> findByRepoIdAndPackageIdContainingIgnoreCase(
+      UUID repoId, String query, Pageable pageable);
+
+  List<NuGetPackage> findByRepoIdAndPackageIdStartingWithIgnoreCase(
+      UUID repoId, String prefix, Pageable pageable);
 }

@@ -24,6 +24,7 @@ import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -32,6 +33,7 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @NullMarked
@@ -85,36 +87,55 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler implements Proto
       final HttpServletResponse response) {
 
     try {
-
-      final var contentType = request.getContentType();
-
-      if (contentType == null || !contentType.toLowerCase().contains("multipart/form-data")) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .body(NuGetErrorResponse.of("Content-Type must be multipart/form-data"));
-      }
+      this.validateRequest(request);
 
       final var parts = request.getParts();
-
       if (parts == null || parts.isEmpty()) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .body(NuGetErrorResponse.of("Missing package content."));
+        return this.createErrorResponse(HttpStatus.BAD_REQUEST, "Missing package content.");
       }
 
-      final var nupkgPart = parts.iterator().next();
-
-      try (final var inputStream = nupkgPart.getInputStream()) {
-        this.facade.publish(context, inputStream);
-      }
-
+      this.processPublishing(context, parts.iterator().next());
       return ResponseEntity.status(HttpStatus.CREATED).build();
 
     } catch (final IllegalArgumentException e) {
-      log.debug("NuGet validation error: {}", e.getMessage());
-      return ResponseEntity.badRequest().body(NuGetErrorResponse.of(e.getMessage()));
+      return this.handleException(e.getMessage());
+    } catch (final ResponseStatusException e) {
+      return this.handleConflict(e);
     } catch (final Exception e) {
-      log.error("NuGet publish failed: ", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(NuGetErrorResponse.of("Publish failed"));
+      return this.createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Publish failed");
     }
+  }
+
+  private void validateRequest(final HttpServletRequest request) {
+
+    final var contentType = request.getContentType();
+
+    if (contentType == null || !contentType.toLowerCase().contains("multipart/form-data")) {
+      throw new IllegalArgumentException("Content-Type must be multipart/form-data");
+    }
+  }
+
+  private void processPublishing(final ProtocolContext context, final Part nupkgPart)
+      throws Exception {
+    try (final var inputStream = nupkgPart.getInputStream()) {
+      this.facade.publish(context, inputStream);
+    }
+  }
+
+  private ResponseEntity<Object> handleException(final String errorMsg) {
+    log.debug("NuGet validation error: {}", errorMsg);
+    return this.createErrorResponse(HttpStatus.BAD_REQUEST, errorMsg);
+  }
+
+  private ResponseEntity<Object> handleConflict(
+      final org.springframework.web.server.ResponseStatusException e) {
+    log.debug("NuGet publish conflict: {}", e.getMessage());
+    final var reason = e.getReason() != null ? e.getReason() : "Conflict";
+    return this.createErrorResponse((HttpStatus) e.getStatusCode(), reason);
+  }
+
+  private ResponseEntity<Object> createErrorResponse(
+      final HttpStatus status, final String message) {
+    return ResponseEntity.status(status).body(NuGetErrorResponse.of(message));
   }
 }

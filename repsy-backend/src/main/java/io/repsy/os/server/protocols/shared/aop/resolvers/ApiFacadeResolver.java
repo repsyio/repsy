@@ -15,6 +15,8 @@
  */
 package io.repsy.os.server.protocols.shared.aop.resolvers;
 
+import static io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils.extractRepoInfo;
+
 import io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -49,8 +51,10 @@ public class ApiFacadeResolver implements HandlerMethodArgumentResolver {
       final NativeWebRequest webRequest,
       final @Nullable WebDataBinderFactory binderFactory) {
 
-    final var repoInfo = ResolverUtils.extractRepoInfo(webRequest);
+    final var repoInfo = extractRepoInfo(webRequest);
 
-    return this.apiFacadeMap.get(repoInfo.getType());
+    final var repoType = ResolverUtils.getRepoTypeIfExists(webRequest, repoInfo);
+
+    return this.apiFacadeMap.get(repoType);
   }
 }

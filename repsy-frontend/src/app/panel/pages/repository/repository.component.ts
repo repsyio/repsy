@@ -38,6 +38,7 @@ import { CargoService } from './cargo/service/cargo.service';
 import { DockerService } from './docker/service/docker.service';
 import { GolangService } from './golang/service/golang.service';
 import { MavenService } from './maven/service/maven.service';
+import { NugetService } from './nuget/service/nuget.service';
 import { NpmService } from './npm/service/npm.service';
 import { PypiService } from './pypi/service/pypi.service';
 
@@ -76,6 +77,7 @@ export class RepositoryComponent {
     RepoType.PYPI,
     RepoType.CARGO,
     RepoType.GOLANG,
+    RepoType.NUGET,
   ];
   public loading = true;
   public operationLock = false;
@@ -90,6 +92,7 @@ export class RepositoryComponent {
     private readonly dockerService: DockerService,
     private readonly cargoService: CargoService,
     private readonly golangService: GolangService,
+    private readonly nugetService: NugetService,
     private readonly profileService: ProfileService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
@@ -175,6 +178,7 @@ export class RepositoryComponent {
     this.fetchRepositories(RepoType.DOCKER);
     this.fetchRepositories(RepoType.CARGO);
     this.fetchRepositories(RepoType.GOLANG);
+    this.fetchRepositories(RepoType.NUGET);
   }
 
   private fetchRepositories(repoType: RepoType): void {
@@ -212,6 +216,8 @@ export class RepositoryComponent {
         return this.cargoService.fetchRepositories();
       case RepoType.GOLANG:
         return this.golangService.fetchRepositories();
+      case RepoType.NUGET:
+        return this.nugetService.fetchRepositories();
       default:
         return Promise.reject('Unsupported repository type');
     }
@@ -231,6 +237,8 @@ export class RepositoryComponent {
         return this.cargoService.deleteRepository(repo.name);
       case RepoType.GOLANG:
         return this.golangService.deleteRepository(repo.name);
+      case RepoType.NUGET:
+        return this.nugetService.deleteRepository(repo.name);
       default:
         return Promise.reject('Unsupported repository type');
     }

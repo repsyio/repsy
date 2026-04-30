@@ -30,6 +30,7 @@ import { MavenService } from '../../maven/service/maven.service';
 import { NpmService } from '../../npm/service/npm.service';
 import { PypiService } from '../../pypi/service/pypi.service';
 import { GolangService } from '../../golang/service/golang.service';
+import { NugetService } from '../../nuget/service/nuget.service';
 
 @Component({
   selector: 'app-repo-info',
@@ -53,6 +54,7 @@ export class RepoInfoComponent implements OnInit {
     private readonly dockerService: DockerService,
     private readonly golangService: GolangService,
     private readonly cargoService: CargoService,
+    private readonly nugetService: NugetService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
@@ -149,6 +151,8 @@ export class RepoInfoComponent implements OnInit {
         return this.cargoService.updateRepositoryName(form);
       case RepoType.GOLANG:
         return this.golangService.updateRepositoryName(form);
+      case RepoType.NUGET:
+        return this.nugetService.updateRepositoryName(form);
       default:
         return Promise.reject('Unsupported repository type');
     }
@@ -168,6 +172,8 @@ export class RepoInfoComponent implements OnInit {
         return this.cargoService.updateRepoDescription(form);
       case RepoType.GOLANG:
         return this.golangService.updateRepoDescription(form);
+      case RepoType.NUGET:
+        return this.nugetService.updateRepoDescription(form);
       default:
         return Promise.reject('Unsupported repository type');
     }

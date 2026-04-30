@@ -34,8 +34,10 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.jspecify.annotations.NonNull;
 
 @Data
@@ -59,9 +61,11 @@ public class NuGetPackage {
   @Column(name = "package_id", nullable = false, length = 128)
   private String packageId;
 
+  @CreationTimestamp
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
+  @UpdateTimestamp
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
 

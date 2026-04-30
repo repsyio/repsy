@@ -15,16 +15,30 @@
  */
 package io.repsy.protocols.nuget.shared.dtos;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+/** Search result entry per NuGet Search Query Service spec. */
 @NullMarked
+@JsonInclude(Include.NON_NULL)
 public record NuGetSearchData(
-    String id,
+    @JsonProperty("@id") String id,
+    @JsonProperty("@type") String type,
+    String registration,
+    @JsonProperty("id") String packageId,
     String version,
-    @Nullable String title,
     @Nullable String description,
+    @Nullable String summary,
+    @Nullable String title,
     @Nullable String iconUrl,
+    @Nullable String licenseUrl,
+    @Nullable String projectUrl,
+    @Nullable List<String> tags,
+    @Nullable List<String> authors,
     long totalDownloads,
-    List<String> versions) {}
+    boolean verified,
+    List<NuGetSearchVersionData> versions) {}

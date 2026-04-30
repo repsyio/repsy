@@ -74,7 +74,7 @@ public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
         return Optional.empty();
       }
 
-      final var relativePath = request.getRequestURI();
+      final var relativePath = request.getServletPath();
 
       if (!VERSIONS_PATTERN.matcher(relativePath).matches()) {
         return Optional.empty();

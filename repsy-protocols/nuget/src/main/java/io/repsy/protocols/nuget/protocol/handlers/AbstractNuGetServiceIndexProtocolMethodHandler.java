@@ -15,12 +15,15 @@
  */
 package io.repsy.protocols.nuget.protocol.handlers;
 
+import static io.repsy.protocols.nuget.shared.utils.NuGetUrlBuilder.buildBaseUrl;
+
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -89,7 +92,9 @@ public abstract class AbstractNuGetServiceIndexProtocolMethodHandler
       final HttpServletResponse response) {
 
     try {
-      final var serviceIndex = this.facade.getServiceIndex(context);
+      final var repoName = ProtocolContextUtils.<Object>getRepoInfo(context).getName();
+      final var baseUrl = buildBaseUrl(request, repoName);
+      final var serviceIndex = this.facade.getServiceIndex(context, baseUrl);
 
       return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(serviceIndex);
     } catch (final Exception e) {

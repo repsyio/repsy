@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.nuget.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
+import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
 import io.repsy.protocols.nuget.protocol.handlers.AbstractNuGetRegistrationProtocolMethodHandler;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -29,8 +30,9 @@ public class NuGetRegistrationIndexProtocolMethodHandler
 
   public NuGetRegistrationIndexProtocolMethodHandler(
       @Qualifier("osNuGetPathParser") final PathParser basePathParser,
+      final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider) {
 
-    super(basePathParser, provider, true);
+    super(basePathParser, facade, provider, true);
   }
 }

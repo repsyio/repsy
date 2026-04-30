@@ -2448,6 +2448,193 @@ paths:
         required: true
         schema:
           type: string
+  "/api/nuget/packages/{repoName}":
+    get:
+      tags:
+        - nuget-package-controller
+      operationId: searchNuGetPackages
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelNuGetPackageListItem"
+      summary: List packages in a NuGet repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/nuget/packages/{repoName}/{packageId}":
+    get:
+      tags:
+        - nuget-package-controller
+      operationId: getNuGetPackage
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseNuGetPackageInfo"
+      summary: Get a NuGet package
+    delete:
+      tags:
+        - nuget-package-controller
+      operationId: deleteNuGetPackage
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a NuGet package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/nuget/packages/{repoName}/{packageId}/versions":
+    get:
+      tags:
+        - nuget-package-controller
+      operationId: listNuGetPackageVersions
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelNuGetVersionListItem"
+      summary: List versions of a NuGet package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/nuget/packages/{repoName}/{packageId}/{version}":
+    get:
+      tags:
+        - nuget-package-controller
+      operationId: getNuGetPackageVersion
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseNuGetVersionInfo"
+      summary: Get a specific NuGet package version
+    delete:
+      tags:
+        - nuget-package-controller
+      operationId: deleteNuGetPackageVersion
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a specific NuGet package version
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
   "/api/repos/{repoName}":
     delete:
       tags:
@@ -4049,6 +4236,156 @@ components:
           type: string
         text:
           type: string
+    NuGetPackageListItem:
+      type: object
+      properties:
+        packageId:
+          type: string
+        latestVersion:
+          type: string
+        description:
+          type: string
+        totalDownloads:
+          type: integer
+          format: int64
+    PagedModelNuGetPackageListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/NuGetPackageListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelNuGetPackageListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelNuGetPackageListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    NuGetPackageInfo:
+      type: object
+      properties:
+        packageId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        authors:
+          type: string
+        tags:
+          type: string
+        iconUrl:
+          type: string
+        licenseUrl:
+          type: string
+        projectUrl:
+          type: string
+        latestVersion:
+          type: string
+        totalDownloads:
+          type: integer
+          format: int64
+    RestResponseNuGetPackageInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/NuGetPackageInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    NuGetVersionListItem:
+      type: object
+      properties:
+        version:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        downloads:
+          type: integer
+          format: int64
+        prerelease:
+          type: boolean
+        listed:
+          type: boolean
+    PagedModelNuGetVersionListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/NuGetVersionListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelNuGetVersionListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelNuGetVersionListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    NuGetVersionInfo:
+      type: object
+      properties:
+        packageId:
+          type: string
+        version:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        authors:
+          type: string
+        tags:
+          type: string
+        iconUrl:
+          type: string
+        licenseUrl:
+          type: string
+        projectUrl:
+          type: string
+        listed:
+          type: boolean
+        downloadCount:
+          type: integer
+          format: int64
+        publishedAt:
+          type: string
+          format: date-time
+    RestResponseNuGetVersionInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/NuGetVersionInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
     ResponseType:
       type: string
       enum:
@@ -4069,3 +4406,4 @@ components:
         - DOCKER
         - CARGO
         - GOLANG
+        - NUGET

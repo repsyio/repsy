@@ -26,6 +26,7 @@ import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerService } from '../../docker/service/docker.service';
 import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form';
 import { MavenService } from '../../maven/service/maven.service';
+import { NugetService } from '../../nuget/service/nuget.service';
 import { NpmService } from '../../npm/service/npm.service';
 import { PypiService } from '../../pypi/service/pypi.service';
 import { GolangService } from '../../golang/service/golang.service';
@@ -49,6 +50,7 @@ export class VisibilityComponent {
     private readonly dockerService: DockerService,
     private readonly cargoService: CargoService,
     private readonly golangService: GolangService,
+    private readonly nugetService: NugetService,
     private readonly toastService: ToastService,
   ) {}
 
@@ -95,6 +97,8 @@ export class VisibilityComponent {
         return this.golangService.updateRepoSettings(form);
       case RepoType.CARGO:
         return this.cargoService.updateRepoSettings(form);
+      case RepoType.NUGET:
+        return this.nugetService.updateRepoSettings(form);
       default:
         return Promise.reject('Unsupported repository type');
     }

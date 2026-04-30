@@ -40,6 +40,8 @@ import { GolangConfigComponent } from '../../golang/config/golang-config.compone
 import { GolangService } from '../../golang/service/golang.service';
 import { MavenConfigComponent } from '../../maven/config/maven-config.component';
 import { MavenService } from '../../maven/service/maven.service';
+import { NugetConfigComponent } from '../../nuget/config/nuget-config.component';
+import { NugetService } from '../../nuget/service/nuget.service';
 import { NpmConfigComponent } from '../../npm/config/npm-config.component';
 import { NpmService } from '../../npm/service/npm.service';
 import { PypiConfigComponent } from '../../pypi/config/pypi-config.component';
@@ -62,6 +64,7 @@ import { TokenCreateInfo } from './dto/token-create-info';
     GolangConfigComponent,
     NgClass,
     MavenConfigComponent,
+    NugetConfigComponent,
     PypiConfigComponent,
     NpmConfigComponent,
     EllipsisPipe,
@@ -94,6 +97,7 @@ export class DeployTokenComponent implements OnInit {
     private readonly dockerService: DockerService,
     private readonly golangService: GolangService,
     private readonly cargoService: CargoService,
+    private readonly nugetService: NugetService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
   ) {
@@ -130,6 +134,9 @@ export class DeployTokenComponent implements OnInit {
       case RepoType.GOLANG: {
         return this.golangService.fetchRepositoryUsage();
       }
+      case RepoType.NUGET: {
+        return this.nugetService.fetchRepositoryUsage();
+      }
       default:
         return Promise.reject('Unsupported repository type');
     }
@@ -155,6 +162,9 @@ export class DeployTokenComponent implements OnInit {
       }
       case RepoType.CARGO: {
         return this.cargoService.getDeployTokens(pageNum, pageSize);
+      }
+      case RepoType.NUGET: {
+        return this.nugetService.getDeployTokens(pageNum, pageSize);
       }
       default:
         return Promise.reject('Unsupported repository type');
@@ -200,6 +210,9 @@ export class DeployTokenComponent implements OnInit {
       }
       case RepoType.GOLANG: {
         return this.golangService.rotateDeployToken(tokenUuid);
+      }
+      case RepoType.NUGET: {
+        return this.nugetService.rotateDeployToken(tokenUuid);
       }
       default:
         return Promise.reject('Unsupported repository type');
@@ -249,6 +262,9 @@ export class DeployTokenComponent implements OnInit {
       }
       case RepoType.GOLANG: {
         return this.golangService.revokeDeployToken(tokenId);
+      }
+      case RepoType.NUGET: {
+        return this.nugetService.revokeDeployToken(tokenId);
       }
       default:
         return Promise.reject('Unsupported repository type');

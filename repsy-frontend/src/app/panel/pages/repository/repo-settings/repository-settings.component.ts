@@ -30,6 +30,7 @@ import { DockerService } from '../docker/service/docker.service';
 import { MavenRepoSettingsForm } from '../maven/dto/maven-repo-settings-form';
 import { GolangService } from '../golang/service/golang.service';
 import { MavenService } from '../maven/service/maven.service';
+import { NugetService } from '../nuget/service/nuget.service';
 import { NpmService } from '../npm/service/npm.service';
 import { RepositorySettingsInfo } from '../pypi/dto/repository-settings-info';
 import { PypiService } from '../pypi/service/pypi.service';
@@ -83,6 +84,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
     private readonly dockerService: DockerService,
     private readonly cargoService: CargoService,
     private readonly golangService: GolangService,
+    private readonly nugetService: NugetService,
     private readonly toastService: ToastService,
     private readonly router: Router,
     private readonly repoLookupService: RepoLookupService,
@@ -184,6 +186,9 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
       case RepoType.CARGO: {
         return this.cargoService.repoChanges;
       }
+      case RepoType.NUGET: {
+        return this.nugetService.repoChanges;
+      }
       default:
         throw new Error('Unsupported repository type');
     }
@@ -208,6 +213,9 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
       }
       case RepoType.CARGO: {
         return this.cargoService.fetchRepositorySettings();
+      }
+      case RepoType.NUGET: {
+        return this.nugetService.fetchRepositorySettings();
       }
       default:
         return Promise.reject('Unsupported repository type');

@@ -32,6 +32,7 @@ export class RepositoryCardComponent {
   @Input() dockerRepoCount: number;
   @Input() golangRepoCount: number;
   @Input() cargoRepoCount: number;
+  @Input() nugetRepoCount: number;
 
   routeMaven() {
     this.router.navigate(['/repositories'], {
@@ -66,6 +67,12 @@ export class RepositoryCardComponent {
   routeGolang() {
     this.router.navigate(['/repositories'], {
       state: { repoType: 'golang' },
+    });
+  }
+
+  routeNuget() {
+    this.router.navigate(['/repositories'], {
+      state: { repoType: 'nuget' },
     });
   }
 }

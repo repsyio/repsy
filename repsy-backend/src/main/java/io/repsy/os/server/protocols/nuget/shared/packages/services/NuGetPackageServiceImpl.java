@@ -16,27 +16,34 @@
 package io.repsy.os.server.protocols.nuget.shared.packages.services;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.os.server.protocols.nuget.shared.packages.dtos.NuGetDeletedItem;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
+import io.repsy.os.server.protocols.nuget.shared.packages.mappers.NuGetPackageConverter;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
+import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
+import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
+import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
-@Slf4j
 @Component
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -49,6 +56,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   private final RepoRepository repoRepository;
   private final NuGetPackageRepository packageRepository;
   private final NuGetPackageVersionRepository packageVersionRepository;
+  private final NuGetPackageConverter converter;
 
   @Override
   @Transactional
@@ -63,80 +71,102 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
             .findById(repoInfo.getId())
             .orElseThrow(() -> new IllegalArgumentException("Repository not found"));
 
-    var pkg =
+    final var pkg =
         this.packageRepository.findByRepoIdAndPackageIdIgnoreCase(
             repoInfo.getId(), packageId.toLowerCase(Locale.ROOT));
 
-    final var nugetPackage =
-        pkg.orElseGet(
-            () -> {
-              final var newPkg = new NuGetPackage();
-              newPkg.setRepo(repo);
-              newPkg.setPackageId(packageId.toLowerCase(Locale.ROOT));
-              newPkg.setCreatedAt(Instant.now());
-              newPkg.setUpdatedAt(Instant.now());
-              return this.packageRepository.save(newPkg);
-            });
+    final var nugetPackage = pkg.orElseGet(() -> this.crateNuGetPackage(repo, packageId));
 
-    final var pkgVersion = new NuGetPackageVersion();
-    pkgVersion.setNugetPackage(nugetPackage);
-    pkgVersion.setVersion(version);
-    pkgVersion.setPrerelease(version.contains("-"));
-    pkgVersion.setListed(true);
-    pkgVersion.setPublishedAt(Instant.now());
-    pkgVersion.setDownloadCount(0);
-    pkgVersion.setCreatedAt(Instant.now());
+    final boolean versionExists =
+        this.packageVersionRepository
+            .findByNugetPackageIdAndVersion(nugetPackage.getId(), version)
+            .isPresent();
+
+    if (versionExists) {
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT,
+          "Version " + version + " of package " + packageId + " already exists.");
+    }
+
+    final var pkgVersion = this.createNuGetPackageVersion(nugetPackage, nuspecXml, version);
 
     this.packageVersionRepository.save(pkgVersion);
-    log.info("Published NuGet package {} version {}", packageId, version);
   }
 
   @Override
   public List<String> getVersions(final BaseRepoInfo<UUID> repoInfo, final String packageId) {
-
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
     return this.packageVersionRepository
         .findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(pkg.getId())
         .stream()
-        .map(NuGetPackageVersion::getVersion)
+        .map(v -> v.getVersion().toLowerCase(Locale.ROOT))
         .toList();
   }
 
   @Override
-  public Page<String> search(
+  public List<NuGetVersionInfo> getVersionInfos(
+      final BaseRepoInfo<UUID> repoInfo, final String packageId) {
+    final var pkg = this.findPackage(repoInfo.getId(), packageId);
+    return this.packageVersionRepository
+        .findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(pkg.getId())
+        .stream()
+        .map(v -> this.converter.toVersionInfo(v, packageId))
+        .toList();
+  }
+
+  @Override
+  public List<NuGetVersionInfo> getAllVersionInfos(
+      final BaseRepoInfo<UUID> repoInfo, final String packageId) {
+    final var pkg = this.findPackage(repoInfo.getId(), packageId);
+    return this.packageVersionRepository
+        .findByNugetPackageIdOrderByPublishedAtDesc(pkg.getId())
+        .stream()
+        .map(v -> this.converter.toVersionInfo(v, packageId))
+        .toList();
+  }
+
+  @Override
+  public Page<NuGetVersionInfo> getVersionInfosPage(
+      final BaseRepoInfo<UUID> repoInfo, final String packageId, final Pageable pageable) {
+    final var pkg = this.findPackage(repoInfo.getId(), packageId);
+    return this.packageVersionRepository
+        .findByNugetPackageIdOrderByPublishedAtDesc(pkg.getId(), pageable)
+        .map(v -> this.converter.toVersionInfo(v, packageId));
+  }
+
+  @Override
+  public Optional<NuGetVersionInfo> findVersionInfo(
+      final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
+
+    return this.packageRepository
+        .findByRepoIdAndPackageIdIgnoreCase(repoInfo.getId(), packageId.toLowerCase(Locale.ROOT))
+        .flatMap(
+            pkg ->
+                this.packageVersionRepository.findByNugetPackageIdAndVersionIgnoreCase(
+                    pkg.getId(), version))
+        .map(v -> this.converter.toVersionInfo(v, packageId));
+  }
+
+  @Override
+  public Page<NuGetPackageSearchResult> search(
       final BaseRepoInfo<UUID> repoInfo,
       final String query,
       final int skip,
       final int take,
       final boolean prerelease) {
 
+    if (take <= 0) {
+      return new org.springframework.data.domain.PageImpl<>(List.of());
+    }
+
     final var page = skip / take;
     final var pageable = PageRequest.of(page, take);
 
-    try {
-      final var pkg =
-          this.packageRepository.findByRepoIdAndPackageIdIgnoreCase(
-              repoInfo.getId(), query.toLowerCase(Locale.ROOT));
+    final var pkgPage =
+        this.packageRepository.findByRepoIdAndPackageIdContainingIgnoreCase(
+            repoInfo.getId(), query, pageable);
 
-      if (pkg.isEmpty()) {
-        return new PageImpl<>(List.of(), pageable, 0);
-      }
-
-      final var versions =
-          this.packageVersionRepository.findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(
-              pkg.get().getId());
-
-      final var searchResults =
-          versions.stream()
-              .filter(v -> !v.isPrerelease() || prerelease)
-              .map(NuGetPackageVersion::getVersion)
-              .toList();
-
-      return new PageImpl<>(searchResults, pageable, searchResults.size());
-    } catch (final Exception e) {
-      log.debug("NuGet search failed for query: {}", query, e);
-      return new PageImpl<>(List.of(), pageable, 0);
-    }
+    return pkgPage.map(pkg -> this.toSearchResult(pkg, prerelease));
   }
 
   @Override
@@ -147,43 +177,126 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final int take,
       final boolean prerelease) {
 
-    try {
-      // Simple autocomplete: find packages matching prefix (case-insensitive)
-      return this.packageRepository.findAll().stream()
-          .filter(p -> p.getRepo().getId().equals(repoInfo.getId()))
-          .filter(
-              p ->
-                  p.getPackageId()
-                      .toLowerCase(Locale.ROOT)
-                      .startsWith(query.toLowerCase(Locale.ROOT)))
-          .limit(take)
-          .skip(skip)
-          .map(NuGetPackage::getPackageId)
-          .distinct()
-          .toList();
-    } catch (final Exception e) {
-      log.debug("NuGet autocomplete failed for query: {}", query, e);
+    if (take <= 0) {
       return List.of();
     }
+
+    final var pageable = Pageable.ofSize(Math.max(skip + take, 1));
+    return this.packageRepository
+        .findByRepoIdAndPackageIdStartingWithIgnoreCase(repoInfo.getId(), query, pageable)
+        .stream()
+        .skip(skip)
+        .limit(take)
+        .map(NuGetPackage::getPackageId)
+        .toList();
   }
 
   @Override
+  @Transactional
   public void incrementDownloadCount(
       final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
 
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
     final var pkgVersion =
         this.packageVersionRepository
-            .findByNugetPackageIdAndVersion(pkg.getId(), version)
+            .findByNugetPackageIdAndVersionIgnoreCase(pkg.getId(), version)
             .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
 
-    pkgVersion.setDownloadCount(pkgVersion.getDownloadCount() + 1);
+    this.packageVersionRepository.incrementDownloadCount(pkgVersion.getId());
+  }
+
+  @Override
+  @Transactional
+  public void unlistVersion(
+      final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
+    final var pkg = this.findPackage(repoInfo.getId(), packageId);
+    final var pkgVersion =
+        this.packageVersionRepository
+            .findByNugetPackageIdAndVersionIgnoreCase(pkg.getId(), version)
+            .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
+    pkgVersion.setListed(false);
     this.packageVersionRepository.save(pkgVersion);
+  }
+
+  @Override
+  @Transactional
+  public void deletePackage(final BaseRepoInfo<UUID> repoInfo, final String packageId) {
+    final var pkg = this.findPackage(repoInfo.getId(), packageId);
+    this.packageRepository.delete(pkg);
+  }
+
+  @Override
+  @Transactional
+  public void deleteVersion(
+      final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
+    this.deleteVersionAndGetDeletedItem(repoInfo, packageId, version);
+  }
+
+  @Transactional
+  public NuGetDeletedItem deleteVersionAndGetDeletedItem(
+      final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
+    final var pkg = this.findPackage(repoInfo.getId(), packageId);
+    final var pkgVersion =
+        this.packageVersionRepository
+            .findByNugetPackageIdAndVersionIgnoreCase(pkg.getId(), version)
+            .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
+    this.packageVersionRepository.delete(pkgVersion);
+
+    final boolean packageHasVersions =
+        this.packageVersionRepository.existsByNugetPackageId(pkg.getId());
+    if (!packageHasVersions) {
+      this.packageRepository.delete(pkg);
+      return NuGetDeletedItem.PACKAGE;
+    }
+
+    return NuGetDeletedItem.VERSION;
   }
 
   private NuGetPackage findPackage(final UUID repoId, final String packageId) {
     return this.packageRepository
         .findByRepoIdAndPackageIdIgnoreCase(repoId, packageId.toLowerCase(Locale.ROOT))
         .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
+  }
+
+  private NuGetPackage crateNuGetPackage(final Repo repo, final String packageId) {
+
+    final var newPkg = new NuGetPackage();
+    newPkg.setRepo(repo);
+    newPkg.setPackageId(packageId.toLowerCase(Locale.ROOT));
+
+    return this.packageRepository.save(newPkg);
+  }
+
+  private NuGetPackageVersion createNuGetPackageVersion(
+      final NuGetPackage nugetPackage, final String nuspecXml, final String version) {
+
+    final var pkgVersion = new NuGetPackageVersion();
+    pkgVersion.setNugetPackage(nugetPackage);
+    pkgVersion.setVersion(version);
+    pkgVersion.setPrerelease(version.contains("-"));
+    pkgVersion.setListed(true);
+    pkgVersion.setPublishedAt(Instant.now());
+    pkgVersion.setDownloadCount(0);
+    pkgVersion.setCreatedAt(Instant.now());
+    pkgVersion.setTitle(NuGetPackageUtils.extractXmlTag(nuspecXml, "title"));
+    pkgVersion.setDescription(NuGetPackageUtils.extractXmlTag(nuspecXml, "description"));
+    pkgVersion.setAuthors(NuGetPackageUtils.extractXmlTag(nuspecXml, "authors"));
+    pkgVersion.setTags(NuGetPackageUtils.extractXmlTag(nuspecXml, "tags"));
+    pkgVersion.setIconUrl(NuGetPackageUtils.extractXmlTag(nuspecXml, "iconUrl"));
+    pkgVersion.setLicenseUrl(NuGetPackageUtils.extractXmlTag(nuspecXml, "licenseUrl"));
+    pkgVersion.setProjectUrl(NuGetPackageUtils.extractXmlTag(nuspecXml, "projectUrl"));
+    pkgVersion.setRepositoryUrl(NuGetPackageUtils.extractXmlTag(nuspecXml, "repository"));
+
+    return pkgVersion;
+  }
+
+  private NuGetPackageSearchResult toSearchResult(
+      final NuGetPackage pkg, final boolean prerelease) {
+
+    final var allVersions =
+        this.packageVersionRepository.findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(
+            pkg.getId());
+
+    return this.converter.toSearchResult(pkg, prerelease, allVersions);
   }
 }

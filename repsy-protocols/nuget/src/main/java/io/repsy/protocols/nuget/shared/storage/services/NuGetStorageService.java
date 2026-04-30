@@ -17,6 +17,7 @@ package io.repsy.protocols.nuget.shared.storage.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
@@ -25,7 +26,7 @@ import org.springframework.core.io.Resource;
 public interface NuGetStorageService {
 
   BaseUsages writePackage(
-      UUID repoId, String packageId, String version, byte[] nupkgBytes, byte[] nuspecBytes)
+      UUID repoId, String packageId, String version, InputStream nupkgStream, byte[] nuspecBytes)
       throws IOException;
 
   Resource getNupkg(UUID repoId, String packageId, String version);
