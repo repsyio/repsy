@@ -196,6 +196,17 @@ public class NuGetApiFacade implements ProtocolApiFacade {
         .projectUrl(v.projectUrl())
         .listed(v.listed())
         .downloadCount(v.downloadCount())
-        .publishedAt(v.publishedAt());
+        .publishedAt(v.publishedAt())
+        .dependencies(
+            v.dependencies() == null
+                ? java.util.List.of()
+                : v.dependencies().stream()
+                    .map(
+                        d ->
+                            new io.repsy.os.generated.model.NuGetDependencyInfo()
+                                .packageId(d.packageId())
+                                .versionRange(d.versionRange())
+                                .targetFramework(d.targetFramework()))
+                    .toList());
   }
 }

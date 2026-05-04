@@ -21,6 +21,7 @@ import org.jspecify.annotations.NullMarked;
 
 @NullMarked
 public record NuGetRegistrationLeafResponse(
+    @JsonProperty("@context") String context,
     @JsonProperty("@id") String id,
     @JsonProperty("@type") String type,
     NuGetCatalogEntry catalogEntry,

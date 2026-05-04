@@ -16,6 +16,7 @@
 package io.repsy.protocols.nuget.shared.packages.dtos;
 
 import java.time.Instant;
+import java.util.List;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -32,4 +33,5 @@ public record NuGetVersionInfo(
     @Nullable String projectUrl,
     boolean listed,
     long downloadCount,
-    Instant publishedAt) {}
+    Instant publishedAt,
+    @Nullable List<NuGetDependencyInfo> dependencies) {}

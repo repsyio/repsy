@@ -50,17 +50,53 @@ export class NugetConfigComponent implements OnInit, OnChanges {
   }
 
   private updateMarkdown(): void {
+    const sourceUrl = `${this.baseUrl}/${this.repoName}/v3/index.json`;
     this.markdown = `
-**Configure NuGet source:**
+**Option A — NuGet.Config (recommended)**
 
-\`\`\`bash
-dotnet nuget add source "${this.baseUrl}/${this.repoName}/v3/index.json" --name repsy --username ${this.username} --password <YOUR_DEPLOY_TOKEN> --store-password-in-clear-text
+Create \`NuGet.Config\` in your project directory:
+
+\`\`\`xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <add key="repsy" value="${sourceUrl}" allowInsecureConnections="true" />
+  </packageSources>
+  <packageSourceCredentials>
+    <repsy>
+      <add key="Username" value="${this.username}" />
+      <add key="ClearTextPassword" value="<YOUR_PASSWORD_OR_DEPLOY_TOKEN>" />
+    </repsy>
+  </packageSourceCredentials>
+</configuration>
 \`\`\`
 
-**Push package:**
+Push package:
 
 \`\`\`bash
-dotnet nuget push <PACKAGE_PATH>.nupkg --source repsy --api-key <YOUR_DEPLOY_TOKEN>
+dotnet nuget push ./bin/Release/*.nupkg --source repsy --api-key any
+\`\`\`
+
+Install package:
+
+\`\`\`bash
+dotnet add package <PACKAGE_ID> --version <VERSION> --source repsy
+\`\`\`
+
+---
+
+**Option B — Direct URL (no NuGet.Config needed)**
+
+Push package:
+
+\`\`\`bash
+dotnet nuget push ./bin/Release/*.nupkg --source "${sourceUrl}" --api-key any
+\`\`\`
+
+Install package:
+
+\`\`\`bash
+dotnet add package <PACKAGE_ID> --version <VERSION> --source "${sourceUrl}"
 \`\`\`
 `;
   }

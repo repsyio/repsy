@@ -4344,6 +4344,15 @@ components:
           type: string
         text:
           type: string
+    NuGetDependencyInfo:
+      type: object
+      properties:
+        packageId:
+          type: string
+        versionRange:
+          type: string
+        targetFramework:
+          type: string
     NuGetVersionInfo:
       type: object
       properties:
@@ -4373,6 +4382,10 @@ components:
         publishedAt:
           type: string
           format: date-time
+        dependencies:
+          type: array
+          items:
+            "$ref": "#/components/schemas/NuGetDependencyInfo"
     RestResponseNuGetVersionInfo:
       type: object
       properties:

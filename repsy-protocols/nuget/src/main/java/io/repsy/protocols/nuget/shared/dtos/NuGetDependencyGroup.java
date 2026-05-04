@@ -15,14 +15,22 @@
  */
 package io.repsy.protocols.nuget.shared.dtos;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 @NullMarked
-public record NuGetRegistrationIndexResponse(
-    @JsonProperty("@context") String context,
-    @JsonProperty("@id") String id,
-    @JsonProperty("@type") List<String> type,
-    int count,
-    List<NuGetRegistrationPageItem> items) {}
+@JsonInclude(Include.NON_NULL)
+public record NuGetDependencyGroup(
+    @JsonProperty("@type") String type,
+    @Nullable String targetFramework,
+    List<NuGetCatalogDependency> dependencies) {
+
+  public static NuGetDependencyGroup of(
+      final @Nullable String targetFramework, final List<NuGetCatalogDependency> dependencies) {
+    return new NuGetDependencyGroup("PackageDependencyGroup", targetFramework, dependencies);
+  }
+}

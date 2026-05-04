@@ -53,7 +53,9 @@ public interface NuGetPackageService<ID> {
 
   void unlistVersion(BaseRepoInfo<ID> repoInfo, String packageId, String version);
 
+  void relistVersion(BaseRepoInfo<ID> repoInfo, String packageId, String version);
+
   void deletePackage(BaseRepoInfo<ID> repoInfo, String packageId);
 
-  void deleteVersion(BaseRepoInfo<ID> repoInfo, String packageId, String version);
+  boolean deleteVersion(BaseRepoInfo<ID> repoInfo, String packageId, String version);
 }

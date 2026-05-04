@@ -13,16 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.nuget.shared.dtos;
+package io.repsy.protocols.nuget.shared.packages.dtos;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.List;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 @NullMarked
-public record NuGetRegistrationIndexResponse(
-    @JsonProperty("@context") String context,
-    @JsonProperty("@id") String id,
-    @JsonProperty("@type") List<String> type,
-    int count,
-    List<NuGetRegistrationPageItem> items) {}
+public record NuGetDependencyInfo(
+    String packageId, String versionRange, @Nullable String targetFramework) {}

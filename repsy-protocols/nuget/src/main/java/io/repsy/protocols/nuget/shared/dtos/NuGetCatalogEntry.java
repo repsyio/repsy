@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
+import java.util.List;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -37,4 +38,5 @@ public record NuGetCatalogEntry(
     @Nullable String projectUrl,
     @Nullable String tags,
     boolean listed,
-    Instant published) {}
+    Instant published,
+    @Nullable List<NuGetDependencyGroup> dependencyGroups) {}

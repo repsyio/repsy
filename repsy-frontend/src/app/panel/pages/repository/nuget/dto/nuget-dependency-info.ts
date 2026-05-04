@@ -14,20 +14,8 @@
 /// limitations under the License.
 ///
 
-import { NugetDependencyInfo } from './nuget-dependency-info';
-
-export class NugetVersionInfo {
+export class NugetDependencyInfo {
   public packageId: string;
-  public version: string;
-  public title: string;
-  public description: string;
-  public authors: string;
-  public tags: string;
-  public iconUrl: string;
-  public licenseUrl: string;
-  public projectUrl: string;
-  public listed: boolean;
-  public downloadCount: number;
-  public publishedAt: string;
-  public dependencies?: NugetDependencyInfo[];
+  public versionRange: string;
+  public targetFramework?: string;
 }

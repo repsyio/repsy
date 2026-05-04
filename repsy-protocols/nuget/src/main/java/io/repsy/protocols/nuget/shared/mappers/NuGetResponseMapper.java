@@ -15,17 +15,22 @@
  */
 package io.repsy.protocols.nuget.shared.mappers;
 
+import io.repsy.protocols.nuget.shared.dtos.NuGetCatalogDependency;
 import io.repsy.protocols.nuget.shared.dtos.NuGetCatalogEntry;
+import io.repsy.protocols.nuget.shared.dtos.NuGetDependencyGroup;
 import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafItem;
 import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafResponse;
 import io.repsy.protocols.nuget.shared.dtos.NuGetSearchData;
 import io.repsy.protocols.nuget.shared.dtos.NuGetSearchVersionData;
+import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.nuget.shared.utils.NuGetUrlBuilder;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -88,7 +93,32 @@ public final class NuGetResponseMapper {
         v.projectUrl(),
         v.tags(),
         v.listed(),
-        v.publishedAt());
+        v.publishedAt(),
+        buildDependencyGroups(v.dependencies()));
+  }
+
+  private static @Nullable List<NuGetDependencyGroup> buildDependencyGroups(
+      final @Nullable List<NuGetDependencyInfo> dependencies) {
+
+    if (dependencies == null || dependencies.isEmpty()) {
+      return null;
+    }
+
+    return dependencies.stream()
+        .collect(
+            Collectors.groupingBy(
+                dep -> dep.targetFramework() != null ? dep.targetFramework() : "",
+                LinkedHashMap::new,
+                Collectors.mapping(
+                    dep ->
+                        NuGetCatalogDependency.of(
+                            dep.packageId(),
+                            dep.versionRange().isBlank() ? null : dep.versionRange()),
+                    Collectors.toList())))
+        .entrySet()
+        .stream()
+        .map(e -> NuGetDependencyGroup.of(e.getKey().isEmpty() ? null : e.getKey(), e.getValue()))
+        .toList();
   }
 
   public static NuGetRegistrationLeafItem toLeafItem(
@@ -124,6 +154,7 @@ public final class NuGetResponseMapper {
     final var packageContent = NuGetUrlBuilder.nupkgUrl(packageBase, idLower, vLower);
 
     return new NuGetRegistrationLeafResponse(
+        "https://schema.nuget.org/schema#",
         leafUrl,
         "Package",
         toCatalogEntry(v, packageId, leafUrl),

@@ -21,4 +21,6 @@ import org.jspecify.annotations.NullMarked;
 
 @NullMarked
 public record NuGetServiceIndexResponse(
-    String version, @JsonProperty("resources") List<NuGetServiceIndexResource> resources) {}
+    @JsonProperty("@context") String context,
+    String version,
+    @JsonProperty("resources") List<NuGetServiceIndexResource> resources) {}

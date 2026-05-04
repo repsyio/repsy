@@ -25,16 +25,17 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
 import io.repsy.protocols.nuget.shared.dtos.NuGetAutocompleteResponse;
 import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationIndexResponse;
+import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafItem;
 import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafResponse;
 import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationPageItem;
 import io.repsy.protocols.nuget.shared.dtos.NuGetSearchResponse;
 import io.repsy.protocols.nuget.shared.dtos.NuGetServiceIndexResponse;
 import io.repsy.protocols.nuget.shared.mappers.NuGetResponseMapper;
-import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
 import io.repsy.protocols.nuget.shared.utils.NuGetServiceIndexResources;
 import io.repsy.protocols.nuget.shared.utils.NuGetUrlBuilder;
+import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.IOException;
 import java.io.InputStream;
@@ -42,6 +43,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -58,6 +60,9 @@ import org.springframework.core.io.Resource;
 public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFacade {
 
   public static final String USAGES = "usages";
+
+  /** Maximum number of leaf items per registration page per the NuGet spec. */
+  private static final int REGISTRATION_PAGE_SIZE = 64;
 
   // NuGet versions may be 4-part (1.0.0.0) — coerce handles them; fallback to string compare
   private static final List<String> REGISTRATION_INDEX_TYPES =
@@ -76,11 +81,22 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   private final NuGetStorageService storageService;
   private final NuGetPackageService<ID> packageService;
 
+  protected void doPublish(
+      final BaseRepoInfo<ID> repoInfo,
+      final String packageId,
+      final String version,
+      final String nuspecXml)
+      throws IOException {
+
+    this.packageService.publish(repoInfo, packageId, version, nuspecXml);
+  }
+
   @Override
   public NuGetServiceIndexResponse getServiceIndex(
       final ProtocolContext context, final String baseUrl) {
 
-    return new NuGetServiceIndexResponse("3.0.0", NuGetServiceIndexResources.build(baseUrl));
+    return new NuGetServiceIndexResponse(
+        "https://schema.nuget.org/schema#", "3.0.0", NuGetServiceIndexResources.build(baseUrl));
   }
 
   @Override
@@ -117,7 +133,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
                 repoInfo.getStorageKey(), packageId, version, nupkgStream, nuspecBytes);
       }
 
-      this.packageService.publish(repoInfo, packageId, version, nuspecXml);
+      this.doPublish(repoInfo, packageId, version, nuspecXml);
 
       log.info("Successfully published and stored NuGet package {} {}", packageId, version);
 
@@ -165,6 +181,14 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var packageIdVersion = extractPackageIdAndVersion(context);
     this.packageService.unlistVersion(repoInfo, packageIdVersion.id(), packageIdVersion.version());
+  }
+
+  @Override
+  public void relistVersion(final ProtocolContext context) {
+
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var packageIdVersion = extractPackageIdAndVersion(context);
+    this.packageService.relistVersion(repoInfo, packageIdVersion.id(), packageIdVersion.version());
   }
 
   @Override
@@ -223,7 +247,8 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
     final var versionInfos = this.packageService.getAllVersionInfos(repoInfo, packageId);
 
     if (versionInfos.isEmpty()) {
-      return new NuGetRegistrationIndexResponse(indexUrl, REGISTRATION_INDEX_TYPES, 0, List.of());
+      return new NuGetRegistrationIndexResponse(
+          "https://schema.nuget.org/schema#", indexUrl, REGISTRATION_INDEX_TYPES, 0, List.of());
     }
 
     final var packageBase = NuGetUrlBuilder.packageBase(baseUrl, idLower);
@@ -233,21 +258,14 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
             .map(v -> NuGetResponseMapper.toLeafItem(v, registrationBase, packageBase, packageId))
             .toList();
 
-    final var lowerVersion =
-        versionInfos.stream().map(NuGetVersionInfo::version).min(VERSION_COMPARATOR);
-    final var upperVersion =
-        versionInfos.stream().map(NuGetVersionInfo::version).max(VERSION_COMPARATOR);
+    final var pages = buildRegistrationPages(leafItems, indexUrl);
 
-    final var page =
-        new NuGetRegistrationPageItem(
-            indexUrl,
-            "catalog:CatalogPage",
-            leafItems.size(),
-            leafItems,
-            lowerVersion.orElse(""),
-            upperVersion.orElse(""));
-
-    return new NuGetRegistrationIndexResponse(indexUrl, REGISTRATION_INDEX_TYPES, 1, List.of(page));
+    return new NuGetRegistrationIndexResponse(
+        "https://schema.nuget.org/schema#",
+        indexUrl,
+        REGISTRATION_INDEX_TYPES,
+        pages.size(),
+        pages);
   }
 
   @Override
@@ -278,5 +296,53 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
 
     return NuGetResponseMapper.toLeafResponse(
         versionInfo, registrationBase, packageBase, packageId);
+  }
+
+  /**
+   * Partitions leaf items into pages of at most {@value #REGISTRATION_PAGE_SIZE} per the NuGet
+   * registration spec. If all items fit in one page they are inlined; otherwise each page gets its
+   * own {@code @id} URL derived from the index URL.
+   */
+  private static List<NuGetRegistrationPageItem> buildRegistrationPages(
+      final List<NuGetRegistrationLeafItem> leafItems, final String indexUrl) {
+
+    if (leafItems.size() <= REGISTRATION_PAGE_SIZE) {
+      final var lowerVersion =
+          leafItems.stream()
+              .map(i -> i.catalogEntry().version())
+              .min(VERSION_COMPARATOR)
+              .orElse("");
+      final var upperVersion =
+          leafItems.stream()
+              .map(i -> i.catalogEntry().version())
+              .max(VERSION_COMPARATOR)
+              .orElse("");
+      return List.of(
+          new NuGetRegistrationPageItem(
+              indexUrl,
+              "catalog:CatalogPage",
+              leafItems.size(),
+              leafItems,
+              lowerVersion,
+              upperVersion));
+    }
+
+    // Split into pages of REGISTRATION_PAGE_SIZE
+    final var pages = new ArrayList<NuGetRegistrationPageItem>();
+    int pageIndex = 0;
+    for (int offset = 0; offset < leafItems.size(); offset += REGISTRATION_PAGE_SIZE) {
+      final var chunk =
+          leafItems.subList(offset, Math.min(offset + REGISTRATION_PAGE_SIZE, leafItems.size()));
+      final var pageUrl = indexUrl.replace("/index.json", "/page/" + pageIndex + ".json");
+      final var lowerVersion =
+          chunk.stream().map(i -> i.catalogEntry().version()).min(VERSION_COMPARATOR).orElse("");
+      final var upperVersion =
+          chunk.stream().map(i -> i.catalogEntry().version()).max(VERSION_COMPARATOR).orElse("");
+      pages.add(
+          new NuGetRegistrationPageItem(
+              pageUrl, "catalog:CatalogPage", chunk.size(), chunk, lowerVersion, upperVersion));
+      pageIndex++;
+    }
+    return pages;
   }
 }

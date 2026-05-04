@@ -51,4 +51,6 @@ public interface NuGetProtocolFacade {
   NuGetRegistrationLeafResponse getRegistrationLeaf(ProtocolContext context, String baseUrl);
 
   void unlistVersion(ProtocolContext context);
+
+  void relistVersion(ProtocolContext context);
 }

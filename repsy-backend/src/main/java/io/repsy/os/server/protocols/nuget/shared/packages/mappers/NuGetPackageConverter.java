@@ -42,6 +42,7 @@ public interface NuGetPackageConverter {
   @Mapping(source = "v.listed", target = "listed")
   @Mapping(source = "v.downloadCount", target = "downloadCount")
   @Mapping(source = "v.publishedAt", target = "publishedAt")
+  @Mapping(target = "dependencies", ignore = true)
   NuGetVersionInfo toVersionInfo(NuGetPackageVersion v, String packageId);
 
   @Mapping(source = "version", target = "version")

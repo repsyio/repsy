@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.nuget.shared.packages.services;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.nuget.shared.packages.dtos.NuGetDeletedItem;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
@@ -35,6 +36,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -44,6 +46,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+@Slf4j
 @Component
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -57,6 +60,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   private final NuGetPackageRepository packageRepository;
   private final NuGetPackageVersionRepository packageVersionRepository;
   private final NuGetPackageConverter converter;
+  private final ObjectMapper objectMapper;
 
   @Override
   @Transactional
@@ -144,7 +148,25 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
             pkg ->
                 this.packageVersionRepository.findByNugetPackageIdAndVersionIgnoreCase(
                     pkg.getId(), version))
-        .map(v -> this.converter.toVersionInfo(v, packageId));
+        .map(
+            v -> {
+              final var base = this.converter.toVersionInfo(v, packageId);
+              final var deps = NuGetPackageUtils.parseDependenciesJson(v.getDependencies());
+              return new NuGetVersionInfo(
+                  base.packageId(),
+                  base.version(),
+                  base.title(),
+                  base.description(),
+                  base.authors(),
+                  base.tags(),
+                  base.iconUrl(),
+                  base.licenseUrl(),
+                  base.projectUrl(),
+                  base.listed(),
+                  base.downloadCount(),
+                  base.publishedAt(),
+                  deps.isEmpty() ? null : deps);
+            });
   }
 
   @Override
@@ -220,6 +242,19 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
   @Override
   @Transactional
+  public void relistVersion(
+      final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
+    final var pkg = this.findPackage(repoInfo.getId(), packageId);
+    final var pkgVersion =
+        this.packageVersionRepository
+            .findByNugetPackageIdAndVersionIgnoreCase(pkg.getId(), version)
+            .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
+    pkgVersion.setListed(true);
+    this.packageVersionRepository.save(pkgVersion);
+  }
+
+  @Override
+  @Transactional
   public void deletePackage(final BaseRepoInfo<UUID> repoInfo, final String packageId) {
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
     this.packageRepository.delete(pkg);
@@ -227,23 +262,44 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
   @Override
   @Transactional
-  public void deleteVersion(
+  public boolean deleteVersion(
       final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
-    this.deleteVersionAndGetDeletedItem(repoInfo, packageId, version);
+
+    final var pkg = this.findPackage(repoInfo.getId(), packageId);
+
+    final var pkgVersion =
+        this.packageVersionRepository
+            .findByNugetPackageIdAndVersionIgnoreCase(pkg.getId(), version)
+            .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
+
+    this.packageVersionRepository.delete(pkgVersion);
+
+    final boolean packageHasVersions =
+        this.packageVersionRepository.existsByNugetPackageId(pkg.getId());
+
+    if (!packageHasVersions) {
+      this.packageRepository.delete(pkg);
+      return true;
+    }
+
+    return false;
   }
 
   @Transactional
   public NuGetDeletedItem deleteVersionAndGetDeletedItem(
       final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
+
     final var pkgVersion =
         this.packageVersionRepository
             .findByNugetPackageIdAndVersionIgnoreCase(pkg.getId(), version)
             .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
+
     this.packageVersionRepository.delete(pkgVersion);
 
     final boolean packageHasVersions =
         this.packageVersionRepository.existsByNugetPackageId(pkg.getId());
+
     if (!packageHasVersions) {
       this.packageRepository.delete(pkg);
       return NuGetDeletedItem.PACKAGE;
@@ -286,6 +342,15 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     pkgVersion.setLicenseUrl(NuGetPackageUtils.extractXmlTag(nuspecXml, "licenseUrl"));
     pkgVersion.setProjectUrl(NuGetPackageUtils.extractXmlTag(nuspecXml, "projectUrl"));
     pkgVersion.setRepositoryUrl(NuGetPackageUtils.extractXmlTag(nuspecXml, "repository"));
+
+    final var deps = NuGetPackageUtils.extractDependenciesFromNuspec(nuspecXml);
+    if (!deps.isEmpty()) {
+      try {
+        pkgVersion.setDependencies(this.objectMapper.writeValueAsString(deps));
+      } catch (final Exception e) {
+        log.warn("Failed to serialize NuGet dependencies for version {}", version, e);
+      }
+    }
 
     return pkgVersion;
   }
