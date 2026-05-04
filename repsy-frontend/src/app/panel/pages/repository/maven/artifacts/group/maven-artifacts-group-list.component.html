@@ -109,7 +109,7 @@
                   <img ngSrc="/assets/icons/maven/group-id.svg" alt="group-id" height="18" width="18" />
                   <app-tooltip
                     class="group-hover:underline"
-                    [text]="artifact.groupName | ellipsis"
+                    [text]="artifact.groupName | ellipsis: 25"
                     [textHover]="artifact.groupName"
                   />
                   <svg
@@ -134,7 +134,7 @@
                 >
                   <app-tooltip
                     class="group-hover:underline"
-                    [text]="artifact.artifactName | ellipsis"
+                    [text]="artifact.artifactName | ellipsis: 20"
                     [textHover]="artifact.artifactName"
                   />
                   <svg
@@ -168,7 +168,7 @@
                 >
                   <app-tooltip
                     class="group-hover:underline"
-                    [text]="artifact.latest | ellipsis"
+                    [text]="artifact.latest | ellipsis: 15"
                     [textHover]="artifact.latest"
                   />
                   <svg

@@ -95,7 +95,7 @@
                     <img ngSrc="/assets/icons/repo/tag.svg" alt="tag" height="18" width="18" />
                     <app-tooltip
                       class="group-hover:underline"
-                      [text]="'@' + pkg.scope | ellipsis"
+                      [text]="'@' + pkg.scope | ellipsis: 25"
                       [textHover]="'@' + pkg.scope"
                     />
                     <svg
@@ -124,7 +124,7 @@
                   class="group text-secondary-500 flex w-max gap-2 text-[14px]"
                   [routerLink]="'/' + activeRegistry.repoName + '/' + (pkg.scope ? pkg.scope : '~') + '/' + pkg.name"
                 >
-                  <app-tooltip class="group-hover:underline" [text]="pkg.name | ellipsis" [textHover]="pkg.name" />
+                  <app-tooltip class="group-hover:underline" [text]="pkg.name | ellipsis: 30" [textHover]="pkg.name" />
                   <svg
                     class="mt-[2px] h-[14px] w-[14px] text-[#9FA0A0] group-hover:text-white"
                     viewBox="0 0 14 14"
@@ -154,7 +154,11 @@
                     pkg.latest
                   "
                 >
-                  <app-tooltip class="group-hover:underline" [text]="pkg.latest | ellipsis" [textHover]="pkg.latest" />
+                  <app-tooltip
+                    class="group-hover:underline"
+                    [text]="pkg.latest | ellipsis: 20"
+                    [textHover]="pkg.latest"
+                  />
                   <svg
                     class="mt-[2px] h-[14px] w-[14px] text-[#9FA0A0] group-hover:text-white"
                     viewBox="0 0 14 14"

@@ -120,7 +120,7 @@
 
                     <app-tooltip
                       class="group-hover:underline"
-                      [text]="artifact.artifactName | ellipsis"
+                      [text]="artifact.artifactName | ellipsis: 25"
                       [textHover]="artifact.artifactName"
                     />
 
@@ -155,7 +155,7 @@
                   >
                     <app-tooltip
                       class="group-hover:underline"
-                      [text]="artifact.latest | ellipsis"
+                      [text]="artifact.latest | ellipsis: 25"
                       [textHover]="artifact.latest"
                     />
                     <svg

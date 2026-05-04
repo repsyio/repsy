@@ -93,7 +93,7 @@
                 >
                   <img ngSrc="/assets/icons/repo/cube-outline.svg" alt="cube" height="20" width="20" />
 
-                  <app-tooltip class="group-hover:underline" [text]="pkg.name | ellipsis" [textHover]="pkg.name" />
+                  <app-tooltip class="group-hover:underline" [text]="pkg.name | ellipsis: 20" [textHover]="pkg.name" />
                   <svg
                     class="mt-[2px] h-[14px] w-[14px] text-[#9FA0A0] group-hover:text-white"
                     viewBox="0 0 14 14"
@@ -116,7 +116,7 @@
                 >
                   <app-tooltip
                     class="group-hover:underline"
-                    [text]="pkg.latestVersion | ellipsis"
+                    [text]="pkg.latestVersion | ellipsis: 20"
                     [textHover]="pkg.latestVersion"
                   />
                   <svg
@@ -141,7 +141,7 @@
                 >
                   <app-tooltip
                     class="group-hover:underline"
-                    [text]="pkg.stableVersion | ellipsis"
+                    [text]="pkg.stableVersion | ellipsis: 20"
                     [textHover]="pkg.stableVersion"
                   />
                   <svg

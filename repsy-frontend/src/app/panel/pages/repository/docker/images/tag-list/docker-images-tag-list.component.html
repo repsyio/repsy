@@ -97,7 +97,7 @@
                 >
                   <img ngSrc="/assets/icons/repo/tag.svg" alt="tag" height="20" width="20" />
 
-                  <app-tooltip class="group-hover:underline" [text]="tag.name | ellipsis" [textHover]="tag.name" />
+                  <app-tooltip class="group-hover:underline" [text]="tag.name | ellipsis: 30" [textHover]="tag.name" />
 
                   <svg
                     class="mt-[2px] h-[14px] w-[14px] text-neutral-200 group-hover:text-white"
@@ -117,7 +117,7 @@
 
                 <app-tooltip
                   class="text-[14px] text-[#FDFDFD]"
-                  [text]="tag.platform | ellipsis"
+                  [text]="tag.platform | ellipsis: 30"
                   [textHover]="tag.platform"
                 />
 
