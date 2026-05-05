@@ -55,6 +55,7 @@ export class DashboardContentComponent {
   public dockerRepoCount = 0;
   public cargoRepoCount = 0;
   public golangRepoCount = 0;
+  public helmRepoCount = 0;
   public repositories: Repository[] = [];
   public repoListInfos: RepoListInfo[] = [];
   public createRepoModal: boolean;
@@ -135,6 +136,11 @@ export class DashboardContentComponent {
       this.golangRepoCount = c;
       this.cdRef.markForCheck();
     });
+
+    this.statsService.getHelmRepoCount().then((c) => {
+      this.helmRepoCount = c;
+      this.cdRef.markForCheck();
+    });
   }
 
   private fetchRepoInfos() {
@@ -167,6 +173,11 @@ export class DashboardContentComponent {
       RepoType.GOLANG,
       this.statsService.getGolangRepoInfo.bind(this.statsService),
       this.statsService.fetchGolangRepositoryUsage.bind(this.statsService),
+    );
+    this.fetchRepoInfo(
+      RepoType.HELM,
+      this.statsService.getHelmRepoInfo.bind(this.statsService),
+      this.statsService.fetchHelmRepositoryUsage.bind(this.statsService),
     );
   }
 }

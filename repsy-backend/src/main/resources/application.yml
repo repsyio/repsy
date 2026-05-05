@@ -60,7 +60,6 @@ h2:
 os:
   app:
     schema: public
-    jwt-secret: ${JWT_SECRET:}
 
     storage:
       file-system:
@@ -82,3 +81,6 @@ os:
         golang:
           base-path: ${storage-gateway.fs.base-path}/golang
           trash-path: ${storage-gateway.fs.base-path}/golang/trash
+        helm:
+          base-path: ${storage-gateway.fs.base-path}/helm
+          trash-path: ${storage-gateway.fs.base-path}/helm/trash

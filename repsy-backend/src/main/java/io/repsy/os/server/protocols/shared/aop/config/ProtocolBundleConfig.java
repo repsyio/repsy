@@ -35,15 +35,17 @@ public class ProtocolBundleConfig {
       @Qualifier("npmAuthComponentImpl") final ProtocolAuthService npm,
       @Qualifier("dockerAuthComponent") final ProtocolAuthService docker,
       @Qualifier("pypiAuthComponent") final ProtocolAuthService pypi,
-      @Qualifier("golangAuthComponent") final ProtocolAuthService golang) {
+      @Qualifier("golangAuthComponent") final ProtocolAuthService golang,
+      @Qualifier("helmAuthComponent") final ProtocolAuthService helm) {
 
-    return Map.of(
-        RepoType.CARGO, cargo,
-        RepoType.MAVEN, maven,
-        RepoType.NPM, npm,
-        RepoType.DOCKER, docker,
-        RepoType.PYPI, pypi,
-        RepoType.GOLANG, golang);
+    return Map.ofEntries(
+        Map.entry(RepoType.CARGO, cargo),
+        Map.entry(RepoType.MAVEN, maven),
+        Map.entry(RepoType.NPM, npm),
+        Map.entry(RepoType.DOCKER, docker),
+        Map.entry(RepoType.PYPI, pypi),
+        Map.entry(RepoType.GOLANG, golang),
+        Map.entry(RepoType.HELM, helm));
   }
 
   @Bean
@@ -53,14 +55,16 @@ public class ProtocolBundleConfig {
       @Qualifier("npmApiFacade") final ProtocolApiFacade npm,
       @Qualifier("dockerApiFacade") final ProtocolApiFacade docker,
       @Qualifier("pypiApiFacade") final ProtocolApiFacade pypi,
-      @Qualifier("golangApiFacade") final ProtocolApiFacade golang) {
+      @Qualifier("golangApiFacade") final ProtocolApiFacade golang,
+      @Qualifier("helmApiFacade") final ProtocolApiFacade helm) {
 
-    return Map.of(
-        RepoType.CARGO, cargo,
-        RepoType.MAVEN, maven,
-        RepoType.NPM, npm,
-        RepoType.DOCKER, docker,
-        RepoType.PYPI, pypi,
-        RepoType.GOLANG, golang);
+    return Map.ofEntries(
+        Map.entry(RepoType.CARGO, cargo),
+        Map.entry(RepoType.MAVEN, maven),
+        Map.entry(RepoType.NPM, npm),
+        Map.entry(RepoType.DOCKER, docker),
+        Map.entry(RepoType.PYPI, pypi),
+        Map.entry(RepoType.GOLANG, golang),
+        Map.entry(RepoType.HELM, helm));
   }
 }

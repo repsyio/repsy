@@ -95,8 +95,8 @@ public class RepoTxService {
   @Transactional
   public void updateSettings(final @NonNull UUID repoId, final @NonNull RepoSettingsForm settings) {
     final var repo = this.findRepoById(repoId);
-    repo.setPrivateRepo(settings.getPrivateRepo());
-    repo.setAllowOverride(settings.getAllowOverride());
+    repo.setPrivateRepo(Boolean.TRUE.equals(settings.getPrivateRepo()));
+    repo.setAllowOverride(Boolean.TRUE.equals(settings.getAllowOverride()));
     repo.setReleases(settings.getReleases());
     repo.setSnapshots(settings.getSnapshots());
     this.repoRepository.save(repo);

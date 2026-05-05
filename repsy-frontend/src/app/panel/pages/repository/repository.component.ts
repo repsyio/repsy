@@ -37,6 +37,7 @@ import { ProfileService } from '../profile/service/profile.service';
 import { CargoService } from './cargo/service/cargo.service';
 import { DockerService } from './docker/service/docker.service';
 import { GolangService } from './golang/service/golang.service';
+import { HelmService } from './helm/service/helm.service';
 import { MavenService } from './maven/service/maven.service';
 import { NpmService } from './npm/service/npm.service';
 import { PypiService } from './pypi/service/pypi.service';
@@ -76,6 +77,7 @@ export class RepositoryComponent {
     RepoType.PYPI,
     RepoType.CARGO,
     RepoType.GOLANG,
+    RepoType.HELM,
   ];
   public loading = true;
   public operationLock = false;
@@ -90,6 +92,7 @@ export class RepositoryComponent {
     private readonly dockerService: DockerService,
     private readonly cargoService: CargoService,
     private readonly golangService: GolangService,
+    private readonly helmService: HelmService,
     private readonly profileService: ProfileService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
@@ -175,6 +178,7 @@ export class RepositoryComponent {
     this.fetchRepositories(RepoType.DOCKER);
     this.fetchRepositories(RepoType.CARGO);
     this.fetchRepositories(RepoType.GOLANG);
+    this.fetchRepositories(RepoType.HELM);
   }
 
   private fetchRepositories(repoType: RepoType): void {
@@ -212,6 +216,8 @@ export class RepositoryComponent {
         return this.cargoService.fetchRepositories();
       case RepoType.GOLANG:
         return this.golangService.fetchRepositories();
+      case RepoType.HELM:
+        return this.helmService.fetchRepositories();
       default:
         return Promise.reject('Unsupported repository type');
     }
@@ -231,6 +237,8 @@ export class RepositoryComponent {
         return this.cargoService.deleteRepository(repo.name);
       case RepoType.GOLANG:
         return this.golangService.deleteRepository(repo.name);
+      case RepoType.HELM:
+        return this.helmService.deleteRepository(repo.name);
       default:
         return Promise.reject('Unsupported repository type');
     }

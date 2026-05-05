@@ -42,5 +42,6 @@
     <module>cargo</module>
     <module>golang</module>
     <module>shared</module>
+    <module>helm</module>
   </modules>
 </project>

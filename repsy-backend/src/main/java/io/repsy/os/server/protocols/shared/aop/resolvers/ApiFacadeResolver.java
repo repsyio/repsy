@@ -15,8 +15,11 @@
  */
 package io.repsy.os.server.protocols.shared.aop.resolvers;
 
+import static org.springframework.web.context.request.RequestAttributes.SCOPE_REQUEST;
+
 import io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
+import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +31,7 @@ import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
+import org.springframework.web.servlet.HandlerMapping;
 
 @Component
 @NullMarked
@@ -49,8 +53,17 @@ public class ApiFacadeResolver implements HandlerMethodArgumentResolver {
       final NativeWebRequest webRequest,
       final @Nullable WebDataBinderFactory binderFactory) {
 
-    final var repoInfo = ResolverUtils.extractRepoInfo(webRequest);
+    final var repoInfo = (RepoInfo) webRequest.getAttribute(ResolverUtils.REPO_INFO, SCOPE_REQUEST);
 
-    return this.apiFacadeMap.get(repoInfo.getType());
+    if (repoInfo != null) {
+      return this.apiFacadeMap.get(repoInfo.getType());
+    }
+
+    @SuppressWarnings("unchecked")
+    final var uriVariables =
+        (Map<String, String>)
+            webRequest.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE, SCOPE_REQUEST);
+
+    return ResolverUtils.extractRepoType(uriVariables).map(this.apiFacadeMap::get).orElse(null);
   }
 }

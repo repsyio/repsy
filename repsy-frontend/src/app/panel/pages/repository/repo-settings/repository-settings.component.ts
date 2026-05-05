@@ -27,8 +27,9 @@ import { RepoPermissionInfo } from '../../../shared/dto/repo/repo-permission-inf
 import { RepoType } from '../../../shared/dto/repo/repo-type';
 import { CargoService } from '../cargo/service/cargo.service';
 import { DockerService } from '../docker/service/docker.service';
-import { MavenRepoSettingsForm } from '../maven/dto/maven-repo-settings-form';
 import { GolangService } from '../golang/service/golang.service';
+import { HelmService } from '../helm/service/helm.service';
+import { MavenRepoSettingsForm } from '../maven/dto/maven-repo-settings-form';
 import { MavenService } from '../maven/service/maven.service';
 import { NpmService } from '../npm/service/npm.service';
 import { RepositorySettingsInfo } from '../pypi/dto/repository-settings-info';
@@ -83,6 +84,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
     private readonly dockerService: DockerService,
     private readonly cargoService: CargoService,
     private readonly golangService: GolangService,
+    private readonly helmService: HelmService,
     private readonly toastService: ToastService,
     private readonly router: Router,
     private readonly repoLookupService: RepoLookupService,
@@ -184,6 +186,9 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
       case RepoType.CARGO: {
         return this.cargoService.repoChanges;
       }
+      case RepoType.HELM: {
+        return this.helmService.repoChanges;
+      }
       default:
         throw new Error('Unsupported repository type');
     }
@@ -208,6 +213,9 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
       }
       case RepoType.CARGO: {
         return this.cargoService.fetchRepositorySettings();
+      }
+      case RepoType.HELM: {
+        return this.helmService.fetchRepositorySettings();
       }
       default:
         return Promise.reject('Unsupported repository type');

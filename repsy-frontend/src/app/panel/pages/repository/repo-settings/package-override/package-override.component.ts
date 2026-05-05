@@ -24,6 +24,7 @@ import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
 import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerService } from '../../docker/service/docker.service';
+import { HelmService } from '../../helm/service/helm.service';
 import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form';
 import { MavenService } from '../../maven/service/maven.service';
 import { NpmService } from '../../npm/service/npm.service';
@@ -49,6 +50,7 @@ export class PackageOverrideComponent implements OnInit {
     private readonly pypiService: PypiService,
     private readonly dockerService: DockerService,
     private readonly cargoService: CargoService,
+    private readonly helmService: HelmService,
     private readonly toastService: ToastService,
   ) {}
 
@@ -72,7 +74,7 @@ export class PackageOverrideComponent implements OnInit {
           this.fetch.emit();
         })
         .catch((err: string) => this.toastService.show(err, 'error'));
-    } else if (this.repoType === RepoType.NPM || this.repoType === RepoType.PYPI || this.repoType === RepoType.DOCKER) {
+    } else if (this.repoType === RepoType.NPM || this.repoType === RepoType.PYPI || this.repoType === RepoType.DOCKER || this.repoType === RepoType.HELM) {
       const form = new RepoSettingsForm();
       form.allowOverride = this.allowOverride;
       form.privateRepo = this.parentForm.get('privateRepository')?.value;
@@ -97,6 +99,8 @@ export class PackageOverrideComponent implements OnInit {
         return this.dockerService.updateRepoSettings(form);
       case RepoType.CARGO:
         return this.cargoService.updateRepoSettings(form);
+      case RepoType.HELM:
+        return this.helmService.updateRepoSettings(form);
       default:
         return Promise.reject('Unsupported repository type');
     }

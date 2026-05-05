@@ -24,11 +24,12 @@ import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
 import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerService } from '../../docker/service/docker.service';
+import { GolangService } from '../../golang/service/golang.service';
+import { HelmService } from '../../helm/service/helm.service';
 import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form';
 import { MavenService } from '../../maven/service/maven.service';
 import { NpmService } from '../../npm/service/npm.service';
 import { PypiService } from '../../pypi/service/pypi.service';
-import { GolangService } from '../../golang/service/golang.service';
 
 @Component({
   selector: 'app-visibility',
@@ -49,6 +50,7 @@ export class VisibilityComponent {
     private readonly dockerService: DockerService,
     private readonly cargoService: CargoService,
     private readonly golangService: GolangService,
+    private readonly helmService: HelmService,
     private readonly toastService: ToastService,
   ) {}
 
@@ -95,6 +97,8 @@ export class VisibilityComponent {
         return this.golangService.updateRepoSettings(form);
       case RepoType.CARGO:
         return this.cargoService.updateRepoSettings(form);
+      case RepoType.HELM:
+        return this.helmService.updateRepoSettings(form);
       default:
         return Promise.reject('Unsupported repository type');
     }

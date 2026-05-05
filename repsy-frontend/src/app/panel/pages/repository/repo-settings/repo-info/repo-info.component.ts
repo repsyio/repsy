@@ -26,10 +26,11 @@ import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
 import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerService } from '../../docker/service/docker.service';
+import { GolangService } from '../../golang/service/golang.service';
+import { HelmService } from '../../helm/service/helm.service';
 import { MavenService } from '../../maven/service/maven.service';
 import { NpmService } from '../../npm/service/npm.service';
 import { PypiService } from '../../pypi/service/pypi.service';
-import { GolangService } from '../../golang/service/golang.service';
 
 @Component({
   selector: 'app-repo-info',
@@ -53,6 +54,7 @@ export class RepoInfoComponent implements OnInit {
     private readonly dockerService: DockerService,
     private readonly golangService: GolangService,
     private readonly cargoService: CargoService,
+    private readonly helmService: HelmService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
@@ -149,6 +151,8 @@ export class RepoInfoComponent implements OnInit {
         return this.cargoService.updateRepositoryName(form);
       case RepoType.GOLANG:
         return this.golangService.updateRepositoryName(form);
+      case RepoType.HELM:
+        return this.helmService.updateRepositoryName(form);
       default:
         return Promise.reject('Unsupported repository type');
     }
@@ -168,6 +172,8 @@ export class RepoInfoComponent implements OnInit {
         return this.cargoService.updateRepoDescription(form);
       case RepoType.GOLANG:
         return this.golangService.updateRepoDescription(form);
+      case RepoType.HELM:
+        return this.helmService.updateRepoDescription(form);
       default:
         return Promise.reject('Unsupported repository type');
     }

@@ -2448,6 +2448,165 @@ paths:
         required: true
         schema:
           type: string
+  "/api/helm/charts/{repoName}":
+    get:
+      tags:
+        - helm-chart-controller
+      operationId: searchHelmCharts
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelHelmChartListItem"
+      summary: List and search charts in a Helm repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/helm/charts/{repoName}/{name}":
+    get:
+      tags:
+        - helm-chart-controller
+      operationId: getHelmChartVersions
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseListHelmChartVersionItem"
+      summary: List all versions of a chart
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/helm/charts/{repoName}/{name}/tags":
+    get:
+      tags:
+        - helm-chart-controller
+      operationId: getHelmChartOciTags
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseListString"
+      summary: List OCI tags for a chart
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/helm/charts/{repoName}/{name}/{version}":
+    get:
+      tags:
+        - helm-chart-controller
+      operationId: getHelmChartDetail
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseHelmChartDetail"
+      summary: Get a specific chart version detail
+    delete:
+      tags:
+        - helm-chart-controller
+      operationId: deleteHelmChart
+      parameters:
+        - name: repoInfo
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/RepoInfo"
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            "*/*":
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a specific chart version
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
   "/api/repos/{repoName}":
     delete:
       tags:
@@ -4060,6 +4219,137 @@ components:
       enum:
         - USER
         - ADMIN
+    HelmChartListItem:
+      type: object
+      properties:
+        name:
+          type: string
+        latestVersion:
+          type: string
+        description:
+          type: string
+          nullable: true
+        type:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+    HelmChartVersionItem:
+      type: object
+      properties:
+        version:
+          type: string
+        appVersion:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        type:
+          type: string
+          nullable: true
+        digest:
+          type: string
+        size:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+    HelmChartDetail:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+          nullable: true
+        appVersion:
+          type: string
+          nullable: true
+        type:
+          type: string
+          nullable: true
+        digest:
+          type: string
+        size:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        lastUpdatedAt:
+          type: string
+          format: date-time
+          nullable: true
+    PagedModelHelmChartListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/HelmChartListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelHelmChartListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelHelmChartListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RestResponseListHelmChartVersionItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          type: array
+          items:
+            "$ref": "#/components/schemas/HelmChartVersionItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RestResponseHelmChartDetail:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/HelmChartDetail"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RestResponseListString:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          type: array
+          items:
+            type: string
+        errorCode:
+          type: string
+        text:
+          type: string
     RepoType:
       type: string
       enum:

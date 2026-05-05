@@ -38,6 +38,8 @@ import { DockerConfigComponent } from '../../docker/config/docker-config.compone
 import { DockerService } from '../../docker/service/docker.service';
 import { GolangConfigComponent } from '../../golang/config/golang-config.component';
 import { GolangService } from '../../golang/service/golang.service';
+import { HelmConfigComponent } from '../../helm/config/helm-config.component';
+import { HelmService } from '../../helm/service/helm.service';
 import { MavenConfigComponent } from '../../maven/config/maven-config.component';
 import { MavenService } from '../../maven/service/maven.service';
 import { NpmConfigComponent } from '../../npm/config/npm-config.component';
@@ -60,6 +62,7 @@ import { TokenCreateInfo } from './dto/token-create-info';
     DockerConfigComponent,
     CargoConfigComponent,
     GolangConfigComponent,
+    HelmConfigComponent,
     NgClass,
     MavenConfigComponent,
     PypiConfigComponent,
@@ -94,6 +97,7 @@ export class DeployTokenComponent implements OnInit {
     private readonly dockerService: DockerService,
     private readonly golangService: GolangService,
     private readonly cargoService: CargoService,
+    private readonly helmService: HelmService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
   ) {
@@ -130,6 +134,9 @@ export class DeployTokenComponent implements OnInit {
       case RepoType.GOLANG: {
         return this.golangService.fetchRepositoryUsage();
       }
+      case RepoType.HELM: {
+        return this.helmService.fetchRepositoryUsage();
+      }
       default:
         return Promise.reject('Unsupported repository type');
     }
@@ -155,6 +162,9 @@ export class DeployTokenComponent implements OnInit {
       }
       case RepoType.CARGO: {
         return this.cargoService.getDeployTokens(pageNum, pageSize);
+      }
+      case RepoType.HELM: {
+        return this.helmService.getDeployTokens(pageNum, pageSize);
       }
       default:
         return Promise.reject('Unsupported repository type');
@@ -200,6 +210,9 @@ export class DeployTokenComponent implements OnInit {
       }
       case RepoType.GOLANG: {
         return this.golangService.rotateDeployToken(tokenUuid);
+      }
+      case RepoType.HELM: {
+        return this.helmService.rotateDeployToken(tokenUuid);
       }
       default:
         return Promise.reject('Unsupported repository type');
@@ -249,6 +262,9 @@ export class DeployTokenComponent implements OnInit {
       }
       case RepoType.GOLANG: {
         return this.golangService.revokeDeployToken(tokenId);
+      }
+      case RepoType.HELM: {
+        return this.helmService.revokeDeployToken(tokenId);
       }
       default:
         return Promise.reject('Unsupported repository type');

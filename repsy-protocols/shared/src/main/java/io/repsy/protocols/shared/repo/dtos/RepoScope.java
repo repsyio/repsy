@@ -22,5 +22,6 @@ public enum RepoScope {
   PYPI,
   DOCKER,
   GOLANG,
-  CARGO
+  CARGO,
+  HELM
 }
