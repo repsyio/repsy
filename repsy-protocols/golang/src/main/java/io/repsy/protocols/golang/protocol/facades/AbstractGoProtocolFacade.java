@@ -142,7 +142,6 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     context.addProperty(USAGES, BaseUsages.ofDisk(totalDiskUsage));
   }
 
-
   private Resource handleVersionList(final BaseRepoInfo<I> repoInfo, final String path) {
     final var atVPath = path.substring(0, path.length() - "list".length());
     final var atVStoragePath = StoragePath.of(repoInfo.getStorageKey(), atVPath);
