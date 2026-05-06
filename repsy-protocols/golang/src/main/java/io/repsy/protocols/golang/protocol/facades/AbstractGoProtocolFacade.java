@@ -25,7 +25,6 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
 import io.repsy.protocols.golang.shared.dto.GoVersionInfo;
-import io.repsy.protocols.golang.shared.exceptions.GoVersionGoneException;
 import io.repsy.protocols.golang.shared.module.services.GoModuleService;
 import io.repsy.protocols.golang.shared.module.validators.GoModFileValidator;
 import io.repsy.protocols.golang.shared.storage.services.GoStorageService;
@@ -38,7 +37,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Locale;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -57,9 +55,6 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
   private static final String INFO_EXTENSION = ".info";
   private static final String MOD_EXTENSION = ".mod";
   private static final String ZIP_EXTENSION = ".zip";
-  private static final Set<String> VERSIONED_EXTENSIONS =
-      Set.of(INFO_EXTENSION, MOD_EXTENSION, ZIP_EXTENSION);
-
   private static final String USAGES = "usages";
   private static final String CONTENT_SHA256_KEY = "contentSha256";
 
@@ -90,7 +85,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
       return this.handleLatestVersion(repoInfo, path);
     }
 
-    this.checkVersionNotDeleted(repoInfo, path);
+    // We no longer return 410 Gone for deleted versions
 
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), path);
     return this.goStorageService.getResource(repoInfo.getName(), storagePath);
@@ -147,24 +142,6 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     context.addProperty(USAGES, BaseUsages.ofDisk(totalDiskUsage));
   }
 
-  // Throws GoVersionGoneException if the requested versioned artifact (.info/.mod/.zip) has been
-  // soft-deleted, so the caller returns 410 Gone per the GOPROXY spec.
-  private void checkVersionNotDeleted(final BaseRepoInfo<I> repoInfo, final String path) {
-    if (!path.contains("/@v/")) {
-      return;
-    }
-    final var fileNameWithExt = path.substring(path.lastIndexOf('/') + 1);
-    final var ext = fileNameWithExt.substring(fileNameWithExt.lastIndexOf('.'));
-    if (!VERSIONED_EXTENSIONS.contains(ext)) {
-      return;
-    }
-    final var modulePath = GoVersionUtils.extractModulePath(path);
-    final var version = fileNameWithExt.substring(0, fileNameWithExt.lastIndexOf('.'));
-    if (modulePath != null
-        && this.goModuleService.isVersionDeleted(repoInfo, modulePath, version)) {
-      throw new GoVersionGoneException(version);
-    }
-  }
 
   private Resource handleVersionList(final BaseRepoInfo<I> repoInfo, final String path) {
     final var atVPath = path.substring(0, path.length() - "list".length());
