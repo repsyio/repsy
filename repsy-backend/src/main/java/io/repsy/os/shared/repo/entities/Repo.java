@@ -67,6 +67,12 @@ public class Repo {
   @Column(name = "disk_usage", nullable = false)
   private long diskUsage;
 
+  @Column(name = "inbound_traffic_usage", nullable = false)
+  private long inboundTrafficUsage;
+
+  @Column(name = "outbound_traffic_usage", nullable = false)
+  private long outboundTrafficUsage;
+
   @CreationTimestamp
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;

@@ -43,6 +43,20 @@ public interface RepoRepository extends JpaRepository<Repo, UUID> {
       where r.id = :repoId""")
   void updateDiskUsage(@NonNull UUID repoId, long diskUsageDiff);
 
+  @Modifying
+  @Query(
+      """
+      update Repo r
+      set r.diskUsage = r.diskUsage + :diskUsageDiff,
+          r.inboundTrafficUsage = r.inboundTrafficUsage + :inboundTrafficDiff,
+          r.outboundTrafficUsage = r.outboundTrafficUsage + :outboundTrafficDiff
+      where r.id = :repoId""")
+  void updateUsages(
+      @NonNull UUID repoId,
+      long diskUsageDiff,
+      long inboundTrafficDiff,
+      long outboundTrafficDiff);
+
   @NonNull Optional<Repo> findByNameAndType(@NonNull String name, @NonNull RepoType type);
 
   Optional<Repo> findByName(@NonNull String name);

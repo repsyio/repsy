@@ -27,6 +27,8 @@ import org.jspecify.annotations.NonNull;
 @AllArgsConstructor
 public class BaseUsages {
   private long diskUsage;
+  private long inboundTrafficUsage;
+  private long outboundTrafficUsage;
 
   public static @NonNull BaseUsages ofDisk(final long diskUsage) {
     return BaseUsages.builder().diskUsage(diskUsage).build();

@@ -156,6 +156,15 @@ public class RepoTxService {
     this.repoRepository.updateDiskUsage(repoId, diskUsageDiff);
   }
 
+  @Transactional
+  public void updateUsages(
+      final @NonNull UUID repoId,
+      final long diskUsageDiff,
+      final long inboundTrafficDiff,
+      final long outboundTrafficDiff) {
+    this.repoRepository.updateUsages(repoId, diskUsageDiff, inboundTrafficDiff, outboundTrafficDiff);
+  }
+
   private @NonNull Repo findRepoOrThrowException(final @NonNull Optional<Repo> repoOptional) {
     return repoOptional.orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
   }

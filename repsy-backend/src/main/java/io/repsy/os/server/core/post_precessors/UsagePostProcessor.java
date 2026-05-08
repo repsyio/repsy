@@ -85,7 +85,9 @@ public class UsagePostProcessor extends ProtocolProcessor {
       return false;
     }
 
-    return usages.getDiskUsage() != 0;
+    return usages.getDiskUsage() != 0
+        || usages.getInboundTrafficUsage() != 0
+        || usages.getOutboundTrafficUsage() != 0;
   }
 
   private @Nullable BaseUsages getUsages(final @NonNull ProtocolContext context) {
