@@ -59,7 +59,6 @@ jobs:
     defaults:
       run:
         working-directory: ./repsy-frontend
-
     steps:
       - uses: actions/checkout@v5
 
@@ -71,11 +70,8 @@ jobs:
       - name: Install pnpm
         run: npm install -g pnpm
 
-      - name: Allow pnpm build scripts
-        run: pnpm config set allow-builds esbuild,@parcel/watcher,lmdb,msgpackr-extract
-
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --ignore-scripts
 
       - name: Check
         run: pnpm run lint
