@@ -27,7 +27,7 @@ import { CopyClipboardComponent } from '../../../../../shared/components/copy-cl
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
-import { ArtifactVersionInfo } from '../../dto/artifact-version-info';
+import { ArtifactVersionInfo } from '../../../../../../../generated/api';
 import { MavenService } from '../../service/maven.service';
 
 @Component({

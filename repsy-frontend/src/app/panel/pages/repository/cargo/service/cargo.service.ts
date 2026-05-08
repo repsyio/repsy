@@ -20,22 +20,25 @@ import { BehaviorSubject, Observable, Subscriber } from 'rxjs';
 import { environment } from '../../../../../../environments/environment';
 import { ErrorHandlerService } from '../../../../../shared/error-handler/error-handler.service';
 import { PagedData } from '../../../../shared/dto/paged-data';
-import { RepoDescriptionForm } from '../../../../shared/dto/repo/repo-description-form';
-import { RepoForm } from '../../../../shared/dto/repo/repo-form';
+import {
+  DeployTokenForm,
+  RepoCreateForm,
+  RepoRenameForm,
+  CrateListItem,
+  CrateVersionListItem,
+  RepoDescriptionForm,
+} from '../../../../../../generated/api';
 import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
-import { RepoNameForm } from '../../../../shared/dto/repo/repo-name-form';
-import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
 import { RestResponse } from '../../../../shared/dto/rest-response';
 import { Sort } from '../../../../shared/dto/sort';
 import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
 import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
-import { DeployTokenForm } from '../../repo-settings/deploy-token/form/deploy-token-form';
-import { CrateInfo } from '../dto/crate-info';
-import { CrateListItem } from '../dto/crate-list-item';
-import { CrateVersionListItem } from '../dto/crate-version-list-item';
 import { CrateVersionInfo } from '../dto/crate-version-info';
+import { CrateInfo } from '../dto/crate-info';
+import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
+import { RepositorySettingsInfo } from '../../pypi/dto/repository-settings-info';
 
 @Injectable({
   providedIn: 'root',
@@ -75,7 +78,7 @@ export class CargoService {
     });
   }
 
-  public async createRepository(repoForm: RepoForm): Promise<void> {
+  public async createRepository(repoForm: RepoCreateForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/CARGO`;
 
@@ -111,14 +114,14 @@ export class CargoService {
     });
   }
 
-  public async fetchRepositorySettings(): Promise<RepoSettingsForm> {
-    return new Promise<RepoSettingsForm>((resolve, reject) => {
+  public async fetchRepositorySettings(): Promise<RepositorySettingsInfo> {
+    return new Promise<RepositorySettingsInfo>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/settings`;
 
       this.http
-        .get<RestResponse<RepoSettingsForm>>(url)
+        .get<RestResponse<RepositorySettingsInfo>>(url)
         .toPromise()
-        .then((res: RestResponse<RepoSettingsForm>) => resolve(res.data))
+        .then((res: RestResponse<RepositorySettingsInfo>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
     });
   }
@@ -134,7 +137,7 @@ export class CargoService {
     });
   }
 
-  public async updateRepositoryName(repositoryNameForm: RepoNameForm): Promise<void> {
+  public async updateRepositoryName(repositoryNameForm: RepoRenameForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/name`;
 

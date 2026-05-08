@@ -34,7 +34,7 @@
           <label for="type">Type</label>
           <app-selector
             size="big"
-            [selectedOption]="selectedOption !== 'all' ? selectedOption : null"
+            [selectedOption]="selectedOption"
             [options]="options"
             (choose)="selectOption($event)"
           />

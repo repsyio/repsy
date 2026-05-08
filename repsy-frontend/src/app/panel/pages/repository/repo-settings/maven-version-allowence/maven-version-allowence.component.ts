@@ -21,7 +21,7 @@ import { RouterLink } from '@angular/router';
 import { SelectorComponent } from '../../../../shared/components/selector/selector.component';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { RepoSupport } from '../../../../shared/dto/repo/repo-type';
-import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form';
+import { RepoSettingsForm } from '../../../../../../generated/api';
 import { MavenService } from '../../maven/service/maven.service';
 
 @Component({
@@ -31,7 +31,7 @@ import { MavenService } from '../../maven/service/maven.service';
   standalone: true,
   imports: [ReactiveFormsModule, SelectorComponent, RouterLink],
 })
-export class VersionAllowenceComponent implements OnInit {
+export class VersionAllowanceComponent implements OnInit {
   @Input() public parentForm: FormGroup;
   @Output() public fetch = new EventEmitter<void>();
 
@@ -50,7 +50,7 @@ export class VersionAllowenceComponent implements OnInit {
   }
 
   public selectType(option: string) {
-    const form: MavenRepoSettingsForm = new MavenRepoSettingsForm();
+    const form: RepoSettingsForm = {};
 
     form.privateRepo = this.parentForm.get('privateRepository')!.value;
     form.snapshots = option === RepoSupport.SNAPSHOTS || option === RepoSupport.ALL;

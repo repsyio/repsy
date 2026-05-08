@@ -19,10 +19,9 @@ import { Injectable } from '@angular/core';
 
 import { environment } from '../../../../../environments/environment';
 import { ErrorHandlerService } from '../../../../shared/error-handler/error-handler.service';
-import { LoginInfo } from '../../../shared/dto/login-info';
 import { RestResponse } from '../../../shared/dto/rest-response';
+import { LoginInfo, ProfileInfo } from '../../../../../generated/api';
 import { PasswordForm } from '../dto/password-form';
-import { ProfileInfo } from '../dto/profile-info';
 
 @Injectable({
   providedIn: 'root',

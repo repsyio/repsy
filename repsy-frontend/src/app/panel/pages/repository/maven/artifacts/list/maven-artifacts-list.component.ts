@@ -36,7 +36,7 @@ import { PagedData } from '../../../../../shared/dto/paged-data';
 import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { MavenConfigComponent } from '../../config/maven-config.component';
-import { ArtifactListItem } from '../../dto/artifact-list-item';
+import { ArtifactListItem } from '../../../../../../../generated/api';
 import { MavenService } from '../../service/maven.service';
 
 @Component({

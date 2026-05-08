@@ -14,9 +14,11 @@
 /// limitations under the License.
 ///
 
-import { PackageDistributionTagListItem } from './package-distribution-tag-list-item';
-import { PackageKeywordListItem } from './package-keyword-list-item';
-import { PackageMaintainerListItem } from './package-maintainer-list-item';
+import {
+  PackageDistributionTagListItem,
+  PackageKeywordListItem,
+  PackageMaintainerListItem,
+} from '../../../../../../generated/api';
 
 export class PackageVersionInfo {
   public versionUuid: string;

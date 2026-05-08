@@ -34,7 +34,7 @@ import { PagedData } from '../../../../../shared/dto/paged-data';
 import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { CargoConfigComponent } from '../../config/cargo-config.component';
-import { CrateListItem } from '../../dto/crate-list-item';
+import { CrateListItem } from '../../../../../../../generated/api';
 import { CargoService } from '../../service/cargo.service';
 import moment from 'moment';
 

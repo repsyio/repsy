@@ -26,7 +26,7 @@ import { NpmService } from '../../../../pages/repository/npm/service/npm.service
 import { PypiService } from '../../../../pages/repository/pypi/service/pypi.service';
 import { CargoService } from '../../../../pages/repository/cargo/service/cargo.service';
 import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dto/token-create-info';
-import { DeployTokenForm } from '../../../../pages/repository/repo-settings/deploy-token/form/deploy-token-form';
+import { DeployTokenForm } from '../../../../../../generated/api';
 import { RepoType } from '../../../dto/repo/repo-type';
 import { ToastService } from '../../toast/toast.service';
 import { RadioGroupComponent, RadioOption } from '../../radio-group/radio-group.component';

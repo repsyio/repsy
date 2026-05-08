@@ -21,10 +21,16 @@ import { BehaviorSubject, Observable, Subscriber } from 'rxjs';
 import { environment } from '../../../../../../environments/environment';
 import { ErrorHandlerService } from '../../../../../shared/error-handler/error-handler.service';
 import { PagedData } from '../../../../shared/dto/paged-data';
-import { RepoDescriptionForm } from '../../../../shared/dto/repo/repo-description-form';
-import { RepoForm } from '../../../../shared/dto/repo/repo-form';
+import {
+  TagDetail,
+  ManifestListItem,
+  ImageListItem,
+  DeployTokenForm,
+  RepoCreateForm,
+  RepoDescriptionForm,
+  RepoRenameForm,
+} from '../../../../../../generated/api';
 import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
-import { RepoNameForm } from '../../../../shared/dto/repo/repo-name-form';
 import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
@@ -32,11 +38,6 @@ import { RestResponse } from '../../../../shared/dto/rest-response';
 import { Sort } from '../../../../shared/dto/sort';
 import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
 import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
-import { DeployTokenForm } from '../../repo-settings/deploy-token/form/deploy-token-form';
-import { ImageListItem } from '../dto/image-list-item';
-import { ManifestListItem } from '../dto/manifest-list-item';
-import { RepoSettingsInfo } from '../dto/repo-settings-info';
-import { TagInfo } from '../dto/tag-info';
 import { TagListItem } from '../dto/tag-list-item';
 import { RepositorySettingsInfo } from '../../pypi/dto/repository-settings-info';
 
@@ -78,7 +79,7 @@ export class DockerService {
     });
   }
 
-  public async createRepository(repoForm: RepoForm): Promise<void> {
+  public async createRepository(repoForm: RepoCreateForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/DOCKER`;
 
@@ -137,7 +138,7 @@ export class DockerService {
     });
   }
 
-  public async updateRepositoryName(repositoryNameForm: RepoNameForm): Promise<void> {
+  public async updateRepositoryName(repositoryNameForm: RepoRenameForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/name`;
 
@@ -263,15 +264,15 @@ export class DockerService {
     });
   }
 
-  public async fetchTag(imageName: string, tagName: string): Promise<TagInfo> {
-    return new Promise<TagInfo>((resolve, reject) => {
+  public async fetchTag(imageName: string, tagName: string): Promise<TagDetail> {
+    return new Promise<TagDetail>((resolve, reject) => {
       const url =
         this.apiBaseUrl + '/api/docker/images/' + this.activeRepo.repoName + '/' + imageName + '/tags/' + tagName;
 
       this.http
-        .get<RestResponse<TagInfo>>(url)
+        .get<RestResponse<TagDetail>>(url)
         .toPromise()
-        .then((res: RestResponse<TagInfo>) => resolve(res.data))
+        .then((res: RestResponse<TagDetail>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
     });
   }

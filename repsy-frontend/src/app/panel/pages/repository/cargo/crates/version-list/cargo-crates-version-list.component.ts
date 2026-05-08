@@ -35,7 +35,7 @@ import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permissi
 import { Sort } from '../../../../../shared/dto/sort';
 import { CargoConfigComponent } from '../../config/cargo-config.component';
 import { CrateInfo } from '../../dto/crate-info';
-import { CrateVersionListItem } from '../../dto/crate-version-list-item';
+import { CrateVersionListItem } from '../../../../../../../generated/api';
 import { CargoService } from '../../service/cargo.service';
 
 @Component({

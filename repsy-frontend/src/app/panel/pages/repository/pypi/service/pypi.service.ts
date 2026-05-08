@@ -21,10 +21,7 @@ import { BehaviorSubject, Observable, Subscriber } from 'rxjs';
 import { environment } from '../../../../../../environments/environment';
 import { ErrorHandlerService } from '../../../../../shared/error-handler/error-handler.service';
 import { PagedData } from '../../../../shared/dto/paged-data';
-import { RepoDescriptionForm } from '../../../../shared/dto/repo/repo-description-form';
-import { RepoForm } from '../../../../shared/dto/repo/repo-form';
 import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
-import { RepoNameForm } from '../../../../shared/dto/repo/repo-name-form';
 import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
@@ -32,12 +29,16 @@ import { RestResponse } from '../../../../shared/dto/rest-response';
 import { Sort } from '../../../../shared/dto/sort';
 import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
 import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
-import { DeployTokenForm } from '../../repo-settings/deploy-token/form/deploy-token-form';
-import { PackageListItem } from '../dto/package-list-item';
-import { ReleaseInfo } from '../dto/release-info';
-import { ReleaseListItem } from '../dto/release-list-item';
+import {
+  DeployTokenForm,
+  ReleaseListItem,
+  ReleaseDetail,
+  PackageListItem,
+  RepoRenameForm,
+  RepoCreateForm,
+  RepoDescriptionForm,
+} from '../../../../../../generated/api';
 import { RepositorySettingsInfo } from '../dto/repository-settings-info';
-
 @Injectable({
   providedIn: 'root',
 })
@@ -76,7 +77,7 @@ export class PypiService {
     });
   }
 
-  public async createRepository(repositoryCreateForm: RepoForm): Promise<void> {
+  public async createRepository(repositoryCreateForm: RepoCreateForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/PYPI`;
 
@@ -136,7 +137,7 @@ export class PypiService {
     });
   }
 
-  public async updateRepositoryName(repositoryNameForm: RepoNameForm): Promise<void> {
+  public async updateRepositoryName(repositoryNameForm: RepoRenameForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/name`;
 
@@ -275,15 +276,15 @@ export class PypiService {
     });
   }
 
-  public async fetchRelease(packageName: string, release: string): Promise<ReleaseInfo> {
-    return new Promise<ReleaseInfo>((resolve, reject) => {
+  public async fetchRelease(packageName: string, release: string): Promise<ReleaseDetail> {
+    return new Promise<ReleaseDetail>((resolve, reject) => {
       const url =
         this.apiBaseUrl + '/api/pypi/packages/' + this.activeRepo.repoName + '/' + packageName + '/releases/' + release;
 
       this.http
-        .get<RestResponse<ReleaseInfo>>(url)
+        .get<RestResponse<ReleaseDetail>>(url)
         .toPromise()
-        .then((res: RestResponse<ReleaseInfo>) => resolve(res.data))
+        .then((res: RestResponse<ReleaseDetail>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
     });
   }

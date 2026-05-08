@@ -25,7 +25,7 @@ import { GolangService } from '../../../../pages/repository/golang/service/golan
 import { MavenService } from '../../../../pages/repository/maven/service/maven.service';
 import { NpmService } from '../../../../pages/repository/npm/service/npm.service';
 import { PypiService } from '../../../../pages/repository/pypi/service/pypi.service';
-import { RepoForm } from '../../../dto/repo/repo-form';
+import { RepoCreateForm } from '../../../../../../generated/api';
 import { RepoType } from '../../../dto/repo/repo-type';
 import { SelectorComponent } from '../../selector/selector.component';
 import { ToastService } from '../../toast/toast.service';
@@ -87,7 +87,8 @@ export class RepositoryCreateModalComponent implements OnInit {
     this.loading = true;
     this.form.disable();
 
-    const form: RepoForm = Object.assign(new RepoForm(), this.form.value);
+    const form = this.form.getRawValue() as RepoCreateForm;
+    //const form: RepoCreateForm = Object.assign(new RepoCreateForm(), this.form.value);
 
     this.createRepositoryService(form)
       .then(() => {
@@ -107,7 +108,7 @@ export class RepositoryCreateModalComponent implements OnInit {
       });
   }
 
-  private createRepositoryService(form: RepoForm) {
+  private createRepositoryService(form: RepoCreateForm) {
     switch (this.selectedOption) {
       case RepoType.MAVEN:
         return this.mavenService.createRepository(form);

@@ -27,7 +27,7 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { getRepoDomain } from '../../docker-repo-util';
-import { TagInfo } from '../../dto/tag-info';
+import { TagDetail } from '../../../../../../../generated/api';
 import { DockerService } from '../../service/docker.service';
 
 type Classifiers = Record<string, [string]>;
@@ -46,7 +46,7 @@ export class DockerImagesTagDetailComponent {
   public manifestText: string;
   public configText: string;
   public error: string;
-  public tagInfo: TagInfo;
+  public tagInfo: TagDetail;
   public activeRepo: RepoPermissionInfo;
   public classifiers: Classifiers;
 
@@ -77,7 +77,7 @@ export class DockerImagesTagDetailComponent {
 
     this.dockerService
       .fetchTag(this.imageName, this.tagName)
-      .then((tagInfo: TagInfo) => {
+      .then((tagInfo: TagDetail) => {
         this.installText = `docker pull ${getRepoDomain()}/${this.activeRepo.repoName}/${tagInfo.imageName}:${tagInfo.name}`;
 
         this.tagInfo = tagInfo;

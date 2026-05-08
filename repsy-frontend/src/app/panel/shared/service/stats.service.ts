@@ -19,10 +19,8 @@ import { Injectable } from '@angular/core';
 
 import { environment } from '../../../../environments/environment';
 import { ErrorHandlerService } from '../../../shared/error-handler/error-handler.service';
-import { RepoListInfo } from '../dto/repo/repo-list-info';
-import { RepoUsageInfo } from '../dto/repo-usage-info';
+import { RepoUsageInfo, TotalUsageInfo, RepoListInfo } from '../../../../generated/api';
 import { RestResponse } from '../dto/rest-response';
-import { TotalUsageInfo } from '../dto/total-usage-info';
 
 @Injectable({
   providedIn: 'root',

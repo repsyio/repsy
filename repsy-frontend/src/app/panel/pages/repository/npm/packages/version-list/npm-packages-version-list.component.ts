@@ -35,8 +35,7 @@ import { PagedData } from '../../../../../shared/dto/paged-data';
 import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { NpmConfigComponent } from '../../config/npm-config.component';
-import { PackageDistributionTagMapListItem } from '../../dto/package-distribution-tag-map-list-item';
-import { PackageVersionListItem } from '../../dto/package-version-list-item';
+import { PackageDistributionTagMapListItem, PackageVersionListItem } from '../../../../../../../generated/api';
 import { NpmService } from '../../service/npm.service';
 
 @Component({

@@ -36,7 +36,7 @@ import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permissi
 import { Sort } from '../../../../../shared/dto/sort';
 import { DockerConfigComponent } from '../../config/docker-config.component';
 import { getRepoDomain } from '../../docker-repo-util';
-import { ManifestListItem } from '../../dto/manifest-list-item';
+import { ManifestListItem } from '../../../../../../../generated/api';
 import { DockerService } from '../../service/docker.service';
 
 @Component({
