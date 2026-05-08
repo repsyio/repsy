@@ -36,7 +36,7 @@ import { PagedData } from '../../../../../shared/dto/paged-data';
 import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { PypiConfigComponent } from '../../config/pypi-config.component';
-import { PackageListItem } from '../../dto/package-list-item';
+import { PackageListItem } from '../../../../../../../generated/api';
 import { PypiService } from '../../service/pypi.service';
 
 @Component({

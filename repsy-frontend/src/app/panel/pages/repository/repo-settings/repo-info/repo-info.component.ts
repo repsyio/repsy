@@ -20,9 +20,7 @@ import { Router, RouterLink } from '@angular/router';
 
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { RepoDescriptionForm } from '../../../../shared/dto/repo/repo-description-form';
-import { RepoNameForm } from '../../../../shared/dto/repo/repo-name-form';
-import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
+import { RepoDescriptionForm, RepoRenameForm } from '../../../../../../generated/api';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
 import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerService } from '../../docker/service/docker.service';
@@ -30,6 +28,7 @@ import { MavenService } from '../../maven/service/maven.service';
 import { NpmService } from '../../npm/service/npm.service';
 import { PypiService } from '../../pypi/service/pypi.service';
 import { GolangService } from '../../golang/service/golang.service';
+import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
 
 @Component({
   selector: 'app-repo-info',
@@ -76,7 +75,7 @@ export class RepoInfoComponent implements OnInit {
   }
 
   public renameRepo() {
-    const form: RepoNameForm = Object.assign(new RepoNameForm(), this.renameForm.value);
+    const form: RepoRenameForm = Object.assign({}, this.renameForm.value);
 
     this.dangerModalService.show('Rename Repository', 'Rename', () => {
       this.loading = true;
@@ -99,7 +98,7 @@ export class RepoInfoComponent implements OnInit {
   }
 
   public updateRepoDescription() {
-    const form: RepoDescriptionForm = Object.assign(new RepoDescriptionForm(), this.descriptionForm.value);
+    const form: RepoDescriptionForm = Object.assign({}, this.descriptionForm.value);
 
     this.loading = true;
     this.renameForm.disable();
@@ -135,7 +134,7 @@ export class RepoInfoComponent implements OnInit {
     this.descriptionForm?.get('description').setValue(this.activeRepository.description);
   }
 
-  private renameRepoService(form: RepoNameForm) {
+  private renameRepoService(form: RepoRenameForm) {
     switch (this.repoType) {
       case RepoType.MAVEN:
         return this.mavenService.updateRepositoryName(form);

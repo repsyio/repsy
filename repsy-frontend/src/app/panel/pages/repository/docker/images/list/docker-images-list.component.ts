@@ -37,7 +37,7 @@ import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permissi
 import { Sort } from '../../../../../shared/dto/sort';
 import { ByteFormatter } from '../../../../../shared/util/byte-formatter';
 import { DockerConfigComponent } from '../../config/docker-config.component';
-import { ImageListItem } from '../../dto/image-list-item';
+import { ImageListItem } from '../../../../../../../generated/api';
 import { DockerService } from '../../service/docker.service';
 
 @Component({

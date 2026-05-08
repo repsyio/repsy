@@ -25,8 +25,7 @@ import { CopyClipboardComponent } from '../../../../../shared/components/copy-cl
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
-import { ReleaseClassifierInfo } from '../../dto/release-classifier-info';
-import { ReleaseInfo } from '../../dto/release-info';
+import { ReleaseDetail, ReleaseClassifierInfo } from '../../../../../../../generated/api';
 import { PypiService } from '../../service/pypi.service';
 
 type Classifiers = Record<string, [string]>;
@@ -46,7 +45,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
   public installation: string;
   public activeRepo: RepoPermissionInfo;
   private readonly repositoryChanges$: Subscription;
-  public versionInfo: ReleaseInfo;
+  public versionInfo: ReleaseDetail;
   public classifiers: Classifiers;
 
   constructor(
@@ -82,7 +81,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
 
     this.pypiService
       .fetchRelease(this.packageName, this.versionName)
-      .then((releaseInfo: ReleaseInfo) => {
+      .then((releaseInfo: ReleaseDetail) => {
         this.versionInfo = releaseInfo;
         releaseInfo.classifiers.forEach((c: ReleaseClassifierInfo) =>
           this.classifiers[c.classifier]

@@ -30,7 +30,7 @@ import { SearchboxComponent } from '../../../shared/components/searchbox/searchb
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../shared/dto/paged-data';
-import { UserInfo } from '../dto/user.info';
+import { UserResponse } from '../../../../../generated/api';
 import { UserService } from '../service/user.service';
 
 @Component({
@@ -56,12 +56,12 @@ export class UserManagementComponent implements OnInit {
   public operationLock = false;
   public pageNum = 0;
   public pageSize = 10;
-  public users: UserInfo[];
-  public pagedData: PagedData<UserInfo>;
+  public users: UserResponse[];
+  public pagedData: PagedData<UserResponse>;
   public showCreateUserModal = false;
   public showEditUserModal = false;
   public showResetPasswordModal = false;
-  public selectedUser: UserInfo;
+  public selectedUser: UserResponse;
   public searchQuery = '';
   public newPassword: string;
 
@@ -70,7 +70,7 @@ export class UserManagementComponent implements OnInit {
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
   ) {
-    this.pagedData = new PagedData<UserInfo>();
+    this.pagedData = new PagedData<UserResponse>();
   }
 
   public ngOnInit(): void {
@@ -80,7 +80,7 @@ export class UserManagementComponent implements OnInit {
   public fetchUsers(): void {
     this.userService
       .getUsers(this.pageNum, this.pageSize, this.searchQuery)
-      .then((pageData: PagedData<UserInfo>) => {
+      .then((pageData: PagedData<UserResponse>) => {
         this.pagedData.page = pageData.page;
         this.users = pageData.content;
       })
@@ -110,12 +110,12 @@ export class UserManagementComponent implements OnInit {
     this.showCreateUserModal = true;
   }
 
-  public editUser(user: UserInfo): void {
+  public editUser(user: UserResponse): void {
     this.selectedUser = user;
     this.showEditUserModal = true;
   }
 
-  public resetPassword(user: UserInfo): void {
+  public resetPassword(user: UserResponse): void {
     this.dangerModalService.show('Reset Password', 'Reset', () => {
       this.operationLock = true;
 
@@ -136,7 +136,7 @@ export class UserManagementComponent implements OnInit {
     });
   }
 
-  public deleteUser(user: UserInfo): void {
+  public deleteUser(user: UserResponse): void {
     // Check if trying to delete the last admin
     if (user.role === 'ADMIN' && this.isLastAdmin()) {
       this.toastService.show('Cannot delete the last admin user. Create another admin first.', 'error');

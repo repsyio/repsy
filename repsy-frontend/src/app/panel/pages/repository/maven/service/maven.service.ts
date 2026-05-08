@@ -21,28 +21,28 @@ import { BehaviorSubject, Observable, Subscriber } from 'rxjs';
 import { environment } from '../../../../../../environments/environment';
 import { ErrorHandlerService } from '../../../../../shared/error-handler/error-handler.service';
 import { PagedData } from '../../../../shared/dto/paged-data';
-import { RepoDescriptionForm } from '../../../../shared/dto/repo/repo-description-form';
-import { RepoForm } from '../../../../shared/dto/repo/repo-form';
 import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
-import { RepoNameForm } from '../../../../shared/dto/repo/repo-name-form';
 import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
-import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
-import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
 import { RestResponse } from '../../../../shared/dto/rest-response';
 import { Sort } from '../../../../shared/dto/sort';
 import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
 import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
-import { DeployTokenForm } from '../../repo-settings/deploy-token/form/deploy-token-form';
 import { SignatureForm } from '../../repo-settings/signature/dto/signature-form';
 import { SignatureItem } from '../../repo-settings/signature/dto/signature-item';
-import { ArtifactListItem } from '../dto/artifact-list-item';
-import { ArtifactVersionInfo } from '../dto/artifact-version-info';
-import { ArtifactVersionListItem } from '../dto/artifact-version-list-item';
+import {
+  RepoSettingsForm,
+  DeployTokenForm,
+  ArtifactListItem,
+  ArtifactVersionInfo,
+  ArtifactVersionListItem,
+  RepoRenameForm,
+  RepoCreateForm,
+  RepoDescriptionForm,
+} from '../../../../../../generated/api';
 import { DeletedItem } from '../dto/deleted-item';
 import { FsItemInfo } from '../dto/fs-item-info';
-import { MavenRepoSettingsInfo } from '../dto/maven-repo-settings-info';
-import { RepoSettingsInfo } from '../../docker/dto/repo-settings-info';
 import { RepositorySettingsInfo } from '../../pypi/dto/repository-settings-info';
+import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
 
 @Injectable({
   providedIn: 'root',
@@ -63,7 +63,7 @@ export class MavenService {
     this.repoChanges = this.repoSub.asObservable();
   }
 
-  public async createRepository(form: RepoForm): Promise<void> {
+  public async createRepository(form: RepoCreateForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       return this.http
         .post<RestResponse<null>>(`${this.apiBaseUrl}/api/repos/MAVEN`, form)
@@ -335,7 +335,7 @@ export class MavenService {
     });
   }
 
-  public async updateRepositoryName(repositoryNameForm: RepoNameForm): Promise<void> {
+  public async updateRepositoryName(repositoryNameForm: RepoRenameForm): Promise<void> {
     const url = `${this.apiBaseUrl}/api/repos/` + `${this.activeRepo.repoName}/name`;
 
     return new Promise<void>((resolve, reject) => {

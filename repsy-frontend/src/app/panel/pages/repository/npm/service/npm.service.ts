@@ -21,10 +21,7 @@ import { BehaviorSubject, Observable, Subscriber } from 'rxjs';
 import { environment } from '../../../../../../environments/environment';
 import { ErrorHandlerService } from '../../../../../shared/error-handler/error-handler.service';
 import { PagedData } from '../../../../shared/dto/paged-data';
-import { RepoDescriptionForm } from '../../../../shared/dto/repo/repo-description-form';
-import { RepoForm } from '../../../../shared/dto/repo/repo-form';
 import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
-import { RepoNameForm } from '../../../../shared/dto/repo/repo-name-form';
 import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
@@ -33,11 +30,16 @@ import { Sort } from '../../../../shared/dto/sort';
 import { RepositorySettingsInfo } from '../../pypi/dto/repository-settings-info';
 import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
 import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
-import { DeployTokenForm } from '../../repo-settings/deploy-token/form/deploy-token-form';
-import { PackageDistributionTagMapListItem } from '../dto/package-distribution-tag-map-list-item';
-import { PackageListItem } from '../dto/package-list-item';
+import {
+  RepoDescriptionForm,
+  RepoRenameForm,
+  RepoCreateForm,
+  PackageDistributionTagMapListItem,
+  DeployTokenForm,
+  PackageListItem,
+  PackageVersionListItem,
+} from '../../../../../../generated/api';
 import { PackageVersionInfo } from '../dto/package-version-info';
-import { PackageVersionListItem } from '../dto/package-version-list-item';
 
 @Injectable({
   providedIn: 'root',
@@ -101,7 +103,7 @@ export class NpmService {
     });
   }
 
-  public async updateRegistryName(repoNameForm: RepoNameForm): Promise<void> {
+  public async updateRegistryName(repoNameForm: RepoRenameForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/${this.activeRegistry.repoName}/name`;
 
@@ -143,7 +145,7 @@ export class NpmService {
     });
   }
 
-  public async createRegistry(registryCreateForm: RepoForm): Promise<void> {
+  public async createRegistry(registryCreateForm: RepoCreateForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/NPM`;
 

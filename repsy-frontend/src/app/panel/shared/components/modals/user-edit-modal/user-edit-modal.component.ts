@@ -18,8 +18,7 @@ import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ReactiveFormsModule } from '@angular/forms';
 
-import { UserInfo } from '../../../../pages/user/dto/user.info';
-import { UserUpdateForm } from '../../../../pages/user/form/user-update-form';
+import { UserResponse, UserUpdateForm } from '../../../../../../generated/api';
 import { UserService } from '../../../../pages/user/service/user.service';
 import { ToastService } from '../../toast/toast.service';
 import { ToggleComponent } from '../../toggle/toggle.component';
@@ -35,7 +34,7 @@ export class UserEditModalComponent implements OnChanges {
   @Output() openChange = new EventEmitter<boolean>();
   @Output() updated = new EventEmitter<void>();
   @Input() public open: boolean;
-  @Input() public user: UserInfo;
+  @Input() public user: UserResponse;
   @Input() public isLastAdmin = false;
 
   public loading = false;

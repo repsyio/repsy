@@ -22,7 +22,7 @@ import { Router, RouterModule } from '@angular/router';
 import { environment } from '../../../../environments/environment';
 import { ToastService } from '../../../panel/shared/components/toast/toast.service';
 import { AuthService } from '../service/auth.service';
-import { LoginForm } from './form/login-form';
+import { LoginForm } from '../../../../generated/api';
 
 @Component({
   selector: 'app-login',
@@ -79,7 +79,7 @@ export class LoginComponent implements OnInit {
     this.loading = true;
     this.form.disable();
 
-    const form = Object.assign(new LoginForm(), this.form.value);
+    const form = this.form.getRawValue() as LoginForm;
 
     this.authService
       .logIn(form)

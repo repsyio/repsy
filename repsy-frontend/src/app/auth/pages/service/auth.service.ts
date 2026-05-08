@@ -21,10 +21,9 @@ import { jwtDecode } from 'jwt-decode';
 import { Observable, Subscriber, throwError } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
-import { LoginInfo } from '../../../panel/shared/dto/login-info';
+import { LoginInfo, LoginForm } from '../../../../generated/api';
 import { RestResponse } from '../../../panel/shared/dto/rest-response';
 import { ErrorHandlerService } from '../../../shared/error-handler/error-handler.service';
-import { LoginForm } from '../login/form/login-form';
 
 interface TokenPayload {
   username?: string;
@@ -90,7 +89,7 @@ export class AuthService {
 
       this.http.post<RestResponse<LoginInfo>>(url, { refreshToken: this._refreshToken }).subscribe(
         (res: RestResponse<LoginInfo>) => {
-          this._update(res.data.email, res.data.username, res.data.token, res.data.refreshToken);
+          this._update(res.data.username, res.data.token, res.data.refreshToken);
           observer.next(res.data.token);
           observer.complete();
         },
@@ -109,7 +108,7 @@ export class AuthService {
         .post<RestResponse<LoginInfo>>(url, form)
         .toPromise()
         .then((res: RestResponse<LoginInfo>) => {
-          this._update(res.data.email, res.data.username, res.data.token, res.data.refreshToken);
+          this._update(res.data.username, res.data.token, res.data.refreshToken);
           resolve();
         })
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
@@ -147,21 +146,18 @@ export class AuthService {
     this._refreshToken = null;
 
     if (this.isBrowser) {
-      localStorage.removeItem('email');
       localStorage.removeItem('username');
       localStorage.removeItem('token');
       localStorage.removeItem('refresh-token');
     }
   }
 
-  private _update(email: string, username: string, accessToken: string, refreshToken: string): void {
-    this._email = email;
+  private _update(username: string, accessToken: string, refreshToken: string): void {
     this._username = username;
     this._accessToken = accessToken;
     this._refreshToken = refreshToken;
 
     if (this.isBrowser) {
-      localStorage.setItem('email', this._email);
       localStorage.setItem('username', this._username);
       localStorage.setItem('token', this._accessToken);
       localStorage.setItem('refresh-token', this._refreshToken);
@@ -169,6 +165,6 @@ export class AuthService {
   }
 
   public updateLoginInfo(info: LoginInfo) {
-    this._update(info.email, info.username, info.token, info.refreshToken);
+    this._update(info.username, info.token, info.refreshToken);
   }
 }

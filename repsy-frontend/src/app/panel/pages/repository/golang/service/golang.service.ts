@@ -21,21 +21,23 @@ import { BehaviorSubject, Observable, Subscriber } from 'rxjs';
 import { environment } from '../../../../../../environments/environment';
 import { ErrorHandlerService } from '../../../../../shared/error-handler/error-handler.service';
 import { PagedData } from '../../../../shared/dto/paged-data';
-import { RepoDescriptionForm } from '../../../../shared/dto/repo/repo-description-form';
-import { RepoForm } from '../../../../shared/dto/repo/repo-form';
 import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
-import { RepoNameForm } from '../../../../shared/dto/repo/repo-name-form';
 import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
 import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
 import { RestResponse } from '../../../../shared/dto/rest-response';
 import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
 import { RepositorySettingsInfo } from '../../pypi/dto/repository-settings-info';
 import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
-import { DeployTokenForm } from '../../repo-settings/deploy-token/form/deploy-token-form';
 import { Sort } from '../../../../shared/dto/sort';
-import { ModuleInfo } from '../dto/module-info';
-import { ModuleListItem } from '../dto/module-list-item';
-import { ModuleVersionListItem } from '../dto/module-version-list-item';
+import {
+  RepoDescriptionForm,
+  DeployTokenForm,
+  GoModuleInfo,
+  GoModuleListItem,
+  GoModuleVersionListItem,
+  RepoRenameForm,
+  RepoCreateForm,
+} from '../../../../../../generated/api';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 
 @Injectable({
@@ -57,7 +59,7 @@ export class GolangService {
     this.repoChanges = this.repoSub.asObservable();
   }
 
-  public async createRepository(form: RepoForm): Promise<void> {
+  public async createRepository(form: RepoCreateForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       return this.http
         .post<RestResponse<null>>(`${this.apiBaseUrl}/api/repos/GOLANG`, form)
@@ -138,19 +140,26 @@ export class GolangService {
     });
   }
 
-  public async fetchModules(sortOption: Sort, pageIndex: number, pageSize: number): Promise<PagedData<ModuleListItem>> {
+  public async fetchModules(
+    sortOption: Sort,
+    pageIndex: number,
+    pageSize: number,
+  ): Promise<PagedData<GoModuleListItem>> {
     const params = new HttpParams()
       .set('page', pageIndex.toString())
       .set('size', pageSize.toString())
       .set('sort', `${sortOption.column},${sortOption.type}`);
 
-    return new Promise<PagedData<ModuleListItem>>((resolve, reject) => {
+    return new Promise<PagedData<GoModuleListItem>>((resolve, reject) => {
       this.http
-        .get<RestResponse<PagedData<ModuleListItem>>>(`${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}`, {
-          params,
-        })
+        .get<RestResponse<PagedData<GoModuleListItem>>>(
+          `${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}`,
+          {
+            params,
+          },
+        )
         .toPromise()
-        .then((res: RestResponse<PagedData<ModuleListItem>>) => resolve(res.data))
+        .then((res: RestResponse<PagedData<GoModuleListItem>>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
     });
   }
@@ -160,21 +169,21 @@ export class GolangService {
     sortOption: Sort,
     pageIndex: number,
     pageSize: number,
-  ): Promise<PagedData<ModuleListItem>> {
+  ): Promise<PagedData<GoModuleListItem>> {
     const params = new HttpParams()
       .set('search', search)
       .set('page', pageIndex.toString())
       .set('size', pageSize.toString())
       .set('sort', `${sortOption.column},${sortOption.type}`);
 
-    return new Promise<PagedData<ModuleListItem>>((resolve, reject) => {
+    return new Promise<PagedData<GoModuleListItem>>((resolve, reject) => {
       this.http
-        .get<RestResponse<PagedData<ModuleListItem>>>(
+        .get<RestResponse<PagedData<GoModuleListItem>>>(
           `${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}/search`,
           { params },
         )
         .toPromise()
-        .then((res: RestResponse<PagedData<ModuleListItem>>) => resolve(res.data))
+        .then((res: RestResponse<PagedData<GoModuleListItem>>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
     });
   }
@@ -197,7 +206,7 @@ export class GolangService {
     sortOption: Sort,
     pageIndex: number,
     pageSize: number,
-  ): Promise<PagedData<ModuleVersionListItem>> {
+  ): Promise<PagedData<GoModuleVersionListItem>> {
     const params = new HttpParams()
       .set('modulePath', modulePath)
       .set('search', search)
@@ -205,26 +214,28 @@ export class GolangService {
       .set('size', pageSize.toString())
       .set('sort', `${sortOption.column},${sortOption.type}`);
 
-    return new Promise<PagedData<ModuleVersionListItem>>((resolve, reject) => {
+    return new Promise<PagedData<GoModuleVersionListItem>>((resolve, reject) => {
       this.http
-        .get<RestResponse<PagedData<ModuleVersionListItem>>>(
+        .get<RestResponse<PagedData<GoModuleVersionListItem>>>(
           `${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}/versions`,
           { params },
         )
         .toPromise()
-        .then((res: RestResponse<PagedData<ModuleVersionListItem>>) => resolve(res.data))
+        .then((res: RestResponse<PagedData<GoModuleVersionListItem>>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
     });
   }
 
-  public async fetchModuleInfo(modulePath: string): Promise<ModuleInfo> {
+  public async fetchModuleInfo(modulePath: string): Promise<GoModuleInfo> {
     const params = new HttpParams().set('modulePath', modulePath);
 
-    return new Promise<ModuleInfo>((resolve, reject) => {
+    return new Promise<GoModuleInfo>((resolve, reject) => {
       this.http
-        .get<RestResponse<ModuleInfo>>(`${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}/info`, { params })
+        .get<RestResponse<GoModuleInfo>>(`${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}/info`, {
+          params,
+        })
         .toPromise()
-        .then((res: RestResponse<ModuleInfo>) => resolve(res.data))
+        .then((res: RestResponse<GoModuleInfo>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
     });
   }
@@ -299,7 +310,7 @@ export class GolangService {
     });
   }
 
-  public async updateRepositoryName(repositoryNameForm: RepoNameForm): Promise<void> {
+  public async updateRepositoryName(repositoryNameForm: RepoRenameForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/name`;
 

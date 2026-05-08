@@ -25,7 +25,7 @@ import { CopyClipboardComponent } from '../../../../../shared/components/copy-cl
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
-import { ModuleVersionListItem } from '../../dto/module-version-list-item';
+import { GoModuleVersionListItem } from '../../../../../../../generated/api';
 import { GolangService } from '../../service/golang.service';
 
 @Component({
@@ -39,7 +39,7 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
   public error: string;
   public modulePath: string;
   public versionName: string;
-  public versionInfo: ModuleVersionListItem;
+  public versionInfo: GoModuleVersionListItem;
   public getCommand: string;
   public goEnvCommand: string;
   public goproxyEndpoints: { label: string; url: string }[];

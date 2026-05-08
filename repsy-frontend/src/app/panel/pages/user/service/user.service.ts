@@ -21,7 +21,7 @@ import { environment } from '../../../../../environments/environment';
 import { ErrorHandlerService } from '../../../../shared/error-handler/error-handler.service';
 import { PagedData } from '../../../shared/dto/paged-data';
 import { RestResponse } from '../../../shared/dto/rest-response';
-import { UserInfo } from '../dto/user.info';
+import { UserResponse } from '../../../../../generated/api';
 import { UserCreateForm } from '../form/user-crete-form';
 import { UserUpdateForm } from '../form/user-update-form';
 
@@ -36,8 +36,8 @@ export class UserService {
     private readonly errorHandlerService: ErrorHandlerService,
   ) {}
 
-  public async getUsers(pageNum: number, pageSize: number, searchQuery?: string): Promise<PagedData<UserInfo>> {
-    return new Promise<PagedData<UserInfo>>((resolve, reject) => {
+  public async getUsers(pageNum: number, pageSize: number, searchQuery?: string): Promise<PagedData<UserResponse>> {
+    return new Promise<PagedData<UserResponse>>((resolve, reject) => {
       let params = new HttpParams().set('page', pageNum.toString()).set('size', pageSize.toString());
 
       if (searchQuery && searchQuery.trim()) {
@@ -45,9 +45,9 @@ export class UserService {
       }
 
       this.http
-        .get<RestResponse<PagedData<UserInfo>>>(this.baseUrl, { params })
+        .get<RestResponse<PagedData<UserResponse>>>(this.baseUrl, { params })
         .toPromise()
-        .then((res: RestResponse<PagedData<UserInfo>>) => {
+        .then((res: RestResponse<PagedData<UserResponse>>) => {
           resolve(res.data);
         })
         .catch((res: HttpErrorResponse) => {
@@ -56,12 +56,12 @@ export class UserService {
     });
   }
 
-  public async createUser(form: UserCreateForm): Promise<UserInfo> {
-    return new Promise<UserInfo>((resolve, reject) => {
+  public async createUser(form: UserCreateForm): Promise<UserResponse> {
+    return new Promise<UserResponse>((resolve, reject) => {
       this.http
-        .post<RestResponse<UserInfo>>(this.baseUrl, form)
+        .post<RestResponse<UserResponse>>(this.baseUrl, form)
         .toPromise()
-        .then((res: RestResponse<UserInfo>) => {
+        .then((res: RestResponse<UserResponse>) => {
           resolve(res.data);
         })
         .catch((res: HttpErrorResponse) => {
@@ -70,12 +70,12 @@ export class UserService {
     });
   }
 
-  public async updateUser(userId: string, form: UserUpdateForm): Promise<UserInfo> {
-    return new Promise<UserInfo>((resolve, reject) => {
+  public async updateUser(userId: string, form: UserUpdateForm): Promise<UserResponse> {
+    return new Promise<UserResponse>((resolve, reject) => {
       this.http
-        .put<RestResponse<UserInfo>>(`${this.baseUrl}/${userId}`, form)
+        .put<RestResponse<UserResponse>>(`${this.baseUrl}/${userId}`, form)
         .toPromise()
-        .then((res: RestResponse<UserInfo>) => {
+        .then((res: RestResponse<UserResponse>) => {
           resolve(res.data);
         })
         .catch((res: HttpErrorResponse) => {

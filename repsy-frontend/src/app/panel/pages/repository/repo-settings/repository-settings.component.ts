@@ -36,7 +36,7 @@ import { PypiService } from '../pypi/service/pypi.service';
 import { RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { DeleteRepoComponent } from './delete-repo/delete-repo.component';
 import { DeployTokenComponent } from './deploy-token/deploy-token.component';
-import { VersionAllowenceComponent } from './maven-version-allowence/maven-version-allowence.component';
+import { VersionAllowanceComponent } from './maven-version-allowence/maven-version-allowence.component';
 import { PackageOverrideComponent } from './package-override/package-override.component';
 import { RepoInfoComponent } from './repo-info/repo-info.component';
 import { RepoStorageComponent } from './repo-storage/repo-storage.component';
@@ -55,7 +55,7 @@ import { VisibilityComponent } from './visibility/visibility.component';
     RepoInfoComponent,
     NgOptimizedImage,
     DeleteRepoComponent,
-    VersionAllowenceComponent,
+    VersionAllowanceComponent,
     RepoStorageComponent,
     PackageOverrideComponent,
     SignatureComponent,

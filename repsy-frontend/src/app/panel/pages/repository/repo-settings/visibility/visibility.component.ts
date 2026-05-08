@@ -24,7 +24,6 @@ import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
 import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerService } from '../../docker/service/docker.service';
-import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form';
 import { MavenService } from '../../maven/service/maven.service';
 import { NpmService } from '../../npm/service/npm.service';
 import { PypiService } from '../../pypi/service/pypi.service';
@@ -60,9 +59,9 @@ export class VisibilityComponent {
     let form;
 
     if (this.repoType === RepoType.MAVEN) {
-      form = new MavenRepoSettingsForm();
+      form = new RepoSettingsForm();
 
-      (form as MavenRepoSettingsForm) = Object.assign(new MavenRepoSettingsForm(), this.parentForm.value);
+      (form as RepoSettingsForm) = Object.assign(new RepoSettingsForm(), this.parentForm.value);
       form.privateRepo = this.parentForm.get('privateRepository').value;
       form.allowOverride = this.parentForm.get('allowOverride').value;
     } else {
