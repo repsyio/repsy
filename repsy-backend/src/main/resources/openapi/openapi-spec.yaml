@@ -26,7 +26,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseUserResponse"
       summary: Update a user
@@ -45,7 +45,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a user
@@ -64,7 +64,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoSettingsInfo"
       summary: Get settings for a repository
@@ -88,7 +88,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Update repository settings
@@ -119,7 +119,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
       summary: Regenerate a deploy token
@@ -143,7 +143,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a deploy token
@@ -174,7 +174,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseLoginInfo"
       summary: Update the current user's username
@@ -199,7 +199,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Update the current user's password
@@ -233,7 +233,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelUserResponse"
       summary: List all users
@@ -251,7 +251,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseUserResponse"
       summary: Create a new user
@@ -271,7 +271,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
       summary: Reset a user's password
@@ -301,7 +301,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Create a new repository
@@ -325,7 +325,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelDeployTokenInfoListItem"
       summary: List deploy tokens for a repository
@@ -349,7 +349,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseTokenInfo"
       summary: Create a deploy token for a repository
@@ -379,7 +379,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelKeyStoreItem"
       summary: List key stores for a Maven repository
@@ -403,7 +403,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseKeyStoreItem"
       summary: Add a key store to a Maven repository
@@ -428,7 +428,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseLoginInfo"
       summary: Refresh access token using a refresh token
@@ -447,7 +447,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseLoginInfo"
       summary: Authenticate user and return JWT tokens
@@ -472,7 +472,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Rename a repository
@@ -503,7 +503,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Update repository description
@@ -522,7 +522,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseTotalUsageInfo"
       summary: Get total usage statistics
@@ -541,7 +541,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListRepoListInfo"
       summary: Get repository list info by type
@@ -560,7 +560,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseLong"
       summary: Get repository count by type
@@ -579,7 +579,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoUsageInfo"
       summary: Get storage usage for a repository
@@ -604,7 +604,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoPermissionInfo"
       summary: Get permissions for a repository
@@ -629,7 +629,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
       summary: Get the format of a repository
@@ -664,7 +664,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListStorageItemInfo"
       summary: List contents of a repository
@@ -700,7 +700,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
       summary: List PyPI packages in a repository
@@ -741,7 +741,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelReleaseListItem"
       summary: List releases of a PyPI package
@@ -776,7 +776,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseReleaseDetail"
       summary: Get a specific PyPI package release
@@ -804,7 +804,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a specific PyPI package release
@@ -834,7 +834,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseReleaseDetail"
       summary: Get a PyPI package
@@ -857,7 +857,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a repository
@@ -882,7 +882,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseProfileInfo"
       summary: Get the current user's profile
@@ -900,7 +900,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete the current user's account
@@ -929,7 +929,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
       summary: List npm packages in a repository
@@ -964,7 +964,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
       summary: Get a specific npm package version
@@ -992,7 +992,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a specific npm package version
@@ -1032,7 +1032,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
       summary: Get a specific scoped npm package version
@@ -1065,7 +1065,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a specific scoped npm package version
@@ -1095,7 +1095,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
       summary: Get an npm package
@@ -1118,7 +1118,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete an npm package
@@ -1153,7 +1153,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
       summary: Get a scoped npm package
@@ -1181,7 +1181,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a scoped npm package
@@ -1222,7 +1222,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
       summary: List artifact groups in a Maven repository
@@ -1258,7 +1258,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
       summary: List npm scopes in a repository
@@ -1299,7 +1299,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
       summary: Get npm packages in a scope
@@ -1340,7 +1340,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelPackageVersionListItem"
       summary: List versions of a Maven artifact
@@ -1386,7 +1386,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelPackageVersionListItem"
       summary: List versions of a scoped npm package
@@ -1416,7 +1416,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListPackageDistributionTagMapListItem"
       summary: List dist-tags for an npm package
@@ -1451,7 +1451,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListPackageDistributionTagMapListItem"
       summary: List dist-tags for a scoped npm package
@@ -1487,7 +1487,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelArtifactListItem"
       summary: List artifact groups in a Maven repository
@@ -1528,7 +1528,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelArtifactListItem"
       summary: List artifacts in a Maven group
@@ -1551,7 +1551,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseDeletedItem"
       summary: Delete a Maven artifact group
@@ -1597,7 +1597,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelArtifactVersionListItem"
       summary: List versions of a Maven artifact
@@ -1632,7 +1632,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseArtifactVersionInfo"
       summary: Get a Maven artifact
@@ -1660,7 +1660,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseDeletedItem"
       summary: Delete a Maven artifact
@@ -1700,7 +1700,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseArtifactVersionInfo"
       summary: Get a specific version of a Maven artifact
@@ -1733,7 +1733,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseDeletedItem"
       summary: Delete a specific Maven artifact version
@@ -1763,7 +1763,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelGoModuleListItem"
       summary: List crates in a Cargo repository
@@ -1786,7 +1786,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a Go module
@@ -1827,7 +1827,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelGoModuleVersionListItem"
       summary: List versions of a Go module
@@ -1855,7 +1855,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete Go module versions
@@ -1906,7 +1906,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelGoModuleListItem"
       summary: Search Go modules in a repository
@@ -1936,7 +1936,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseGoModuleInfo"
       summary: Get Go module info
@@ -1972,7 +1972,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelImageListItem"
       summary: List Go modules in a repository
@@ -2013,7 +2013,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelImageTagListItem"
       summary: List tags of a Docker image
@@ -2059,7 +2059,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelManifestListItem"
       summary: List manifests for a Docker image tag
@@ -2094,7 +2094,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
       summary: Get a Docker image manifest
@@ -2124,7 +2124,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseTagDetail"
       summary: Get a Docker image
@@ -2147,7 +2147,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a Docker image
@@ -2182,7 +2182,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseTagDetail"
       summary: Get a specific Docker image tag
@@ -2210,7 +2210,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a Docker image tag
@@ -2245,7 +2245,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
       summary: Get Docker image config by digest
@@ -2281,7 +2281,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelCrateListItem"
       summary: List crates in a Cargo repository
@@ -2311,7 +2311,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseBaseCrateInfoUUID"
       summary: Get a Cargo crate
@@ -2334,7 +2334,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a Cargo crate
@@ -2369,7 +2369,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseBaseCrateVersionInfoUUID"
       summary: Get a specific Cargo crate version
@@ -2397,7 +2397,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a specific Cargo crate version
@@ -2438,7 +2438,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelCrateVersionListItem"
       summary: List versions of a Cargo crate
@@ -2468,7 +2468,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a repository
@@ -2499,7 +2499,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseKeyStoreItem"
       summary: Remove a key store from a Maven repository
