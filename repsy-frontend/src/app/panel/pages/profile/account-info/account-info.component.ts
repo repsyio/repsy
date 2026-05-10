@@ -18,6 +18,7 @@ import { NgClass } from '@angular/common';
 import { Component, Input, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { finalize } from 'rxjs';
 
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
@@ -51,7 +52,7 @@ export class AccountInfoComponent implements OnInit {
 
   constructor(
     private readonly fb: FormBuilder,
-    private readonly profileService: ProfileService,
+    private readonly profileFacadeService: ProfileService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
   ) {
@@ -114,18 +115,20 @@ export class AccountInfoComponent implements OnInit {
       this.loading = true;
       this.passwordForm.disable();
 
-      this.profileService
+      this.profileFacadeService
         .updatePassword(this.passwordForm.value.newPassword)
-        .then(() => {
-          this.toastService.show('Your password updated successfully', 'success');
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
+        .pipe(finalize(() => {
           this.passwordForm.enable();
           this.passwordForm.reset();
           this.loading = false;
+        }))
+        .subscribe({
+          next: () => {
+            this.toastService.show('Your password updated successfully', 'success');
+          },
+          error: (err: string) => {
+            this.toastService.show(err, 'error');
+          },
         });
     });
   }
@@ -141,21 +144,23 @@ export class AccountInfoComponent implements OnInit {
 
       const newUsername = this.usernameForm.get('username').value;
 
-      this.profileService
+      this.profileFacadeService
         .updateUsername(newUsername)
-        .then((loginInfo: LoginInfo) => {
-          localStorage.setItem('username', newUsername);
-          localStorage.setItem('token', loginInfo.token);
-          localStorage.setItem('refresh-token', loginInfo.refreshToken);
-          this.toastService.show('Your username changed successfully', 'success');
-          location.reload();
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
+        .pipe(finalize(() => {
           this.usernameForm.enable();
           this.loading = false;
+        }))
+        .subscribe({
+          next: (loginInfo: LoginInfo) => {
+            localStorage.setItem('username', newUsername);
+            localStorage.setItem('token', loginInfo.token);
+            localStorage.setItem('refresh-token', loginInfo.refreshToken);
+            this.toastService.show('Your username changed successfully', 'success');
+            location.reload();
+          },
+          error: (err: string) => {
+            this.toastService.show(err, 'error');
+          },
         });
     });
   }

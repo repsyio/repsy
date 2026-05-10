@@ -90,7 +90,7 @@ export class RepositoryComponent {
     private readonly dockerService: DockerService,
     private readonly cargoService: CargoService,
     private readonly golangService: GolangService,
-    private readonly profileService: ProfileService,
+    private readonly profileFacadeService: ProfileService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
   ) {
@@ -248,7 +248,7 @@ export class RepositoryComponent {
   }
 
   private loadUserRole(): void {
-    this.profileService.get().then((profile) => {
+    this.profileFacadeService.get().subscribe(profile => {
       this.isAdmin = profile.role === 'ADMIN';
     });
   }
