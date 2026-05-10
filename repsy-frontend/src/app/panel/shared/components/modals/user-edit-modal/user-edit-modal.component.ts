@@ -17,9 +17,10 @@
 import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ReactiveFormsModule } from '@angular/forms';
+import { finalize } from 'rxjs';
 
 import { UserResponse, UserUpdateForm } from '../../../../../../generated/api';
-import { UserService } from '../../../../pages/user/service/user.service';
+import { UserControllerService } from '../../../../../../generated/api/api/user-controller.service';
 import { ToastService } from '../../toast/toast.service';
 import { ToggleComponent } from '../../toggle/toggle.component';
 
@@ -42,7 +43,7 @@ export class UserEditModalComponent implements OnChanges {
 
   constructor(
     private readonly fb: FormBuilder,
-    private readonly userService: UserService,
+    private readonly userControllerService: UserControllerService,
     private readonly toastService: ToastService,
   ) {
     this.form = this.fb.group({
@@ -94,22 +95,19 @@ export class UserEditModalComponent implements OnChanges {
       role: formValue.isAdmin ? 'ADMIN' : 'USER',
     };
 
-    this.userService
+    this.userControllerService
       .updateUser(this.user.id, updateForm)
-      .then(() => {
-        this.toastService.show('User updated successfully', 'success');
-        this.updated.emit();
-        this.closeModal();
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
+      .pipe(finalize(() => {
         this.form.enable();
         if (this.isLastAdmin) {
           this.form.get('isAdmin')?.disable();
         }
         this.loading = false;
+      }))
+      .subscribe(() => {
+        this.toastService.show('User updated successfully', 'success');
+        this.updated.emit();
+        this.closeModal();
       });
   }
 }
