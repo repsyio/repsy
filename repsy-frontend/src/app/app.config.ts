@@ -21,6 +21,8 @@ import { PreloadAllModules, PreloadingStrategy, provideRouter, withInMemoryScrol
 import { provideHighlightOptions } from 'ngx-highlightjs';
 import { provideMarkdown } from 'ngx-markdown';
 
+import { environment } from '../environments/environment';
+import { BASE_PATH } from '../generated/api';
 import { routes } from './app.routes';
 import { AppGlobalErrorHandler } from './shared/error-handler/app-global-error-handler';
 import { ACCESS_TOKEN_INITIALIZER } from './shared/initializer/access-token.initializer';
@@ -57,6 +59,7 @@ export const appConfig: ApplicationConfig = {
       provide: PreloadingStrategy,
       useClass: PreloadAllModules,
     },
+    { provide: BASE_PATH, useValue: environment.apiBaseUrl },
     ACCESS_TOKEN_INITIALIZER,
     provideHighlightOptions({
       fullLibraryLoader: () => import('highlight.js'),

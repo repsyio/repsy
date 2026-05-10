@@ -15,14 +15,11 @@
 ///
 
 import { isPlatformBrowser } from '@angular/common';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Inject, Injectable, PLATFORM_ID } from '@angular/core';
-import { Observable, Subscriber, throwError } from 'rxjs';
+import { Observable, map, throwError } from 'rxjs';
 
-import { environment } from '../../../../environments/environment';
-import { LoginInfo, LoginForm } from '../../../../generated/api';
-import { RestResponse } from '../../../panel/shared/dto/rest-response';
-import { ErrorHandlerService } from '../../../shared/error-handler/error-handler.service';
+import { LoginForm } from '../../../../generated/api';
+import { AuthControllerService } from '../../../../generated/api/api/auth-controller.service';
 
 @Injectable({
   providedIn: 'root',
@@ -34,8 +31,7 @@ export class AuthService {
   private readonly isBrowser: boolean;
 
   constructor(
-    private readonly http: HttpClient,
-    private readonly errorHandlerService: ErrorHandlerService,
+    private readonly authControllerService: AuthControllerService,
     @Inject(PLATFORM_ID) platformId: object,
   ) {
     this.isBrowser = isPlatformBrowser(platformId);
@@ -58,65 +54,25 @@ export class AuthService {
     return !!(this._accessToken && this._refreshToken);
   }
 
+  public logIn(form: LoginForm): Observable<void> {
+    return this.authControllerService.login(form).pipe(
+      map(r => {
+        this._update(r.data!.username!, r.data!.token!, r.data!.refreshToken!);
+      }),
+    );
+  }
+
   public refreshToken(): Observable<string> {
     if (!this._refreshToken) {
       return throwError(new Error('No refresh token presents.'));
     }
-
-    return new Observable<string>((observer: Subscriber<string>) => {
-      const url = environment.apiBaseUrl + '/api/auth/tokens/refresh';
-
-      this.http.post<RestResponse<LoginInfo>>(url, { refreshToken: this._refreshToken }).subscribe(
-        (res: RestResponse<LoginInfo>) => {
-          this._update(res.data.username, res.data.token, res.data.refreshToken);
-          observer.next(res.data.token);
-          observer.complete();
-        },
-        (error: HttpErrorResponse) => {
-          observer.error(error);
-          observer.complete();
-        },
-      );
-    });
+    return this.authControllerService.refreshToken({ refreshToken: this._refreshToken }).pipe(
+      map(r => {
+        this._update(r.data!.username!, r.data!.token!, r.data!.refreshToken!);
+        return r.data!.token!;
+      }),
+    );
   }
-
-  public logIn(form: LoginForm): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const url = environment.apiBaseUrl + '/api/auth/login';
-      this.http
-        .post<RestResponse<LoginInfo>>(url, form)
-        .toPromise()
-        .then((res: RestResponse<LoginInfo>) => {
-          this._update(res.data.username, res.data.token, res.data.refreshToken);
-          resolve();
-        })
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  // public preLogIn(form: LoginForm): Promise<PreLoginInfo> {
-  //   return new Promise((resolve, reject) => {
-  //     const url = environment.apiBaseUrl + '/api/auth/pre-login';
-  //     this.http
-  //       .post<RestResponse<PreLoginInfo>>(url, form)
-  //       .toPromise()
-  //       .then((res: RestResponse<PreLoginInfo>) => resolve(res.data))
-  //       .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-  //   });
-  // }
-  //
-  // public async register(form: RegistrationForm): Promise<LoginInfo> {
-  //   return new Promise<LoginInfo>((resolve, reject) => {
-  //     return this.http
-  //       .post<RestResponse<LoginInfo>>(environment.apiBaseUrl + '/api/auth/register', form)
-  //       .toPromise()
-  //       .then((res: RestResponse<LoginInfo>) => {
-  //         this._update(res.data.email, res.data.username, res.data.token, res.data.refreshToken);
-  //         resolve(res.data);
-  //       })
-  //       .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-  //   });
-  // }
 
   public logOut(): void {
     this._username = null;
