@@ -25,9 +25,8 @@ import { SpinnerComponent } from '../../../../../../shared/components/spinner/sp
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { getRepoDomain } from '../../docker-repo-util';
-import { TagDetail } from '../../../../../../../generated/api';
+import { RepoPermissionInfo, TagDetail } from '../../../../../../../generated/api';
 import { DockerService } from '../../service/docker.service';
 
 type Classifiers = Record<string, [string]>;
@@ -60,11 +59,11 @@ export class DockerImagesTagDetailComponent {
     private readonly dangerModalService: DangerModalService,
   ) {
     this.classifiers = {};
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
 
     this.repositoryChanges$ = this.dockerService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.imageName = this.route.snapshot.paramMap.get('image');
         this.tagName = this.route.snapshot.paramMap.get('tag');
         this.loadTag();

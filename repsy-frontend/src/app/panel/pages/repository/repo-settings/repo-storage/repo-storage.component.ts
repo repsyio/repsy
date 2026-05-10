@@ -19,8 +19,8 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
 import { ToastService } from '../../../../shared/components/toast/toast.service';
+import { RepoUsageInfo } from '../../../../../../generated/api';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
-import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
 import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerService } from '../../docker/service/docker.service';
 import { GolangService } from '../../golang/service/golang.service';

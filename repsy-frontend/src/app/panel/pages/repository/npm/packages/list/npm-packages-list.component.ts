@@ -33,7 +33,7 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
+import { RepoPermissionInfo } from '../../../../../../../generated/api';
 import { Sort } from '../../../../../shared/dto/sort';
 import { NpmConfigComponent } from '../../config/npm-config.component';
 import { PackageListItem } from '../../dto/package-list-item';
@@ -87,11 +87,11 @@ export class NpmPackagesListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.pagedData = new PagedData<PackageListItem>();
-    this.activeRegistry = new RepoPermissionInfo();
+    this.activeRegistry = {} as RepoPermissionInfo;
     this.username = this.authService.username;
     this.registryChanges$ = this.npmService.registryChanges.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
-        this.activeRegistry = Object.assign(new RepoPermissionInfo(), registry);
+        this.activeRegistry = Object.assign({}, registry);
         this.fetchPackages();
       }
     });

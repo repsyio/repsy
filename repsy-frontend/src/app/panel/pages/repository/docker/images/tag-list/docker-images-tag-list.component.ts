@@ -34,7 +34,7 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
+import { RepoPermissionInfo } from '../../../../../../../generated/api';
 import { Sort } from '../../../../../shared/dto/sort';
 import { DockerConfigComponent } from '../../config/docker-config.component';
 import { getRepoDomain } from '../../docker-repo-util';
@@ -94,11 +94,11 @@ export class DockerImagesTagListComponent implements OnDestroy {
     this.baseUrl = environment.apiBaseUrl;
     this.username = this.authService.username;
     this.pagedData = new PagedData<TagListItem>();
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
 
     this.repositoryChanges$ = this.dockerService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.imageName = this.route.snapshot.paramMap.get('image');
         this.installText = `docker pull ${getRepoDomain()}/${this.activeRepo.repoName}/${this.imageName}`;
         this.fetchTags();

@@ -33,11 +33,10 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { ByteFormatter } from '../../../../../shared/util/byte-formatter';
 import { DockerConfigComponent } from '../../config/docker-config.component';
-import { ImageListItem } from '../../../../../../../generated/api';
+import { RepoPermissionInfo, ImageListItem } from '../../../../../../../generated/api';
 import { DockerService } from '../../service/docker.service';
 
 @Component({
@@ -87,11 +86,11 @@ export class DockerImagesListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.apiBaseUrl;
     this.pagedData = new PagedData<ImageListItem>();
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
     this.username = this.authService.username;
     this.repositoryChanges$ = this.dockerService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.fetchImages();
       }
     });

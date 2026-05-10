@@ -20,7 +20,7 @@ import { Router, RouterLink } from '@angular/router';
 
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
+import { RepoPermissionInfo } from '../../../../../../generated/api';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
 import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerService } from '../../docker/service/docker.service';

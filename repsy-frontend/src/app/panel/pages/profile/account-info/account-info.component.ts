@@ -21,7 +21,7 @@ import { RouterLink } from '@angular/router';
 
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
-import { LoginInfo } from '../../../shared/dto/login-info';
+import { LoginInfo } from '../../../../../generated/api';
 import { ProfileService } from '../service/profile.service';
 
 class PasswordFormUiInputElement {

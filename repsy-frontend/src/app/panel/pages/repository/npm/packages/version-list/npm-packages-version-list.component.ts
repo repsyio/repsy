@@ -32,10 +32,13 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { NpmConfigComponent } from '../../config/npm-config.component';
-import { PackageDistributionTagMapListItem, PackageVersionListItem } from '../../../../../../../generated/api';
+import {
+  RepoPermissionInfo,
+  PackageDistributionTagMapListItem,
+  PackageVersionListItem,
+} from '../../../../../../../generated/api';
 import { NpmService } from '../../service/npm.service';
 
 @Component({
@@ -89,10 +92,10 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.pagedData = new PagedData<PackageVersionListItem>();
-    this.activeRegistry = new RepoPermissionInfo();
+    this.activeRegistry = {} as RepoPermissionInfo;
     this.registryChanges$ = this.npmService.registryChanges.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
-        this.activeRegistry = Object.assign(new RepoPermissionInfo(), registry);
+        this.activeRegistry = Object.assign({}, registry);
         this.scopeName = this.route.snapshot.paramMap.get('scope');
         this.packageName = this.route.snapshot.paramMap.get('package');
 

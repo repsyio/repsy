@@ -17,17 +17,12 @@
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Inject, Injectable, PLATFORM_ID } from '@angular/core';
-import { jwtDecode } from 'jwt-decode';
 import { Observable, Subscriber, throwError } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
 import { LoginInfo, LoginForm } from '../../../../generated/api';
 import { RestResponse } from '../../../panel/shared/dto/rest-response';
 import { ErrorHandlerService } from '../../../shared/error-handler/error-handler.service';
-
-interface TokenPayload {
-  username?: string;
-}
 
 @Injectable({
   providedIn: 'root',
@@ -36,7 +31,6 @@ export class AuthService {
   private _accessToken: string;
   private _refreshToken: string;
   private _username: string;
-  private _email: string;
   private readonly isBrowser: boolean;
 
   constructor(
@@ -46,15 +40,10 @@ export class AuthService {
   ) {
     this.isBrowser = isPlatformBrowser(platformId);
     if (this.isBrowser) {
-      this._email = localStorage.getItem('email');
       this._username = localStorage.getItem('username');
       this._accessToken = localStorage.getItem('token');
       this._refreshToken = localStorage.getItem('refresh-token');
     }
-  }
-
-  public get email(): string {
-    return this._email;
   }
 
   public get username(): string {
@@ -63,16 +52,6 @@ export class AuthService {
 
   public get accessToken(): string {
     return this._accessToken;
-  }
-
-  public isAuthorized(username: string): boolean {
-    if (!this.isAuthenticated()) {
-      return false;
-    }
-
-    const decoded = jwtDecode<TokenPayload>(this._accessToken);
-
-    return decoded.username === username;
   }
 
   public isAuthenticated(): boolean {
@@ -140,7 +119,6 @@ export class AuthService {
   // }
 
   public logOut(): void {
-    this._email = null;
     this._username = null;
     this._accessToken = null;
     this._refreshToken = null;
@@ -162,9 +140,5 @@ export class AuthService {
       localStorage.setItem('token', this._accessToken);
       localStorage.setItem('refresh-token', this._refreshToken);
     }
-  }
-
-  public updateLoginInfo(info: LoginInfo) {
-    this._update(info.username, info.token, info.refreshToken);
   }
 }

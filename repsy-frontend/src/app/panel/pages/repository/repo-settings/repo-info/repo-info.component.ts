@@ -20,15 +20,14 @@ import { Router, RouterLink } from '@angular/router';
 
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { RepoDescriptionForm, RepoRenameForm } from '../../../../../../generated/api';
-import { RepoType } from '../../../../shared/dto/repo/repo-type';
+import { RepoPermissionInfo, RepoDescriptionForm, RepoRenameForm } from '../../../../../../generated/api';
 import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerService } from '../../docker/service/docker.service';
 import { MavenService } from '../../maven/service/maven.service';
 import { NpmService } from '../../npm/service/npm.service';
 import { PypiService } from '../../pypi/service/pypi.service';
 import { GolangService } from '../../golang/service/golang.service';
-import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
+import { RepoType } from '../../../../shared/dto/repo/repo-type';
 
 @Component({
   selector: 'app-repo-info',

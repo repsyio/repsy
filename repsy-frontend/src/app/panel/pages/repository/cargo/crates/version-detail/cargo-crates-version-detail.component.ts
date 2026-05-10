@@ -24,7 +24,7 @@ import { SpinnerComponent } from '../../../../../../shared/components/spinner/sp
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
+import { RepoPermissionInfo } from '../../../../../../../generated/api';
 import { CrateInfo } from '../../dto/crate-info';
 import { CrateDependencyInfo, CrateVersionInfo } from '../../dto/crate-version-info';
 import { CargoService } from '../../service/cargo.service';
@@ -55,10 +55,10 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
   ) {
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.cargoService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.loadVersion();
       }
     });

@@ -33,10 +33,9 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { PypiConfigComponent } from '../../config/pypi-config.component';
-import { PackageListItem } from '../../../../../../../generated/api';
+import { RepoPermissionInfo, PackageListItem } from '../../../../../../../generated/api';
 import { PypiService } from '../../service/pypi.service';
 
 @Component({
@@ -89,11 +88,11 @@ export class PypiPackagesListComponent implements OnDestroy {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
     this.pagedData = new PagedData<PackageListItem>();
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
 
     this.repositoryChanges$ = this.pypiService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.fetchPackages();
       }
     });

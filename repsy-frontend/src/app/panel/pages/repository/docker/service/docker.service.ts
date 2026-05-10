@@ -29,9 +29,10 @@ import {
   RepoCreateForm,
   RepoDescriptionForm,
   RepoRenameForm,
+  RepoSettingsInfo,
+  RepoPermissionInfo,
 } from '../../../../../../generated/api';
 import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
-import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
 import { RestResponse } from '../../../../shared/dto/rest-response';
@@ -39,7 +40,6 @@ import { Sort } from '../../../../shared/dto/sort';
 import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
 import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
 import { TagListItem } from '../dto/tag-list-item';
-import { RepositorySettingsInfo } from '../../pypi/dto/repository-settings-info';
 
 @Injectable({
   providedIn: 'root',
@@ -115,14 +115,14 @@ export class DockerService {
     });
   }
 
-  public async fetchRepositorySettings(): Promise<RepositorySettingsInfo> {
-    return new Promise<RepositorySettingsInfo>((resolve, reject) => {
+  public async fetchRepositorySettings(): Promise<RepoSettingsInfo> {
+    return new Promise<RepoSettingsInfo>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/settings`;
 
       this.http
-        .get<RestResponse<RepositorySettingsInfo>>(url)
+        .get<RestResponse<RepoSettingsInfo>>(url)
         .toPromise()
-        .then((res: RestResponse<RepositorySettingsInfo>) => resolve(res.data))
+        .then((res: RestResponse<RepoSettingsInfo>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
     });
   }

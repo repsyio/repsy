@@ -23,7 +23,6 @@ import { filter } from 'rxjs/operators';
 
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { ToastService } from '../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../shared/dto/repo/repo-permission-info';
 import { RepoType } from '../../../shared/dto/repo/repo-type';
 import { CargoService } from '../cargo/service/cargo.service';
 import { DockerService } from '../docker/service/docker.service';
@@ -31,7 +30,7 @@ import { MavenRepoSettingsForm } from '../maven/dto/maven-repo-settings-form';
 import { GolangService } from '../golang/service/golang.service';
 import { MavenService } from '../maven/service/maven.service';
 import { NpmService } from '../npm/service/npm.service';
-import { RepositorySettingsInfo } from '../pypi/dto/repository-settings-info';
+import { RepoPermissionInfo, RepoSettingsInfo } from '../../../../../generated/api';
 import { PypiService } from '../pypi/service/pypi.service';
 import { RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { DeleteRepoComponent } from './delete-repo/delete-repo.component';
@@ -67,7 +66,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
 
   public repoType: string;
   public activeRepository: RepoPermissionInfo;
-  public repositorySettings: RepositorySettingsInfo;
+  public repositorySettings: RepoSettingsInfo;
   public mavenRepositorySettings: MavenRepoSettingsForm;
 
   private repositoryChanges$: Subscription;
@@ -135,9 +134,9 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
 
   public getRepoSettings() {
     this.getRepoSettingsService()
-      .then((res: RepositorySettingsInfo) => {
+      .then((res: RepoSettingsInfo) => {
         if (this.repoType === RepoType.NPM) {
-          this.repositorySettings = res as RepositorySettingsInfo;
+          this.repositorySettings = res as RepoSettingsInfo;
           this.generalSettingsForm.patchValue({
             privateRepository: this.repositorySettings.privateRepo,
             ...this.repositorySettings,
@@ -149,7 +148,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
             ...this.mavenRepositorySettings,
           });
         } else {
-          this.repositorySettings = res as RepositorySettingsInfo;
+          this.repositorySettings = res as RepoSettingsInfo;
           this.generalSettingsForm.patchValue({
             privateRepository: this.repositorySettings.privateRepo,
             ...this.repositorySettings,
@@ -189,7 +188,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
     }
   }
 
-  private getRepoSettingsService(): Promise<RepositorySettingsInfo> {
+  private getRepoSettingsService(): Promise<RepoSettingsInfo> {
     switch (this.repoType) {
       case RepoType.MAVEN: {
         return this.mavenService.getRepoSettings();

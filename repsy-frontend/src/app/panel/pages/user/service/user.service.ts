@@ -21,9 +21,7 @@ import { environment } from '../../../../../environments/environment';
 import { ErrorHandlerService } from '../../../../shared/error-handler/error-handler.service';
 import { PagedData } from '../../../shared/dto/paged-data';
 import { RestResponse } from '../../../shared/dto/rest-response';
-import { UserResponse } from '../../../../../generated/api';
-import { UserCreateForm } from '../form/user-crete-form';
-import { UserUpdateForm } from '../form/user-update-form';
+import { UserUpdateForm, UserCreateForm, UserResponse } from '../../../../../generated/api';
 
 @Injectable({
   providedIn: 'root',

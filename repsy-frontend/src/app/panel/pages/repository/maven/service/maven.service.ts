@@ -22,7 +22,6 @@ import { environment } from '../../../../../../environments/environment';
 import { ErrorHandlerService } from '../../../../../shared/error-handler/error-handler.service';
 import { PagedData } from '../../../../shared/dto/paged-data';
 import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
-import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
 import { RestResponse } from '../../../../shared/dto/rest-response';
 import { Sort } from '../../../../shared/dto/sort';
 import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
@@ -38,10 +37,11 @@ import {
   RepoRenameForm,
   RepoCreateForm,
   RepoDescriptionForm,
+  RepoSettingsInfo,
+  RepoPermissionInfo,
 } from '../../../../../../generated/api';
 import { DeletedItem } from '../dto/deleted-item';
 import { FsItemInfo } from '../dto/fs-item-info';
-import { RepositorySettingsInfo } from '../../pypi/dto/repository-settings-info';
 import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
 
 @Injectable({
@@ -311,14 +311,14 @@ export class MavenService {
     });
   }
 
-  public async getRepoSettings(): Promise<RepositorySettingsInfo> {
+  public async getRepoSettings(): Promise<RepoSettingsInfo> {
     const url = `${this.apiBaseUrl}/api/repos/` + `${this.activeRepo.repoName}/settings`;
 
-    return new Promise<RepositorySettingsInfo>((resolve, reject) => {
+    return new Promise<RepoSettingsInfo>((resolve, reject) => {
       this.http
-        .get<RestResponse<RepositorySettingsInfo>>(url)
+        .get<RestResponse<RepoSettingsInfo>>(url)
         .toPromise()
-        .then((res: RestResponse<RepositorySettingsInfo>) => resolve(res.data))
+        .then((res: RestResponse<RepoSettingsInfo>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
     });
   }

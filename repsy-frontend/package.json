@@ -18,6 +18,7 @@
     "lint": "ng lint",
     "format": "prettier --write \"src/**/*.{ts,html,css,scss}\"",
     "format:check": "prettier --check \"src/**/*.{ts,html,css,scss}\"",
+    "gen:api": "openapi-generator-cli generate -i ../repsy-backend/src/main/resources/openapi/openapi-spec.yaml -g typescript-angular -o src/generated/api --additional-properties=fileNaming=kebab-case,ngVersion=21.0.0,withInterfaces=true",
     "vercel-build": "pnpm run build:prod"
   },
   "dependencies": {
@@ -62,6 +63,7 @@
     "@angular/build": "^21.0.4",
     "@angular/cli": "^21.0.4",
     "@angular/compiler-cli": "^21.0.6",
+    "@openapitools/openapi-generator-cli": "^2.32.0",
     "@tailwindcss/nesting": "0.0.0-insiders.565cd3e",
     "@types/jasmine": "~5.1.13",
     "@types/md5": "^2.3.6",

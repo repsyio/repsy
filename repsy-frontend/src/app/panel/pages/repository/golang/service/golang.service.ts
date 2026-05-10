@@ -22,11 +22,9 @@ import { environment } from '../../../../../../environments/environment';
 import { ErrorHandlerService } from '../../../../../shared/error-handler/error-handler.service';
 import { PagedData } from '../../../../shared/dto/paged-data';
 import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
-import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
 import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
 import { RestResponse } from '../../../../shared/dto/rest-response';
 import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
-import { RepositorySettingsInfo } from '../../pypi/dto/repository-settings-info';
 import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
 import { Sort } from '../../../../shared/dto/sort';
 import {
@@ -37,6 +35,8 @@ import {
   GoModuleVersionListItem,
   RepoRenameForm,
   RepoCreateForm,
+  RepoSettingsInfo,
+  RepoPermissionInfo,
 } from '../../../../../../generated/api';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 
@@ -108,14 +108,14 @@ export class GolangService {
     });
   }
 
-  public async fetchRepositorySettings(): Promise<RepositorySettingsInfo> {
-    return new Promise<RepositorySettingsInfo>((resolve, reject) => {
+  public async fetchRepositorySettings(): Promise<RepoSettingsInfo> {
+    return new Promise<RepoSettingsInfo>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/settings`;
 
       this.http
-        .get<RestResponse<RepositorySettingsInfo>>(url)
+        .get<RestResponse<RepoSettingsInfo>>(url)
         .toPromise()
-        .then((res: RestResponse<RepositorySettingsInfo>) => resolve(res.data))
+        .then((res: RestResponse<RepoSettingsInfo>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
     });
   }

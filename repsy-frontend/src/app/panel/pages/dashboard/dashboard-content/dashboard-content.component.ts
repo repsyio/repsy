@@ -19,10 +19,7 @@ import { RouterModule } from '@angular/router';
 
 import { RepositoryCreateModalComponent } from '../../../shared/components/modals/repository-create-modal/repository-create-modal.component';
 import { ToastService } from '../../../shared/components/toast/toast.service';
-import { RepoListInfo } from '../../../shared/dto/repo/repo-list-info';
-import { RepoType } from '../../../shared/dto/repo/repo-type';
-import { RepoUsageInfo } from '../../../shared/dto/repo-usage-info';
-import { TotalUsageInfo } from '../../../shared/dto/total-usage-info';
+import { RepoType, RepoUsageInfo, TotalUsageInfo, RepoListInfo } from '../../../../../generated/api';
 import { StatsService } from '../../../shared/service/stats.service';
 import { RecentActivityComponent } from '../recent-activity/recent-activity.component';
 import { RepositoryCardComponent } from '../repository-card/repository-card.component';
@@ -48,7 +45,7 @@ interface Repository {
 })
 export class DashboardContentComponent {
   public username = '';
-  public usage: TotalUsageInfo = new TotalUsageInfo();
+  public usage: TotalUsageInfo = {} as TotalUsageInfo;
   public mavenRepoCount = 0;
   public npmRegistryCount = 0;
   public pypiRepoCount = 0;
@@ -86,7 +83,7 @@ export class DashboardContentComponent {
     for (const repo of repos) {
       try {
         const usage = await usageFetcher(repo.name);
-        repo.diskUsed = usage.diskUsed;
+        repo.diskUsage = usage.diskUsed.value;
         repo.type = repoType;
         updatedRepos.push(repo);
       } catch (error) {
@@ -139,32 +136,32 @@ export class DashboardContentComponent {
 
   private fetchRepoInfos() {
     this.fetchRepoInfo(
-      RepoType.MAVEN,
+      RepoType.Maven,
       this.statsService.getMavenRepoInfo.bind(this.statsService),
       this.statsService.fetchMavenRepositoryUsage.bind(this.statsService),
     );
     this.fetchRepoInfo(
-      RepoType.NPM,
+      RepoType.Npm,
       this.statsService.getNpmRepoInfo.bind(this.statsService),
       this.statsService.fetchNpmRepositoryUsage.bind(this.statsService),
     );
     this.fetchRepoInfo(
-      RepoType.PYPI,
+      RepoType.Pypi,
       this.statsService.getPypiRepoInfo.bind(this.statsService),
       this.statsService.fetchPypiRepositoryUsage.bind(this.statsService),
     );
     this.fetchRepoInfo(
-      RepoType.DOCKER,
+      RepoType.Docker,
       this.statsService.getDockerRepoInfo.bind(this.statsService),
       this.statsService.fetchDockerRepositoryUsage.bind(this.statsService),
     );
     this.fetchRepoInfo(
-      RepoType.CARGO,
+      RepoType.Cargo,
       this.statsService.getCargoRepoInfo.bind(this.statsService),
       this.statsService.fetchCargoRepositoryUsage.bind(this.statsService),
     );
     this.fetchRepoInfo(
-      RepoType.GOLANG,
+      RepoType.Golang,
       this.statsService.getGolangRepoInfo.bind(this.statsService),
       this.statsService.fetchGolangRepositoryUsage.bind(this.statsService),
     );

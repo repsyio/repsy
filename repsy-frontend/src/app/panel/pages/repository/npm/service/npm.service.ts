@@ -22,12 +22,10 @@ import { environment } from '../../../../../../environments/environment';
 import { ErrorHandlerService } from '../../../../../shared/error-handler/error-handler.service';
 import { PagedData } from '../../../../shared/dto/paged-data';
 import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
-import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
 import { RestResponse } from '../../../../shared/dto/rest-response';
 import { Sort } from '../../../../shared/dto/sort';
-import { RepositorySettingsInfo } from '../../pypi/dto/repository-settings-info';
 import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
 import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
 import {
@@ -38,6 +36,8 @@ import {
   DeployTokenForm,
   PackageListItem,
   PackageVersionListItem,
+  RepoSettingsInfo,
+  RepoPermissionInfo,
 } from '../../../../../../generated/api';
 import { PackageVersionInfo } from '../dto/package-version-info';
 
@@ -79,14 +79,14 @@ export class NpmService {
     });
   }
 
-  public async fetchRegistrySettings(): Promise<RepositorySettingsInfo> {
-    return new Promise<RepositorySettingsInfo>((resolve, reject) => {
+  public async fetchRegistrySettings(): Promise<RepoSettingsInfo> {
+    return new Promise<RepoSettingsInfo>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/${this.activeRegistry.repoName}/settings`;
 
       this.http
-        .get<RestResponse<RepositorySettingsInfo>>(url)
+        .get<RestResponse<RepoSettingsInfo>>(url)
         .toPromise()
-        .then((res: RestResponse<RepositorySettingsInfo>) => resolve(res.data))
+        .then((res: RestResponse<RepoSettingsInfo>) => resolve(res.data))
         .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
     });
   }

@@ -33,10 +33,9 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
+import { GoModuleListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { Sort } from '../../../../../shared/dto/sort';
 import { GolangConfigComponent } from '../../config/golang-config.component';
-import { ModuleListItem } from '../../dto/module-list-item';
 import { GolangService } from '../../service/golang.service';
 
 @Component({
@@ -65,7 +64,7 @@ export class GolangModulesListComponent implements OnDestroy {
   public pageSize = 10;
   public searchText = '';
   public error: string;
-  public pagedData: PagedData<ModuleListItem>;
+  public pagedData: PagedData<GoModuleListItem>;
   public activeRepo: RepoPermissionInfo;
   public sortOption: Sort = { name: 'Newest', column: 'id', type: 'DESC' };
   public sortOptions: Sort[] = [
@@ -73,7 +72,7 @@ export class GolangModulesListComponent implements OnDestroy {
     { name: 'Oldest', column: 'id', type: 'ASC' },
   ];
 
-  public modules: ModuleListItem[];
+  public modules: GoModuleListItem[];
 
   public readonly baseUrl: string;
   public readonly username: string;
@@ -87,12 +86,12 @@ export class GolangModulesListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
-    this.pagedData = new PagedData<ModuleListItem>();
-    this.activeRepo = new RepoPermissionInfo();
+    this.pagedData = new PagedData<GoModuleListItem>();
+    this.activeRepo = {} as RepoPermissionInfo;
 
     this.repositoryChanges$ = this.golangService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.fetchModules();
       }
     });
@@ -130,7 +129,7 @@ export class GolangModulesListComponent implements OnDestroy {
     return moment(date).fromNow();
   }
 
-  public deleteModule(mod: ModuleListItem) {
+  public deleteModule(mod: GoModuleListItem) {
     this.dangerModalService.show('Delete Module', 'Delete', () => {
       this.loading = true;
       this.golangService
@@ -156,7 +155,7 @@ export class GolangModulesListComponent implements OnDestroy {
       : this.golangService.fetchModules(this.sortOption, this.pageNum, this.pageSize);
 
     fetch
-      .then((pagedData: PagedData<ModuleListItem>) => {
+      .then((pagedData: PagedData<GoModuleListItem>) => {
         this.pagedData.page = pagedData.page;
         this.modules = pagedData.content;
       })

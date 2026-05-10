@@ -33,10 +33,9 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { MavenConfigComponent } from '../../config/maven-config.component';
-import { ArtifactListItem } from '../../../../../../../generated/api';
+import { RepoPermissionInfo, ArtifactListItem } from '../../../../../../../generated/api';
 import { MavenService } from '../../service/maven.service';
 
 @Component({
@@ -90,11 +89,11 @@ export class MavenArtifactsListComponent implements OnDestroy {
     this.baseUrl = environment.apiBaseUrl;
     this.username = this.authService.username;
     this.pagedData = new PagedData<ArtifactListItem>();
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
     this.groupName = this.route.snapshot.paramMap.get('group');
     this.repositoryChanges$ = this.mavenService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.fetchGroupArtifacts();
       }
     });

@@ -24,8 +24,7 @@ import { SpinnerComponent } from '../../../../../../shared/components/spinner/sp
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
-import { GoModuleVersionListItem } from '../../../../../../../generated/api';
+import { RepoPermissionInfo, GoModuleVersionListItem } from '../../../../../../../generated/api';
 import { GolangService } from '../../service/golang.service';
 
 @Component({
@@ -56,11 +55,11 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
     private readonly dangerModalService: DangerModalService,
   ) {
     this.repoBaseUrl = environment.repoBaseUrl;
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
 
     this.repositoryChanges$ = this.golangService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.modulePath = this.route.snapshot.queryParamMap.get('modulePath');
         this.versionName = this.route.snapshot.queryParamMap.get('version');
 

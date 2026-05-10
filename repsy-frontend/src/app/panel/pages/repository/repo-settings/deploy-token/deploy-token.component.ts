@@ -29,9 +29,8 @@ import { PaginationComponent } from '../../../../shared/components/pagination/pa
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
+import { RepoPermissionInfo, RepoUsageInfo } from '../../../../../../generated/api';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
-import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
 import { CargoConfigComponent } from '../../cargo/config/cargo-config.component';
 import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerConfigComponent } from '../../docker/config/docker-config.component';

@@ -26,8 +26,7 @@ import { SpinnerComponent } from '../../../../../../shared/components/spinner/sp
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
-import { ArtifactVersionInfo } from '../../../../../../../generated/api';
+import { RepoPermissionInfo, ArtifactVersionInfo } from '../../../../../../../generated/api';
 import { MavenService } from '../../service/maven.service';
 
 @Component({
@@ -66,11 +65,10 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
     private readonly toastService: ToastService,
   ) {
     this.baseUrl = environment.apiBaseUrl;
-    this.activeRepo = new RepoPermissionInfo();
-
+    this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.mavenService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), registry);
+        this.activeRepo = Object.assign({}, registry);
         this.loadVersion();
       }
     });

@@ -25,7 +25,7 @@ import { DropdownComponent } from '../../../../shared/components/dropdown/dropdo
 import { EmptyListComponent } from '../../../../shared/components/empty-list/empty-list.component';
 import { SearchboxComponent } from '../../../../shared/components/searchbox/searchbox.component';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
+import { RepoPermissionInfo } from '../../../../../../generated/api';
 import { ByteFormatter } from '../../../../shared/util/byte-formatter';
 import { MavenConfigComponent } from '../config/maven-config.component';
 import { FsItemInfo } from '../dto/fs-item-info';
@@ -58,7 +58,7 @@ export class MavenBrowserComponent implements OnDestroy {
   public loading = false;
   public operationLock = false;
   public showConfig = false;
-  public activeRepo: RepoPermissionInfo = new RepoPermissionInfo();
+  public activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
   public baseUrl: string;
   public repoUrl = '';
   public directoryStack: Directory[] = [];

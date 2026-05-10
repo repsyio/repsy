@@ -33,10 +33,9 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { GolangConfigComponent } from '../../config/golang-config.component';
-import { GoModuleVersionListItem } from '../../../../../../../generated/api';
+import { RepoPermissionInfo, GoModuleVersionListItem } from '../../../../../../../generated/api';
 import { GolangService } from '../../service/golang.service';
 
 @Component({
@@ -90,11 +89,11 @@ export class GolangModuleVersionListComponent implements OnDestroy {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
     this.pagedData = new PagedData<GoModuleVersionListItem>();
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
 
     this.repositoryChanges$ = this.golangService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.modulePath = this.route.snapshot.queryParamMap.get('modulePath');
         if (!this.modulePath) {
           this.router.navigate(['/' + this.activeRepo.repoName]);

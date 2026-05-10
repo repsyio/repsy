@@ -18,7 +18,7 @@
       <!-- Repository Name with Icon -->
       <div class="flex items-center gap-2 text-neutral-200">
         @switch (repo.type) {
-          @case ('npm') {
+          @case (RepoType.Npm) {
             <svg
               class="group-hover:text-secondary-500 h-[20px] w-[20px] shrink-0"
               width="141"
@@ -34,7 +34,7 @@
               />
             </svg>
           }
-          @case ('maven') {
+          @case (RepoType.Maven) {
             <svg
               class="group-hover:text-secondary-500 h-[20px] w-[20px] shrink-0"
               width="37"
@@ -94,7 +94,7 @@
               />
             </svg>
           }
-          @case ('pypi') {
+          @case (RepoType.Pypi) {
             <svg
               class="group-hover:text-secondary-500 h-[20px] w-[20px] shrink-0"
               width="46"
@@ -111,7 +111,7 @@
               />
             </svg>
           }
-          @case ('docker') {
+          @case (RepoType.Docker) {
             <svg
               class="group-hover:text-secondary-500 h-[20px] w-[20px] shrink-0"
               width="101"
@@ -127,7 +127,7 @@
               />
             </svg>
           }
-          @case ('golang') {
+          @case (RepoType.Golang) {
             <svg
               class="group-hover:text-secondary-500 h-[20px] w-[20px]"
               viewBox="0 0 587 301"
@@ -139,7 +139,7 @@
               />
             </svg>
           }
-          @case ('cargo') {
+          @case (RepoType.Cargo) {
             <svg
               class="group-hover:text-secondary-500 h-[20px] w-[20px]"
               viewBox="0 0 256 256"
@@ -161,7 +161,7 @@
       <!-- Disk Usage -->
       <div class="flex items-center justify-between lg:justify-start">
         <span class="text-sm text-[#9FA0A0] lg:hidden">Disk Usage:</span>
-        <span class="text-sm text-[#FDFDFD]">{{ repo.diskUsed?.text || '0 B' }}</span>
+        <span class="text-sm text-[#FDFDFD]">{{ formatBytes(repo.diskUsage) }}</span>
       </div>
 
       <!-- Created Date -->

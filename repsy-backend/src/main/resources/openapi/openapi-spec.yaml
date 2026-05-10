@@ -2885,6 +2885,8 @@ components:
       properties:
         name:
           type: string
+        type:
+          "$ref": "#/components/schemas/RepoType"
         privateRepo:
           type: boolean
           nullable: false
