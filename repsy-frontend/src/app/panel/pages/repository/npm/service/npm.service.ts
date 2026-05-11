@@ -20,7 +20,6 @@ import { map, tap } from 'rxjs/operators';
 
 import { PagedData } from '../../../../shared/dto/paged-data';
 import { Sort } from '../../../../shared/dto/sort';
-import { PackageVersionInfo } from '../dto/package-version-info';
 import {
   NpmPackageApiControllerService,
   PackageDistributionTagMapListItem,
@@ -28,6 +27,7 @@ import {
   PackageVersionListItem,
   ProtocolRepoControllerService,
   RepoPermissionInfo,
+  PackageVersionDetail
 } from '../../../../../../generated/api';
 
 @Injectable({
@@ -122,11 +122,11 @@ export class NpmService {
     return call.pipe(map(r => r.data ?? []));
   }
 
-  public fetchPackageVersion(packageName: string, scopeName: string, versionName: string): Observable<PackageVersionInfo> {
+  public fetchPackageVersion(packageName: string, scopeName: string, versionName: string): Observable<PackageVersionDetail> {
     const call = scopeName
       ? this.npmPackageApiControllerService.getNpmScopedPackageVersion(scopeName, packageName, versionName, this.repoName)
       : this.npmPackageApiControllerService.getVersion(packageName, versionName, this.repoName);
-    return call.pipe(map(r => r.data as unknown as PackageVersionInfo));
+    return call.pipe(map(r => r.data as unknown as PackageVersionDetail));
   }
 
   public deletePackage(packageName: string, scopeName: string): Observable<void> {

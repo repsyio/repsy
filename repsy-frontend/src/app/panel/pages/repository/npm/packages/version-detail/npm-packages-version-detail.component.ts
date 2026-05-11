@@ -24,8 +24,7 @@ import { SpinnerComponent } from '../../../../../../shared/components/spinner/sp
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../../../generated/api';
-import { PackageVersionInfo } from '../../dto/package-version-info';
+import { PackageVersionDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { NpmService } from '../../service/npm.service';
 
 @Component({
@@ -43,7 +42,7 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
   public error: string;
   public activeRegistry: RepoPermissionInfo;
   private readonly registryChanges$: Subscription;
-  public versionInfo: PackageVersionInfo;
+  public versionInfo: PackageVersionDetail;
 
   constructor(
     private readonly npmService: NpmService,
@@ -84,11 +83,8 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
     this.npmService.fetchPackageVersion(this.packageName, this.scopeName, this.versionName).pipe(
       finalize(() => { this.loading = false; }),
     ).subscribe({
-      next: (packageVersionInfo: PackageVersionInfo) => {
-        packageVersionInfo.createdAt = new Date(packageVersionInfo.createdAt);
-        packageVersionInfo.fullName = packageVersionInfo.scopeName
-          ? '@' + packageVersionInfo.scopeName + '/' + packageVersionInfo.packageName
-          : packageVersionInfo.packageName;
+      next: (packageVersionInfo: PackageVersionDetail) => {
+        console.log('VERSION DETAIL RAW:', JSON.stringify(packageVersionInfo));
         this.versionInfo = packageVersionInfo;
         this.versionInfo.versionName = this.versionName;
       },
