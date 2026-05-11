@@ -54,12 +54,6 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: getSettings
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       responses:
         '200':
           description: OK
@@ -72,12 +66,6 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: updateSettings
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       requestBody:
         content:
           application/json:
@@ -104,11 +92,6 @@ paths:
         - protocol-deploy-token-controller
       operationId: rotate
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: tokenId
           in: path
           required: true
@@ -128,11 +111,6 @@ paths:
         - protocol-deploy-token-controller
       operationId: revoke
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: tokenId
           in: path
           required: true
@@ -281,11 +259,6 @@ paths:
         - protocol-repo-controller
       operationId: createRepo
       parameters:
-        - name: facade
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/ProtocolApiFacade"
         - name: repoType
           in: path
           required: true
@@ -316,11 +289,6 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       responses:
         '200':
           description: OK
@@ -333,12 +301,6 @@ paths:
       tags:
         - protocol-deploy-token-controller
       operationId: createDeployToken
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       requestBody:
         content:
           application/json:
@@ -365,11 +327,6 @@ paths:
         - key-store-controller
       operationId: listMavenKeyStores
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: pageable
           in: query
           required: true
@@ -387,12 +344,6 @@ paths:
       tags:
         - key-store-controller
       operationId: createMavenKeyStore
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       requestBody:
         content:
           application/json:
@@ -456,12 +407,6 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: rename
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       requestBody:
         content:
           application/json:
@@ -487,12 +432,6 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: updateDescription
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       requestBody:
         content:
           application/json:
@@ -569,12 +508,6 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: getUsage
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       responses:
         '200':
           description: OK
@@ -594,12 +527,6 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: getPermission
-      parameters:
-        - name: repoPermissionInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoPermissionInfo"
       responses:
         '200':
           description: OK
@@ -619,12 +546,6 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: getRepoType
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       responses:
         '200':
           description: OK
@@ -645,16 +566,6 @@ paths:
         - protocol-repo-controller
       operationId: getPathContent
       parameters:
-        - name: facade
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/ProtocolApiFacadeMavenAdapter"
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: path
           in: query
           required: true
@@ -680,11 +591,6 @@ paths:
         - pypi-package-controller
       operationId: listPypiPackages
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: pageable
           in: query
           required: true
@@ -716,11 +622,6 @@ paths:
         - pypi-package-controller
       operationId: listReleases
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -757,11 +658,6 @@ paths:
         - pypi-package-controller
       operationId: getRelease
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -785,11 +681,6 @@ paths:
         - pypi-package-controller
       operationId: deleteRelease
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -820,11 +711,6 @@ paths:
         - pypi-package-controller
       operationId: getPypiPackage
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -843,11 +729,6 @@ paths:
         - pypi-package-controller
       operationId: deletePypiPackage
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -910,11 +791,6 @@ paths:
         - npm-package-api-controller
       operationId: listNpmPackages
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: query
           required: false
@@ -945,11 +821,6 @@ paths:
         - npm-package-api-controller
       operationId: getVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -973,11 +844,6 @@ paths:
         - npm-package-api-controller
       operationId: deleteVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -1008,11 +874,6 @@ paths:
         - npm-package-api-controller
       operationId: getNpmScopedPackageVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: path
           required: true
@@ -1041,11 +902,6 @@ paths:
         - npm-package-api-controller
       operationId: deleteNpmScopedPackageVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: path
           required: true
@@ -1081,11 +937,6 @@ paths:
         - npm-package-api-controller
       operationId: getNpmPackage
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -1104,11 +955,6 @@ paths:
         - npm-package-api-controller
       operationId: deleteNpmPackage
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -1134,11 +980,6 @@ paths:
         - npm-package-api-controller
       operationId: getNpmScopedPackage
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: path
           required: true
@@ -1162,11 +1003,6 @@ paths:
         - npm-package-api-controller
       operationId: deleteScopedNpmPackage
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: path
           required: true
@@ -1197,11 +1033,6 @@ paths:
         - npm-package-api-controller
       operationId: listScopedNpmPackages
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: ignoredScope
           in: path
           required: true
@@ -1238,11 +1069,6 @@ paths:
         - npm-package-api-controller
       operationId: listFilterByScope
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: name
           in: query
           required: false
@@ -1274,11 +1100,6 @@ paths:
         - npm-package-api-controller
       operationId: listNpmPackagesByScope
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: path
           required: true
@@ -1315,11 +1136,6 @@ paths:
         - npm-package-api-controller
       operationId: listVersions
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -1356,11 +1172,6 @@ paths:
         - npm-package-api-controller
       operationId: listNpmScopedPackageVersions
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: path
           required: true
@@ -1402,11 +1213,6 @@ paths:
         - npm-package-api-controller
       operationId: listTags
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -1432,11 +1238,6 @@ paths:
         - npm-package-api-controller
       operationId: listNpmScopedPackageTags
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: path
           required: true
@@ -1467,11 +1268,6 @@ paths:
         - maven-artifact-controller
       operationId: listContainsGroupName
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: query
           required: false
@@ -1503,11 +1299,6 @@ paths:
         - maven-artifact-controller
       operationId: listContainsArtifactName
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: path
           required: true
@@ -1537,11 +1328,6 @@ paths:
         - maven-artifact-controller
       operationId: deleteGroup
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: path
           required: true
@@ -1567,11 +1353,6 @@ paths:
         - maven-artifact-controller
       operationId: listMavenArtifactVersions
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: path
           required: true
@@ -1613,11 +1394,6 @@ paths:
         - maven-artifact-controller
       operationId: getMavenArtifact
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: path
           required: true
@@ -1641,11 +1417,6 @@ paths:
         - maven-artifact-controller
       operationId: deleteMavenArtifact
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: path
           required: true
@@ -1676,11 +1447,6 @@ paths:
         - maven-artifact-controller
       operationId: getMavenArtifactVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: path
           required: true
@@ -1709,11 +1475,6 @@ paths:
         - maven-artifact-controller
       operationId: deleteMavenArtifactVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: path
           required: true
@@ -1749,11 +1510,6 @@ paths:
         - golang-module-controller
       operationId: listGolangModules
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: pageable
           in: query
           required: true
@@ -1772,11 +1528,6 @@ paths:
         - golang-module-controller
       operationId: deleteGolangModule
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: modulePath
           in: query
           required: true
@@ -1802,11 +1553,6 @@ paths:
         - golang-module-controller
       operationId: listGolangModuleVersions
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: modulePath
           in: query
           required: true
@@ -1836,11 +1582,6 @@ paths:
         - golang-module-controller
       operationId: deleteGolangModuleVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: modulePath
           in: query
           required: true
@@ -1886,11 +1627,6 @@ paths:
         - golang-module-controller
       operationId: searchGolangModules
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: search
           in: query
           required: false
@@ -1922,11 +1658,6 @@ paths:
         - golang-module-controller
       operationId: getGolangModuleInfo
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: modulePath
           in: query
           required: true
@@ -1952,11 +1683,6 @@ paths:
         - docker-image-controller
       operationId: listDockerImages
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: name
           in: query
           required: false
@@ -1988,11 +1714,6 @@ paths:
         - docker-image-controller
       operationId: listDockerImageTags
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: imageName
           in: path
           required: true
@@ -2029,11 +1750,6 @@ paths:
         - docker-image-controller
       operationId: listTagManifests
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: imageName
           in: path
           required: true
@@ -2075,11 +1791,6 @@ paths:
         - docker-image-controller
       operationId: getManifest
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: imageName
           in: path
           required: true
@@ -2110,11 +1821,6 @@ paths:
         - docker-image-controller
       operationId: getTagDetail
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: imageName
           in: path
           required: true
@@ -2133,11 +1839,6 @@ paths:
         - docker-image-controller
       operationId: deleteDockerImage
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: imageName
           in: path
           required: true
@@ -2163,11 +1864,6 @@ paths:
         - docker-image-controller
       operationId: getDockerImageTag
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: imageName
           in: path
           required: true
@@ -2191,11 +1887,6 @@ paths:
         - docker-image-controller
       operationId: deleteTag
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: imageName
           in: path
           required: true
@@ -2226,11 +1917,6 @@ paths:
         - docker-image-controller
       operationId: getConfig
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: ignoredImageName
           in: path
           required: true
@@ -2261,11 +1947,6 @@ paths:
         - cargo-crate-controller
       operationId: searchCargoCrates
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: query
           in: query
           required: false
@@ -2297,11 +1978,6 @@ paths:
         - cargo-crate-controller
       operationId: getCargoCrate
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: crateName
           in: path
           required: true
@@ -2320,11 +1996,6 @@ paths:
         - cargo-crate-controller
       operationId: deleteCargoCrate
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: crateName
           in: path
           required: true
@@ -2350,11 +2021,6 @@ paths:
         - cargo-crate-controller
       operationId: getCargoCrateVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: crateName
           in: path
           required: true
@@ -2378,11 +2044,6 @@ paths:
         - cargo-crate-controller
       operationId: deleteCargoCrateVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: crateName
           in: path
           required: true
@@ -2413,11 +2074,6 @@ paths:
         - cargo-crate-controller
       operationId: listCargoCrateVersions
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: crateName
           in: path
           required: true
@@ -2453,17 +2109,6 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: deleteRepo
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
-        - name: facade
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/ProtocolApiFacade"
       responses:
         '200':
           description: OK
@@ -2484,11 +2129,6 @@ paths:
         - key-store-controller
       operationId: deleteMavenKeyStore
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: keyStoreId
           in: path
           required: true

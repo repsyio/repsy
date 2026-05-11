@@ -24,7 +24,6 @@ import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/depl
 import {
   DeployTokenForm,
   ProtocolDeployTokenControllerService,
-  RepoInfo,
 } from '../../../../../../generated/api';
 import { ToastService } from '../../toast/toast.service';
 import { RadioGroupComponent, RadioOption } from '../../radio-group/radio-group.component';
@@ -100,7 +99,7 @@ export class DeployTokenCreateModalComponent implements OnInit {
       return;
     }
 
-    this.protocolDeployTokenControllerService.createDeployToken({} as RepoInfo, this.repoName, payload).pipe(
+    this.protocolDeployTokenControllerService.createDeployToken(this.repoName, payload).pipe(
       finalize(() => { this.form.enable(); this.loading = false; }),
     ).subscribe({
       next: (r) => {

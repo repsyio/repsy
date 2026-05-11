@@ -24,7 +24,6 @@ import { ToastService } from '../../../../shared/components/toast/toast.service'
 import {
   ProtocolRepoControllerService,
   RepoDescriptionForm,
-  RepoInfo,
   RepoPermissionInfo,
   RepoRenameForm,
 } from '../../../../../../generated/api';
@@ -75,7 +74,7 @@ export class RepoInfoComponent implements OnInit {
       this.loading = true;
       this.renameForm.disable();
 
-      this.protocolRepoControllerService.rename({} as RepoInfo, this.activeRepository.repoName, form).pipe(
+      this.protocolRepoControllerService.rename(this.activeRepository.repoName, form).pipe(
         finalize(() => { this.loading = false; this.renameForm.enable(); }),
       ).subscribe({
         next: () => {
@@ -93,7 +92,7 @@ export class RepoInfoComponent implements OnInit {
     this.loading = true;
     this.renameForm.disable();
 
-    this.protocolRepoControllerService.updateDescription({} as RepoInfo, this.activeRepository.repoName, form).pipe(
+    this.protocolRepoControllerService.updateDescription(this.activeRepository.repoName, form).pipe(
       finalize(() => { this.loading = false; this.renameForm.enable(); }),
     ).subscribe({
       next: () => {

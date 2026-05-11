@@ -22,7 +22,7 @@ import { ToastService } from '../../../../shared/components/toast/toast.service'
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
-import { ProtocolRepoControllerService, RepoInfo } from '../../../../../../generated/api';
+import { ProtocolRepoControllerService } from '../../../../../../generated/api';
 import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form';
 
 @Component({
@@ -60,7 +60,7 @@ export class VisibilityComponent {
       form.allowOverride = this.parentForm.get('allowOverride').value;
     }
 
-    this.protocolRepoControllerService.updateSettings({} as RepoInfo, this.repoName, form).subscribe({
+    this.protocolRepoControllerService.updateSettings(this.repoName, form).subscribe({
       next: () => {
         this.fetch.emit();
         this.toastService.show(`Repository visibility has changed as ${privacy ? 'private' : 'public'}`, 'success');

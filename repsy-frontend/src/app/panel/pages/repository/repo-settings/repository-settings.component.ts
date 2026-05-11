@@ -27,7 +27,6 @@ import { RepoType } from '../../../shared/dto/repo/repo-type';
 import { MavenRepoSettingsForm } from '../maven/dto/maven-repo-settings-form';
 import {
   ProtocolRepoControllerService,
-  RepoInfo,
   RepoPermissionInfo,
   RepoSettingsInfo,
 } from '../../../../../generated/api';
@@ -97,7 +96,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
       filter((context) => !!context),
       switchMap((context) => {
         this.repoType = context.repoType;
-        return this.protocolRepoControllerService.getPermission({} as RepoPermissionInfo, context.repoName).pipe(
+        return this.protocolRepoControllerService.getPermission(context.repoName).pipe(
           map(r => r.data!),
         );
       }),
@@ -119,7 +118,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
   }
 
   public getRepoSettings() {
-    this.protocolRepoControllerService.getSettings({} as RepoInfo, this.activeRepository.repoName).pipe(
+    this.protocolRepoControllerService.getSettings(this.activeRepository.repoName).pipe(
       map(r => r.data!),
       finalize(() => { this.loading = false; }),
     ).subscribe({

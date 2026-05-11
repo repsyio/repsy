@@ -80,7 +80,7 @@ export class RepositoryCreateModalComponent implements OnInit {
     const form = this.form.getRawValue() as RepoCreateForm;
     const apiRepoType = this.selectedOption.toUpperCase() as ApiRepoType;
 
-    this.protocolRepoControllerService.createRepo({} as any, apiRepoType, form).pipe(
+    this.protocolRepoControllerService.createRepo(apiRepoType, form).pipe(
       finalize(() => { this.form.enable(); this.loading = false; }),
     ).subscribe({
       next: () => {

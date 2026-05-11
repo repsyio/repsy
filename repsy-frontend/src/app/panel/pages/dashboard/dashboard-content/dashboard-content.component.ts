@@ -19,9 +19,9 @@ import { RouterModule } from '@angular/router';
 import { forkJoin, map, of, switchMap } from 'rxjs';
 
 import { RepositoryCreateModalComponent } from '../../../shared/components/modals/repository-create-modal/repository-create-modal.component';
-import { RepoInfo, RepoListInfo, RepoType, TotalUsageInfo } from '../../../../../generated/api';
-import { ProtocolRepoControllerService } from '../../../../../generated/api/api/protocol-repo-controller.service';
-import { UsageControllerService } from '../../../../../generated/api/api/usage-controller.service';
+import { RepoListInfo, RepoType, TotalUsageInfo } from '../../../../../generated/api';
+import { ProtocolRepoControllerService } from '../../../../../generated/api';
+import { UsageControllerService } from '../../../../../generated/api';
 import { RecentActivityComponent } from '../recent-activity/recent-activity.component';
 import { RepositoryCardComponent } from '../repository-card/repository-card.component';
 import { TotalDiskComponent } from '../total-disk/total-disk.component';
@@ -115,7 +115,7 @@ export class DashboardContentComponent {
           }
           return forkJoin(
             repos.map(repo =>
-              this.protocolRepoControllerService.getUsage({} as RepoInfo, repo.name).pipe(
+              this.protocolRepoControllerService.getUsage(repo.name).pipe(
                 map(r => {
                   repo.diskUsage = r.data?.diskUsed?.value;
                   repo.type = repoType;

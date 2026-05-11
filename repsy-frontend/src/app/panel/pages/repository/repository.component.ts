@@ -18,7 +18,6 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
-import { Observable } from 'rxjs';
 import { finalize, map } from 'rxjs/operators';
 
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
@@ -38,7 +37,6 @@ import { ByteFormatter } from '../../shared/util/byte-formatter';
 import { ProfileService } from '../profile/service/profile.service';
 import {
   ProtocolRepoControllerService,
-  RepoInfo,
   RepoType as ApiRepoType,
 } from '../../../../generated/api';
 
@@ -142,7 +140,7 @@ export class RepositoryComponent {
     }
     this.dangerModalService.show('Delete Repository', 'Delete', () => {
       this.operationLock = true;
-      this.protocolRepoControllerService.deleteRepo({} as RepoInfo, {} as any, repo.name).pipe(
+      this.protocolRepoControllerService.deleteRepo(repo.name).pipe(
         finalize(() => { this.operationLock = false; }),
         map(() => undefined),
       ).subscribe({

@@ -28,7 +28,6 @@ import {
   ArtifactVersionListItem,
   MavenArtifactControllerService,
   ProtocolRepoControllerService,
-  RepoInfo,
   RepoPermissionInfo,
   RepoSettingsForm,
 } from '../../../../../../generated/api';
@@ -53,25 +52,24 @@ export class MavenService {
   }
 
   public getRepository(repoName: string): Observable<RepoPermissionInfo> {
-    return this.protocolRepoControllerService.getPermission({} as RepoPermissionInfo, repoName).pipe(
+    return this.protocolRepoControllerService.getPermission(repoName).pipe(
       map(r => r.data!),
       tap(info => this.repoSubject.next(info)),
     );
   }
 
   public updateRepoSettings(form: RepoSettingsForm): Observable<void> {
-    return this.protocolRepoControllerService.updateSettings({} as RepoInfo, this.repoName, form).pipe(map(() => undefined));
+    return this.protocolRepoControllerService.updateSettings(this.repoName, form).pipe(map(() => undefined));
   }
 
   public getPathContent(path: string): Observable<FsItemInfo[]> {
-    return this.protocolRepoControllerService.getPathContent({} as any, {} as RepoInfo, path, this.repoName).pipe(
+    return this.protocolRepoControllerService.getPathContent(path, this.repoName).pipe(
       map(r => r.data as unknown as FsItemInfo[]),
     );
   }
 
   public searchGroups(groupName: string, sortOption: Sort, pageIndex: number, pageSize: number): Observable<PagedData<ArtifactListItem>> {
     return this.mavenArtifactControllerService.listContainsGroupName(
-      {} as RepoInfo,
       { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
       this.repoName,
       groupName || undefined,
@@ -88,7 +86,6 @@ export class MavenService {
     pageSize: number,
   ): Observable<PagedData<ArtifactListItem>> {
     return this.mavenArtifactControllerService.listContainsArtifactName(
-      {} as RepoInfo,
       groupName,
       { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
       this.repoName,
@@ -107,7 +104,6 @@ export class MavenService {
     pageSize: number,
   ): Observable<PagedData<ArtifactVersionListItem>> {
     return this.mavenArtifactControllerService.listMavenArtifactVersions(
-      {} as RepoInfo,
       groupName,
       artifactName,
       { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
@@ -119,25 +115,25 @@ export class MavenService {
   }
 
   public fetchArtifactVersion(groupName: string, artifactName: string, versionName: string): Observable<ArtifactVersionInfo> {
-    return this.mavenArtifactControllerService.getMavenArtifactVersion({} as RepoInfo, groupName, artifactName, versionName, this.repoName).pipe(
+    return this.mavenArtifactControllerService.getMavenArtifactVersion(groupName, artifactName, versionName, this.repoName).pipe(
       map(r => r.data!),
     );
   }
 
   public deleteGroup(groupName: string): Observable<DeletedItem> {
-    return this.mavenArtifactControllerService.deleteGroup({} as RepoInfo, groupName, this.repoName).pipe(
+    return this.mavenArtifactControllerService.deleteGroup(groupName, this.repoName).pipe(
       map(r => r.data as unknown as DeletedItem),
     );
   }
 
   public deleteArtifact(groupName: string, artifactName: string): Observable<DeletedItem> {
-    return this.mavenArtifactControllerService.deleteMavenArtifact({} as RepoInfo, groupName, artifactName, this.repoName).pipe(
+    return this.mavenArtifactControllerService.deleteMavenArtifact(groupName, artifactName, this.repoName).pipe(
       map(r => r.data as unknown as DeletedItem),
     );
   }
 
   public deleteVersion(groupName: string, artifactName: string, versionName: string): Observable<DeletedItem> {
-    return this.mavenArtifactControllerService.deleteMavenArtifactVersion({} as RepoInfo, groupName, artifactName, versionName, this.repoName).pipe(
+    return this.mavenArtifactControllerService.deleteMavenArtifactVersion(groupName, artifactName, versionName, this.repoName).pipe(
       map(r => r.data as unknown as DeletedItem),
     );
   }

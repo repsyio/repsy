@@ -16,8 +16,6 @@
 
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, map, Observable, of, tap } from 'rxjs';
-
-import { RepoInfo } from '../../../../../generated/api';
 import { ProtocolRepoControllerService } from '../../../../../generated/api';
 
 export type RepoType = 'maven' | 'npm' | 'pypi' | 'docker' | 'golang' | 'cargo';
@@ -71,7 +69,7 @@ export class RepoLookupService {
   }
 
   private fetchRepoType(repoName: string): Observable<RepoType> {
-    return this.protocolRepoControllerService.getRepoType({} as RepoInfo, repoName).pipe(
+    return this.protocolRepoControllerService.getRepoType(repoName).pipe(
       map(r => r.data as RepoType),
     );
   }

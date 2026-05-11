@@ -17,9 +17,7 @@
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-
-import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { ProtocolRepoControllerService, RepoInfo, RepoUsageInfo } from '../../../../../../generated/api';
+import { ProtocolRepoControllerService, RepoUsageInfo } from '../../../../../../generated/api';
 
 @Component({
   selector: 'app-repo-storage',
@@ -36,7 +34,6 @@ export class RepoStorageComponent implements OnInit {
 
   constructor(
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
-    private readonly toastService: ToastService,
   ) {}
 
   ngOnInit(): void {
@@ -44,7 +41,7 @@ export class RepoStorageComponent implements OnInit {
   }
 
   fetchRepoUsage() {
-    this.protocolRepoControllerService.getUsage({} as RepoInfo, this.repoName).subscribe({
+    this.protocolRepoControllerService.getUsage(this.repoName).subscribe({
       next: (r) => { this.usage = r.data!; },
       error: () => {},
     });

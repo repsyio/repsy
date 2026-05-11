@@ -33,7 +33,6 @@ import { PagedData } from '../../../../shared/dto/paged-data';
 import {
   ProtocolDeployTokenControllerService,
   ProtocolRepoControllerService,
-  RepoInfo,
   RepoPermissionInfo,
   RepoUsageInfo,
 } from '../../../../../../generated/api';
@@ -101,7 +100,7 @@ export class DeployTokenComponent implements OnInit {
   }
 
   private fetchRepoUsage() {
-    this.protocolRepoControllerService.getUsage({} as RepoInfo, this.activeRepository.repoName).subscribe({
+    this.protocolRepoControllerService.getUsage(this.activeRepository.repoName).subscribe({
       next: (r) => { this.repoUsage = r.data!; },
       error: () => {},
     });
@@ -110,7 +109,7 @@ export class DeployTokenComponent implements OnInit {
   public fetchDeployTokens() {
     this.fetchRepoUsage();
     this.protocolDeployTokenControllerService.listDeployTokens(
-      { page: this.pageNum, size: this.pageSize }, {} as RepoInfo, this.activeRepository.repoName,
+      { page: this.pageNum, size: this.pageSize }, this.activeRepository.repoName,
     ).subscribe({
       next: (r) => {
         this.pagedData.page = r.data?.page as any;
@@ -134,7 +133,7 @@ export class DeployTokenComponent implements OnInit {
     this.dangerModalService.show('Rotate Deploy Token', 'Rotate', () => {
       this.operationLock = true;
 
-      this.protocolDeployTokenControllerService.rotate({} as RepoInfo, deployToken.id, this.activeRepository.repoName).pipe(
+      this.protocolDeployTokenControllerService.rotate(deployToken.id, this.activeRepository.repoName).pipe(
         finalize(() => { this.operationLock = false; }),
       ).subscribe({
         next: (r) => {
@@ -166,7 +165,7 @@ export class DeployTokenComponent implements OnInit {
     this.dangerModalService.show('Delete Deploy Token', 'Delete', () => {
       this.operationLock = true;
 
-      this.protocolDeployTokenControllerService.revoke({} as RepoInfo, deployToken.id, this.activeRepository.repoName).pipe(
+      this.protocolDeployTokenControllerService.revoke(deployToken.id, this.activeRepository.repoName).pipe(
         finalize(() => { this.operationLock = false; }),
       ).subscribe({
         next: onSuccess,

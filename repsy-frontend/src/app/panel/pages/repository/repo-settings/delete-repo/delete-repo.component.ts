@@ -21,7 +21,7 @@ import { finalize } from 'rxjs/operators';
 
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { ProtocolRepoControllerService, RepoInfo, RepoPermissionInfo } from '../../../../../../generated/api';
+import { ProtocolRepoControllerService, RepoPermissionInfo } from '../../../../../../generated/api';
 
 @Component({
   selector: 'app-delete-repo',
@@ -53,7 +53,7 @@ export class DeleteRepoComponent {
     const successMsg = 'Repository deleted successfully';
     this.dangerModalService.show('Delete Repository', 'Delete', () => {
       this.loading = true;
-      this.protocolRepoControllerService.deleteRepo({} as RepoInfo, {} as any, this.activeRepository.repoName).pipe(
+      this.protocolRepoControllerService.deleteRepo(this.activeRepository.repoName).pipe(
         finalize(() => { this.loading = false; }),
       ).subscribe({
         next: () => {

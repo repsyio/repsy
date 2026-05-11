@@ -23,12 +23,10 @@ import { finalize } from 'rxjs/operators';
 import { environment } from '../../../../../../environments/environment';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { PagedData } from '../../../../shared/dto/paged-data';
 import {
   KeyStoreControllerService,
   KeyStoreForm,
   ProtocolRepoControllerService,
-  RepoInfo,
   RepoPermissionInfo,
 } from '../../../../../../generated/api';
 import { SignatureForm } from './dto/signature-form';
@@ -76,7 +74,7 @@ export class SignatureComponent implements OnInit {
   }
 
   private fetchRepoSettings(): void {
-    this.protocolRepoControllerService.getSettings({} as RepoInfo, this.activeRepository.repoName).subscribe({
+    this.protocolRepoControllerService.getSettings(this.activeRepository.repoName).subscribe({
       next: () => {
         this.keyStoreForm.patchValue({ url: '' });
         this.keyStoreForm.get('url')?.enable();
@@ -97,7 +95,7 @@ export class SignatureComponent implements OnInit {
     };
 
     this.keyStoreControllerService.createMavenKeyStore(
-      {} as RepoInfo, this.activeRepository.repoName, keyStoreForm as unknown as KeyStoreForm,
+      this.activeRepository.repoName, keyStoreForm as unknown as KeyStoreForm,
     ).pipe(
       finalize(() => { this.isSubmitting = false; }),
     ).subscribe({
@@ -114,7 +112,7 @@ export class SignatureComponent implements OnInit {
   public fetchKeyStores(): void {
     this.pageNum = 1;
     this.keyStoreControllerService.listMavenKeyStores(
-      {} as RepoInfo, { page: 0, size: this.pageSize }, this.activeRepository.repoName,
+      { page: 0, size: this.pageSize }, this.activeRepository.repoName,
     ).subscribe({
       next: (r) => {
         this.keyStores = (r.data?.content ?? []) as unknown as SignatureItem[];
@@ -125,7 +123,7 @@ export class SignatureComponent implements OnInit {
 
   public loadMoreKeyStores(): void {
     this.keyStoreControllerService.listMavenKeyStores(
-      {} as RepoInfo, { page: this.pageNum, size: this.pageSize }, this.activeRepository.repoName,
+      { page: this.pageNum, size: this.pageSize }, this.activeRepository.repoName,
     ).subscribe({
       next: (r) => {
         const newItems = (r.data?.content ?? []) as unknown as SignatureItem[];
@@ -146,7 +144,7 @@ export class SignatureComponent implements OnInit {
 
   public deleteKeyStore(uuid: string): void {
     this.dangerModalService.show('Delete Key Store', 'Delete', () => {
-      this.keyStoreControllerService.deleteMavenKeyStore({} as RepoInfo, uuid, this.activeRepository.repoName).subscribe({
+      this.keyStoreControllerService.deleteMavenKeyStore(uuid, this.activeRepository.repoName).subscribe({
         next: () => {
           this.pageNum = 1;
           this.fetchKeyStores();

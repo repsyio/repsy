@@ -17,31 +17,16 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
-
 import {
-  DeployTokenForm,
   PackageListItem,
-  ProtocolDeployTokenControllerService,
   ProtocolRepoControllerService,
   PypiPackageControllerService,
   ReleaseDetail,
   ReleaseListItem,
-  RepoCreateForm,
-  RepoDescriptionForm,
-  RepoInfo,
   RepoPermissionInfo,
-  RepoRenameForm,
-  RepoSettingsForm,
-  RepoSettingsInfo,
-  RepoType as ApiRepoType,
-  RepoUsageInfo,
 } from '../../../../../../generated/api';
-
 import { PagedData } from '../../../../shared/dto/paged-data';
-import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
 import { Sort } from '../../../../shared/dto/sort';
-import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
-import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
 
 @Injectable({
   providedIn: 'root',
@@ -53,7 +38,6 @@ export class PypiService {
   constructor(
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly pypiPackageControllerService: PypiPackageControllerService,
-    private readonly protocolDeployTokenControllerService: ProtocolDeployTokenControllerService,
   ) {
     this.repoChanges = this.repoSubject.asObservable();
   }
@@ -63,7 +47,7 @@ export class PypiService {
   }
 
   public selectRepository(repoName: string): Observable<RepoPermissionInfo> {
-    return this.protocolRepoControllerService.getPermission({} as RepoPermissionInfo, repoName).pipe(
+    return this.protocolRepoControllerService.getPermission(repoName).pipe(
       map(r => r.data!),
       tap(info => this.repoSubject.next(info)),
     );
@@ -71,7 +55,6 @@ export class PypiService {
 
   public fetchRepositoryPackagesLikeName(name: string, sort: Sort, pageIndex: number, pageSize: number): Observable<PagedData<PackageListItem>> {
     return this.pypiPackageControllerService.listPypiPackages(
-      {} as RepoInfo,
       { page: pageIndex, size: pageSize, sort: [`${sort.column},${sort.type}`] },
       this.repoName,
       name || undefined,
@@ -82,7 +65,6 @@ export class PypiService {
 
   public fetchPackageReleasesLikeName(packageName: string, version: string, sort: Sort, pageIndex: number, pageSize: number): Observable<PagedData<ReleaseListItem>> {
     return this.pypiPackageControllerService.listReleases(
-      {} as RepoInfo,
       packageName,
       { page: pageIndex, size: pageSize, sort: [`${sort.column},${sort.type}`] },
       this.repoName,
@@ -93,19 +75,19 @@ export class PypiService {
   }
 
   public deletePackage(packageName: string): Observable<void> {
-    return this.pypiPackageControllerService.deletePypiPackage({} as RepoInfo, packageName, this.repoName).pipe(
+    return this.pypiPackageControllerService.deletePypiPackage(packageName, this.repoName).pipe(
       map(() => undefined),
     );
   }
 
   public fetchRelease(packageName: string, release: string): Observable<ReleaseDetail> {
-    return this.pypiPackageControllerService.getRelease({} as RepoInfo, packageName, release, this.repoName).pipe(
+    return this.pypiPackageControllerService.getRelease(packageName, release, this.repoName).pipe(
       map(r => r.data!),
     );
   }
 
   public deleteRelease(packageName: string, releaseVersion: string): Observable<void> {
-    return this.pypiPackageControllerService.deleteRelease({} as RepoInfo, packageName, releaseVersion, this.repoName).pipe(
+    return this.pypiPackageControllerService.deleteRelease(packageName, releaseVersion, this.repoName).pipe(
       map(() => undefined),
     );
   }
