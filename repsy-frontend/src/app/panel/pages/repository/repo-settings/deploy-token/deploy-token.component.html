@@ -286,6 +286,7 @@
 
 <app-deploy-token-modal
   [repoType]="this.repoType"
+  [repoName]="this.activeRepository?.repoName"
   [(open)]="showCreateTokenModal"
   (created)="fetchDeployTokens(); this.createdDeployToken = $event; showTokenInfoModal = true"
 />

@@ -19,6 +19,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
@@ -33,10 +34,9 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { PypiConfigComponent } from '../../config/pypi-config.component';
-import { ReleaseListItem } from '../../../../../../../generated/api';
+import { RepoPermissionInfo, ReleaseListItem } from '../../../../../../../generated/api';
 import { PypiService } from '../../service/pypi.service';
 
 @Component({
@@ -93,10 +93,10 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
     this.pagedData = new PagedData<ReleaseListItem>();
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.pypiService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.packageName = this.route.snapshot.paramMap.get('package');
 
         this.fetchVersions();
@@ -139,9 +139,10 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
   public deleteVersion(version: ReleaseListItem) {
     this.dangerModalService.show('Delete Release', 'Delete', () => {
       this.loading = true;
-      this.pypiService
-        .deleteRelease(this.packageName, version.version)
-        .then(() => {
+      this.pypiService.deleteRelease(this.packageName, version.version).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           if (this.versions.length - 1 === 0) {
             this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
               this.toastService.show('Version deleted successfully', 'success');
@@ -150,13 +151,9 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
             this.refreshPage();
             this.toastService.show('Version deleted successfully', 'success');
           }
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 
@@ -164,17 +161,14 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
     this.loading = true;
     this.pypiService
       .fetchPackageReleasesLikeName(this.packageName, this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .then((pagedData: PagedData<ReleaseListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.versions = pagedData.content;
-        this.finalRelease = this.versions.find((version) => version.finalRelease)?.version;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+      .pipe(finalize(() => { this.loading = false; }))
+      .subscribe({
+        next: (pagedData: PagedData<ReleaseListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.versions = pagedData.content;
+          this.finalRelease = this.versions.find((version) => version.finalRelease)?.version;
+        },
+        error: () => {},
       });
   }
 

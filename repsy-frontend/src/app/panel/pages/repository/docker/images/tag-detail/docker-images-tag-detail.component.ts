@@ -20,14 +20,14 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Highlight } from 'ngx-highlightjs';
 import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { getRepoDomain } from '../../docker-repo-util';
-import { TagDetail } from '../../../../../../../generated/api';
+import { RepoPermissionInfo, TagDetail } from '../../../../../../../generated/api';
 import { DockerService } from '../../service/docker.service';
 
 type Classifiers = Record<string, [string]>;
@@ -60,11 +60,11 @@ export class DockerImagesTagDetailComponent {
     private readonly dangerModalService: DangerModalService,
   ) {
     this.classifiers = {};
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
 
     this.repositoryChanges$ = this.dockerService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.imageName = this.route.snapshot.paramMap.get('image');
         this.tagName = this.route.snapshot.paramMap.get('tag');
         this.loadTag();
@@ -75,61 +75,54 @@ export class DockerImagesTagDetailComponent {
   public loadTag(): void {
     this.loading = true;
 
-    this.dockerService
-      .fetchTag(this.imageName, this.tagName)
-      .then((tagInfo: TagDetail) => {
+    this.dockerService.fetchTag(this.imageName, this.tagName).pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (tagInfo: TagDetail) => {
         this.installText = `docker pull ${getRepoDomain()}/${this.activeRepo.repoName}/${tagInfo.imageName}:${tagInfo.name}`;
-
         this.tagInfo = tagInfo;
         this.loadManifestText(tagInfo.digest);
         this.loadConfigText(tagInfo.configDigest);
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   public loadManifestText(digest: string): void {
     const imageName = this.route.snapshot.paramMap.get('image');
 
-    this.dockerService.fetchManifestText(imageName, digest).then((manifestText: string) => {
-      this.manifestText = manifestText;
+    this.dockerService.fetchManifestText(imageName, digest).subscribe({
+      next: (manifestText: string) => { this.manifestText = manifestText; },
+      error: () => {},
     });
   }
 
   public loadConfigText(configDigest: string): void {
     if (configDigest === null) {
-      // Multiplatform
       return;
     }
 
     const imageName = this.route.snapshot.paramMap.get('image');
 
-    this.dockerService.fetchConfigText(imageName, configDigest).then((configText: string) => {
-      this.configText = JSON.stringify(JSON.parse(configText), null, 2);
+    this.dockerService.fetchConfigText(imageName, configDigest).subscribe({
+      next: (configText: string) => { this.configText = JSON.stringify(JSON.parse(configText), null, 2); },
+      error: () => {},
     });
   }
 
   public deleteTag() {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
-      this.dockerService
-        .deleteTag(this.imageName, this.tagName)
-        .then(() => {
+      this.dockerService.deleteTag(this.imageName, this.tagName).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
             this.toastService.show('Tag deleted successfully', 'success');
           });
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 }

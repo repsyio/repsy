@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.npm.shared.npm_package.dtos;
 
 import io.repsy.protocols.npm.shared.npm_package.dtos.BasePackageVersionInfo;
-import java.time.Instant;
 import java.util.UUID;
 import lombok.experimental.SuperBuilder;
 
@@ -38,5 +37,4 @@ public class PackageVersionInfo extends BasePackageVersionInfo<UUID> {
   private boolean deprecated;
   private String deprecationMessage;
   private boolean deleted;
-  private Instant createdAt;
 }

@@ -20,7 +20,7 @@ import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
 import { AuthService } from '../../../../auth/pages/service/auth.service';
-import { RepoPermissionInfo } from '../../../shared/dto/repo/repo-permission-info';
+import { RepoPermissionInfo } from '../../../../../generated/api';
 import { RepositoryBreadcrumbComponent } from '../breadcrumb/repository-breadcrumb.component';
 import { RepoContext, RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { PypiService } from './service/pypi.service';
@@ -73,13 +73,13 @@ export class PypiComponent implements OnInit, OnDestroy {
     this.pypiService.selectRepository(repoName).subscribe({
       next: (permissions: RepoPermissionInfo) => {
         // If repo is private and user is not authenticated, redirect to 404
-        if (permissions.isPrivate && !this.isAuthenticated) {
+        if (permissions.private && !this.isAuthenticated) {
           this.router.navigate(['/not-found']);
           return;
         }
 
         this.permissions = permissions;
-        this.isPublicView = !permissions.isPrivate && !this.isAuthenticated;
+        this.isPublicView = !permissions.private && !this.isAuthenticated;
         this.loading = false;
       },
       error: () => {

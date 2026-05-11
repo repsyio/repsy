@@ -17,18 +17,16 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { finalize } from 'rxjs/operators';
 
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { RepoDescriptionForm, RepoRenameForm } from '../../../../../../generated/api';
-import { RepoType } from '../../../../shared/dto/repo/repo-type';
-import { CargoService } from '../../cargo/service/cargo.service';
-import { DockerService } from '../../docker/service/docker.service';
-import { MavenService } from '../../maven/service/maven.service';
-import { NpmService } from '../../npm/service/npm.service';
-import { PypiService } from '../../pypi/service/pypi.service';
-import { GolangService } from '../../golang/service/golang.service';
-import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
+import {
+  ProtocolRepoControllerService,
+  RepoDescriptionForm,
+  RepoPermissionInfo,
+  RepoRenameForm,
+} from '../../../../../../generated/api';
 
 @Component({
   selector: 'app-repo-info',
@@ -46,12 +44,7 @@ export class RepoInfoComponent implements OnInit {
   public private = false;
 
   constructor(
-    private readonly mavenService: MavenService,
-    private readonly npmService: NpmService,
-    private readonly pypiService: PypiService,
-    private readonly dockerService: DockerService,
-    private readonly golangService: GolangService,
-    private readonly cargoService: CargoService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
@@ -81,19 +74,15 @@ export class RepoInfoComponent implements OnInit {
       this.loading = true;
       this.renameForm.disable();
 
-      this.renameRepoService(form)
-        .then(() => {
+      this.protocolRepoControllerService.rename(this.activeRepository.repoName, form).pipe(
+        finalize(() => { this.loading = false; this.renameForm.enable(); }),
+      ).subscribe({
+        next: () => {
           this.router.navigate([this.renameForm.get('name').value, 'settings']);
-
           this.toastService.show('Repository renamed successfully', 'success');
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-          this.renameForm.enable();
-        });
+        },
+        error: () => {},
+      });
     });
   }
 
@@ -103,20 +92,16 @@ export class RepoInfoComponent implements OnInit {
     this.loading = true;
     this.renameForm.disable();
 
-    this.updateRepoDescriptionService(form)
-      .then(() => {
+    this.protocolRepoControllerService.updateDescription(this.activeRepository.repoName, form).pipe(
+      finalize(() => { this.loading = false; this.renameForm.enable(); }),
+    ).subscribe({
+      next: () => {
         this.toastService.show('Repository description updated successfully', 'success');
-
         this.activeRepository.description = form.description;
         this.resetDescriptionForm();
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-        this.renameForm.enable();
-      });
+      },
+      error: () => {},
+    });
   }
 
   public resetForms() {
@@ -132,43 +117,5 @@ export class RepoInfoComponent implements OnInit {
   private resetDescriptionForm() {
     this.descriptionForm?.reset();
     this.descriptionForm?.get('description').setValue(this.activeRepository.description);
-  }
-
-  private renameRepoService(form: RepoRenameForm) {
-    switch (this.repoType) {
-      case RepoType.MAVEN:
-        return this.mavenService.updateRepositoryName(form);
-      case RepoType.NPM:
-        return this.npmService.updateRegistryName(form);
-      case RepoType.PYPI:
-        return this.pypiService.updateRepositoryName(form);
-      case RepoType.DOCKER:
-        return this.dockerService.updateRepositoryName(form);
-      case RepoType.CARGO:
-        return this.cargoService.updateRepositoryName(form);
-      case RepoType.GOLANG:
-        return this.golangService.updateRepositoryName(form);
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
-  }
-
-  private updateRepoDescriptionService(form: RepoDescriptionForm) {
-    switch (this.repoType) {
-      case RepoType.MAVEN:
-        return this.mavenService.updateRepoDescription(form);
-      case RepoType.NPM:
-        return this.npmService.updateRegistryDescription(form);
-      case RepoType.PYPI:
-        return this.pypiService.updateRepoDescription(form);
-      case RepoType.DOCKER:
-        return this.dockerService.updateRepositoryDescription(form);
-      case RepoType.CARGO:
-        return this.cargoService.updateRepoDescription(form);
-      case RepoType.GOLANG:
-        return this.golangService.updateRepoDescription(form);
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
   }
 }

@@ -19,7 +19,7 @@ import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.generated.model.PackageListItem;
+import io.repsy.os.generated.model.PypiPackageListItem;
 import io.repsy.os.generated.model.ReleaseDetail;
 import io.repsy.os.generated.model.ReleaseListItem;
 import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPackageServiceImpl;
@@ -85,7 +85,7 @@ public class PypiPackageController {
 
   @GetMapping("/{repoName}")
   @RepoOperation
-  public RestResponse<PagedModel<PackageListItem>> list(
+  public RestResponse<PagedModel<PypiPackageListItem>> list(
       final RepoInfo repoInfo,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
@@ -97,7 +97,7 @@ public class PypiPackageController {
 
   @GetMapping(value = "/{repoName}", params = "name")
   @RepoOperation
-  public RestResponse<PagedModel<PackageListItem>> listLikeName(
+  public RestResponse<PagedModel<PypiPackageListItem>> listLikeName(
       final RepoInfo repoInfo,
       @RequestParam(required = false, defaultValue = "") final String name,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {

@@ -18,9 +18,10 @@ import { NgClass } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ReactiveFormsModule } from '@angular/forms';
+import { finalize } from 'rxjs';
 
-import { UserCreateForm } from '../../../../pages/user/form/user-crete-form';
-import { UserService } from '../../../../pages/user/service/user.service';
+import { UserCreateForm } from '../../../../../../generated/api';
+import { UserControllerService } from '../../../../../../generated/api/api/user-controller.service';
 import { ToastService } from '../../toast/toast.service';
 import { ToggleComponent } from '../../toggle/toggle.component';
 
@@ -42,7 +43,7 @@ export class UserCreateModalComponent {
   public showConfirmPassword = false;
 
   constructor(
-    private readonly userService: UserService,
+    private readonly userControllerService: UserControllerService,
     private readonly fb: FormBuilder,
     private readonly toastService: ToastService,
   ) {
@@ -116,19 +117,16 @@ export class UserCreateModalComponent {
       role: this.form.value.isAdmin ? 'ADMIN' : 'USER',
     };
 
-    this.userService
+    this.userControllerService
       .createUser(payload)
-      .then(() => {
+      .pipe(finalize(() => {
+        this.form.enable();
+        this.loading = false;
+      }))
+      .subscribe(() => {
         this.toastService.show('User created successfully.', 'success');
         this.closeModal();
         this.created.emit();
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.form.enable();
-        this.loading = false;
       });
   }
 

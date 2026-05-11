@@ -126,9 +126,8 @@ public interface NpmPackageConverter {
   }
 
   @Mapping(target = "latestVersion", source = "latest")
-  @Mapping(target = "stableVersion", ignore = true)
   @Mapping(target = "updatedAt", source = "updatedAt")
-  io.repsy.os.generated.model.PackageListItem toPackageListItemDto(PackageListItem source);
+  io.repsy.os.generated.model.NpmPackageListItem toPackageListItemDto(PackageListItem source);
 
   @Mapping(target = "createdAt", source = "createdAt")
   io.repsy.os.generated.model.PackageVersionListItem toPackageVersionListItemDto(

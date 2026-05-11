@@ -18,13 +18,13 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
-import { PackageVersionInfo } from '../../dto/package-version-info';
+import { PackageVersionDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { NpmService } from '../../service/npm.service';
 
 @Component({
@@ -42,7 +42,7 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
   public error: string;
   public activeRegistry: RepoPermissionInfo;
   private readonly registryChanges$: Subscription;
-  public versionInfo: PackageVersionInfo;
+  public versionInfo: PackageVersionDetail;
 
   constructor(
     private readonly npmService: NpmService,
@@ -51,11 +51,11 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
   ) {
-    this.activeRegistry = new RepoPermissionInfo();
+    this.activeRegistry = {} as RepoPermissionInfo;
 
-    this.registryChanges$ = this.npmService.registryChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.registryChanges$ = this.npmService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
-        this.activeRegistry = Object.assign(new RepoPermissionInfo(), registry);
+        this.activeRegistry = Object.assign({}, registry);
         this.loadVersion();
       }
     });
@@ -80,40 +80,31 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
       ? `npm install @${this.scopeName}/${this.packageName}`
       : `npm install ${this.packageName}`;
 
-    this.npmService
-      .fetchPackageVersion(this.packageName, this.scopeName, this.versionName)
-      .then((packageVersionInfo: PackageVersionInfo) => {
-        packageVersionInfo.createdAt = new Date(packageVersionInfo.createdAt);
-        packageVersionInfo.fullName = packageVersionInfo.scopeName
-          ? '@' + packageVersionInfo.scopeName + '/' + packageVersionInfo.packageName
-          : packageVersionInfo.packageName;
+    this.npmService.fetchPackageVersion(this.packageName, this.scopeName, this.versionName).pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (packageVersionInfo: PackageVersionDetail) => {
+        console.log('VERSION DETAIL RAW:', JSON.stringify(packageVersionInfo));
         this.versionInfo = packageVersionInfo;
         this.versionInfo.versionName = this.versionName;
-        this.loading = false;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   public deleteVersion() {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
-      this.npmService
-        .deletePackageVersion(this.packageName, this.scopeName, this.versionInfo.versionName)
-        .then(() => {
+      this.npmService.deletePackageVersion(this.packageName, this.scopeName, this.versionInfo.versionName).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           this.router.navigateByUrl(`/${this.activeRegistry.repoName}`).then(() => {
             this.toastService.show('Version deleted successfully', 'success');
           });
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 }

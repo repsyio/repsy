@@ -41,7 +41,6 @@ export class PanelHeaderComponent {
     private readonly router: Router,
   ) {
     this.username = this.authService.username;
-    this.email = this.authService.email;
   }
 
   docDropdown = false;
@@ -50,12 +49,6 @@ export class PanelHeaderComponent {
   openMobileMenu() {
     this.isMobileMenuOpen = true;
     this.mobileMenuToggle.emit(this.isMobileMenuOpen);
-  }
-
-  toggleDocDropdown(event: Event) {
-    event.stopPropagation();
-    this.docDropdown = !this.docDropdown;
-    this.profileDropdown = false;
   }
 
   toggleProfileDropdown(event: Event) {

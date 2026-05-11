@@ -18,14 +18,14 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
-import { GoModuleVersionListItem } from '../../../../../../../generated/api';
+import { RepoPermissionInfo, GoModuleVersionListItem } from '../../../../../../../generated/api';
 import { GolangService } from '../../service/golang.service';
 
 @Component({
@@ -56,11 +56,11 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
     private readonly dangerModalService: DangerModalService,
   ) {
     this.repoBaseUrl = environment.repoBaseUrl;
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
 
     this.repositoryChanges$ = this.golangService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.modulePath = this.route.snapshot.queryParamMap.get('modulePath');
         this.versionName = this.route.snapshot.queryParamMap.get('version');
 
@@ -96,10 +96,10 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
 
   public deleteVersion(): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
-      this.loading = true;
-      this.golangService
-        .deleteModuleVersion(this.modulePath, this.versionName)
-        .then(() => {
+      this.golangService.deleteModuleVersion(this.modulePath, this.versionName).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           this.router
             .navigate(['/' + this.activeRepo.repoName + '/modules'], {
               queryParams: { modulePath: this.modulePath },
@@ -107,35 +107,27 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
             .then(() => {
               this.toastService.show('Version deleted successfully', 'success');
             });
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 
   private fetchVersion(): void {
     this.loading = true;
-    this.golangService
-      .fetchModuleInfo(this.modulePath)
-      .then((info) => {
+    this.golangService.fetchModuleInfo(this.modulePath).pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (info) => {
         const found = info.versions.find((v) => v.version === this.versionName);
         if (!found) {
           this.error = `Version '${this.versionName}' not found`;
           return;
         }
         this.versionInfo = found;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   public get canManage(): boolean {

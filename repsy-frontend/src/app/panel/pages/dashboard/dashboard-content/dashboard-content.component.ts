@@ -16,14 +16,12 @@
 
 import { ChangeDetectorRef, Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
+import { forkJoin, map, of, switchMap } from 'rxjs';
 
 import { RepositoryCreateModalComponent } from '../../../shared/components/modals/repository-create-modal/repository-create-modal.component';
-import { ToastService } from '../../../shared/components/toast/toast.service';
-import { RepoListInfo } from '../../../shared/dto/repo/repo-list-info';
-import { RepoType } from '../../../shared/dto/repo/repo-type';
-import { RepoUsageInfo } from '../../../shared/dto/repo-usage-info';
-import { TotalUsageInfo } from '../../../shared/dto/total-usage-info';
-import { StatsService } from '../../../shared/service/stats.service';
+import { RepoListInfo, RepoType, TotalUsageInfo } from '../../../../../generated/api';
+import { ProtocolRepoControllerService } from '../../../../../generated/api';
+import { UsageControllerService } from '../../../../../generated/api';
 import { RecentActivityComponent } from '../recent-activity/recent-activity.component';
 import { RepositoryCardComponent } from '../repository-card/repository-card.component';
 import { TotalDiskComponent } from '../total-disk/total-disk.component';
@@ -48,7 +46,7 @@ interface Repository {
 })
 export class DashboardContentComponent {
   public username = '';
-  public usage: TotalUsageInfo = new TotalUsageInfo();
+  public usage: TotalUsageInfo = {} as TotalUsageInfo;
   public mavenRepoCount = 0;
   public npmRegistryCount = 0;
   public pypiRepoCount = 0;
@@ -60,113 +58,89 @@ export class DashboardContentComponent {
   public createRepoModal: boolean;
 
   constructor(
-    private readonly statsService: StatsService,
-    private cdRef: ChangeDetectorRef,
-    private readonly toastService: ToastService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly usageControllerService: UsageControllerService,
+    private readonly cdRef: ChangeDetectorRef,
   ) {
-    this.statsService.getTotalUsage().then((usage) => {
-      if (usage === null) {
-        return;
-      }
-      Object.assign(this.usage, usage);
-    });
+    this.usageControllerService.getTotalUsage()
+      .pipe(map(r => r.data))
+      .subscribe(usage => {
+        if (!usage) {
+          return;
+        }
+        Object.assign(this.usage, usage);
+      });
 
     this.fetchRepoCounts();
     this.fetchRepoInfos();
   }
 
-  public async fetchRepoInfo(
-    repoType: RepoType,
-    listFetcher: () => Promise<RepoListInfo[]>,
-    usageFetcher: (name: string) => Promise<RepoUsageInfo>,
-  ) {
-    const repos = await listFetcher();
-    const updatedRepos: RepoListInfo[] = [];
-
-    for (const repo of repos) {
-      try {
-        const usage = await usageFetcher(repo.name);
-        repo.diskUsed = usage.diskUsed;
-        repo.type = repoType;
-        updatedRepos.push(repo);
-      } catch (error) {
-        this.toastService.show(error, 'error');
-      }
-    }
-
-    this.repoListInfos = this.repoListInfos
-      .concat(updatedRepos)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 6);
-
-    this.cdRef.markForCheck();
-  }
-
-  public openCreateRepo() {
+  public openCreateRepo(): void {
     this.createRepoModal = true;
   }
 
-  private fetchRepoCounts() {
-    this.statsService.getNpmRegistryCount().then((c) => {
-      this.npmRegistryCount = c;
-      this.cdRef.markForCheck();
-    });
+  private fetchRepoCounts(): void {
+    this.protocolRepoControllerService.getCount(RepoType.Npm)
+      .pipe(map(r => r.data ?? 0))
+      .subscribe(c => { this.npmRegistryCount = c; this.cdRef.markForCheck(); });
 
-    this.statsService.getPypiRepoCount().then((c) => {
-      this.pypiRepoCount = c;
-      this.cdRef.markForCheck();
-    });
+    this.protocolRepoControllerService.getCount(RepoType.Pypi)
+      .pipe(map(r => r.data ?? 0))
+      .subscribe(c => { this.pypiRepoCount = c; this.cdRef.markForCheck(); });
 
-    this.statsService.getMavenRepoCount().then((c) => {
-      this.mavenRepoCount = c;
-      this.cdRef.markForCheck();
-    });
+    this.protocolRepoControllerService.getCount(RepoType.Maven)
+      .pipe(map(r => r.data ?? 0))
+      .subscribe(c => { this.mavenRepoCount = c; this.cdRef.markForCheck(); });
 
-    this.statsService.getDockerRepoCount().then((c) => {
-      this.dockerRepoCount = c;
-      this.cdRef.markForCheck();
-    });
-    this.statsService.getCargoRepoCount().then((c) => {
-      this.cargoRepoCount = c;
-      this.cdRef.markForCheck();
-    });
+    this.protocolRepoControllerService.getCount(RepoType.Docker)
+      .pipe(map(r => r.data ?? 0))
+      .subscribe(c => { this.dockerRepoCount = c; this.cdRef.markForCheck(); });
 
-    this.statsService.getGolangRepoCount().then((c) => {
-      this.golangRepoCount = c;
-      this.cdRef.markForCheck();
-    });
+    this.protocolRepoControllerService.getCount(RepoType.Cargo)
+      .pipe(map(r => r.data ?? 0))
+      .subscribe(c => { this.cargoRepoCount = c; this.cdRef.markForCheck(); });
+
+    this.protocolRepoControllerService.getCount(RepoType.Golang)
+      .pipe(map(r => r.data ?? 0))
+      .subscribe(c => { this.golangRepoCount = c; this.cdRef.markForCheck(); });
   }
 
-  private fetchRepoInfos() {
-    this.fetchRepoInfo(
-      RepoType.MAVEN,
-      this.statsService.getMavenRepoInfo.bind(this.statsService),
-      this.statsService.fetchMavenRepositoryUsage.bind(this.statsService),
-    );
-    this.fetchRepoInfo(
-      RepoType.NPM,
-      this.statsService.getNpmRepoInfo.bind(this.statsService),
-      this.statsService.fetchNpmRepositoryUsage.bind(this.statsService),
-    );
-    this.fetchRepoInfo(
-      RepoType.PYPI,
-      this.statsService.getPypiRepoInfo.bind(this.statsService),
-      this.statsService.fetchPypiRepositoryUsage.bind(this.statsService),
-    );
-    this.fetchRepoInfo(
-      RepoType.DOCKER,
-      this.statsService.getDockerRepoInfo.bind(this.statsService),
-      this.statsService.fetchDockerRepositoryUsage.bind(this.statsService),
-    );
-    this.fetchRepoInfo(
-      RepoType.CARGO,
-      this.statsService.getCargoRepoInfo.bind(this.statsService),
-      this.statsService.fetchCargoRepositoryUsage.bind(this.statsService),
-    );
-    this.fetchRepoInfo(
-      RepoType.GOLANG,
-      this.statsService.getGolangRepoInfo.bind(this.statsService),
-      this.statsService.fetchGolangRepositoryUsage.bind(this.statsService),
-    );
+  private fetchRepoInfo(repoType: RepoType): void {
+    this.protocolRepoControllerService.getInfo(repoType)
+      .pipe(
+        map(r => r.data ?? []),
+        switchMap(repos => {
+          if (repos.length === 0) {
+            return of([]);
+          }
+          return forkJoin(
+            repos.map(repo =>
+              this.protocolRepoControllerService.getUsage(repo.name).pipe(
+                map(r => {
+                  repo.diskUsage = r.data?.diskUsed?.value;
+                  repo.type = repoType;
+                  return repo;
+                }),
+              )
+            )
+          );
+        }),
+      )
+      .subscribe(updatedRepos => {
+        this.repoListInfos = this.repoListInfos
+          .concat(updatedRepos)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 6);
+        this.cdRef.markForCheck();
+      });
+  }
+
+  private fetchRepoInfos(): void {
+    this.fetchRepoInfo(RepoType.Maven);
+    this.fetchRepoInfo(RepoType.Npm);
+    this.fetchRepoInfo(RepoType.Pypi);
+    this.fetchRepoInfo(RepoType.Docker);
+    this.fetchRepoInfo(RepoType.Cargo);
+    this.fetchRepoInfo(RepoType.Golang);
   }
 }

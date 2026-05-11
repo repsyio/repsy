@@ -19,6 +19,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../environments/environment';
 import { EllipsisPipe } from '../../../../shared/components/ellipsis/ellipsis.pipe';
@@ -29,21 +30,19 @@ import { PaginationComponent } from '../../../../shared/components/pagination/pa
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
+import {
+  ProtocolDeployTokenControllerService,
+  ProtocolRepoControllerService,
+  RepoPermissionInfo,
+  RepoUsageInfo,
+} from '../../../../../../generated/api';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
-import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
 import { CargoConfigComponent } from '../../cargo/config/cargo-config.component';
-import { CargoService } from '../../cargo/service/cargo.service';
 import { DockerConfigComponent } from '../../docker/config/docker-config.component';
-import { DockerService } from '../../docker/service/docker.service';
 import { GolangConfigComponent } from '../../golang/config/golang-config.component';
-import { GolangService } from '../../golang/service/golang.service';
 import { MavenConfigComponent } from '../../maven/config/maven-config.component';
-import { MavenService } from '../../maven/service/maven.service';
 import { NpmConfigComponent } from '../../npm/config/npm-config.component';
-import { NpmService } from '../../npm/service/npm.service';
 import { PypiConfigComponent } from '../../pypi/config/pypi-config.component';
-import { PypiService } from '../../pypi/service/pypi.service';
 import { DeployTokenInfo } from './dto/deploy-token-info';
 import { TokenCreateInfo } from './dto/token-create-info';
 
@@ -88,12 +87,8 @@ export class DeployTokenComponent implements OnInit {
   public repoUsage: RepoUsageInfo;
 
   constructor(
-    private readonly mavenService: MavenService,
-    private readonly npmService: NpmService,
-    private readonly pypiService: PypiService,
-    private readonly dockerService: DockerService,
-    private readonly golangService: GolangService,
-    private readonly cargoService: CargoService,
+    private readonly protocolDeployTokenControllerService: ProtocolDeployTokenControllerService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
   ) {
@@ -105,71 +100,23 @@ export class DeployTokenComponent implements OnInit {
   }
 
   private fetchRepoUsage() {
-    this.fetchRepoUsageService().then((usage: RepoUsageInfo) => {
-      this.repoUsage = usage;
+    this.protocolRepoControllerService.getUsage(this.activeRepository.repoName).subscribe({
+      next: (r) => { this.repoUsage = r.data!; },
+      error: () => {},
     });
   }
 
-  private fetchRepoUsageService(): Promise<RepoUsageInfo> {
-    switch (this.repoType) {
-      case RepoType.MAVEN: {
-        return this.mavenService.getRepoUsage();
-      }
-      case RepoType.PYPI: {
-        return this.pypiService.fetchRepositoryUsage();
-      }
-      case RepoType.DOCKER: {
-        return this.dockerService.fetchRepositoryUsage();
-      }
-      case RepoType.NPM: {
-        return this.npmService.fetchRegistryUsage();
-      }
-      case RepoType.CARGO: {
-        return this.cargoService.fetchRepositoryUsage();
-      }
-      case RepoType.GOLANG: {
-        return this.golangService.fetchRepositoryUsage();
-      }
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
-  }
-
-  private fetchDeployTokensService(pageNum: number, pageSize: number): Promise<PagedData<DeployTokenInfo>> {
-    this.fetchRepoUsage();
-    switch (this.repoType) {
-      case RepoType.MAVEN: {
-        return this.mavenService.getDeployTokens(pageNum, pageSize);
-      }
-      case RepoType.PYPI: {
-        return this.pypiService.getDeployTokens(pageNum, pageSize);
-      }
-      case RepoType.DOCKER: {
-        return this.dockerService.getDeployTokens(pageNum, pageSize);
-      }
-      case RepoType.NPM: {
-        return this.npmService.getDeployTokens(pageNum, pageSize);
-      }
-      case RepoType.GOLANG: {
-        return this.golangService.getDeployTokens(pageNum, pageSize);
-      }
-      case RepoType.CARGO: {
-        return this.cargoService.getDeployTokens(pageNum, pageSize);
-      }
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
-  }
-
   public fetchDeployTokens() {
-    this.fetchDeployTokensService(this.pageNum, this.pageSize)
-      .then((pageData: PagedData<DeployTokenInfo>) => {
-        this.pagedData.page = pageData.page;
-        this.deployTokens = pageData.content;
-      })
-      .catch(() => {
-        /*User has no permission to view and manage. No actions, Message is written on UI*/
-      });
+    this.fetchRepoUsage();
+    this.protocolDeployTokenControllerService.listDeployTokens(
+      { page: this.pageNum, size: this.pageSize }, this.activeRepository.repoName,
+    ).subscribe({
+      next: (r) => {
+        this.pagedData.page = r.data?.page as any;
+        this.deployTokens = (r.data?.content ?? []) as unknown as DeployTokenInfo[];
+      },
+      error: () => {},
+    });
   }
 
   public loadPage(pageNum: number) {
@@ -181,78 +128,26 @@ export class DeployTokenComponent implements OnInit {
     this.showCreateTokenModal = true;
   }
 
-  private rotateDeployTokenService(tokenUuid: string) {
-    switch (this.repoType) {
-      case RepoType.MAVEN: {
-        return this.mavenService.rotateDeployToken(tokenUuid);
-      }
-      case RepoType.PYPI: {
-        return this.pypiService.rotateDeployToken(tokenUuid);
-      }
-      case RepoType.DOCKER: {
-        return this.dockerService.rotateDeployToken(tokenUuid);
-      }
-      case RepoType.NPM: {
-        return this.npmService.rotateDeployToken(tokenUuid);
-      }
-      case RepoType.CARGO: {
-        return this.cargoService.rotateDeployToken(tokenUuid);
-      }
-      case RepoType.GOLANG: {
-        return this.golangService.rotateDeployToken(tokenUuid);
-      }
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
-  }
-
   public rotateDeployToken(deployToken: DeployTokenInfo) {
     const successMsg = 'Deploy token rotated successfully';
     this.dangerModalService.show('Rotate Deploy Token', 'Rotate', () => {
       this.operationLock = true;
 
-      this.rotateDeployTokenService(deployToken.id)
-        .then((token: string) => {
+      this.protocolDeployTokenControllerService.rotate(deployToken.id, this.activeRepository.repoName).pipe(
+        finalize(() => { this.operationLock = false; }),
+      ).subscribe({
+        next: (r) => {
           this.fetchDeployTokens();
           this.toastService.show(successMsg, 'success');
           this.createdDeployToken = new TokenCreateInfo();
-          this.createdDeployToken.token = token;
+          this.createdDeployToken.token = r.data!;
           this.createdDeployToken.username = deployToken.username;
           this.createdDeployToken.id = deployToken.id;
           this.showTokenInfoModal = true;
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.operationLock = false;
-        });
+        },
+        error: () => {},
+      });
     });
-  }
-
-  private revokeDeployTokenService(tokenId: string) {
-    switch (this.repoType) {
-      case RepoType.MAVEN: {
-        return this.mavenService.revokeDeployToken(tokenId);
-      }
-      case RepoType.PYPI: {
-        return this.pypiService.revokeDeployToken(tokenId);
-      }
-      case RepoType.DOCKER: {
-        return this.dockerService.revokeDeployToken(tokenId);
-      }
-      case RepoType.NPM: {
-        return this.npmService.revokeDeployToken(tokenId);
-      }
-      case RepoType.CARGO: {
-        return this.cargoService.revokeDeployToken(tokenId);
-      }
-      case RepoType.GOLANG: {
-        return this.golangService.revokeDeployToken(tokenId);
-      }
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
   }
 
   public revokeDeployToken(deployToken: DeployTokenInfo) {
@@ -270,14 +165,12 @@ export class DeployTokenComponent implements OnInit {
     this.dangerModalService.show('Delete Deploy Token', 'Delete', () => {
       this.operationLock = true;
 
-      this.revokeDeployTokenService(deployToken.id)
-        .then(onSuccess)
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.operationLock = false;
-        });
+      this.protocolDeployTokenControllerService.revoke(deployToken.id, this.activeRepository.repoName).pipe(
+        finalize(() => { this.operationLock = false; }),
+      ).subscribe({
+        next: onSuccess,
+        error: () => {},
+      });
     });
   }
 

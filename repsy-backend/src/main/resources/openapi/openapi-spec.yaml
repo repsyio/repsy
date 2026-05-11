@@ -26,7 +26,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseUserResponse"
       summary: Update a user
@@ -45,7 +45,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a user
@@ -54,17 +54,11 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: getSettings
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       responses:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoSettingsInfo"
       summary: Get settings for a repository
@@ -72,12 +66,6 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: updateSettings
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       requestBody:
         content:
           application/json:
@@ -88,7 +76,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Update repository settings
@@ -104,11 +92,6 @@ paths:
         - protocol-deploy-token-controller
       operationId: rotate
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: tokenId
           in: path
           required: true
@@ -119,7 +102,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
       summary: Regenerate a deploy token
@@ -128,11 +111,6 @@ paths:
         - protocol-deploy-token-controller
       operationId: revoke
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: tokenId
           in: path
           required: true
@@ -143,7 +121,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a deploy token
@@ -174,7 +152,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseLoginInfo"
       summary: Update the current user's username
@@ -199,7 +177,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Update the current user's password
@@ -233,7 +211,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelUserResponse"
       summary: List all users
@@ -251,7 +229,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseUserResponse"
       summary: Create a new user
@@ -271,7 +249,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
       summary: Reset a user's password
@@ -281,11 +259,6 @@ paths:
         - protocol-repo-controller
       operationId: createRepo
       parameters:
-        - name: facade
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/ProtocolApiFacade"
         - name: repoType
           in: path
           required: true
@@ -301,7 +274,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Create a new repository
@@ -316,16 +289,11 @@ paths:
           required: true
           schema:
             "$ref": "#/components/schemas/Pageable"
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       responses:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelDeployTokenInfoListItem"
       summary: List deploy tokens for a repository
@@ -333,12 +301,6 @@ paths:
       tags:
         - protocol-deploy-token-controller
       operationId: createDeployToken
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       requestBody:
         content:
           application/json:
@@ -349,7 +311,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseTokenInfo"
       summary: Create a deploy token for a repository
@@ -365,11 +327,6 @@ paths:
         - key-store-controller
       operationId: listMavenKeyStores
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: pageable
           in: query
           required: true
@@ -379,7 +336,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelKeyStoreItem"
       summary: List key stores for a Maven repository
@@ -387,12 +344,6 @@ paths:
       tags:
         - key-store-controller
       operationId: createMavenKeyStore
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       requestBody:
         content:
           application/json:
@@ -403,7 +354,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseKeyStoreItem"
       summary: Add a key store to a Maven repository
@@ -428,7 +379,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseLoginInfo"
       summary: Refresh access token using a refresh token
@@ -447,7 +398,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseLoginInfo"
       summary: Authenticate user and return JWT tokens
@@ -456,12 +407,6 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: rename
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       requestBody:
         content:
           application/json:
@@ -472,7 +417,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Rename a repository
@@ -487,12 +432,6 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: updateDescription
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       requestBody:
         content:
           application/json:
@@ -503,7 +442,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Update repository description
@@ -522,7 +461,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseTotalUsageInfo"
       summary: Get total usage statistics
@@ -541,7 +480,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListRepoListInfo"
       summary: Get repository list info by type
@@ -560,7 +499,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseLong"
       summary: Get repository count by type
@@ -569,17 +508,11 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: getUsage
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       responses:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoUsageInfo"
       summary: Get storage usage for a repository
@@ -594,17 +527,11 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: getPermission
-      parameters:
-        - name: repoPermissionInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoPermissionInfo"
       responses:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoPermissionInfo"
       summary: Get permissions for a repository
@@ -619,17 +546,11 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: getRepoType
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
       responses:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
       summary: Get the format of a repository
@@ -645,16 +566,6 @@ paths:
         - protocol-repo-controller
       operationId: getPathContent
       parameters:
-        - name: facade
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/ProtocolApiFacadeMavenAdapter"
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: path
           in: query
           required: true
@@ -664,7 +575,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListStorageItemInfo"
       summary: List contents of a repository
@@ -680,11 +591,6 @@ paths:
         - pypi-package-controller
       operationId: listPypiPackages
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: pageable
           in: query
           required: true
@@ -700,9 +606,9 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
+                "$ref": "#/components/schemas/RestResponsePagedModelPypiPackageListItem"
       summary: List PyPI packages in a repository
     parameters:
       - name: repoName
@@ -716,11 +622,6 @@ paths:
         - pypi-package-controller
       operationId: listReleases
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -741,7 +642,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelReleaseListItem"
       summary: List releases of a PyPI package
@@ -757,11 +658,6 @@ paths:
         - pypi-package-controller
       operationId: getRelease
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -776,7 +672,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseReleaseDetail"
       summary: Get a specific PyPI package release
@@ -785,11 +681,6 @@ paths:
         - pypi-package-controller
       operationId: deleteRelease
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -804,7 +695,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a specific PyPI package release
@@ -820,11 +711,6 @@ paths:
         - pypi-package-controller
       operationId: getPypiPackage
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -834,7 +720,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseReleaseDetail"
       summary: Get a PyPI package
@@ -843,11 +729,6 @@ paths:
         - pypi-package-controller
       operationId: deletePypiPackage
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -857,7 +738,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a repository
@@ -882,7 +763,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseProfileInfo"
       summary: Get the current user's profile
@@ -900,7 +781,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete the current user's account
@@ -910,11 +791,6 @@ paths:
         - npm-package-api-controller
       operationId: listNpmPackages
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: query
           required: false
@@ -929,9 +805,9 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
+                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
       summary: List npm packages in a repository
     parameters:
       - name: repoName
@@ -945,11 +821,6 @@ paths:
         - npm-package-api-controller
       operationId: getVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -964,7 +835,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
       summary: Get a specific npm package version
@@ -973,11 +844,6 @@ paths:
         - npm-package-api-controller
       operationId: deleteVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -992,7 +858,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a specific npm package version
@@ -1008,11 +874,6 @@ paths:
         - npm-package-api-controller
       operationId: getNpmScopedPackageVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: path
           required: true
@@ -1032,7 +893,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
       summary: Get a specific scoped npm package version
@@ -1041,11 +902,6 @@ paths:
         - npm-package-api-controller
       operationId: deleteNpmScopedPackageVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: path
           required: true
@@ -1065,7 +921,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a specific scoped npm package version
@@ -1081,11 +937,6 @@ paths:
         - npm-package-api-controller
       operationId: getNpmPackage
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -1095,7 +946,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
       summary: Get an npm package
@@ -1104,11 +955,6 @@ paths:
         - npm-package-api-controller
       operationId: deleteNpmPackage
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -1118,7 +964,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete an npm package
@@ -1134,11 +980,6 @@ paths:
         - npm-package-api-controller
       operationId: getNpmScopedPackage
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: path
           required: true
@@ -1153,7 +994,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePackageVersionDetail"
       summary: Get a scoped npm package
@@ -1162,11 +1003,6 @@ paths:
         - npm-package-api-controller
       operationId: deleteScopedNpmPackage
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: path
           required: true
@@ -1181,7 +1017,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a scoped npm package
@@ -1197,11 +1033,6 @@ paths:
         - npm-package-api-controller
       operationId: listScopedNpmPackages
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: ignoredScope
           in: path
           required: true
@@ -1222,9 +1053,9 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
+                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
       summary: List artifact groups in a Maven repository
     parameters:
       - name: repoName
@@ -1238,11 +1069,6 @@ paths:
         - npm-package-api-controller
       operationId: listFilterByScope
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: name
           in: query
           required: false
@@ -1258,9 +1084,9 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
+                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
       summary: List npm scopes in a repository
     parameters:
       - name: repoName
@@ -1274,11 +1100,6 @@ paths:
         - npm-package-api-controller
       operationId: listNpmPackagesByScope
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: path
           required: true
@@ -1299,9 +1120,9 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
+                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
       summary: Get npm packages in a scope
     parameters:
       - name: repoName
@@ -1315,11 +1136,6 @@ paths:
         - npm-package-api-controller
       operationId: listVersions
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -1340,7 +1156,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelPackageVersionListItem"
       summary: List versions of a Maven artifact
@@ -1356,11 +1172,6 @@ paths:
         - npm-package-api-controller
       operationId: listNpmScopedPackageVersions
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: path
           required: true
@@ -1386,7 +1197,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelPackageVersionListItem"
       summary: List versions of a scoped npm package
@@ -1402,11 +1213,6 @@ paths:
         - npm-package-api-controller
       operationId: listTags
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: packageName
           in: path
           required: true
@@ -1416,7 +1222,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListPackageDistributionTagMapListItem"
       summary: List dist-tags for an npm package
@@ -1432,11 +1238,6 @@ paths:
         - npm-package-api-controller
       operationId: listNpmScopedPackageTags
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: scope
           in: path
           required: true
@@ -1451,7 +1252,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListPackageDistributionTagMapListItem"
       summary: List dist-tags for a scoped npm package
@@ -1467,11 +1268,6 @@ paths:
         - maven-artifact-controller
       operationId: listContainsGroupName
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: query
           required: false
@@ -1487,7 +1283,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelArtifactListItem"
       summary: List artifact groups in a Maven repository
@@ -1503,11 +1299,6 @@ paths:
         - maven-artifact-controller
       operationId: listContainsArtifactName
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: path
           required: true
@@ -1528,7 +1319,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelArtifactListItem"
       summary: List artifacts in a Maven group
@@ -1537,11 +1328,6 @@ paths:
         - maven-artifact-controller
       operationId: deleteGroup
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: path
           required: true
@@ -1551,7 +1337,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseDeletedItem"
       summary: Delete a Maven artifact group
@@ -1567,11 +1353,6 @@ paths:
         - maven-artifact-controller
       operationId: listMavenArtifactVersions
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: path
           required: true
@@ -1597,7 +1378,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelArtifactVersionListItem"
       summary: List versions of a Maven artifact
@@ -1613,11 +1394,6 @@ paths:
         - maven-artifact-controller
       operationId: getMavenArtifact
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: path
           required: true
@@ -1632,7 +1408,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseArtifactVersionInfo"
       summary: Get a Maven artifact
@@ -1641,11 +1417,6 @@ paths:
         - maven-artifact-controller
       operationId: deleteMavenArtifact
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: path
           required: true
@@ -1660,7 +1431,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseDeletedItem"
       summary: Delete a Maven artifact
@@ -1676,11 +1447,6 @@ paths:
         - maven-artifact-controller
       operationId: getMavenArtifactVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: path
           required: true
@@ -1700,7 +1466,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseArtifactVersionInfo"
       summary: Get a specific version of a Maven artifact
@@ -1709,11 +1475,6 @@ paths:
         - maven-artifact-controller
       operationId: deleteMavenArtifactVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: groupName
           in: path
           required: true
@@ -1733,7 +1494,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseDeletedItem"
       summary: Delete a specific Maven artifact version
@@ -1749,11 +1510,6 @@ paths:
         - golang-module-controller
       operationId: listGolangModules
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: pageable
           in: query
           required: true
@@ -1763,7 +1519,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelGoModuleListItem"
       summary: List crates in a Cargo repository
@@ -1772,11 +1528,6 @@ paths:
         - golang-module-controller
       operationId: deleteGolangModule
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: modulePath
           in: query
           required: true
@@ -1786,7 +1537,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a Go module
@@ -1802,11 +1553,6 @@ paths:
         - golang-module-controller
       operationId: listGolangModuleVersions
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: modulePath
           in: query
           required: true
@@ -1827,7 +1573,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelGoModuleVersionListItem"
       summary: List versions of a Go module
@@ -1836,11 +1582,6 @@ paths:
         - golang-module-controller
       operationId: deleteGolangModuleVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: modulePath
           in: query
           required: true
@@ -1855,7 +1596,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete Go module versions
@@ -1886,11 +1627,6 @@ paths:
         - golang-module-controller
       operationId: searchGolangModules
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: search
           in: query
           required: false
@@ -1906,7 +1642,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelGoModuleListItem"
       summary: Search Go modules in a repository
@@ -1922,11 +1658,6 @@ paths:
         - golang-module-controller
       operationId: getGolangModuleInfo
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: modulePath
           in: query
           required: true
@@ -1936,7 +1667,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseGoModuleInfo"
       summary: Get Go module info
@@ -1952,11 +1683,6 @@ paths:
         - docker-image-controller
       operationId: listDockerImages
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: name
           in: query
           required: false
@@ -1972,7 +1698,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelImageListItem"
       summary: List Go modules in a repository
@@ -1988,11 +1714,6 @@ paths:
         - docker-image-controller
       operationId: listDockerImageTags
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: imageName
           in: path
           required: true
@@ -2013,7 +1734,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelImageTagListItem"
       summary: List tags of a Docker image
@@ -2029,11 +1750,6 @@ paths:
         - docker-image-controller
       operationId: listTagManifests
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: imageName
           in: path
           required: true
@@ -2059,7 +1775,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelManifestListItem"
       summary: List manifests for a Docker image tag
@@ -2075,11 +1791,6 @@ paths:
         - docker-image-controller
       operationId: getManifest
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: imageName
           in: path
           required: true
@@ -2094,7 +1805,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
       summary: Get a Docker image manifest
@@ -2110,11 +1821,6 @@ paths:
         - docker-image-controller
       operationId: getTagDetail
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: imageName
           in: path
           required: true
@@ -2124,7 +1830,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseTagDetail"
       summary: Get a Docker image
@@ -2133,11 +1839,6 @@ paths:
         - docker-image-controller
       operationId: deleteDockerImage
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: imageName
           in: path
           required: true
@@ -2147,7 +1848,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a Docker image
@@ -2163,11 +1864,6 @@ paths:
         - docker-image-controller
       operationId: getDockerImageTag
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: imageName
           in: path
           required: true
@@ -2182,7 +1878,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseTagDetail"
       summary: Get a specific Docker image tag
@@ -2191,11 +1887,6 @@ paths:
         - docker-image-controller
       operationId: deleteTag
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: imageName
           in: path
           required: true
@@ -2210,7 +1901,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a Docker image tag
@@ -2226,11 +1917,6 @@ paths:
         - docker-image-controller
       operationId: getConfig
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: ignoredImageName
           in: path
           required: true
@@ -2245,7 +1931,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
       summary: Get Docker image config by digest
@@ -2261,11 +1947,6 @@ paths:
         - cargo-crate-controller
       operationId: searchCargoCrates
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: query
           in: query
           required: false
@@ -2281,7 +1962,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelCrateListItem"
       summary: List crates in a Cargo repository
@@ -2297,11 +1978,6 @@ paths:
         - cargo-crate-controller
       operationId: getCargoCrate
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: crateName
           in: path
           required: true
@@ -2311,7 +1987,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseBaseCrateInfoUUID"
       summary: Get a Cargo crate
@@ -2320,11 +1996,6 @@ paths:
         - cargo-crate-controller
       operationId: deleteCargoCrate
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: crateName
           in: path
           required: true
@@ -2334,7 +2005,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a Cargo crate
@@ -2350,11 +2021,6 @@ paths:
         - cargo-crate-controller
       operationId: getCargoCrateVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: crateName
           in: path
           required: true
@@ -2369,7 +2035,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseBaseCrateVersionInfoUUID"
       summary: Get a specific Cargo crate version
@@ -2378,11 +2044,6 @@ paths:
         - cargo-crate-controller
       operationId: deleteCargoCrateVersion
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: crateName
           in: path
           required: true
@@ -2397,7 +2058,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a specific Cargo crate version
@@ -2413,11 +2074,6 @@ paths:
         - cargo-crate-controller
       operationId: listCargoCrateVersions
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: crateName
           in: path
           required: true
@@ -2438,7 +2094,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelCrateVersionListItem"
       summary: List versions of a Cargo crate
@@ -2453,22 +2109,11 @@ paths:
       tags:
         - protocol-repo-controller
       operationId: deleteRepo
-      parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
-        - name: facade
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/ProtocolApiFacade"
       responses:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a repository
@@ -2484,11 +2129,6 @@ paths:
         - key-store-controller
       operationId: deleteMavenKeyStore
       parameters:
-        - name: repoInfo
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoInfo"
         - name: keyStoreId
           in: path
           required: true
@@ -2499,7 +2139,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseKeyStoreItem"
       summary: Remove a key store from a Maven repository
@@ -2885,6 +2525,8 @@ components:
       properties:
         name:
           type: string
+        type:
+          "$ref": "#/components/schemas/RepoType"
         privateRepo:
           type: boolean
           nullable: false
@@ -3106,7 +2748,41 @@ components:
           type: boolean
         path:
           type: string
-    PackageListItem:
+    NpmPackageListItem:
+      type: object
+      properties:
+        name:
+          type: string
+        scope:
+          type: string
+        latestVersion:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+    PagedModelNpmPackageListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/NpmPackageListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelNpmPackageListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelNpmPackageListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    PypiPackageListItem:
       type: object
       properties:
         name:
@@ -3118,16 +2794,16 @@ components:
         updatedAt:
           type: string
           format: date-time
-    PagedModelPackageListItem:
+    PagedModelPypiPackageListItem:
       type: object
       properties:
         content:
           type: array
           items:
-            "$ref": "#/components/schemas/PackageListItem"
+            "$ref": "#/components/schemas/PypiPackageListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelPackageListItem:
+    RestResponsePagedModelPypiPackageListItem:
       type: object
       properties:
         msgId:
@@ -3135,7 +2811,7 @@ components:
         type:
           "$ref": "#/components/schemas/ResponseType"
         data:
-          "$ref": "#/components/schemas/PagedModelPackageListItem"
+          "$ref": "#/components/schemas/PagedModelPypiPackageListItem"
         errorCode:
           type: string
         text:

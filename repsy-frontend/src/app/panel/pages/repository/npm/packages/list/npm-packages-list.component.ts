@@ -19,6 +19,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
@@ -33,10 +34,9 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
+import { NpmPackageListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { Sort } from '../../../../../shared/dto/sort';
 import { NpmConfigComponent } from '../../config/npm-config.component';
-import { PackageListItem } from '../../dto/package-list-item';
 import { NpmService } from '../../service/npm.service';
 
 @Component({
@@ -66,9 +66,9 @@ export class NpmPackagesListComponent implements OnDestroy {
   public error: string;
   public pageNum = 0;
   public pageSize = 10;
-  public pagedData: PagedData<PackageListItem>;
+  public pagedData: PagedData<NpmPackageListItem>;
   public activeRegistry: RepoPermissionInfo;
-  public packages: PackageListItem[];
+  public packages: NpmPackageListItem[];
 
   public sortOption: Sort = { name: 'Newest', column: 'updatedAt', type: 'DESC' };
   public sortOptions: Sort[] = [
@@ -86,12 +86,12 @@ export class NpmPackagesListComponent implements OnDestroy {
     private readonly dangerModalService: DangerModalService,
   ) {
     this.baseUrl = environment.repoBaseUrl;
-    this.pagedData = new PagedData<PackageListItem>();
-    this.activeRegistry = new RepoPermissionInfo();
+    this.pagedData = new PagedData<NpmPackageListItem>();
+    this.activeRegistry = {} as RepoPermissionInfo;
     this.username = this.authService.username;
-    this.registryChanges$ = this.npmService.registryChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.registryChanges$ = this.npmService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
-        this.activeRegistry = Object.assign(new RepoPermissionInfo(), registry);
+        this.activeRegistry = Object.assign({}, registry);
         this.fetchPackages();
       }
     });
@@ -135,41 +135,35 @@ export class NpmPackagesListComponent implements OnDestroy {
 
   private fetchPackages(): void {
     this.loading = true;
-    this.npmService
-      .fetchRegistryPackagesLikeScope(
-        this.searchText === '' ? null : this.searchText,
-        this.sortOption,
-        this.pageNum,
-        this.pageSize,
-      )
-      .then((pagedData: PagedData<PackageListItem>) => {
+    this.npmService.searchPackages(
+      this.searchText === '' ? null : this.searchText,
+      this.sortOption,
+      this.pageNum,
+      this.pageSize,
+    ).pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (pagedData: PagedData<NpmPackageListItem>) => {
         this.pagedData.page = pagedData.page;
         this.packages = pagedData.content;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+        console.log('Fetched packages:', this.packages);
+      },
+      error: () => {},
+    });
   }
 
-  public deletePackage(pck: PackageListItem) {
+  public deletePackage(pck: NpmPackageListItem) {
     this.dangerModalService.show('Delete Package', 'Delete', () => {
       this.loading = true;
-      this.npmService
-        .deletePackage(pck.name, pck.scope)
-        .then(() => {
+      this.npmService.deletePackage(pck.name, pck.scope).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           this.refreshPage();
           this.toastService.show('Package deleted successfully', 'success');
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 

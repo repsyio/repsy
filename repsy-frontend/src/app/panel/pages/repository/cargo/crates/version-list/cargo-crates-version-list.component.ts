@@ -18,6 +18,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize, switchMap } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
@@ -31,11 +32,10 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { CargoConfigComponent } from '../../config/cargo-config.component';
 import { CrateInfo } from '../../dto/crate-info';
-import { CrateVersionListItem } from '../../../../../../../generated/api';
+import { RepoPermissionInfo, CrateVersionListItem } from '../../../../../../../generated/api';
 import { CargoService } from '../../service/cargo.service';
 
 @Component({
@@ -91,10 +91,10 @@ export class CargoCratesVersionListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.cargoService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.packageName = this.route.snapshot.paramMap.get('crate');
         this.fetchVersions();
       }
@@ -137,19 +137,19 @@ export class CargoCratesVersionListComponent implements OnDestroy {
       const deleteAction = isLastVersion
         ? this.cargoService.deleteCrate(this.packageName)
         : this.cargoService.deleteCrateVersion(this.packageName, version.version);
-      deleteAction
-        .then(() => {
+      deleteAction.pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           this.toastService.show('Version deleted successfully', 'success');
           if (isLastVersion) {
             this.router.navigate(['..'], { relativeTo: this.route });
           } else {
             this.fetchVersions();
           }
-        })
-        .catch((err: string) => {
-          this.loading = false;
-          this.toastService.show(err, 'error');
-        });
+        },
+        error: () => {},
+      });
     });
   }
 
@@ -157,34 +157,20 @@ export class CargoCratesVersionListComponent implements OnDestroy {
     const crateName = this.packageName;
 
     this.loading = true;
-    this.cargoService
-      .fetchCrate(crateName)
-      .then((crate) => {
+    this.cargoService.fetchCrate(crateName).pipe(
+      switchMap((crate) => {
         this.crate = crate;
-        return this.cargoService.fetchCrateVersions(
-          crateName,
-          this.searchText,
-          this.sortOption,
-          this.pageNum,
-          this.pageSize,
-        );
-      })
-      .then((pagedData) => {
+        return this.cargoService.fetchCrateVersions(crateName, this.searchText, this.sortOption, this.pageNum, this.pageSize);
+      }),
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (pagedData) => {
         this.pagedData.page = pagedData.page;
         this.versions = pagedData.content;
         this.error = null;
-      })
-      .catch((err: string) => {
-        if (err === 'Crate is not Found.') {
-          this.router.navigateByUrl(`/${this.activeRepo.repoName}`);
-          return;
-        }
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   public get canManage(): boolean {

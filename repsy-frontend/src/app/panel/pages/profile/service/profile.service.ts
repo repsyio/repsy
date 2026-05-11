@@ -14,80 +14,47 @@
 /// limitations under the License.
 ///
 
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { Observable, map } from 'rxjs';
 
-import { environment } from '../../../../../environments/environment';
-import { ErrorHandlerService } from '../../../../shared/error-handler/error-handler.service';
-import { RestResponse } from '../../../shared/dto/rest-response';
 import { LoginInfo, ProfileInfo } from '../../../../../generated/api';
-import { PasswordForm } from '../dto/password-form';
+import { ProfileControllerService } from '../../../../../generated/api';
+import { AuthService } from '../../../../auth/pages/service/auth.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class ProfileService {
   constructor(
-    private readonly http: HttpClient,
-    private readonly errorHandlerService: ErrorHandlerService,
+    private readonly profileControllerService: ProfileControllerService,
+    private readonly authService: AuthService,
   ) {}
 
-  public async get(): Promise<ProfileInfo> {
-    return new Promise<ProfileInfo>((resolve, reject) => {
-      this.http
-        .get<RestResponse<ProfileInfo>>(`${environment.apiBaseUrl}/api/profile`)
-        .toPromise()
-        .then((res: RestResponse<ProfileInfo>) => {
-          resolve(res.data);
-        })
-        .catch((res: HttpErrorResponse) => {
-          reject(this.errorHandlerService.handle(res));
-        });
-    });
+  private get authorizationHeader(): string {
+    return `Bearer ${this.authService.accessToken}`;
   }
 
-  public async updatePassword(password: string): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const form = new PasswordForm();
-      form.password = password;
-
-      this.http
-        .put<RestResponse<null>>(`${environment.apiBaseUrl}/api/profile/password`, form)
-        .toPromise()
-        .then((res: RestResponse<void>) => {
-          resolve(res.data);
-        })
-        .catch((res: HttpErrorResponse) => {
-          reject(this.errorHandlerService.handle(res));
-        });
-    });
+  public get(): Observable<ProfileInfo> {
+    return this.profileControllerService.getProfile(this.authorizationHeader).pipe(
+      map(r => r.data!),
+    );
   }
 
-  public async updateUsername(username: string): Promise<LoginInfo> {
-    return new Promise<LoginInfo>((resolve, reject) => {
-      this.http
-        .put<RestResponse<LoginInfo>>(`${environment.apiBaseUrl}/api/profile/username`, { username })
-        .toPromise()
-        .then((res: RestResponse<LoginInfo>) => {
-          resolve(res.data);
-        })
-        .catch((res: HttpErrorResponse) => {
-          reject(this.errorHandlerService.handle(res));
-        });
-    });
+  public updatePassword(password: string): Observable<void> {
+    return this.profileControllerService.updatePassword(this.authorizationHeader, { password }).pipe(
+      map(() => undefined),
+    );
   }
 
-  public async deleteAccount(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      this.http
-        .delete<RestResponse<void>>(`${environment.apiBaseUrl}/api/profile`)
-        .toPromise()
-        .then((res: RestResponse<void>) => {
-          resolve(res.data);
-        })
-        .catch((res: HttpErrorResponse) => {
-          reject(this.errorHandlerService.handle(res));
-        });
-    });
+  public updateUsername(username: string): Observable<LoginInfo> {
+    return this.profileControllerService.updateUsername(this.authorizationHeader, { username }).pipe(
+      map(r => r.data!),
+    );
+  }
+
+  public deleteAccount(): Observable<void> {
+    return this.profileControllerService.deleteProfile(this.authorizationHeader).pipe(
+      map(() => undefined),
+    );
   }
 }

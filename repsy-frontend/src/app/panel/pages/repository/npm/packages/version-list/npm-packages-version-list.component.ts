@@ -19,6 +19,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
@@ -32,10 +33,13 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { NpmConfigComponent } from '../../config/npm-config.component';
-import { PackageDistributionTagMapListItem, PackageVersionListItem } from '../../../../../../../generated/api';
+import {
+  RepoPermissionInfo,
+  PackageDistributionTagMapListItem,
+  PackageVersionListItem,
+} from '../../../../../../../generated/api';
 import { NpmService } from '../../service/npm.service';
 
 @Component({
@@ -89,10 +93,10 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.pagedData = new PagedData<PackageVersionListItem>();
-    this.activeRegistry = new RepoPermissionInfo();
-    this.registryChanges$ = this.npmService.registryChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.activeRegistry = {} as RepoPermissionInfo;
+    this.registryChanges$ = this.npmService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
-        this.activeRegistry = Object.assign(new RepoPermissionInfo(), registry);
+        this.activeRegistry = Object.assign({}, registry);
         this.scopeName = this.route.snapshot.paramMap.get('scope');
         this.packageName = this.route.snapshot.paramMap.get('package');
 
@@ -144,10 +148,10 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
   public deleteVersion(version: PackageVersionListItem) {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
-
-      this.npmService
-        .deletePackageVersion(this.packageName, this.scopeName, version.version)
-        .then(() => {
+      this.npmService.deletePackageVersion(this.packageName, this.scopeName, version.version).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           if (this.versions.length - 1 === 0) {
             this.router.navigateByUrl(`/${this.activeRegistry.repoName}`).then(() => {
               this.toastService.show('Version deleted successfully', 'success');
@@ -156,51 +160,40 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
             this.refreshPage();
             this.toastService.show('Version deleted successfully', 'success');
           }
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 
   private fetchVersions(): void {
     this.loading = true;
-    this.npmService
-      .fetchPackageVersionsLikeVersion(
-        this.packageName,
-        this.scopeName,
-        this.searchText,
-        this.sortOption,
-        this.pageNum,
-        this.pageSize,
-      )
-      .then((pagedData: PagedData<PackageVersionListItem>) => {
+    this.npmService.searchPackageVersions(
+      this.packageName,
+      this.scopeName,
+      this.searchText,
+      this.sortOption,
+      this.pageNum,
+      this.pageSize,
+    ).pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (pagedData: PagedData<PackageVersionListItem>) => {
         this.pagedData.page = pagedData.page;
         this.versions = pagedData.content;
         this.fetchPackageTags();
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   private fetchPackageTags() {
-    this.npmService
-      .fetchPackageTags(this.packageName, this.scopeName)
-      .then((tags: PackageDistributionTagMapListItem[]) => {
+    this.npmService.fetchPackageTags(this.packageName, this.scopeName).subscribe({
+      next: (tags: PackageDistributionTagMapListItem[]) => {
         this.tags = tags;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      });
+      },
+      error: () => {},
+    });
   }
 
   public get canManage(): boolean {
