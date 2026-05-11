@@ -64,7 +64,8 @@ public class ApiFacadeResolver implements HandlerMethodArgumentResolver {
 
     @SuppressWarnings("unchecked")
     final var uriVariables =
-        (Map<String, String>) webRequest.getAttribute(URI_TEMPLATE_VARIABLES_ATTRIBUTE, SCOPE_REQUEST);
+        (Map<String, String>)
+            webRequest.getAttribute(URI_TEMPLATE_VARIABLES_ATTRIBUTE, SCOPE_REQUEST);
 
     return extractRepoType(uriVariables)
         .map(this.apiFacadeMap::get)
