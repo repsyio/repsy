@@ -118,13 +118,13 @@
                     '/' +
                     pkg.name +
                     '/' +
-                    pkg.latest
+                    pkg.latestVersion
                   "
                 >
                   <app-tooltip
                     class="group-hover:underline"
-                    [text]="pkg.latest | ellipsis: 15"
-                    [textHover]="pkg.latest"
+                    [text]="pkg.latestVersion | ellipsis: 15"
+                    [textHover]="pkg.latestVersion"
                   />
                   <svg
                     class="mt-[2px] h-[14px] w-[14px] text-[#9FA0A0] group-hover:text-white"
@@ -179,7 +179,7 @@
               class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
               role="button"
               [routerLink]="
-                '/' + activeRegistry.repoName + '/' + (pkg.scope ? pkg.scope : '~') + '/' + pkg.name + '/' + pkg.latest
+                '/' + activeRegistry.repoName + '/' + (pkg.scope ? pkg.scope : '~') + '/' + pkg.name + '/' + pkg.latestVersion
               "
             >
               @if (activeRegistry.canWrite) {
@@ -232,11 +232,11 @@
                       '/' +
                       pkg.name +
                       '/' +
-                      pkg.latest
+                      pkg.latestVersion
                     "
                   >
                     <span class="text-right text-sm break-all group-hover:underline">
-                      {{ pkg.latest }}
+                      {{ pkg.latestVersion }}
                     </span>
 
                     <svg

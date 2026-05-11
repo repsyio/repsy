@@ -18,7 +18,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
 import {
-  PackageListItem,
+  PypiPackageListItem,
   ProtocolRepoControllerService,
   PypiPackageControllerService,
   ReleaseDetail,
@@ -53,13 +53,13 @@ export class PypiService {
     );
   }
 
-  public fetchRepositoryPackagesLikeName(name: string, sort: Sort, pageIndex: number, pageSize: number): Observable<PagedData<PackageListItem>> {
+  public fetchRepositoryPackagesLikeName(name: string, sort: Sort, pageIndex: number, pageSize: number): Observable<PagedData<PypiPackageListItem>> {
     return this.pypiPackageControllerService.listPypiPackages(
       { page: pageIndex, size: pageSize, sort: [`${sort.column},${sort.type}`] },
       this.repoName,
       name || undefined,
     ).pipe(
-      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<PackageListItem>)),
+      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<PypiPackageListItem>)),
     );
   }
 

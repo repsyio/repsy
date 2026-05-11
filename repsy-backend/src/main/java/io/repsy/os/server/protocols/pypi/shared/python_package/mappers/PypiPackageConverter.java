@@ -75,7 +75,7 @@ public interface PypiPackageConverter {
   }
 
   @Mapping(target = "updatedAt", source = "updatedAt")
-  io.repsy.os.generated.model.PackageListItem toPackageListItemDto(PackageListItem source);
+  io.repsy.os.generated.model.PypiPackageListItem toPackageListItemDto(PackageListItem source);
 
   @Mapping(target = "createdAt", source = "createdAt")
   io.repsy.os.generated.model.ReleaseListItem toReleaseListItemDto(ReleaseListItem source);

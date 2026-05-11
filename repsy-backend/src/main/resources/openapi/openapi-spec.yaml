@@ -608,7 +608,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
+                "$ref": "#/components/schemas/RestResponsePagedModelPypiPackageListItem"
       summary: List PyPI packages in a repository
     parameters:
       - name: repoName
@@ -807,7 +807,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
+                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
       summary: List npm packages in a repository
     parameters:
       - name: repoName
@@ -1055,7 +1055,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
+                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
       summary: List artifact groups in a Maven repository
     parameters:
       - name: repoName
@@ -1086,7 +1086,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
+                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
       summary: List npm scopes in a repository
     parameters:
       - name: repoName
@@ -1122,7 +1122,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelPackageListItem"
+                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
       summary: Get npm packages in a scope
     parameters:
       - name: repoName
@@ -2748,7 +2748,41 @@ components:
           type: boolean
         path:
           type: string
-    PackageListItem:
+    NpmPackageListItem:
+      type: object
+      properties:
+        name:
+          type: string
+        scope:
+          type: string
+        latestVersion:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+    PagedModelNpmPackageListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/NpmPackageListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelNpmPackageListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelNpmPackageListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    PypiPackageListItem:
       type: object
       properties:
         name:
@@ -2760,16 +2794,16 @@ components:
         updatedAt:
           type: string
           format: date-time
-    PagedModelPackageListItem:
+    PagedModelPypiPackageListItem:
       type: object
       properties:
         content:
           type: array
           items:
-            "$ref": "#/components/schemas/PackageListItem"
+            "$ref": "#/components/schemas/PypiPackageListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelPackageListItem:
+    RestResponsePagedModelPypiPackageListItem:
       type: object
       properties:
         msgId:
@@ -2777,7 +2811,7 @@ components:
         type:
           "$ref": "#/components/schemas/ResponseType"
         data:
-          "$ref": "#/components/schemas/PagedModelPackageListItem"
+          "$ref": "#/components/schemas/PagedModelPypiPackageListItem"
         errorCode:
           type: string
         text:

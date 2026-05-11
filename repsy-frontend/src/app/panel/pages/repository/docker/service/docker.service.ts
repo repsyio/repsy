@@ -27,7 +27,6 @@ import {
   ManifestListItem,
   ProtocolRepoControllerService,
   RepoPermissionInfo,
-
   TagDetail,
 } from '../../../../../../generated/api';
 

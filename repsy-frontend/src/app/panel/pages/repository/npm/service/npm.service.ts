@@ -20,11 +20,11 @@ import { map, tap } from 'rxjs/operators';
 
 import { PagedData } from '../../../../shared/dto/paged-data';
 import { Sort } from '../../../../shared/dto/sort';
-import { PackageListItem } from '../dto/package-list-item';
 import { PackageVersionInfo } from '../dto/package-version-info';
 import {
   NpmPackageApiControllerService,
   PackageDistributionTagMapListItem,
+  NpmPackageListItem,
   PackageVersionListItem,
   ProtocolRepoControllerService,
   RepoPermissionInfo,
@@ -56,13 +56,13 @@ export class NpmService {
     );
   }
 
-  public searchPackages(scope: string, sortOption: Sort, pageIndex: number, pageSize: number): Observable<PagedData<PackageListItem>> {
+  public searchPackages(scope: string, sortOption: Sort, pageIndex: number, pageSize: number): Observable<PagedData<NpmPackageListItem>> {
     return this.npmPackageApiControllerService.listNpmPackages(
       { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
       this.repoName,
       scope || undefined,
     ).pipe(
-      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<PackageListItem>)),
+      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<NpmPackageListItem>)),
     );
   }
 
@@ -72,14 +72,14 @@ export class NpmService {
     sortOption: Sort,
     pageIndex: number,
     pageSize: number,
-  ): Observable<PagedData<PackageListItem>> {
+  ): Observable<PagedData<NpmPackageListItem>> {
     return this.npmPackageApiControllerService.listNpmPackagesByScope(
       scope,
       { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
       this.repoName,
       name || undefined,
     ).pipe(
-      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<PackageListItem>)),
+      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<NpmPackageListItem>)),
     );
   }
 
@@ -88,13 +88,13 @@ export class NpmService {
     sortOption: Sort,
     pageIndex: number,
     pageSize: number,
-  ): Observable<PagedData<PackageListItem>> {
+  ): Observable<PagedData<NpmPackageListItem>> {
     return this.npmPackageApiControllerService.listFilterByScope(
       { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
       this.repoName,
       name || undefined,
     ).pipe(
-      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<PackageListItem>)),
+      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<NpmPackageListItem>)),
     );
   }
 

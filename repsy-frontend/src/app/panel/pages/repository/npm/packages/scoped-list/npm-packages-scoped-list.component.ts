@@ -33,10 +33,9 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../../../generated/api';
+import { NpmPackageListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { Sort } from '../../../../../shared/dto/sort';
 import { NpmConfigComponent } from '../../config/npm-config.component';
-import { PackageListItem } from '../../dto/package-list-item';
 import { NpmService } from '../../service/npm.service';
 
 @Component({
@@ -66,8 +65,8 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
   public scopeName: string;
   public pageNum = 0;
   public pageSize = 10;
-  public pagedData: PagedData<PackageListItem>;
-  public packages: PackageListItem[];
+  public pagedData: PagedData<NpmPackageListItem>;
+  public packages: NpmPackageListItem[];
   public activeRegistry: RepoPermissionInfo;
   public searchText = '';
 
@@ -87,7 +86,7 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
     private readonly router: Router,
   ) {
     this.baseUrl = environment.repoBaseUrl;
-    this.pagedData = new PagedData<PackageListItem>();
+    this.pagedData = new PagedData<NpmPackageListItem>();
     this.activeRegistry = {} as RepoPermissionInfo;
 
     this.registryChanges$ = this.npmService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
@@ -139,7 +138,7 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
     call.pipe(
       finalize(() => { this.loading = false; }),
     ).subscribe({
-      next: (pagedData: PagedData<PackageListItem>) => {
+      next: (pagedData: PagedData<NpmPackageListItem>) => {
         this.pagedData.page = pagedData.page;
         this.packages = pagedData.content;
       },
@@ -147,7 +146,7 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
     });
   }
 
-  public deletePackage(pck: PackageListItem) {
+  public deletePackage(pck: NpmPackageListItem) {
     this.dangerModalService.show('Delete Package', 'Delete', () => {
       this.loading = true;
       this.npmService.deletePackage(pck.name, pck.scope).pipe(
