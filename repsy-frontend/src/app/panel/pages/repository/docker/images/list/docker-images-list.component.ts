@@ -19,6 +19,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
@@ -135,36 +136,29 @@ export class DockerImagesListComponent implements OnDestroy {
   public deleteImage(image: ImageListItem) {
     this.dangerModalService.show('Delete Image', 'Delete', () => {
       this.loading = true;
-      this.dockerService
-        .deleteImage(image.name)
-        .then(() => {
+      this.dockerService.deleteImage(image.name).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           this.refreshPage();
           this.toastService.show('Image deleted successfully', 'success');
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 
   private fetchImages(): void {
     this.loading = true;
-    this.dockerService
-      .fetchRepositoryImagesLikeName(this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .then((pagedData: PagedData<ImageListItem>) => {
+    this.dockerService.searchImages(this.searchText, this.sortOption, this.pageNum, this.pageSize).pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (pagedData: PagedData<ImageListItem>) => {
         this.pagedData.page = pagedData.page;
         this.images = pagedData.content;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   public get canManage(): boolean {

@@ -19,6 +19,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
@@ -138,9 +139,10 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
   public deleteVersion(version: ReleaseListItem) {
     this.dangerModalService.show('Delete Release', 'Delete', () => {
       this.loading = true;
-      this.pypiService
-        .deleteRelease(this.packageName, version.version)
-        .then(() => {
+      this.pypiService.deleteRelease(this.packageName, version.version).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           if (this.versions.length - 1 === 0) {
             this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
               this.toastService.show('Version deleted successfully', 'success');
@@ -149,13 +151,9 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
             this.refreshPage();
             this.toastService.show('Version deleted successfully', 'success');
           }
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 
@@ -163,17 +161,14 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
     this.loading = true;
     this.pypiService
       .fetchPackageReleasesLikeName(this.packageName, this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .then((pagedData: PagedData<ReleaseListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.versions = pagedData.content;
-        this.finalRelease = this.versions.find((version) => version.finalRelease)?.version;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+      .pipe(finalize(() => { this.loading = false; }))
+      .subscribe({
+        next: (pagedData: PagedData<ReleaseListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.versions = pagedData.content;
+          this.finalRelease = this.versions.find((version) => version.finalRelease)?.version;
+        },
+        error: () => {},
       });
   }
 

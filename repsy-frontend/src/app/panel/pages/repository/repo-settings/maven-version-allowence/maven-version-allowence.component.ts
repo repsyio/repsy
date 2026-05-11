@@ -57,15 +57,13 @@ export class VersionAllowanceComponent implements OnInit {
     form.releases = option === RepoSupport.RELEASES || option === RepoSupport.ALL;
     form.allowOverride = this.parentForm.get('allowOverride')!.value;
 
-    this.mavenService
-      .updateRepoSettings(form)
-      .then(() => {
+    this.mavenService.updateRepoSettings(form).subscribe({
+      next: () => {
         this.fetch.emit();
         this.toastService.show(`Version allowance has changed as ${option}`, 'success');
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      });
+      },
+      error: () => {},
+    });
   }
 
   private whichVersionAllowence(snapshots: boolean, releases: boolean) {

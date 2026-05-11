@@ -19,6 +19,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
@@ -134,35 +135,28 @@ export class MavenArtifactsGroupListComponent implements OnDestroy {
   public deleteGroup(artifact: ArtifactListItem) {
     this.dangerModalService.show('Delete Group', 'Delete', () => {
       this.loading = true;
-      this.mavenService
-        .deleteGroup(artifact.groupName)
-        .then(() => {
+      this.mavenService.deleteGroup(artifact.groupName).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           this.refreshPage();
           this.toastService.show('Group deleted successfully', 'success');
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 
   private fetchArtifacts(): void {
     this.loading = true;
-    this.mavenService
-      .getRepoArtifactsLikeGroupName(this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .then((pagedData: PagedData<ArtifactListItem>) => {
+    this.mavenService.searchGroups(this.searchText, this.sortOption, this.pageNum, this.pageSize).pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (pagedData: PagedData<ArtifactListItem>) => {
         this.pagedData.page = pagedData.page;
         this.artifacts = pagedData.content;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 }

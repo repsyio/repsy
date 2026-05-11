@@ -18,6 +18,7 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
@@ -78,9 +79,10 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
 
     this.installation = `pip install hello-world --extra-index-url ${this.baseUrl}/${this.activeRepo.repoName}/simple`;
 
-    this.pypiService
-      .fetchRelease(this.packageName, this.versionName)
-      .then((releaseInfo: ReleaseDetail) => {
+    this.pypiService.fetchRelease(this.packageName, this.versionName).pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (releaseInfo: ReleaseDetail) => {
         this.versionInfo = releaseInfo;
         releaseInfo.classifiers.forEach((c: ReleaseClassifierInfo) =>
           this.classifiers[c.classifier]
@@ -91,32 +93,24 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
         releaseInfo.descriptionContentType = releaseInfo.descriptionContentType
           ? releaseInfo.descriptionContentType.split(';')[0].trim()
           : '';
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   public deleteVersion() {
     this.dangerModalService.show('Delete Release', 'Delete', () => {
       this.loading = true;
-      this.pypiService
-        .deleteRelease(this.packageName, this.versionInfo.version)
-        .then(() => {
+      this.pypiService.deleteRelease(this.packageName, this.versionInfo.version).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
             this.toastService.show('Version deleted successfully', 'success');
           });
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 }

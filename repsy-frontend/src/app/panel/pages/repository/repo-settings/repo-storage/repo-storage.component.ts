@@ -19,14 +19,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { RepoUsageInfo } from '../../../../../../generated/api';
-import { RepoType } from '../../../../shared/dto/repo/repo-type';
-import { CargoService } from '../../cargo/service/cargo.service';
-import { DockerService } from '../../docker/service/docker.service';
-import { GolangService } from '../../golang/service/golang.service';
-import { MavenService } from '../../maven/service/maven.service';
-import { NpmService } from '../../npm/service/npm.service';
-import { PypiService } from '../../pypi/service/pypi.service';
+import { ProtocolRepoControllerService, RepoInfo, RepoUsageInfo } from '../../../../../../generated/api';
 
 @Component({
   selector: 'app-repo-storage',
@@ -36,17 +29,13 @@ import { PypiService } from '../../pypi/service/pypi.service';
 })
 export class RepoStorageComponent implements OnInit {
   @Input() public repoType: string;
+  @Input() public repoName: string;
   @Output() public fetch = new EventEmitter<void>();
 
   public usage: RepoUsageInfo;
 
   constructor(
-    private readonly mavenService: MavenService,
-    private readonly npmService: NpmService,
-    private readonly pypiService: PypiService,
-    private readonly dockerService: DockerService,
-    private readonly cargoService: CargoService,
-    private readonly golangService: GolangService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly toastService: ToastService,
   ) {}
 
@@ -54,32 +43,10 @@ export class RepoStorageComponent implements OnInit {
     this.fetchRepoUsage();
   }
 
-  repoUsageService() {
-    switch (this.repoType) {
-      case RepoType.MAVEN:
-        return this.mavenService.getRepoUsage();
-      case RepoType.NPM:
-        return this.npmService.fetchRegistryUsage();
-      case RepoType.PYPI:
-        return this.pypiService.fetchRepositoryUsage();
-      case RepoType.DOCKER:
-        return this.dockerService.fetchRepositoryUsage();
-      case RepoType.CARGO:
-        return this.cargoService.fetchRepositoryUsage();
-      case RepoType.GOLANG:
-        return this.golangService.fetchRepositoryUsage();
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
-  }
-
   fetchRepoUsage() {
-    this.repoUsageService()
-      .then((data) => {
-        this.usage = data;
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      });
+    this.protocolRepoControllerService.getUsage({} as RepoInfo, this.repoName).subscribe({
+      next: (r) => { this.usage = r.data!; },
+      error: () => {},
+    });
   }
 }

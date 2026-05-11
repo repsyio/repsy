@@ -18,6 +18,7 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../environments/environment';
 import { SpinnerComponent } from '../../../../../shared/components/spinner/spinner.component';
@@ -185,19 +186,16 @@ export class MavenBrowserComponent implements OnDestroy {
     this.loading = true;
     this.operationLock = true;
 
-    this.mavenService
-      .getPathContent(this.directoryStack[this.directoryStack.length - 1].path)
-      .then((items: FsItemInfo[]) => {
+    this.mavenService.getPathContent(this.directoryStack[this.directoryStack.length - 1].path).pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (items: FsItemInfo[]) => {
         this.fsItems = items;
         this.filteredFsItems = this.fsItems;
         this.operationLock = false;
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+      },
+      error: () => { this.operationLock = false; },
+    });
   }
 
   private updateRepoUrl(): void {

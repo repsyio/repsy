@@ -19,6 +19,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
@@ -89,7 +90,7 @@ export class NpmPackagesListComponent implements OnDestroy {
     this.pagedData = new PagedData<PackageListItem>();
     this.activeRegistry = {} as RepoPermissionInfo;
     this.username = this.authService.username;
-    this.registryChanges$ = this.npmService.registryChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.registryChanges$ = this.npmService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
         this.activeRegistry = Object.assign({}, registry);
         this.fetchPackages();
@@ -135,41 +136,34 @@ export class NpmPackagesListComponent implements OnDestroy {
 
   private fetchPackages(): void {
     this.loading = true;
-    this.npmService
-      .fetchRegistryPackagesLikeScope(
-        this.searchText === '' ? null : this.searchText,
-        this.sortOption,
-        this.pageNum,
-        this.pageSize,
-      )
-      .then((pagedData: PagedData<PackageListItem>) => {
+    this.npmService.searchPackages(
+      this.searchText === '' ? null : this.searchText,
+      this.sortOption,
+      this.pageNum,
+      this.pageSize,
+    ).pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (pagedData: PagedData<PackageListItem>) => {
         this.pagedData.page = pagedData.page;
         this.packages = pagedData.content;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   public deletePackage(pck: PackageListItem) {
     this.dangerModalService.show('Delete Package', 'Delete', () => {
       this.loading = true;
-      this.npmService
-        .deletePackage(pck.name, pck.scope)
-        .then(() => {
+      this.npmService.deletePackage(pck.name, pck.scope).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           this.refreshPage();
           this.toastService.show('Package deleted successfully', 'success');
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 

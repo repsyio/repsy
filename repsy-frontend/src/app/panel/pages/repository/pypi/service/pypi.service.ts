@@ -14,348 +14,99 @@
 /// limitations under the License.
 ///
 
-import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, Subscriber } from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { map, tap } from 'rxjs/operators';
 
-import { environment } from '../../../../../../environments/environment';
-import { ErrorHandlerService } from '../../../../../shared/error-handler/error-handler.service';
+import {
+  DeployTokenForm,
+  PackageListItem,
+  ProtocolDeployTokenControllerService,
+  ProtocolRepoControllerService,
+  PypiPackageControllerService,
+  ReleaseDetail,
+  ReleaseListItem,
+  RepoCreateForm,
+  RepoDescriptionForm,
+  RepoInfo,
+  RepoPermissionInfo,
+  RepoRenameForm,
+  RepoSettingsForm,
+  RepoSettingsInfo,
+  RepoType as ApiRepoType,
+  RepoUsageInfo,
+} from '../../../../../../generated/api';
+
 import { PagedData } from '../../../../shared/dto/paged-data';
 import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
-import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
-import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
-import { RestResponse } from '../../../../shared/dto/rest-response';
 import { Sort } from '../../../../shared/dto/sort';
 import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
 import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
-import {
-  DeployTokenForm,
-  ReleaseListItem,
-  ReleaseDetail,
-  PackageListItem,
-  RepoRenameForm,
-  RepoCreateForm,
-  RepoDescriptionForm,
-  RepoSettingsInfo,
-  RepoPermissionInfo,
-} from '../../../../../../generated/api';
 
 @Injectable({
   providedIn: 'root',
 })
 export class PypiService {
   public readonly repoChanges: Observable<RepoPermissionInfo>;
-
-  private activeRepo: RepoPermissionInfo;
-
-  private readonly apiBaseUrl: string = environment.apiBaseUrl;
   private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
   constructor(
-    private readonly http: HttpClient,
-    private readonly errorHandlerService: ErrorHandlerService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly pypiPackageControllerService: PypiPackageControllerService,
+    private readonly protocolDeployTokenControllerService: ProtocolDeployTokenControllerService,
   ) {
     this.repoChanges = this.repoSubject.asObservable();
   }
 
+  private get repoName(): string {
+    return this.repoSubject.getValue()?.repoName ?? '';
+  }
+
   public selectRepository(repoName: string): Observable<RepoPermissionInfo> {
-    const url = `${this.apiBaseUrl}/api/repos/${repoName}/permissions`;
-
-    return new Observable<RepoPermissionInfo>((subscriber: Subscriber<RepoPermissionInfo>) => {
-      this.http.get<RestResponse<RepoPermissionInfo>>(url).subscribe({
-        next: (res: RestResponse<RepoPermissionInfo>) => {
-          this.activeRepo = res.data;
-          this.repoSubject.next(res.data);
-
-          subscriber.next(res.data);
-          subscriber.complete();
-        },
-        error: (err: HttpErrorResponse) => {
-          subscriber.error(this.errorHandlerService.handle(err));
-          subscriber.complete();
-        },
-      });
-    });
+    return this.protocolRepoControllerService.getPermission({} as RepoPermissionInfo, repoName).pipe(
+      map(r => r.data!),
+      tap(info => this.repoSubject.next(info)),
+    );
   }
 
-  public async createRepository(repositoryCreateForm: RepoCreateForm): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/PYPI`;
-
-      this.http
-        .post<RestResponse<void>>(url, repositoryCreateForm)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public fetchRepositoryPackagesLikeName(name: string, sort: Sort, pageIndex: number, pageSize: number): Observable<PagedData<PackageListItem>> {
+    return this.pypiPackageControllerService.listPypiPackages(
+      {} as RepoInfo,
+      { page: pageIndex, size: pageSize, sort: [`${sort.column},${sort.type}`] },
+      this.repoName,
+      name || undefined,
+    ).pipe(
+      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<PackageListItem>)),
+    );
   }
 
-  public async fetchRepositoryUsage(): Promise<RepoUsageInfo> {
-    return new Promise<RepoUsageInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/usage`;
-
-      this.http
-        .get<RestResponse<RepoUsageInfo>>(url)
-        .toPromise()
-        .then((res: RestResponse<RepoUsageInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public fetchPackageReleasesLikeName(packageName: string, version: string, sort: Sort, pageIndex: number, pageSize: number): Observable<PagedData<ReleaseListItem>> {
+    return this.pypiPackageControllerService.listReleases(
+      {} as RepoInfo,
+      packageName,
+      { page: pageIndex, size: pageSize, sort: [`${sort.column},${sort.type}`] },
+      this.repoName,
+      version || undefined,
+    ).pipe(
+      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<ReleaseListItem>)),
+    );
   }
 
-  public async fetchRepositories(): Promise<RepoListItem[]> {
-    return new Promise<RepoListItem[]>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/PYPI/info`;
-
-      this.http
-        .get<RestResponse<RepoListItem[]>>(url)
-        .toPromise()
-        .then((res: RestResponse<RepoListItem[]>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public deletePackage(packageName: string): Observable<void> {
+    return this.pypiPackageControllerService.deletePypiPackage({} as RepoInfo, packageName, this.repoName).pipe(
+      map(() => undefined),
+    );
   }
 
-  public async fetchRepositorySettings(): Promise<RepoSettingsInfo> {
-    return new Promise<RepoSettingsInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/settings`;
-
-      this.http
-        .get<RestResponse<RepoSettingsInfo>>(url)
-        .toPromise()
-        .then((res: RestResponse<RepoSettingsInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public fetchRelease(packageName: string, release: string): Observable<ReleaseDetail> {
+    return this.pypiPackageControllerService.getRelease({} as RepoInfo, packageName, release, this.repoName).pipe(
+      map(r => r.data!),
+    );
   }
 
-  public async updateRepoSettings(repoSettingsForm: RepoSettingsForm): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/settings`;
-
-      this.http
-        .put<RestResponse<void>>(url, repoSettingsForm)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async updateRepositoryName(repositoryNameForm: RepoRenameForm): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/name`;
-
-      this.http
-        .patch<RestResponse<void>>(url, repositoryNameForm)
-        .toPromise()
-        .then(() => {
-          if (this.activeRepo) {
-            this.activeRepo.repoName = repositoryNameForm.name;
-            this.repoSubject.next(this.activeRepo);
-          }
-          resolve();
-        })
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async updateRepoDescription(repositoryDescriptionForm: RepoDescriptionForm): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/description`;
-
-    return new Promise<void>((resolve, reject) => {
-      return this.http
-        .patch<RestResponse<null>>(url, repositoryDescriptionForm)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async deleteRepository(repo: string): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/${repo}`;
-
-      this.http
-        .delete<RestResponse<void>>(url)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async fetchRepositoryPackages(pageIndex: number, pageSize: number): Promise<PagedData<PackageListItem>> {
-    return new Promise((resolve, reject) => {
-      const params = new HttpParams()
-        .set('page', pageIndex.toString())
-        .set('sort', 'updatedAt,DESC')
-        .set('size', pageSize.toString());
-
-      const url = `${this.apiBaseUrl}/api/pypi/packages/${this.activeRepo.repoName}`;
-
-      this.http
-        .get<RestResponse<PagedData<PackageListItem>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<PackageListItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async fetchRepositoryPackagesLikeName(
-    name: string,
-    sortOption: Sort,
-    pageIndex: number,
-    pageSize: number,
-  ): Promise<PagedData<PackageListItem>> {
-    return new Promise((resolve, reject) => {
-      const params = new HttpParams()
-        .set('name', name)
-        .set('page', pageIndex.toString())
-        .set('sort', `${sortOption.column},${sortOption.type}`)
-        .set('size', pageSize.toString());
-
-      const url = `${this.apiBaseUrl}/api/pypi/packages/${this.activeRepo.repoName}`;
-
-      this.http
-        .get<RestResponse<PagedData<PackageListItem>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<PackageListItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async fetchPackageReleases(
-    packageName: string,
-    pageIndex: number,
-    pageSize: number,
-  ): Promise<PagedData<ReleaseListItem>> {
-    return new Promise((resolve, reject) => {
-      const params = new HttpParams()
-        .set('page', pageIndex.toString())
-        .set('sort', 'createdAt,DESC')
-        .set('size', pageSize.toString());
-
-      const url = `${this.apiBaseUrl}/api/pypi/packages/${this.activeRepo.repoName}/${packageName}/releases`;
-
-      this.http
-        .get<RestResponse<PagedData<ReleaseListItem>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<ReleaseListItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async fetchPackageReleasesLikeName(
-    packageName: string,
-    version: string,
-    sortOption: Sort,
-    pageIndex: number,
-    pageSize: number,
-  ): Promise<PagedData<ReleaseListItem>> {
-    return new Promise((resolve, reject) => {
-      const params = new HttpParams()
-        .set('version', version)
-        .set('page', pageIndex.toString())
-        .set('sort', `${sortOption.column},${sortOption.type}`)
-        .set('size', pageSize.toString());
-
-      const url = `${this.apiBaseUrl}/api/pypi/packages/${this.activeRepo.repoName}/${packageName}/releases`;
-
-      this.http
-        .get<RestResponse<PagedData<ReleaseListItem>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<ReleaseListItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public deletePackage(packageName: string): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/pypi/packages/${this.activeRepo.repoName}/${packageName}`;
-
-      this.http
-        .delete<RestResponse<void>>(url)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async fetchRelease(packageName: string, release: string): Promise<ReleaseDetail> {
-    return new Promise<ReleaseDetail>((resolve, reject) => {
-      const url =
-        this.apiBaseUrl + '/api/pypi/packages/' + this.activeRepo.repoName + '/' + packageName + '/releases/' + release;
-
-      this.http
-        .get<RestResponse<ReleaseDetail>>(url)
-        .toPromise()
-        .then((res: RestResponse<ReleaseDetail>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public deleteRelease(packageName: string, releaseVersion: string): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const url =
-        this.apiBaseUrl +
-        '/api/pypi/packages/' +
-        this.activeRepo.repoName +
-        '/' +
-        packageName +
-        '/releases/' +
-        releaseVersion;
-
-      this.http
-        .delete<RestResponse<void>>(url)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async getDeployTokens(pageNumber: number, pageSize: number): Promise<PagedData<DeployTokenInfo>> {
-    const params = new HttpParams().set('page', pageNumber.toString()).set('size', pageSize.toString());
-
-    const url = `${this.apiBaseUrl}/api/repos/` + this.activeRepo.repoName + '/deploy-tokens';
-
-    return new Promise<PagedData<DeployTokenInfo>>((resolve, reject) => {
-      this.http
-        .get<RestResponse<PagedData<DeployTokenInfo>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<DeployTokenInfo>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async rotateDeployToken(tokenUuid: string): Promise<string> {
-    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens/` + tokenUuid;
-
-    return new Promise<string>((resolve, reject) => {
-      this.http
-        .put(url, {})
-        .toPromise()
-        .then((res: RestResponse<string>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async createDeployToken(form: DeployTokenForm): Promise<TokenCreateInfo> {
-    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens`;
-
-    return new Promise<TokenCreateInfo>((resolve, reject) => {
-      this.http
-        .post(url, form)
-        .toPromise()
-        .then((res: RestResponse<TokenCreateInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async revokeDeployToken(tokenId: string): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens/` + tokenId;
-
-    return new Promise((resolve, reject) => {
-      this.http
-        .delete(url, {})
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public deleteRelease(packageName: string, releaseVersion: string): Observable<void> {
+    return this.pypiPackageControllerService.deleteRelease({} as RepoInfo, packageName, releaseVersion, this.repoName).pipe(
+      map(() => undefined),
+    );
   }
 }

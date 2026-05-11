@@ -19,6 +19,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
@@ -138,10 +139,10 @@ export class GolangModuleVersionListComponent implements OnDestroy {
 
   public deleteVersion(version: GoModuleVersionListItem): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
-      this.loading = true;
-      this.golangService
-        .deleteModuleVersion(this.modulePath, version.version)
-        .then(() => {
+      this.golangService.deleteModuleVersion(this.modulePath, version.version).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           if (this.versions.length - 1 === 0) {
             this.router.navigateByUrl('/' + this.activeRepo.repoName).then(() => {
               this.toastService.show('Version deleted successfully', 'success');
@@ -150,31 +151,23 @@ export class GolangModuleVersionListComponent implements OnDestroy {
             this.refreshPage();
             this.toastService.show('Version deleted successfully', 'success');
           }
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 
   private fetchVersions(): void {
     this.loading = true;
-    this.golangService
-      .fetchModuleVersions(this.modulePath, this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .then((pagedData: PagedData<GoModuleVersionListItem>) => {
+    this.golangService.fetchModuleVersions(this.modulePath, this.searchText, this.sortOption, this.pageNum, this.pageSize).pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (pagedData: PagedData<GoModuleVersionListItem>) => {
         this.pagedData.page = pagedData.page;
         this.versions = pagedData.content;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   public get canManage(): boolean {

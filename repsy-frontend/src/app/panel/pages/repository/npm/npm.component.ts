@@ -70,7 +70,7 @@ export class NpmComponent implements OnInit, OnDestroy {
   private loadRegistry(repoName: string): void {
     this.loading = true;
 
-    this.npmService.getRegistry(repoName).subscribe({
+    this.npmService.getRepository(repoName).subscribe({
       next: (registry: RepoPermissionInfo) => {
         // If repo is private and user is not authenticated, redirect to 404
         if (registry.private && !this.isAuthenticated) {

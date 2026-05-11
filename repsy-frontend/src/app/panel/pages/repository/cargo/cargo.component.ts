@@ -69,7 +69,7 @@ export class CargoComponent implements OnInit, OnDestroy {
   private loadPermissions(repoName: string): void {
     this.loading = true;
 
-    this.cargoService.selectRepository(repoName).subscribe({
+    this.cargoService.getRepository(repoName).subscribe({
       next: (permissions: RepoPermissionInfo) => {
         if (permissions.private && !this.isAuthenticated) {
           this.router.navigate(['/not-found']);

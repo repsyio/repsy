@@ -18,6 +18,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize, switchMap } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
@@ -136,19 +137,19 @@ export class CargoCratesVersionListComponent implements OnDestroy {
       const deleteAction = isLastVersion
         ? this.cargoService.deleteCrate(this.packageName)
         : this.cargoService.deleteCrateVersion(this.packageName, version.version);
-      deleteAction
-        .then(() => {
+      deleteAction.pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           this.toastService.show('Version deleted successfully', 'success');
           if (isLastVersion) {
             this.router.navigate(['..'], { relativeTo: this.route });
           } else {
             this.fetchVersions();
           }
-        })
-        .catch((err: string) => {
-          this.loading = false;
-          this.toastService.show(err, 'error');
-        });
+        },
+        error: () => {},
+      });
     });
   }
 
@@ -156,34 +157,20 @@ export class CargoCratesVersionListComponent implements OnDestroy {
     const crateName = this.packageName;
 
     this.loading = true;
-    this.cargoService
-      .fetchCrate(crateName)
-      .then((crate) => {
+    this.cargoService.fetchCrate(crateName).pipe(
+      switchMap((crate) => {
         this.crate = crate;
-        return this.cargoService.fetchCrateVersions(
-          crateName,
-          this.searchText,
-          this.sortOption,
-          this.pageNum,
-          this.pageSize,
-        );
-      })
-      .then((pagedData) => {
+        return this.cargoService.fetchCrateVersions(crateName, this.searchText, this.sortOption, this.pageNum, this.pageSize);
+      }),
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (pagedData) => {
         this.pagedData.page = pagedData.page;
         this.versions = pagedData.content;
         this.error = null;
-      })
-      .catch((err: string) => {
-        if (err === 'Crate is not Found.') {
-          this.router.navigateByUrl(`/${this.activeRepo.repoName}`);
-          return;
-        }
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   public get canManage(): boolean {

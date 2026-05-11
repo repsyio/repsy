@@ -19,6 +19,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
@@ -89,7 +90,7 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
     this.pagedData = new PagedData<PackageListItem>();
     this.activeRegistry = {} as RepoPermissionInfo;
 
-    this.registryChanges$ = this.npmService.registryChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.registryChanges$ = this.npmService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
         this.activeRegistry = registry;
         this.scopeName = this.route.snapshot.paramMap.get('scope');
@@ -132,49 +133,27 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
 
   private fetchPackages(): void {
     this.loading = true;
-    if (this.scopeName !== '~') {
-      this.npmService
-        .fetchRegistryPackagesFilterByScopeLikeName(
-          this.searchText,
-          this.sortOption,
-          this.scopeName,
-          this.pageNum,
-          this.pageSize,
-        )
-        .then((pagedData: PagedData<PackageListItem>) => {
-          this.pagedData.page = pagedData.page;
-          this.packages = pagedData.content;
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
-
-      return;
-    }
-
-    this.npmService
-      .fetchRegistryPackagesFilterByNoScopeLikeName(this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .then((pagedData: PagedData<PackageListItem>) => {
+    const call = this.scopeName !== '~'
+      ? this.npmService.searchScopedPackages(this.scopeName, this.searchText, this.sortOption, this.pageNum, this.pageSize)
+      : this.npmService.searchUnscopedPackages(this.searchText, this.sortOption, this.pageNum, this.pageSize);
+    call.pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (pagedData: PagedData<PackageListItem>) => {
         this.pagedData.page = pagedData.page;
         this.packages = pagedData.content;
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   public deletePackage(pck: PackageListItem) {
     this.dangerModalService.show('Delete Package', 'Delete', () => {
       this.loading = true;
-      this.npmService
-        .deletePackage(pck.name, pck.scope)
-        .then(() => {
+      this.npmService.deletePackage(pck.name, pck.scope).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           if (this.packages.length - 1 === 0) {
             this.router.navigateByUrl(`/${this.activeRegistry.repoName}`).then(() => {
               this.toastService.show('Package deleted successfully', 'success');
@@ -183,13 +162,9 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
             this.refreshPage();
             this.toastService.show('Package deleted successfully', 'success');
           }
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 

@@ -19,6 +19,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
@@ -139,9 +140,10 @@ export class MavenArtifactsListComponent implements OnDestroy {
   public deleteArtifact(artifact: ArtifactListItem) {
     this.dangerModalService.show('Delete Artifact', 'Delete', () => {
       this.loading = true;
-      this.mavenService
-        .deleteArtifact(artifact.groupName, artifact.artifactName)
-        .then(() => {
+      this.mavenService.deleteArtifact(artifact.groupName, artifact.artifactName).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           if (this.artifacts.length === 1) {
             this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
               this.toastService.show('Artifact deleted successfully', 'success');
@@ -150,31 +152,23 @@ export class MavenArtifactsListComponent implements OnDestroy {
             this.refreshPage();
             this.toastService.show('Artifact deleted successfully', 'success');
           }
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 
   private fetchGroupArtifacts(): void {
     this.loading = true;
-    this.mavenService
-      .getGroupArtifactsLikeArtifactName(this.groupName, this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .then((pagedData: PagedData<ArtifactListItem>) => {
+    this.mavenService.searchArtifacts(this.groupName, this.searchText, this.sortOption, this.pageNum, this.pageSize).pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (pagedData: PagedData<ArtifactListItem>) => {
         this.pagedData.page = pagedData.page;
         this.artifacts = pagedData.content;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   public get canManage(): boolean {

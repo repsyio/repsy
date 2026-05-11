@@ -22,12 +22,8 @@ import { ToastService } from '../../../../shared/components/toast/toast.service'
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
-import { CargoService } from '../../cargo/service/cargo.service';
-import { DockerService } from '../../docker/service/docker.service';
-import { MavenService } from '../../maven/service/maven.service';
-import { NpmService } from '../../npm/service/npm.service';
-import { PypiService } from '../../pypi/service/pypi.service';
-import { GolangService } from '../../golang/service/golang.service';
+import { ProtocolRepoControllerService, RepoInfo } from '../../../../../../generated/api';
+import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form';
 
 @Component({
   selector: 'app-visibility',
@@ -38,16 +34,12 @@ import { GolangService } from '../../golang/service/golang.service';
 })
 export class VisibilityComponent {
   @Input() public repoType: string;
+  @Input() public repoName: string;
   @Input() public parentForm: FormGroup;
   @Output() public fetch = new EventEmitter<void>();
 
   constructor(
-    private readonly mavenService: MavenService,
-    private readonly npmService: NpmService,
-    private readonly pypiService: PypiService,
-    private readonly dockerService: DockerService,
-    private readonly cargoService: CargoService,
-    private readonly golangService: GolangService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly toastService: ToastService,
   ) {}
 
@@ -56,46 +48,24 @@ export class VisibilityComponent {
 
     const privacy = this.parentForm.get('privateRepository').value;
 
-    let form;
+    let form: RepoSettingsForm | MavenRepoSettingsForm;
 
     if (this.repoType === RepoType.MAVEN) {
-      form = new RepoSettingsForm();
-
-      (form as RepoSettingsForm) = Object.assign(new RepoSettingsForm(), this.parentForm.value);
-      form.privateRepo = this.parentForm.get('privateRepository').value;
-      form.allowOverride = this.parentForm.get('allowOverride').value;
+      form = Object.assign(new MavenRepoSettingsForm(), this.parentForm.value);
+      (form as MavenRepoSettingsForm).privateRepo = this.parentForm.get('privateRepository').value;
+      (form as MavenRepoSettingsForm).allowOverride = this.parentForm.get('allowOverride').value;
     } else {
       form = new RepoSettingsForm();
       form.privateRepo = this.parentForm.get('privateRepository').value;
       form.allowOverride = this.parentForm.get('allowOverride').value;
     }
 
-    this.changePrivacyService(form)
-      .then(() => {
+    this.protocolRepoControllerService.updateSettings({} as RepoInfo, this.repoName, form).subscribe({
+      next: () => {
         this.fetch.emit();
         this.toastService.show(`Repository visibility has changed as ${privacy ? 'private' : 'public'}`, 'success');
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      });
-  }
-
-  private changePrivacyService(form: RepoSettingsForm) {
-    switch (this.repoType) {
-      case RepoType.MAVEN:
-        return this.mavenService.updateRepoSettings(form);
-      case RepoType.NPM:
-        return this.npmService.updateRepoSettings(form);
-      case RepoType.PYPI:
-        return this.pypiService.updateRepoSettings(form);
-      case RepoType.DOCKER:
-        return this.dockerService.updateRepoSettings(form);
-      case RepoType.GOLANG:
-        return this.golangService.updateRepoSettings(form);
-      case RepoType.CARGO:
-        return this.cargoService.updateRepoSettings(form);
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
+      },
+      error: () => {},
+    });
   }
 }

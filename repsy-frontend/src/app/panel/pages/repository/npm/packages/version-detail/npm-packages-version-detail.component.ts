@@ -18,6 +18,7 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
@@ -53,7 +54,7 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
   ) {
     this.activeRegistry = {} as RepoPermissionInfo;
 
-    this.registryChanges$ = this.npmService.registryChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.registryChanges$ = this.npmService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
         this.activeRegistry = Object.assign({}, registry);
         this.loadVersion();
@@ -80,40 +81,34 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
       ? `npm install @${this.scopeName}/${this.packageName}`
       : `npm install ${this.packageName}`;
 
-    this.npmService
-      .fetchPackageVersion(this.packageName, this.scopeName, this.versionName)
-      .then((packageVersionInfo: PackageVersionInfo) => {
+    this.npmService.fetchPackageVersion(this.packageName, this.scopeName, this.versionName).pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (packageVersionInfo: PackageVersionInfo) => {
         packageVersionInfo.createdAt = new Date(packageVersionInfo.createdAt);
         packageVersionInfo.fullName = packageVersionInfo.scopeName
           ? '@' + packageVersionInfo.scopeName + '/' + packageVersionInfo.packageName
           : packageVersionInfo.packageName;
         this.versionInfo = packageVersionInfo;
         this.versionInfo.versionName = this.versionName;
-        this.loading = false;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   public deleteVersion() {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
-      this.npmService
-        .deletePackageVersion(this.packageName, this.scopeName, this.versionInfo.versionName)
-        .then(() => {
+      this.npmService.deletePackageVersion(this.packageName, this.scopeName, this.versionInfo.versionName).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           this.router.navigateByUrl(`/${this.activeRegistry.repoName}`).then(() => {
             this.toastService.show('Version deleted successfully', 'success');
           });
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 }

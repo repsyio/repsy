@@ -19,6 +19,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
@@ -131,19 +132,15 @@ export class GolangModulesListComponent implements OnDestroy {
 
   public deleteModule(mod: GoModuleListItem) {
     this.dangerModalService.show('Delete Module', 'Delete', () => {
-      this.loading = true;
-      this.golangService
-        .deleteModule(mod.modulePath)
-        .then(() => {
+      this.golangService.deleteModule(mod.modulePath).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           this.refreshPage();
           this.toastService.show('Module deleted successfully', 'success');
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
   }
 
@@ -154,18 +151,15 @@ export class GolangModulesListComponent implements OnDestroy {
       ? this.golangService.searchModules(this.searchText, this.sortOption, this.pageNum, this.pageSize)
       : this.golangService.fetchModules(this.sortOption, this.pageNum, this.pageSize);
 
-    fetch
-      .then((pagedData: PagedData<GoModuleListItem>) => {
+    fetch.pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (pagedData: PagedData<GoModuleListItem>) => {
         this.pagedData.page = pagedData.page;
         this.modules = pagedData.content;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   public get canManage(): boolean {

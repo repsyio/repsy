@@ -19,6 +19,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
@@ -136,26 +137,15 @@ export class DockerImagesManifestListComponent implements OnDestroy {
 
   private fetchManifests(): void {
     this.loading = true;
-    this.dockerService
-      .fetchManifestsLikeName(
-        this.searchText,
-        this.sortOption,
-        this.imageName,
-        this.tagName,
-        this.pageNum,
-        this.pageSize,
-      )
-      .then((pagedData: PagedData<ManifestListItem>) => {
+    this.dockerService.searchManifests(this.searchText, this.sortOption, this.imageName, this.tagName, this.pageNum, this.pageSize).pipe(
+      finalize(() => { this.loading = false; }),
+    ).subscribe({
+      next: (pagedData: PagedData<ManifestListItem>) => {
         this.pagedData.page = pagedData.page;
         this.manifests = pagedData.content;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   public get canManage(): boolean {

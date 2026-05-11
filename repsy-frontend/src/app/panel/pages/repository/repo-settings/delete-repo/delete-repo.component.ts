@@ -17,17 +17,11 @@
 import { Component, Input } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { finalize } from 'rxjs/operators';
 
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../../generated/api';
-import { RepoType } from '../../../../shared/dto/repo/repo-type';
-import { CargoService } from '../../cargo/service/cargo.service';
-import { DockerService } from '../../docker/service/docker.service';
-import { MavenService } from '../../maven/service/maven.service';
-import { NpmService } from '../../npm/service/npm.service';
-import { PypiService } from '../../pypi/service/pypi.service';
-import { GolangService } from '../../golang/service/golang.service';
+import { ProtocolRepoControllerService, RepoInfo, RepoPermissionInfo } from '../../../../../../generated/api';
 
 @Component({
   selector: 'app-delete-repo',
@@ -45,12 +39,7 @@ export class DeleteRepoComponent {
   public visibilityForm: FormGroup;
 
   constructor(
-    private readonly mavenService: MavenService,
-    private readonly npmService: NpmService,
-    private readonly pypiService: PypiService,
-    private readonly dockerService: DockerService,
-    private readonly cargoService: CargoService,
-    private readonly golangService: GolangService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
@@ -64,38 +53,16 @@ export class DeleteRepoComponent {
     const successMsg = 'Repository deleted successfully';
     this.dangerModalService.show('Delete Repository', 'Delete', () => {
       this.loading = true;
-
-      this.deleteRepoService(this.activeRepository.repoName)
-        .then(() => {
+      this.protocolRepoControllerService.deleteRepo({} as RepoInfo, {} as any, this.activeRepository.repoName).pipe(
+        finalize(() => { this.loading = false; }),
+      ).subscribe({
+        next: () => {
           this.router.navigate(['/repositories']).then(() => {
             this.toastService.show(successMsg, 'success');
           });
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
+        },
+        error: () => {},
+      });
     });
-  }
-
-  private deleteRepoService(repoName: string) {
-    switch (this.repoType) {
-      case RepoType.MAVEN:
-        return this.mavenService.deleteRepository(repoName);
-      case RepoType.NPM:
-        return this.npmService.deleteRegistry(repoName);
-      case RepoType.PYPI:
-        return this.pypiService.deleteRepository(repoName);
-      case RepoType.DOCKER:
-        return this.dockerService.deleteRepository(repoName);
-      case RepoType.CARGO:
-        return this.cargoService.deleteRepository(repoName);
-      case RepoType.GOLANG:
-        return this.golangService.deleteRepository(repoName);
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
   }
 }

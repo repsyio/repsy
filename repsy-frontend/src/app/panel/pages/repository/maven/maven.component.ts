@@ -70,7 +70,7 @@ export class MavenComponent implements OnInit, OnDestroy {
   private loadPermissions(repoName: string): void {
     this.loading = true;
 
-    this.mavenService.getRepoPermission(repoName).subscribe({
+    this.mavenService.getRepository(repoName).subscribe({
       next: (permissions: RepoPermissionInfo) => {
         // If repo is private and user is not authenticated, redirect to 404
         if (permissions.private && !this.isAuthenticated) {

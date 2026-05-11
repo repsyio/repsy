@@ -14,31 +14,21 @@
 /// limitations under the License.
 ///
 
-import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, Subscriber } from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { map, tap } from 'rxjs/operators';
 
-import { environment } from '../../../../../../environments/environment';
-import { ErrorHandlerService } from '../../../../../shared/error-handler/error-handler.service';
 import { PagedData } from '../../../../shared/dto/paged-data';
-import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
-import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
-import { RestResponse } from '../../../../shared/dto/rest-response';
-import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
-import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
 import { Sort } from '../../../../shared/dto/sort';
 import {
-  RepoDescriptionForm,
-  DeployTokenForm,
   GoModuleInfo,
   GoModuleListItem,
   GoModuleVersionListItem,
-  RepoRenameForm,
-  RepoCreateForm,
-  RepoSettingsInfo,
+  GolangModuleControllerService,
+  ProtocolRepoControllerService,
+  RepoInfo,
   RepoPermissionInfo,
 } from '../../../../../../generated/api';
-import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 
 @Injectable({
   providedIn: 'root',
@@ -46,285 +36,78 @@ import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form
 export class GolangService {
   public readonly repoChanges: Observable<RepoPermissionInfo>;
 
-  private readonly repoSub = new BehaviorSubject<RepoPermissionInfo>(null);
-
-  private readonly apiBaseUrl = environment.apiBaseUrl;
-
-  private activeRepo: RepoPermissionInfo;
+  private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
   constructor(
-    private readonly http: HttpClient,
-    private readonly errorHandlerService: ErrorHandlerService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly golangModuleControllerService: GolangModuleControllerService,
   ) {
-    this.repoChanges = this.repoSub.asObservable();
+    this.repoChanges = this.repoSubject.asObservable();
   }
 
-  public async createRepository(form: RepoCreateForm): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      return this.http
-        .post<RestResponse<null>>(`${this.apiBaseUrl}/api/repos/GOLANG`, form)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  private get repoName(): string {
+    return this.repoSubject.getValue()?.repoName ?? '';
   }
 
   public getRepository(repoName: string): Observable<RepoPermissionInfo> {
-    const url = `${this.apiBaseUrl}/api/repos/${repoName}/permissions`;
-
-    return new Observable<RepoPermissionInfo>((observer: Subscriber<RepoPermissionInfo>) => {
-      this.http.get<RestResponse<RepoPermissionInfo>>(url).subscribe(
-        (res: RestResponse<RepoPermissionInfo>) => {
-          this.activeRepo = res.data;
-          this.repoSub.next(res.data);
-          observer.next(res.data);
-          observer.complete();
-        },
-        (err: HttpErrorResponse) => {
-          observer.error(this.errorHandlerService.handle(err));
-          observer.complete();
-        },
-      );
-    });
+    return this.protocolRepoControllerService.getPermission({} as RepoPermissionInfo, repoName).pipe(
+      map(r => r.data!),
+      tap(info => this.repoSubject.next(info)),
+    );
   }
 
-  public async deleteRepository(repoName: string): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      return this.http
-        .delete<RestResponse<null>>(`${this.apiBaseUrl}/api/repos/${repoName}`)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public fetchModules(sortOption: Sort, pageIndex: number, pageSize: number): Observable<PagedData<GoModuleListItem>> {
+    return this.golangModuleControllerService.listGolangModules(
+      {} as RepoInfo,
+      { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
+      this.repoName,
+    ).pipe(
+      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<GoModuleListItem>)),
+    );
   }
 
-  public async fetchRepositories(): Promise<RepoListItem[]> {
-    return new Promise<RepoListItem[]>((resolve, reject) => {
-      this.http
-        .get<RestResponse<RepoListItem[]>>(`${this.apiBaseUrl}/api/repos/GOLANG/info`)
-        .toPromise()
-        .then((res: RestResponse<RepoListItem[]>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public searchModules(search: string, sortOption: Sort, pageIndex: number, pageSize: number): Observable<PagedData<GoModuleListItem>> {
+    return this.golangModuleControllerService.searchGolangModules(
+      {} as RepoInfo,
+      { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
+      this.repoName,
+      search || undefined,
+    ).pipe(
+      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<GoModuleListItem>)),
+    );
   }
 
-  public async fetchRepositorySettings(): Promise<RepoSettingsInfo> {
-    return new Promise<RepoSettingsInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/settings`;
-
-      this.http
-        .get<RestResponse<RepoSettingsInfo>>(url)
-        .toPromise()
-        .then((res: RestResponse<RepoSettingsInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public deleteModule(modulePath: string): Observable<void> {
+    return this.golangModuleControllerService.deleteGolangModule({} as RepoInfo, modulePath, this.repoName).pipe(map(() => undefined));
   }
 
-  public async fetchRepositoryUsage(): Promise<RepoUsageInfo> {
-    return new Promise<RepoUsageInfo>((resolve, reject) => {
-      this.http
-        .get<RestResponse<RepoUsageInfo>>(`${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/usage`)
-        .toPromise()
-        .then((res: RestResponse<RepoUsageInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async updateRepoDescription(form: RepoDescriptionForm): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      this.http
-        .patch<RestResponse<void>>(`${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/description`, form)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async fetchModules(
-    sortOption: Sort,
-    pageIndex: number,
-    pageSize: number,
-  ): Promise<PagedData<GoModuleListItem>> {
-    const params = new HttpParams()
-      .set('page', pageIndex.toString())
-      .set('size', pageSize.toString())
-      .set('sort', `${sortOption.column},${sortOption.type}`);
-
-    return new Promise<PagedData<GoModuleListItem>>((resolve, reject) => {
-      this.http
-        .get<RestResponse<PagedData<GoModuleListItem>>>(
-          `${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}`,
-          {
-            params,
-          },
-        )
-        .toPromise()
-        .then((res: RestResponse<PagedData<GoModuleListItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async searchModules(
-    search: string,
-    sortOption: Sort,
-    pageIndex: number,
-    pageSize: number,
-  ): Promise<PagedData<GoModuleListItem>> {
-    const params = new HttpParams()
-      .set('search', search)
-      .set('page', pageIndex.toString())
-      .set('size', pageSize.toString())
-      .set('sort', `${sortOption.column},${sortOption.type}`);
-
-    return new Promise<PagedData<GoModuleListItem>>((resolve, reject) => {
-      this.http
-        .get<RestResponse<PagedData<GoModuleListItem>>>(
-          `${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}/search`,
-          { params },
-        )
-        .toPromise()
-        .then((res: RestResponse<PagedData<GoModuleListItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async deleteModule(modulePath: string): Promise<void> {
-    const params = new HttpParams().set('modulePath', modulePath);
-
-    return new Promise<void>((resolve, reject) => {
-      this.http
-        .delete<RestResponse<null>>(`${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}`, { params })
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async fetchModuleVersions(
+  public fetchModuleVersions(
     modulePath: string,
     search: string,
     sortOption: Sort,
     pageIndex: number,
     pageSize: number,
-  ): Promise<PagedData<GoModuleVersionListItem>> {
-    const params = new HttpParams()
-      .set('modulePath', modulePath)
-      .set('search', search)
-      .set('page', pageIndex.toString())
-      .set('size', pageSize.toString())
-      .set('sort', `${sortOption.column},${sortOption.type}`);
-
-    return new Promise<PagedData<GoModuleVersionListItem>>((resolve, reject) => {
-      this.http
-        .get<RestResponse<PagedData<GoModuleVersionListItem>>>(
-          `${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}/versions`,
-          { params },
-        )
-        .toPromise()
-        .then((res: RestResponse<PagedData<GoModuleVersionListItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  ): Observable<PagedData<GoModuleVersionListItem>> {
+    return this.golangModuleControllerService.listGolangModuleVersions(
+      {} as RepoInfo,
+      modulePath,
+      { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
+      this.repoName,
+      search || undefined,
+    ).pipe(
+      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<GoModuleVersionListItem>)),
+    );
   }
 
-  public async fetchModuleInfo(modulePath: string): Promise<GoModuleInfo> {
-    const params = new HttpParams().set('modulePath', modulePath);
-
-    return new Promise<GoModuleInfo>((resolve, reject) => {
-      this.http
-        .get<RestResponse<GoModuleInfo>>(`${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}/info`, {
-          params,
-        })
-        .toPromise()
-        .then((res: RestResponse<GoModuleInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public fetchModuleInfo(modulePath: string): Observable<GoModuleInfo> {
+    return this.golangModuleControllerService.getGolangModuleInfo({} as RepoInfo, modulePath, this.repoName).pipe(
+      map(r => r.data!),
+    );
   }
 
-  public async deleteModuleVersion(modulePath: string, version: string): Promise<void> {
-    const params = new HttpParams().set('modulePath', modulePath).set('version', version);
-
-    return new Promise<void>((resolve, reject) => {
-      this.http
-        .delete<RestResponse<null>>(`${this.apiBaseUrl}/api/go/modules/${this.activeRepo.repoName}/versions`, {
-          params,
-        })
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async getDeployTokens(pageNumber: number, pageSize: number): Promise<PagedData<DeployTokenInfo>> {
-    const params = new HttpParams().set('page', pageNumber.toString()).set('size', pageSize.toString());
-
-    return new Promise<PagedData<DeployTokenInfo>>((resolve, reject) => {
-      this.http
-        .get<RestResponse<PagedData<DeployTokenInfo>>>(
-          `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens`,
-          { params },
-        )
-        .toPromise()
-        .then((res: RestResponse<PagedData<DeployTokenInfo>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async createDeployToken(form: DeployTokenForm): Promise<TokenCreateInfo> {
-    return new Promise<TokenCreateInfo>((resolve, reject) => {
-      this.http
-        .post(`${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens`, form)
-        .toPromise()
-        .then((res: RestResponse<TokenCreateInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async revokeDeployToken(tokenUuid: string): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      this.http
-        .delete(`${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens/${tokenUuid}`)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async rotateDeployToken(tokenUuid: string): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
-      this.http
-        .put(`${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens/${tokenUuid}`, {})
-        .toPromise()
-        .then((res: RestResponse<string>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async updateRepoSettings(repoSettingsForm: RepoSettingsForm): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/settings`;
-      this.http
-        .put<RestResponse<void>>(url, repoSettingsForm)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async updateRepositoryName(repositoryNameForm: RepoRenameForm): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/name`;
-
-      this.http
-        .patch<RestResponse<void>>(url, repositoryNameForm)
-        .toPromise()
-        .then(() => {
-          if (this.activeRepo) {
-            this.activeRepo.repoName = repositoryNameForm.name;
-            this.repoSub.next(this.activeRepo);
-          }
-          resolve();
-        })
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public deleteModuleVersion(modulePath: string, version: string): Observable<void> {
+    return this.golangModuleControllerService.deleteGolangModuleVersion({} as RepoInfo, modulePath, version, this.repoName).pipe(
+      map(() => undefined),
+    );
   }
 }

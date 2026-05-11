@@ -18,17 +18,19 @@ import { CommonModule } from '@angular/common';
 import { Component, Input, OnInit } from '@angular/core';
 import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../environments/environment';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { PagedData } from '../../../../shared/dto/paged-data';
-import { RepoType } from '../../../../shared/dto/repo/repo-type';
-import { DockerService } from '../../docker/service/docker.service';
-import { MavenService } from '../../maven/service/maven.service';
-import { NpmService } from '../../npm/service/npm.service';
-import { RepoPermissionInfo, RepoSettingsInfo } from '../../../../../../generated/api';
-import { PypiService } from '../../pypi/service/pypi.service';
+import {
+  KeyStoreControllerService,
+  KeyStoreForm,
+  ProtocolRepoControllerService,
+  RepoInfo,
+  RepoPermissionInfo,
+} from '../../../../../../generated/api';
 import { SignatureForm } from './dto/signature-form';
 import { SignatureItem } from './dto/signature-item';
 
@@ -52,10 +54,8 @@ export class SignatureComponent implements OnInit {
   constructor(
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
-    private readonly mavenService: MavenService,
-    private readonly npmService: NpmService,
-    private readonly pypiService: PypiService,
-    private readonly dockerService: DockerService,
+    private readonly keyStoreControllerService: KeyStoreControllerService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
   ) {
     this.docsBaseUrl = environment.docsBase;
     this.initForm();
@@ -76,16 +76,13 @@ export class SignatureComponent implements OnInit {
   }
 
   private fetchRepoSettings(): void {
-    this.getRepoSettingsService()
-      .then(() => {
-        this.keyStoreForm.patchValue({
-          url: '',
-        });
+    this.protocolRepoControllerService.getSettings({} as RepoInfo, this.activeRepository.repoName).subscribe({
+      next: () => {
+        this.keyStoreForm.patchValue({ url: '' });
         this.keyStoreForm.get('url')?.enable();
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      });
+      },
+      error: () => {},
+    });
   }
 
   public createKeyStore(): void {
@@ -99,42 +96,44 @@ export class SignatureComponent implements OnInit {
       url: this.keyStoreForm.get('url')?.value,
     };
 
-    this.createKeyStoreService(keyStoreForm)
-      .then(() => {
+    this.keyStoreControllerService.createMavenKeyStore(
+      {} as RepoInfo, this.activeRepository.repoName, keyStoreForm as unknown as KeyStoreForm,
+    ).pipe(
+      finalize(() => { this.isSubmitting = false; }),
+    ).subscribe({
+      next: () => {
         this.pageNum = 1;
         this.fetchKeyStores();
         this.keyStoreForm.reset({ active: true });
         this.toastService.show('Key Store URL added', 'success');
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.isSubmitting = false;
-      });
+      },
+      error: () => {},
+    });
   }
 
   public fetchKeyStores(): void {
     this.pageNum = 1;
-    this.fetchKeyStoreService(0, this.pageSize)
-      .then((data) => {
-        this.keyStores = data.content;
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      });
+    this.keyStoreControllerService.listMavenKeyStores(
+      {} as RepoInfo, { page: 0, size: this.pageSize }, this.activeRepository.repoName,
+    ).subscribe({
+      next: (r) => {
+        this.keyStores = (r.data?.content ?? []) as unknown as SignatureItem[];
+      },
+      error: () => {},
+    });
   }
 
   public loadMoreKeyStores(): void {
-    this.fetchKeyStoreService(this.pageNum, this.pageSize)
-      .then((pageData) => {
-        const newItems: SignatureItem[] = pageData.content;
+    this.keyStoreControllerService.listMavenKeyStores(
+      {} as RepoInfo, { page: this.pageNum, size: this.pageSize }, this.activeRepository.repoName,
+    ).subscribe({
+      next: (r) => {
+        const newItems = (r.data?.content ?? []) as unknown as SignatureItem[];
         this.keyStores = [...this.keyStores, ...newItems];
         this.pageNum++;
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      });
+      },
+      error: () => {},
+    });
   }
 
   public onScroll(event: Event): void {
@@ -147,65 +146,14 @@ export class SignatureComponent implements OnInit {
 
   public deleteKeyStore(uuid: string): void {
     this.dangerModalService.show('Delete Key Store', 'Delete', () => {
-      this.deleteKeyStoreService(uuid)
-        .then(() => {
+      this.keyStoreControllerService.deleteMavenKeyStore({} as RepoInfo, uuid, this.activeRepository.repoName).subscribe({
+        next: () => {
           this.pageNum = 1;
           this.fetchKeyStores();
           this.toastService.show('Key Store URL deleted', 'success');
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        });
+        },
+        error: () => {},
+      });
     });
-  }
-
-  // Service methods based on repoType
-  private createKeyStoreService(form: SignatureForm) {
-    switch (this.repoType) {
-      case RepoType.MAVEN: {
-        return this.mavenService.createKeyStore(form);
-      }
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
-  }
-
-  private deleteKeyStoreService(uuid: string): Promise<void> {
-    switch (this.repoType) {
-      case RepoType.MAVEN: {
-        return this.mavenService.deleteKeyStore(uuid);
-      }
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
-  }
-
-  private fetchKeyStoreService(pageIndex: number, pageSize: number): Promise<PagedData<SignatureItem>> {
-    switch (this.repoType) {
-      case RepoType.MAVEN: {
-        return this.mavenService.fetchKeyStores(pageIndex, pageSize);
-      }
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
-  }
-
-  private getRepoSettingsService(): Promise<RepoSettingsInfo> {
-    switch (this.repoType) {
-      case RepoType.MAVEN: {
-        return this.mavenService.getRepoSettings();
-      }
-      case RepoType.NPM: {
-        return this.npmService.fetchRegistrySettings();
-      }
-      case RepoType.PYPI: {
-        return this.pypiService.fetchRepositorySettings();
-      }
-      case RepoType.DOCKER: {
-        return this.dockerService.fetchRepositorySettings();
-      }
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
   }
 }
