@@ -89,7 +89,7 @@ export class LoginComponent implements OnInit {
       }))
       .subscribe({
         next: () => this.router.navigateByUrl('/'),
-        error: (err: string) => this.toastService.show(err, 'error'),
+        error: () => {},
       });
   }
 
