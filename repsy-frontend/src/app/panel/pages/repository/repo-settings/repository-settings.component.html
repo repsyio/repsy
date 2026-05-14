@@ -37,6 +37,9 @@
       <div><app-deploy-token [repoType]="repoType" [activeRepository]="activeRepository"></app-deploy-token></div>
       <div><app-repo-storage [repoType]="repoType" [repoName]="activeRepository?.repoName" /></div>
       <div><app-repo-info [repoType]="repoType" [activeRepository]="activeRepository" /></div>
+      @if (repoType === 'docker') {
+        <div><app-delete-orphan-layers [activeRepository]="activeRepository" /></div>
+      }
       <div><app-delete-repo [repoType]="repoType" [activeRepository]="activeRepository" /></div>
     </div>
   } @else {

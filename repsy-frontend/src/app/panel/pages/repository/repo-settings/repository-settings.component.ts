@@ -30,6 +30,7 @@ import {
   RepoPermissionInfo,
   RepoSettingsInfo,
 } from '../../../../../generated/api';
+import { DeleteOrphanLayersComponent } from './delete-orphan-layers/delete-orphan-layers.component';
 import { RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { DeleteRepoComponent } from './delete-repo/delete-repo.component';
 import { DeployTokenComponent } from './deploy-token/deploy-token.component';
@@ -52,6 +53,7 @@ import { VisibilityComponent } from './visibility/visibility.component';
     RepoInfoComponent,
     NgOptimizedImage,
     DeleteRepoComponent,
+    DeleteOrphanLayersComponent,
     VersionAllowanceComponent,
     RepoStorageComponent,
     PackageOverrideComponent,
