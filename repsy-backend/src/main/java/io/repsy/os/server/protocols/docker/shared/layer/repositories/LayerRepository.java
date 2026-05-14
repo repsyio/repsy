@@ -47,9 +47,9 @@ public interface LayerRepository extends JpaRepository<Layer, UUID> {
 
   @Query(
       """
-    SELECT l FROM Layer l
-    WHERE l.repo.id = :repoId
-    AND l.manifests IS EMPTY
+    select l from Layer l
+    where l.repo.id = :repoId
+    and l.manifests is empty
     """)
   List<Layer> findOrphansByRepoId(UUID repoId);
 
