@@ -20,7 +20,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 
 import { UserResponse, UserUpdateForm } from '../../../../../../generated/api';
-import { UserControllerService } from '../../../../../../generated/api/api/user-controller.service';
+import { UserControllerService } from '../../../../../../generated/api';
 import { ToastService } from '../../toast/toast.service';
 import { ToggleComponent } from '../../toggle/toggle.component';
 

@@ -1708,7 +1708,7 @@ paths:
         required: true
         schema:
           type: string
-  "/api/docker/images/{repoName}/orphan-layers":
+  "/api/docker/images/blobs/{repoName}/orphan-layers":
     delete:
       tags:
         - docker-image-controller

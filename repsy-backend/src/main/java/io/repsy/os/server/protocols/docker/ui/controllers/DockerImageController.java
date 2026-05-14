@@ -90,7 +90,7 @@ public class DockerImageController {
     return this.restResponseFactory.success("imageTagsFetched", new PagedModel<>(imageTags));
   }
 
-  @DeleteMapping("/{repoName}/orphan-layers")
+  @DeleteMapping("/blobs/{repoName}/orphan-layers")
   @RepoOperation(permission = Permission.MANAGE)
   public RestResponse<Void> deleteOrphanLayers(final RepoInfo repoInfo) {
 
