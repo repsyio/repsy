@@ -19,6 +19,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.docker.shared.layer.entities.Layer;
 import io.repsy.os.server.protocols.docker.shared.layer.mappers.LayerConverter;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
+import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerForm;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
@@ -41,6 +42,7 @@ public class LayerTxService implements LayerService<UUID> {
 
   private final @NonNull LayerConverter layerConverter;
   private final @NonNull LayerRepository layerRepository;
+  private final @NonNull DockerStorageService dockerStorageService;
 
   @Override
   @Transactional
@@ -122,6 +124,22 @@ public class LayerTxService implements LayerService<UUID> {
     for (final var layer : layers) {
       this.layerRepository.delete(layer);
     }
+  }
+
+  @Transactional
+  public long deleteOrphanLayers(final @NonNull UUID repoId) {
+
+    final var orphans = this.layerRepository.findOrphansByRepoId(repoId);
+
+    return orphans.stream()
+        .mapToLong(
+            layer -> {
+              final var size = layer.getSize();
+              this.dockerStorageService.deleteBlob(repoId, layer.getDigest());
+              this.layerRepository.delete(layer);
+              return size;
+            })
+        .sum();
   }
 
   private @NonNull Layer getLayer(final @NonNull UUID repoId, final @NonNull String digest) {

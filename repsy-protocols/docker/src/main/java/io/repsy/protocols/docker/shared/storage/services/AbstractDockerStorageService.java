@@ -39,6 +39,7 @@ import org.springframework.core.io.Resource;
 public abstract class AbstractDockerStorageService<ID> implements DockerStorageService<ID> {
 
   private static final String MANIFESTS_PATH = "manifests";
+  private static final String BLOBS_PATH = "blobs";
 
   private final StorageStrategy storageStrategy;
 
@@ -127,6 +128,14 @@ public abstract class AbstractDockerStorageService<ID> implements DockerStorageS
       log.warn("Failed to delete manifest {} while calculating manifest usage", manifestName, e);
       return 0L;
     }
+  }
+
+  @Override
+  public void deleteBlob(final UUID repoUuid, final String digest) {
+
+    final var storagePath = StoragePath.of(repoUuid, Paths.get(BLOBS_PATH, digest).toString());
+
+    this.storageStrategy.delete(storagePath);
   }
 
   @Override

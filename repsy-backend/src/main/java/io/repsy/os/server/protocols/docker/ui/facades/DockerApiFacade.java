@@ -83,28 +83,6 @@ public class DockerApiFacade implements ProtocolApiFacade {
     return BaseUsages.builder().diskUsage(-1L * free).build();
   }
 
-  @Transactional(readOnly = true)
-  public @NonNull RepoSettingsInfo getSettings(final @NonNull RepoInfo repoInfo) {
-
-    RepoUtils.validateRepoName(repoInfo.getName());
-
-    return RepoSettingsInfo.builder()
-        .privateRepo(repoInfo.isPrivateRepo())
-        .searchable(repoInfo.isSearchable())
-        .releases(repoInfo.getReleases())
-        .snapshots(repoInfo.getSnapshots())
-        .allowOverride(repoInfo.isAllowOverride())
-        .build();
-  }
-
-  public void updateSettings(
-      final @NonNull RepoInfo repoInfo, final @NonNull RepoSettingsForm settings) {
-
-    RepoUtils.validateRepoName(repoInfo.getName());
-
-    this.repoTxService.updateSettings(repoInfo.getStorageKey(), settings);
-  }
-
   public @NonNull BaseUsages deleteImage(
       final @NonNull RepoInfo repoInfo, final @NonNull String imageName) {
 
@@ -215,6 +193,13 @@ public class DockerApiFacade implements ProtocolApiFacade {
     return this.dockerStorageService
         .getResource(storagePath, repoInfo.getName())
         .orElseThrow(() -> new ItemNotFoundException("manifestNotFound"));
+  }
+
+  public @NonNull BaseUsages deleteOrphanLayers(final @NonNull RepoInfo repoInfo) {
+
+    final var freedBytes = this.layerTxService.deleteOrphanLayers(repoInfo.getStorageKey());
+
+    return BaseUsages.builder().diskUsage(-1L * freedBytes).build();
   }
 
   public void createRepo(final @NonNull UUID repoId) {

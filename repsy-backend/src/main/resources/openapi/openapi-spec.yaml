@@ -1708,6 +1708,25 @@ paths:
         required: true
         schema:
           type: string
+  "/api/docker/images/{repoName}/orphan-layers":
+    delete:
+      tags:
+        - docker-image-controller
+      operationId: deleteOrphanLayers
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete orphan layers for a Docker repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
   "/api/docker/images/{repoName}/{imageName}/tags":
     get:
       tags:
