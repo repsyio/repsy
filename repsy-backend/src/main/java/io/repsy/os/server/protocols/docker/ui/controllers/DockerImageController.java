@@ -94,9 +94,7 @@ public class DockerImageController {
   @RepoOperation(permission = Permission.MANAGE)
   public RestResponse<Void> deleteOrphanLayers(final RepoInfo repoInfo) {
 
-    final var usages = this.dockerApiFacade.deleteOrphanLayers(repoInfo);
-
-    this.updateUsage(repoInfo, usages);
+    this.dockerApiFacade.deleteOrphanLayers(repoInfo);
 
     return this.restResponseFactory.success("orphanLayersDeleted");
   }

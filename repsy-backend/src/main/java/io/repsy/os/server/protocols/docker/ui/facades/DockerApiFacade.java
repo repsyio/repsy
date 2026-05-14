@@ -23,6 +23,7 @@ import io.repsy.os.generated.model.ManifestListItem;
 import io.repsy.os.generated.model.TagDetail;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.layer.services.LayerTxService;
+import io.repsy.os.server.protocols.docker.shared.layer.services.OrphanLayerCleanupService;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
@@ -60,6 +61,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
   private final @NonNull LayerTxService layerTxService;
   private final @NonNull ManifestTxService manifestService;
   private final @NonNull DockerStorageService dockerStorageService;
+  private final @NonNull OrphanLayerCleanupService orphanLayerCleanupService;
 
   public @NonNull BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
 
@@ -191,11 +193,11 @@ public class DockerApiFacade implements ProtocolApiFacade {
         .orElseThrow(() -> new ItemNotFoundException("manifestNotFound"));
   }
 
-  public @NonNull BaseUsages deleteOrphanLayers(final @NonNull RepoInfo repoInfo) {
+  public void deleteOrphanLayers(final @NonNull RepoInfo repoInfo) {
 
-    final var freedBytes = this.layerTxService.deleteOrphanLayers(repoInfo.getStorageKey());
+    final var orphans = this.layerTxService.deleteOrphanLayers(repoInfo.getStorageKey());
 
-    return BaseUsages.builder().diskUsage(-1L * freedBytes).build();
+    this.orphanLayerCleanupService.cleanupBlobs(repoInfo.getStorageKey(), orphans);
   }
 
   public void createRepo(final @NonNull UUID repoId) {
