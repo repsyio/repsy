@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.nuget.protocol.pre_processors;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 
+import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -79,30 +80,47 @@ public class NuGetAuthPreProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
-    final var authHeader = this.extractAuthHeader(request);
+    final var rawAuthHeader = this.extractAuthHeader(request);
 
-    if (authHeader == null) {
+    if (rawAuthHeader == null) {
       return ProcessorResult.of(
           ResponseEntity.status(HttpStatus.UNAUTHORIZED)
               .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"")
               .build());
     }
 
-    this.authenticateRequest(authHeader, repoInfo.getId(), properties);
+    final var authHeader = this.normalizeAuthHeader(rawAuthHeader);
+
+    try {
+      this.authenticateRequest(authHeader, repoInfo.getId(), properties);
+    } catch (final AccessNotAllowedException | UnAuthorizedException ignored) {
+      return ProcessorResult.of(
+          ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+              .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"")
+              .build());
+    }
 
     return ProcessorResult.next();
   }
 
-  private @Nullable String extractAuthHeader(final HttpServletRequest request) {
-    // NuGet clients send API key in X-NuGet-ApiKey header
-    final var nugetApiKey = request.getHeader(X_NUGET_API_KEY);
-    if (nugetApiKey != null && !nugetApiKey.isBlank()) {
-      return AUTH_BEARER + nugetApiKey;
+  private String normalizeAuthHeader(final String authHeader) {
+
+    if (authHeader.startsWith(AUTH_BASIC) || authHeader.startsWith(AUTH_BEARER)) {
+      return authHeader;
     }
 
-    // Fall back to Authorization header for Basic auth or other clients
+    return AUTH_BEARER + authHeader;
+  }
+
+  private @Nullable String extractAuthHeader(final HttpServletRequest request) {
+
     final var authHeader = request.getHeader(AUTHORIZATION);
-    return (authHeader != null && !authHeader.isBlank()) ? authHeader : null;
+    if (authHeader != null && !authHeader.isBlank()) {
+      return authHeader;
+    }
+
+    final var nugetApiKey = request.getHeader(X_NUGET_API_KEY);
+    return (nugetApiKey != null && !nugetApiKey.isBlank()) ? nugetApiKey : null;
   }
 
   private void authenticateRequest(
