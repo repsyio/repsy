@@ -18,17 +18,12 @@ import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
+import { ProtocolRepoControllerService } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
-import { CargoService } from '../../cargo/service/cargo.service';
-import { DockerService } from '../../docker/service/docker.service';
 import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form';
-import { MavenService } from '../../maven/service/maven.service';
-import { NugetService } from '../../nuget/service/nuget.service';
-import { NpmService } from '../../npm/service/npm.service';
-import { PypiService } from '../../pypi/service/pypi.service';
 
 @Component({
   selector: 'app-package-override',
@@ -39,18 +34,14 @@ import { PypiService } from '../../pypi/service/pypi.service';
 })
 export class PackageOverrideComponent implements OnInit {
   @Input() public repoType: string;
+  @Input() public repoName: string;
   @Input() public parentForm: FormGroup;
   @Output() public fetch = new EventEmitter<void>();
 
   public allowOverride: boolean;
 
   constructor(
-    private readonly mavenService: MavenService,
-    private readonly npmService: NpmService,
-    private readonly pypiService: PypiService,
-    private readonly dockerService: DockerService,
-    private readonly cargoService: CargoService,
-    private readonly nugetService: NugetService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly toastService: ToastService,
   ) {}
 
@@ -59,55 +50,29 @@ export class PackageOverrideComponent implements OnInit {
   }
 
   public changeOverride() {
+    let form: RepoSettingsForm | MavenRepoSettingsForm;
+
     if (this.repoType === RepoType.MAVEN) {
-      const form = new MavenRepoSettingsForm();
-      form.allowOverride = this.allowOverride;
-      form.privateRepo = this.parentForm.get('privateRepository')?.value;
-      form.snapshots = this.parentForm.get('snapshots')?.value;
-      form.releases = this.parentForm.get('releases')?.value;
-
-      this.mavenService
-        .updateRepoSettings(form)
-        .then(() => {
-          this.parentForm.get('allowOverride')?.setValue(this.allowOverride);
-          this.toastService.show(`Package override is now ${this.allowOverride ? 'allowed' : 'blocked'}`, 'success');
-          this.fetch.emit();
-        })
-        .catch((err: string) => this.toastService.show(err, 'error'));
-    } else if (
-      this.repoType === RepoType.NPM ||
-      this.repoType === RepoType.PYPI ||
-      this.repoType === RepoType.DOCKER ||
-      this.repoType === RepoType.NUGET
-    ) {
-      const form = new RepoSettingsForm();
-      form.allowOverride = this.allowOverride;
-      form.privateRepo = this.parentForm.get('privateRepository')?.value;
-
-      this.updateRepoSettingsService(form)
-        .then(() => {
-          this.parentForm.get('allowOverride')?.setValue(this.allowOverride);
-          this.toastService.show(`Package override is now ${this.allowOverride ? 'allowed' : 'blocked'}`, 'success');
-          this.fetch.emit();
-        })
-        .catch((err: string) => this.toastService.show(err, 'error'));
+      const mavenForm = new MavenRepoSettingsForm();
+      mavenForm.allowOverride = this.allowOverride;
+      mavenForm.privateRepo = this.parentForm.get('privateRepository')?.value;
+      mavenForm.snapshots = this.parentForm.get('snapshots')?.value;
+      mavenForm.releases = this.parentForm.get('releases')?.value;
+      form = mavenForm;
+    } else {
+      const generalForm = new RepoSettingsForm();
+      generalForm.allowOverride = this.allowOverride;
+      generalForm.privateRepo = this.parentForm.get('privateRepository')?.value;
+      form = generalForm;
     }
-  }
 
-  private updateRepoSettingsService(form: MavenRepoSettingsForm | RepoSettingsForm) {
-    switch (this.repoType) {
-      case RepoType.NPM:
-        return this.npmService.updateRepoSettings(form);
-      case RepoType.PYPI:
-        return this.pypiService.updateRepoSettings(form);
-      case RepoType.DOCKER:
-        return this.dockerService.updateRepoSettings(form);
-      case RepoType.CARGO:
-        return this.cargoService.updateRepoSettings(form);
-      case RepoType.NUGET:
-        return this.nugetService.updateRepoSettings(form);
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
+    this.protocolRepoControllerService.updateSettings(this.repoName, form).subscribe({
+      next: () => {
+        this.parentForm.get('allowOverride')?.setValue(this.allowOverride);
+        this.toastService.show(`Package override is now ${this.allowOverride ? 'allowed' : 'blocked'}`, 'success');
+        this.fetch.emit();
+      },
+      error: () => {},
+    });
   }
 }

@@ -20,6 +20,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Highlight } from 'ngx-highlightjs';
 import { Subscription } from 'rxjs';
 
+import { environment } from '../../../../../../../environments/environment';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -29,7 +30,6 @@ import { NugetDeletedItem } from '../../dto/nuget-deleted-item';
 import { NugetDependencyInfo } from '../../dto/nuget-dependency-info';
 import { NugetVersionInfo } from '../../dto/nuget-version-info';
 import { NugetService } from '../../service/nuget.service';
-import { environment } from '../../../../../../../environments/environment';
 
 @Component({
   selector: 'app-nuget-packages-version-detail',
@@ -133,11 +133,15 @@ export class NugetPackagesVersionDetailComponent implements OnDestroy {
   }
 
   public get dependenciesByFramework(): { framework: string; deps: NugetDependencyInfo[] }[] {
-    if (!this.versionInfo?.dependencies?.length) return [];
+    if (!this.versionInfo?.dependencies?.length) {
+      return [];
+    }
     const map = new Map<string, NugetDependencyInfo[]>();
     for (const dep of this.versionInfo.dependencies) {
       const key = dep.targetFramework || 'All Frameworks';
-      if (!map.has(key)) map.set(key, []);
+      if (!map.has(key)) {
+        map.set(key, []);
+      }
       map.get(key)!.push(dep);
     }
     return Array.from(map.entries()).map(([framework, deps]) => ({ framework, deps }));

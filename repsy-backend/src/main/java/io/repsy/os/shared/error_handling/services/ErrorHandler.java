@@ -46,6 +46,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -536,5 +537,20 @@ public class ErrorHandler {
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(messageText, ex.getMessage()));
+  }
+
+  @ExceptionHandler(MissingRequestHeaderException.class)
+  @Nullable ResponseEntity<RestResponse<String>> handleException(
+      final @NonNull MissingRequestHeaderException ex,
+      final @Nullable HttpServletResponse response) {
+
+    if (response == null) {
+      log.debug("Request Header resolution failed", ex);
+      return null;
+    }
+
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(this.resp.error("Missing Request Header"));
   }
 }

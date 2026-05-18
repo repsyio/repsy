@@ -19,12 +19,13 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Highlight } from 'ngx-highlightjs';
 import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
 import { Subscription } from 'rxjs';
+import { finalize, switchMap } from 'rxjs/operators';
 
+import { RepoPermissionInfo } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { CrateInfo } from '../../dto/crate-info';
 import { CrateDependencyInfo, CrateVersionInfo } from '../../dto/crate-version-info';
 import { CargoService } from '../../service/cargo.service';
@@ -55,10 +56,10 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
   ) {
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.cargoService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.loadVersion();
       }
     });
@@ -83,21 +84,22 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
     this.loading = true;
     this.cargoService
       .fetchCrate(crateName)
-      .then((crate) => {
-        this.crate = crate;
-        return this.cargoService.fetchCrateVersion(crateName, version);
-      })
-      .then((crateVersion) => {
-        this.crateVersion = crateVersion;
-        this.cargoToml = this.buildCargoToml(this.crate, crateVersion);
-        this.error = null;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+      .pipe(
+        switchMap((crate) => {
+          this.crate = crate;
+          return this.cargoService.fetchCrateVersion(crateName, version);
+        }),
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (crateVersion) => {
+          this.crateVersion = crateVersion;
+          this.cargoToml = this.buildCargoToml(this.crate, crateVersion);
+          this.error = null;
+        },
+        error: () => {},
       });
   }
 
@@ -106,16 +108,18 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
       this.loading = true;
       this.cargoService
         .deleteCrateVersion(this.packageName, this.versionName)
-        .then(() => {
-          this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
-            this.toastService.show('Version deleted successfully', 'success');
-          });
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+              this.toastService.show('Version deleted successfully', 'success');
+            });
+          },
+          error: () => {},
         });
     });
   }

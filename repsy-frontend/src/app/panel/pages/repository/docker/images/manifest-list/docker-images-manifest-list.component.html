@@ -101,26 +101,26 @@
                 <img ngSrc="/assets/icons/repo/archive.svg" alt="archive" height="20" width="20" />
                 <app-tooltip
                   class="text-[14px] text-[#FDFDFD]"
-                  [text]="manifest.name | ellipsis"
+                  [text]="manifest.name | ellipsis: 15"
                   [textHover]="manifest.name"
                 />
               </div>
 
               <app-tooltip
                 class="text-[14px] text-[#FDFDFD]"
-                [text]="manifest.platform | ellipsis"
+                [text]="manifest.platform | ellipsis: 20"
                 [textHover]="manifest.platform"
               />
 
               <app-tooltip
                 class="text-[14px] text-[#FDFDFD]"
-                [text]="manifest.platform | ellipsis"
+                [text]="manifest.platform | ellipsis: 15"
                 [textHover]="manifest.digest"
               />
 
               <app-tooltip
                 class="text-[14px] text-[#FDFDFD]"
-                [text]="manifest.digest | ellipsis"
+                [text]="manifest.digest | ellipsis: 15"
                 [textHover]="manifest.configDigest"
               />
 

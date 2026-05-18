@@ -18,14 +18,15 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../environments/environment';
+import { RepoPermissionInfo } from '../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../../shared/components/empty-list/empty-list.component';
 import { SearchboxComponent } from '../../../../shared/components/searchbox/searchbox.component';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
 import { ByteFormatter } from '../../../../shared/util/byte-formatter';
 import { MavenConfigComponent } from '../config/maven-config.component';
 import { FsItemInfo } from '../dto/fs-item-info';
@@ -58,7 +59,7 @@ export class MavenBrowserComponent implements OnDestroy {
   public loading = false;
   public operationLock = false;
   public showConfig = false;
-  public activeRepo: RepoPermissionInfo = new RepoPermissionInfo();
+  public activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
   public baseUrl: string;
   public repoUrl = '';
   public directoryStack: Directory[] = [];
@@ -187,16 +188,20 @@ export class MavenBrowserComponent implements OnDestroy {
 
     this.mavenService
       .getPathContent(this.directoryStack[this.directoryStack.length - 1].path)
-      .then((items: FsItemInfo[]) => {
-        this.fsItems = items;
-        this.filteredFsItems = this.fsItems;
-        this.operationLock = false;
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (items: FsItemInfo[]) => {
+          this.fsItems = items;
+          this.filteredFsItems = this.fsItems;
+          this.operationLock = false;
+        },
+        error: () => {
+          this.operationLock = false;
+        },
       });
   }
 

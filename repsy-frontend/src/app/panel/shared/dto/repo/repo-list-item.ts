@@ -14,12 +14,10 @@
 /// limitations under the License.
 ///
 
-import { RepoType } from './repo-type';
-
 export class RepoListItem {
   public name: string;
   public privateRepo: boolean;
-  public repoType: RepoType;
+  public repoType: string;
   public createdAt: string;
   public diskUsage: number;
 }

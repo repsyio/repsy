@@ -19,8 +19,8 @@ import { Router, RouterOutlet } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
+import { RepoPermissionInfo } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/service/auth.service';
-import { RepoPermissionInfo } from '../../../shared/dto/repo/repo-permission-info';
 import { RepositoryBreadcrumbComponent } from '../breadcrumb/repository-breadcrumb.component';
 import { RepoContext, RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { MavenService } from './service/maven.service';
@@ -70,10 +70,10 @@ export class MavenComponent implements OnInit, OnDestroy {
   private loadPermissions(repoName: string): void {
     this.loading = true;
 
-    this.mavenService.getRepoPermission(repoName).subscribe({
+    this.mavenService.getRepository(repoName).subscribe({
       next: (permissions: RepoPermissionInfo) => {
         // If repo is private and user is not authenticated, redirect to 404
-        if (permissions.isPrivate && !this.isAuthenticated) {
+        if (permissions.private && !this.isAuthenticated) {
           this.router.navigate(['/not-found'], {
             queryParams: {
               message: `Repository '${repoName}' not found`,
@@ -83,7 +83,7 @@ export class MavenComponent implements OnInit, OnDestroy {
         }
 
         this.permissions = permissions;
-        this.isPublicView = !permissions.isPrivate && !this.isAuthenticated;
+        this.isPublicView = !permissions.private && !this.isAuthenticated;
         this.loading = false;
       },
       error: () => {

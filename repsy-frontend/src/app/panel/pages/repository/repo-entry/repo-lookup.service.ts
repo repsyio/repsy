@@ -14,11 +14,10 @@
 /// limitations under the License.
 ///
 
-import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, map, Observable, of, tap } from 'rxjs';
 
-import { environment } from '../../../../../environments/environment';
+import { ProtocolRepoControllerService } from '../../../../../generated/api';
 
 export type RepoType = 'maven' | 'npm' | 'pypi' | 'docker' | 'golang' | 'cargo' | 'nuget';
 
@@ -27,28 +26,23 @@ export interface RepoContext {
   repoType: RepoType;
 }
 
-interface RepoTypeResponse {
-  data: RepoType;
-}
-
 @Injectable({
   providedIn: 'root',
 })
 export class RepoLookupService {
-  private readonly baseUrl = `${environment.apiBaseUrl}/api/repos`;
   private readonly cache = new Map<string, RepoType>();
 
   private readonly currentRepoSubject = new BehaviorSubject<RepoContext | null>(null);
   public readonly currentRepo$ = this.currentRepoSubject.asObservable();
 
-  constructor(private readonly http: HttpClient) {}
+  constructor(private readonly protocolRepoControllerService: ProtocolRepoControllerService) {}
 
   public get currentRepo(): RepoContext | null {
     return this.currentRepoSubject.getValue();
   }
 
   public getRepoType(repoName: string): Observable<RepoType> {
-    const cacheKey = this.buildCacheKey(repoName);
+    const cacheKey = repoName;
     const cachedType = this.cache.get(cacheKey);
 
     if (cachedType) {
@@ -65,7 +59,7 @@ export class RepoLookupService {
   }
 
   public checkRepoType(repoName: string): Observable<RepoType> {
-    const cacheKey = this.buildCacheKey(repoName);
+    const cacheKey = repoName;
     const cachedType = this.cache.get(cacheKey);
 
     if (cachedType) {
@@ -76,10 +70,6 @@ export class RepoLookupService {
   }
 
   private fetchRepoType(repoName: string): Observable<RepoType> {
-    return this.http.get<RepoTypeResponse>(`${this.baseUrl}/${repoName}/format`).pipe(map((response) => response.data));
-  }
-
-  private buildCacheKey(repoName: string): string {
-    return `${repoName}`;
+    return this.protocolRepoControllerService.getRepoType(repoName).pipe(map((r) => r.data as RepoType));
   }
 }

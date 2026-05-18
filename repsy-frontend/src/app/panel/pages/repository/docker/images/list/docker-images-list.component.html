@@ -86,14 +86,14 @@
                   <img ngSrc="/assets/icons/repo/monitor.svg" alt="monitor" height="18" width="18" />
                   <app-tooltip
                     class="text-[14px] text-[#FDFDFD]"
-                    [text]="image.name | ellipsis"
+                    [text]="image.name | ellipsis: 35"
                     [textHover]="image.name"
                   />
                 </div>
 
                 <app-tooltip
                   class="text-[14px] text-[#FDFDFD]"
-                  [text]="image.digest | ellipsis"
+                  [text]="image.digest | ellipsis: 20"
                   [textHover]="image.digest"
                 />
 

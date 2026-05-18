@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.nuget.shared.packages.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
-import io.repsy.os.server.protocols.nuget.shared.packages.dtos.NuGetDeletedItem;
+import io.repsy.os.generated.model.NuGetDeletedItem;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
 import io.repsy.os.server.protocols.nuget.shared.packages.mappers.NuGetPackageConverter;
@@ -99,7 +99,9 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
   @Override
   public List<String> getVersions(final BaseRepoInfo<UUID> repoInfo, final String packageId) {
+
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
+
     return this.packageVersionRepository
         .findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(pkg.getId())
         .stream()
@@ -110,7 +112,9 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   @Override
   public List<NuGetVersionInfo> getVersionInfos(
       final BaseRepoInfo<UUID> repoInfo, final String packageId) {
+
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
+
     return this.packageVersionRepository
         .findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(pkg.getId())
         .stream()
@@ -121,7 +125,9 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   @Override
   public List<NuGetVersionInfo> getAllVersionInfos(
       final BaseRepoInfo<UUID> repoInfo, final String packageId) {
+
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
+
     return this.packageVersionRepository
         .findByNugetPackageIdOrderByPublishedAtDesc(pkg.getId())
         .stream()
@@ -132,7 +138,9 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   @Override
   public Page<NuGetVersionInfo> getVersionInfosPage(
       final BaseRepoInfo<UUID> repoInfo, final String packageId, final Pageable pageable) {
+
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
+
     return this.packageVersionRepository
         .findByNugetPackageIdOrderByPublishedAtDesc(pkg.getId(), pageable)
         .map(v -> this.converter.toVersionInfo(v, packageId));
@@ -219,6 +227,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
 
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
+
     final var pkgVersion =
         this.packageVersionRepository
             .findByNugetPackageIdAndVersionIgnoreCase(pkg.getId(), version)
@@ -231,12 +240,16 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   @Transactional
   public void unlistVersion(
       final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
+
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
+
     final var pkgVersion =
         this.packageVersionRepository
             .findByNugetPackageIdAndVersionIgnoreCase(pkg.getId(), version)
             .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
+
     pkgVersion.setListed(false);
+
     this.packageVersionRepository.save(pkgVersion);
   }
 
@@ -244,19 +257,25 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   @Transactional
   public void relistVersion(
       final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
+
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
+
     final var pkgVersion =
         this.packageVersionRepository
             .findByNugetPackageIdAndVersionIgnoreCase(pkg.getId(), version)
             .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
+
     pkgVersion.setListed(true);
+
     this.packageVersionRepository.save(pkgVersion);
   }
 
   @Override
   @Transactional
   public void deletePackage(final BaseRepoInfo<UUID> repoInfo, final String packageId) {
+
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
+
     this.packageRepository.delete(pkg);
   }
 
@@ -265,29 +284,14 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   public boolean deleteVersion(
       final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
 
-    final var pkg = this.findPackage(repoInfo.getId(), packageId);
-
-    final var pkgVersion =
-        this.packageVersionRepository
-            .findByNugetPackageIdAndVersionIgnoreCase(pkg.getId(), version)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
-
-    this.packageVersionRepository.delete(pkgVersion);
-
-    final boolean packageHasVersions =
-        this.packageVersionRepository.existsByNugetPackageId(pkg.getId());
-
-    if (!packageHasVersions) {
-      this.packageRepository.delete(pkg);
-      return true;
-    }
-
-    return false;
+    return this.deleteVersionAndGetDeletedItem(repoInfo, packageId, version)
+        == NuGetDeletedItem.PACKAGE;
   }
 
   @Transactional
   public NuGetDeletedItem deleteVersionAndGetDeletedItem(
       final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
+
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
 
     final var pkgVersion =

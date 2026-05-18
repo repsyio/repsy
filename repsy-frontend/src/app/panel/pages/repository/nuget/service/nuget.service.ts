@@ -19,12 +19,10 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, Subscriber } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
+import { DeployTokenForm, RepoCreateForm, RepoDescriptionForm, RepoRenameForm } from '../../../../../../generated/api';
 import { ErrorHandlerService } from '../../../../../shared/error-handler/error-handler.service';
 import { PagedData } from '../../../../shared/dto/paged-data';
-import { RepoDescriptionForm } from '../../../../shared/dto/repo/repo-description-form';
-import { RepoForm } from '../../../../shared/dto/repo/repo-form';
 import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
-import { RepoNameForm } from '../../../../shared/dto/repo/repo-name-form';
 import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
@@ -32,9 +30,8 @@ import { RestResponse } from '../../../../shared/dto/rest-response';
 import { Sort } from '../../../../shared/dto/sort';
 import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
 import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
-import { DeployTokenForm } from '../../repo-settings/deploy-token/form/deploy-token-form';
-import { NugetPackageInfo } from '../dto/nuget-package-info';
 import { NugetDeletedItem } from '../dto/nuget-deleted-item';
+import { NugetPackageInfo } from '../dto/nuget-package-info';
 import { NugetPackageListItem } from '../dto/nuget-package-list-item';
 import { NugetVersionInfo } from '../dto/nuget-version-info';
 import { NugetVersionListItem } from '../dto/nuget-version-list-item';
@@ -76,7 +73,7 @@ export class NugetService {
     });
   }
 
-  public async createRepository(repoForm: RepoForm): Promise<void> {
+  public async createRepository(repoForm: RepoCreateForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/NUGET`;
       this.http
@@ -131,7 +128,7 @@ export class NugetService {
     });
   }
 
-  public async updateRepositoryName(repositoryNameForm: RepoNameForm): Promise<void> {
+  public async updateRepositoryName(repositoryNameForm: RepoRenameForm): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/name`;
       this.http

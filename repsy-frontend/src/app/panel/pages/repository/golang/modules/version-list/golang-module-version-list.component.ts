@@ -19,8 +19,10 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { GoModuleVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -33,10 +35,8 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { GolangConfigComponent } from '../../config/golang-config.component';
-import { ModuleVersionListItem } from '../../dto/module-version-list-item';
 import { GolangService } from '../../service/golang.service';
 
 @Component({
@@ -66,8 +66,8 @@ export class GolangModuleVersionListComponent implements OnDestroy {
   public searchText = '';
   public error: string;
   public modulePath: string;
-  public pagedData: PagedData<ModuleVersionListItem>;
-  public versions: ModuleVersionListItem[];
+  public pagedData: PagedData<GoModuleVersionListItem>;
+  public versions: GoModuleVersionListItem[];
   public activeRepo: RepoPermissionInfo;
   public sortOption: Sort = { name: 'Newest', column: 'id', type: 'DESC' };
   public sortOptions: Sort[] = [
@@ -89,12 +89,12 @@ export class GolangModuleVersionListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
-    this.pagedData = new PagedData<ModuleVersionListItem>();
-    this.activeRepo = new RepoPermissionInfo();
+    this.pagedData = new PagedData<GoModuleVersionListItem>();
+    this.activeRepo = {} as RepoPermissionInfo;
 
     this.repositoryChanges$ = this.golangService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.modulePath = this.route.snapshot.queryParamMap.get('modulePath');
         if (!this.modulePath) {
           this.router.navigate(['/' + this.activeRepo.repoName]);
@@ -137,26 +137,27 @@ export class GolangModuleVersionListComponent implements OnDestroy {
     return moment(date).fromNow();
   }
 
-  public deleteVersion(version: ModuleVersionListItem): void {
+  public deleteVersion(version: GoModuleVersionListItem): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
-      this.loading = true;
       this.golangService
         .deleteModuleVersion(this.modulePath, version.version)
-        .then(() => {
-          if (this.versions.length - 1 === 0) {
-            this.router.navigateByUrl('/' + this.activeRepo.repoName).then(() => {
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            if (this.versions.length - 1 === 0) {
+              this.router.navigateByUrl('/' + this.activeRepo.repoName).then(() => {
+                this.toastService.show('Version deleted successfully', 'success');
+              });
+            } else {
+              this.refreshPage();
               this.toastService.show('Version deleted successfully', 'success');
-            });
-          } else {
-            this.refreshPage();
-            this.toastService.show('Version deleted successfully', 'success');
-          }
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
+            }
+          },
+          error: () => {},
         });
     });
   }
@@ -165,16 +166,17 @@ export class GolangModuleVersionListComponent implements OnDestroy {
     this.loading = true;
     this.golangService
       .fetchModuleVersions(this.modulePath, this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .then((pagedData: PagedData<ModuleVersionListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.versions = pagedData.content;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<GoModuleVersionListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.versions = pagedData.content;
+        },
+        error: () => {},
       });
   }
 

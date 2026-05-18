@@ -70,13 +70,13 @@
                   />
                   <app-tooltip
                     class="text-secondary-500 group-hover:underline"
-                    [text]="crate.name | ellipsis"
+                    [text]="crate.name | ellipsis: 35"
                     [textHover]="crate.name"
                   />
                 </div>
                 <app-tooltip
                   class="text-[#FDFDFD]"
-                  [text]="crate.max_version | ellipsis"
+                  [text]="crate.max_version | ellipsis: 20"
                   [textHover]="crate.max_version"
                 />
                 @if (crate.updated_at) {

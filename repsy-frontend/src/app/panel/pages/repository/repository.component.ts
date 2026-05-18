@@ -18,7 +18,9 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
+import { finalize, map } from 'rxjs/operators';
 
+import { ProtocolRepoControllerService, RepoType as ApiRepoType } from '../../../../generated/api';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../shared/components/ellipsis/ellipsis.pipe';
@@ -34,13 +36,6 @@ import { RepoListItem } from '../../shared/dto/repo/repo-list-item';
 import { RepoType } from '../../shared/dto/repo/repo-type';
 import { ByteFormatter } from '../../shared/util/byte-formatter';
 import { ProfileService } from '../profile/service/profile.service';
-import { CargoService } from './cargo/service/cargo.service';
-import { DockerService } from './docker/service/docker.service';
-import { GolangService } from './golang/service/golang.service';
-import { MavenService } from './maven/service/maven.service';
-import { NugetService } from './nuget/service/nuget.service';
-import { NpmService } from './npm/service/npm.service';
-import { PypiService } from './pypi/service/pypi.service';
 
 @Component({
   selector: 'app-repository',
@@ -86,14 +81,8 @@ export class RepositoryComponent {
   public isAdmin = false;
 
   constructor(
-    private readonly mavenService: MavenService,
-    private readonly npmService: NpmService,
-    private readonly pypiService: PypiService,
-    private readonly dockerService: DockerService,
-    private readonly cargoService: CargoService,
-    private readonly golangService: GolangService,
-    private readonly nugetService: NugetService,
-    private readonly profileService: ProfileService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly profileFacadeService: ProfileService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
   ) {
@@ -149,16 +138,20 @@ export class RepositoryComponent {
     }
     this.dangerModalService.show('Delete Repository', 'Delete', () => {
       this.operationLock = true;
-      this.deleteRepositoryService(repo)
-        .then(() => {
-          this.refreshPage();
-          this.toastService.show('Repository deleted successfully', 'success');
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.operationLock = false;
+      this.protocolRepoControllerService
+        .deleteRepo(repo.name)
+        .pipe(
+          finalize(() => {
+            this.operationLock = false;
+          }),
+          map(() => undefined),
+        )
+        .subscribe({
+          next: () => {
+            this.refreshPage();
+            this.toastService.show('Repository deleted successfully', 'success');
+          },
+          error: () => {},
         });
     });
   }
@@ -183,65 +176,27 @@ export class RepositoryComponent {
 
   private fetchRepositories(repoType: RepoType): void {
     this.loading = true;
-    this.fetchRepositoriesService(repoType)
-      .then((repos: RepoListItem[]) => {
-        const temp = repos.map((repo: RepoListItem) => {
-          repo.repoType = repoType;
-          return repo;
-        });
+    this.protocolRepoControllerService
+      .getInfo(repoType.toUpperCase() as ApiRepoType)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+        map((r) => r.data as unknown as RepoListItem[]),
+      )
+      .subscribe({
+        next: (repos: RepoListItem[]) => {
+          const temp = (repos ?? []).map((repo: RepoListItem) => {
+            repo.repoType = repoType;
+            return repo;
+          });
 
-        this.repositories.push(...temp);
-        this.filteredRepos.push(...temp);
-        this.loadPage(0);
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+          this.repositories.push(...temp);
+          this.filteredRepos.push(...temp);
+          this.loadPage(0);
+        },
+        error: () => {},
       });
-  }
-
-  private fetchRepositoriesService(repoType: RepoType): Promise<RepoListItem[]> {
-    switch (repoType) {
-      case RepoType.MAVEN:
-        return this.mavenService.fetchRepos();
-      case RepoType.NPM:
-        return this.npmService.fetchRegistries();
-      case RepoType.PYPI:
-        return this.pypiService.fetchRepositories();
-      case RepoType.DOCKER:
-        return this.dockerService.fetchRepositories();
-      case RepoType.CARGO:
-        return this.cargoService.fetchRepositories();
-      case RepoType.GOLANG:
-        return this.golangService.fetchRepositories();
-      case RepoType.NUGET:
-        return this.nugetService.fetchRepositories();
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
-  }
-
-  private deleteRepositoryService(repo: RepoListItem) {
-    switch (repo.repoType) {
-      case RepoType.MAVEN:
-        return this.mavenService.deleteRepository(repo.name);
-      case RepoType.NPM:
-        return this.npmService.deleteRegistry(repo.name);
-      case RepoType.PYPI:
-        return this.pypiService.deleteRepository(repo.name);
-      case RepoType.DOCKER:
-        return this.dockerService.deleteRepository(repo.name);
-      case RepoType.CARGO:
-        return this.cargoService.deleteRepository(repo.name);
-      case RepoType.GOLANG:
-        return this.golangService.deleteRepository(repo.name);
-      case RepoType.NUGET:
-        return this.nugetService.deleteRepository(repo.name);
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
   }
 
   private loadAllRepos(option: string) {
@@ -256,7 +211,7 @@ export class RepositoryComponent {
   }
 
   private loadUserRole(): void {
-    this.profileService.get().then((profile) => {
+    this.profileFacadeService.get().subscribe((profile) => {
       this.isAdmin = profile.role === 'ADMIN';
     });
   }

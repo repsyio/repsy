@@ -20,6 +20,7 @@ export default tseslint.config(
       "simple-import-sort": simpleImportSort,
     },
     rules: {
+      '@typescript-eslint/no-empty-function': 'off',
       "@angular-eslint/prefer-inject": "off",
       "no-useless-escape": "off",
       "curly": ["error", "all"],
@@ -48,7 +49,8 @@ export default tseslint.config(
       "simple-import-sort/exports": "error",
     },
     ignores: [
-      "**/env.d.ts"
+      "**/env.d.ts",
+      "src/generated/**"
     ]
   },
   {

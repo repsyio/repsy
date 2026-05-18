@@ -20,14 +20,14 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Highlight } from 'ngx-highlightjs';
 import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { ArtifactVersionInfo, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
-import { ArtifactVersionInfo } from '../../dto/artifact-version-info';
 import { MavenService } from '../../service/maven.service';
 
 @Component({
@@ -66,11 +66,10 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
     private readonly toastService: ToastService,
   ) {
     this.baseUrl = environment.apiBaseUrl;
-    this.activeRepo = new RepoPermissionInfo();
-
+    this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.mavenService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), registry);
+        this.activeRepo = Object.assign({}, registry);
         this.loadVersion();
       }
     });
@@ -88,36 +87,37 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
     this.versionName = this.route.snapshot.paramMap.get('version');
 
     this.mavenService
-      .getArtifactVersion(this.groupName, this.artifactName, this.versionName)
-      .then((data) => {
-        this.version = data;
-        this.mavenDependencyHtml = `<dependency>
+      .fetchArtifactVersion(this.groupName, this.artifactName, this.versionName)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (data) => {
+          this.version = data;
+          this.mavenDependencyHtml = `<dependency>
   <groupId>${this.version.artifactGroupName}</groupId>
   <artifactId>${this.version.artifactName}</artifactId>
   <version>${this.version.artifactVersionName}</version>
 </dependency>`;
-        this.gradleDependencyHtml = `implementation '${this.version.artifactGroupName}:${this.version.artifactName}:${this.version.artifactVersionName}'`;
-        this.gradleKotlinDependencyHtml = `implementation("${this.version.artifactGroupName}:${this.version.artifactName}:${this.version.artifactVersionName}")`;
-        this.sbtDependencyHtml = `libraryDependencies += "${this.version.artifactGroupName}" % "${this.version.artifactName}" % "${this.version.artifactVersionName}"`;
-        this.ivyDependencyHtml = `<dependency org="${this.version.artifactGroupName}" name="${this.version.artifactName}" rev="${this.version.artifactVersionName}" />`;
-        this.groovyDependencyHtml = `@Grapes(
+          this.gradleDependencyHtml = `implementation '${this.version.artifactGroupName}:${this.version.artifactName}:${this.version.artifactVersionName}'`;
+          this.gradleKotlinDependencyHtml = `implementation("${this.version.artifactGroupName}:${this.version.artifactName}:${this.version.artifactVersionName}")`;
+          this.sbtDependencyHtml = `libraryDependencies += "${this.version.artifactGroupName}" % "${this.version.artifactName}" % "${this.version.artifactVersionName}"`;
+          this.ivyDependencyHtml = `<dependency org="${this.version.artifactGroupName}" name="${this.version.artifactName}" rev="${this.version.artifactVersionName}" />`;
+          this.groovyDependencyHtml = `@Grapes(
   @Grab(group='${this.version.artifactGroupName}', module='${this.version.artifactName}', version='${this.version.artifactVersionName}')
 )`;
-        this.leiningenDependencyHtml = `[${this.version.artifactGroupName}/${this.version.artifactName} "${this.version.artifactVersionName}"]`;
-        this.buildrDependencyHtml = `'${this.version.artifactGroupName}:${this.version.artifactName}:jar:${this.version.artifactVersionName}'`;
-        this.purlDependencyHtml = `pkg:maven/${this.version.artifactGroupName}/${this.version.artifactName}@${this.version.artifactVersionName}`;
-        this.bazelDependencyHtml = `maven_jar(
+          this.leiningenDependencyHtml = `[${this.version.artifactGroupName}/${this.version.artifactName} "${this.version.artifactVersionName}"]`;
+          this.buildrDependencyHtml = `'${this.version.artifactGroupName}:${this.version.artifactName}:jar:${this.version.artifactVersionName}'`;
+          this.purlDependencyHtml = `pkg:maven/${this.version.artifactGroupName}/${this.version.artifactName}@${this.version.artifactVersionName}`;
+          this.bazelDependencyHtml = `maven_jar(
   name = "${this.version.artifactName}",
   artifact = "${this.version.artifactGroupName}:${this.version.artifactName}:${this.version.artifactVersionName}",
   sha1 = "calculating...",
 )`;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+        },
+        error: () => {},
       });
   }
 
@@ -126,16 +126,18 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
       this.loading = true;
       this.mavenService
         .deleteVersion(this.groupName, this.artifactName, this.version.artifactVersionName)
-        .then(() => {
-          this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
-            this.toastService.show('Version deleted successfully', 'success');
-          });
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+              this.toastService.show('Version deleted successfully', 'success');
+            });
+          },
+          error: () => {},
         });
     });
   }

@@ -28,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 @Slf4j
 @EnableConfigurationProperties({
@@ -39,6 +40,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
   CargoFileSystemStorageBackendConfigProps.class,
   NuGetFileSystemStorageBackendConfigProps.class,
 })
+@EnableAsync
 @SpringBootApplication(
     scanBasePackages = {"io.repsy.os", "io.repsy.core", "io.repsy.libs", "io.repsy.protocols"})
 @EnableMultiport

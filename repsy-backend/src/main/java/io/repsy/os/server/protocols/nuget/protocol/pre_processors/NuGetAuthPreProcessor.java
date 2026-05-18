@@ -16,12 +16,14 @@
 package io.repsy.os.server.protocols.nuget.protocol.pre_processors;
 
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.nuget.shared.auth.services.NuGetAuthComponent;
+import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -33,6 +35,8 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -68,23 +72,23 @@ public class NuGetAuthPreProcessor extends ProtocolProcessor {
       final HttpServletResponse response,
       final Map<String, Object> properties) {
 
-    //    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
-    //
-    //    if (shouldSkipAuthentication(
-    //        SKIP_PRE_PROCESSOR_KEY, WRITE_OPERATION_KEY, repoInfo, properties)) {
-    //      return ProcessorResult.next();
-    //    }
-    //
-    //    final var authHeader = this.extractAuthHeader(request);
-    //
-    //    if (authHeader == null) {
-    //      return ProcessorResult.of(
-    //          ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-    //              .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"")
-    //              .build());
-    //    }
-    //
-    //    this.authenticateRequest(authHeader, repoInfo.getId(), properties);
+    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
+
+    if (shouldSkipAuthentication(
+        SKIP_PRE_PROCESSOR_KEY, WRITE_OPERATION_KEY, repoInfo, properties)) {
+      return ProcessorResult.next();
+    }
+
+    final var authHeader = this.extractAuthHeader(request);
+
+    if (authHeader == null) {
+      return ProcessorResult.of(
+          ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+              .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"")
+              .build());
+    }
+
+    this.authenticateRequest(authHeader, repoInfo.getId(), properties);
 
     return ProcessorResult.next();
   }

@@ -18,10 +18,10 @@ import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
+import { RepoSettingsForm } from '../../../../../../generated/api';
 import { SelectorComponent } from '../../../../shared/components/selector/selector.component';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { RepoSupport } from '../../../../shared/dto/repo/repo-type';
-import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form';
 import { MavenService } from '../../maven/service/maven.service';
 
 @Component({
@@ -31,7 +31,7 @@ import { MavenService } from '../../maven/service/maven.service';
   standalone: true,
   imports: [ReactiveFormsModule, SelectorComponent, RouterLink],
 })
-export class VersionAllowenceComponent implements OnInit {
+export class VersionAllowanceComponent implements OnInit {
   @Input() public parentForm: FormGroup;
   @Output() public fetch = new EventEmitter<void>();
 
@@ -50,22 +50,20 @@ export class VersionAllowenceComponent implements OnInit {
   }
 
   public selectType(option: string) {
-    const form: MavenRepoSettingsForm = new MavenRepoSettingsForm();
+    const form: RepoSettingsForm = {};
 
     form.privateRepo = this.parentForm.get('privateRepository')!.value;
     form.snapshots = option === RepoSupport.SNAPSHOTS || option === RepoSupport.ALL;
     form.releases = option === RepoSupport.RELEASES || option === RepoSupport.ALL;
     form.allowOverride = this.parentForm.get('allowOverride')!.value;
 
-    this.mavenService
-      .updateRepoSettings(form)
-      .then(() => {
+    this.mavenService.updateRepoSettings(form).subscribe({
+      next: () => {
         this.fetch.emit();
         this.toastService.show(`Version allowance has changed as ${option}`, 'success');
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      });
+      },
+      error: () => {},
+    });
   }
 
   private whichVersionAllowence(snapshots: boolean, releases: boolean) {

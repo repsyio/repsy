@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.nuget.shared.packages.dtos;
+package io.repsy.os.server.protocols.docker.shared.layer.dtos;
 
-public enum NuGetDeletedItem {
-  VERSION,
-  PACKAGE
-}
+import org.jspecify.annotations.NonNull;
+
+public record OrphanLayerInfo(@NonNull String digest, long size) {}

@@ -17,10 +17,10 @@
 import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ReactiveFormsModule } from '@angular/forms';
+import { finalize } from 'rxjs';
 
-import { UserInfo } from '../../../../pages/user/dto/user.info';
-import { UserUpdateForm } from '../../../../pages/user/form/user-update-form';
-import { UserService } from '../../../../pages/user/service/user.service';
+import { UserResponse, UserUpdateForm } from '../../../../../../generated/api';
+import { UserControllerService } from '../../../../../../generated/api';
 import { ToastService } from '../../toast/toast.service';
 import { ToggleComponent } from '../../toggle/toggle.component';
 
@@ -35,7 +35,7 @@ export class UserEditModalComponent implements OnChanges {
   @Output() openChange = new EventEmitter<boolean>();
   @Output() updated = new EventEmitter<void>();
   @Input() public open: boolean;
-  @Input() public user: UserInfo;
+  @Input() public user: UserResponse;
   @Input() public isLastAdmin = false;
 
   public loading = false;
@@ -43,7 +43,7 @@ export class UserEditModalComponent implements OnChanges {
 
   constructor(
     private readonly fb: FormBuilder,
-    private readonly userService: UserService,
+    private readonly userControllerService: UserControllerService,
     private readonly toastService: ToastService,
   ) {
     this.form = this.fb.group({
@@ -95,22 +95,21 @@ export class UserEditModalComponent implements OnChanges {
       role: formValue.isAdmin ? 'ADMIN' : 'USER',
     };
 
-    this.userService
+    this.userControllerService
       .updateUser(this.user.id, updateForm)
-      .then(() => {
+      .pipe(
+        finalize(() => {
+          this.form.enable();
+          if (this.isLastAdmin) {
+            this.form.get('isAdmin')?.disable();
+          }
+          this.loading = false;
+        }),
+      )
+      .subscribe(() => {
         this.toastService.show('User updated successfully', 'success');
         this.updated.emit();
         this.closeModal();
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.form.enable();
-        if (this.isLastAdmin) {
-          this.form.get('isAdmin')?.disable();
-        }
-        this.loading = false;
       });
   }
 }

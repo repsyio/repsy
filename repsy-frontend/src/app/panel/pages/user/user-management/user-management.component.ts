@@ -18,7 +18,10 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import moment from 'moment';
+import { finalize, map } from 'rxjs';
 
+import { PagedModelUserResponse, UserResponse } from '../../../../../generated/api';
+import { UserControllerService } from '../../../../../generated/api/api/user-controller.service';
 import { DropdownComponent } from '../../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../../shared/components/ellipsis/ellipsis.pipe';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -29,9 +32,6 @@ import { PaginationComponent } from '../../../shared/components/pagination/pagin
 import { SearchboxComponent } from '../../../shared/components/searchbox/searchbox.component';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../shared/components/tooltip/tooltip.component';
-import { PagedData } from '../../../shared/dto/paged-data';
-import { UserInfo } from '../dto/user.info';
-import { UserService } from '../service/user.service';
 
 @Component({
   selector: 'app-user-management',
@@ -56,36 +56,32 @@ export class UserManagementComponent implements OnInit {
   public operationLock = false;
   public pageNum = 0;
   public pageSize = 10;
-  public users: UserInfo[];
-  public pagedData: PagedData<UserInfo>;
+  public users: UserResponse[];
+  public pagedData: PagedModelUserResponse = { page: { totalPages: 0 } };
   public showCreateUserModal = false;
   public showEditUserModal = false;
   public showResetPasswordModal = false;
-  public selectedUser: UserInfo;
+  public selectedUser: UserResponse;
   public searchQuery = '';
   public newPassword: string;
 
   constructor(
-    private readonly userService: UserService,
+    private readonly userControllerService: UserControllerService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
-  ) {
-    this.pagedData = new PagedData<UserInfo>();
-  }
+  ) {}
 
   public ngOnInit(): void {
     this.fetchUsers();
   }
 
   public fetchUsers(): void {
-    this.userService
-      .getUsers(this.pageNum, this.pageSize, this.searchQuery)
-      .then((pageData: PagedData<UserInfo>) => {
-        this.pagedData.page = pageData.page;
-        this.users = pageData.content;
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
+    this.userControllerService
+      .listUsers(this.searchQuery || undefined, this.pageNum, this.pageSize)
+      .pipe(map((r) => r.data!))
+      .subscribe((pagedModel) => {
+        this.pagedData = pagedModel;
+        this.users = pagedModel.content ?? [];
       });
   }
 
@@ -110,33 +106,33 @@ export class UserManagementComponent implements OnInit {
     this.showCreateUserModal = true;
   }
 
-  public editUser(user: UserInfo): void {
+  public editUser(user: UserResponse): void {
     this.selectedUser = user;
     this.showEditUserModal = true;
   }
 
-  public resetPassword(user: UserInfo): void {
+  public resetPassword(user: UserResponse): void {
     this.dangerModalService.show('Reset Password', 'Reset', () => {
       this.operationLock = true;
 
-      this.userService
+      this.userControllerService
         .resetPassword(user.id)
-        .then((password: string) => {
+        .pipe(
+          map((r) => r.data!),
+          finalize(() => {
+            this.operationLock = false;
+          }),
+        )
+        .subscribe((password) => {
           this.newPassword = password;
           this.selectedUser = user;
           this.showResetPasswordModal = true;
           this.toastService.show('Password reset successfully', 'success');
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.operationLock = false;
         });
     });
   }
 
-  public deleteUser(user: UserInfo): void {
+  public deleteUser(user: UserResponse): void {
     // Check if trying to delete the last admin
     if (user.role === 'ADMIN' && this.isLastAdmin()) {
       this.toastService.show('Cannot delete the last admin user. Create another admin first.', 'error');
@@ -147,9 +143,14 @@ export class UserManagementComponent implements OnInit {
     this.dangerModalService.show('Delete User', 'Delete', () => {
       this.operationLock = true;
 
-      this.userService
+      this.userControllerService
         .deleteUser(user.id)
-        .then(() => {
+        .pipe(
+          finalize(() => {
+            this.operationLock = false;
+          }),
+        )
+        .subscribe(() => {
           this.fetchUsers();
           this.toastService.show(successMsg, 'success');
 
@@ -157,12 +158,6 @@ export class UserManagementComponent implements OnInit {
             this.pageNum = 0;
             this.fetchUsers();
           }
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.operationLock = false;
         });
     });
   }

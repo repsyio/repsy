@@ -17,10 +17,10 @@ package io.repsy.os.server.protocols.nuget.ui.facades;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.os.generated.model.NuGetDeletedItem;
 import io.repsy.os.generated.model.NuGetPackageInfo;
 import io.repsy.os.generated.model.NuGetPackageListItem;
 import io.repsy.os.generated.model.NuGetVersionListItem;
-import io.repsy.os.server.protocols.nuget.shared.packages.dtos.NuGetDeletedItem;
 import io.repsy.os.server.protocols.nuget.shared.packages.services.NuGetPackageServiceImpl;
 import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;

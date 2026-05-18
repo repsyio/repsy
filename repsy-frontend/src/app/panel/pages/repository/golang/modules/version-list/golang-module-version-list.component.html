@@ -93,7 +93,7 @@
               >
                 <div class="flex gap-2 text-[14px] text-[#FDFDFD]">
                   <img ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
-                  <app-tooltip [text]="version.version | ellipsis" [textHover]="version.version" />
+                  <app-tooltip [text]="version.version | ellipsis: 20" [textHover]="version.version" />
                 </div>
 
                 <span class="text-[14px] text-[#9FA0A0]">{{ version.goVersion ?? '-' }}</span>
