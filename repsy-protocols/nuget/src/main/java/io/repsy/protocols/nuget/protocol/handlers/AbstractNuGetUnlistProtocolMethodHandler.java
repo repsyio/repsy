@@ -15,12 +15,15 @@
  */
 package io.repsy.protocols.nuget.protocol.handlers;
 
+import static io.repsy.protocols.nuget.protocol.dtos.NuGetErrorResponse.of;
+import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
+
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
-import io.repsy.protocols.nuget.protocol.dtos.NuGetErrorResponse;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,13 +35,8 @@ import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-/**
- * Handles NuGet protocol DELETE — sets listed=false (unlist) per NuGet PackagePublish API spec.
- * Path: DELETE /v3/package/{id}/{version}
- */
 @Slf4j
 @NullMarked
 public abstract class AbstractNuGetUnlistProtocolMethodHandler implements ProtocolMethodHandler {
@@ -96,13 +94,11 @@ public abstract class AbstractNuGetUnlistProtocolMethodHandler implements Protoc
     try {
       this.facade.unlistVersion(context);
       return ResponseEntity.noContent().build();
+
     } catch (final ItemNotFoundException e) {
-      return ResponseEntity.status(HttpStatus.NOT_FOUND)
-          .body(NuGetErrorResponse.of(e.getMessage()));
+      return ResponseEntity.status(NOT_FOUND).body(of(e.getMessage()));
     } catch (final Exception e) {
-      log.error("NuGet unlist failed: ", e);
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(NuGetErrorResponse.of("Unlist failed"));
+      return ResponseEntity.status(INTERNAL_SERVER_ERROR).body(of("Unlist failed"));
     }
   }
 }

@@ -90,6 +90,7 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler implements Proto
       this.validateRequest(request);
 
       final var parts = request.getParts();
+
       if (parts == null || parts.isEmpty()) {
         return this.createErrorResponse(HttpStatus.BAD_REQUEST, "Missing package content.");
       }
@@ -117,25 +118,32 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler implements Proto
 
   private void processPublishing(final ProtocolContext context, final Part nupkgPart)
       throws Exception {
+
     try (final var inputStream = nupkgPart.getInputStream()) {
       this.facade.publish(context, inputStream);
     }
   }
 
   private ResponseEntity<Object> handleException(final String errorMsg) {
+
     log.debug("NuGet validation error: {}", errorMsg);
+
     return this.createErrorResponse(HttpStatus.BAD_REQUEST, errorMsg);
   }
 
   private ResponseEntity<Object> handleConflict(
       final org.springframework.web.server.ResponseStatusException e) {
+
     log.debug("NuGet publish conflict: {}", e.getMessage());
+
     final var reason = e.getReason() != null ? e.getReason() : "Conflict";
+
     return this.createErrorResponse((HttpStatus) e.getStatusCode(), reason);
   }
 
   private ResponseEntity<Object> createErrorResponse(
       final HttpStatus status, final String message) {
+
     return ResponseEntity.status(status).body(NuGetErrorResponse.of(message));
   }
 }

@@ -80,6 +80,7 @@ public final class NuGetResponseMapper {
 
   public static NuGetCatalogEntry toCatalogEntry(
       final NuGetVersionInfo v, final String packageId, final String leafUrl) {
+
     return new NuGetCatalogEntry(
         leafUrl,
         "PackageDetails",
@@ -165,10 +166,12 @@ public final class NuGetResponseMapper {
   }
 
   private static @Nullable List<String> splitTags(final @Nullable String tags) {
+
     return tags != null && !tags.isBlank() ? Arrays.asList(tags.split("\\s+")) : null;
   }
 
   private static @Nullable List<String> splitAuthors(final @Nullable String authors) {
+
     return authors != null && !authors.isBlank() ? Arrays.asList(authors.split(",\\s*")) : null;
   }
 }

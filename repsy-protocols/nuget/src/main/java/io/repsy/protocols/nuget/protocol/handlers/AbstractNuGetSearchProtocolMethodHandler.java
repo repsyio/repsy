@@ -16,6 +16,7 @@
 package io.repsy.protocols.nuget.protocol.handlers;
 
 import static io.repsy.protocols.nuget.shared.utils.NuGetUrlBuilder.buildBaseUrl;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -32,7 +33,6 @@ import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @Slf4j
@@ -100,7 +100,7 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler implements Protoc
       final var results =
           this.facade.search(context, q != null ? q : "", skip, take, prerelease, baseUrl);
 
-      return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(results);
+      return ResponseEntity.ok().contentType(APPLICATION_JSON).body(results);
     } catch (final Exception e) {
       log.debug("NuGet search failed: {}", e.getMessage());
       return ResponseEntity.internalServerError().build();

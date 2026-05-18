@@ -25,6 +25,7 @@ import org.jspecify.annotations.NullMarked;
 public final class NuGetServiceIndexResources {
 
   public static List<NuGetServiceIndexResource> build(final String baseUrl) {
+
     return List.of(
         new NuGetServiceIndexResource(
             baseUrl + "/v3/package", "PackageBaseAddress/3.0.0", "Package download base URL"),

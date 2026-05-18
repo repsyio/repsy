@@ -15,6 +15,10 @@
  */
 package io.repsy.protocols.nuget.protocol.handlers;
 
+import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
+import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
+import static org.springframework.http.MediaType.APPLICATION_XML;
+
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
@@ -29,9 +33,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @Slf4j
@@ -93,16 +95,15 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
       final HttpServletResponse response) {
 
     try {
-      final var resource =
-          this.isNupkg
-              ? this.facade.downloadNuPackage(context)
-              : this.facade.downloadNuspec(context);
-      final var contentType =
-          this.isNupkg ? MediaType.APPLICATION_OCTET_STREAM : MediaType.APPLICATION_XML;
+      if (this.isNupkg) {
+        final var resource = this.facade.downloadNuPackage(context);
+        return ResponseEntity.ok()
+            .header(CONTENT_TYPE, APPLICATION_OCTET_STREAM.toString())
+            .body(resource);
+      }
 
-      return ResponseEntity.ok()
-          .header(HttpHeaders.CONTENT_TYPE, contentType.toString())
-          .body(resource);
+      final var resource = this.facade.downloadNuspec(context);
+      return ResponseEntity.ok().header(CONTENT_TYPE, APPLICATION_XML.toString()).body(resource);
     } catch (final Exception e) {
       log.debug("NuGet download failed: {}", e.getMessage());
       return ResponseEntity.notFound().build();

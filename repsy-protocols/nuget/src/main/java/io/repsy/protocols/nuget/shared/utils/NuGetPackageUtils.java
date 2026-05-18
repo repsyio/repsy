@@ -15,16 +15,25 @@
  */
 package io.repsy.protocols.nuget.shared.utils;
 
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
+
 import io.repsy.libs.protocol.router.ProtocolContext;
+import io.repsy.protocols.nuget.protocol.facades.dtos.NuspecMetadata;
 import io.repsy.protocols.nuget.protocol.facades.dtos.PackageIdVersion;
+import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafItem;
+import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationPageItem;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -33,6 +42,7 @@ import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.semver4j.Semver;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import tools.jackson.core.type.TypeReference;
@@ -45,7 +55,19 @@ public final class NuGetPackageUtils {
 
   private static final int THREE = 3;
   private static final int FOUR = 4;
+  public static final String FORMAT_JSON = ".json";
+  private static final int REGISTRATION_PAGE_SIZE = 64;
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+  private static final Comparator<String> VERSION_COMPARATOR =
+      (v1, v2) -> {
+        try {
+          return Objects.requireNonNull(Semver.coerce(v1))
+              .compareTo(Objects.requireNonNull(Semver.coerce(v2)));
+        } catch (final Exception e) {
+          return v1.compareToIgnoreCase(v2);
+        }
+      };
 
   public static @Nullable String extractXmlTag(final String xml, final String tagName) {
     try {
@@ -171,6 +193,77 @@ public final class NuGetPackageUtils {
     } catch (final Exception e) {
       log.debug("Failed to parse dependencies JSON", e);
       return List.of();
+    }
+  }
+
+  public static List<NuGetRegistrationPageItem> buildRegistrationPages(
+      final List<NuGetRegistrationLeafItem> leafItems, final String indexUrl) {
+
+    if (leafItems.size() <= REGISTRATION_PAGE_SIZE) {
+      final var lowerVersion =
+          leafItems.stream()
+              .map(i -> i.catalogEntry().version())
+              .min(VERSION_COMPARATOR)
+              .orElse("");
+      final var upperVersion =
+          leafItems.stream()
+              .map(i -> i.catalogEntry().version())
+              .max(VERSION_COMPARATOR)
+              .orElse("");
+
+      return List.of(
+          new NuGetRegistrationPageItem(
+              indexUrl,
+              "catalog:CatalogPage",
+              leafItems.size(),
+              leafItems,
+              lowerVersion,
+              upperVersion));
+    }
+
+    // Split into pages of REGISTRATION_PAGE_SIZE
+    final var pages = new ArrayList<NuGetRegistrationPageItem>();
+    int pageIndex = 0;
+    for (int offset = 0; offset < leafItems.size(); offset += REGISTRATION_PAGE_SIZE) {
+      final var chunk =
+          leafItems.subList(offset, Math.min(offset + REGISTRATION_PAGE_SIZE, leafItems.size()));
+      final var pageUrl = indexUrl.replace("/index.json", "/page/" + pageIndex + FORMAT_JSON);
+      final var lowerVersion =
+          chunk.stream().map(i -> i.catalogEntry().version()).min(VERSION_COMPARATOR).orElse("");
+      final var upperVersion =
+          chunk.stream().map(i -> i.catalogEntry().version()).max(VERSION_COMPARATOR).orElse("");
+      pages.add(
+          new NuGetRegistrationPageItem(
+              pageUrl, "catalog:CatalogPage", chunk.size(), chunk, lowerVersion, upperVersion));
+      pageIndex++;
+    }
+    return pages;
+  }
+
+  public static NuspecMetadata readNuspecMetadata(final Path tempFile) throws IOException {
+    final String nuspecXml;
+
+    try (final var is = Files.newInputStream(tempFile)) {
+      nuspecXml = extractNuspec(is);
+    }
+
+    final var packageId = extractXmlTag(nuspecXml, "id");
+    final var version = extractXmlTag(nuspecXml, "version");
+
+    if (packageId == null || packageId.isBlank() || version == null || version.isBlank()) {
+      throw new IllegalArgumentException("Missing 'id' or 'version' in nuspec.");
+    }
+
+    return new NuspecMetadata(packageId, version, nuspecXml);
+  }
+
+  public static void copyStreamToFile(final InputStream stream, final Path target)
+      throws IOException {
+
+    final long size = Files.copy(stream, target, REPLACE_EXISTING);
+
+    if (size == 0) {
+      throw new IllegalArgumentException("NuGet package stream is empty.");
     }
   }
 }

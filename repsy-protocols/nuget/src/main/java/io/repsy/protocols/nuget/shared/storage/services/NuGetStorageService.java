@@ -26,10 +26,10 @@ import org.springframework.core.io.Resource;
 public interface NuGetStorageService {
 
   BaseUsages writePackage(
-      UUID repoId, String packageId, String version, InputStream nupkgStream, byte[] nuspecBytes)
+      UUID repoId, String packageId, String version, InputStream nuPkgStream, byte[] nuspecBytes)
       throws IOException;
 
-  Resource getNupkg(UUID repoId, String packageId, String version);
+  Resource getNuPkg(UUID repoId, String packageId, String version);
 
   Resource getNuspec(UUID repoId, String packageId, String version);
 

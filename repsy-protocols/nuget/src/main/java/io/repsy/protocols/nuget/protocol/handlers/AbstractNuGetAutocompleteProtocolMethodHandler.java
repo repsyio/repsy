@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -89,8 +90,8 @@ public abstract class AbstractNuGetAutocompleteProtocolMethodHandler
       final var takeStr = request.getParameter("take");
       final var prerelease = "true".equalsIgnoreCase(request.getParameter("prerelease"));
 
-      final var skip = skipStr != null ? Integer.parseInt(skipStr) : 0;
-      final var take = takeStr != null ? Integer.parseInt(takeStr) : 20;
+      final var skip = parseOrDefault(skipStr, 0);
+      final var take = parseOrDefault(takeStr, 20);
 
       final var results =
           this.facade.autocomplete(context, q != null ? q : "", skip, take, prerelease);
@@ -100,5 +101,10 @@ public abstract class AbstractNuGetAutocompleteProtocolMethodHandler
       log.debug("NuGet autocomplete failed: {}", e.getMessage());
       return ResponseEntity.internalServerError().build();
     }
+  }
+
+  private static int parseOrDefault(final @Nullable String value, final int defaultValue) {
+
+    return value != null ? Integer.parseInt(value) : defaultValue;
   }
 }

@@ -41,7 +41,7 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
       final UUID repoId,
       final String packageId,
       final String version,
-      final InputStream nupkgStream,
+      final InputStream nuPkgStream,
       final byte[] nuspecBytes)
       throws IOException {
 
@@ -59,6 +59,7 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
             + "."
             + normalizedVersion
             + ".nupkg";
+
     final var nuspecPath =
         PACKAGES_PATH
             + "/"
@@ -75,7 +76,7 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
     final var nuspecStoragePath = StoragePath.of(repoId, nuspecPath);
 
     final var nupkgUsages =
-        this.storageStrategy.write(repoId.toString(), nupkgStoragePath, nupkgStream);
+        this.storageStrategy.write(repoId.toString(), nupkgStoragePath, nuPkgStream);
 
     final BaseUsages nuspecUsages;
     try (final var bis = new ByteArrayInputStream(nuspecBytes)) {
@@ -87,7 +88,7 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
   }
 
   @Override
-  public Resource getNupkg(final UUID repoId, final String packageId, final String version) {
+  public Resource getNuPkg(final UUID repoId, final String packageId, final String version) {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
     final var normalizedVersion = version.toLowerCase(Locale.ROOT);

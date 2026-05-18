@@ -15,6 +15,8 @@
  */
 package io.repsy.protocols.nuget.protocol.handlers;
 
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
@@ -30,7 +32,6 @@ import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @Slf4j
@@ -92,9 +93,8 @@ public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
 
     try {
       final var versions = this.facade.getPackageVersions(context);
-      return ResponseEntity.ok()
-          .contentType(MediaType.APPLICATION_JSON)
-          .body(Map.of("versions", versions));
+      return ResponseEntity.ok().contentType(APPLICATION_JSON).body(Map.of("versions", versions));
+
     } catch (final Exception e) {
       log.debug("NuGet package versions failed: {}", e.getMessage());
       return ResponseEntity.notFound().build();

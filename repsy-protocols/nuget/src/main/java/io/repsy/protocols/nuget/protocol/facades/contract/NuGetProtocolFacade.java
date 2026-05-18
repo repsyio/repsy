@@ -30,15 +30,13 @@ import org.springframework.core.io.Resource;
 @NullMarked
 public interface NuGetProtocolFacade {
 
-  NuGetServiceIndexResponse getServiceIndex(ProtocolContext context, String baseUrl);
-
   void publish(ProtocolContext context, InputStream inputStream) throws IOException;
 
-  List<String> getPackageVersions(ProtocolContext context);
+  void unlistVersion(ProtocolContext context);
 
-  Resource downloadNuPackage(ProtocolContext context);
+  void relistVersion(ProtocolContext context);
 
-  Resource downloadNuspec(ProtocolContext context);
+  NuGetServiceIndexResponse getServiceIndex(ProtocolContext context, String baseUrl);
 
   NuGetSearchResponse search(
       ProtocolContext context, String q, int skip, int take, boolean prerelease, String baseUrl);
@@ -50,7 +48,9 @@ public interface NuGetProtocolFacade {
 
   NuGetRegistrationLeafResponse getRegistrationLeaf(ProtocolContext context, String baseUrl);
 
-  void unlistVersion(ProtocolContext context);
+  Resource downloadNuPackage(ProtocolContext context);
 
-  void relistVersion(ProtocolContext context);
+  Resource downloadNuspec(ProtocolContext context);
+
+  List<String> getPackageVersions(ProtocolContext context);
 }

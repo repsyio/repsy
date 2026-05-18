@@ -25,33 +25,45 @@ public final class NuGetUrlBuilder {
 
   private static final int PORT_HTTPS = 443;
   private static final int PORT_HTTP = 80;
+  private static final String PROTO_HTTPS = "HTTPS";
+  private static final String PROTO_HTTP = "HTTP";
 
   public static String registrationBase(final String baseUrl, final String idLower) {
+
     return baseUrl + "/v3/registration/" + idLower;
   }
 
   public static String packageBase(final String baseUrl, final String idLower) {
+
     return baseUrl + "/v3/package/" + idLower;
   }
 
-  /** Returns {@code base/segment.json} — works for both leaf and index URLs. */
   public static String leafUrl(final String registrationBase, final String segment) {
+
     return registrationBase + "/" + segment + ".json";
   }
 
   public static String nupkgUrl(
       final String packageBase, final String idLower, final String versionLower) {
+
     return packageBase + "/" + versionLower + "/" + idLower + "." + versionLower + ".nupkg";
   }
 
   public static String buildBaseUrl(final HttpServletRequest request, final String repoName) {
+
     final var scheme = request.getScheme();
     final var host = request.getServerName();
     final var port = request.getServerPort();
-    final var isDefaultPort =
-        ("http".equals(scheme) && port == PORT_HTTP)
-            || ("https".equals(scheme) && port == PORT_HTTPS);
-    final var authority = isDefaultPort ? host : host + ":" + port;
+    final var authority = buildAuthority(scheme, host, port);
+
     return scheme + "://" + authority + "/" + repoName;
+  }
+
+  private static String buildAuthority(final String scheme, final String host, final int port) {
+    final var isDefaultPort =
+        (PROTO_HTTP.equals(scheme) && port == PORT_HTTP)
+            || (PROTO_HTTPS.equals(scheme) && port == PORT_HTTPS);
+
+    return isDefaultPort ? host : host + ":" + port;
   }
 }

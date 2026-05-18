@@ -109,10 +109,11 @@ public abstract class AbstractNuGetRegistrationProtocolMethodHandler
       if (this.isIndex) {
         final var result = this.facade.getRegistrationIndex(context, baseUrl);
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(result);
-      } else {
-        final var result = this.facade.getRegistrationLeaf(context, baseUrl);
-        return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(result);
       }
+
+      final var result = this.facade.getRegistrationLeaf(context, baseUrl);
+      return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(result);
+
     } catch (final ItemNotFoundException | IllegalArgumentException e) {
       log.debug("NuGet registration not found: {}", e.getMessage());
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();

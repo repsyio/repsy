@@ -31,24 +31,6 @@ public interface NuGetPackageService<ID> {
   void publish(BaseRepoInfo<ID> repoInfo, String packageId, String version, String nuspecXml)
       throws IOException;
 
-  List<String> getVersions(BaseRepoInfo<ID> repoInfo, String packageId);
-
-  List<NuGetVersionInfo> getVersionInfos(BaseRepoInfo<ID> repoInfo, String packageId);
-
-  List<NuGetVersionInfo> getAllVersionInfos(BaseRepoInfo<ID> repoInfo, String packageId);
-
-  Page<NuGetVersionInfo> getVersionInfosPage(
-      BaseRepoInfo<ID> repoInfo, String packageId, Pageable pageable);
-
-  Optional<NuGetVersionInfo> findVersionInfo(
-      BaseRepoInfo<ID> repoInfo, String packageId, String version);
-
-  Page<NuGetPackageSearchResult> search(
-      BaseRepoInfo<ID> repoInfo, String query, int skip, int take, boolean prerelease);
-
-  List<String> autocomplete(
-      BaseRepoInfo<ID> repoInfo, String query, int skip, int take, boolean prerelease);
-
   void incrementDownloadCount(BaseRepoInfo<ID> repoInfo, String packageId, String version);
 
   void unlistVersion(BaseRepoInfo<ID> repoInfo, String packageId, String version);
@@ -58,4 +40,22 @@ public interface NuGetPackageService<ID> {
   void deletePackage(BaseRepoInfo<ID> repoInfo, String packageId);
 
   boolean deleteVersion(BaseRepoInfo<ID> repoInfo, String packageId, String version);
+
+  Optional<NuGetVersionInfo> findVersionInfo(
+      BaseRepoInfo<ID> repoInfo, String packageId, String version);
+
+  List<String> getVersions(BaseRepoInfo<ID> repoInfo, String packageId);
+
+  List<NuGetVersionInfo> getVersionInfos(BaseRepoInfo<ID> repoInfo, String packageId);
+
+  List<NuGetVersionInfo> getAllVersionInfos(BaseRepoInfo<ID> repoInfo, String packageId);
+
+  List<String> autocomplete(
+      BaseRepoInfo<ID> repoInfo, String query, int skip, int take, boolean prerelease);
+
+  Page<NuGetVersionInfo> getVersionInfosPage(
+      BaseRepoInfo<ID> repoInfo, String packageId, Pageable pageable);
+
+  Page<NuGetPackageSearchResult> search(
+      BaseRepoInfo<ID> repoInfo, String query, int skip, int take, boolean prerelease);
 }
