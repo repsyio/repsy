@@ -92,7 +92,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
       final var metadata = readNuspecMetadata(tempFile);
       final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
-      final var usages = storePackage(repoInfo, metadata, tempFile);
+      final var usages = this.storePackage(repoInfo, metadata, tempFile);
       this.doPublish(repoInfo, metadata.packageId(), metadata.version(), metadata.nuspecXml());
 
       log.info(
