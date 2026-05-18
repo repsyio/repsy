@@ -1303,143 +1303,143 @@ paths:
         schema:
           type: string
 
-    "/api/nuget/packages/{repoName}/{packageId}":
-      get:
-        tags:
-          - nuget-package-controller
-        operationId: getNugetPackage
-        parameters:
-          - name: packageId
-            in: path
-            required: true
-            schema:
-              type: string
-        responses:
-          '200':
-            description: OK
-            content:
-              application/json:
-                schema:
-                  "$ref": "#/components/schemas/RestResponseNuGetPackageInfo"
-        summary: Get a NuGet package
-      delete:
-        tags:
-          - nuget-package-controller
-        operationId: deleteNugetPackage
-        parameters:
-          - name: packageId
-            in: path
-            required: true
-            schema:
-              type: string
-        responses:
-          '200':
-            description: OK
-            content:
-              application/json:
-                schema:
-                  "$ref": "#/components/schemas/RestResponseNuGetDeletedItem"
-        summary: Delete a NuGet package
+  "/api/nuget/packages/{repoName}/{packageId}":
+    get:
+      tags:
+        - nuget-package-controller
+      operationId: getNugetPackage
       parameters:
-        - name: repoName
+        - name: packageId
           in: path
           required: true
           schema:
             type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseNuGetPackageInfo"
+      summary: Get a NuGet package
+    delete:
+      tags:
+        - nuget-package-controller
+      operationId: deleteNugetPackage
+      parameters:
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseNuGetDeletedItem"
+      summary: Delete a NuGet package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
 
-    "/api/nuget/packages/{repoName}/{packageId}/versions":
-      get:
-        tags:
-          - nuget-package-controller
-        operationId: listNugetVersions
-        parameters:
-          - name: packageId
-            in: path
-            required: true
-            schema:
-              type: string
-          - name: page
-            in: query
-            required: false
-            schema:
-              type: integer
-              format: int32
-              default: 0
-          - name: size
-            in: query
-            required: false
-            schema:
-              type: integer
-              format: int32
-              default: 10
-        responses:
-          '200':
-            description: OK
-            content:
-              application/json:
-                schema:
-                  "$ref": "#/components/schemas/RestResponsePagedModelNuGetVersionListItem"
-        summary: List versions of a NuGet package
+  "/api/nuget/packages/{repoName}/{packageId}/versions":
+    get:
+      tags:
+        - nuget-package-controller
+      operationId: listNugetVersions
       parameters:
-        - name: repoName
+        - name: packageId
           in: path
           required: true
           schema:
             type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 10
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelNuGetVersionListItem"
+      summary: List versions of a NuGet package
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
 
-    "/api/nuget/packages/{repoName}/{packageId}/{version}":
-      get:
-        tags:
-          - nuget-package-controller
-        operationId: getNugetVersion
-        parameters:
-          - name: packageId
-            in: path
-            required: true
-            schema:
-              type: string
-          - name: version
-            in: path
-            required: true
-            schema:
-              type: string
-        responses:
-          '200':
-            description: OK
-            content:
-              application/json:
-                schema:
-                  "$ref": "#/components/schemas/RestResponseNuGetVersionInfo"
-        summary: Get a specific NuGet package version
-      delete:
-        tags:
-          - nuget-package-controller
-        operationId: deleteNugetVersion
-        parameters:
-          - name: packageId
-            in: path
-            required: true
-            schema:
-              type: string
-          - name: version
-            in: path
-            required: true
-            schema:
-              type: string
-        responses:
-          '200':
-            description: OK
-            content:
-              application/json:
-                schema:
-                  "$ref": "#/components/schemas/RestResponseNuGetDeletedItem"
-        summary: Delete a specific NuGet package version
+  "/api/nuget/packages/{repoName}/{packageId}/{version}":
+    get:
+      tags:
+        - nuget-package-controller
+      operationId: getNugetVersion
       parameters:
-        - name: repoName
+        - name: packageId
           in: path
           required: true
           schema:
             type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseNuGetVersionInfo"
+      summary: Get a specific NuGet package version
+    delete:
+      tags:
+        - nuget-package-controller
+      operationId: deleteNugetVersion
+      parameters:
+        - name: packageId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseNuGetDeletedItem"
+      summary: Delete a specific NuGet package version
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
   "/api/mvn/artifacts/{repoName}":
     get:
       tags:
@@ -2651,7 +2651,7 @@ components:
           type: string
         type:
           "$ref": "#/components/schemas/ResponseType"
-        data: {}
+        data: { }
         errorCode:
           type: string
         text:
@@ -2729,7 +2729,7 @@ components:
         - password
         - username
         - role
-    ProtocolApiFacade: {}
+    ProtocolApiFacade: { }
     RepoCreateForm:
       type: object
       properties:
@@ -3119,7 +3119,7 @@ components:
           type: string
         text:
           type: string
-    ProtocolApiFacadeMavenAdapter: {}
+    ProtocolApiFacadeMavenAdapter: { }
     RestResponseListStorageItemInfo:
       type: object
       properties:
@@ -4146,4 +4146,5 @@ components:
         - PYPI
         - DOCKER
         - CARGO
+        - NUGET
         - GOLANG
