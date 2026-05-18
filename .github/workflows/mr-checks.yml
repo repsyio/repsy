@@ -50,6 +50,9 @@ jobs:
       - name: Install core modules
         run: mvn -B -ntp install -f core/pom.xml -DskipTests -Drat.skip=true -Dcheckstyle.skip=true
 
+      - name: Generate Sources
+        run: mvn generate-sources
+
       - name: Build and Verify
         run: mvn -B -ntp verify
 
