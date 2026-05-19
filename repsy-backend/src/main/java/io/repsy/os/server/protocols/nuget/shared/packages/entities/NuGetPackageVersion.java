@@ -16,18 +16,14 @@
 package io.repsy.os.server.protocols.nuget.shared.packages.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -35,15 +31,14 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
 @Table(name = "nuget_package_version")
 @NoArgsConstructor
-@ToString(exclude = {"nugetPackage", "packageTypes"})
-@EqualsAndHashCode(exclude = {"nugetPackage", "packageTypes"})
+@ToString(exclude = {"nugetPackage"})
+@EqualsAndHashCode(exclude = {"nugetPackage"})
 public class NuGetPackageVersion {
 
   @Id
@@ -113,7 +108,4 @@ public class NuGetPackageVersion {
 
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
-
-  @OneToMany(mappedBy = "packageVersion", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<NuGetPackageType> packageTypes = new HashSet<>();
 }

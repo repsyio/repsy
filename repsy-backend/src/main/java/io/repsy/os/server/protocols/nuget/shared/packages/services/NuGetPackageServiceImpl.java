@@ -70,6 +70,17 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final String version,
       final String nuspecXml) {
 
+    final boolean isPrerelease = version.contains("-");
+    if (isPrerelease && Boolean.FALSE.equals(repoInfo.getSnapshots())) {
+      throw new ResponseStatusException(
+          HttpStatus.UNPROCESSABLE_CONTENT,
+          "Pre-release packages are not allowed in this repository.");
+    }
+    if (!isPrerelease && Boolean.FALSE.equals(repoInfo.getReleases())) {
+      throw new ResponseStatusException(
+          HttpStatus.UNPROCESSABLE_CONTENT, "Release packages are not allowed in this repository.");
+    }
+
     final var repo =
         this.repoRepository
             .findById(repoInfo.getId())
@@ -81,15 +92,16 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
     final var nugetPackage = pkg.orElseGet(() -> this.crateNuGetPackage(repo, packageId));
 
-    final boolean versionExists =
-        this.packageVersionRepository
-            .findByNugetPackageIdAndVersion(nugetPackage.getId(), version)
-            .isPresent();
+    final var existingVersion =
+        this.packageVersionRepository.findByNugetPackageIdAndVersion(nugetPackage.getId(), version);
 
-    if (versionExists) {
-      throw new ResponseStatusException(
-          HttpStatus.CONFLICT,
-          "Version " + version + " of package " + packageId + " already exists.");
+    if (existingVersion.isPresent()) {
+      if (!repoInfo.isAllowOverride()) {
+        throw new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "Version " + version + " of package " + packageId + " already exists.");
+      }
+      this.packageVersionRepository.delete(existingVersion.get());
     }
 
     final var pkgVersion = this.createNuGetPackageVersion(nugetPackage, nuspecXml, version);

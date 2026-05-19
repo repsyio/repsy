@@ -53,24 +53,6 @@ create unique index "ux_nuget_package_version__package_id_version"
 create index "ix_nuget_package_version__package_id"
     on "public"."nuget_package_version" ("package_id");
 
-
-create table "public"."nuget_package_type"
-(
-    "id"                  uuid        not null
-        constraint "pk_nuget_package_type"
-            primary key,
-    "package_version_id"  uuid        not null
-        constraint "fk_nuget_package_type__package_version_id"
-            references "public"."nuget_package_version"
-            on delete cascade,
-    "type"                varchar(64) not null,
-    "created_at"          timestamp   not null
-);
-
-create index "ix_nuget_package_type__package_version_id"
-    on "public"."nuget_package_type" ("package_version_id");
-
-
 alter table "public"."repo"
 drop constraint "ch_repo__type";
 
