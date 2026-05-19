@@ -15,6 +15,8 @@
  */
 package io.repsy.os.server.protocols.nuget.shared.packages.services;
 
+import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.checkVersionAllowance;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.generated.model.NuGetDeletedItem;
@@ -70,16 +72,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final String version,
       final String nuspecXml) {
 
-    final boolean isPrerelease = version.contains("-");
-    if (isPrerelease && Boolean.FALSE.equals(repoInfo.getSnapshots())) {
-      throw new ResponseStatusException(
-          HttpStatus.UNPROCESSABLE_CONTENT,
-          "Pre-release packages are not allowed in this repository.");
-    }
-    if (!isPrerelease && Boolean.FALSE.equals(repoInfo.getReleases())) {
-      throw new ResponseStatusException(
-          HttpStatus.UNPROCESSABLE_CONTENT, "Release packages are not allowed in this repository.");
-    }
+    checkVersionAllowance(version, repoInfo);
 
     final var repo =
         this.repoRepository

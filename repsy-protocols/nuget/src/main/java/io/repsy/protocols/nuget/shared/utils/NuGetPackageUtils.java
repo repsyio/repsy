@@ -23,6 +23,7 @@ import io.repsy.protocols.nuget.protocol.facades.dtos.PackageIdVersion;
 import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafItem;
 import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationPageItem;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
+import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -43,6 +44,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.semver4j.Semver;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import tools.jackson.core.type.TypeReference;
@@ -264,6 +267,20 @@ public final class NuGetPackageUtils {
 
     if (size == 0) {
       throw new IllegalArgumentException("NuGet package stream is empty.");
+    }
+  }
+
+  public static void checkVersionAllowance(final String version, final BaseRepoInfo<?> repoInfo) {
+
+    final boolean isPrerelease = version.contains("-");
+    if (isPrerelease && Boolean.FALSE.equals(repoInfo.getSnapshots())) {
+      throw new ResponseStatusException(
+          HttpStatus.UNPROCESSABLE_CONTENT,
+          "Pre-release packages are not allowed in this repository.");
+    }
+    if (!isPrerelease && Boolean.FALSE.equals(repoInfo.getReleases())) {
+      throw new ResponseStatusException(
+          HttpStatus.UNPROCESSABLE_CONTENT, "Release packages are not allowed in this repository.");
     }
   }
 }

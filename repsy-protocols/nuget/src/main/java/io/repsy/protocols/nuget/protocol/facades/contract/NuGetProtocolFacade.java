@@ -32,9 +32,9 @@ public interface NuGetProtocolFacade {
 
   void publish(ProtocolContext context, InputStream inputStream) throws IOException;
 
-  void unlistVersion(ProtocolContext context);
+  void unlistVersion(ProtocolContext context) throws IOException;
 
-  void relistVersion(ProtocolContext context);
+  void relistVersion(ProtocolContext context) throws IOException;
 
   NuGetServiceIndexResponse getServiceIndex(ProtocolContext context, String baseUrl);
 

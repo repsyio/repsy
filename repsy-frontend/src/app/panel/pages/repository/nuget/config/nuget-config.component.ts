@@ -54,7 +54,7 @@ export class NugetConfigComponent implements OnInit, OnChanges {
     this.markdown = `
 **Option A — NuGet.Config (recommended)**
 
-Create \`NuGet.Config\` in your project directory:
+Add source to \`nuget.config\` in your project/solution root *(safe to commit)*:
 
 \`\`\`xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -62,6 +62,14 @@ Create \`NuGet.Config\` in your project directory:
   <packageSources>
     <add key="repsy" value="${sourceUrl}" allowInsecureConnections="true" />
   </packageSources>
+</configuration>
+\`\`\`
+
+Add credentials to \`~/.nuget/NuGet/NuGet.Config\` *(user-level — do not commit)*:
+
+\`\`\`xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
   <packageSourceCredentials>
     <repsy>
       <add key="Username" value="${this.username}" />
@@ -90,7 +98,9 @@ dotnet add package <PACKAGE_ID> --version <VERSION> --source repsy
 Push package:
 
 \`\`\`bash
-dotnet nuget push ./bin/Release/*.nupkg --source "${sourceUrl}" --api-key any
+dotnet nuget push ./bin/Release/*.nupkg \\
+  --source "${sourceUrl}" \\
+  --api-key "<YOUR_PASSWORD_OR_DEPLOY_TOKEN>"
 \`\`\`
 
 Install package:

@@ -59,6 +59,13 @@ export class PackageOverrideComponent implements OnInit {
       mavenForm.snapshots = this.parentForm.get('snapshots')?.value;
       mavenForm.releases = this.parentForm.get('releases')?.value;
       form = mavenForm;
+    } else if (this.repoType === RepoType.NUGET) {
+      const nugetForm = new RepoSettingsForm();
+      nugetForm.allowOverride = this.allowOverride;
+      nugetForm.privateRepo = this.parentForm.get('privateRepository')?.value;
+      nugetForm.releases = this.parentForm.get('releases')?.value;
+      nugetForm.snapshots = this.parentForm.get('snapshots')?.value;
+      form = nugetForm;
     } else {
       const generalForm = new RepoSettingsForm();
       generalForm.allowOverride = this.allowOverride;

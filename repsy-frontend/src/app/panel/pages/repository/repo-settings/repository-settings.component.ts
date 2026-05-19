@@ -138,6 +138,12 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
               privateRepository: this.mavenRepositorySettings.privateRepo,
               ...this.mavenRepositorySettings,
             });
+          } else if (this.repoType === RepoType.NUGET) {
+            this.repositorySettings = res as RepoSettingsInfo;
+            this.mavenSettingsForm.patchValue({
+              privateRepository: this.repositorySettings.privateRepo,
+              ...this.repositorySettings,
+            });
           } else {
             this.repositorySettings = res as RepoSettingsInfo;
             this.generalSettingsForm.patchValue({

@@ -7,7 +7,7 @@
 
       <div>
         <app-visibility
-          [parentForm]="repoType === 'maven' ? mavenSettingsForm : generalSettingsForm"
+          [parentForm]="repoType === 'maven' || repoType === 'nuget' ? mavenSettingsForm : generalSettingsForm"
           [repoType]="repoType"
           [repoName]="activeRepository?.repoName"
           (fetch)="getRepoSettings()"
@@ -17,7 +17,7 @@
       <div>
         @if (repoType !== 'cargo' && repoType !== 'golang') {
           <app-package-override
-            [parentForm]="repoType === 'maven' ? mavenSettingsForm : generalSettingsForm"
+            [parentForm]="repoType === 'maven' || repoType === 'nuget' ? mavenSettingsForm : generalSettingsForm"
             [repoType]="repoType"
             [repoName]="activeRepository?.repoName"
             (fetch)="getRepoSettings()"
@@ -26,8 +26,13 @@
       </div>
 
       <div>
-        @if (repoType === 'maven') {
-          <app-maven-version-allowence [parentForm]="mavenSettingsForm" (fetch)="getRepoSettings()" />
+        @if (repoType === 'maven' || repoType === 'nuget') {
+          <app-maven-version-allowence
+            [parentForm]="mavenSettingsForm"
+            [repoType]="repoType"
+            [repoName]="activeRepository?.repoName"
+            (fetch)="getRepoSettings()"
+          />
         }
       </div>
 

@@ -29,4 +29,6 @@ export enum RepoSupport {
   ALL = 'all packages',
   SNAPSHOTS = 'snapshots',
   RELEASES = 'releases',
+  PRE_RELEASE = 'pre-release',
+  STABLE = 'stable',
 }

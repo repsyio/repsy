@@ -18,6 +18,7 @@ package io.repsy.protocols.nuget.protocol.facades;
 import static io.repsy.protocols.nuget.shared.mappers.NuGetResponseMapper.toLeafItem;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.FORMAT_JSON;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.buildRegistrationPages;
+import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.checkVersionAllowance;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.copyStreamToFile;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.extractPackageId;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.extractPackageIdAndVersion;
@@ -50,8 +51,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @NullMarked
@@ -94,7 +93,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
       final var metadata = readNuspecMetadata(tempFile);
       final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
-      this.validatePackageTypeAllowed(repoInfo, metadata.version());
+      checkVersionAllowance(metadata.version(), repoInfo);
 
       final var usages = this.storePackage(repoInfo, metadata, tempFile);
       this.doPublish(repoInfo, metadata.packageId(), metadata.version(), metadata.nuspecXml());
@@ -257,22 +256,6 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
 
     return NuGetResponseMapper.toLeafResponse(
         versionInfo, registrationBase, packageBase, packageId);
-  }
-
-  private void validatePackageTypeAllowed(final BaseRepoInfo<ID> repoInfo, final String version) {
-
-    final boolean isPrerelease = version.contains("-");
-
-    if (isPrerelease && Boolean.FALSE.equals(repoInfo.getSnapshots())) {
-      throw new ResponseStatusException(
-          HttpStatus.UNPROCESSABLE_CONTENT,
-          "Pre-release packages are not allowed in this repository.");
-    }
-
-    if (!isPrerelease && Boolean.FALSE.equals(repoInfo.getReleases())) {
-      throw new ResponseStatusException(
-          HttpStatus.UNPROCESSABLE_CONTENT, "Release packages are not allowed in this repository.");
-    }
   }
 
   private String normalizeVersion(final String rawVersion) {

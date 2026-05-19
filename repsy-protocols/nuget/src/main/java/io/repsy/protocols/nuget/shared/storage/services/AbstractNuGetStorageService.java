@@ -141,8 +141,8 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
   }
 
   @Override
-  public long deletePackageVersion(
-      final UUID repoId, final String packageId, final String version) {
+  public long deletePackageVersion(final UUID repoId, final String packageId, final String version)
+      throws IOException {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
     final var normalizedVersion = version.toLowerCase(Locale.ROOT);
