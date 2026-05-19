@@ -15,7 +15,6 @@
  */
 package io.repsy.os.server.protocols.nuget.shared.auth.services;
 
-
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
