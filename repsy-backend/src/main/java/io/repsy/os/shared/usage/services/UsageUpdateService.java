@@ -39,18 +39,15 @@ public class UsageUpdateService {
   }
 
   private void updateRepoUsage(final @NonNull UUID repoId, final long diskUsageDiff) {
+
     final var repo = this.repoTxService.getRepoEntity(repoId);
-    final long currentUsage = repo.getDiskUsage();
-    final long clampedDiff = Math.max(diskUsageDiff, -currentUsage);
 
-    if (clampedDiff != diskUsageDiff) {
-      log.warn(
-          "Repo {} disk usage clamped to 0 (current: {}, diff: {})",
-          repo.getName(),
-          currentUsage,
-          diskUsageDiff);
+    this.repoTxService.updateDiskUsage(repoId, diskUsageDiff);
+
+    final var newDiskUsage = repo.getDiskUsage() + diskUsageDiff;
+
+    if (newDiskUsage < 0) {
+      log.error("Repo {} disk usage is negative: {}", repo.getName(), newDiskUsage);
     }
-
-    this.repoTxService.updateDiskUsage(repoId, clampedDiff);
   }
 }
