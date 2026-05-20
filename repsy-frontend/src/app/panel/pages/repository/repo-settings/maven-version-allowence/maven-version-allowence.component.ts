@@ -89,13 +89,21 @@ export class VersionAllowanceComponent implements OnInit {
 
   private resolveSelectedOption(snapshots: boolean, releases: boolean): RepoSupport {
     if (this.repoType === RepoType.NUGET) {
-      if (snapshots && !releases) {return RepoSupport.PRE_RELEASE;}
-      if (!snapshots && releases) {return RepoSupport.STABLE;}
+      if (snapshots && !releases) {
+        return RepoSupport.PRE_RELEASE;
+      }
+      if (!snapshots && releases) {
+        return RepoSupport.STABLE;
+      }
       return RepoSupport.ALL;
     }
 
-    if (snapshots && !releases) {return RepoSupport.SNAPSHOTS;}
-    if (!snapshots && releases) {return RepoSupport.RELEASES;}
+    if (snapshots && !releases) {
+      return RepoSupport.SNAPSHOTS;
+    }
+    if (!snapshots && releases) {
+      return RepoSupport.RELEASES;
+    }
     return RepoSupport.ALL;
   }
 }

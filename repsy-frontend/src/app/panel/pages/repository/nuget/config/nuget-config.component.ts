@@ -54,7 +54,7 @@ export class NugetConfigComponent implements OnInit, OnChanges {
     this.markdown = `
 **Option A — NuGet.Config (recommended)**
 
-Add source to \`nuget.config\` in your project/solution root *(safe to commit)*:
+Add source to \`NuGet.Config\` in your project/solution root *(safe to commit)*:
 
 \`\`\`xml
 <?xml version="1.0" encoding="utf-8"?>

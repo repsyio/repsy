@@ -86,6 +86,7 @@ public abstract class AbstractNuGetAutocompleteProtocolMethodHandler
 
     try {
       final var q = request.getParameter("q");
+      final var id = request.getParameter("id");
       final var skipStr = request.getParameter("skip");
       final var takeStr = request.getParameter("take");
       final var prerelease = "true".equalsIgnoreCase(request.getParameter("prerelease"));
@@ -94,7 +95,7 @@ public abstract class AbstractNuGetAutocompleteProtocolMethodHandler
       final var take = parseOrDefault(takeStr, 20);
 
       final var results =
-          this.facade.autocomplete(context, q != null ? q : "", skip, take, prerelease);
+          this.facade.autocomplete(context, q != null ? q : "", id, skip, take, prerelease);
 
       return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(results);
     } catch (final Exception e) {

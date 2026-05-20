@@ -129,6 +129,14 @@ export class DashboardContentComponent {
         this.golangRepoCount = c;
         this.cdRef.markForCheck();
       });
+
+    this.protocolRepoControllerService
+      .getCount(RepoType.Nuget)
+      .pipe(map((r) => r.data ?? 0))
+      .subscribe((c) => {
+        this.nugetRepoCount = c;
+        this.cdRef.markForCheck();
+      });
   }
 
   private fetchRepoInfo(repoType: RepoType): void {

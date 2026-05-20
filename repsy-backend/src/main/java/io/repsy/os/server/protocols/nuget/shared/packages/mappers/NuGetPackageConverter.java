@@ -19,6 +19,7 @@ import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
+import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import java.util.Comparator;
 import java.util.List;
 import org.jspecify.annotations.NullMarked;
@@ -48,6 +49,27 @@ public interface NuGetPackageConverter {
   @Mapping(source = "version", target = "version")
   @Mapping(source = "downloadCount", target = "downloads")
   NuGetPackageSearchResult.VersionSummary toVersionSummary(NuGetPackageVersion v);
+
+  default NuGetVersionInfo toVersionInfoWithDeps(
+      final NuGetPackageVersion v, final String packageId) {
+
+    final var base = toVersionInfo(v, packageId);
+    final var deps = NuGetPackageUtils.parseDependenciesJson(v.getDependencies());
+    return new NuGetVersionInfo(
+        base.packageId(),
+        base.version(),
+        base.title(),
+        base.description(),
+        base.authors(),
+        base.tags(),
+        base.iconUrl(),
+        base.licenseUrl(),
+        base.projectUrl(),
+        base.listed(),
+        base.downloadCount(),
+        base.publishedAt(),
+        deps.isEmpty() ? null : deps);
+  }
 
   default NuGetPackageSearchResult toSearchResult(
       final NuGetPackage pkg,

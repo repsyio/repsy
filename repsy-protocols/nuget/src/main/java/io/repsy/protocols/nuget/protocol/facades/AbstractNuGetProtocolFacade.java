@@ -51,6 +51,7 @@ import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -79,7 +80,8 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   }
 
   @Override
-  public NuGetServiceIndexResponse getServiceIndex(final ProtocolContext context, final String baseUrl) {
+  public NuGetServiceIndexResponse getServiceIndex(
+      final ProtocolContext context, final String baseUrl) {
 
     return new NuGetServiceIndexResponse(NUGET_CONTEXT, SUPPORTED_VERSION, build(baseUrl));
   }
@@ -209,13 +211,22 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   public NuGetAutocompleteResponse autocomplete(
       final ProtocolContext context,
       final String q,
+      final @Nullable String id,
       final int skip,
       final int take,
       final boolean prerelease) {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var results = this.packageService.autocomplete(repoInfo, q, skip, take, prerelease);
 
+    if (id != null && !id.isBlank()) {
+      List<String> versions = this.packageService.getVersions(repoInfo, id);
+      if (!prerelease) {
+        versions = versions.stream().filter(v -> !v.contains("-")).toList();
+      }
+      return new NuGetAutocompleteResponse(versions.size(), versions);
+    }
+
+    final var results = this.packageService.autocomplete(repoInfo, q, skip, take, prerelease);
     return new NuGetAutocompleteResponse(results.size(), results);
   }
 

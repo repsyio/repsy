@@ -15,8 +15,6 @@
  */
 package io.repsy.os.server.protocols.nuget.shared.packages.services;
 
-import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.checkVersionAllowance;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.generated.model.NuGetDeletedItem;
@@ -37,21 +35,23 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Component
 @Transactional(readOnly = true)
-@RequiredArgsConstructor
 @NullMarked
 public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
@@ -64,6 +64,26 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   private final NuGetPackageConverter converter;
   private final ObjectMapper objectMapper;
 
+  // Using for escape from spring proxy problem in same class.
+  private final TransactionTemplate requiresNewTx;
+
+  public NuGetPackageServiceImpl(
+      final RepoRepository repoRepository,
+      final NuGetPackageRepository packageRepository,
+      final NuGetPackageVersionRepository packageVersionRepository,
+      final NuGetPackageConverter converter,
+      final ObjectMapper objectMapper,
+      final PlatformTransactionManager txManager) {
+
+    this.repoRepository = repoRepository;
+    this.packageRepository = packageRepository;
+    this.packageVersionRepository = packageVersionRepository;
+    this.converter = converter;
+    this.objectMapper = objectMapper;
+    this.requiresNewTx = new TransactionTemplate(txManager);
+    this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+  }
+
   @Override
   @Transactional
   public void publish(
@@ -72,18 +92,8 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final String version,
       final String nuspecXml) {
 
-    checkVersionAllowance(version, repoInfo);
-
-    final var repo =
-        this.repoRepository
-            .findById(repoInfo.getId())
-            .orElseThrow(() -> new IllegalArgumentException("Repository not found"));
-
-    final var pkg =
-        this.packageRepository.findByRepoIdAndPackageIdIgnoreCase(
-            repoInfo.getId(), packageId.toLowerCase(Locale.ROOT));
-
-    final var nugetPackage = pkg.orElseGet(() -> this.crateNuGetPackage(repo, packageId));
+    final var repo = this.findRepoById(repoInfo.getId());
+    final var nugetPackage = this.findPackageByRepoIdAndPackageId(repo, packageId);
 
     final var existingVersion =
         this.packageVersionRepository.findByNugetPackageIdAndVersion(nugetPackage.getId(), version);
@@ -161,25 +171,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
             pkg ->
                 this.packageVersionRepository.findByNugetPackageIdAndVersionIgnoreCase(
                     pkg.getId(), version))
-        .map(
-            v -> {
-              final var base = this.converter.toVersionInfo(v, packageId);
-              final var deps = NuGetPackageUtils.parseDependenciesJson(v.getDependencies());
-              return new NuGetVersionInfo(
-                  base.packageId(),
-                  base.version(),
-                  base.title(),
-                  base.description(),
-                  base.authors(),
-                  base.tags(),
-                  base.iconUrl(),
-                  base.licenseUrl(),
-                  base.projectUrl(),
-                  base.listed(),
-                  base.downloadCount(),
-                  base.publishedAt(),
-                  deps.isEmpty() ? null : deps);
-            });
+        .map(v -> this.converter.toVersionInfoWithDeps(v, packageId));
   }
 
   @Override
@@ -337,13 +329,36 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
         .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
   }
 
-  private NuGetPackage crateNuGetPackage(final Repo repo, final String packageId) {
+  private Repo findRepoById(final UUID id) {
+    return this.repoRepository
+        .findById(id)
+        .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
+  }
 
-    final var newPkg = new NuGetPackage();
-    newPkg.setRepo(repo);
-    newPkg.setPackageId(packageId.toLowerCase(Locale.ROOT));
+  private NuGetPackage findPackageByRepoIdAndPackageId(final Repo repo, final String packageId) {
 
-    return this.packageRepository.save(newPkg);
+    final var normalizedId = packageId.toLowerCase(Locale.ROOT);
+
+    return this.packageRepository
+        .findByRepoIdAndPackageIdIgnoreCase(repo.getId(), normalizedId)
+        .orElseGet(() -> this.createOrFindPackage(repo, normalizedId));
+  }
+
+  private NuGetPackage createOrFindPackage(final Repo repo, final String packageId) {
+
+    try {
+      return this.requiresNewTx.execute(
+          _ -> {
+            final var pkg = new NuGetPackage();
+            pkg.setRepo(repo);
+            pkg.setPackageId(packageId);
+            return this.packageRepository.save(pkg);
+          });
+    } catch (final DataIntegrityViolationException e) {
+      return this.packageRepository
+          .findByRepoIdAndPackageIdIgnoreCase(repo.getId(), packageId)
+          .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
+    }
   }
 
   private NuGetPackageVersion createNuGetPackageVersion(

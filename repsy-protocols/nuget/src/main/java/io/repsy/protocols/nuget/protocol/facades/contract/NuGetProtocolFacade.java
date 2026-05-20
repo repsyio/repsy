@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
 @NullMarked
@@ -42,7 +43,12 @@ public interface NuGetProtocolFacade {
       ProtocolContext context, String q, int skip, int take, boolean prerelease, String baseUrl);
 
   NuGetAutocompleteResponse autocomplete(
-      ProtocolContext context, String q, int skip, int take, boolean prerelease);
+      ProtocolContext context,
+      String q,
+      @Nullable String id,
+      int skip,
+      int take,
+      boolean prerelease);
 
   NuGetRegistrationIndexResponse getRegistrationIndex(ProtocolContext context, String baseUrl);
 
