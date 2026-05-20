@@ -15,6 +15,8 @@
  */
 package io.repsy.protocols.nuget.shared.mappers;
 
+import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.NUGET_CONTEXT;
+
 import io.repsy.protocols.nuget.shared.dtos.NuGetCatalogDependency;
 import io.repsy.protocols.nuget.shared.dtos.NuGetCatalogEntry;
 import io.repsy.protocols.nuget.shared.dtos.NuGetDependencyGroup;
@@ -155,7 +157,7 @@ public final class NuGetResponseMapper {
     final var packageContent = NuGetUrlBuilder.nupkgUrl(packageBase, idLower, vLower);
 
     return new NuGetRegistrationLeafResponse(
-        "https://schema.nuget.org/schema#",
+        NUGET_CONTEXT,
         leafUrl,
         "Package",
         toCatalogEntry(v, packageId, leafUrl),

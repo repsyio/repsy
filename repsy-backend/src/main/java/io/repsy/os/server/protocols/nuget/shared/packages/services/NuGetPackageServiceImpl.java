@@ -276,6 +276,20 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   }
 
   @Override
+  public boolean versionExists(
+      final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
+
+    return this.packageRepository
+        .findByRepoIdAndPackageIdIgnoreCase(repoInfo.getId(), packageId.toLowerCase(Locale.ROOT))
+        .map(
+            pkg ->
+                this.packageVersionRepository
+                    .findByNugetPackageIdAndVersion(pkg.getId(), version)
+                    .isPresent())
+        .orElse(false);
+  }
+
+  @Override
   @Transactional
   public void deletePackage(final BaseRepoInfo<UUID> repoInfo, final String packageId) {
 

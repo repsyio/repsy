@@ -34,6 +34,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -56,9 +57,13 @@ import tools.jackson.databind.ObjectMapper;
 @UtilityClass
 public final class NuGetPackageUtils {
 
+  public static final String FORMAT_JSON = ".json";
+  public static final Map<String, String> NUGET_CONTEXT =
+      Map.of(
+          "@vocab", "http://schema.nuget.org/schema#",
+          "comment", "http://www.w3.org/2000/01/rdf-schema#comment");
   private static final int THREE = 3;
   private static final int FOUR = 4;
-  public static final String FORMAT_JSON = ".json";
   private static final int REGISTRATION_PAGE_SIZE = 64;
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 

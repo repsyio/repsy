@@ -25,8 +25,8 @@ public final class NuGetUrlBuilder {
 
   private static final int PORT_HTTPS = 443;
   private static final int PORT_HTTP = 80;
-  private static final String PROTO_HTTPS = "HTTPS";
-  private static final String PROTO_HTTP = "HTTP";
+  private static final String PROTO_HTTPS = "https";
+  private static final String PROTO_HTTP = "http";
 
   public static String registrationBase(final String baseUrl, final String idLower) {
 

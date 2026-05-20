@@ -17,10 +17,11 @@ package io.repsy.protocols.nuget.shared.dtos;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
+import java.util.Map;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked
 public record NuGetServiceIndexResponse(
-    @JsonProperty("@context") String context,
+    @JsonProperty("@context") Map<String, String> context,
     String version,
     @JsonProperty("resources") List<NuGetServiceIndexResource> resources) {}

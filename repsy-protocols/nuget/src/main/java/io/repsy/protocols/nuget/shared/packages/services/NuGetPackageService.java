@@ -31,6 +31,8 @@ public interface NuGetPackageService<ID> {
   void publish(BaseRepoInfo<ID> repoInfo, String packageId, String version, String nuspecXml)
       throws IOException;
 
+  boolean versionExists(BaseRepoInfo<ID> repoInfo, String packageId, String version);
+
   void incrementDownloadCount(BaseRepoInfo<ID> repoInfo, String packageId, String version);
 
   void unlistVersion(BaseRepoInfo<ID> repoInfo, String packageId, String version);

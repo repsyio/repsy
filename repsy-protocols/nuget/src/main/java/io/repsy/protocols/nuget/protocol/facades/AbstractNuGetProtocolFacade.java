@@ -17,6 +17,7 @@ package io.repsy.protocols.nuget.protocol.facades;
 
 import static io.repsy.protocols.nuget.shared.mappers.NuGetResponseMapper.toLeafItem;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.FORMAT_JSON;
+import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.NUGET_CONTEXT;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.buildRegistrationPages;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.checkVersionAllowance;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.copyStreamToFile;
@@ -51,6 +52,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @NullMarked
@@ -59,8 +62,9 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
 
   private final NuGetStorageService storageService;
   private final NuGetPackageService<ID> packageService;
+
   public static final String USAGES = "usages";
-  public static final String NUGET_SCHEMA = "https://schema.nuget.org/schema#";
+  public static final String SUPPORTED_VERSION = "3.0.0";
   private static final List<String> REGISTRATION_INDEX_TYPES =
       List.of("catalog:CatalogRoot", "PackageRegistration", "catalog:Permalink");
 
@@ -75,10 +79,9 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   }
 
   @Override
-  public NuGetServiceIndexResponse getServiceIndex(
-      final ProtocolContext context, final String baseUrl) {
+  public NuGetServiceIndexResponse getServiceIndex(final ProtocolContext context, final String baseUrl) {
 
-    return new NuGetServiceIndexResponse(NUGET_SCHEMA, "3.0.0", build(baseUrl));
+    return new NuGetServiceIndexResponse(NUGET_CONTEXT, SUPPORTED_VERSION, build(baseUrl));
   }
 
   @Override
@@ -95,6 +98,19 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
 
       checkVersionAllowance(metadata.version(), repoInfo);
 
+      // Fail fast before writing to storage — avoids orphan disk writes when override is denied
+      if (!repoInfo.isAllowOverride()
+          && this.packageService.versionExists(
+              repoInfo, metadata.packageId(), metadata.version())) {
+        throw new ResponseStatusException(
+            HttpStatus.CONFLICT,
+            "Version "
+                + metadata.version()
+                + " of package "
+                + metadata.packageId()
+                + " already exists.");
+      }
+
       final var usages = this.storePackage(repoInfo, metadata, tempFile);
       this.doPublish(repoInfo, metadata.packageId(), metadata.version(), metadata.nuspecXml());
 
@@ -102,6 +118,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
           "Successfully published and stored NuGet package {} {}",
           metadata.packageId(),
           metadata.version());
+
       context.addProperty(USAGES, usages);
     } finally {
       Files.deleteIfExists(tempFile);
@@ -130,7 +147,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
     try {
       this.packageService.incrementDownloadCount(repoInfo, packageId, packageIdVersion.version());
     } catch (final Exception e) {
-      log.warn(
+      log.debug(
           "Failed to increment download count for {} {}: {}",
           packageId,
           packageIdVersion.version(),
@@ -216,7 +233,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
 
     if (versionInfos.isEmpty()) {
       return new NuGetRegistrationIndexResponse(
-          NUGET_SCHEMA, indexUrl, REGISTRATION_INDEX_TYPES, 0, List.of());
+          NUGET_CONTEXT, indexUrl, REGISTRATION_INDEX_TYPES, 0, List.of());
     }
 
     final var packageBase = NuGetUrlBuilder.packageBase(baseUrl, idLower);
@@ -229,7 +246,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
     final var pages = buildRegistrationPages(leafItems, indexUrl);
 
     return new NuGetRegistrationIndexResponse(
-        NUGET_SCHEMA, indexUrl, REGISTRATION_INDEX_TYPES, pages.size(), pages);
+        NUGET_CONTEXT, indexUrl, REGISTRATION_INDEX_TYPES, pages.size(), pages);
   }
 
   @Override
@@ -270,14 +287,15 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
       final BaseRepoInfo<ID> repoInfo, final NuspecMetadata metadata, final Path tempFile)
       throws IOException {
 
-    final byte[] nuspecBytes = metadata.nuspecXml().getBytes(StandardCharsets.UTF_8);
+    final var nuspecBytes = metadata.nuspecXml().getBytes(StandardCharsets.UTF_8);
 
-    try (final var nupkgStream = Files.newInputStream(tempFile)) {
+    try (final var nuPkgStream = Files.newInputStream(tempFile)) {
+
       return this.storageService.writePackage(
           repoInfo.getStorageKey(),
           metadata.packageId(),
           metadata.version(),
-          nupkgStream,
+          nuPkgStream,
           nuspecBytes);
     }
   }
