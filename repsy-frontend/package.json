@@ -54,7 +54,7 @@
     "showdown-highlight": "^3.1.0",
     "ts-md5": "^2.0.1",
     "tslib": "^2.8.1",
-    "zone.js": "~0.16.0"
+    "zone.js": "~0.16.2"
   },
   "devDependencies": {
     "@angular-eslint/builder": "^21.1.0",
