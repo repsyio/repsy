@@ -68,7 +68,19 @@
       class="flex h-[43px] items-center justify-between rounded-[12px] border border-[#101112] bg-linear-to-b from-[rgba(17,16,16,0.6)] to-[#1D1C1C] px-[20px] hover:border-[#404141]"
     >
       <div class="text-[13px] text-[#FDFDFD]">{{ cargoRepoCount }} / Repositories are in use.</div>
-      <img src="assets/icons/cargo/cargo_light.svg" width="23" height="60" />
+      <img src="assets/icons/cargo/cargo_light.svg" width="23" height="60" alt="cargo" />
+    </a>
+
+    <!-- NuGet Row -->
+    <a
+      href="javascript:void(0)"
+      (click)="routeNuget()"
+      class="flex h-[43px] items-center justify-between rounded-[12px] border border-[#101112] bg-linear-to-b from-[rgba(17,16,16,0.6)] to-[#1D1C1C] px-[20px] hover:border-[#404141]"
+    >
+      <div class="text-[13px] text-[#FDFDFD]">{{ nugetRepoCount }} / Repositories are in use.</div>
+      <div class="h-[24px] w-[24px]">
+        <img ngSrc="/assets/icons/nuget/nuget-light.svg" alt="NuGet" height="24" width="24" />
+      </div>
     </a>
   </div>
 </div>

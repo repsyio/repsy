@@ -20,9 +20,9 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
+import { LoginInfo } from '../../../../../generated/api';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
-import { LoginInfo } from '../../../../../generated/api';
 import { ProfileService } from '../service/profile.service';
 
 class PasswordFormUiInputElement {
@@ -117,11 +117,13 @@ export class AccountInfoComponent implements OnInit {
 
       this.profileFacadeService
         .updatePassword(this.passwordForm.value.newPassword)
-        .pipe(finalize(() => {
-          this.passwordForm.enable();
-          this.passwordForm.reset();
-          this.loading = false;
-        }))
+        .pipe(
+          finalize(() => {
+            this.passwordForm.enable();
+            this.passwordForm.reset();
+            this.loading = false;
+          }),
+        )
         .subscribe({
           next: () => {
             this.toastService.show('Your password updated successfully', 'success');
@@ -146,10 +148,12 @@ export class AccountInfoComponent implements OnInit {
 
       this.profileFacadeService
         .updateUsername(newUsername)
-        .pipe(finalize(() => {
-          this.usernameForm.enable();
-          this.loading = false;
-        }))
+        .pipe(
+          finalize(() => {
+            this.usernameForm.enable();
+            this.loading = false;
+          }),
+        )
         .subscribe({
           next: (loginInfo: LoginInfo) => {
             localStorage.setItem('username', newUsername);

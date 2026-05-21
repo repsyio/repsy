@@ -119,10 +119,12 @@ export class UserCreateModalComponent {
 
     this.userControllerService
       .createUser(payload)
-      .pipe(finalize(() => {
-        this.form.enable();
-        this.loading = false;
-      }))
+      .pipe(
+        finalize(() => {
+          this.form.enable();
+          this.loading = false;
+        }),
+      )
       .subscribe(() => {
         this.toastService.show('User created successfully.', 'success');
         this.closeModal();

@@ -20,13 +20,10 @@ import { ReactiveFormsModule } from '@angular/forms';
 import moment, { Moment } from 'moment';
 import { finalize } from 'rxjs/operators';
 
+import { DeployTokenForm, ProtocolDeployTokenControllerService } from '../../../../../../generated/api';
 import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dto/token-create-info';
-import {
-  DeployTokenForm,
-  ProtocolDeployTokenControllerService,
-} from '../../../../../../generated/api';
-import { ToastService } from '../../toast/toast.service';
 import { RadioGroupComponent, RadioOption } from '../../radio-group/radio-group.component';
+import { ToastService } from '../../toast/toast.service';
 
 @Component({
   selector: 'app-deploy-token-modal',
@@ -99,17 +96,23 @@ export class DeployTokenCreateModalComponent implements OnInit {
       return;
     }
 
-    this.protocolDeployTokenControllerService.createDeployToken(this.repoName, payload).pipe(
-      finalize(() => { this.form.enable(); this.loading = false; }),
-    ).subscribe({
-      next: (r) => {
-        const tokenInfo = r.data as unknown as TokenCreateInfo;
-        this.closeModal();
-        this.created.emit(tokenInfo);
-        this.toastService.show('Deploy token created successfully.', 'success');
-      },
-      error: () => {},
-    });
+    this.protocolDeployTokenControllerService
+      .createDeployToken(this.repoName, payload)
+      .pipe(
+        finalize(() => {
+          this.form.enable();
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (r) => {
+          const tokenInfo = r.data as unknown as TokenCreateInfo;
+          this.closeModal();
+          this.created.emit(tokenInfo);
+          this.toastService.show('Deploy token created successfully.', 'success');
+        },
+        error: () => {},
+      });
   }
 
   private preparePayload(): DeployTokenForm | null {

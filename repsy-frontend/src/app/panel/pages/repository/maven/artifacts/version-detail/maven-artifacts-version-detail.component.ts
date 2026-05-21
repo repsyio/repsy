@@ -23,11 +23,11 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { ArtifactVersionInfo, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo, ArtifactVersionInfo } from '../../../../../../../generated/api';
 import { MavenService } from '../../service/maven.service';
 
 @Component({
@@ -86,49 +86,59 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
     this.artifactName = this.route.snapshot.paramMap.get('artifact');
     this.versionName = this.route.snapshot.paramMap.get('version');
 
-    this.mavenService.fetchArtifactVersion(this.groupName, this.artifactName, this.versionName).pipe(
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (data) => {
-        this.version = data;
-        this.mavenDependencyHtml = `<dependency>
+    this.mavenService
+      .fetchArtifactVersion(this.groupName, this.artifactName, this.versionName)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (data) => {
+          this.version = data;
+          this.mavenDependencyHtml = `<dependency>
   <groupId>${this.version.artifactGroupName}</groupId>
   <artifactId>${this.version.artifactName}</artifactId>
   <version>${this.version.artifactVersionName}</version>
 </dependency>`;
-        this.gradleDependencyHtml = `implementation '${this.version.artifactGroupName}:${this.version.artifactName}:${this.version.artifactVersionName}'`;
-        this.gradleKotlinDependencyHtml = `implementation("${this.version.artifactGroupName}:${this.version.artifactName}:${this.version.artifactVersionName}")`;
-        this.sbtDependencyHtml = `libraryDependencies += "${this.version.artifactGroupName}" % "${this.version.artifactName}" % "${this.version.artifactVersionName}"`;
-        this.ivyDependencyHtml = `<dependency org="${this.version.artifactGroupName}" name="${this.version.artifactName}" rev="${this.version.artifactVersionName}" />`;
-        this.groovyDependencyHtml = `@Grapes(
+          this.gradleDependencyHtml = `implementation '${this.version.artifactGroupName}:${this.version.artifactName}:${this.version.artifactVersionName}'`;
+          this.gradleKotlinDependencyHtml = `implementation("${this.version.artifactGroupName}:${this.version.artifactName}:${this.version.artifactVersionName}")`;
+          this.sbtDependencyHtml = `libraryDependencies += "${this.version.artifactGroupName}" % "${this.version.artifactName}" % "${this.version.artifactVersionName}"`;
+          this.ivyDependencyHtml = `<dependency org="${this.version.artifactGroupName}" name="${this.version.artifactName}" rev="${this.version.artifactVersionName}" />`;
+          this.groovyDependencyHtml = `@Grapes(
   @Grab(group='${this.version.artifactGroupName}', module='${this.version.artifactName}', version='${this.version.artifactVersionName}')
 )`;
-        this.leiningenDependencyHtml = `[${this.version.artifactGroupName}/${this.version.artifactName} "${this.version.artifactVersionName}"]`;
-        this.buildrDependencyHtml = `'${this.version.artifactGroupName}:${this.version.artifactName}:jar:${this.version.artifactVersionName}'`;
-        this.purlDependencyHtml = `pkg:maven/${this.version.artifactGroupName}/${this.version.artifactName}@${this.version.artifactVersionName}`;
-        this.bazelDependencyHtml = `maven_jar(
+          this.leiningenDependencyHtml = `[${this.version.artifactGroupName}/${this.version.artifactName} "${this.version.artifactVersionName}"]`;
+          this.buildrDependencyHtml = `'${this.version.artifactGroupName}:${this.version.artifactName}:jar:${this.version.artifactVersionName}'`;
+          this.purlDependencyHtml = `pkg:maven/${this.version.artifactGroupName}/${this.version.artifactName}@${this.version.artifactVersionName}`;
+          this.bazelDependencyHtml = `maven_jar(
   name = "${this.version.artifactName}",
   artifact = "${this.version.artifactGroupName}:${this.version.artifactName}:${this.version.artifactVersionName}",
   sha1 = "calculating...",
 )`;
-      },
-      error: () => {},
-    });
+        },
+        error: () => {},
+      });
   }
 
   public deleteVersion() {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
-      this.mavenService.deleteVersion(this.groupName, this.artifactName, this.version.artifactVersionName).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
-            this.toastService.show('Version deleted successfully', 'success');
-          });
-        },
-        error: () => {},
-      });
+      this.mavenService
+        .deleteVersion(this.groupName, this.artifactName, this.version.artifactVersionName)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+              this.toastService.show('Version deleted successfully', 'success');
+            });
+          },
+          error: () => {},
+        });
     });
   }
 }

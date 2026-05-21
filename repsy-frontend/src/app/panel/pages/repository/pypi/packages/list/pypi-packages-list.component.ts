@@ -22,6 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { PypiPackageListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -36,7 +37,6 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { PypiConfigComponent } from '../../config/pypi-config.component';
-import { RepoPermissionInfo, PypiPackageListItem } from '../../../../../../../generated/api';
 import { PypiService } from '../../service/pypi.service';
 
 @Component({
@@ -134,15 +134,20 @@ export class PypiPackagesListComponent implements OnDestroy {
   public deletePackage(pck: PypiPackageListItem) {
     this.dangerModalService.show('Delete Package', 'Delete', () => {
       this.loading = true;
-      this.pypiService.deletePackage(pck.name).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          this.refreshPage();
-          this.toastService.show('Package deleted successfully', 'success');
-        },
-        error: () => {},
-      });
+      this.pypiService
+        .deletePackage(pck.name)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.refreshPage();
+            this.toastService.show('Package deleted successfully', 'success');
+          },
+          error: () => {},
+        });
     });
   }
 
@@ -151,7 +156,11 @@ export class PypiPackagesListComponent implements OnDestroy {
 
     this.pypiService
       .fetchRepositoryPackagesLikeName(this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .pipe(finalize(() => { this.loading = false; }))
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
       .subscribe({
         next: (pagedData: PagedData<PypiPackageListItem>) => {
           this.pagedData.page = pagedData.page;

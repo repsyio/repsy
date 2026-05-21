@@ -19,14 +19,14 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
-import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
-import { ToastService } from '../../../../shared/components/toast/toast.service';
 import {
   ProtocolRepoControllerService,
   RepoDescriptionForm,
   RepoPermissionInfo,
   RepoRenameForm,
 } from '../../../../../../generated/api';
+import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 
 @Component({
   selector: 'app-repo-info',
@@ -74,15 +74,21 @@ export class RepoInfoComponent implements OnInit {
       this.loading = true;
       this.renameForm.disable();
 
-      this.protocolRepoControllerService.rename(this.activeRepository.repoName, form).pipe(
-        finalize(() => { this.loading = false; this.renameForm.enable(); }),
-      ).subscribe({
-        next: () => {
-          this.router.navigate([this.renameForm.get('name').value, 'settings']);
-          this.toastService.show('Repository renamed successfully', 'success');
-        },
-        error: () => {},
-      });
+      this.protocolRepoControllerService
+        .rename(this.activeRepository.repoName, form)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+            this.renameForm.enable();
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.router.navigate([this.renameForm.get('name').value, 'settings']);
+            this.toastService.show('Repository renamed successfully', 'success');
+          },
+          error: () => {},
+        });
     });
   }
 
@@ -92,16 +98,22 @@ export class RepoInfoComponent implements OnInit {
     this.loading = true;
     this.renameForm.disable();
 
-    this.protocolRepoControllerService.updateDescription(this.activeRepository.repoName, form).pipe(
-      finalize(() => { this.loading = false; this.renameForm.enable(); }),
-    ).subscribe({
-      next: () => {
-        this.toastService.show('Repository description updated successfully', 'success');
-        this.activeRepository.description = form.description;
-        this.resetDescriptionForm();
-      },
-      error: () => {},
-    });
+    this.protocolRepoControllerService
+      .updateDescription(this.activeRepository.repoName, form)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+          this.renameForm.enable();
+        }),
+      )
+      .subscribe({
+        next: () => {
+          this.toastService.show('Repository description updated successfully', 'success');
+          this.activeRepository.description = form.description;
+          this.resetDescriptionForm();
+        },
+        error: () => {},
+      });
   }
 
   public resetForms() {

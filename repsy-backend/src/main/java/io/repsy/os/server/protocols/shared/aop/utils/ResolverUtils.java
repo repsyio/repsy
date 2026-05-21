@@ -16,7 +16,9 @@
 package io.repsy.os.server.protocols.shared.aop.utils;
 
 import static org.springframework.web.context.request.RequestAttributes.SCOPE_REQUEST;
+import static org.springframework.web.servlet.HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.generated.model.RepoPermissionInfo;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -37,9 +39,23 @@ public class ResolverUtils {
   public static final String REPO_TYPE = "repoType";
   public static final String REPO_NAME = "repoName";
 
-  public static RepoInfo extractRepoInfo(final NativeWebRequest webRequest) {
+  @SuppressWarnings("unchecked")
+  public static Map<String, String> getUrlVariables(final NativeWebRequest webRequest) {
 
-    return (RepoInfo) Objects.requireNonNull(webRequest.getAttribute(REPO_INFO, SCOPE_REQUEST));
+    final var uriVariables =
+        (Map<String, String>)
+            webRequest.getAttribute(URI_TEMPLATE_VARIABLES_ATTRIBUTE, SCOPE_REQUEST);
+
+    if (uriVariables == null) {
+      throw new ItemNotFoundException("repoNotFound");
+    }
+
+    return uriVariables;
+  }
+
+  public static @Nullable RepoInfo extractRepoInfo(final NativeWebRequest webRequest) {
+
+    return (RepoInfo) webRequest.getAttribute(REPO_INFO, SCOPE_REQUEST);
   }
 
   public static RepoPermissionInfo extractRepoPermissionInfo(final NativeWebRequest webRequest) {
@@ -58,5 +74,28 @@ public class ResolverUtils {
     final var repoType = uriVariables.get(REPO_TYPE);
 
     return RepoType.fromString(repoType);
+  }
+
+  public static Optional<RepoType> extractProtocolRepoType(final Map<String, String> uriVariables) {
+
+    final var repoType = uriVariables.get(REPO_TYPE);
+
+    return RepoType.fromString(repoType);
+  }
+
+  public static RepoType getRepoTypeIfExists(
+      final NativeWebRequest webRequest, final @Nullable RepoInfo repoInfo) {
+
+    if (repoInfo != null) {
+      return repoInfo.getType();
+    }
+
+    final var repoTypeOpt = extractProtocolRepoType(getUrlVariables(webRequest));
+
+    if (repoTypeOpt.isEmpty()) {
+      throw new ItemNotFoundException("repoTypeNotFound");
+    }
+
+    return repoTypeOpt.get();
   }
 }

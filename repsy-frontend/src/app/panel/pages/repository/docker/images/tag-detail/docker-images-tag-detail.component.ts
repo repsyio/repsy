@@ -22,12 +22,12 @@ import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
 import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
+import { RepoPermissionInfo, TagDetail } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { getRepoDomain } from '../../docker-repo-util';
-import { RepoPermissionInfo, TagDetail } from '../../../../../../../generated/api';
 import { DockerService } from '../../service/docker.service';
 
 type Classifiers = Record<string, [string]>;
@@ -75,24 +75,31 @@ export class DockerImagesTagDetailComponent {
   public loadTag(): void {
     this.loading = true;
 
-    this.dockerService.fetchTag(this.imageName, this.tagName).pipe(
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (tagInfo: TagDetail) => {
-        this.installText = `docker pull ${getRepoDomain()}/${this.activeRepo.repoName}/${tagInfo.imageName}:${tagInfo.name}`;
-        this.tagInfo = tagInfo;
-        this.loadManifestText(tagInfo.digest);
-        this.loadConfigText(tagInfo.configDigest);
-      },
-      error: () => {},
-    });
+    this.dockerService
+      .fetchTag(this.imageName, this.tagName)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (tagInfo: TagDetail) => {
+          this.installText = `docker pull ${getRepoDomain()}/${this.activeRepo.repoName}/${tagInfo.imageName}:${tagInfo.name}`;
+          this.tagInfo = tagInfo;
+          this.loadManifestText(tagInfo.digest);
+          this.loadConfigText(tagInfo.configDigest);
+        },
+        error: () => {},
+      });
   }
 
   public loadManifestText(digest: string): void {
     const imageName = this.route.snapshot.paramMap.get('image');
 
     this.dockerService.fetchManifestText(imageName, digest).subscribe({
-      next: (manifestText: string) => { this.manifestText = manifestText; },
+      next: (manifestText: string) => {
+        this.manifestText = manifestText;
+      },
       error: () => {},
     });
   }
@@ -105,7 +112,9 @@ export class DockerImagesTagDetailComponent {
     const imageName = this.route.snapshot.paramMap.get('image');
 
     this.dockerService.fetchConfigText(imageName, configDigest).subscribe({
-      next: (configText: string) => { this.configText = JSON.stringify(JSON.parse(configText), null, 2); },
+      next: (configText: string) => {
+        this.configText = JSON.stringify(JSON.parse(configText), null, 2);
+      },
       error: () => {},
     });
   }
@@ -113,16 +122,21 @@ export class DockerImagesTagDetailComponent {
   public deleteTag() {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
-      this.dockerService.deleteTag(this.imageName, this.tagName).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
-            this.toastService.show('Tag deleted successfully', 'success');
-          });
-        },
-        error: () => {},
-      });
+      this.dockerService
+        .deleteTag(this.imageName, this.tagName)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+              this.toastService.show('Tag deleted successfully', 'success');
+            });
+          },
+          error: () => {},
+        });
     });
   }
 }

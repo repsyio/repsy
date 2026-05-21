@@ -16,7 +16,7 @@
 
 import { isPlatformBrowser } from '@angular/common';
 import { Inject, Injectable, PLATFORM_ID } from '@angular/core';
-import { Observable, map, throwError } from 'rxjs';
+import { map, Observable, throwError } from 'rxjs';
 
 import { LoginForm } from '../../../../generated/api';
 import { AuthControllerService } from '../../../../generated/api/api/auth-controller.service';
@@ -56,7 +56,7 @@ export class AuthService {
 
   public logIn(form: LoginForm): Observable<void> {
     return this.authControllerService.login(form).pipe(
-      map(r => {
+      map((r) => {
         this._update(r.data!.username!, r.data!.token!, r.data!.refreshToken!);
       }),
     );
@@ -67,7 +67,7 @@ export class AuthService {
       return throwError(new Error('No refresh token presents.'));
     }
     return this.authControllerService.refreshToken({ refreshToken: this._refreshToken }).pipe(
-      map(r => {
+      map((r) => {
         this._update(r.data!.username!, r.data!.token!, r.data!.refreshToken!);
         return r.data!.token!;
       }),

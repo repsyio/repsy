@@ -22,10 +22,13 @@ export enum RepoType {
   DOCKER = 'docker',
   CARGO = 'cargo',
   GOLANG = 'golang',
+  NUGET = 'nuget',
 }
 
 export enum RepoSupport {
   ALL = 'all packages',
   SNAPSHOTS = 'snapshots',
   RELEASES = 'releases',
+  PRE_RELEASE = 'pre-release',
+  STABLE = 'stable',
 }

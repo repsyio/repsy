@@ -18,10 +18,10 @@ import { ChangeDetectorRef, Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { forkJoin, map, of, switchMap } from 'rxjs';
 
-import { RepositoryCreateModalComponent } from '../../../shared/components/modals/repository-create-modal/repository-create-modal.component';
 import { RepoListInfo, RepoType, TotalUsageInfo } from '../../../../../generated/api';
 import { ProtocolRepoControllerService } from '../../../../../generated/api';
 import { UsageControllerService } from '../../../../../generated/api';
+import { RepositoryCreateModalComponent } from '../../../shared/components/modals/repository-create-modal/repository-create-modal.component';
 import { RecentActivityComponent } from '../recent-activity/recent-activity.component';
 import { RepositoryCardComponent } from '../repository-card/repository-card.component';
 import { TotalDiskComponent } from '../total-disk/total-disk.component';
@@ -53,6 +53,7 @@ export class DashboardContentComponent {
   public dockerRepoCount = 0;
   public cargoRepoCount = 0;
   public golangRepoCount = 0;
+  public nugetRepoCount = 0;
   public repositories: Repository[] = [];
   public repoListInfos: RepoListInfo[] = [];
   public createRepoModal: boolean;
@@ -62,9 +63,10 @@ export class DashboardContentComponent {
     private readonly usageControllerService: UsageControllerService,
     private readonly cdRef: ChangeDetectorRef,
   ) {
-    this.usageControllerService.getTotalUsage()
-      .pipe(map(r => r.data))
-      .subscribe(usage => {
+    this.usageControllerService
+      .getTotalUsage()
+      .pipe(map((r) => r.data))
+      .subscribe((usage) => {
         if (!usage) {
           return;
         }
@@ -80,53 +82,86 @@ export class DashboardContentComponent {
   }
 
   private fetchRepoCounts(): void {
-    this.protocolRepoControllerService.getCount(RepoType.Npm)
-      .pipe(map(r => r.data ?? 0))
-      .subscribe(c => { this.npmRegistryCount = c; this.cdRef.markForCheck(); });
+    this.protocolRepoControllerService
+      .getCount(RepoType.Npm)
+      .pipe(map((r) => r.data ?? 0))
+      .subscribe((c) => {
+        this.npmRegistryCount = c;
+        this.cdRef.markForCheck();
+      });
 
-    this.protocolRepoControllerService.getCount(RepoType.Pypi)
-      .pipe(map(r => r.data ?? 0))
-      .subscribe(c => { this.pypiRepoCount = c; this.cdRef.markForCheck(); });
+    this.protocolRepoControllerService
+      .getCount(RepoType.Pypi)
+      .pipe(map((r) => r.data ?? 0))
+      .subscribe((c) => {
+        this.pypiRepoCount = c;
+        this.cdRef.markForCheck();
+      });
 
-    this.protocolRepoControllerService.getCount(RepoType.Maven)
-      .pipe(map(r => r.data ?? 0))
-      .subscribe(c => { this.mavenRepoCount = c; this.cdRef.markForCheck(); });
+    this.protocolRepoControllerService
+      .getCount(RepoType.Maven)
+      .pipe(map((r) => r.data ?? 0))
+      .subscribe((c) => {
+        this.mavenRepoCount = c;
+        this.cdRef.markForCheck();
+      });
 
-    this.protocolRepoControllerService.getCount(RepoType.Docker)
-      .pipe(map(r => r.data ?? 0))
-      .subscribe(c => { this.dockerRepoCount = c; this.cdRef.markForCheck(); });
+    this.protocolRepoControllerService
+      .getCount(RepoType.Docker)
+      .pipe(map((r) => r.data ?? 0))
+      .subscribe((c) => {
+        this.dockerRepoCount = c;
+        this.cdRef.markForCheck();
+      });
 
-    this.protocolRepoControllerService.getCount(RepoType.Cargo)
-      .pipe(map(r => r.data ?? 0))
-      .subscribe(c => { this.cargoRepoCount = c; this.cdRef.markForCheck(); });
+    this.protocolRepoControllerService
+      .getCount(RepoType.Cargo)
+      .pipe(map((r) => r.data ?? 0))
+      .subscribe((c) => {
+        this.cargoRepoCount = c;
+        this.cdRef.markForCheck();
+      });
 
-    this.protocolRepoControllerService.getCount(RepoType.Golang)
-      .pipe(map(r => r.data ?? 0))
-      .subscribe(c => { this.golangRepoCount = c; this.cdRef.markForCheck(); });
+    this.protocolRepoControllerService
+      .getCount(RepoType.Golang)
+      .pipe(map((r) => r.data ?? 0))
+      .subscribe((c) => {
+        this.golangRepoCount = c;
+        this.cdRef.markForCheck();
+      });
+
+    this.protocolRepoControllerService
+      .getCount(RepoType.Nuget)
+      .pipe(map((r) => r.data ?? 0))
+      .subscribe((c) => {
+        this.nugetRepoCount = c;
+        this.cdRef.markForCheck();
+      });
   }
 
   private fetchRepoInfo(repoType: RepoType): void {
-    this.protocolRepoControllerService.getInfo(repoType)
+    this.protocolRepoControllerService
+      .getInfo(repoType)
       .pipe(
-        map(r => r.data ?? []),
-        switchMap(repos => {
+        map((r) => r.data ?? []),
+        switchMap((repos) => {
           if (repos.length === 0) {
             return of([]);
           }
           return forkJoin(
-            repos.map(repo =>
+            repos.map((repo) =>
               this.protocolRepoControllerService.getUsage(repo.name).pipe(
-                map(r => {
+                map((r) => {
                   repo.diskUsage = r.data?.diskUsed?.value;
                   repo.type = repoType;
                   return repo;
                 }),
-              )
-            )
+              ),
+            ),
           );
         }),
       )
-      .subscribe(updatedRepos => {
+      .subscribe((updatedRepos) => {
         this.repoListInfos = this.repoListInfos
           .concat(updatedRepos)
           .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -142,5 +177,6 @@ export class DashboardContentComponent {
     this.fetchRepoInfo(RepoType.Docker);
     this.fetchRepoInfo(RepoType.Cargo);
     this.fetchRepoInfo(RepoType.Golang);
+    this.fetchRepoInfo(RepoType.Nuget);
   }
 }

@@ -21,14 +21,14 @@ import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../environments/environment';
-import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
-import { ToastService } from '../../../../shared/components/toast/toast.service';
 import {
   KeyStoreControllerService,
   KeyStoreForm,
   ProtocolRepoControllerService,
   RepoPermissionInfo,
 } from '../../../../../../generated/api';
+import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { SignatureForm } from './dto/signature-form';
 import { SignatureItem } from './dto/signature-item';
 
@@ -94,44 +94,47 @@ export class SignatureComponent implements OnInit {
       url: this.keyStoreForm.get('url')?.value,
     };
 
-    this.keyStoreControllerService.createMavenKeyStore(
-      this.activeRepository.repoName, keyStoreForm as unknown as KeyStoreForm,
-    ).pipe(
-      finalize(() => { this.isSubmitting = false; }),
-    ).subscribe({
-      next: () => {
-        this.pageNum = 1;
-        this.fetchKeyStores();
-        this.keyStoreForm.reset({ active: true });
-        this.toastService.show('Key Store URL added', 'success');
-      },
-      error: () => {},
-    });
+    this.keyStoreControllerService
+      .createMavenKeyStore(this.activeRepository.repoName, keyStoreForm as unknown as KeyStoreForm)
+      .pipe(
+        finalize(() => {
+          this.isSubmitting = false;
+        }),
+      )
+      .subscribe({
+        next: () => {
+          this.pageNum = 1;
+          this.fetchKeyStores();
+          this.keyStoreForm.reset({ active: true });
+          this.toastService.show('Key Store URL added', 'success');
+        },
+        error: () => {},
+      });
   }
 
   public fetchKeyStores(): void {
     this.pageNum = 1;
-    this.keyStoreControllerService.listMavenKeyStores(
-      { page: 0, size: this.pageSize }, this.activeRepository.repoName,
-    ).subscribe({
-      next: (r) => {
-        this.keyStores = (r.data?.content ?? []) as unknown as SignatureItem[];
-      },
-      error: () => {},
-    });
+    this.keyStoreControllerService
+      .listMavenKeyStores({ page: 0, size: this.pageSize }, this.activeRepository.repoName)
+      .subscribe({
+        next: (r) => {
+          this.keyStores = (r.data?.content ?? []) as unknown as SignatureItem[];
+        },
+        error: () => {},
+      });
   }
 
   public loadMoreKeyStores(): void {
-    this.keyStoreControllerService.listMavenKeyStores(
-      { page: this.pageNum, size: this.pageSize }, this.activeRepository.repoName,
-    ).subscribe({
-      next: (r) => {
-        const newItems = (r.data?.content ?? []) as unknown as SignatureItem[];
-        this.keyStores = [...this.keyStores, ...newItems];
-        this.pageNum++;
-      },
-      error: () => {},
-    });
+    this.keyStoreControllerService
+      .listMavenKeyStores({ page: this.pageNum, size: this.pageSize }, this.activeRepository.repoName)
+      .subscribe({
+        next: (r) => {
+          const newItems = (r.data?.content ?? []) as unknown as SignatureItem[];
+          this.keyStores = [...this.keyStores, ...newItems];
+          this.pageNum++;
+        },
+        error: () => {},
+      });
   }
 
   public onScroll(event: Event): void {

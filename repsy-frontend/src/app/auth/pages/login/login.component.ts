@@ -21,9 +21,9 @@ import { Router, RouterModule } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
+import { LoginForm } from '../../../../generated/api';
 import { ToastService } from '../../../panel/shared/components/toast/toast.service';
 import { AuthService } from '../service/auth.service';
-import { LoginForm } from '../../../../generated/api';
 
 @Component({
   selector: 'app-login',
@@ -82,11 +82,14 @@ export class LoginComponent implements OnInit {
 
     const form = this.form.getRawValue() as LoginForm;
 
-    this.authService.logIn(form)
-      .pipe(finalize(() => {
-        this.loading = false;
-        this.form.enable();
-      }))
+    this.authService
+      .logIn(form)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+          this.form.enable();
+        }),
+      )
       .subscribe({
         next: () => this.router.navigateByUrl('/'),
         error: () => {},

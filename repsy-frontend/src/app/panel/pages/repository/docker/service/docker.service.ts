@@ -18,9 +18,6 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
 
-import { PagedData } from '../../../../shared/dto/paged-data';
-import { Sort } from '../../../../shared/dto/sort';
-import { TagListItem } from '../dto/tag-list-item';
 import {
   DockerImageControllerService,
   ImageListItem,
@@ -29,6 +26,9 @@ import {
   RepoPermissionInfo,
   TagDetail,
 } from '../../../../../../generated/api';
+import { PagedData } from '../../../../shared/dto/paged-data';
+import { Sort } from '../../../../shared/dto/sort';
+import { TagListItem } from '../dto/tag-list-item';
 
 @Injectable({
   providedIn: 'root',
@@ -51,30 +51,43 @@ export class DockerService {
 
   public getRepository(repoName: string): Observable<RepoPermissionInfo> {
     return this.protocolRepoControllerService.getPermission(repoName).pipe(
-      map(r => r.data!),
-      tap(info => this.repoSubject.next(info)),
+      map((r) => r.data!),
+      tap((info) => this.repoSubject.next(info)),
     );
   }
 
-  public searchImages(name: string, sortOption: Sort, pageIndex: number, pageSize: number): Observable<PagedData<ImageListItem>> {
-    return this.dockerImageControllerService.listDockerImages(
-      { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-      this.repoName,
-      name || undefined,
-    ).pipe(
-      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<ImageListItem>)),
-    );
+  public searchImages(
+    name: string,
+    sortOption: Sort,
+    pageIndex: number,
+    pageSize: number,
+  ): Observable<PagedData<ImageListItem>> {
+    return this.dockerImageControllerService
+      .listDockerImages(
+        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
+        this.repoName,
+        name || undefined,
+      )
+      .pipe(
+        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<ImageListItem>),
+      );
   }
 
-  public searchTags(name: string, sortOption: Sort, imageName: string, pageIndex: number, pageSize: number): Observable<PagedData<TagListItem>> {
-    return this.dockerImageControllerService.listDockerImageTags(
-      imageName,
-      { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-      this.repoName,
-      name || undefined,
-    ).pipe(
-      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<TagListItem>)),
-    );
+  public searchTags(
+    name: string,
+    sortOption: Sort,
+    imageName: string,
+    pageIndex: number,
+    pageSize: number,
+  ): Observable<PagedData<TagListItem>> {
+    return this.dockerImageControllerService
+      .listDockerImageTags(
+        imageName,
+        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
+        this.repoName,
+        name || undefined,
+      )
+      .pipe(map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<TagListItem>));
   }
 
   public searchManifests(
@@ -85,15 +98,17 @@ export class DockerService {
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<ManifestListItem>> {
-    return this.dockerImageControllerService.listTagManifests(
-      imageName,
-      tagName,
-      { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-      this.repoName,
-      name || undefined,
-    ).pipe(
-      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<ManifestListItem>)),
-    );
+    return this.dockerImageControllerService
+      .listTagManifests(
+        imageName,
+        tagName,
+        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
+        this.repoName,
+        name || undefined,
+      )
+      .pipe(
+        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<ManifestListItem>),
+      );
   }
 
   public deleteImage(imageName: string): Observable<void> {
@@ -101,9 +116,9 @@ export class DockerService {
   }
 
   public fetchTag(imageName: string, tagName: string): Observable<TagDetail> {
-    return this.dockerImageControllerService.getDockerImageTag(imageName, tagName, this.repoName).pipe(
-      map(r => r.data!),
-    );
+    return this.dockerImageControllerService
+      .getDockerImageTag(imageName, tagName, this.repoName)
+      .pipe(map((r) => r.data!));
   }
 
   public deleteTag(imageName: string, tagName: string): Observable<void> {
@@ -111,14 +126,10 @@ export class DockerService {
   }
 
   public fetchManifestText(imageName: string, digest: string): Observable<string> {
-    return this.dockerImageControllerService.getManifest(imageName, digest, this.repoName).pipe(
-      map(r => r.data!),
-    );
+    return this.dockerImageControllerService.getManifest(imageName, digest, this.repoName).pipe(map((r) => r.data!));
   }
 
   public fetchConfigText(imageName: string, digest: string): Observable<string> {
-    return this.dockerImageControllerService.getConfig(imageName, digest, this.repoName).pipe(
-      map(r => r.data!),
-    );
+    return this.dockerImageControllerService.getConfig(imageName, digest, this.repoName).pipe(map((r) => r.data!));
   }
 }

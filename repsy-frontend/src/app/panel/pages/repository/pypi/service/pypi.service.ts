@@ -17,10 +17,11 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
+
 import {
-  PypiPackageListItem,
   ProtocolRepoControllerService,
   PypiPackageControllerService,
+  PypiPackageListItem,
   ReleaseDetail,
   ReleaseListItem,
   RepoPermissionInfo,
@@ -48,47 +49,60 @@ export class PypiService {
 
   public selectRepository(repoName: string): Observable<RepoPermissionInfo> {
     return this.protocolRepoControllerService.getPermission(repoName).pipe(
-      map(r => r.data!),
-      tap(info => this.repoSubject.next(info)),
+      map((r) => r.data!),
+      tap((info) => this.repoSubject.next(info)),
     );
   }
 
-  public fetchRepositoryPackagesLikeName(name: string, sort: Sort, pageIndex: number, pageSize: number): Observable<PagedData<PypiPackageListItem>> {
-    return this.pypiPackageControllerService.listPypiPackages(
-      { page: pageIndex, size: pageSize, sort: [`${sort.column},${sort.type}`] },
-      this.repoName,
-      name || undefined,
-    ).pipe(
-      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<PypiPackageListItem>)),
-    );
+  public fetchRepositoryPackagesLikeName(
+    name: string,
+    sort: Sort,
+    pageIndex: number,
+    pageSize: number,
+  ): Observable<PagedData<PypiPackageListItem>> {
+    return this.pypiPackageControllerService
+      .listPypiPackages(
+        { page: pageIndex, size: pageSize, sort: [`${sort.column},${sort.type}`] },
+        this.repoName,
+        name || undefined,
+      )
+      .pipe(
+        map(
+          (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<PypiPackageListItem>,
+        ),
+      );
   }
 
-  public fetchPackageReleasesLikeName(packageName: string, version: string, sort: Sort, pageIndex: number, pageSize: number): Observable<PagedData<ReleaseListItem>> {
-    return this.pypiPackageControllerService.listReleases(
-      packageName,
-      { page: pageIndex, size: pageSize, sort: [`${sort.column},${sort.type}`] },
-      this.repoName,
-      version || undefined,
-    ).pipe(
-      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<ReleaseListItem>)),
-    );
+  public fetchPackageReleasesLikeName(
+    packageName: string,
+    version: string,
+    sort: Sort,
+    pageIndex: number,
+    pageSize: number,
+  ): Observable<PagedData<ReleaseListItem>> {
+    return this.pypiPackageControllerService
+      .listReleases(
+        packageName,
+        { page: pageIndex, size: pageSize, sort: [`${sort.column},${sort.type}`] },
+        this.repoName,
+        version || undefined,
+      )
+      .pipe(
+        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<ReleaseListItem>),
+      );
   }
 
   public deletePackage(packageName: string): Observable<void> {
-    return this.pypiPackageControllerService.deletePypiPackage(packageName, this.repoName).pipe(
-      map(() => undefined),
-    );
+    return this.pypiPackageControllerService.deletePypiPackage(packageName, this.repoName).pipe(map(() => undefined));
   }
 
   public fetchRelease(packageName: string, release: string): Observable<ReleaseDetail> {
-    return this.pypiPackageControllerService.getRelease(packageName, release, this.repoName).pipe(
-      map(r => r.data!),
-    );
+    return this.pypiPackageControllerService.getRelease(packageName, release, this.repoName).pipe(map((r) => r.data!));
   }
 
   public deleteRelease(packageName: string, releaseVersion: string): Observable<void> {
-    return this.pypiPackageControllerService.deleteRelease(packageName, releaseVersion, this.repoName).pipe(
-      map(() => undefined),
-    );
+    return this.pypiPackageControllerService
+      .deleteRelease(packageName, releaseVersion, this.repoName)
+      .pipe(map(() => undefined));
   }
 }

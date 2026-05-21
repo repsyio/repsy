@@ -82,3 +82,6 @@ os:
         golang:
           base-path: ${storage-gateway.fs.base-path}/golang
           trash-path: ${storage-gateway.fs.base-path}/golang/trash
+        nuget:
+          base-path: ${storage-gateway.fs.base-path}/nuget
+          trash-path: ${storage-gateway.fs.base-path}/nuget/trash

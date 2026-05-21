@@ -21,11 +21,11 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { GoModuleVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo, GoModuleVersionListItem } from '../../../../../../../generated/api';
 import { GolangService } from '../../service/golang.service';
 
 @Component({
@@ -96,38 +96,48 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
 
   public deleteVersion(): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
-      this.golangService.deleteModuleVersion(this.modulePath, this.versionName).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          this.router
-            .navigate(['/' + this.activeRepo.repoName + '/modules'], {
-              queryParams: { modulePath: this.modulePath },
-            })
-            .then(() => {
-              this.toastService.show('Version deleted successfully', 'success');
-            });
-        },
-        error: () => {},
-      });
+      this.golangService
+        .deleteModuleVersion(this.modulePath, this.versionName)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.router
+              .navigate(['/' + this.activeRepo.repoName + '/modules'], {
+                queryParams: { modulePath: this.modulePath },
+              })
+              .then(() => {
+                this.toastService.show('Version deleted successfully', 'success');
+              });
+          },
+          error: () => {},
+        });
     });
   }
 
   private fetchVersion(): void {
     this.loading = true;
-    this.golangService.fetchModuleInfo(this.modulePath).pipe(
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (info) => {
-        const found = info.versions.find((v) => v.version === this.versionName);
-        if (!found) {
-          this.error = `Version '${this.versionName}' not found`;
-          return;
-        }
-        this.versionInfo = found;
-      },
-      error: () => {},
-    });
+    this.golangService
+      .fetchModuleInfo(this.modulePath)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (info) => {
+          const found = info.versions.find((v) => v.version === this.versionName);
+          if (!found) {
+            this.error = `Version '${this.versionName}' not found`;
+            return;
+          }
+          this.versionInfo = found;
+        },
+        error: () => {},
+      });
   }
 
   public get canManage(): boolean {

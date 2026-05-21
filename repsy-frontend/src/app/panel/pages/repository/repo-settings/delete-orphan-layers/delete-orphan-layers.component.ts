@@ -18,9 +18,9 @@ import { Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
+import { DockerImageControllerService, RepoPermissionInfo } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { DockerImageControllerService, RepoPermissionInfo } from '../../../../../../generated/api';
 
 @Component({
   selector: 'app-delete-orphan-layers',
@@ -41,19 +41,19 @@ export class DeleteOrphanLayersComponent {
   ) {}
 
   public deleteOrphanLayers(): void {
-    this.dangerModalService.show(
-      'Delete Orphan Layers',
-      'Delete',
-      () => {
-        this.deleting = true;
-        this.dockerImageControllerService
-          .deleteOrphanLayers(this.activeRepository.repoName)
-          .pipe(finalize(() => { this.deleting = false; }))
-          .subscribe({
-            next: () => this.toastService.show('Orphan layers deleted successfully', 'success'),
-            error: () => {},
-          });
-      },
-    );
+    this.dangerModalService.show('Delete Orphan Layers', 'Delete', () => {
+      this.deleting = true;
+      this.dockerImageControllerService
+        .deleteOrphanLayers(this.activeRepository.repoName)
+        .pipe(
+          finalize(() => {
+            this.deleting = false;
+          }),
+        )
+        .subscribe({
+          next: () => this.toastService.show('Orphan layers deleted successfully', 'success'),
+          error: () => {},
+        });
+    });
   }
 }

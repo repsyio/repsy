@@ -22,6 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { ArtifactVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -36,7 +37,6 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { MavenConfigComponent } from '../../config/maven-config.component';
-import { RepoPermissionInfo, ArtifactVersionListItem } from '../../../../../../../generated/api';
 import { MavenService } from '../../service/maven.service';
 
 @Component({
@@ -139,35 +139,52 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
 
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
-      this.mavenService.deleteVersion(this.groupName, this.artifactName, version.versionName).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          if (versionCount - 1 === 0) {
-            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+      this.mavenService
+        .deleteVersion(this.groupName, this.artifactName, version.versionName)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            if (versionCount - 1 === 0) {
+              this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+                this.toastService.show('Version deleted successfully', 'success');
+              });
+            } else {
+              this.refreshPage();
               this.toastService.show('Version deleted successfully', 'success');
-            });
-          } else {
-            this.refreshPage();
-            this.toastService.show('Version deleted successfully', 'success');
-          }
-        },
-        error: () => {},
-      });
+            }
+          },
+          error: () => {},
+        });
     });
   }
 
   private fetchArtifactVersions(): void {
     this.loading = true;
-    this.mavenService.searchArtifactVersions(this.groupName, this.artifactName, this.searchText, this.sortOption, this.pageNum, this.pageSize).pipe(
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (pagedData: PagedData<ArtifactVersionListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.versions = pagedData.content;
-      },
-      error: () => {},
-    });
+    this.mavenService
+      .searchArtifactVersions(
+        this.groupName,
+        this.artifactName,
+        this.searchText,
+        this.sortOption,
+        this.pageNum,
+        this.pageSize,
+      )
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<ArtifactVersionListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.versions = pagedData.content;
+        },
+        error: () => {},
+      });
   }
 
   public get canManage(): boolean {

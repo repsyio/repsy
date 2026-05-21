@@ -22,6 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { GoModuleVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -36,7 +37,6 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { GolangConfigComponent } from '../../config/golang-config.component';
-import { RepoPermissionInfo, GoModuleVersionListItem } from '../../../../../../../generated/api';
 import { GolangService } from '../../service/golang.service';
 
 @Component({
@@ -139,35 +139,45 @@ export class GolangModuleVersionListComponent implements OnDestroy {
 
   public deleteVersion(version: GoModuleVersionListItem): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
-      this.golangService.deleteModuleVersion(this.modulePath, version.version).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          if (this.versions.length - 1 === 0) {
-            this.router.navigateByUrl('/' + this.activeRepo.repoName).then(() => {
+      this.golangService
+        .deleteModuleVersion(this.modulePath, version.version)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            if (this.versions.length - 1 === 0) {
+              this.router.navigateByUrl('/' + this.activeRepo.repoName).then(() => {
+                this.toastService.show('Version deleted successfully', 'success');
+              });
+            } else {
+              this.refreshPage();
               this.toastService.show('Version deleted successfully', 'success');
-            });
-          } else {
-            this.refreshPage();
-            this.toastService.show('Version deleted successfully', 'success');
-          }
-        },
-        error: () => {},
-      });
+            }
+          },
+          error: () => {},
+        });
     });
   }
 
   private fetchVersions(): void {
     this.loading = true;
-    this.golangService.fetchModuleVersions(this.modulePath, this.searchText, this.sortOption, this.pageNum, this.pageSize).pipe(
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (pagedData: PagedData<GoModuleVersionListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.versions = pagedData.content;
-      },
-      error: () => {},
-    });
+    this.golangService
+      .fetchModuleVersions(this.modulePath, this.searchText, this.sortOption, this.pageNum, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<GoModuleVersionListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.versions = pagedData.content;
+        },
+        error: () => {},
+      });
   }
 
   public get canManage(): boolean {

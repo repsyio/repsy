@@ -22,6 +22,12 @@ import moment from 'moment';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../environments/environment';
+import {
+  ProtocolDeployTokenControllerService,
+  ProtocolRepoControllerService,
+  RepoPermissionInfo,
+  RepoUsageInfo,
+} from '../../../../../../generated/api';
 import { EllipsisPipe } from '../../../../shared/components/ellipsis/ellipsis.pipe';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { DeployTokenCreateModalComponent } from '../../../../shared/components/modals/deploy-token-create-modal/deploy-token-create-modal.component';
@@ -30,18 +36,13 @@ import { PaginationComponent } from '../../../../shared/components/pagination/pa
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../shared/dto/paged-data';
-import {
-  ProtocolDeployTokenControllerService,
-  ProtocolRepoControllerService,
-  RepoPermissionInfo,
-  RepoUsageInfo,
-} from '../../../../../../generated/api';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
 import { CargoConfigComponent } from '../../cargo/config/cargo-config.component';
 import { DockerConfigComponent } from '../../docker/config/docker-config.component';
 import { GolangConfigComponent } from '../../golang/config/golang-config.component';
 import { MavenConfigComponent } from '../../maven/config/maven-config.component';
 import { NpmConfigComponent } from '../../npm/config/npm-config.component';
+import { NugetConfigComponent } from '../../nuget/config/nuget-config.component';
 import { PypiConfigComponent } from '../../pypi/config/pypi-config.component';
 import { DeployTokenInfo } from './dto/deploy-token-info';
 import { TokenCreateInfo } from './dto/token-create-info';
@@ -61,6 +62,7 @@ import { TokenCreateInfo } from './dto/token-create-info';
     GolangConfigComponent,
     NgClass,
     MavenConfigComponent,
+    NugetConfigComponent,
     PypiConfigComponent,
     NpmConfigComponent,
     EllipsisPipe,
@@ -101,22 +103,24 @@ export class DeployTokenComponent implements OnInit {
 
   private fetchRepoUsage() {
     this.protocolRepoControllerService.getUsage(this.activeRepository.repoName).subscribe({
-      next: (r) => { this.repoUsage = r.data!; },
+      next: (r) => {
+        this.repoUsage = r.data!;
+      },
       error: () => {},
     });
   }
 
   public fetchDeployTokens() {
     this.fetchRepoUsage();
-    this.protocolDeployTokenControllerService.listDeployTokens(
-      { page: this.pageNum, size: this.pageSize }, this.activeRepository.repoName,
-    ).subscribe({
-      next: (r) => {
-        this.pagedData.page = r.data?.page as any;
-        this.deployTokens = (r.data?.content ?? []) as unknown as DeployTokenInfo[];
-      },
-      error: () => {},
-    });
+    this.protocolDeployTokenControllerService
+      .listDeployTokens({ page: this.pageNum, size: this.pageSize }, this.activeRepository.repoName)
+      .subscribe({
+        next: (r) => {
+          this.pagedData.page = { ...r.data?.page } as PagedData<DeployTokenInfo>['page'];
+          this.deployTokens = (r.data?.content ?? []) as unknown as DeployTokenInfo[];
+        },
+        error: () => {},
+      });
   }
 
   public loadPage(pageNum: number) {
@@ -133,20 +137,25 @@ export class DeployTokenComponent implements OnInit {
     this.dangerModalService.show('Rotate Deploy Token', 'Rotate', () => {
       this.operationLock = true;
 
-      this.protocolDeployTokenControllerService.rotate(deployToken.id, this.activeRepository.repoName).pipe(
-        finalize(() => { this.operationLock = false; }),
-      ).subscribe({
-        next: (r) => {
-          this.fetchDeployTokens();
-          this.toastService.show(successMsg, 'success');
-          this.createdDeployToken = new TokenCreateInfo();
-          this.createdDeployToken.token = r.data!;
-          this.createdDeployToken.username = deployToken.username;
-          this.createdDeployToken.id = deployToken.id;
-          this.showTokenInfoModal = true;
-        },
-        error: () => {},
-      });
+      this.protocolDeployTokenControllerService
+        .rotate(deployToken.id, this.activeRepository.repoName)
+        .pipe(
+          finalize(() => {
+            this.operationLock = false;
+          }),
+        )
+        .subscribe({
+          next: (r) => {
+            this.fetchDeployTokens();
+            this.toastService.show(successMsg, 'success');
+            this.createdDeployToken = new TokenCreateInfo();
+            this.createdDeployToken.token = r.data!;
+            this.createdDeployToken.username = deployToken.username;
+            this.createdDeployToken.id = deployToken.id;
+            this.showTokenInfoModal = true;
+          },
+          error: () => {},
+        });
     });
   }
 
@@ -165,12 +174,17 @@ export class DeployTokenComponent implements OnInit {
     this.dangerModalService.show('Delete Deploy Token', 'Delete', () => {
       this.operationLock = true;
 
-      this.protocolDeployTokenControllerService.revoke(deployToken.id, this.activeRepository.repoName).pipe(
-        finalize(() => { this.operationLock = false; }),
-      ).subscribe({
-        next: onSuccess,
-        error: () => {},
-      });
+      this.protocolDeployTokenControllerService
+        .revoke(deployToken.id, this.activeRepository.repoName)
+        .pipe(
+          finalize(() => {
+            this.operationLock = false;
+          }),
+        )
+        .subscribe({
+          next: onSuccess,
+          error: () => {},
+        });
     });
   }
 

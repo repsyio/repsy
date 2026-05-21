@@ -15,7 +15,7 @@
 ///
 
 import { Injectable } from '@angular/core';
-import { Observable, map } from 'rxjs';
+import { map, Observable } from 'rxjs';
 
 import { LoginInfo, ProfileInfo } from '../../../../../generated/api';
 import { ProfileControllerService } from '../../../../../generated/api';
@@ -35,26 +35,22 @@ export class ProfileService {
   }
 
   public get(): Observable<ProfileInfo> {
-    return this.profileControllerService.getProfile(this.authorizationHeader).pipe(
-      map(r => r.data!),
-    );
+    return this.profileControllerService.getProfile(this.authorizationHeader).pipe(map((r) => r.data!));
   }
 
   public updatePassword(password: string): Observable<void> {
-    return this.profileControllerService.updatePassword(this.authorizationHeader, { password }).pipe(
-      map(() => undefined),
-    );
+    return this.profileControllerService
+      .updatePassword(this.authorizationHeader, { password })
+      .pipe(map(() => undefined));
   }
 
   public updateUsername(username: string): Observable<LoginInfo> {
-    return this.profileControllerService.updateUsername(this.authorizationHeader, { username }).pipe(
-      map(r => r.data!),
-    );
+    return this.profileControllerService
+      .updateUsername(this.authorizationHeader, { username })
+      .pipe(map((r) => r.data!));
   }
 
   public deleteAccount(): Observable<void> {
-    return this.profileControllerService.deleteProfile(this.authorizationHeader).pipe(
-      map(() => undefined),
-    );
+    return this.profileControllerService.deleteProfile(this.authorizationHeader).pipe(map(() => undefined));
   }
 }

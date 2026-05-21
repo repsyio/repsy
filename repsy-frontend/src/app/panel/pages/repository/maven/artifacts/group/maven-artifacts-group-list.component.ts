@@ -22,6 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { ArtifactListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -36,7 +37,6 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { MavenConfigComponent } from '../../config/maven-config.component';
-import { RepoPermissionInfo, ArtifactListItem } from '../../../../../../../generated/api';
 import { MavenService } from '../../service/maven.service';
 
 @Component({
@@ -135,28 +135,38 @@ export class MavenArtifactsGroupListComponent implements OnDestroy {
   public deleteGroup(artifact: ArtifactListItem) {
     this.dangerModalService.show('Delete Group', 'Delete', () => {
       this.loading = true;
-      this.mavenService.deleteGroup(artifact.groupName).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          this.refreshPage();
-          this.toastService.show('Group deleted successfully', 'success');
-        },
-        error: () => {},
-      });
+      this.mavenService
+        .deleteGroup(artifact.groupName)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.refreshPage();
+            this.toastService.show('Group deleted successfully', 'success');
+          },
+          error: () => {},
+        });
     });
   }
 
   private fetchArtifacts(): void {
     this.loading = true;
-    this.mavenService.searchGroups(this.searchText, this.sortOption, this.pageNum, this.pageSize).pipe(
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (pagedData: PagedData<ArtifactListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.artifacts = pagedData.content;
-      },
-      error: () => {},
-    });
+    this.mavenService
+      .searchGroups(this.searchText, this.sortOption, this.pageNum, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<ArtifactListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.artifacts = pagedData.content;
+        },
+        error: () => {},
+      });
   }
 }

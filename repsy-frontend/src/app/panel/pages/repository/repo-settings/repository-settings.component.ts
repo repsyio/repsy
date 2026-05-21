@@ -21,17 +21,13 @@ import { Router, RouterModule } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { filter, finalize, map, switchMap } from 'rxjs/operators';
 
+import { ProtocolRepoControllerService, RepoPermissionInfo, RepoSettingsInfo } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { RepoType } from '../../../shared/dto/repo/repo-type';
 import { MavenRepoSettingsForm } from '../maven/dto/maven-repo-settings-form';
-import {
-  ProtocolRepoControllerService,
-  RepoPermissionInfo,
-  RepoSettingsInfo,
-} from '../../../../../generated/api';
-import { DeleteOrphanLayersComponent } from './delete-orphan-layers/delete-orphan-layers.component';
 import { RepoLookupService } from '../repo-entry/repo-lookup.service';
+import { DeleteOrphanLayersComponent } from './delete-orphan-layers/delete-orphan-layers.component';
 import { DeleteRepoComponent } from './delete-repo/delete-repo.component';
 import { DeployTokenComponent } from './deploy-token/deploy-token.component';
 import { VersionAllowanceComponent } from './maven-version-allowence/maven-version-allowence.component';
@@ -94,23 +90,23 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
   }
 
   public ngOnInit(): void {
-    this.repoContext$ = this.repoLookupService.currentRepo$.pipe(
-      filter((context) => !!context),
-      switchMap((context) => {
-        this.repoType = context.repoType;
-        return this.protocolRepoControllerService.getPermission(context.repoName).pipe(
-          map(r => r.data!),
-        );
-      }),
-    ).subscribe((repo: RepoPermissionInfo) => {
-      this.loading = true;
-      this.activeRepository = repo;
-      if (this.activeRepository.canManage) {
-        this.getRepoSettings();
-      } else {
-        this.router.navigate(['/repositories']);
-      }
-    });
+    this.repoContext$ = this.repoLookupService.currentRepo$
+      .pipe(
+        filter((context) => !!context),
+        switchMap((context) => {
+          this.repoType = context.repoType;
+          return this.protocolRepoControllerService.getPermission(context.repoName).pipe(map((r) => r.data!));
+        }),
+      )
+      .subscribe((repo: RepoPermissionInfo) => {
+        this.loading = true;
+        this.activeRepository = repo;
+        if (this.activeRepository.canManage) {
+          this.getRepoSettings();
+        } else {
+          this.router.navigate(['/repositories']);
+        }
+      });
   }
 
   public ngOnDestroy(): void {
@@ -120,32 +116,43 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
   }
 
   public getRepoSettings() {
-    this.protocolRepoControllerService.getSettings(this.activeRepository.repoName).pipe(
-      map(r => r.data!),
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (res: RepoSettingsInfo) => {
-        if (this.repoType === RepoType.NPM) {
-          this.repositorySettings = res as RepoSettingsInfo;
-          this.generalSettingsForm.patchValue({
-            privateRepository: this.repositorySettings.privateRepo,
-            ...this.repositorySettings,
-          });
-        } else if (this.repoType === RepoType.MAVEN) {
-          this.mavenRepositorySettings = res as MavenRepoSettingsForm;
-          this.mavenSettingsForm.patchValue({
-            privateRepository: this.mavenRepositorySettings.privateRepo,
-            ...this.mavenRepositorySettings,
-          });
-        } else {
-          this.repositorySettings = res as RepoSettingsInfo;
-          this.generalSettingsForm.patchValue({
-            privateRepository: this.repositorySettings.privateRepo,
-            ...this.repositorySettings,
-          });
-        }
-      },
-      error: () => {},
-    });
+    this.protocolRepoControllerService
+      .getSettings(this.activeRepository.repoName)
+      .pipe(
+        map((r) => r.data!),
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (res: RepoSettingsInfo) => {
+          if (this.repoType === RepoType.NPM) {
+            this.repositorySettings = res as RepoSettingsInfo;
+            this.generalSettingsForm.patchValue({
+              privateRepository: this.repositorySettings.privateRepo,
+              ...this.repositorySettings,
+            });
+          } else if (this.repoType === RepoType.MAVEN) {
+            this.mavenRepositorySettings = res as MavenRepoSettingsForm;
+            this.mavenSettingsForm.patchValue({
+              privateRepository: this.mavenRepositorySettings.privateRepo,
+              ...this.mavenRepositorySettings,
+            });
+          } else if (this.repoType === RepoType.NUGET) {
+            this.repositorySettings = res as RepoSettingsInfo;
+            this.mavenSettingsForm.patchValue({
+              privateRepository: this.repositorySettings.privateRepo,
+              ...this.repositorySettings,
+            });
+          } else {
+            this.repositorySettings = res as RepoSettingsInfo;
+            this.generalSettingsForm.patchValue({
+              privateRepository: this.repositorySettings.privateRepo,
+              ...this.repositorySettings,
+            });
+          }
+        },
+        error: () => {},
+      });
   }
 }

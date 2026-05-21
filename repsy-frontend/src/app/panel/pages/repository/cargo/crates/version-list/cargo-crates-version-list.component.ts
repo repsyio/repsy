@@ -21,6 +21,7 @@ import { Subscription } from 'rxjs';
 import { finalize, switchMap } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { CrateVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -35,7 +36,6 @@ import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { CargoConfigComponent } from '../../config/cargo-config.component';
 import { CrateInfo } from '../../dto/crate-info';
-import { RepoPermissionInfo, CrateVersionListItem } from '../../../../../../../generated/api';
 import { CargoService } from '../../service/cargo.service';
 
 @Component({
@@ -137,19 +137,23 @@ export class CargoCratesVersionListComponent implements OnDestroy {
       const deleteAction = isLastVersion
         ? this.cargoService.deleteCrate(this.packageName)
         : this.cargoService.deleteCrateVersion(this.packageName, version.version);
-      deleteAction.pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          this.toastService.show('Version deleted successfully', 'success');
-          if (isLastVersion) {
-            this.router.navigate(['..'], { relativeTo: this.route });
-          } else {
-            this.fetchVersions();
-          }
-        },
-        error: () => {},
-      });
+      deleteAction
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.toastService.show('Version deleted successfully', 'success');
+            if (isLastVersion) {
+              this.router.navigate(['..'], { relativeTo: this.route });
+            } else {
+              this.fetchVersions();
+            }
+          },
+          error: () => {},
+        });
     });
   }
 
@@ -157,20 +161,31 @@ export class CargoCratesVersionListComponent implements OnDestroy {
     const crateName = this.packageName;
 
     this.loading = true;
-    this.cargoService.fetchCrate(crateName).pipe(
-      switchMap((crate) => {
-        this.crate = crate;
-        return this.cargoService.fetchCrateVersions(crateName, this.searchText, this.sortOption, this.pageNum, this.pageSize);
-      }),
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (pagedData) => {
-        this.pagedData.page = pagedData.page;
-        this.versions = pagedData.content;
-        this.error = null;
-      },
-      error: () => {},
-    });
+    this.cargoService
+      .fetchCrate(crateName)
+      .pipe(
+        switchMap((crate) => {
+          this.crate = crate;
+          return this.cargoService.fetchCrateVersions(
+            crateName,
+            this.searchText,
+            this.sortOption,
+            this.pageNum,
+            this.pageSize,
+          );
+        }),
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData) => {
+          this.pagedData.page = pagedData.page;
+          this.versions = pagedData.content;
+          this.error = null;
+        },
+        error: () => {},
+      });
   }
 
   public get canManage(): boolean {

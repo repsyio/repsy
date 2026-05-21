@@ -19,8 +19,8 @@ import { Router, RouterOutlet } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
-import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { RepoPermissionInfo } from '../../../../../generated/api';
+import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { RepositoryBreadcrumbComponent } from '../breadcrumb/repository-breadcrumb.component';
 import { RepoContext, RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { NpmService } from './service/npm.service';

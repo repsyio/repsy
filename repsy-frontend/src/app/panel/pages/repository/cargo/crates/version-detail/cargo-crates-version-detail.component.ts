@@ -21,11 +21,11 @@ import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
 import { Subscription } from 'rxjs';
 import { finalize, switchMap } from 'rxjs/operators';
 
+import { RepoPermissionInfo } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../../../generated/api';
 import { CrateInfo } from '../../dto/crate-info';
 import { CrateDependencyInfo, CrateVersionInfo } from '../../dto/crate-version-info';
 import { CargoService } from '../../service/cargo.service';
@@ -82,35 +82,45 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
     this.installBinaryCommand = `cargo install ${crateName} --version ${version} --registry repsy`;
 
     this.loading = true;
-    this.cargoService.fetchCrate(crateName).pipe(
-      switchMap((crate) => {
-        this.crate = crate;
-        return this.cargoService.fetchCrateVersion(crateName, version);
-      }),
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (crateVersion) => {
-        this.crateVersion = crateVersion;
-        this.cargoToml = this.buildCargoToml(this.crate, crateVersion);
-        this.error = null;
-      },
-      error: () => {},
-    });
+    this.cargoService
+      .fetchCrate(crateName)
+      .pipe(
+        switchMap((crate) => {
+          this.crate = crate;
+          return this.cargoService.fetchCrateVersion(crateName, version);
+        }),
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (crateVersion) => {
+          this.crateVersion = crateVersion;
+          this.cargoToml = this.buildCargoToml(this.crate, crateVersion);
+          this.error = null;
+        },
+        error: () => {},
+      });
   }
 
   public deleteVersion(): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
-      this.cargoService.deleteCrateVersion(this.packageName, this.versionName).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
-            this.toastService.show('Version deleted successfully', 'success');
-          });
-        },
-        error: () => {},
-      });
+      this.cargoService
+        .deleteCrateVersion(this.packageName, this.versionName)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+              this.toastService.show('Version deleted successfully', 'success');
+            });
+          },
+          error: () => {},
+        });
     });
   }
 

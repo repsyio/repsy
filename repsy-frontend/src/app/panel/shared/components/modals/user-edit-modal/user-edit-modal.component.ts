@@ -97,13 +97,15 @@ export class UserEditModalComponent implements OnChanges {
 
     this.userControllerService
       .updateUser(this.user.id, updateForm)
-      .pipe(finalize(() => {
-        this.form.enable();
-        if (this.isLastAdmin) {
-          this.form.get('isAdmin')?.disable();
-        }
-        this.loading = false;
-      }))
+      .pipe(
+        finalize(() => {
+          this.form.enable();
+          if (this.isLastAdmin) {
+            this.form.get('isAdmin')?.disable();
+          }
+          this.loading = false;
+        }),
+      )
       .subscribe(() => {
         this.toastService.show('User updated successfully', 'success');
         this.updated.emit();

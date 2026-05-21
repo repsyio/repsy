@@ -22,6 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { ImageListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -37,7 +38,6 @@ import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { ByteFormatter } from '../../../../../shared/util/byte-formatter';
 import { DockerConfigComponent } from '../../config/docker-config.component';
-import { RepoPermissionInfo, ImageListItem } from '../../../../../../../generated/api';
 import { DockerService } from '../../service/docker.service';
 
 @Component({
@@ -136,29 +136,39 @@ export class DockerImagesListComponent implements OnDestroy {
   public deleteImage(image: ImageListItem) {
     this.dangerModalService.show('Delete Image', 'Delete', () => {
       this.loading = true;
-      this.dockerService.deleteImage(image.name).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          this.refreshPage();
-          this.toastService.show('Image deleted successfully', 'success');
-        },
-        error: () => {},
-      });
+      this.dockerService
+        .deleteImage(image.name)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.refreshPage();
+            this.toastService.show('Image deleted successfully', 'success');
+          },
+          error: () => {},
+        });
     });
   }
 
   private fetchImages(): void {
     this.loading = true;
-    this.dockerService.searchImages(this.searchText, this.sortOption, this.pageNum, this.pageSize).pipe(
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (pagedData: PagedData<ImageListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.images = pagedData.content;
-      },
-      error: () => {},
-    });
+    this.dockerService
+      .searchImages(this.searchText, this.sortOption, this.pageNum, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<ImageListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.images = pagedData.content;
+        },
+        error: () => {},
+      });
   }
 
   public get canManage(): boolean {

@@ -18,11 +18,11 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
+import { ProtocolRepoControllerService } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
-import { ProtocolRepoControllerService } from '../../../../../../generated/api';
 import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form';
 
 @Component({
@@ -54,6 +54,12 @@ export class VisibilityComponent {
       form = Object.assign(new MavenRepoSettingsForm(), this.parentForm.value);
       (form as MavenRepoSettingsForm).privateRepo = this.parentForm.get('privateRepository').value;
       (form as MavenRepoSettingsForm).allowOverride = this.parentForm.get('allowOverride').value;
+    } else if (this.repoType === RepoType.NUGET) {
+      form = new RepoSettingsForm();
+      form.privateRepo = this.parentForm.get('privateRepository').value;
+      form.allowOverride = this.parentForm.get('allowOverride').value;
+      form.releases = this.parentForm.get('releases').value;
+      form.snapshots = this.parentForm.get('snapshots').value;
     } else {
       form = new RepoSettingsForm();
       form.privateRepo = this.parentForm.get('privateRepository').value;

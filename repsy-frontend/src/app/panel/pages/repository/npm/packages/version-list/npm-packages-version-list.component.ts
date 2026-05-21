@@ -22,6 +22,11 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import {
+  PackageDistributionTagMapListItem,
+  PackageVersionListItem,
+  RepoPermissionInfo,
+} from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../../../../shared/components/ellipsis/ellipsis.pipe';
@@ -35,11 +40,6 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { NpmConfigComponent } from '../../config/npm-config.component';
-import {
-  RepoPermissionInfo,
-  PackageDistributionTagMapListItem,
-  PackageVersionListItem,
-} from '../../../../../../../generated/api';
 import { NpmService } from '../../service/npm.service';
 
 @Component({
@@ -148,43 +148,53 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
   public deleteVersion(version: PackageVersionListItem) {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
-      this.npmService.deletePackageVersion(this.packageName, this.scopeName, version.version).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          if (this.versions.length - 1 === 0) {
-            this.router.navigateByUrl(`/${this.activeRegistry.repoName}`).then(() => {
+      this.npmService
+        .deletePackageVersion(this.packageName, this.scopeName, version.version)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            if (this.versions.length - 1 === 0) {
+              this.router.navigateByUrl(`/${this.activeRegistry.repoName}`).then(() => {
+                this.toastService.show('Version deleted successfully', 'success');
+              });
+            } else {
+              this.refreshPage();
               this.toastService.show('Version deleted successfully', 'success');
-            });
-          } else {
-            this.refreshPage();
-            this.toastService.show('Version deleted successfully', 'success');
-          }
-        },
-        error: () => {},
-      });
+            }
+          },
+          error: () => {},
+        });
     });
   }
 
   private fetchVersions(): void {
     this.loading = true;
-    this.npmService.searchPackageVersions(
-      this.packageName,
-      this.scopeName,
-      this.searchText,
-      this.sortOption,
-      this.pageNum,
-      this.pageSize,
-    ).pipe(
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (pagedData: PagedData<PackageVersionListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.versions = pagedData.content;
-        this.fetchPackageTags();
-      },
-      error: () => {},
-    });
+    this.npmService
+      .searchPackageVersions(
+        this.packageName,
+        this.scopeName,
+        this.searchText,
+        this.sortOption,
+        this.pageNum,
+        this.pageSize,
+      )
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<PackageVersionListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.versions = pagedData.content;
+          this.fetchPackageTags();
+        },
+        error: () => {},
+      });
   }
 
   private fetchPackageTags() {

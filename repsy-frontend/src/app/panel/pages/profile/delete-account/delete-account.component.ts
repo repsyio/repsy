@@ -49,9 +49,11 @@ export class DeleteAccountComponent {
 
     this.profileFacadeService
       .deleteAccount()
-      .pipe(finalize(() => {
-        this.loading = false;
-      }))
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
       .subscribe({
         next: () => {
           this.toastService.show('Account deleted successfully.', 'success');

@@ -22,6 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { GoModuleListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -34,7 +35,6 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { GoModuleListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { Sort } from '../../../../../shared/dto/sort';
 import { GolangConfigComponent } from '../../config/golang-config.component';
 import { GolangService } from '../../service/golang.service';
@@ -132,15 +132,20 @@ export class GolangModulesListComponent implements OnDestroy {
 
   public deleteModule(mod: GoModuleListItem) {
     this.dangerModalService.show('Delete Module', 'Delete', () => {
-      this.golangService.deleteModule(mod.modulePath).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          this.refreshPage();
-          this.toastService.show('Module deleted successfully', 'success');
-        },
-        error: () => {},
-      });
+      this.golangService
+        .deleteModule(mod.modulePath)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.refreshPage();
+            this.toastService.show('Module deleted successfully', 'success');
+          },
+          error: () => {},
+        });
     });
   }
 
@@ -151,15 +156,19 @@ export class GolangModulesListComponent implements OnDestroy {
       ? this.golangService.searchModules(this.searchText, this.sortOption, this.pageNum, this.pageSize)
       : this.golangService.fetchModules(this.sortOption, this.pageNum, this.pageSize);
 
-    fetch.pipe(
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (pagedData: PagedData<GoModuleListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.modules = pagedData.content;
-      },
-      error: () => {},
-    });
+    fetch
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<GoModuleListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.modules = pagedData.content;
+        },
+        error: () => {},
+      });
   }
 
   public get canManage(): boolean {

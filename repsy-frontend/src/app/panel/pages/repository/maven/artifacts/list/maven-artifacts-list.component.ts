@@ -22,6 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { ArtifactListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -36,7 +37,6 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { MavenConfigComponent } from '../../config/maven-config.component';
-import { RepoPermissionInfo, ArtifactListItem } from '../../../../../../../generated/api';
 import { MavenService } from '../../service/maven.service';
 
 @Component({
@@ -140,35 +140,45 @@ export class MavenArtifactsListComponent implements OnDestroy {
   public deleteArtifact(artifact: ArtifactListItem) {
     this.dangerModalService.show('Delete Artifact', 'Delete', () => {
       this.loading = true;
-      this.mavenService.deleteArtifact(artifact.groupName, artifact.artifactName).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          if (this.artifacts.length === 1) {
-            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+      this.mavenService
+        .deleteArtifact(artifact.groupName, artifact.artifactName)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            if (this.artifacts.length === 1) {
+              this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+                this.toastService.show('Artifact deleted successfully', 'success');
+              });
+            } else {
+              this.refreshPage();
               this.toastService.show('Artifact deleted successfully', 'success');
-            });
-          } else {
-            this.refreshPage();
-            this.toastService.show('Artifact deleted successfully', 'success');
-          }
-        },
-        error: () => {},
-      });
+            }
+          },
+          error: () => {},
+        });
     });
   }
 
   private fetchGroupArtifacts(): void {
     this.loading = true;
-    this.mavenService.searchArtifacts(this.groupName, this.searchText, this.sortOption, this.pageNum, this.pageSize).pipe(
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (pagedData: PagedData<ArtifactListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.artifacts = pagedData.content;
-      },
-      error: () => {},
-    });
+    this.mavenService
+      .searchArtifacts(this.groupName, this.searchText, this.sortOption, this.pageNum, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<ArtifactListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.artifacts = pagedData.content;
+        },
+        error: () => {},
+      });
   }
 
   public get canManage(): boolean {

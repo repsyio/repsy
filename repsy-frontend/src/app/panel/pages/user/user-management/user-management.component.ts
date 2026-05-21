@@ -20,6 +20,8 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import moment from 'moment';
 import { finalize, map } from 'rxjs';
 
+import { PagedModelUserResponse, UserResponse } from '../../../../../generated/api';
+import { UserControllerService } from '../../../../../generated/api/api/user-controller.service';
 import { DropdownComponent } from '../../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../../shared/components/ellipsis/ellipsis.pipe';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -30,8 +32,6 @@ import { PaginationComponent } from '../../../shared/components/pagination/pagin
 import { SearchboxComponent } from '../../../shared/components/searchbox/searchbox.component';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../shared/components/tooltip/tooltip.component';
-import { PagedModelUserResponse, UserResponse } from '../../../../../generated/api';
-import { UserControllerService } from '../../../../../generated/api/api/user-controller.service';
 
 @Component({
   selector: 'app-user-management',
@@ -78,8 +78,8 @@ export class UserManagementComponent implements OnInit {
   public fetchUsers(): void {
     this.userControllerService
       .listUsers(this.searchQuery || undefined, this.pageNum, this.pageSize)
-      .pipe(map(r => r.data!))
-      .subscribe(pagedModel => {
+      .pipe(map((r) => r.data!))
+      .subscribe((pagedModel) => {
         this.pagedData = pagedModel;
         this.users = pagedModel.content ?? [];
       });
@@ -118,10 +118,12 @@ export class UserManagementComponent implements OnInit {
       this.userControllerService
         .resetPassword(user.id)
         .pipe(
-          map(r => r.data!),
-          finalize(() => { this.operationLock = false; }),
+          map((r) => r.data!),
+          finalize(() => {
+            this.operationLock = false;
+          }),
         )
-        .subscribe(password => {
+        .subscribe((password) => {
           this.newPassword = password;
           this.selectedUser = user;
           this.showResetPasswordModal = true;
@@ -143,7 +145,11 @@ export class UserManagementComponent implements OnInit {
 
       this.userControllerService
         .deleteUser(user.id)
-        .pipe(finalize(() => { this.operationLock = false; }))
+        .pipe(
+          finalize(() => {
+            this.operationLock = false;
+          }),
+        )
         .subscribe(() => {
           this.fetchUsers();
           this.toastService.show(successMsg, 'success');

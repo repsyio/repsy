@@ -18,16 +18,16 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
 
-import { PagedData } from '../../../../shared/dto/paged-data';
-import { Sort } from '../../../../shared/dto/sort';
 import {
+  GolangModuleControllerService,
   GoModuleInfo,
   GoModuleListItem,
   GoModuleVersionListItem,
-  GolangModuleControllerService,
   ProtocolRepoControllerService,
   RepoPermissionInfo,
 } from '../../../../../../generated/api';
+import { PagedData } from '../../../../shared/dto/paged-data';
+import { Sort } from '../../../../shared/dto/sort';
 
 @Injectable({
   providedIn: 'root',
@@ -50,28 +50,37 @@ export class GolangService {
 
   public getRepository(repoName: string): Observable<RepoPermissionInfo> {
     return this.protocolRepoControllerService.getPermission(repoName).pipe(
-      map(r => r.data!),
-      tap(info => this.repoSubject.next(info)),
+      map((r) => r.data!),
+      tap((info) => this.repoSubject.next(info)),
     );
   }
 
   public fetchModules(sortOption: Sort, pageIndex: number, pageSize: number): Observable<PagedData<GoModuleListItem>> {
-    return this.golangModuleControllerService.listGolangModules(
-      { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-      this.repoName,
-    ).pipe(
-      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<GoModuleListItem>)),
-    );
+    return this.golangModuleControllerService
+      .listGolangModules(
+        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
+        this.repoName,
+      )
+      .pipe(
+        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GoModuleListItem>),
+      );
   }
 
-  public searchModules(search: string, sortOption: Sort, pageIndex: number, pageSize: number): Observable<PagedData<GoModuleListItem>> {
-    return this.golangModuleControllerService.searchGolangModules(
-      { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-      this.repoName,
-      search || undefined,
-    ).pipe(
-      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<GoModuleListItem>)),
-    );
+  public searchModules(
+    search: string,
+    sortOption: Sort,
+    pageIndex: number,
+    pageSize: number,
+  ): Observable<PagedData<GoModuleListItem>> {
+    return this.golangModuleControllerService
+      .searchGolangModules(
+        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
+        this.repoName,
+        search || undefined,
+      )
+      .pipe(
+        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GoModuleListItem>),
+      );
   }
 
   public deleteModule(modulePath: string): Observable<void> {
@@ -85,25 +94,28 @@ export class GolangService {
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<GoModuleVersionListItem>> {
-    return this.golangModuleControllerService.listGolangModuleVersions(
-      modulePath,
-      { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-      this.repoName,
-      search || undefined,
-    ).pipe(
-      map(r => ({ content: r.data?.content ?? [], page: r.data?.page } as unknown as PagedData<GoModuleVersionListItem>)),
-    );
+    return this.golangModuleControllerService
+      .listGolangModuleVersions(
+        modulePath,
+        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
+        this.repoName,
+        search || undefined,
+      )
+      .pipe(
+        map(
+          (r) =>
+            ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GoModuleVersionListItem>,
+        ),
+      );
   }
 
   public fetchModuleInfo(modulePath: string): Observable<GoModuleInfo> {
-    return this.golangModuleControllerService.getGolangModuleInfo(modulePath, this.repoName).pipe(
-      map(r => r.data!),
-    );
+    return this.golangModuleControllerService.getGolangModuleInfo(modulePath, this.repoName).pipe(map((r) => r.data!));
   }
 
   public deleteModuleVersion(modulePath: string, version: string): Observable<void> {
-    return this.golangModuleControllerService.deleteGolangModuleVersion(modulePath, version, this.repoName).pipe(
-      map(() => undefined),
-    );
+    return this.golangModuleControllerService
+      .deleteGolangModuleVersion(modulePath, version, this.repoName)
+      .pipe(map(() => undefined));
   }
 }

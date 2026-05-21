@@ -22,6 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { NpmPackageListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -34,7 +35,6 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { NpmPackageListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { Sort } from '../../../../../shared/dto/sort';
 import { NpmConfigComponent } from '../../config/npm-config.component';
 import { NpmService } from '../../service/npm.service';
@@ -135,35 +135,40 @@ export class NpmPackagesListComponent implements OnDestroy {
 
   private fetchPackages(): void {
     this.loading = true;
-    this.npmService.searchPackages(
-      this.searchText === '' ? null : this.searchText,
-      this.sortOption,
-      this.pageNum,
-      this.pageSize,
-    ).pipe(
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (pagedData: PagedData<NpmPackageListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.packages = pagedData.content;
-        console.log('Fetched packages:', this.packages);
-      },
-      error: () => {},
-    });
+    this.npmService
+      .searchPackages(this.searchText === '' ? null : this.searchText, this.sortOption, this.pageNum, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<NpmPackageListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.packages = pagedData.content;
+          console.log('Fetched packages:', this.packages);
+        },
+        error: () => {},
+      });
   }
 
   public deletePackage(pck: NpmPackageListItem) {
     this.dangerModalService.show('Delete Package', 'Delete', () => {
       this.loading = true;
-      this.npmService.deletePackage(pck.name, pck.scope).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          this.refreshPage();
-          this.toastService.show('Package deleted successfully', 'success');
-        },
-        error: () => {},
-      });
+      this.npmService
+        .deletePackage(pck.name, pck.scope)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.refreshPage();
+            this.toastService.show('Package deleted successfully', 'success');
+          },
+          error: () => {},
+        });
     });
   }
 

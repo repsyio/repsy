@@ -16,10 +16,12 @@
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import moment from 'moment';
 import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { CrateListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -34,9 +36,7 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { CargoConfigComponent } from '../../config/cargo-config.component';
-import { RepoPermissionInfo, CrateListItem } from '../../../../../../../generated/api';
 import { CargoService } from '../../service/cargo.service';
-import moment from 'moment';
 
 @Component({
   selector: 'app-cargo-crates-list',
@@ -127,30 +127,40 @@ export class CargoCratesListComponent implements OnDestroy {
   public deleteCrate(crate: CrateListItem): void {
     this.dangerModalService.show('Delete Crate', 'Delete', () => {
       this.loading = true;
-      this.cargoService.deleteCrate(crate.name).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          this.refreshPage();
-          this.toastService.show('Crate deleted successfully', 'success');
-        },
-        error: () => {},
-      });
+      this.cargoService
+        .deleteCrate(crate.name)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.refreshPage();
+            this.toastService.show('Crate deleted successfully', 'success');
+          },
+          error: () => {},
+        });
     });
   }
 
   private fetchCrates(): void {
     this.loading = true;
-    this.cargoService.searchCrates(this.searchText, this.sortOption, this.pageNum, this.pageSize).pipe(
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (pagedData: PagedData<CrateListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.crates = pagedData.content;
-        this.error = null;
-      },
-      error: () => {},
-    });
+    this.cargoService
+      .searchCrates(this.searchText, this.sortOption, this.pageNum, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<CrateListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.crates = pagedData.content;
+          this.error = null;
+        },
+        error: () => {},
+      });
   }
 
   public get canManage(): boolean {

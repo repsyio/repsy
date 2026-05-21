@@ -22,6 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { ManifestListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
@@ -36,7 +37,6 @@ import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { DockerConfigComponent } from '../../config/docker-config.component';
 import { getRepoDomain } from '../../docker-repo-util';
-import { RepoPermissionInfo, ManifestListItem } from '../../../../../../../generated/api';
 import { DockerService } from '../../service/docker.service';
 
 @Component({
@@ -137,15 +137,20 @@ export class DockerImagesManifestListComponent implements OnDestroy {
 
   private fetchManifests(): void {
     this.loading = true;
-    this.dockerService.searchManifests(this.searchText, this.sortOption, this.imageName, this.tagName, this.pageNum, this.pageSize).pipe(
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (pagedData: PagedData<ManifestListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.manifests = pagedData.content;
-      },
-      error: () => {},
-    });
+    this.dockerService
+      .searchManifests(this.searchText, this.sortOption, this.imageName, this.tagName, this.pageNum, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<ManifestListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.manifests = pagedData.content;
+        },
+        error: () => {},
+      });
   }
 
   public get canManage(): boolean {

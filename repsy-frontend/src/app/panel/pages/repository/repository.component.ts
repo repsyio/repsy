@@ -20,6 +20,7 @@ import { RouterLink } from '@angular/router';
 import moment from 'moment';
 import { finalize, map } from 'rxjs/operators';
 
+import { ProtocolRepoControllerService, RepoType as ApiRepoType } from '../../../../generated/api';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../shared/components/ellipsis/ellipsis.pipe';
@@ -35,10 +36,6 @@ import { RepoListItem } from '../../shared/dto/repo/repo-list-item';
 import { RepoType } from '../../shared/dto/repo/repo-type';
 import { ByteFormatter } from '../../shared/util/byte-formatter';
 import { ProfileService } from '../profile/service/profile.service';
-import {
-  ProtocolRepoControllerService,
-  RepoType as ApiRepoType,
-} from '../../../../generated/api';
 
 @Component({
   selector: 'app-repository',
@@ -75,6 +72,7 @@ export class RepositoryComponent {
     RepoType.PYPI,
     RepoType.CARGO,
     RepoType.GOLANG,
+    RepoType.NUGET,
   ];
   public loading = true;
   public operationLock = false;
@@ -140,16 +138,21 @@ export class RepositoryComponent {
     }
     this.dangerModalService.show('Delete Repository', 'Delete', () => {
       this.operationLock = true;
-      this.protocolRepoControllerService.deleteRepo(repo.name).pipe(
-        finalize(() => { this.operationLock = false; }),
-        map(() => undefined),
-      ).subscribe({
-        next: () => {
-          this.refreshPage();
-          this.toastService.show('Repository deleted successfully', 'success');
-        },
-        error: () => {},
-      });
+      this.protocolRepoControllerService
+        .deleteRepo(repo.name)
+        .pipe(
+          finalize(() => {
+            this.operationLock = false;
+          }),
+          map(() => undefined),
+        )
+        .subscribe({
+          next: () => {
+            this.refreshPage();
+            this.toastService.show('Repository deleted successfully', 'success');
+          },
+          error: () => {},
+        });
     });
   }
 
@@ -168,26 +171,32 @@ export class RepositoryComponent {
     this.fetchRepositories(RepoType.DOCKER);
     this.fetchRepositories(RepoType.CARGO);
     this.fetchRepositories(RepoType.GOLANG);
+    this.fetchRepositories(RepoType.NUGET);
   }
 
   private fetchRepositories(repoType: RepoType): void {
     this.loading = true;
-    this.protocolRepoControllerService.getInfo(repoType.toUpperCase() as ApiRepoType).pipe(
-      finalize(() => { this.loading = false; }),
-      map(r => r.data as unknown as RepoListItem[]),
-    ).subscribe({
-      next: (repos: RepoListItem[]) => {
-        const temp = (repos ?? []).map((repo: RepoListItem) => {
-          repo.repoType = repoType;
-          return repo;
-        });
+    this.protocolRepoControllerService
+      .getInfo(repoType.toUpperCase() as ApiRepoType)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+        map((r) => r.data as unknown as RepoListItem[]),
+      )
+      .subscribe({
+        next: (repos: RepoListItem[]) => {
+          const temp = (repos ?? []).map((repo: RepoListItem) => {
+            repo.repoType = repoType;
+            return repo;
+          });
 
-        this.repositories.push(...temp);
-        this.filteredRepos.push(...temp);
-        this.loadPage(0);
-      },
-      error: () => {},
-    });
+          this.repositories.push(...temp);
+          this.filteredRepos.push(...temp);
+          this.loadPage(0);
+        },
+        error: () => {},
+      });
   }
 
   private loadAllRepos(option: string) {
@@ -202,7 +211,7 @@ export class RepositoryComponent {
   }
 
   private loadUserRole(): void {
-    this.profileFacadeService.get().subscribe(profile => {
+    this.profileFacadeService.get().subscribe((profile) => {
       this.isAdmin = profile.role === 'ADMIN';
     });
   }

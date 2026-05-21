@@ -21,6 +21,7 @@ import io.repsy.os.server.protocols.docker.shared.storage.configs.DockerFileSyst
 import io.repsy.os.server.protocols.golang.shared.storage.configs.GolangFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.maven.shared.storage.configs.MavenFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.npm.shared.storage.configs.NpmFileSystemStorageBackendConfigProps;
+import io.repsy.os.server.protocols.nuget.shared.storage.configs.NuGetFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.pypi.shared.storage.configs.PypiFileSystemStorageBackendConfigProps;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +37,8 @@ import org.springframework.scheduling.annotation.EnableAsync;
   PypiFileSystemStorageBackendConfigProps.class,
   DockerFileSystemStorageBackendConfigProps.class,
   GolangFileSystemStorageBackendConfigProps.class,
-  CargoFileSystemStorageBackendConfigProps.class
+  CargoFileSystemStorageBackendConfigProps.class,
+  NuGetFileSystemStorageBackendConfigProps.class,
 })
 @EnableAsync
 @SpringBootApplication(

@@ -361,6 +361,17 @@
       >
       </app-cargo-config>
     }
+    @case (RepoType.NUGET) {
+      <app-nuget-config
+        (openChange)="openConfigure($event)"
+        [(open)]="showConfig"
+        [baseUrl]="this.environment.repoBaseUrl"
+        [username]="this.selectedDeployToken.username"
+        [repoName]="this.activeRepository.repoName"
+        [deployToken]="true"
+      >
+      </app-nuget-config>
+    }
     @default {
       <p>No config available for this repository.</p>
     }

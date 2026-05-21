@@ -22,6 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
@@ -35,7 +36,6 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../../../generated/api';
 import { Sort } from '../../../../../shared/dto/sort';
 import { DockerConfigComponent } from '../../config/docker-config.component';
 import { getRepoDomain } from '../../docker-repo-util';
@@ -141,35 +141,45 @@ export class DockerImagesTagListComponent implements OnDestroy {
 
   private fetchTags(): void {
     this.loading = true;
-    this.dockerService.searchTags(this.searchText, this.sortOption, this.imageName, this.pageNum, this.pageSize).pipe(
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (pagedData: PagedData<TagListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.tags = pagedData.content;
-      },
-      error: () => {},
-    });
+    this.dockerService
+      .searchTags(this.searchText, this.sortOption, this.imageName, this.pageNum, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<TagListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.tags = pagedData.content;
+        },
+        error: () => {},
+      });
   }
 
   public deleteTag(tag: TagListItem) {
     this.dangerModalService.show('Delete Tag', 'Delete', () => {
       this.loading = true;
-      this.dockerService.deleteTag(this.imageName, tag.name).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          if (this.tags.length - 1 === 0) {
-            this.router.navigate([`/${this.activeRepo.repoName}`]).then(() => {
+      this.dockerService
+        .deleteTag(this.imageName, tag.name)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            if (this.tags.length - 1 === 0) {
+              this.router.navigate([`/${this.activeRepo.repoName}`]).then(() => {
+                this.toastService.show('Tag deleted successfully', 'success');
+              });
+            } else {
+              this.refreshPage();
               this.toastService.show('Tag deleted successfully', 'success');
-            });
-          } else {
-            this.refreshPage();
-            this.toastService.show('Tag deleted successfully', 'success');
-          }
-        },
-        error: () => {},
-      });
+            }
+          },
+          error: () => {},
+        });
     });
   }
 

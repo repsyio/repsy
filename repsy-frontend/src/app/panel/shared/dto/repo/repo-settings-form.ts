@@ -17,6 +17,6 @@
 export class RepoSettingsForm {
   public privateRepo: boolean;
   public allowOverride: boolean;
-  public releases: boolean = false;
-  public snapshots: boolean = false;
+  public releases = false;
+  public snapshots = false;
 }

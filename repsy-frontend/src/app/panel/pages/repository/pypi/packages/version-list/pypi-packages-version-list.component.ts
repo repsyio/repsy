@@ -22,6 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { ReleaseListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -36,7 +37,6 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { PypiConfigComponent } from '../../config/pypi-config.component';
-import { RepoPermissionInfo, ReleaseListItem } from '../../../../../../../generated/api';
 import { PypiService } from '../../service/pypi.service';
 
 @Component({
@@ -139,21 +139,26 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
   public deleteVersion(version: ReleaseListItem) {
     this.dangerModalService.show('Delete Release', 'Delete', () => {
       this.loading = true;
-      this.pypiService.deleteRelease(this.packageName, version.version).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          if (this.versions.length - 1 === 0) {
-            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+      this.pypiService
+        .deleteRelease(this.packageName, version.version)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            if (this.versions.length - 1 === 0) {
+              this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+                this.toastService.show('Version deleted successfully', 'success');
+              });
+            } else {
+              this.refreshPage();
               this.toastService.show('Version deleted successfully', 'success');
-            });
-          } else {
-            this.refreshPage();
-            this.toastService.show('Version deleted successfully', 'success');
-          }
-        },
-        error: () => {},
-      });
+            }
+          },
+          error: () => {},
+        });
     });
   }
 
@@ -161,7 +166,11 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
     this.loading = true;
     this.pypiService
       .fetchPackageReleasesLikeName(this.packageName, this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .pipe(finalize(() => { this.loading = false; }))
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
       .subscribe({
         next: (pagedData: PagedData<ReleaseListItem>) => {
           this.pagedData.page = pagedData.page;

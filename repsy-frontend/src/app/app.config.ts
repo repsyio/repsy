@@ -14,7 +14,13 @@
 /// limitations under the License.
 ///
 
-import { HTTP_INTERCEPTORS, HttpClient, provideHttpClient, withInterceptors, withInterceptorsFromDi } from '@angular/common/http';
+import {
+  HTTP_INTERCEPTORS,
+  HttpClient,
+  provideHttpClient,
+  withInterceptors,
+  withInterceptorsFromDi,
+} from '@angular/common/http';
 import { ApplicationConfig, ErrorHandler, importProvidersFrom } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { PreloadAllModules, PreloadingStrategy, provideRouter, withInMemoryScrolling } from '@angular/router';

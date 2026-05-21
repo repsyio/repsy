@@ -21,11 +21,11 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { ReleaseClassifierInfo, ReleaseDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo, ReleaseDetail, ReleaseClassifierInfo } from '../../../../../../../generated/api';
 import { PypiService } from '../../service/pypi.service';
 
 type Classifiers = Record<string, [string]>;
@@ -79,38 +79,48 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
 
     this.installation = `pip install hello-world --extra-index-url ${this.baseUrl}/${this.activeRepo.repoName}/simple`;
 
-    this.pypiService.fetchRelease(this.packageName, this.versionName).pipe(
-      finalize(() => { this.loading = false; }),
-    ).subscribe({
-      next: (releaseInfo: ReleaseDetail) => {
-        this.versionInfo = releaseInfo;
-        releaseInfo.classifiers.forEach((c: ReleaseClassifierInfo) =>
-          this.classifiers[c.classifier]
-            ? this.classifiers[c.classifier].push(c.value)
-            : (this.classifiers[c.classifier] = [c.value]),
-        );
+    this.pypiService
+      .fetchRelease(this.packageName, this.versionName)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (releaseInfo: ReleaseDetail) => {
+          this.versionInfo = releaseInfo;
+          releaseInfo.classifiers.forEach((c: ReleaseClassifierInfo) =>
+            this.classifiers[c.classifier]
+              ? this.classifiers[c.classifier].push(c.value)
+              : (this.classifiers[c.classifier] = [c.value]),
+          );
 
-        releaseInfo.descriptionContentType = releaseInfo.descriptionContentType
-          ? releaseInfo.descriptionContentType.split(';')[0].trim()
-          : '';
-      },
-      error: () => {},
-    });
+          releaseInfo.descriptionContentType = releaseInfo.descriptionContentType
+            ? releaseInfo.descriptionContentType.split(';')[0].trim()
+            : '';
+        },
+        error: () => {},
+      });
   }
 
   public deleteVersion() {
     this.dangerModalService.show('Delete Release', 'Delete', () => {
       this.loading = true;
-      this.pypiService.deleteRelease(this.packageName, this.versionInfo.version).pipe(
-        finalize(() => { this.loading = false; }),
-      ).subscribe({
-        next: () => {
-          this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
-            this.toastService.show('Version deleted successfully', 'success');
-          });
-        },
-        error: () => {},
-      });
+      this.pypiService
+        .deleteRelease(this.packageName, this.versionInfo.version)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+              this.toastService.show('Version deleted successfully', 'success');
+            });
+          },
+          error: () => {},
+        });
     });
   }
 }

@@ -20,7 +20,11 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
-import { ProtocolRepoControllerService, RepoCreateForm, RepoType as ApiRepoType } from '../../../../../../generated/api';
+import {
+  ProtocolRepoControllerService,
+  RepoCreateForm,
+  RepoType as ApiRepoType,
+} from '../../../../../../generated/api';
 import { RepoType } from '../../../dto/repo/repo-type';
 import { SelectorComponent } from '../../selector/selector.component';
 import { ToastService } from '../../toast/toast.service';
@@ -39,7 +43,15 @@ export class RepositoryCreateModalComponent implements OnInit {
   @Input() public open: boolean;
   @Input() selectedOption: RepoType;
 
-  public options = [RepoType.DOCKER, RepoType.MAVEN, RepoType.NPM, RepoType.PYPI, RepoType.CARGO, RepoType.GOLANG];
+  public options = [
+    RepoType.DOCKER,
+    RepoType.MAVEN,
+    RepoType.NPM,
+    RepoType.PYPI,
+    RepoType.CARGO,
+    RepoType.GOLANG,
+    RepoType.NUGET,
+  ];
   public form: FormGroup;
 
   public loading = false;
@@ -80,18 +92,24 @@ export class RepositoryCreateModalComponent implements OnInit {
     const form = this.form.getRawValue() as RepoCreateForm;
     const apiRepoType = this.selectedOption.toUpperCase() as ApiRepoType;
 
-    this.protocolRepoControllerService.createRepo(apiRepoType, form).pipe(
-      finalize(() => { this.form.enable(); this.loading = false; }),
-    ).subscribe({
-      next: () => {
-        this.router.navigate(['/repositories']).then(() => {
-          this.toastService.show('Repository created successfully', 'success');
-        });
+    this.protocolRepoControllerService
+      .createRepo(apiRepoType, form)
+      .pipe(
+        finalize(() => {
+          this.form.enable();
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: () => {
+          this.router.navigate(['/repositories']).then(() => {
+            this.toastService.show('Repository created successfully', 'success');
+          });
 
-        this.created.emit();
-        this.closeModal();
-      },
-      error: () => {},
-    });
+          this.created.emit();
+          this.closeModal();
+        },
+        error: () => {},
+      });
   }
 }

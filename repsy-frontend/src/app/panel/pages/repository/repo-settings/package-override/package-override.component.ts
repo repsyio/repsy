@@ -18,11 +18,11 @@ import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
+import { ProtocolRepoControllerService } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
-import { ProtocolRepoControllerService } from '../../../../../../generated/api';
 import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form';
 
 @Component({
@@ -59,6 +59,13 @@ export class PackageOverrideComponent implements OnInit {
       mavenForm.snapshots = this.parentForm.get('snapshots')?.value;
       mavenForm.releases = this.parentForm.get('releases')?.value;
       form = mavenForm;
+    } else if (this.repoType === RepoType.NUGET) {
+      const nugetForm = new RepoSettingsForm();
+      nugetForm.allowOverride = this.allowOverride;
+      nugetForm.privateRepo = this.parentForm.get('privateRepository')?.value;
+      nugetForm.releases = this.parentForm.get('releases')?.value;
+      nugetForm.snapshots = this.parentForm.get('snapshots')?.value;
+      form = nugetForm;
     } else {
       const generalForm = new RepoSettingsForm();
       generalForm.allowOverride = this.allowOverride;

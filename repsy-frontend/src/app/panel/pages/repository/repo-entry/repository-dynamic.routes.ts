@@ -84,4 +84,9 @@ export const REPOSITORY_DYNAMIC_ROUTES: Routes = [
     canMatch: [canMatchRepoType('golang')],
     loadChildren: () => import('../golang/golang.routes').then((m) => m.GOLANG_ROUTES),
   },
+  {
+    path: '',
+    canMatch: [canMatchRepoType('nuget')],
+    loadChildren: () => import('../nuget/nuget.routes').then((m) => m.NUGET_ROUTES),
+  },
 ];

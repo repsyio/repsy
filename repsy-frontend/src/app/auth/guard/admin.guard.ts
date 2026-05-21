@@ -25,7 +25,7 @@ export const adminGuard: CanActivateFn = () => {
   const router = inject(Router);
 
   return profileFacadeService.get().pipe(
-    map(profile => {
+    map((profile) => {
       if (profile.role === 'ADMIN') {
         return true;
       }
