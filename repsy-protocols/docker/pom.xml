@@ -36,7 +36,7 @@
       <artifactId>spring-data-commons</artifactId>
     </dependency>
     <dependency>
-      <groupId>actions/checkout@v6</groupId>
+      <groupId>org.json</groupId>
       <artifactId>json</artifactId>
       <version>20251224</version>
       <scope>compile</scope>
