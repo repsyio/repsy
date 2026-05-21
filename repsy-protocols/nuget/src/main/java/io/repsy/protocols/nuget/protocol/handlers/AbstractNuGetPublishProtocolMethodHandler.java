@@ -25,6 +25,7 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -95,7 +96,7 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler implements Proto
         return this.createErrorResponse(HttpStatus.BAD_REQUEST, "Missing package content.");
       }
 
-      this.processPublishing(context, parts.iterator().next());
+      this.processPublishing(context, findPackagePart(parts));
       return ResponseEntity.status(HttpStatus.CREATED).build();
 
     } catch (final IllegalArgumentException e) {
@@ -114,6 +115,14 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler implements Proto
     if (contentType == null || !contentType.toLowerCase().contains("multipart/form-data")) {
       throw new IllegalArgumentException("Content-Type must be multipart/form-data");
     }
+  }
+
+  private static Part findPackagePart(final Collection<Part> parts) {
+
+    return parts.stream()
+        .filter(p -> "package".equalsIgnoreCase(p.getName()))
+        .findFirst()
+        .orElseGet(() -> parts.iterator().next());
   }
 
   private void processPublishing(final ProtocolContext context, final Part nupkgPart)

@@ -70,13 +70,10 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
       List.of("catalog:CatalogRoot", "PackageRegistration", "catalog:Permalink");
 
   protected void doPublish(
-      final BaseRepoInfo<ID> repoInfo,
-      final String packageId,
-      final String version,
-      final String nuspecXml)
+      final BaseRepoInfo<ID> repoInfo, final ID pkgId, final String version, final String nuspecXml)
       throws IOException {
 
-    this.packageService.publish(repoInfo, packageId, version, nuspecXml);
+    this.packageService.publishVersion(repoInfo, pkgId, version, nuspecXml);
   }
 
   @Override
@@ -113,8 +110,9 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
                 + " already exists.");
       }
 
+      final var pkgId = this.packageService.findOrCreatePackage(repoInfo, metadata.packageId());
       final var usages = this.storePackage(repoInfo, metadata, tempFile);
-      this.doPublish(repoInfo, metadata.packageId(), metadata.version(), metadata.nuspecXml());
+      this.doPublish(repoInfo, pkgId, metadata.version(), metadata.nuspecXml());
 
       log.info(
           "Successfully published and stored NuGet package {} {}",
@@ -133,7 +131,10 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var packageId = extractPackageId(context);
 
-    return this.packageService.getVersions(repoInfo, packageId);
+    // Flat container spec: return ALL versions including unlisted
+    return this.packageService.getAllVersionInfos(repoInfo, packageId).stream()
+        .map(v -> v.version().toLowerCase(Locale.ROOT))
+        .toList();
   }
 
   @Override

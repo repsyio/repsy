@@ -15,6 +15,8 @@
  */
 package io.repsy.protocols.nuget.shared.storage.services;
 
+import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.normalizeNuGetVersion;
+
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -46,7 +48,7 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
       throws IOException {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
-    final var normalizedVersion = version.toLowerCase(Locale.ROOT);
+    final var normalizedVersion = normalizeNuGetVersion(version);
 
     final var nupkgPath =
         PACKAGES_PATH
@@ -91,7 +93,7 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
   public Resource getNuPkg(final UUID repoId, final String packageId, final String version) {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
-    final var normalizedVersion = version.toLowerCase(Locale.ROOT);
+    final var normalizedVersion = normalizeNuGetVersion(version);
 
     final var nupkgPath =
         PACKAGES_PATH
@@ -115,7 +117,7 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
   public Resource getNuspec(final UUID repoId, final String packageId, final String version) {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
-    final var normalizedVersion = version.toLowerCase(Locale.ROOT);
+    final var normalizedVersion = normalizeNuGetVersion(version);
 
     final var nuspecPath =
         PACKAGES_PATH
@@ -145,7 +147,7 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
       throws IOException {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
-    final var normalizedVersion = version.toLowerCase(Locale.ROOT);
+    final var normalizedVersion = normalizeNuGetVersion(version);
 
     final var versionPath = PACKAGES_PATH + "/" + normalizedId + "/" + normalizedVersion;
     final var versionStoragePath = StoragePath.of(repoId, versionPath);

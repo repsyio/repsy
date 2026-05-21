@@ -42,17 +42,15 @@ public class NuGetProtocolFacade extends AbstractNuGetProtocolFacade<UUID> {
   @Override
   protected void doPublish(
       final BaseRepoInfo<UUID> repoInfo,
-      final String packageId,
+      final UUID pkgId,
       final String version,
       final String nuspecXml)
       throws IOException {
 
     try {
-      super.doPublish(repoInfo, packageId, version, nuspecXml);
+      super.doPublish(repoInfo, pkgId, version, nuspecXml);
     } catch (final DataIntegrityViolationException e) {
-      final var msg = "Version %s of package %s already exists.".formatted(version, packageId);
-
-      throw new ResponseStatusException(CONFLICT, msg);
+      throw new ResponseStatusException(CONFLICT, "Version %s already exists.".formatted(version));
     }
   }
 }

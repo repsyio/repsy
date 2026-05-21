@@ -86,28 +86,38 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
   @Override
   @Transactional
-  public void publish(
+  public UUID findOrCreatePackage(final BaseRepoInfo<UUID> repoInfo, final String packageId) {
+
+    final var repo = this.findRepoById(repoInfo.getId());
+    return this.findPackageByRepoIdAndPackageId(repo, packageId.toLowerCase(Locale.ROOT)).getId();
+  }
+
+  @Override
+  @Transactional
+  public void publishVersion(
       final BaseRepoInfo<UUID> repoInfo,
-      final String packageId,
+      final UUID pkgId,
       final String version,
       final String nuspecXml) {
 
-    final var repo = this.findRepoById(repoInfo.getId());
-    final var nugetPackage = this.findPackageByRepoIdAndPackageId(repo, packageId);
+    final var pkg =
+        this.packageRepository
+            .findById(pkgId)
+            .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
 
     final var existingVersion =
-        this.packageVersionRepository.findByNugetPackageIdAndVersion(nugetPackage.getId(), version);
+        this.packageVersionRepository.findByNugetPackageIdAndVersion(pkg.getId(), version);
 
     if (existingVersion.isPresent()) {
       if (!repoInfo.isAllowOverride()) {
         throw new ResponseStatusException(
             HttpStatus.CONFLICT,
-            "Version " + version + " of package " + packageId + " already exists.");
+            "Version " + version + " of package " + pkg.getPackageId() + " already exists.");
       }
       this.packageVersionRepository.delete(existingVersion.get());
     }
 
-    final var pkgVersion = this.createNuGetPackageVersion(nugetPackage, nuspecXml, version);
+    final var pkgVersion = this.createNuGetPackageVersion(pkg, nuspecXml, version);
 
     this.packageVersionRepository.save(pkgVersion);
   }

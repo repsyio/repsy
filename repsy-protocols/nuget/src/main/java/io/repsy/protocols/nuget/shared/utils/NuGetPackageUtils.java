@@ -34,6 +34,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -76,6 +77,40 @@ public final class NuGetPackageUtils {
           return v1.compareToIgnoreCase(v2);
         }
       };
+
+  /**
+   * Normalizes a NuGet version string to its canonical form: - Lowercased - Trailing zero
+   * components stripped (min 3: major.minor.patch) - 1.0 → 1.0.0, 1.0.0.0 → 1.0.0, 1.0.0-Alpha →
+   * 1.0.0-alpha
+   */
+  public static String normalizeNuGetVersion(final String rawVersion) {
+
+    final var lower = rawVersion.strip().toLowerCase(Locale.ROOT);
+    final var dashIdx = lower.indexOf('-');
+    final var core = dashIdx >= 0 ? lower.substring(0, dashIdx) : lower;
+    final var preRelease = dashIdx >= 0 ? lower.substring(dashIdx) : "";
+
+    final var components = core.split("\\.");
+
+    int end = components.length;
+    while (end > THREE && "0".equals(components[end - 1])) {
+      end--;
+    }
+
+    return buildVersionString(components, end) + preRelease;
+  }
+
+  private static String buildVersionString(final String[] components, final int end) {
+    final var sb = new StringBuilder();
+    final int partCount = Math.max(end, 3);
+    for (int i = 0; i < partCount; i++) {
+      if (i > 0) {
+        sb.append('.');
+      }
+      sb.append(i < components.length ? components[i] : "0");
+    }
+    return sb.toString();
+  }
 
   public static @Nullable String extractXmlTag(final String xml, final String tagName) {
     try {
@@ -262,7 +297,7 @@ public final class NuGetPackageUtils {
       throw new IllegalArgumentException("Missing 'id' or 'version' in nuspec.");
     }
 
-    return new NuspecMetadata(packageId, version, nuspecXml);
+    return new NuspecMetadata(packageId, normalizeNuGetVersion(version), nuspecXml);
   }
 
   public static void copyStreamToFile(final InputStream stream, final Path target)

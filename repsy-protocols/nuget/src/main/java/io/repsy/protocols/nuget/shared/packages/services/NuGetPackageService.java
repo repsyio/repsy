@@ -18,7 +18,6 @@ package io.repsy.protocols.nuget.shared.packages.services;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
-import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
@@ -28,8 +27,9 @@ import org.springframework.data.domain.Pageable;
 @NullMarked
 public interface NuGetPackageService<ID> {
 
-  void publish(BaseRepoInfo<ID> repoInfo, String packageId, String version, String nuspecXml)
-      throws IOException;
+  ID findOrCreatePackage(BaseRepoInfo<ID> repoInfo, String packageId);
+
+  void publishVersion(BaseRepoInfo<ID> repoInfo, ID pkgId, String version, String nuspecXml);
 
   boolean versionExists(BaseRepoInfo<ID> repoInfo, String packageId, String version);
 
