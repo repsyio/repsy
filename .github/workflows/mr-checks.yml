@@ -13,7 +13,7 @@ jobs:
     name: Editorconfig check - All
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: There must be only one .editorconfig file
         run: |
@@ -33,12 +33,12 @@ jobs:
     name: Repsy check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           submodules: recursive
 
       - name: Setup Maven Action
-        uses: s4u/setup-maven-action@v1.19.0
+        uses: s4u/setup-maven-action@v1.20.0
 
       - name: Set up JDK
         uses: actions/setup-java@v5
@@ -60,10 +60,10 @@ jobs:
       run:
         working-directory: ./repsy-frontend
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Set up Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: "24"
 
