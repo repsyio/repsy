@@ -154,9 +154,9 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
     if (!contentType.equals(OCI_IMAGE_INDEX) && !contentType.equals(DOCKER_MANIFEST_LIST)) {
       final var storagePathMap = this.layerRenamer.findLayersToRename(repoInfo, manifestJson);
       this.layerRenamer.renameLayers(repoInfo, storagePathMap);
-    } else {
-      this.imageTxService.updateImageSize(repoInfo.getId(), imageInfo.getId(), manifestDigest);
     }
+
+    this.imageTxService.updateImageSize(repoInfo.getId(), imageInfo.getId(), manifestDigest);
 
     final var location = this.getServletURILocation(context, imageName, digest);
 
