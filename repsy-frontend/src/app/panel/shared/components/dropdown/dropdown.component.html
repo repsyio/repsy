@@ -1,5 +1,5 @@
 <button role="button" class="relative flex" (click)="$event.stopPropagation()">
-  <button (click)="toggleDropdown()" class="px-[20px] text-[#9FA0A0] hover:text-[#FDFDFD]">
+  <button (click)="toggleDropdown()" class="px-[20px] text-base-content/70 hover:text-base-content">
     <svg width="3" height="16" viewBox="0 0 3 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
       <path
         fill-rule="evenodd"
@@ -13,7 +13,7 @@
     <div
       animate.enter="fade-in-down"
       tabindex="0"
-      class="absolute top-6 right-4 z-1 w-36 rounded-md border border-[#404141] bg-[#101112]"
+      class="absolute top-6 right-4 z-1 w-36 rounded-md border border-base-300 bg-base-100"
     >
       <ng-content></ng-content>
     </div>

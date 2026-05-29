@@ -24,7 +24,6 @@ const RESERVED_ROUTES = new Set([
   'terms-and-conditions',
   'privacy-policy',
   'security-and-compliance',
-  'login',
   'repositories',
   'account',
   'settings',

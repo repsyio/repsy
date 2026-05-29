@@ -14,12 +14,13 @@
 /// limitations under the License.
 ///
 
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 import { DangerModalComponent } from './panel/shared/components/modals/danger-modal/danger-modal.component';
 import { ToastComponent } from './panel/shared/components/toast/toast.component';
 import { SplashComponent } from './shared/components/splash-screen/splash-screen.component';
+import { ThemeService } from './shared/services/theme.service';
 
 @Component({
   selector: 'app-root',
@@ -27,4 +28,7 @@ import { SplashComponent } from './shared/components/splash-screen/splash-screen
   imports: [RouterOutlet, ToastComponent, DangerModalComponent, SplashComponent],
   templateUrl: './app.component.html',
 })
-export class AppComponent {}
+export class AppComponent {
+  /** Eager init so `data-theme` matches localStorage before first paint. */
+  private readonly _theme = inject(ThemeService);
+}

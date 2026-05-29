@@ -69,7 +69,7 @@
         <div>
           <!-- Table Headers -->
           <div
-            class="hidden grid-cols-[3fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-neutral-400 bg-neutral-500 p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+            class="hidden grid-cols-[3fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-neutral-400 bg-neutral-500 p-4 text-sm whitespace-nowrap text-base-content/70 lg:grid"
             animate.enter="fade-in-up"
           >
             <div>Artifact</div>
@@ -100,7 +100,7 @@
                 <div
                   animate.enter="fade-in-down"
                   [ngClass]="{ 'rounded-b-[12px]': i === artifacts.length - 1 }"
-                  class="grid grid-cols-[3fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                  class="grid grid-cols-[3fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-base-200"
                 >
                   <a
                     class="group text-secondary-500 flex w-max gap-2"
@@ -125,7 +125,7 @@
                     />
 
                     <svg
-                      class="mt-[2px] h-[14px] w-[14px] text-neutral-200 group-hover:text-white"
+                      class="mt-[2px] h-[14px] w-[14px] text-neutral-200 group-hover:text-base-content"
                       viewBox="0 0 14 14"
                       fill="none"
                       xmlns="http://www.w3.org/2000/svg"
@@ -159,7 +159,7 @@
                       [textHover]="artifact.latest"
                     />
                     <svg
-                      class="mt-[2px] h-[14px] w-[14px] text-neutral-200 group-hover:text-white"
+                      class="mt-[2px] h-[14px] w-[14px] text-neutral-200 group-hover:text-base-content"
                       viewBox="0 0 14 14"
                       fill="none"
                       xmlns="http://www.w3.org/2000/svg"
@@ -186,7 +186,7 @@
                       <button
                         (click)="deleteArtifact(artifact)"
                         [disabled]="loading"
-                        class="text-error-500 flex w-full items-center gap-2 px-4 py-2 hover:bg-[#2D2C2C]"
+                        class="text-error-500 flex w-full items-center gap-2 px-4 py-2 hover:bg-base-300"
                       >
                         <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
                         Delete
@@ -205,7 +205,7 @@
           @for (artifact of artifacts; track artifact.artifactName; let i = $index) {
             <div animate.enter="fade-in-down" class="lg:hidden">
               <div
-                class="hover:border-secondary-400 relative flex flex-col gap-2 rounded-[12px] border border-neutral-400 bg-neutral-500 p-4 hover:bg-[#1D1C1C]"
+                class="hover:border-secondary-400 relative flex flex-col gap-2 rounded-[12px] border border-neutral-400 bg-neutral-500 p-4 hover:bg-base-200"
                 role="button"
                 [routerLink]="
                   '/' +
@@ -223,7 +223,7 @@
                     <button
                       (click)="deleteArtifact(artifact)"
                       [disabled]="loading"
-                      class="text-error-500 flex w-full items-center gap-2 px-4 py-2 hover:bg-[#2D2C2C]"
+                      class="text-error-500 flex w-full items-center gap-2 px-4 py-2 hover:bg-base-300"
                     >
                       <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
                       Delete
@@ -286,7 +286,7 @@
                       </span>
 
                       <svg
-                        class="mt-[2px] h-[14px] w-[14px] shrink-0 text-neutral-200 group-hover:text-white"
+                        class="mt-[2px] h-[14px] w-[14px] shrink-0 text-neutral-200 group-hover:text-base-content"
                         viewBox="0 0 14 14"
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"
@@ -337,7 +337,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p class="text-error-500 mt-2 text-lg">{{ this.error }}</p>
     </div>
   }
 }

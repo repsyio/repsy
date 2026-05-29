@@ -2,10 +2,10 @@
 
 <div
   [ngClass]="{ 'pointer-events-none opacity-50 select-none': loading || this.error }"
-  class="mb-8 inline-flex items-start gap-2 rounded-lg bg-[#101112] p-[14px]"
+  class="mb-8 inline-flex items-start gap-2 rounded-lg bg-base-100 p-[14px]"
 >
   <img class="mt-[2px]" ngSrc="/assets/icons/docker/docker.svg" alt="docker-light" height="18" width="18" />
-  <span class="text-[13px] break-all text-[#9C9C9D]">{{ installText }}</span>
+  <span class="text-sm break-all text-base-content/65">{{ installText }}</span>
 
   <app-copy-clipboard [text]="installText" />
 </div>
@@ -73,7 +73,7 @@
       <div class="text-body1">
         <!-- Table Headers (Desktop) -->
         <div
-          class="hidden grid-cols-[3fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[3fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-base-300 bg-base-100 p-4 text-sm whitespace-nowrap text-base-content/70 lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Tag</div>
@@ -83,13 +83,13 @@
         </div>
 
         <!-- Tag Table (Desktop) -->
-        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
+        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-base-300 bg-base-100 lg:block">
           @for (tag of tags; track tag.name; let i = $index) {
             <div role="button" [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name + '/detail'">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === tags.length - 1 }"
-                class="grid grid-cols-[3fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="grid grid-cols-[3fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-base-200"
               >
                 <a
                   class="group text-secondary-500 flex w-max gap-2"
@@ -100,7 +100,7 @@
                   <app-tooltip class="group-hover:underline" [text]="tag.name | ellipsis: 30" [textHover]="tag.name" />
 
                   <svg
-                    class="mt-[2px] h-[14px] w-[14px] text-neutral-200 group-hover:text-white"
+                    class="mt-[2px] h-[14px] w-[14px] text-neutral-200 group-hover:text-base-content"
                     viewBox="0 0 14 14"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -116,13 +116,13 @@
                 </a>
 
                 <app-tooltip
-                  class="text-[14px] text-[#FDFDFD]"
+                  class="text-sm text-base-content"
                   [text]="tag.platform | ellipsis: 30"
                   [textHover]="tag.platform"
                 />
 
                 <app-tooltip
-                  class="text-[14px] text-[#FDFDFD]"
+                  class="text-sm text-base-content"
                   [text]="timeAgo(tag.lastUpdatedAt)"
                   [textHover]="tag.lastUpdatedAt | date: 'medium'"
                   [always]="true"
@@ -133,7 +133,7 @@
                     <button
                       (click)="deleteTag(tag)"
                       [disabled]="loading"
-                      class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-base-300"
                     >
                       <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
 
@@ -143,7 +143,7 @@
                 }
               </div>
               @if (i !== tags.length - 1) {
-                <div class="h-[1px] w-full bg-[#404141]"></div>
+                <div class="h-[1px] w-full bg-base-300"></div>
               }
             </div>
           }
@@ -153,7 +153,7 @@
         @for (tag of tags; track tag.name; let i = $index) {
           <div animate.enter="fade-in-down" class="lg:hidden">
             <div
-              class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+              class="relative flex flex-col gap-2 rounded-[12px] border border-base-300 bg-base-100 p-4 hover:border-primary hover:bg-base-200"
               role="button"
               [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name + '/detail'"
             >
@@ -162,7 +162,7 @@
                   <button
                     (click)="deleteTag(tag)"
                     [disabled]="loading"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                    class="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-base-300"
                   >
                     <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
                     Delete
@@ -177,7 +177,7 @@
                 <img class="mt-[2px]" ngSrc="/assets/icons/repo/tag.svg" alt="tag" height="18" width="18" />
                 <span class="text-right break-all group-hover:underline">{{ tag.name }}</span>
                 <svg
-                  class="h-4 w-4 shrink-0 text-neutral-200 group-hover:text-white"
+                  class="h-4 w-4 shrink-0 text-neutral-200 group-hover:text-base-content"
                   viewBox="0 0 14 14"
                   fill="currentColor"
                   xmlns="http://www.w3.org/2000/svg"
@@ -194,12 +194,12 @@
 
               <div class="space-y-2">
                 <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Platform: </span>
-                  <span class="text-right text-sm break-all text-[#FDFDFD]">{{ tag.platform }}</span>
+                  <span class="text-sm text-base-content/70">Platform: </span>
+                  <span class="text-right text-sm break-all text-base-content">{{ tag.platform }}</span>
                 </div>
                 <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Last Updated: </span>
-                  <span class="text-right text-sm break-all text-[#FDFDFD]">
+                  <span class="text-sm text-base-content/70">Last Updated: </span>
+                  <span class="text-right text-sm break-all text-base-content">
                     {{ tag.lastUpdatedAt | date: 'medium' }} {{ '(' + timeAgo(tag.lastUpdatedAt) + ')' }}
                   </span>
                 </div>
@@ -207,7 +207,7 @@
             </div>
             @if (i !== tags.length - 1) {
               <div class="px-2 py-4">
-                <div class="h-[1px] bg-[#404141]"></div>
+                <div class="h-[1px] bg-base-300"></div>
               </div>
             }
           </div>
@@ -232,7 +232,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p class="text-error-500 mt-2 text-lg">{{ this.error }}</p>
     </div>
   }
 }

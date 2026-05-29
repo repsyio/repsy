@@ -199,7 +199,7 @@ export class DeployTokenComponent implements OnInit {
 
   getBorderForExpireStatus(expireDate: string): string {
     if (!expireDate) {
-      return 'text-[#FDFDFD]';
+      return 'text-base-content';
     }
 
     const date = moment(expireDate);
@@ -215,7 +215,7 @@ export class DeployTokenComponent implements OnInit {
       return 'text-warning-500';
     }
 
-    return 'text-[#FDFDFD]';
+    return 'text-base-content';
   }
 
   timeAgo(date: Date | string): string {

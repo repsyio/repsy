@@ -1,13 +1,25 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="originhub-light">
   <head>
     <meta charset="utf-8" />
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('repsy-theme');
+          document.documentElement.setAttribute(
+            'data-theme',
+            stored === 'originhub' ? 'originhub' : 'originhub-light',
+          );
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'originhub-light');
+        }
+      })();
+    </script>
     <title>Repsy</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/x-icon" href="/assets/icons/repsy/repsy-logo.svg" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" />
-    <link rel="stylesheet" href="/path/to/styles/default.min.css" />
     <!-- Google Tag Manager -->
     <script>
       (function (w, d, s, l, i) {

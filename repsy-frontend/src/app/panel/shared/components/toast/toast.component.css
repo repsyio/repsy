@@ -13,23 +13,23 @@
   font-weight: bold;
 
   &.success {
-    background-color: #101d13;
-    border-color: #206a35;
-    color: #1eac52;
+    background-color: color-mix(in oklch, var(--color-success) 12%, var(--color-base-100));
+    border-color: color-mix(in oklch, var(--color-success) 45%, var(--color-base-300));
+    color: var(--color-success);
   }
 
   &.success svg {
-    stroke: #206a35;
+    stroke: var(--color-success);
   }
 
   &.error {
-    background-color: #211011;
-    border-color: #952e2e;
-    color: #db3f3f;
+    background-color: color-mix(in oklch, var(--color-error) 12%, var(--color-base-100));
+    border-color: color-mix(in oklch, var(--color-error) 45%, var(--color-base-300));
+    color: var(--color-error);
   }
 
   &.error svg {
-    fill: #952e2e;
-    stroke: #952e2e;
+    fill: var(--color-error);
+    stroke: var(--color-error);
   }
 }

@@ -5,9 +5,9 @@
 
   <div
     animate.enter="fade-in-left"
-    class="text-secondary-500 fixed top-[24px] left-1/2 z-4 flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] -translate-x-1/2 flex-col overflow-y-auto rounded-[12px] border border-[#404141] bg-gradient-to-b from-[#111010] to-[#333333] md:right-[24px] md:left-auto md:max-h-[calc(100%-48px)] md:w-[680px] md:translate-x-0"
+    class="text-secondary-500 fixed top-[24px] left-1/2 z-4 flex max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] -translate-x-1/2 flex-col overflow-y-auto rounded-[12px] border border-base-300 bg-gradient-to-b from-base-200 to-base-300 md:right-[24px] md:left-auto md:max-h-[calc(100%-48px)] md:w-[680px] md:translate-x-0"
   >
-    <div class="flex items-center justify-between border-b border-[#404141] px-4 py-3 md:px-6 md:py-4">
+    <div class="flex items-center justify-between border-b border-base-300 px-4 py-3 md:px-6 md:py-4">
       <div class="flex flex-wrap items-center gap-1">
         @if (deployToken) {
           Deploy Token Usage
@@ -15,11 +15,11 @@
           NuGet Configuration
         }
       </div>
-      <button (click)="closeModal()" class="ml-2 rounded-full p-1 hover:bg-[#2A2B2B]" aria-label="Close modal">
+      <button (click)="closeModal()" class="ml-2 rounded-full p-1 hover:bg-base-300" aria-label="Close modal">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path
             d="M15 5L5 15M5 5L15 15"
-            stroke="#FDFDFD"
+            stroke="currentColor"
             stroke-width="1.5"
             stroke-linecap="round"
             stroke-linejoin="round"

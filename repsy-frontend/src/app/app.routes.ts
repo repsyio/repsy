@@ -16,43 +16,23 @@
 
 import { Routes } from '@angular/router';
 
-import { AuthRedirectComponent } from './auth/components/redirect/auth-redirect.component';
-import { adminGuard } from './auth/guard/admin.guard';
 import { AuthGuard } from './auth/guard/auth.guard';
-import { AuthRedirectGuard } from './auth/guard/auth-redirect.guard';
-import { LoginComponent } from './auth/pages/login/login.component';
 import { NotFoundComponent } from './panel/pages/not-found/not-found.component';
-import { ProfileComponent } from './panel/pages/profile/profile.component';
 import { repoTypeResolver } from './panel/pages/repository/repo-entry/repo-type.resolver';
 import { RepositoryWrapperComponent } from './panel/pages/repository/repo-entry/repository-wrapper.component';
 import { RepositoryComponent } from './panel/pages/repository/repository.component';
-import { UserManagementComponent } from './panel/pages/user/user-management/user-management.component';
 import { PanelLayoutComponent } from './panel/shared/layout/panel-layout.component';
 
 export const routes: Routes = [
   {
-    path: 'login',
-    pathMatch: 'full',
-    canActivate: [AuthRedirectGuard],
-    title: 'repsy | Login',
-    component: LoginComponent,
-  },
-  {
     path: '',
     pathMatch: 'full',
-    component: AuthRedirectComponent,
+    redirectTo: 'repositories',
   },
   {
     path: '',
     component: PanelLayoutComponent,
     children: [
-      {
-        path: 'profile',
-        pathMatch: 'full',
-        canActivate: [AuthGuard],
-        title: 'repsy | Account',
-        component: ProfileComponent,
-      },
       {
         path: 'repositories',
         pathMatch: 'full',
@@ -61,18 +41,10 @@ export const routes: Routes = [
         component: RepositoryComponent,
       },
       {
-        path: 'users',
-        pathMatch: 'full',
-        canActivate: [AuthGuard, adminGuard],
-        title: 'repsy | User Management',
-        component: UserManagementComponent,
-      },
-      {
         path: 'not-found',
         component: NotFoundComponent,
         title: 'repsy | Not Found',
       },
-      // Dynamic Repository Route (:repoName)
       {
         path: ':repoName',
         component: RepositoryWrapperComponent,

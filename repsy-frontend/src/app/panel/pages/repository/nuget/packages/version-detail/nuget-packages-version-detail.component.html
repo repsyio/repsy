@@ -4,9 +4,9 @@
   @if (!this.error) {
     @if (versionInfo) {
       <div animate.enter="fade-in-up">
-        <div class="mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-5">
+        <div class="mb-6 rounded-lg border border-base-300 bg-base-200 p-5">
           <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
-            <div class="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-lg bg-[#101112]">
+            <div class="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-lg bg-base-100">
               <img
                 [src]="versionInfo.iconUrl || '/assets/icons/nuget/nuget.svg'"
                 alt="NuGet package icon"
@@ -17,18 +17,18 @@
             </div>
             <div class="min-w-0 flex-1">
               <div class="mb-2 flex flex-wrap items-center gap-2">
-                <h2 class="text-[24px] leading-tight text-[#FDFDFD]">{{ versionInfo.packageId }}</h2>
+                <h2 class="text-xl leading-tight text-base-content">{{ versionInfo.packageId }}</h2>
                 <span
-                  class="inline-flex items-center rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[12px] py-[4px] text-[13px] text-[#FDFDFD]"
+                  class="inline-flex items-center rounded-[14px] bg-linear-to-b from-base-300 to-base-200 px-[12px] py-[4px] text-sm text-base-content"
                 >
                   {{ versionInfo.version }}
                 </span>
               </div>
-              <p class="mb-3 text-[14px] text-[#9C9C9D]">{{ versionInfo.description || '-' }}</p>
+              <p class="mb-3 text-base text-base-content/65">{{ versionInfo.description || '-' }}</p>
               <div class="flex flex-wrap gap-2">
                 @for (tag of tags; track tag) {
                   <span
-                    class="rounded-[999px] border border-[#3A3A3A] bg-[#151617] px-3 py-1 text-[12px] text-[#C9C9C9]"
+                    class="rounded-[999px] border border-base-300 bg-base-200 px-3 py-1 text-sm text-base-content/80"
                   >
                     {{ tag }}
                   </span>
@@ -39,88 +39,88 @@
         </div>
 
         <div class="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-            <p class="text-[12px] text-[#8A8A8A]">Downloads</p>
-            <p class="mt-1 text-[18px] text-[#FDFDFD]">{{ versionInfo.downloadCount }}</p>
+          <div class="rounded-lg border border-base-300 bg-base-200 p-4">
+            <p class="text-sm text-base-content/60">Downloads</p>
+            <p class="mt-1 text-base font-medium text-base-content">{{ versionInfo.downloadCount }}</p>
           </div>
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-            <p class="text-[12px] text-[#8A8A8A]">Published</p>
-            <p class="mt-1 text-[18px] text-[#FDFDFD]">{{ versionInfo.publishedAt | date: 'mediumDate' }}</p>
+          <div class="rounded-lg border border-base-300 bg-base-200 p-4">
+            <p class="text-sm text-base-content/60">Published</p>
+            <p class="mt-1 text-base font-medium text-base-content">{{ versionInfo.publishedAt | date: 'mediumDate' }}</p>
           </div>
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-            <p class="text-[12px] text-[#8A8A8A]">Listed</p>
-            <p class="mt-1 text-[18px] text-[#FDFDFD]">{{ versionInfo.listed ? 'Yes' : 'No' }}</p>
+          <div class="rounded-lg border border-base-300 bg-base-200 p-4">
+            <p class="text-sm text-base-content/60">Listed</p>
+            <p class="mt-1 text-base font-medium text-base-content">{{ versionInfo.listed ? 'Yes' : 'No' }}</p>
           </div>
         </div>
 
-        <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Install</h2>
+        <h2 class="mb-2 text-sm text-base-content/70">Install</h2>
         <div class="mb-8 space-y-4">
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-            <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <div class="rounded-lg border border-base-300 bg-base-200">
+            <div class="flex items-center gap-2 border-b border-base-300 p-4">
               <img ngSrc="/assets/icons/nuget/nuget.svg" alt="NuGet" width="20" height="20" />
-              <span class="text-[14px] text-[#FDFDFD]">PackageReference</span>
+              <span class="text-sm text-base-content">PackageReference</span>
               <app-copy-clipboard class="ml-auto" [text]="packageReferenceCommand" />
             </div>
             <pre
-              class="overflow-x-auto p-4 text-[13px]"
+              class="overflow-x-auto p-4 text-sm"
             ><code [highlight]="packageReferenceCommand" language="xml"></code></pre>
           </div>
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-            <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <div class="rounded-lg border border-base-300 bg-base-200">
+            <div class="flex items-center gap-2 border-b border-base-300 p-4">
               <img ngSrc="/assets/icons/nuget/nuget.svg" alt="NuGet" width="20" height="20" />
-              <span class="text-[14px] text-[#FDFDFD]">.NET CLI</span>
+              <span class="text-sm text-base-content">.NET CLI</span>
               <app-copy-clipboard class="ml-auto" [text]="installCommand" />
             </div>
             <pre
-              class="overflow-x-auto p-4 text-[13px]"
+              class="overflow-x-auto p-4 text-sm"
             ><code [highlight]="installCommand" language="bash"></code></pre>
           </div>
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-            <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <div class="rounded-lg border border-base-300 bg-base-200">
+            <div class="flex items-center gap-2 border-b border-base-300 p-4">
               <img ngSrc="/assets/icons/nuget/nuget.svg" alt="NuGet" width="20" height="20" />
-              <span class="text-[14px] text-[#FDFDFD]">.NET CLI (direct URL)</span>
+              <span class="text-sm text-base-content">.NET CLI (direct URL)</span>
               <app-copy-clipboard class="ml-auto" [text]="installCommandUrl" />
             </div>
             <pre
-              class="overflow-x-auto p-4 text-[13px]"
+              class="overflow-x-auto p-4 text-sm"
             ><code [highlight]="installCommandUrl" language="bash"></code></pre>
           </div>
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-            <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <div class="rounded-lg border border-base-300 bg-base-200">
+            <div class="flex items-center gap-2 border-b border-base-300 p-4">
               <img ngSrc="/assets/icons/nuget/nuget.svg" alt="NuGet" width="20" height="20" />
-              <span class="text-[14px] text-[#FDFDFD]">Package Manager</span>
+              <span class="text-sm text-base-content">Package Manager</span>
               <app-copy-clipboard class="ml-auto" [text]="packageManagerCommand" />
             </div>
             <pre
-              class="overflow-x-auto p-4 text-[13px]"
+              class="overflow-x-auto p-4 text-sm"
             ><code [highlight]="packageManagerCommand" language="powershell"></code></pre>
           </div>
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-            <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+          <div class="rounded-lg border border-base-300 bg-base-200">
+            <div class="flex items-center gap-2 border-b border-base-300 p-4">
               <img ngSrc="/assets/icons/nuget/nuget.svg" alt="NuGet" width="20" height="20" />
-              <span class="text-[14px] text-[#FDFDFD]">Package Manager (direct URL)</span>
+              <span class="text-sm text-base-content">Package Manager (direct URL)</span>
               <app-copy-clipboard class="ml-auto" [text]="packageManagerCommandUrl" />
             </div>
             <pre
-              class="overflow-x-auto p-4 text-[13px]"
+              class="overflow-x-auto p-4 text-sm"
             ><code [highlight]="packageManagerCommandUrl" language="powershell"></code></pre>
           </div>
         </div>
 
-        <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Dependencies</h2>
-        <div class="mb-8 overflow-hidden rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] text-[14px]">
+        <h2 class="mb-2 text-sm text-base-content/70">Dependencies</h2>
+        <div class="mb-8 overflow-hidden rounded-lg border border-base-300 bg-base-200 text-base">
           @if (dependenciesByFramework.length === 0) {
-            <div class="p-4 text-[#8A8A8A]">No dependencies</div>
+            <div class="p-4 text-base-content/60">No dependencies</div>
           } @else {
             @for (group of dependenciesByFramework; track group.framework) {
-              <div class="border-b border-[#2A2A2A] last:border-b-0">
-                <div class="bg-[#080808] px-4 py-2 text-[12px] text-[#8A8A8A]">{{ group.framework }}</div>
+              <div class="border-b border-base-300 last:border-b-0">
+                <div class="bg-base-200 px-4 py-2 text-sm text-base-content/60">{{ group.framework }}</div>
                 @for (dep of group.deps; track dep.packageId) {
                   <div
-                    class="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-[#1A1A1A] px-4 py-2 last:border-b-0"
+                    class="grid grid-cols-[1fr_auto] items-center gap-4 border-b border-base-300 px-4 py-2 last:border-b-0"
                   >
-                    <span class="text-[#FDFDFD]">{{ dep.packageId }}</span>
-                    <span class="font-mono text-[12px] text-[#8A8A8A]">{{ dep.versionRange }}</span>
+                    <span class="text-base-content">{{ dep.packageId }}</span>
+                    <span class="font-mono text-sm text-base-content/60">{{ dep.versionRange }}</span>
                   </div>
                 }
               </div>
@@ -128,27 +128,27 @@
           }
         </div>
 
-        <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Metadata</h2>
-        <div class="mb-8 overflow-hidden rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] text-[14px]">
-          <div class="grid grid-cols-[150px_1fr] border-b border-[#2A2A2A] p-4">
-            <span class="text-[#8A8A8A]">Authors</span>
-            <span class="text-[#FDFDFD]">{{ versionInfo.authors || '-' }}</span>
+        <h2 class="mb-2 text-sm text-base-content/70">Metadata</h2>
+        <div class="mb-8 overflow-hidden rounded-lg border border-base-300 bg-base-200 text-base">
+          <div class="grid grid-cols-[150px_1fr] border-b border-base-300 p-4">
+            <span class="text-base-content/60">Authors</span>
+            <span class="text-base-content">{{ versionInfo.authors || '-' }}</span>
           </div>
-          <div class="grid grid-cols-[150px_1fr] border-b border-[#2A2A2A] p-4">
-            <span class="text-[#8A8A8A]">Project URL</span>
-            <span class="text-[#FDFDFD]">{{ versionInfo.projectUrl || '-' }}</span>
+          <div class="grid grid-cols-[150px_1fr] border-b border-base-300 p-4">
+            <span class="text-base-content/60">Project URL</span>
+            <span class="text-base-content">{{ versionInfo.projectUrl || '-' }}</span>
           </div>
-          <div class="grid grid-cols-[150px_1fr] border-b border-[#2A2A2A] p-4">
-            <span class="text-[#8A8A8A]">License URL</span>
-            <span class="text-[#FDFDFD]">{{ versionInfo.licenseUrl || '-' }}</span>
+          <div class="grid grid-cols-[150px_1fr] border-b border-base-300 p-4">
+            <span class="text-base-content/60">License URL</span>
+            <span class="text-base-content">{{ versionInfo.licenseUrl || '-' }}</span>
           </div>
-          <div class="grid grid-cols-[150px_1fr] border-b border-[#2A2A2A] p-4">
-            <span class="text-[#8A8A8A]">Published</span>
-            <span class="text-[#FDFDFD]">{{ versionInfo.publishedAt | date: 'medium' }}</span>
+          <div class="grid grid-cols-[150px_1fr] border-b border-base-300 p-4">
+            <span class="text-base-content/60">Published</span>
+            <span class="text-base-content">{{ versionInfo.publishedAt | date: 'medium' }}</span>
           </div>
           <div class="grid grid-cols-[150px_1fr] p-4">
-            <span class="text-[#8A8A8A]">Listed</span>
-            <span class="text-[#FDFDFD]">{{ versionInfo.listed ? 'Yes' : 'No' }}</span>
+            <span class="text-base-content/60">Listed</span>
+            <span class="text-base-content">{{ versionInfo.listed ? 'Yes' : 'No' }}</span>
           </div>
         </div>
 
@@ -173,7 +173,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p class="text-error-500 mt-2 text-lg">{{ this.error }}</p>
     </div>
   }
 }

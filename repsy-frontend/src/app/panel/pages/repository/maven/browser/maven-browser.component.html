@@ -11,13 +11,13 @@
     <div class="flex items-center">
       <button
         (click)="prev()"
-        class="flex h-[40px] w-[40px] items-center justify-center rounded-l-md border border-[#404141] bg-[#101112] text-[#9FA0A0] hover:border hover:border-[#FDFDFD] hover:text-[#FDFDFD]"
+        class="flex h-[40px] w-[40px] items-center justify-center rounded-l-md border border-base-300 bg-base-100 text-base-content/70 hover:border hover:border-primary hover:text-base-content"
       >
         <img class="h-[12px]" ngSrc="/assets/icons/cursor/arrow-left.svg" alt="page-left" height="8" width="4" />
       </button>
       <button
         (click)="next()"
-        class="flex h-[40px] w-[40px] items-center justify-center rounded-r-md border border-[#404141] bg-[#101112] text-[#9FA0A0] hover:border-[#FDFDFD] hover:text-[#FDFDFD]"
+        class="flex h-[40px] w-[40px] items-center justify-center rounded-r-md border border-base-300 bg-base-100 text-base-content/70 hover:border-primary hover:text-base-content"
       >
         <img class="h-[12px]" ngSrc="/assets/icons/cursor/arrow-right.svg" alt="page-right" height="8" width="5" />
       </button>
@@ -40,7 +40,7 @@
   </div>
 </div>
 
-<p class="mb-4 text-[14px] font-medium text-[#9FA0A0]">
+<p class="mb-4 text-sm font-medium text-base-content/70">
   • Browse the
   <a
     href="javascript:void(0)"
@@ -52,7 +52,7 @@
   on your browser.
 </p>
 
-<div class="mb-4 text-[14px] text-neutral-200">
+<div class="mb-4 text-sm text-neutral-200">
   <a class="hover:text-secondary-500" href="javascript:void(0)" (click)="goToDir({ name: '/', path: '/', prev: null })"
     >{{ activeRepo.repoName }}:</a
   >
@@ -75,12 +75,12 @@
       @for (file of filteredFsItems; track file.name) {
         <div
           animate.enter="fade-in-up"
-          class="relative rounded-lg border border-[#404141] bg-[#14161A] hover:border-[#FDFDFD]"
+          class="relative rounded-lg border border-base-300 bg-base-200 hover:border-primary"
         >
           <app-dropdown class="absolute top-0 right-0 z-1 px-2 py-4">
             <button
               (click)="goToBrowser(directoryStack[directoryStack.length - 1]?.path + file.name)"
-              class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FDFDFD] hover:bg-[#2D2C2C]"
+              class="flex w-full items-center gap-2 px-4 py-2 text-sm text-base-content hover:bg-base-300"
             >
               <i id="password-toggle-icon" class="fa-solid fa-eye"></i>
               Browse File
@@ -113,7 +113,7 @@
 
             <!-- File Name -->
             <div
-              class="mb-1 text-start text-[15px] font-medium break-all text-neutral-200"
+              class="mb-1 text-start text-sm font-medium break-all text-neutral-200"
               tabindex="0"
               role="button"
               [attr.aria-label]="'Open ' + file.name"
@@ -127,11 +127,11 @@
 
             <!-- File Details -->
             @if (file.size) {
-              <div class="text-[13px] text-[#9FA0A0]">File size: {{ formatBytes(file.size) }}</div>
+              <div class="text-sm text-base-content/70">File size: {{ formatBytes(file.size) }}</div>
             }
 
             @if (file.createdAt) {
-              <div class="text-[13px] text-[#9FA0A0]">Created: {{ file.createdAt | date: 'medium' }}</div>
+              <div class="text-sm text-base-content/70">Created: {{ file.createdAt | date: 'medium' }}</div>
             }
           </div>
         </div>
@@ -148,8 +148,8 @@
           width="510"
         />
         <div>
-          <p class="text-[28px] text-[#9FA0A0]">404</p>
-          <p class="mt-2 text-[20px] text-[#9FA0A0]">Repository files not found!</p>
+          <p class="text-2xl text-base-content/70">404</p>
+          <p class="mt-2 text-lg text-base-content/70">Repository files not found!</p>
         </div>
       </div>
     } @else {

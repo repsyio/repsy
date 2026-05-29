@@ -1,7 +1,7 @@
-<button class="hover:text-secondary-500 h-4 w-4 text-[#9FA0A0]" (click)="copyToClipboard(text)">
+<button class="hover:text-secondary-500 h-4 w-4 text-base-content/70" (click)="copyToClipboard(text)">
   @if (copied) {
     <svg width="16" height="12" viewBox="0 0 16 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M1 5.34547L6.05556 10.4364L14.9311 1.5625" stroke="#69FFB4" stroke-width="1.5" stroke-linecap="round" />
+      <path d="M1 5.34547L6.05556 10.4364L14.9311 1.5625" stroke="currentColor" class="text-primary" stroke-width="1.5" stroke-linecap="round" />
     </svg>
   } @else {
     <svg

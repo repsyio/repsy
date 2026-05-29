@@ -1,19 +1,9 @@
 <app-panel-header />
 
 <main
-  class="flex min-h-screen w-full p-4 pt-[80px] sm:p-6 sm:pt-[90px] md:space-x-8 md:p-8 md:pt-[120px] lg:space-x-[75px] lg:p-[75px] lg:pt-[170px]"
+  class="flex min-h-[calc(100vh-44px)] w-full flex-col px-4 pb-4 pt-11 sm:min-h-[calc(100vh-48px)] sm:px-5 sm:pb-5 sm:pt-12 md:px-6 md:pb-6 lg:px-8 lg:pb-8"
 >
-  @if (isAuthenticated) {
-    <app-sidebar [isMobileMenuOpen]="isMobileMenuOpen" (closeModal)="closeMobileMenu()" />
-  }
-
-  <div
-    class="mx-auto h-full min-h-[775px] w-full overflow-hidden"
-    [ngClass]="{
-      'max-w-[1025px]': isAuthenticated,
-      'max-w-[1400px]': !isAuthenticated,
-    }"
-  >
+  <div class="mx-auto mt-6 h-full w-full max-w-[min(1400px,100%)] flex-1 overflow-hidden sm:mt-8">
     @if (!loading) {
       <router-outlet />
     }

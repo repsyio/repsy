@@ -69,7 +69,7 @@
       <div class="text-body1">
         <!-- Table Headers (Desktop) -->
         <div
-          class="hidden grid-cols-[3fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[3fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-base-300 bg-base-100 p-4 text-sm whitespace-nowrap text-base-content/70 lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Version</div>
@@ -79,7 +79,7 @@
         </div>
 
         <!-- Version Table (Desktop) -->
-        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
+        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-base-300 bg-base-100 lg:block">
           @for (version of versions; track version.id; let i = $index) {
             <div
               role="button"
@@ -89,14 +89,14 @@
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === versions.length - 1 }"
-                class="grid grid-cols-[3fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="grid grid-cols-[3fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-base-200"
               >
-                <div class="flex gap-2 text-[14px] text-[#FDFDFD]">
+                <div class="flex gap-2 text-sm text-base-content">
                   <img ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
                   <app-tooltip [text]="version.version | ellipsis: 20" [textHover]="version.version" />
                 </div>
 
-                <span class="text-[14px] text-[#9FA0A0]">{{ version.goVersion ?? '-' }}</span>
+                <span class="text-sm text-base-content/70">{{ version.goVersion ?? '-' }}</span>
 
                 <app-tooltip
                   class="text-secondary-500"
@@ -110,7 +110,7 @@
                     <button
                       (click)="deleteVersion(version)"
                       [disabled]="loading"
-                      class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-base-300"
                     >
                       <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
                       Delete
@@ -119,7 +119,7 @@
                 }
               </div>
               @if (i !== versions.length - 1) {
-                <div class="h-[1px] w-full bg-[#404141]"></div>
+                <div class="h-[1px] w-full bg-base-300"></div>
               }
             </div>
           }
@@ -132,14 +132,14 @@
               role="button"
               [routerLink]="['/' + activeRepo.repoName + '/modules/version']"
               [queryParams]="{ modulePath: modulePath, version: version.version }"
-              class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+              class="relative flex flex-col gap-2 rounded-[12px] border border-base-300 bg-base-100 p-4 hover:border-primary hover:bg-base-200"
             >
               @if (canManage) {
                 <app-dropdown class="relative left-4 ml-auto" (click)="$event.stopPropagation()">
                   <button
                     (click)="deleteVersion(version)"
                     [disabled]="loading"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                    class="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-base-300"
                   >
                     <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
                     Delete
@@ -147,18 +147,18 @@
                 </app-dropdown>
               }
 
-              <div class="flex items-start gap-2 text-[14px] text-[#FDFDFD]">
+              <div class="flex items-start gap-2 text-sm text-base-content">
                 <img class="mt-[2px]" ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
                 <span class="break-all">{{ version.version }}</span>
               </div>
 
               <div class="space-y-2">
                 <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Go Version: </span>
-                  <span class="text-right text-sm text-[#FDFDFD]">{{ version.goVersion ?? '-' }}</span>
+                  <span class="text-sm text-base-content/70">Go Version: </span>
+                  <span class="text-right text-sm text-base-content">{{ version.goVersion ?? '-' }}</span>
                 </div>
                 <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Uploaded: </span>
+                  <span class="text-sm text-base-content/70">Uploaded: </span>
                   <span class="text-secondary-500 text-right break-all">
                     {{ version.createdAt | date: 'medium' }} {{ '(' + timeAgo(version.createdAt) + ')' }}
                   </span>
@@ -167,7 +167,7 @@
             </div>
             @if (i !== versions.length - 1) {
               <div class="px-2 py-4">
-                <div class="h-[1px] bg-[#404141]"></div>
+                <div class="h-[1px] bg-base-300"></div>
               </div>
             }
           </div>
@@ -187,7 +187,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p class="text-error-500 mt-2 text-lg">{{ this.error }}</p>
     </div>
   }
 }

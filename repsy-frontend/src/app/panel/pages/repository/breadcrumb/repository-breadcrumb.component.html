@@ -1,18 +1,18 @@
 @if (crumbs.length > 0) {
-  <nav class="mb-4 text-[14px]">
+  <nav class="mb-4 text-sm">
     <ol class="flex flex-wrap items-center p-0">
       @for (crumbLink of crumbLinks; track crumbLink; let i = $index; let last = $last) {
         <li class="flex items-center">
           <!-- Last breadcrumb item (No link) -->
           @if (last) {
-            <div class="text-[#FDFDFD]">
+            <div class="text-base-content">
               @if (repoIcon.includes('cargo')) {
                 <img
                   width="23"
                   height="23"
                   [ngSrc]="repoIcon"
                   alt="icon"
-                  class="inline-block h-[23px] w-[23px] brightness-0 invert"
+                  class="icon-img inline-block h-[23px] w-[23px]"
                 />
               } @else {
                 <img
@@ -20,13 +20,13 @@
                   height="25"
                   [ngSrc]="repoIcon"
                   alt="icon"
-                  class="inline-block h-[25px] w-[25px] brightness-0 invert"
+                  class="icon-img inline-block h-[25px] w-[25px]"
                 />
               }
               {{ crumbs[i] }}
             </div>
           } @else {
-            <a class="text-[#9FA0A0] hover:text-[#FDFDFD]" [routerLink]="crumbLink" [queryParams]="crumbQueryParams[i]">
+            <a class="text-base-content/70 hover:text-base-content" [routerLink]="crumbLink" [queryParams]="crumbQueryParams[i]">
               @if (i === 1) {
                 <img width="20" height="20" [ngSrc]="repoIcon" alt="icon" class="inline-block h-[20px] w-[20px]" />
               }

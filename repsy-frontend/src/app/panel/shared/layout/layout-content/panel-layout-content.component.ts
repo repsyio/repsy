@@ -19,19 +19,11 @@ import { RouterModule } from '@angular/router';
 
 import { FooterComponent } from '../../../../shared/components/footer/footer.component';
 import { PanelHeaderComponent } from '../../../../shared/components/panel-header/panel-header.component';
-import { SidebarComponent } from '../../components/sidebar/sidebar.component';
 
 @Component({
   selector: 'app-panel-layout-content',
-  imports: [SidebarComponent, FooterComponent, PanelHeaderComponent, RouterModule],
+  imports: [FooterComponent, PanelHeaderComponent, RouterModule],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './panel-layout-content.component.html',
 })
-export class PanelLayoutContentComponent {
-  public loading = true;
-  public isMobileMenuOpen = false;
-
-  closeMobileMenu(): void {
-    this.isMobileMenuOpen = false;
-  }
-}
+export class PanelLayoutContentComponent {}

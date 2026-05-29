@@ -35,7 +35,7 @@ export class ErrorHandlerService {
       (res.error.msgId === 'sessionExpired' || res.error.msgId === 'refreshTokenExpired')
     ) {
       localStorage.clear();
-      this.router.navigateByUrl('/');
+      this.router.navigateByUrl('/repositories');
     } else {
       console.error(res.error);
     }

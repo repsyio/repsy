@@ -16,7 +16,6 @@
 
 import { HttpErrorResponse, HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Router } from '@angular/router';
 import { EMPTY, Observable, Subject, throwError } from 'rxjs';
 import { catchError, switchMap, tap } from 'rxjs/operators';
 
@@ -29,10 +28,7 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
   private readonly _refreshTokenSource = new Subject<string>();
   private readonly _tokenRefreshed$ = this._refreshTokenSource.asObservable();
 
-  constructor(
-    private readonly router: Router,
-    private readonly authService: AuthService,
-  ) {}
+  constructor(private readonly authService: AuthService) {}
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     return next.handle(req).pipe(
@@ -60,7 +56,6 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
 
   private _logOut(): void {
     this.authService.logOut();
-    this.router.navigateByUrl('login');
   }
 
   private _refreshToken(): Observable<string> {

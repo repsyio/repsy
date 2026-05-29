@@ -3,7 +3,7 @@ spring:
     name: repsy-backend
 
   datasource:
-    url: ${DB_URL:jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    url: ${DB_URL:jdbc:h2:file:~/repsy/app/data/repsy;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
     username: ${DB_USERNAME:repsy}
     password: ${DB_PASSWORD:repsy123}
 
@@ -50,7 +50,7 @@ storage-gateway:
     trash-path: ${storage-gateway.fs.base-path}
 
 admin:
-  initial-password: ${ADMIN_INITIAL_PASSWORD:}
+  initial-password: Admin123
 
 h2:
   tcp-server:
@@ -60,7 +60,7 @@ h2:
 os:
   app:
     schema: public
-    jwt-secret: ${JWT_SECRET:}
+    jwt-secret: ${JWT_SECRET:BPfK3xyzNZHBUv/hCzrqEf8Kafr2xbFGNeeZITkmOUaqMLGpUvbwat3Hfawh/gwYqOnF36BijI3KYvOP+qb6Gg==}
 
     storage:
       file-system:

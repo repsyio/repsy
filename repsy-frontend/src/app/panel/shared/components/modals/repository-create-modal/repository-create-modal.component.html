@@ -6,11 +6,11 @@
 
   <!-- Modal Content -->
   <div
-    class="fixed top-1/2 left-1/2 z-4 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-[#404141] bg-[#101112] p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px] lg:max-w-[882px]"
+    class="fixed top-1/2 left-1/2 z-4 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-base-300 bg-base-100 p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px] lg:max-w-[882px]"
   >
     <!-- Header -->
     <div class="flex justify-between">
-      <h1 class="text-[24px] leading-6 text-white">Create Repository</h1>
+      <h1 class="text-xl leading-6 text-base-content">Create Repository</h1>
       <button (click)="closeModal()" class="hover:text-secondary-500 text-neutral-200">
         <svg
           width="15"
@@ -28,7 +28,7 @@
 
     <div class="gradient-border mx-auto my-6 sm:my-10"></div>
 
-    <form [formGroup]="form" class="flex flex-col gap-4 text-[#9FA0A0]" (submit)="form.valid && createRepo()">
+    <form [formGroup]="form" class="flex flex-col gap-4 text-base-content/70" (submit)="form.valid && createRepo()">
       <div class="flex flex-col gap-8 sm:flex-row">
         <div class="form-group w-full">
           <label for="type">Type</label>

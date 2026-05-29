@@ -15,65 +15,24 @@
 ///
 
 import { NgOptimizedImage } from '@angular/common';
-import { Component, EventEmitter, HostListener, Output } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Component, inject } from '@angular/core';
 
-import { AuthService } from '../../../auth/pages/service/auth.service';
-import { ProfileAvatarComponent } from '../../../panel/shared/components/avatar/profile.avatar.component';
-import { DividerComponent } from '../divider/divider.component';
+import { ThemeService } from '../../services/theme.service';
+import { RepsyBrandComponent } from '../repsy-brand/repsy-brand.component';
 
 @Component({
   selector: 'app-panel-header',
   templateUrl: './panel-header.component.html',
   styleUrls: ['./panel-header.component.css'],
-  imports: [RouterLink, DividerComponent, NgOptimizedImage, ProfileAvatarComponent],
+  imports: [NgOptimizedImage, RepsyBrandComponent],
   standalone: true,
 })
 export class PanelHeaderComponent {
-  public username: string;
-  public email: string;
-  public isMobileMenuOpen = false;
+  protected readonly originHubHomeUrl = 'https://repo-originhub.nuricanozturk.com';
+  protected readonly themeService = inject(ThemeService);
 
-  @Output() mobileMenuToggle = new EventEmitter<boolean>();
-
-  constructor(
-    private readonly authService: AuthService,
-    private readonly router: Router,
-  ) {
-    this.username = this.authService.username;
-  }
-
-  docDropdown = false;
-  profileDropdown = false;
-
-  openMobileMenu() {
-    this.isMobileMenuOpen = true;
-    this.mobileMenuToggle.emit(this.isMobileMenuOpen);
-  }
-
-  toggleProfileDropdown(event: Event) {
+  toggleTheme(event: Event): void {
     event.stopPropagation();
-    this.profileDropdown = !this.profileDropdown;
-    this.docDropdown = false;
-  }
-
-  public logOut(): void {
-    this.authService.logOut();
-    this.router.navigateByUrl('login');
-  }
-
-  @HostListener('document:click')
-  onDocumentClick() {
-    this.docDropdown = false;
-    this.profileDropdown = false;
-  }
-
-  @HostListener('window:scroll')
-  onWindowScroll() {
-    if (window.pageYOffset > 100) {
-      document.querySelector('header')?.classList.add('smaller');
-    } else {
-      document.querySelector('header')?.classList.remove('smaller');
-    }
+    this.themeService.toggle();
   }
 }

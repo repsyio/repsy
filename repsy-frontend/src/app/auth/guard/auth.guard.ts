@@ -19,35 +19,31 @@ import {
   ActivatedRouteSnapshot,
   CanActivate,
   CanActivateChild,
-  Router,
   RouterStateSnapshot,
   UrlTree,
 } from '@angular/router';
 import { Observable } from 'rxjs';
 
-import { AuthService } from '../../auth/pages/service/auth.service';
-
+/**
+ * OriginHub handles authentication externally (gateway cookies / headers).
+ * The app shell is always reachable; API interceptors still attach tokens when present.
+ */
 @Injectable({
   providedIn: 'root',
 })
 export class AuthGuard implements CanActivate, CanActivateChild {
-  public constructor(
-    private readonly router: Router,
-    private readonly authService: AuthService,
-  ) {}
-
   /* eslint-disable @typescript-eslint/no-unused-vars */
   public canActivate(
     route: ActivatedRouteSnapshot,
     state: RouterStateSnapshot,
   ): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {
-    return this.authService.isAuthenticated() ? true : this.router.navigateByUrl('/');
+    return true;
   }
 
   public canActivateChild(
     childRoute: ActivatedRouteSnapshot,
     state: RouterStateSnapshot,
   ): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {
-    return this.authService.isAuthenticated() ? true : this.router.navigateByUrl('/');
+    return true;
   }
 }

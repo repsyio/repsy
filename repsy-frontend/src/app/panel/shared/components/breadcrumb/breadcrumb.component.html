@@ -1,13 +1,13 @@
 @if (crumbs.length > 0) {
-  <nav class="mb-4 text-[14px]">
+  <nav class="mb-4 text-sm">
     <ol class="flex items-center p-0">
       @for (crumbLink of crumbLinks; track crumbLink; let i = $index; let last = $last) {
         <li class="flex items-center">
           <!-- Last breadcrumb item (No link) -->
           @if (last) {
-            <span class="text-[#FDFDFD]">{{ crumbs[i] }}</span>
+            <span class="text-base-content">{{ crumbs[i] }}</span>
           } @else {
-            <a class="text-[#9FA0A0] hover:text-[#FDFDFD]" [routerLink]="crumbLink">{{ crumbs[i] }}</a>
+            <a class="text-base-content/70 hover:text-base-content" [routerLink]="crumbLink">{{ crumbs[i] }}</a>
           }
 
           <!-- Separator Image -->

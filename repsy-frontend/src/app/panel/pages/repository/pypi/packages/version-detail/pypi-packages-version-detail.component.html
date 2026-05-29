@@ -5,53 +5,53 @@
     <div class="mb-4" animate.enter="fade-in-up">
       <div class="mb-4 flex flex-wrap items-center gap-x-2">
         @if (versionInfo.finalRelease) {
-          <span class="font-courier text-[12px] text-[#9C9C9D]">Final release:</span>
+          <span class="font-courier text-sm text-base-content/65">Final release:</span>
         } @else if (versionInfo.preRelease) {
-          <span class="font-courier text-[12px] text-[#9C9C9D]">Pre release:</span>
+          <span class="font-courier text-sm text-base-content/65">Pre release:</span>
         } @else if (versionInfo.postRelease) {
-          <span class="font-courier text-[12px] text-[#9C9C9D]">Pre release:</span>
+          <span class="font-courier text-sm text-base-content/65">Pre release:</span>
         } @else if (versionInfo.devRelease) {
-          <span class="font-courier text-[12px] text-[#9C9C9D]">Dev Release:</span>
+          <span class="font-courier text-sm text-base-content/65">Dev Release:</span>
         }
         <div
-          class="inline-flex gap-2 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[16px] py-[6px] text-[14px] text-[#FDFDFD]"
+          class="inline-flex gap-2 rounded-[14px] bg-linear-to-b from-base-300 to-base-200 px-[16px] py-[6px] text-sm text-base-content"
         >
           <img ngSrc="/assets/icons/cursor/tick.svg" alt="tick" height="12" width="16" />
           {{ versionInfo.version }}
         </div>
       </div>
-      <p class="font-courier mb-8 text-[12px] text-[#9C9C9D]">
+      <p class="font-courier mb-8 text-sm text-base-content/65">
         Uploaded at: {{ versionInfo.createdAt | date: 'medium' }}
       </p>
 
-      <h3 class="mb-2 text-[13px] text-white">Installation:</h3>
-      <div class="mb-8 inline-flex items-start gap-2 rounded-lg bg-[#101112] p-[14px]">
+      <h3 class="mb-2 text-sm text-white">Installation:</h3>
+      <div class="mb-8 inline-flex items-start gap-2 rounded-lg bg-base-100 p-[14px]">
         <img class="h-5 w-5" ngSrc="/assets/icons/pypi/pypi2.svg" alt="Npm Logo" height="46" width="46" />
-        <span class="text-[13px] break-all text-[#9C9C9D]">{{ installation }}</span>
+        <span class="text-sm break-all text-base-content/65">{{ installation }}</span>
 
         <app-copy-clipboard [text]="installation" />
       </div>
 
-      <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Metadata</h2>
-      <h3 class="mb-2 text-[12px] text-[#9FA0A0]">Requires Python: {{ versionInfo.requiresPython }}</h3>
-      <div class="mb-8 flex flex-col gap-2 text-[14px]">
-        <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+      <h2 class="mb-2 text-sm text-base-content/70">Metadata</h2>
+      <h3 class="mb-2 text-sm text-base-content/70">Requires Python: {{ versionInfo.requiresPython }}</h3>
+      <div class="mb-8 flex flex-col gap-2 text-sm">
+        <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-base-100 p-[14px]">
           <span class="text-white">Licenses: </span>
-          <span class="text-[#9C9C9D]">{{ versionInfo.license ? versionInfo.license : 'No license found!' }}</span>
+          <span class="text-base-content/65">{{ versionInfo.license ? versionInfo.license : 'No license found!' }}</span>
         </div>
-        <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+        <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-base-100 p-[14px]">
           <span class="text-white">Author: </span>
-          <span class="text-[#9C9C9D]">{{ versionInfo.author ? versionInfo.author : 'No author found!' }}</span>
+          <span class="text-base-content/65">{{ versionInfo.author ? versionInfo.author : 'No author found!' }}</span>
           <img height="11" width="14" ngSrc="/assets/icons/email.svg" alt="Email" />
         </div>
       </div>
 
-      <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Project Links</h2>
-      <div class="group mb-8 items-center gap-2 rounded-lg bg-[#101112] p-[14px] text-[14px]">
+      <h2 class="mb-2 text-sm text-base-content/70">Project Links</h2>
+      <div class="group mb-8 items-center gap-2 rounded-lg bg-base-100 p-[14px] text-sm">
         <a class="flex gap-2 text-white" [href]="versionInfo.homePage">
           Homepage
           <svg
-            class="mt-[2px] h-[14px] w-[14px] text-[#9FA0A0] group-hover:text-white"
+            class="mt-[2px] h-[14px] w-[14px] text-base-content/70 group-hover:text-base-content"
             viewBox="0 0 14 14"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
@@ -69,9 +69,9 @@
 
       @if (versionInfo.classifiers.length !== 0) {
         <div class="mb-2 flex flex-col gap-2">
-          <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Classifiers</h2>
+          <h2 class="mb-2 text-sm text-base-content/70">Classifiers</h2>
           @for (classifier of classifiers | keyvalue; track classifier.key) {
-            <div class="rounded-lg bg-[#101112] p-[14px] text-[#9C9C9D]">
+            <div class="rounded-lg bg-base-100 p-[14px] text-base-content/65">
               <span class="text-white">{{ classifier.key }}</span>
               <ul class="grid grid-cols-1 gap-2 sm:grid-cols-2" style="padding-inline-start: 30px; list-style: disc">
                 @for (value of classifier.value; track $index) {
@@ -83,7 +83,7 @@
         </div>
       }
 
-      <div class="mb-8 rounded-lg bg-[#101112] p-[22px] text-[24px]">
+      <div class="mb-8 rounded-lg bg-base-100 p-[22px] text-xl">
         <h3 class="text-neutral-200">{{ packageName }}</h3>
       </div>
 
@@ -115,7 +115,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p class="text-error-500 mt-2 text-lg">{{ this.error }}</p>
     </div>
   }
 }

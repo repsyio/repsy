@@ -1,9 +1,11 @@
 @if (splashService.loading) {
   <div class="splash-screen">
-    <div class="water-spinner">
+    <app-repsy-brand link="/repositories" size="lg" [showWordmark]="false" class="mb-8" />
+    <div class="water-spinner" aria-hidden="true">
       <span></span>
       <span></span>
       <span></span>
     </div>
+    <p class="mt-6 text-sm text-base-content/60">Loading…</p>
   </div>
 }

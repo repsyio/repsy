@@ -1,16 +1,16 @@
 <section id="repository-info" class="mt-[-100px] pt-[100px]">
   <h3
-    class="w-full rounded-t-[12px] border border-[#e8546a] border-b-[#404141] bg-[#101112] p-[24px] font-medium text-[#FDFDFD]"
+    class="w-full rounded-t-[12px] border border-[var(--color-error)] border-b-base-300 bg-base-100 p-[24px] font-medium text-base-content"
   >
     <a [routerLink]="[]" fragment="repository-info"> Repository Info </a>
   </h3>
-  <div class="rounded-b-[12px] border-r border-b border-l border-[#e8546a] bg-[#101112] p-[24px]">
-    <p class="mb-[50px] text-sm text-[#FDFDFD]">
+  <div class="rounded-b-[12px] border-r border-b border-l border-[var(--color-error)] bg-base-100 p-[24px]">
+    <p class="mb-[50px] text-sm text-base-content">
       Changing repo name might your current projects set up. Do not forget to change settings of your projects and
       settings.xml.
     </p>
     <div class="form-group">
-      <label for="name" class="mb-2 block text-sm text-[#9FA0A0]">New Repository Name</label>
+      <label for="name" class="mb-2 block text-sm text-base-content/70">New Repository Name</label>
       <form [formGroup]="renameForm" (submit)="renameForm.valid && renameRepo()">
         <div class="flex w-full flex-col gap-2 sm:w-2/3 sm:flex-row">
           <input
@@ -41,7 +41,7 @@
       </form>
     </div>
     <div class="form-group">
-      <label for="description" class="mb-2 block text-sm text-[#9FA0A0]">Description</label>
+      <label for="description" class="mb-2 block text-sm text-base-content/70">Description</label>
       <form [formGroup]="descriptionForm" (submit)="descriptionForm.valid && updateRepoDescription()">
         <textarea
           id="description"

@@ -6,10 +6,10 @@
 
   <!-- Modal Content -->
   <div
-    class="fixed top-1/2 left-1/2 z-50 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-[#404141] bg-[#101112] p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px] lg:max-w-[882px]"
+    class="fixed top-1/2 left-1/2 z-50 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-base-300 bg-base-100 p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px] lg:max-w-[882px]"
   >
     <div class="flex items-center justify-between">
-      <h1 class="text-[20px] leading-6 text-white sm:text-[24px]">
+      <h1 class="text-lg leading-6 text-base-content sm:text-xl">
         {{ dangerModalService.modal.title }}
       </h1>
 
@@ -30,12 +30,12 @@
 
     <div class="gradient-border mx-auto my-6 sm:my-10"></div>
 
-    <div class="text-[16px]">
-      <div class="text-[#9FA0A0]">Do you want to {{ dangerModalService.modal.title.toLocaleLowerCase() }}?</div>
+    <div class="text-sm">
+      <div class="text-base-content/70">Do you want to {{ dangerModalService.modal.title.toLocaleLowerCase() }}?</div>
     </div>
 
     @if (dangerModalService.modal.message !== null) {
-      <div class="mt-2 text-[13px]">
+      <div class="mt-2 text-sm">
         <div class="text-warning-500">{{ dangerModalService.modal.message }}</div>
       </div>
     }

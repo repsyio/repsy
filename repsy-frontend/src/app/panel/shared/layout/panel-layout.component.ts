@@ -14,45 +14,31 @@
 /// limitations under the License.
 ///
 
-// panel-layout.component.ts
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, ViewEncapsulation } from '@angular/core';
 import { RouterModule, RouterOutlet } from '@angular/router';
 
-import { AuthService } from '../../../auth/pages/service/auth.service';
 import { FooterComponent } from '../../../shared/components/footer/footer.component';
 import { PanelHeaderComponent } from '../../../shared/components/panel-header/panel-header.component';
 import { SplashService } from '../../../shared/components/splash-screen/splasht.service';
-import { SidebarComponent } from '../components/sidebar/sidebar.component';
 
 @Component({
   selector: 'app-panel-layout',
-  imports: [CommonModule, SidebarComponent, FooterComponent, PanelHeaderComponent, RouterModule, RouterOutlet],
+  imports: [CommonModule, FooterComponent, PanelHeaderComponent, RouterModule, RouterOutlet],
   encapsulation: ViewEncapsulation.None,
   templateUrl: './panel-layout.component.html',
   standalone: true,
 })
 export class PanelLayoutComponent implements OnInit {
   public loading = true;
-  public isMobileMenuOpen = false;
-  public isAuthenticated = false;
 
-  constructor(
-    private readonly splashService: SplashService,
-    private readonly authService: AuthService,
-  ) {}
+  constructor(private readonly splashService: SplashService) {}
 
   public ngOnInit(): void {
-    this.isAuthenticated = this.authService.isAuthenticated();
-
     this.splashService.setLoading = true;
     setTimeout(() => {
       this.loading = false;
       this.splashService.setLoading = false;
     }, 500);
-  }
-
-  public closeMobileMenu(): void {
-    this.isMobileMenuOpen = false;
   }
 }

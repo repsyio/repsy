@@ -1,11 +1,11 @@
 <section id="delete-orphan-layers" class="mt-[-100px] pt-[100px]">
   <h3
-    class="w-full rounded-t-[12px] border border-[#e8546a] border-b-[#404141] bg-[#101112] p-[24px] font-medium text-[#FDFDFD]"
+    class="w-full rounded-t-[12px] border border-[var(--color-error)] border-b-base-300 bg-base-100 p-[24px] font-medium text-base-content"
   >
     <a [routerLink]="[]" fragment="delete-orphan-layers"> Orphan Layers </a>
   </h3>
-  <div class="rounded-b-[12px] border-r border-b border-l border-[#e8546a] bg-[#101112] p-[24px]">
-    <p class="mb-[24px] text-[14px] text-[#FDFDFD]">
+  <div class="rounded-b-[12px] border-r border-b border-l border-[var(--color-error)] bg-base-100 p-[24px]">
+    <p class="mb-[24px] text-base text-base-content">
       Delete layer blobs that are no longer referenced by any manifest. This will free up storage space.
     </p>
     <button class="repsy-btn-danger w-full sm:w-auto" (click)="deleteOrphanLayers()" [disabled]="deleting">

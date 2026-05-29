@@ -1,35 +1,61 @@
-.header {
-  padding-top: 12px;
-  padding-bottom: 12px;
+/* Equal 24×24 slots so fork + Repsy marks share one visual centerline */
+.brand-lockup-mark {
+  display: inline-flex;
+  height: 1.5rem;
+  width: 1.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
 }
 
-@media (min-width: 640px) {
-  .header {
-    padding-top: 16px;
-    padding-bottom: 16px;
-  }
+.brand-lockup-icon {
+  display: block;
+  height: 1.5rem;
+  width: 1.5rem;
+  flex-shrink: 0;
+  object-fit: contain;
+  object-position: center;
 }
 
-@media (min-width: 768px) {
-  .header {
-    padding-top: 24px;
-    padding-bottom: 24px;
-  }
-
-  .header.smaller {
-    padding-top: 16px;
-    padding-bottom: 16px;
-  }
+.brand-lockup-separator {
+  align-self: center;
+  height: 1.5rem;
+  width: 1px;
+  background-color: color-mix(in oklch, var(--color-base-content) 15%, transparent);
 }
 
-@media (min-width: 1024px) {
-  .header {
-    padding-top: 40px;
-    padding-bottom: 40px;
-  }
+.brand-lockup-mark app-repsy-brand {
+  display: flex;
+  height: 1.5rem;
+  width: 1.5rem;
+  align-items: center;
+  justify-content: center;
+}
 
-  .header.smaller {
-    padding-top: 20px;
-    padding-bottom: 20px;
-  }
+.brand-lockup-mark ::ng-deep .repsy-brand-lockup {
+  display: inline-flex;
+  height: 1.5rem;
+  width: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.brand-lockup-mark ::ng-deep .repsy-brand-lockup img {
+  display: block;
+  height: 1.5rem;
+  width: 1.5rem;
+  margin: 0;
+  object-fit: contain;
+  object-position: center;
+}
+
+.brand-lockup-link {
+  opacity: 0.88;
+}
+
+.brand-lockup-link:hover,
+.brand-lockup-link:focus-visible {
+  opacity: 1;
 }

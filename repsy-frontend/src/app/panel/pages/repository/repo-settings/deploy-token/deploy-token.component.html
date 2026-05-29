@@ -1,17 +1,17 @@
 <section id="deploy-tokens" class="mt-[-100px] pt-[100px]">
-  <div class="flex w-full justify-between rounded-t-[12px] border border-[#404141] bg-[#101112] p-4 sm:p-6">
-    <h3 class="font-medium text-[#FDFDFD]">
+  <div class="flex w-full justify-between rounded-t-[12px] border border-base-300 bg-base-100 p-4 sm:p-6">
+    <h3 class="font-medium text-base-content">
       <a [routerLink]="[]" fragment="deploy-tokens"> Deploy Tokens </a>
     </h3>
   </div>
 
   <!-- Content Section -->
   <div
-    class="w-full overflow-y-auto rounded-b-[12px] border-r border-b border-l border-[#404141] bg-[#101112] p-4 sm:p-6"
+    class="w-full overflow-y-auto rounded-b-[12px] border-r border-b border-l border-base-300 bg-base-100 p-4 sm:p-6"
   >
     <!-- Description and Create Button -->
     <div class="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-      <p class="text-sm text-[#9FA0A0]">Manage deploy tokens for this repository.</p>
+      <p class="text-sm text-base-content/70">Manage deploy tokens for this repository.</p>
       <div class="w-full sm:w-auto">
         <button class="repsy-btn-confirm w-full sm:w-auto" (click)="createDeployToken()">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -28,7 +28,7 @@
         <div class="text-body1 overflo-y-auto mb-16">
           <!-- Package Headers (Desktop)-->
           <div
-            class="hidden grid-cols-[1fr_1fr_1fr_1fr_1fr_100px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+            class="hidden grid-cols-[1fr_1fr_1fr_1fr_1fr_100px] gap-4 rounded-t-[12px] border-t border-r border-l border-base-300 bg-base-100 p-4 text-sm whitespace-nowrap text-base-content/70 lg:grid"
             animate.enter="fade-in-up"
           >
             <div>Name</div>
@@ -42,7 +42,7 @@
           <!-- Package Table (Desktop) -->
           <div
             animate.enter="fade-in-down"
-            class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block"
+            class="hidden rounded-b-[12px] border border-base-300 bg-base-100 lg:block"
           >
             <!-- Package Rows -->
             @for (deployToken of deployTokens; track deployToken.id; let i = $index) {
@@ -149,37 +149,37 @@
             <div animate.enter="fade-in-down" class="lg:hidden">
               <!-- Package Version Row -->
               <div
-                class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+                class="relative flex flex-col gap-2 rounded-[12px] border border-base-300 bg-base-100 p-4 hover:border-primary hover:bg-base-200"
                 role="button"
               >
                 <div class="space-y-2">
                   <div class="flex justify-between gap-2">
-                    <span class="text-sm text-[#9FA0A0]">Name: </span>
+                    <span class="text-sm text-base-content/70">Name: </span>
                     <span class="text-secondary-500">
                       {{ deployToken.name }}
                     </span>
                   </div>
                   <div class="flex justify-between gap-2">
-                    <span class="text-sm text-[#9FA0A0]">Username: </span>
+                    <span class="text-sm text-base-content/70">Username: </span>
                     <span class="text-secondary-500">
                       {{ deployToken.username }}
                     </span>
                   </div>
                   <div class="flex justify-between gap-2">
-                    <span class="text-sm text-[#9FA0A0]">Created: </span>
+                    <span class="text-sm text-base-content/70">Created: </span>
                     <span class="text-secondary-500 break-all">
                       {{ deployToken.created_at | date: 'medium' }} {{ '(' + timeAgo(deployToken.created_at) + ')' }}
                     </span>
                   </div>
                   <div class="flex justify-between gap-2">
-                    <span class="text-sm text-[#9FA0A0]">Expires: </span>
+                    <span class="text-sm text-base-content/70">Expires: </span>
                     <span class="text-secondary-500 break-all">
                       {{ deployToken.expiration_date | date: 'medium' }}
                       {{ '(' + timeAgo(deployToken.expiration_date) + ')' }}
                     </span>
                   </div>
                   <div class="flex justify-between gap-2">
-                    <span class="text-sm text-[#9FA0A0]">Permissions: </span>
+                    <span class="text-sm text-base-content/70">Permissions: </span>
                     <span class="text-secondary-500">
                       {{ deployToken.read_only ? 'R/O' : 'R/W' }}
                     </span>
@@ -246,7 +246,7 @@
               </div>
               @if (i !== deployTokens?.length - 1) {
                 <div class="px-2 py-4">
-                  <div class="h-[1px] bg-[#404141]"></div>
+                  <div class="h-[1px] bg-base-300"></div>
                 </div>
               }
             </div>
@@ -270,13 +270,13 @@
           width="300"
         />
         <div class="mx-auto mt-4 text-center">
-          <p class="text-[14px] text-[#9FA0A0]">Your list is empty,</p>
-          <p class="mt-2 text-[14px] text-[#9FA0A0]">just like this hippo's to-do list!</p>
+          <p class="text-sm text-base-content/70">Your list is empty,</p>
+          <p class="mt-2 text-sm text-base-content/70">just like this hippo's to-do list!</p>
         </div>
       }
     } @else {
       <!-- No deploy tokens state -->
-      <div class="flex items-center gap-2 text-[14px]">
+      <div class="flex items-center gap-2 text-base">
         <img ngSrc="/assets/icons/cursor/warning.svg" alt="danger" height="24" width="24" />
         <span class="text-warning-500"> You haven't permission to view deploy tokens. </span>
       </div>

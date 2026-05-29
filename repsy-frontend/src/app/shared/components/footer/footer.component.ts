@@ -14,6 +14,7 @@
 /// limitations under the License.
 ///
 
+import { NgOptimizedImage } from '@angular/common';
 import { Component } from '@angular/core';
 
 import { DividerComponent } from '../divider/divider.component';
@@ -21,7 +22,7 @@ import { DividerComponent } from '../divider/divider.component';
 @Component({
   selector: 'app-footer',
   standalone: true,
-  imports: [DividerComponent],
+  imports: [DividerComponent, NgOptimizedImage],
   templateUrl: './footer.component.html',
   styleUrls: ['./footer.component.css'],
 })

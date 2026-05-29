@@ -16,7 +16,6 @@
 
 import { HttpErrorResponse, HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Router } from '@angular/router';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
@@ -25,7 +24,7 @@ export class ErrorInterceptor implements HttpInterceptor {
   private readonly UNAUTHORIZED_STATUS = 401;
   private _error: HttpErrorResponse;
 
-  constructor(private readonly router: Router) {}
+  constructor() {}
 
   intercept(request: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
     return next.handle(request).pipe(
@@ -46,8 +45,6 @@ export class ErrorInterceptor implements HttpInterceptor {
 
   private handleUnauthorizedError(error: HttpErrorResponse) {
     this._error = error;
-    console.error('Unauthorized access - redirecting to login');
-    localStorage.clear();
-    this.router.navigate(['/login']).then(() => window.location.reload());
+    console.error('Unauthorized API access — OriginHub handles session externally');
   }
 }

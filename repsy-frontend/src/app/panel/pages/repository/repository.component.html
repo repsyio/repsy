@@ -1,10 +1,6 @@
-<div class="mb-4 flex items-center gap-2 text-[14px]">
-  <span class="text-secondary-500 outline-none hover:text-white focus:text-white"> Repositories </span>
-</div>
-
 <div
   [ngClass]="{ 'pointer-events-none opacity-50 select-none': loading || this.error }"
-  class="mb-7 flex flex-col flex-col-reverse items-start justify-between gap-4 md:items-start lg:flex-row lg:items-center"
+  class="mt-4 mb-7 flex flex-col flex-col-reverse items-start justify-between gap-4 sm:mt-6 md:items-start lg:flex-row lg:items-center"
 >
   <div class="flex w-full flex-col items-start gap-4 sm:w-auto sm:flex-row sm:items-center">
     <app-searchbox placeholder="repository" (filter)="search($event)" class="w-full sm:max-w-[192px]" />
@@ -41,7 +37,7 @@
 
   <button
     (click)="openCreateRepoModal()"
-    class="repsy-btn-confirm flex h-[40px] w-full items-center gap-2 px-4 text-[14px] font-bold transition-all sm:w-auto"
+    class="repsy-btn-confirm flex h-[40px] w-full items-center gap-2 px-4 text-base font-bold transition-all sm:w-auto"
   >
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M8 2V14M2 8H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
@@ -58,7 +54,7 @@
       <div class="text-body1">
         <!-- Table Headers (Desktop)-->
         <div
-          class="hidden grid-cols-[3fr_3fr_2fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[3fr_3fr_2fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-base-300 bg-base-100 p-4 text-sm whitespace-nowrap text-base-content/70 lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Repository</div>
@@ -69,16 +65,16 @@
         </div>
 
         <!-- Repository Table (Desktop) -->
-        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
+        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-base-300 bg-base-100 lg:block">
           <!-- Repo Items -->
           @for (repo of paginatedRepos; track repo.name; let i = $index) {
             <div role="button" [routerLink]="'/' + repo.name">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === paginatedRepos.length - 1 }"
-                class="group grid grid-cols-[3fr_3fr_2fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="group grid grid-cols-[3fr_3fr_2fr_1fr_40px] items-center gap-4 p-4 hover:bg-base-200"
               >
-                <div class="flex gap-2 text-[14px] text-[#9FA0A0]">
+                <div class="flex gap-2 text-sm text-base-content/70">
                   @switch (repo.repoType) {
                     @case ('npm') {
                       <svg
@@ -226,25 +222,25 @@
                   }
 
                   <app-tooltip
-                    class="text-[14px] text-[#FDFDFD]"
+                    class="text-sm text-base-content"
                     [text]="repo.name | ellipsis"
                     [textHover]="repo.name"
                   />
                 </div>
 
-                <div class="text-[14px] text-[#FDFDFD]">
+                <div class="text-sm text-base-content">
                   {{ repo.privateRepo ? 'Private' : 'Public' }}
                 </div>
 
                 <app-tooltip
-                  class="text-[14px] text-[#FDFDFD]"
+                  class="text-sm text-base-content"
                   [text]="timeAgo(repo.createdAt)"
                   [textHover]="repo.createdAt | date: 'medium'"
                   [always]="true"
                 />
 
                 <app-tooltip
-                  class="text-right text-[14px] text-[#FDFDFD]"
+                  class="text-right text-sm text-base-content"
                   [text]="formatBytes(repo.diskUsage)"
                   [textHover]="formatBytes(repo.diskUsage) | ellipsis"
                 />
@@ -253,14 +249,14 @@
                   <app-dropdown (click)="$event.stopPropagation()">
                     <button
                       [routerLink]="'/' + repo.name + '/settings'"
-                      class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FDFDFD] hover:bg-[#2D2C2C]"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-sm text-base-content hover:bg-base-300"
                     >
                       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path
                           fill-rule="evenodd"
                           clip-rule="evenodd"
                           d="M7.22171 1L7.12343 1.49942L6.74744 3.32685C6.1463 3.55656 5.60114 3.8823 5.10857 4.26858L3.27086 3.65372L2.77715 3.50057L2.52115 3.94172L1.256 6.05826L1 6.49946L1.37486 6.82744L2.79658 8.03771C2.74515 8.35428 2.67887 8.6674 2.67887 8.99997C2.67887 9.33254 2.74515 9.64573 2.79658 9.96229L1.37486 11.1726L1 11.5006L1.256 11.9416L2.52115 14.0583L2.77715 14.5005L3.27086 14.3463L5.10857 13.7315C5.60114 14.1177 6.1463 14.4434 6.74744 14.6731L7.12343 16.5005L7.22171 17H10.7772L10.8766 16.5005L11.2514 14.6731C11.8526 14.4434 12.3977 14.1177 12.8903 13.7315L14.728 14.3463L15.2217 14.5005L15.4789 14.0583L16.7429 11.9416L17 11.5006L16.624 11.1726L15.2023 9.96229C15.2549 9.64573 15.32 9.33254 15.32 8.99997C15.32 8.6674 15.2549 8.35428 15.2023 8.03771L16.624 6.82744L17 6.49946L16.7429 6.05826L15.4789 3.94172L15.2217 3.50057L14.728 3.65372L12.8903 4.26858C12.3977 3.8823 11.8526 3.55656 11.2514 3.32685L10.8766 1.49942L10.7772 1H7.22171Z"
-                          stroke="#FDFDFD"
+                          stroke="currentColor"
                           stroke-linecap="square"
                           stroke-linejoin="round"
                         />
@@ -268,7 +264,7 @@
                           fill-rule="evenodd"
                           clip-rule="evenodd"
                           d="M11.2863 8.99855C11.2863 10.2603 10.2623 11.2843 9.00056 11.2843C7.73884 11.2843 6.71484 10.2603 6.71484 8.99855C6.71484 7.73684 7.73884 6.71289 9.00056 6.71289C10.2623 6.71289 11.2863 7.73684 11.2863 8.99855Z"
-                          stroke="#FDFDFD"
+                          stroke="currentColor"
                           stroke-linecap="square"
                           stroke-linejoin="round"
                         />
@@ -279,12 +275,12 @@
                     <button
                       (click)="deleteRepository(repo)"
                       [disabled]="operationLock"
-                      class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-base-300"
                     >
                       <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path
                           d="M17.3077 2.76833H14.0225C13.5249 2.76833 13.0846 2.45079 12.9277 1.98002L12.636 1.10404C12.4154 0.443114 11.7997 0 11.1037 0H6.89536C6.19936 0 5.58369 0.443095 5.36308 1.10494L5.0714 1.98002C4.91448 2.45171 4.47414 2.76923 3.9766 2.76923H0.692308C0.310154 2.76923 0 3.07938 0 3.46154C0 3.84369 0.310154 4.15385 0.692308 4.15385H1.89043L2.59846 14.7692C2.71938 16.5812 4.23601 18 6.05262 18H11.9483C13.764 18 15.2815 16.5803 15.4025 14.7692L16.1105 4.15385H17.3077C17.6898 4.15385 18 3.84369 18 3.46154C18 3.07938 17.6898 2.76833 17.3077 2.76833ZM6.67659 1.54158C6.70797 1.44742 6.79566 1.38371 6.89536 1.38371H11.1037C11.2034 1.38371 11.2911 1.44745 11.3225 1.54068L11.6142 2.41665C11.6548 2.5385 11.7055 2.65574 11.7628 2.76743H6.23538C6.29262 2.65482 6.3434 2.53853 6.38402 2.41576L6.67659 1.54158ZM14.0197 14.676C13.9477 15.7634 13.0375 16.6145 11.9474 16.6145H6.05172C4.96249 16.6145 4.05136 15.7634 3.97936 14.676L3.27787 4.15294H3.9766C4.07537 4.15294 4.17231 4.14092 4.26923 4.12985C4.308 4.13631 4.3431 4.15294 4.38371 4.15294H13.6145C13.6551 4.15294 13.6902 4.13631 13.7289 4.12985C13.8258 4.14092 13.9218 4.15294 14.0215 4.15294H14.7203L14.0197 14.676ZM11.5385 8.076V12.6914C11.5385 13.0735 11.2283 13.3837 10.8462 13.3837C10.464 13.3837 10.1538 13.0735 10.1538 12.6914V8.076C10.1538 7.69385 10.464 7.38369 10.8462 7.38369C11.2283 7.38369 11.5385 7.69385 11.5385 8.076ZM7.84615 8.076V12.6914C7.84615 13.0735 7.536 13.3837 7.15385 13.3837C6.77169 13.3837 6.46154 13.0735 6.46154 12.6914V8.076C6.46154 7.69385 6.77169 7.38369 7.15385 7.38369C7.536 7.38369 7.84615 7.69385 7.84615 8.076Z"
-                          fill="#E8546A"
+                          fill="currentColor"
                         />
                       </svg>
                       @if (operationLock) {
@@ -297,7 +293,7 @@
                 }
               </div>
               @if (i !== paginatedRepos.length - 1) {
-                <div class="h-[1px] w-full bg-[#404141]"></div>
+                <div class="h-[1px] w-full bg-base-300"></div>
               }
             </div>
           }
@@ -307,7 +303,7 @@
         @for (repo of paginatedRepos; track repo.name; let i = $index) {
           <div animate.enter="fade-in-down" class="lg:hidden">
             <div
-              class="group relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+              class="group relative flex flex-col gap-2 rounded-[12px] border border-base-300 bg-base-100 p-4 hover:border-primary hover:bg-base-200"
               role="button"
               tabindex="0"
               [routerLink]="'/' + repo.name"
@@ -316,14 +312,14 @@
                 <app-dropdown class="relative left-4 ml-auto" (click)="$event.stopPropagation()">
                   <button
                     [routerLink]="'/' + repo.name + '/settings'"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FDFDFD] hover:bg-[#2D2C2C]"
+                    class="flex w-full items-center gap-2 px-4 py-2 text-sm text-base-content hover:bg-base-300"
                   >
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path
                         fill-rule="evenodd"
                         clip-rule="evenodd"
                         d="M7.22171 1L7.12343 1.49942L6.74744 3.32685C6.1463 3.55656 5.60114 3.8823 5.10857 4.26858L3.27086 3.65372L2.77715 3.50057L2.52115 3.94172L1.256 6.05826L1 6.49946L1.37486 6.82744L2.79658 8.03771C2.74515 8.35428 2.67887 8.6674 2.67887 8.99997C2.67887 9.33254 2.74515 9.64573 2.79658 9.96229L1.37486 11.1726L1 11.5006L1.256 11.9416L2.52115 14.0583L2.77715 14.5005L3.27086 14.3463L5.10857 13.7315C5.60114 14.1177 6.1463 14.4434 6.74744 14.6731L7.12343 16.5005L7.22171 17H10.7772L10.8766 16.5005L11.2514 14.6731C11.8526 14.4434 12.3977 14.1177 12.8903 13.7315L14.728 14.3463L15.2217 14.5005L15.4789 14.0583L16.7429 11.9416L17 11.5006L16.624 11.1726L15.2023 9.96229C15.2549 9.64573 15.32 9.33254 15.32 8.99997C15.32 8.6674 15.2549 8.35428 15.2023 8.03771L16.624 6.82744L17 6.49946L16.7429 6.05826L15.4789 3.94172L15.2217 3.50057L14.728 3.65372L12.8903 4.26858C12.3977 3.8823 11.8526 3.55656 11.2514 3.32685L10.8766 1.49942L10.7772 1H7.22171Z"
-                        stroke="#FDFDFD"
+                        stroke="currentColor"
                         stroke-linecap="square"
                         stroke-linejoin="round"
                       />
@@ -331,7 +327,7 @@
                         fill-rule="evenodd"
                         clip-rule="evenodd"
                         d="M11.2863 8.99855C11.2863 10.2603 10.2623 11.2843 9.00056 11.2843C7.73884 11.2843 6.71484 10.2603 6.71484 8.99855C6.71484 7.73684 7.73884 6.71289 9.00056 6.71289C10.2623 6.71289 11.2863 7.73684 11.2863 8.99855Z"
-                        stroke="#FDFDFD"
+                        stroke="currentColor"
                         stroke-linecap="square"
                         stroke-linejoin="round"
                       />
@@ -342,12 +338,12 @@
                   <button
                     (click)="deleteRepository(repo)"
                     [disabled]="operationLock"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                    class="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-base-300"
                   >
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path
                         d="M17.3077 2.76833H14.0225C13.5249 2.76833 13.0846 2.45079 12.9277 1.98002L12.636 1.10404C12.4154 0.443114 11.7997 0 11.1037 0H6.89536C6.19936 0 5.58369 0.443095 5.36308 1.10494L5.0714 1.98002C4.91448 2.45171 4.47414 2.76923 3.9766 2.76923H0.692308C0.310154 2.76923 0 3.07938 0 3.46154C0 3.84369 0.310154 4.15385 0.692308 4.15385H1.89043L2.59846 14.7692C2.71938 16.5812 4.23601 18 6.05262 18H11.9483C13.764 18 15.2815 16.5803 15.4025 14.7692L16.1105 4.15385H17.3077C17.6898 4.15385 18 3.84369 18 3.46154C18 3.07938 17.6898 2.76833 17.3077 2.76833ZM6.67659 1.54158C6.70797 1.44742 6.79566 1.38371 6.89536 1.38371H11.1037C11.2034 1.38371 11.2911 1.44745 11.3225 1.54068L11.6142 2.41665C11.6548 2.5385 11.7055 2.65574 11.7628 2.76743H6.23538C6.29262 2.65482 6.3434 2.53853 6.38402 2.41576L6.67659 1.54158ZM14.0197 14.676C13.9477 15.7634 13.0375 16.6145 11.9474 16.6145H6.05172C4.96249 16.6145 4.05136 15.7634 3.97936 14.676L3.27787 4.15294H3.9766C4.07537 4.15294 4.17231 4.14092 4.26923 4.12985C4.308 4.13631 4.3431 4.15294 4.38371 4.15294H13.6145C13.6551 4.15294 13.6902 4.13631 13.7289 4.12985C13.8258 4.14092 13.9218 4.15294 14.0215 4.15294H14.7203L14.0197 14.676ZM11.5385 8.076V12.6914C11.5385 13.0735 11.2283 13.3837 10.8462 13.3837C10.464 13.3837 10.1538 13.0735 10.1538 12.6914V8.076C10.1538 7.69385 10.464 7.38369 10.8462 7.38369C11.2283 7.38369 11.5385 7.69385 11.5385 8.076ZM7.84615 8.076V12.6914C7.84615 13.0735 7.536 13.3837 7.15385 13.3837C6.77169 13.3837 6.46154 13.0735 6.46154 12.6914V8.076C6.46154 7.69385 6.77169 7.38369 7.15385 7.38369C7.536 7.38369 7.84615 7.69385 7.84615 8.076Z"
-                        fill="#E8546A"
+                        fill="currentColor"
                       />
                     </svg>
                     @if (operationLock) {
@@ -359,7 +355,7 @@
                 </app-dropdown>
               }
 
-              <div class="flex gap-2 text-[14px] text-[#9FA0A0]">
+              <div class="flex gap-2 text-sm text-base-content/70">
                 @switch (repo.repoType) {
                   @case ('npm') {
                     <svg
@@ -503,25 +499,25 @@
                     </svg>
                   }
                 }
-                <span class="break-all text-[#FDFDFD]">{{ repo.name }}</span>
+                <span class="break-all text-base-content">{{ repo.name }}</span>
               </div>
 
               <div class="space-y-2">
                 <div class="flex items-center justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Visibility: </span>
-                  <span class="text-sm break-all text-[#FDFDFD]">
+                  <span class="text-sm text-base-content/70">Visibility: </span>
+                  <span class="text-sm break-all text-base-content">
                     {{ repo.privateRepo ? 'Private' : 'Public' }}
                   </span>
                 </div>
                 <div class="flex items-center justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Size: </span>
-                  <span class="text-sm break-all text-[#FDFDFD]">
+                  <span class="text-sm text-base-content/70">Size: </span>
+                  <span class="text-sm break-all text-base-content">
                     {{ formatBytes(repo.diskUsage) }}
                   </span>
                 </div>
                 <div class="flex items-center justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Created: </span>
-                  <span class="text-sm break-all text-[#FDFDFD]">
+                  <span class="text-sm text-base-content/70">Created: </span>
+                  <span class="text-sm break-all text-base-content">
                     {{ repo.createdAt | date: 'medium' }} {{ '(' + timeAgo(repo.createdAt) + ')' }}
                   </span>
                 </div>
@@ -529,7 +525,7 @@
             </div>
             @if (i !== paginatedRepos.length - 1) {
               <div class="px-2 py-4">
-                <div class="h-[1px] bg-[#404141]"></div>
+                <div class="h-[1px] bg-base-300"></div>
               </div>
             }
           </div>
@@ -550,7 +546,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p class="text-error-500 mt-2 text-lg">{{ this.error }}</p>
     </div>
   }
 }

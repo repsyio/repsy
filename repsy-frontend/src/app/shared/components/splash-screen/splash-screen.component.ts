@@ -16,12 +16,13 @@
 
 import { Component } from '@angular/core';
 
+import { RepsyBrandComponent } from '../repsy-brand/repsy-brand.component';
 import { SplashService } from './splasht.service';
 
 @Component({
   selector: 'app-splash-screen',
   templateUrl: './splash-screen.component.html',
-  imports: [],
+  imports: [RepsyBrandComponent],
   styleUrls: ['./splash-screen.component.css'],
 })
 export class SplashComponent {

@@ -5,44 +5,44 @@
     <div class="mb-4" animate.enter="fade-in-up">
       <div class="mb-4 flex items-center gap-x-2">
         <div
-          class="inline-flex gap-2 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[16px] py-[6px] text-[14px] text-[#FDFDFD]"
+          class="inline-flex gap-2 rounded-[14px] bg-linear-to-b from-base-300 to-base-200 px-[16px] py-[6px] text-sm text-base-content"
         >
           <img ngSrc="/assets/icons/cursor/tick.svg" alt="tick" height="12" width="16" />
           {{ tagInfo.name }}
         </div>
       </div>
-      <p class="font-courier mb-8 text-[12px] text-[#9C9C9D]">Uploaded at: {{ tagInfo.createdAt | date: 'medium' }}</p>
+      <p class="font-courier mb-8 text-sm text-base-content/65">Uploaded at: {{ tagInfo.createdAt | date: 'medium' }}</p>
 
-      <h3 class="mb-2 text-[13px] text-white">Installation:</h3>
-      <div class="mb-8 inline-flex items-start gap-2 rounded-lg bg-[#101112] p-[14px]">
+      <h3 class="mb-2 text-sm text-white">Installation:</h3>
+      <div class="mb-8 inline-flex items-start gap-2 rounded-lg bg-base-100 p-[14px]">
         <img class="mt-[2px]" ngSrc="/assets/icons/docker/docker-light.svg" alt="docker-light" height="18" width="18" />
-        <span class="text-[13px] break-all text-[#9C9C9D]">{{ installText }}</span>
+        <span class="text-sm break-all text-base-content/65">{{ installText }}</span>
 
         <app-copy-clipboard [text]="installText" />
       </div>
 
-      <div class="mb-8 rounded-lg bg-[#101112] p-[22px] text-[24px]">
+      <div class="mb-8 rounded-lg bg-base-100 p-[22px] text-xl">
         <h3 class="text-neutral-200">{{ imageName }}</h3>
       </div>
 
-      <div class="relative mb-6 overflow-x-auto rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-        <div class="flex items-center justify-between gap-2 border-b border-[#2A2A2A] p-4">
-          <span class="text-[14px] text-[#FDFDFD]">Manifest</span>
+      <div class="relative mb-6 overflow-x-auto rounded-lg border border-base-300 bg-base-200">
+        <div class="flex items-center justify-between gap-2 border-b border-base-300 p-4">
+          <span class="text-sm text-base-content">Manifest</span>
           <app-copy-clipboard [text]="manifestText" />
         </div>
-        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <pre class="max-h-[500px] text-sm sm:max-h-[800px]">
         <code [highlight]="manifestText" language="json" lineNumbers>
         </code>
       </pre>
       </div>
 
       @if (tagInfo.configDigest !== null) {
-        <div class="relative mb-6 overflow-x-auto rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-          <div class="flex items-center justify-between gap-2 border-b border-[#2A2A2A] p-4">
-            <span class="text-[14px] text-[#FDFDFD]">Config</span>
+        <div class="relative mb-6 overflow-x-auto rounded-lg border border-base-300 bg-base-200">
+          <div class="flex items-center justify-between gap-2 border-b border-base-300 p-4">
+            <span class="text-sm text-base-content">Config</span>
             <app-copy-clipboard [text]="configText" />
           </div>
-          <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+          <pre class="max-h-[500px] text-sm sm:max-h-[800px]">
         <code [highlight]="configText" language="json" lineNumbers>
         </code>
       </pre>
@@ -77,7 +77,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p class="text-error-500 mt-2 text-lg">{{ this.error }}</p>
     </div>
   }
 }

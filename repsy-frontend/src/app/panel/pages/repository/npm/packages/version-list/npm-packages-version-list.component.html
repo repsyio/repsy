@@ -10,11 +10,11 @@
     [ngClass]="{ 'pointer-events-none opacity-50 select-none': loading }"
     class="mb-[40px] flex flex-col items-start gap-2"
   >
-    <span class="text-[16px] font-bold text-[#9FA0A0]">Distribution Tags</span>
+    <span class="text-sm font-bold text-base-content/70">Distribution Tags</span>
     <div class="flex h-[40px] flex-wrap gap-2">
       @for (tag of tags; track tag.tag) {
         <div
-          class="inline-flex h-[40px] min-w-max items-center justify-start gap-2 rounded-[10px] bg-linear-to-b from-[#333333] to-[#111010] px-3 text-[14px] font-bold text-white"
+          class="inline-flex h-[40px] min-w-max items-center justify-start gap-2 rounded-[10px] bg-linear-to-b from-base-300 to-base-200 px-3 text-sm font-bold text-white"
         >
           <img
             class="h-[20px] w-[20px]"
@@ -93,7 +93,7 @@
       <div class="text-body1">
         <!-- Table Headers (Desktop) -->
         <div
-          class="hidden grid-cols-[5fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[5fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-base-300 bg-base-100 p-4 text-sm whitespace-nowrap text-base-content/70 lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Version</div>
@@ -102,7 +102,7 @@
         </div>
 
         <!-- Version Table (Desktop) -->
-        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
+        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-base-300 bg-base-100 lg:block">
           @for (version of versions; track version.version; let i = $index) {
             <div
               role="button"
@@ -119,9 +119,9 @@
             >
               <div
                 [ngClass]="{ 'rounded-b-[12px]': i === versions.length - 1 }"
-                class="grid grid-cols-[5fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="grid grid-cols-[5fr_1fr_40px] items-center gap-4 p-4 hover:bg-base-200"
               >
-                <div class="flex gap-2 text-[14px] text-white">
+                <div class="flex gap-2 text-sm text-base-content">
                   <img class="mb-1" ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
                   <app-tooltip
                     class="group-hover:underline"
@@ -142,7 +142,7 @@
                     <button
                       (click)="deleteVersion(version)"
                       [disabled]="loading"
-                      class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-base-300"
                     >
                       <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
                       Delete
@@ -151,7 +151,7 @@
                 }
               </div>
               @if (i !== versions.length - 1) {
-                <div class="h-[1px] w-full bg-[#404141]"></div>
+                <div class="h-[1px] w-full bg-base-300"></div>
               }
             </div>
           }
@@ -161,7 +161,7 @@
         @for (version of versions; track version.version; let i = $index) {
           <div animate.enter="fade-in-down" class="lg:hidden">
             <div
-              class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+              class="relative flex flex-col gap-2 rounded-[12px] border border-base-300 bg-base-100 p-4 hover:border-primary hover:bg-base-200"
               role="button"
               [routerLink]="
                 '/' +
@@ -179,7 +179,7 @@
                   <button
                     (click)="deleteVersion(version)"
                     [disabled]="loading"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                    class="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-base-300"
                   >
                     <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
                     Delete
@@ -187,15 +187,15 @@
                 </app-dropdown>
               }
 
-              <div class="group text-secondary-500 flex items-start gap-2 text-[14px]">
+              <div class="group text-secondary-500 flex items-start gap-2 text-sm">
                 <img class="mt-[2px]" ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
 
-                <span class="text-right break-all text-[#FDFDFD]">{{ version.version }}</span>
+                <span class="text-right break-all text-base-content">{{ version.version }}</span>
               </div>
 
               <div class="space-y-2">
                 <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Upladed: </span>
+                  <span class="text-sm text-base-content/70">Upladed: </span>
                   <span class="text-secondary-500 text-right break-all">
                     {{ version.createdAt | date: 'medium' }} {{ '(' + timeAgo(version.createdAt) + ')' }}
                   </span>
@@ -204,7 +204,7 @@
             </div>
             @if (i !== versions.length - 1) {
               <div class="px-2 py-4">
-                <div class="h-[1px] bg-[#404141]"></div>
+                <div class="h-[1px] bg-base-300"></div>
               </div>
             }
           </div>
@@ -229,7 +229,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p class="text-error-500 mt-2 text-lg">{{ this.error }}</p>
     </div>
   }
 }

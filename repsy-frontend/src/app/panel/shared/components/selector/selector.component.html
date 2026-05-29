@@ -3,7 +3,7 @@
     (click)="toggleDropdown($event)"
     type="button"
     [ngClass]="size === 'small' ? 'h-[40px]' : 'h-[50px]'"
-    class="flex h-[40px] w-full min-w-[113px] items-center justify-between gap-2 rounded-lg border border-[#404141] bg-[#101112] px-4 text-[14px] text-white hover:border-white"
+    class="flex h-[40px] w-full min-w-[113px] items-center justify-between gap-2 rounded-lg border border-base-300 bg-base-100 px-4 text-sm text-base-content hover:border-primary"
   >
     <span>{{ selectedOption.charAt(0).toUpperCase() + selectedOption.slice(1) }}</span>
     <svg
@@ -29,15 +29,15 @@
       [appOutSideClick]="isOpen"
       (outSideClick)="isOpen = false"
       [ngClass]="size === 'small' ? 'top-[44px]' : 'top-[54px]'"
-      class="absolute right-0 z-1 w-full rounded-lg border border-[#404141] bg-[#101112]"
+      class="absolute right-0 z-1 w-full rounded-lg border border-base-300 bg-base-100"
       animate.enter="fade-in-down"
     >
       @for (option of options; track option; let i = $index) {
         <button
           type="button"
           [ngClass]="{ 'rounded-t-lg': i === 0, 'rounded-b-lg': i === options.length - 1 }"
-          class="flex w-full items-center rounded-t-lg px-4 py-2 text-[14px] text-white hover:bg-[#2D2C2C]"
-          [class.text-[#FDFDFD]]="selectedOption === option"
+          class="flex w-full items-center rounded-t-lg px-4 py-2 text-sm text-base-content hover:bg-base-300"
+          [class.text-base-content]="selectedOption === option"
           (click)="selectOption(option)"
         >
           {{ option.charAt(0).toUpperCase() + option.slice(1) }}

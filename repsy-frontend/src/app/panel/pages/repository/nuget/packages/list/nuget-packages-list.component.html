@@ -42,7 +42,7 @@
     @if (packages?.length > 0) {
       <div class="text-body1">
         <div
-          class="hidden grid-cols-[2fr_2fr_3fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[2fr_2fr_3fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-base-300 bg-base-100 p-4 text-sm whitespace-nowrap text-base-content/70 lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Package</div>
@@ -51,13 +51,13 @@
           <div>Downloads</div>
           <div></div>
         </div>
-        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
+        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-base-300 bg-base-100 lg:block">
           @for (pkg of packages; track pkg.packageId; let i = $index) {
             <div role="button" [routerLink]="'/' + activeRepo.repoName + '/' + pkg.packageId">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === packages.length - 1 }"
-                class="grid grid-cols-[2fr_2fr_3fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="grid grid-cols-[2fr_2fr_3fr_1fr_40px] items-center gap-4 p-4 hover:bg-base-200"
               >
                 <div class="flex items-center gap-2">
                   <img ngSrc="/assets/icons/nuget/nuget.svg" alt="NuGet" height="25" width="25" />
@@ -68,22 +68,22 @@
                   />
                 </div>
                 <app-tooltip
-                  class="text-[#FDFDFD]"
+                  class="text-base-content"
                   [text]="pkg.latestVersion | ellipsis"
                   [textHover]="pkg.latestVersion"
                 />
                 <app-tooltip
-                  class="text-[#9FA0A0]"
+                  class="text-base-content/70"
                   [text]="pkg.description || '-' | ellipsis"
                   [textHover]="pkg.description || '-'"
                 />
-                <span class="text-[#FDFDFD]">{{ pkg.totalDownloads }}</span>
+                <span class="text-base-content">{{ pkg.totalDownloads }}</span>
                 @if (activeRepo.canManage) {
                   <app-dropdown (click)="$event.stopPropagation()">
                     <button
                       (click)="deletePackage(pkg)"
                       [disabled]="loading"
-                      class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-base-300"
                     >
                       <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
                       Delete
@@ -92,7 +92,7 @@
                 }
               </div>
               @if (i !== packages.length - 1) {
-                <div class="h-[1px] w-full bg-[#404141]"></div>
+                <div class="h-[1px] w-full bg-base-300"></div>
               }
             </div>
           }
@@ -101,7 +101,7 @@
         @for (pkg of packages; track pkg.packageId; let i = $index) {
           <div animate.enter="fade-in-down" class="lg:hidden">
             <div
-              class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+              class="relative flex flex-col gap-2 rounded-[12px] border border-base-300 bg-base-100 p-4 hover:border-primary hover:bg-base-200"
               role="button"
               [routerLink]="'/' + activeRepo.repoName + '/' + pkg.packageId"
             >
@@ -110,7 +110,7 @@
                   <button
                     (click)="deletePackage(pkg)"
                     [disabled]="loading"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                    class="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-base-300"
                   >
                     <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
                     Delete
@@ -119,29 +119,29 @@
               }
               <div class="space-y-2">
                 <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Package:</span>
+                  <span class="text-sm text-base-content/70">Package:</span>
                   <span class="text-secondary-500 inline-flex items-center gap-2 text-right break-all">
                     <img ngSrc="/assets/icons/repo/nuget.svg" alt="NuGet" height="14" width="14" />
                     {{ pkg.packageId }}
                   </span>
                 </div>
                 <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Latest:</span>
-                  <span class="text-right break-all text-[#FDFDFD]">{{ pkg.latestVersion }}</span>
+                  <span class="text-sm text-base-content/70">Latest:</span>
+                  <span class="text-right break-all text-base-content">{{ pkg.latestVersion }}</span>
                 </div>
                 <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Downloads:</span>
-                  <span class="text-right break-all text-[#FDFDFD]">{{ pkg.totalDownloads }}</span>
+                  <span class="text-sm text-base-content/70">Downloads:</span>
+                  <span class="text-right break-all text-base-content">{{ pkg.totalDownloads }}</span>
                 </div>
                 <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Description:</span>
-                  <span class="text-right break-all text-[#FDFDFD]">{{ pkg.description || '-' }}</span>
+                  <span class="text-sm text-base-content/70">Description:</span>
+                  <span class="text-right break-all text-base-content">{{ pkg.description || '-' }}</span>
                 </div>
               </div>
             </div>
             @if (i !== packages.length - 1) {
               <div class="px-2 py-4">
-                <div class="h-[1px] bg-[#404141]"></div>
+                <div class="h-[1px] bg-base-300"></div>
               </div>
             }
           </div>
@@ -161,7 +161,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p class="text-error-500 mt-2 text-lg">{{ this.error }}</p>
     </div>
   }
 }

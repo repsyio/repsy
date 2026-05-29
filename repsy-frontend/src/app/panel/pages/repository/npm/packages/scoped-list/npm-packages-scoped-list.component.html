@@ -67,7 +67,7 @@
       <div class="text-body1">
         <!-- Table Headers (Desktop)-->
         <div
-          class="hidden grid-cols-[3fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[3fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-base-300 bg-base-100 p-4 text-sm whitespace-nowrap text-base-content/70 lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Package</div>
@@ -77,23 +77,23 @@
         </div>
 
         <!-- Package Table (Desktop) -->
-        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
+        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-base-300 bg-base-100 lg:block">
           @for (pkg of packages; track pkg.name; let i = $index) {
             <div role="button" [routerLink]="'/' + activeRegistry.repoName + '/' + scopeName + '/' + pkg.name">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === packages.length - 1 }"
-                class="grid grid-cols-[3fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="grid grid-cols-[3fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-base-200"
               >
                 <a
-                  class="group text-secondary-500 flex w-max gap-2 text-[14px]"
+                  class="group text-secondary-500 flex w-max gap-2 text-sm"
                   [routerLink]="'/' + activeRegistry.repoName + '/' + (pkg.scope ? pkg.scope : '~') + '/' + pkg.name"
                 >
                   <img ngSrc="/assets/icons/repo/cube-outline.svg" alt="cube" height="18" width="18" />
 
                   <app-tooltip class="group-hover:underline" [text]="pkg.name | ellipsis: 35" [textHover]="pkg.name" />
                   <svg
-                    class="mt-[2px] h-[14px] w-[14px] text-[#9FA0A0] group-hover:text-white"
+                    class="mt-[2px] h-[14px] w-[14px] text-base-content/70 group-hover:text-base-content"
                     viewBox="0 0 14 14"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -109,7 +109,7 @@
                 </a>
 
                 <a
-                  class="group flex w-max gap-2 text-[14px] text-[#FDFDFD]"
+                  class="group flex w-max gap-2 text-sm text-base-content"
                   [routerLink]="
                     '/' +
                     activeRegistry.repoName +
@@ -127,7 +127,7 @@
                     [textHover]="pkg.latestVersion"
                   />
                   <svg
-                    class="mt-[2px] h-[14px] w-[14px] text-[#9FA0A0] group-hover:text-white"
+                    class="mt-[2px] h-[14px] w-[14px] text-base-content/70 group-hover:text-base-content"
                     viewBox="0 0 14 14"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -142,7 +142,7 @@
                   </svg>
                 </a>
 
-                <div class="text-[14px] text-[#FDFDFD]">
+                <div class="text-sm text-base-content">
                   <app-tooltip
                     class="text-secondary-500 group-hover:underline"
                     [text]="timeAgo(pkg.updatedAt)"
@@ -156,7 +156,7 @@
                     <button
                       (click)="deletePackage(pkg)"
                       [disabled]="loading"
-                      class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-sm text-error hover:bg-base-300"
                     >
                       <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
                       Delete
@@ -166,7 +166,7 @@
               </div>
 
               @if (i !== packages.length - 1) {
-                <div class="h-[1px] w-full bg-[#404141]"></div>
+                <div class="h-[1px] w-full bg-base-300"></div>
               }
             </div>
           }
@@ -176,7 +176,7 @@
         @for (pkg of packages; track pkg.name; let i = $index) {
           <div animate.enter="fade-in-down" class="lg:hidden">
             <div
-              class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+              class="relative flex flex-col gap-2 rounded-[12px] border border-base-300 bg-base-100 p-4 hover:border-primary hover:bg-base-200"
               role="button"
               [routerLink]="
                 '/' +
@@ -194,7 +194,7 @@
                   <button
                     (click)="deletePackage(pkg)"
                     [disabled]="loading"
-                    class="flex w-full gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                    class="flex w-full gap-2 px-4 py-2 text-sm text-error hover:bg-base-300"
                   >
                     <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
                     Delete
@@ -203,7 +203,7 @@
               }
 
               <a
-                class="group text-secondary-500 flex items-start gap-2 text-[14px]"
+                class="group text-secondary-500 flex items-start gap-2 text-sm"
                 [routerLink]="'/' + activeRegistry.repoName + '/' + (pkg.scope ? pkg.scope : '~') + '/' + pkg.name"
               >
                 <img class="mt-[2px]" ngSrc="/assets/icons/repo/cube-outline.svg" alt="cube" height="18" width="18" />
@@ -211,7 +211,7 @@
                   {{ pkg.name }}
                 </span>
                 <svg
-                  class="mt-[2px] h-[14px] w-[14px] shrink-0 text-[#9FA0A0] group-hover:text-white"
+                  class="mt-[2px] h-[14px] w-[14px] shrink-0 text-base-content/70 group-hover:text-base-content"
                   viewBox="0 0 14 14"
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
@@ -228,9 +228,9 @@
 
               <div class="space-y-2">
                 <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Latest: </span>
+                  <span class="text-sm text-base-content/70">Latest: </span>
                   <a
-                    class="group flex min-w-0 gap-2 text-[14px] text-[#FDFDFD]"
+                    class="group flex min-w-0 gap-2 text-sm text-base-content"
                     [routerLink]="
                       '/' +
                       activeRegistry.repoName +
@@ -247,7 +247,7 @@
                     </span>
 
                     <svg
-                      class="mt-[2px] h-[14px] w-[14px] shrink-0 text-[#9FA0A0] group-hover:text-white"
+                      class="mt-[2px] h-[14px] w-[14px] shrink-0 text-base-content/70 group-hover:text-base-content"
                       viewBox="0 0 14 14"
                       fill="none"
                       xmlns="http://www.w3.org/2000/svg"
@@ -263,7 +263,7 @@
                   </a>
                 </div>
                 <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Last Updated: </span>
+                  <span class="text-sm text-base-content/70">Last Updated: </span>
                   <span class="text-secondary-500 text-right break-all">
                     {{ pkg.updatedAt | date: 'medium' }} {{ '(' + timeAgo(pkg.updatedAt) + ')' }}
                   </span>
@@ -272,7 +272,7 @@
             </div>
             @if (i !== packages.length - 1) {
               <div class="px-2 py-4">
-                <div class="h-[1px] bg-[#404141]"></div>
+                <div class="h-[1px] bg-base-300"></div>
               </div>
             }
           </div>
@@ -297,7 +297,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p class="text-error-500 mt-2 text-lg">{{ this.error }}</p>
     </div>
   }
 }

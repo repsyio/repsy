@@ -27,7 +27,7 @@ export function accessTokenInitializer() {
 
     if (accessToken) {
       localStorage.setItem('token', accessToken);
-      router.navigate(['/']);
+      router.navigate(['/repositories']);
     }
   };
 }

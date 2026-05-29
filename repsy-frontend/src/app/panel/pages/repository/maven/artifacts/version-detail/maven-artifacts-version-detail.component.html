@@ -7,54 +7,54 @@
       <div class="space-y-4">
         <!-- First row - Group ID and Organization -->
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-            <div class="mb-1 text-[13px] text-[#FDFDFD]">
-              Group ID: <span class="text-[#9FA0A0]">{{ version.artifactGroupName }}</span>
+          <div class="rounded-lg border border-base-300 bg-base-200 p-4">
+            <div class="mb-1 text-sm text-base-content">
+              Group ID: <span class="text-base-content/70">{{ version.artifactGroupName }}</span>
             </div>
           </div>
 
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-            <div class="mb-1 text-[13px] text-[#FDFDFD]">
-              Organization: <span class="text-[#9FA0A0]">{{ version.organization }}</span>
+          <div class="rounded-lg border border-base-300 bg-base-200 p-4">
+            <div class="mb-1 text-sm text-base-content">
+              Organization: <span class="text-base-content/70">{{ version.organization }}</span>
             </div>
           </div>
         </div>
 
         <!-- Second row - Artifact ID and Licenses -->
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-            <div class="mb-1 text-[13px] text-[#FDFDFD]">
-              Artifact ID: <span class="text-[#9FA0A0]">{{ version.artifactName }} ({{ version.versionName }})</span>
+          <div class="rounded-lg border border-base-300 bg-base-200 p-4">
+            <div class="mb-1 text-sm text-base-content">
+              Artifact ID: <span class="text-base-content/70">{{ version.artifactName }} ({{ version.versionName }})</span>
             </div>
           </div>
 
-          <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-            <div class="mb-1 text-[13px] text-[#FDFDFD]">
-              Licenses: <span class="text-[#9FA0A0]">{{ version.licenses }}</span>
+          <div class="rounded-lg border border-base-300 bg-base-200 p-4">
+            <div class="mb-1 text-sm text-base-content">
+              Licenses: <span class="text-base-content/70">{{ version.licenses }}</span>
             </div>
           </div>
         </div>
 
-        <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-          <div class="mb-1 text-[13px] text-[#FDFDFD]">
-            Developers: <span class="text-[#9FA0A0]">{{ version.developers }}</span>
+        <div class="rounded-lg border border-base-300 bg-base-200 p-4">
+          <div class="mb-1 text-sm text-base-content">
+            Developers: <span class="text-base-content/70">{{ version.developers }}</span>
           </div>
         </div>
 
-        <div class="rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-          <div class="mb-1 text-[13px] text-[#FDFDFD]">
-            URL: <span class="text-[#9FA0A0]">{{ version.url }}</span>
+        <div class="rounded-lg border border-base-300 bg-base-200 p-4">
+          <div class="mb-1 text-sm text-base-content">
+            URL: <span class="text-base-content/70">{{ version.url }}</span>
           </div>
         </div>
 
-        <div class="mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-          <div class="mb-1 text-[13px] text-[#FDFDFD]">
-            SCM URL: <span class="text-[#9FA0A0]">{{ version.scmUrl }}</span>
+        <div class="mb-6 rounded-lg border border-base-300 bg-base-200 p-4">
+          <div class="mb-1 text-sm text-base-content">
+            SCM URL: <span class="text-base-content/70">{{ version.scmUrl }}</span>
           </div>
         </div>
 
-        <div class="mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4">
-          <div class="mb-1 text-[13px] text-[#FDFDFD]">
+        <div class="mb-6 rounded-lg border border-base-300 bg-base-200 p-4">
+          <div class="mb-1 text-sm text-base-content">
             Signed:
             @if (version.signed) {
               <i class="fa-solid fa-lock"></i>
@@ -65,152 +65,152 @@
         </div>
       </div>
 
-      <div class="mb-8 rounded-lg bg-[#101112] p-[22px] text-[24px]">
+      <div class="mb-8 rounded-lg bg-base-100 p-[22px] text-xl">
         <h3 class="text-neutral-200">{{ artifactName }}</h3>
       </div>
 
       <!-- POM File -->
-      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+      <div class="relative mb-6 rounded-lg border border-base-300 bg-base-200">
+        <div class="flex items-center gap-2 border-b border-base-300 p-4">
           <img ngSrc="/assets/icons/maven/maven2.svg" alt="Apache Maven" width="24" height="24" />
-          <span class="text-[14px] text-[#FDFDFD]">Pom XML</span>
+          <span class="text-sm text-base-content">Pom XML</span>
           <app-copy-clipboard class="ml-auto" [text]="version.pomFile" />
         </div>
-        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <pre class="max-h-[500px] text-sm sm:max-h-[800px]">
         <code [highlight]="version.pomFile" language="xml" lineNumbers>
         </code>
       </pre>
       </div>
 
       <!-- Apache Maven Dependency -->
-      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+      <div class="relative mb-6 rounded-lg border border-base-300 bg-base-200">
+        <div class="flex items-center gap-2 border-b border-base-300 p-4">
           <img ngSrc="/assets/icons/maven/maven2.svg" alt="Apache Maven" width="24" height="24" />
-          <span class="text-[14px] text-[#FDFDFD]">Apache Maven</span>
+          <span class="text-sm text-base-content">Apache Maven</span>
           <app-copy-clipboard class="ml-auto" [text]="mavenDependencyHtml" />
         </div>
-        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <pre class="max-h-[500px] text-sm sm:max-h-[800px]">
         <code [highlight]="mavenDependencyHtml" language="xml" lineNumbers>
         </code>
       </pre>
       </div>
 
       <!-- Gradle Groovy DSL -->
-      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+      <div class="relative mb-6 rounded-lg border border-base-300 bg-base-200">
+        <div class="flex items-center gap-2 border-b border-base-300 p-4">
           <img ngSrc="/assets/icons/maven/detail/gradle.svg" alt="Gradle Groovy DSL" width="24" height="24" />
-          <span class="text-[14px] text-[#FDFDFD]">Gradle Groovy DSL</span>
+          <span class="text-sm text-base-content">Gradle Groovy DSL</span>
           <app-copy-clipboard class="ml-auto" [text]="groovyDependencyHtml" />
         </div>
-        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <pre class="max-h-[500px] text-sm sm:max-h-[800px]">
         <code [highlight]="groovyDependencyHtml" language="groovy" lineNumbers>
         </code>
       </pre>
       </div>
 
       <!-- Gradle Kotlin DSL -->
-      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+      <div class="relative mb-6 rounded-lg border border-base-300 bg-base-200">
+        <div class="flex items-center gap-2 border-b border-base-300 p-4">
           <img ngSrc="/assets/icons/maven/detail/kotlin.svg" alt="Gradle Kotlin DSL" width="24" height="24" />
-          <span class="text-[14px] text-[#FDFDFD]">Gradle Kotlin DSL</span>
+          <span class="text-sm text-base-content">Gradle Kotlin DSL</span>
           <app-copy-clipboard class="ml-auto" [text]="gradleKotlinDependencyHtml" />
         </div>
 
-        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <pre class="max-h-[500px] text-sm sm:max-h-[800px]">
         <code [highlight]="gradleKotlinDependencyHtml" language="kotlin" lineNumbers>
         </code>
       </pre>
       </div>
 
       <!-- SBT -->
-      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+      <div class="relative mb-6 rounded-lg border border-base-300 bg-base-200">
+        <div class="flex items-center gap-2 border-b border-base-300 p-4">
           <img ngSrc="/assets/icons/maven/detail/sbt.svg" alt="SBT" width="24" height="24" />
-          <span class="text-[14px] text-[#FDFDFD]">Scala SBT</span>
+          <span class="text-sm text-base-content">Scala SBT</span>
           <app-copy-clipboard class="ml-auto" [text]="sbtDependencyHtml" />
         </div>
 
-        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <pre class="max-h-[500px] text-sm sm:max-h-[800px]">
         <code [highlight]="sbtDependencyHtml" language="scala" lineNumbers>
         </code>
       </pre>
       </div>
 
       <!-- Apache Ivy -->
-      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+      <div class="relative mb-6 rounded-lg border border-base-300 bg-base-200">
+        <div class="flex items-center gap-2 border-b border-base-300 p-4">
           <img ngSrc="/assets/icons/maven/detail/ivy.svg" alt="Apache Ivy" width="24" height="24" />
-          <span class="text-[14px] text-[#FDFDFD]">Apache Ivy</span>
+          <span class="text-sm text-base-content">Apache Ivy</span>
           <app-copy-clipboard class="ml-auto" [text]="ivyDependencyHtml" />
         </div>
 
-        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <pre class="max-h-[500px] text-sm sm:max-h-[800px]">
         <code [highlight]="ivyDependencyHtml" language="xml" lineNumbers>
         </code>
       </pre>
       </div>
 
       <!-- Groovy Grape -->
-      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+      <div class="relative mb-6 rounded-lg border border-base-300 bg-base-200">
+        <div class="flex items-center gap-2 border-b border-base-300 p-4">
           <img ngSrc="/assets/icons/maven/detail/groovy.svg" alt="Groovy Grape" width="24" height="24" />
-          <span class="text-[14px] text-[#FDFDFD]">Groovy Grape</span>
+          <span class="text-sm text-base-content">Groovy Grape</span>
           <app-copy-clipboard class="ml-auto" [text]="groovyDependencyHtml" />
         </div>
 
-        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <pre class="max-h-[500px] text-sm sm:max-h-[800px]">
         <code [highlight]="groovyDependencyHtml" language="groovy" lineNumbers>
         </code>
       </pre>
       </div>
 
       <!-- Leiningen -->
-      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+      <div class="relative mb-6 rounded-lg border border-base-300 bg-base-200">
+        <div class="flex items-center gap-2 border-b border-base-300 p-4">
           <img ngSrc="/assets/icons/maven/detail/leiningen.svg" alt="Leiningen" width="18" height="18" />
-          <span class="text-[14px] text-[#FDFDFD]">Leiningen</span>
+          <span class="text-sm text-base-content">Leiningen</span>
           <app-copy-clipboard class="ml-auto" [text]="leiningenDependencyHtml" />
         </div>
-        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <pre class="max-h-[500px] text-sm sm:max-h-[800px]">
         <code [highlight]="leiningenDependencyHtml" language="clojure" lineNumbers>
         </code>
       </pre>
       </div>
 
       <!-- Apache Buildr -->
-      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+      <div class="relative mb-6 rounded-lg border border-base-300 bg-base-200">
+        <div class="flex items-center gap-2 border-b border-base-300 p-4">
           <img ngSrc="/assets/icons/maven/detail/buildr.svg" alt="Apache Buildr" width="24" height="24" />
-          <span class="text-[14px] text-[#FDFDFD]">Apache Buildr</span>
+          <span class="text-sm text-base-content">Apache Buildr</span>
           <app-copy-clipboard class="ml-auto" [text]="buildrDependencyHtml" />
         </div>
-        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <pre class="max-h-[500px] text-sm sm:max-h-[800px]">
         <code [highlight]="buildrDependencyHtml" language="ruby" lineNumbers>
         </code>
       </pre>
       </div>
 
       <!-- Purl -->
-      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+      <div class="relative mb-6 rounded-lg border border-base-300 bg-base-200">
+        <div class="flex items-center gap-2 border-b border-base-300 p-4">
           <img ngSrc="/assets/icons/maven/detail/purl.svg" alt="Purl" width="24" height="24" />
-          <span class="text-[14px] text-[#FDFDFD]">Purl</span>
+          <span class="text-sm text-base-content">Purl</span>
           <app-copy-clipboard class="ml-auto" [text]="purlDependencyHtml" />
         </div>
-        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <pre class="max-h-[500px] text-sm sm:max-h-[800px]">
         <code [highlight]="purlDependencyHtml" language="text" lineNumbers>
         </code>
       </pre>
       </div>
 
       <!-- Bazel -->
-      <div class="relative mb-6 rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
-        <div class="flex items-center gap-2 border-b border-[#2A2A2A] p-4">
+      <div class="relative mb-6 rounded-lg border border-base-300 bg-base-200">
+        <div class="flex items-center gap-2 border-b border-base-300 p-4">
           <img ngSrc="/assets/icons/maven/detail/bazel.svg" alt="Bazel" width="24" height="24" />
-          <span class="text-[14px] text-[#FDFDFD]">Bazel</span>
+          <span class="text-sm text-base-content">Bazel</span>
           <app-copy-clipboard class="ml-auto" [text]="bazelDependencyHtml" />
         </div>
-        <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <pre class="max-h-[500px] text-sm sm:max-h-[800px]">
         <code [highlight]="bazelDependencyHtml" language="python" lineNumbers>
         </code>
       </pre>
@@ -246,7 +246,7 @@
         width="510"
       />
       <div>
-        <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+        <p class="text-error-500 mt-2 text-lg">{{ this.error }}</p>
       </div>
     </div>
   }

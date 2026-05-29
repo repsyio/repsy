@@ -1,9 +1,9 @@
 <section id="version-allowence" class="mt-[-100px] pt-[100px]">
-  <h3 class="w-full rounded-t-[12px] border border-[#404141] bg-[#101112] p-[24px] font-medium text-[#FDFDFD]">
+  <h3 class="w-full rounded-t-[12px] border border-base-300 bg-base-100 p-[24px] font-medium text-base-content">
     <a [routerLink]="[]" fragment="version-allowence"> Version Allowance </a>
   </h3>
   <div
-    class="flex flex-col gap-4 rounded-b-[12px] border-r border-b border-l border-[#404141] bg-[#101112] p-[24px] sm:flex-row sm:gap-10"
+    class="flex flex-col gap-4 rounded-b-[12px] border-r border-b border-l border-base-300 bg-base-100 p-[24px] sm:flex-row sm:gap-10"
   >
     <app-selector
       class="min-w-[150px]"
@@ -12,8 +12,8 @@
       (choose)="selectType($event)"
     />
 
-    <div class="flex h-full flex-col justify-end text-[13px]">
-      <p class="text-[#9FA0A0]">
+    <div class="flex h-full flex-col justify-end text-sm">
+      <p class="text-base-content/70">
         @if (selectedOption === 'snapshots') {
           This repository supports only deploy of &nbsp;<span class="font-bold text-white">"Snapshot"</span> package
           type

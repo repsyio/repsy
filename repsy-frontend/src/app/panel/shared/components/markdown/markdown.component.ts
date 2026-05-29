@@ -76,7 +76,7 @@ export class MarkdownComponent implements OnInit, AfterViewInit {
 
     preBlocks.forEach((pre) => {
       const button = document.createElement('button');
-      button.className = 'copy-button h-4 w-4 text-[#9FA0A0] hover:text-secondary-500';
+      button.className = 'copy-button h-4 w-4 text-base-content/70 hover:text-secondary-500';
 
       // Initial copy icon SVG (without Angular directive - this is vanilla JS)
       const copyIconSVG =
@@ -88,7 +88,7 @@ export class MarkdownComponent implements OnInit, AfterViewInit {
       // Success checkmark SVG
       const successIconSVG =
         '<svg width="16" height="12" viewBox="0 0 16 12" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-        '<path d="M1 5.34547L6.05556 10.4364L14.9311 1.5625" stroke="#69FFB4" stroke-width="1.5" stroke-linecap="round" />' +
+        '<path d="M1 5.34547L6.05556 10.4364L14.9311 1.5625" stroke="currentColor" class="text-primary" stroke-width="1.5" stroke-linecap="round" />' +
         '</svg>';
 
       button.innerHTML = copyIconSVG;
@@ -104,7 +104,7 @@ export class MarkdownComponent implements OnInit, AfterViewInit {
 
           // Reset to original state after 2 seconds
           setTimeout(() => {
-            button.className = 'copy-button h-4 w-4 text-[#9FA0A0] hover:text-secondary-500';
+            button.className = 'copy-button h-4 w-4 text-base-content/70 hover:text-secondary-500';
             button.innerHTML = copyIconSVG;
           }, 2000);
         }

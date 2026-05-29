@@ -1,15 +1,15 @@
 <section id="pgp-signature" class="mt-[-100px] pt-[100px]">
   <!-- Header with Toggle -->
-  <div class="flex w-full items-center justify-between rounded-t-[12px] border border-[#404141] bg-[#101112] p-[24px]">
+  <div class="flex w-full items-center justify-between rounded-t-[12px] border border-base-300 bg-base-100 p-[24px]">
     <div class="flex items-center gap-2">
-      <h3 class="font-medium text-[#FDFDFD]">
+      <h3 class="font-medium text-base-content">
         <a [routerLink]="[]" fragment="pgp-signature"> PGP Signature Key Stores </a>
       </h3>
     </div>
   </div>
   <!-- Body -->
-  <div class="w-full rounded-b-[12px] border-r border-b border-l border-[#404141] bg-[#101112] p-[24px]">
-    <p class="mb-6 text-[14px] text-[#9FA0A0]">Configure PGP Signature Key Store Server.</p>
+  <div class="w-full rounded-b-[12px] border-r border-b border-l border-base-300 bg-base-100 p-[24px]">
+    <p class="mb-6 text-sm text-base-content/70">Configure PGP Signature Key Store Server.</p>
     <form
       [formGroup]="keyStoreForm"
       (submit)="keyStoreForm.markAllAsTouched(); keyStoreForm.valid && createKeyStore()"
@@ -22,13 +22,13 @@
             formControlName="url"
             placeholder="repsy.io"
             type="text"
-            class="text-body1 min-h-[50px] w-full rounded-lg border border-neutral-400 bg-neutral-600 px-[20px] py-[12px] text-neutral-200 placeholder-neutral-400 focus:border-[#FDFDFD] focus:outline-none disabled:opacity-40"
+            class="text-body1 min-h-[50px] w-full rounded-lg border border-neutral-400 bg-neutral-600 px-[20px] py-[12px] text-neutral-200 placeholder-neutral-400 focus:border-primary focus:outline-none disabled:opacity-40"
           />
           <button
             type="submit"
             [disabled]="isSubmitting"
             [ngClass]="{ 'pointer-events-none opacity-40': isSubmitting }"
-            class="flex h-[50px] min-w-[50px] items-center justify-center rounded-lg border border-neutral-400 font-bold text-white hover:border-[#FDFDFD] focus:border-[#FDFDFD] focus:outline-none"
+            class="flex h-[50px] min-w-[50px] items-center justify-center rounded-lg border border-neutral-400 font-bold text-base-content hover:border-primary focus:border-primary focus:outline-none"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M8 2V14M2 8H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
