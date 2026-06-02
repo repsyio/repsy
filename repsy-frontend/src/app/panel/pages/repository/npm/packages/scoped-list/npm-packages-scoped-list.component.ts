@@ -19,8 +19,10 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { NpmPackageListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../../../../shared/components/ellipsis/ellipsis.pipe';
@@ -32,10 +34,8 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { NpmConfigComponent } from '../../config/npm-config.component';
-import { PackageListItem } from '../../dto/package-list-item';
 import { NpmService } from '../../service/npm.service';
 
 @Component({
@@ -65,8 +65,8 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
   public scopeName: string;
   public pageNum = 0;
   public pageSize = 10;
-  public pagedData: PagedData<PackageListItem>;
-  public packages: PackageListItem[];
+  public pagedData: PagedData<NpmPackageListItem>;
+  public packages: NpmPackageListItem[];
   public activeRegistry: RepoPermissionInfo;
   public searchText = '';
 
@@ -86,10 +86,10 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
     private readonly router: Router,
   ) {
     this.baseUrl = environment.repoBaseUrl;
-    this.pagedData = new PagedData<PackageListItem>();
-    this.activeRegistry = new RepoPermissionInfo();
+    this.pagedData = new PagedData<NpmPackageListItem>();
+    this.activeRegistry = {} as RepoPermissionInfo;
 
-    this.registryChanges$ = this.npmService.registryChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.registryChanges$ = this.npmService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
         this.activeRegistry = registry;
         this.scopeName = this.route.snapshot.paramMap.get('scope');
@@ -132,63 +132,53 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
 
   private fetchPackages(): void {
     this.loading = true;
-    if (this.scopeName !== '~') {
-      this.npmService
-        .fetchRegistryPackagesFilterByScopeLikeName(
-          this.searchText,
-          this.sortOption,
-          this.scopeName,
-          this.pageNum,
-          this.pageSize,
-        )
-        .then((pagedData: PagedData<PackageListItem>) => {
+    const call =
+      this.scopeName !== '~'
+        ? this.npmService.searchScopedPackages(
+            this.scopeName,
+            this.searchText,
+            this.sortOption,
+            this.pageNum,
+            this.pageSize,
+          )
+        : this.npmService.searchUnscopedPackages(this.searchText, this.sortOption, this.pageNum, this.pageSize);
+    call
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<NpmPackageListItem>) => {
           this.pagedData.page = pagedData.page;
           this.packages = pagedData.content;
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
-        });
-
-      return;
-    }
-
-    this.npmService
-      .fetchRegistryPackagesFilterByNoScopeLikeName(this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .then((pagedData: PagedData<PackageListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.packages = pagedData.content;
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+        },
+        error: () => {},
       });
   }
 
-  public deletePackage(pck: PackageListItem) {
+  public deletePackage(pck: NpmPackageListItem) {
     this.dangerModalService.show('Delete Package', 'Delete', () => {
       this.loading = true;
       this.npmService
         .deletePackage(pck.name, pck.scope)
-        .then(() => {
-          if (this.packages.length - 1 === 0) {
-            this.router.navigateByUrl(`/${this.activeRegistry.repoName}`).then(() => {
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            if (this.packages.length - 1 === 0) {
+              this.router.navigateByUrl(`/${this.activeRegistry.repoName}`).then(() => {
+                this.toastService.show('Package deleted successfully', 'success');
+              });
+            } else {
+              this.refreshPage();
               this.toastService.show('Package deleted successfully', 'success');
-            });
-          } else {
-            this.refreshPage();
-            this.toastService.show('Package deleted successfully', 'success');
-          }
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
+            }
+          },
+          error: () => {},
         });
     });
   }

@@ -19,8 +19,8 @@ import { Router, RouterOutlet } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
+import { RepoPermissionInfo } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/service/auth.service';
-import { RepoPermissionInfo } from '../../../shared/dto/repo/repo-permission-info';
 import { RepositoryBreadcrumbComponent } from '../breadcrumb/repository-breadcrumb.component';
 import { RepoContext, RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { GolangService } from './service/golang.service';
@@ -72,7 +72,7 @@ export class GolangComponent implements OnInit, OnDestroy {
 
     this.golangService.getRepository(repoName).subscribe({
       next: (repo: RepoPermissionInfo) => {
-        if (repo.isPrivate && !this.isAuthenticated) {
+        if (repo.private && !this.isAuthenticated) {
           this.router.navigate(['/not-found'], {
             queryParams: {
               message: `Repository '${repoName}' not found`,
@@ -82,7 +82,7 @@ export class GolangComponent implements OnInit, OnDestroy {
         }
 
         this.activeRepo = repo;
-        this.isPublicView = !repo.isPrivate && !this.isAuthenticated;
+        this.isPublicView = !repo.private && !this.isAuthenticated;
         this.loading = false;
       },
       error: () => {

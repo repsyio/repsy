@@ -33,14 +33,11 @@ public interface GoModuleVersionRepository extends JpaRepository<GoModuleVersion
 
   Optional<GoModuleVersion> findByGoModuleIdAndVersion(UUID moduleId, String version);
 
-  boolean existsByGoModuleIdAndVersionAndDeletedTrue(UUID moduleId, String version);
-
   @Query(
       """
       select v.id as id, v.version as version, v.goVersion as goVersion, v.createdAt as createdAt
       from GoModuleVersion v
       where v.goModule.id = :moduleId
-        and v.deleted = false
       order by v.createdAt desc
       """)
   List<GoModuleVersionListItem> findAllByModuleId(UUID moduleId);
@@ -50,7 +47,6 @@ public interface GoModuleVersionRepository extends JpaRepository<GoModuleVersion
       select v.id as id, v.version as version, v.goVersion as goVersion, v.createdAt as createdAt
       from GoModuleVersion v
       where v.goModule.id = :moduleId
-        and v.deleted = false
         and lower(v.version) like lower(concat('%', :search, '%'))
       """)
   Page<GoModuleVersionListItem> findAllByModuleIdContainsVersion(

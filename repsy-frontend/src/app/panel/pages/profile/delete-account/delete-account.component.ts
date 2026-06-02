@@ -16,6 +16,7 @@
 
 import { Component } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { finalize } from 'rxjs';
 
 import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -33,7 +34,7 @@ export class DeleteAccountComponent {
 
   constructor(
     private readonly router: Router,
-    private readonly profileService: ProfileService,
+    private readonly profileFacadeService: ProfileService,
     private readonly toastService: ToastService,
     private readonly authService: AuthService,
     private readonly dangerModalService: DangerModalService,
@@ -46,18 +47,22 @@ export class DeleteAccountComponent {
   private deleteAccount(): void {
     this.loading = true;
 
-    this.profileService
+    this.profileFacadeService
       .deleteAccount()
-      .then(() => {
-        this.toastService.show('Account deleted successfully.', 'success');
-        this.authService.logOut();
-        this.router.navigateByUrl('/login');
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: () => {
+          this.toastService.show('Account deleted successfully.', 'success');
+          this.authService.logOut();
+          this.router.navigateByUrl('/login');
+        },
+        error: (err: string) => {
+          this.toastService.show(err, 'error');
+        },
       });
   }
 }

@@ -47,6 +47,14 @@ public interface LayerRepository extends JpaRepository<Layer, UUID> {
 
   @Query(
       """
+    select l from Layer l
+    where l.repo.id = :repoId
+    and l.manifests is empty
+    """)
+  List<Layer> findOrphansByRepoId(UUID repoId);
+
+  @Query(
+      """
     select coalesce(sum(l.size), 0) from Layer l
       where l.id in (
         select distinct l2.id from Layer l2

@@ -19,8 +19,10 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
@@ -34,7 +36,6 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { DockerConfigComponent } from '../../config/docker-config.component';
 import { getRepoDomain } from '../../docker-repo-util';
@@ -94,11 +95,11 @@ export class DockerImagesTagListComponent implements OnDestroy {
     this.baseUrl = environment.apiBaseUrl;
     this.username = this.authService.username;
     this.pagedData = new PagedData<TagListItem>();
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
 
     this.repositoryChanges$ = this.dockerService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.imageName = this.route.snapshot.paramMap.get('image');
         this.installText = `docker pull ${getRepoDomain()}/${this.activeRepo.repoName}/${this.imageName}`;
         this.fetchTags();
@@ -141,17 +142,18 @@ export class DockerImagesTagListComponent implements OnDestroy {
   private fetchTags(): void {
     this.loading = true;
     this.dockerService
-      .fetchImageTagsLikeName(this.searchText, this.sortOption, this.imageName, this.pageNum, this.pageSize)
-      .then((pagedData: PagedData<TagListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.tags = pagedData.content;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+      .searchTags(this.searchText, this.sortOption, this.imageName, this.pageNum, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<TagListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.tags = pagedData.content;
+        },
+        error: () => {},
       });
   }
 
@@ -160,21 +162,23 @@ export class DockerImagesTagListComponent implements OnDestroy {
       this.loading = true;
       this.dockerService
         .deleteTag(this.imageName, tag.name)
-        .then(() => {
-          if (this.tags.length - 1 === 0) {
-            this.router.navigate([`/${this.activeRepo.repoName}`]).then(() => {
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            if (this.tags.length - 1 === 0) {
+              this.router.navigate([`/${this.activeRepo.repoName}`]).then(() => {
+                this.toastService.show('Tag deleted successfully', 'success');
+              });
+            } else {
+              this.refreshPage();
               this.toastService.show('Tag deleted successfully', 'success');
-            });
-          } else {
-            this.refreshPage();
-            this.toastService.show('Tag deleted successfully', 'success');
-          }
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
+            }
+          },
+          error: () => {},
         });
     });
   }

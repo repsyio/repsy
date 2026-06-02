@@ -19,8 +19,10 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { ManifestListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
@@ -32,11 +34,9 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { DockerConfigComponent } from '../../config/docker-config.component';
 import { getRepoDomain } from '../../docker-repo-util';
-import { ManifestListItem } from '../../dto/manifest-list-item';
 import { DockerService } from '../../service/docker.service';
 
 @Component({
@@ -91,10 +91,10 @@ export class DockerImagesManifestListComponent implements OnDestroy {
     this.baseUrl = environment.apiBaseUrl;
     this.username = this.authService.username;
     this.pagedData = new PagedData<ManifestListItem>();
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.dockerService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.imageName = this.route.snapshot.paramMap.get('image');
         this.tagName = this.route.snapshot.paramMap.get('tag');
         this.installText = `docker pull ${getRepoDomain()}/${this.activeRepo.repoName}/${this.imageName}:${this.tagName}`;
@@ -138,24 +138,18 @@ export class DockerImagesManifestListComponent implements OnDestroy {
   private fetchManifests(): void {
     this.loading = true;
     this.dockerService
-      .fetchManifestsLikeName(
-        this.searchText,
-        this.sortOption,
-        this.imageName,
-        this.tagName,
-        this.pageNum,
-        this.pageSize,
+      .searchManifests(this.searchText, this.sortOption, this.imageName, this.tagName, this.pageNum, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
       )
-      .then((pagedData: PagedData<ManifestListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.manifests = pagedData.content;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+      .subscribe({
+        next: (pagedData: PagedData<ManifestListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.manifests = pagedData.content;
+        },
+        error: () => {},
       });
   }
 

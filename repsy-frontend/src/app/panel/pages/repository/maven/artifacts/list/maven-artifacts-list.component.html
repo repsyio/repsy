@@ -83,7 +83,7 @@
             animate.enter="fade-in-down"
             class="hidden rounded-b-[12px] border border-neutral-400 bg-neutral-500 lg:block"
           >
-            @for (artifact of artifacts; track artifact.name; let i = $index) {
+            @for (artifact of artifacts; track artifact.artifactName; let i = $index) {
               <div
                 role="button"
                 [routerLink]="
@@ -202,7 +202,7 @@
           </div>
 
           <!-- Artifact List (Mobile) -->
-          @for (artifact of artifacts; track artifact.name; let i = $index) {
+          @for (artifact of artifacts; track artifact.artifactName; let i = $index) {
             <div animate.enter="fade-in-down" class="lg:hidden">
               <div
                 class="hover:border-secondary-400 relative flex flex-col gap-2 rounded-[12px] border border-neutral-400 bg-neutral-500 p-4 hover:bg-[#1D1C1C]"

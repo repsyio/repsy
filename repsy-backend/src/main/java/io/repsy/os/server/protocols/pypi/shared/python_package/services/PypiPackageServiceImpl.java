@@ -213,14 +213,14 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
         .map(this.pypiPackageConverter::toReleaseListItemDto);
   }
 
-  public Page<io.repsy.os.generated.model.PackageListItem> getPackageList(
+  public Page<io.repsy.os.generated.model.PypiPackageListItem> getPackageList(
       final UUID repoId, final Pageable pageable) {
     return this.pypiPackageRepository
         .findAllByRepoId(repoId, pageable)
         .map(this.pypiPackageConverter::toPackageListItemDto);
   }
 
-  public Page<io.repsy.os.generated.model.PackageListItem> getPackagesContainsName(
+  public Page<io.repsy.os.generated.model.PypiPackageListItem> getPackagesContainsName(
       final UUID repoId, final String name, final Pageable pageable) {
 
     return this.pypiPackageRepository

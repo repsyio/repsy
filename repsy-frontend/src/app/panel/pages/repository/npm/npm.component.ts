@@ -19,8 +19,8 @@ import { Router, RouterOutlet } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
+import { RepoPermissionInfo } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/service/auth.service';
-import { RepoPermissionInfo } from '../../../shared/dto/repo/repo-permission-info';
 import { RepositoryBreadcrumbComponent } from '../breadcrumb/repository-breadcrumb.component';
 import { RepoContext, RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { NpmService } from './service/npm.service';
@@ -70,10 +70,10 @@ export class NpmComponent implements OnInit, OnDestroy {
   private loadRegistry(repoName: string): void {
     this.loading = true;
 
-    this.npmService.getRegistry(repoName).subscribe({
+    this.npmService.getRepository(repoName).subscribe({
       next: (registry: RepoPermissionInfo) => {
         // If repo is private and user is not authenticated, redirect to 404
-        if (registry.isPrivate && !this.isAuthenticated) {
+        if (registry.private && !this.isAuthenticated) {
           this.router.navigate(['/not-found'], {
             queryParams: {
               message: `Repository '${repoName}' not found`,
@@ -83,7 +83,7 @@ export class NpmComponent implements OnInit, OnDestroy {
         }
 
         this.activeRegistry = registry;
-        this.isPublicView = !registry.isPrivate && !this.isAuthenticated;
+        this.isPublicView = !registry.private && !this.isAuthenticated;
         this.loading = false;
       },
       error: () => {

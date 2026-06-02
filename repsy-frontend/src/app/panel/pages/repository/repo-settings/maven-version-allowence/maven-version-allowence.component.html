@@ -14,13 +14,19 @@
 
     <div class="flex h-full flex-col justify-end text-[13px]">
       <p class="text-[#9FA0A0]">
-        @if (selectedOption.match('snapshots')) {
+        @if (selectedOption === 'snapshots') {
           This repository supports only deploy of &nbsp;<span class="font-bold text-white">"Snapshot"</span> package
           type
-        } @else if (selectedOption.match('release')) {
+        } @else if (selectedOption === 'releases') {
           This repository supports only deploy of &nbsp;<span class="font-bold text-white">"Release"</span> package type
-        } @else if (selectedOption.match('all packages')) {
-          This repository has accept all version type
+        } @else if (selectedOption === 'pre-release') {
+          This repository supports only deploy of &nbsp;<span class="font-bold text-white">"Pre-release"</span> packages
+          (versions containing a pre-release label, e.g. 1.0.0-alpha.1)
+        } @else if (selectedOption === 'stable') {
+          This repository supports only deploy of &nbsp;<span class="font-bold text-white">"Stable"</span> packages
+          (versions without a pre-release label, e.g. 1.0.0)
+        } @else if (selectedOption === 'all packages') {
+          This repository accepts all version types
         }
       </p>
     </div>

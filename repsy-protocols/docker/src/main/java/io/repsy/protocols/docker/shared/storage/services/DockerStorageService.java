@@ -51,6 +51,8 @@ public interface DockerStorageService<ID> {
 
   long deleteManifest(BaseRepoInfo<ID> repoInfo, String manifestName);
 
+  void deleteBlob(UUID repoUuid, String digest);
+
   void rename(UUID repoUuid, RelativePath relativePath, String digest);
 
   void clearTrash();

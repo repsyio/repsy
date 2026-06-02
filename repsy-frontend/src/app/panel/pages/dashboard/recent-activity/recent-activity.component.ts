@@ -19,7 +19,8 @@ import { Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
 
-import { RepoListInfo } from '../../../shared/dto/repo/repo-list-info';
+import { RepoListInfo, RepoType } from '../../../../../generated/api';
+import { ByteFormatter } from '../../../shared/util/byte-formatter';
 
 @Component({
   selector: 'app-recent-activity',
@@ -33,5 +34,11 @@ export class RecentActivityComponent {
 
   public timeAgo(date: Date | string): string {
     return moment(date).fromNow();
+  }
+
+  protected readonly RepoType = RepoType;
+
+  public formatBytes(bytes: number, decimals = 2): string {
+    return ByteFormatter.formatBytes(bytes, decimals);
   }
 }

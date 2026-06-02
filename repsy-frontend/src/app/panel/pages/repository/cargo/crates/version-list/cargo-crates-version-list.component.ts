@@ -18,8 +18,10 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize, switchMap } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { CrateVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -31,11 +33,9 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { CargoConfigComponent } from '../../config/cargo-config.component';
 import { CrateInfo } from '../../dto/crate-info';
-import { CrateVersionListItem } from '../../dto/crate-version-list-item';
 import { CargoService } from '../../service/cargo.service';
 
 @Component({
@@ -91,10 +91,10 @@ export class CargoCratesVersionListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.cargoService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.packageName = this.route.snapshot.paramMap.get('crate');
         this.fetchVersions();
       }
@@ -138,17 +138,21 @@ export class CargoCratesVersionListComponent implements OnDestroy {
         ? this.cargoService.deleteCrate(this.packageName)
         : this.cargoService.deleteCrateVersion(this.packageName, version.version);
       deleteAction
-        .then(() => {
-          this.toastService.show('Version deleted successfully', 'success');
-          if (isLastVersion) {
-            this.router.navigate(['..'], { relativeTo: this.route });
-          } else {
-            this.fetchVersions();
-          }
-        })
-        .catch((err: string) => {
-          this.loading = false;
-          this.toastService.show(err, 'error');
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.toastService.show('Version deleted successfully', 'success');
+            if (isLastVersion) {
+              this.router.navigate(['..'], { relativeTo: this.route });
+            } else {
+              this.fetchVersions();
+            }
+          },
+          error: () => {},
         });
     });
   }
@@ -159,31 +163,28 @@ export class CargoCratesVersionListComponent implements OnDestroy {
     this.loading = true;
     this.cargoService
       .fetchCrate(crateName)
-      .then((crate) => {
-        this.crate = crate;
-        return this.cargoService.fetchCrateVersions(
-          crateName,
-          this.searchText,
-          this.sortOption,
-          this.pageNum,
-          this.pageSize,
-        );
-      })
-      .then((pagedData) => {
-        this.pagedData.page = pagedData.page;
-        this.versions = pagedData.content;
-        this.error = null;
-      })
-      .catch((err: string) => {
-        if (err === 'Crate is not Found.') {
-          this.router.navigateByUrl(`/${this.activeRepo.repoName}`);
-          return;
-        }
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+      .pipe(
+        switchMap((crate) => {
+          this.crate = crate;
+          return this.cargoService.fetchCrateVersions(
+            crateName,
+            this.searchText,
+            this.sortOption,
+            this.pageNum,
+            this.pageSize,
+          );
+        }),
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData) => {
+          this.pagedData.page = pagedData.page;
+          this.versions = pagedData.content;
+          this.error = null;
+        },
+        error: () => {},
       });
   }
 

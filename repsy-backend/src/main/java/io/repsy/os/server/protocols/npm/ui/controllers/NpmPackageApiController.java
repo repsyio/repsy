@@ -19,7 +19,7 @@ import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.generated.model.PackageListItem;
+import io.repsy.os.generated.model.NpmPackageListItem;
 import io.repsy.os.generated.model.PackageVersionDetail;
 import io.repsy.os.generated.model.PackageVersionListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmPackageServiceImpl;
@@ -101,7 +101,7 @@ public class NpmPackageApiController {
 
   @GetMapping("/{repoName}")
   @RepoOperation
-  public RestResponse<PagedModel<PackageListItem>> list(
+  public RestResponse<PagedModel<NpmPackageListItem>> list(
       final RepoInfo repoInfo,
       @RequestParam(required = false) final @Nullable String scope,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
@@ -114,7 +114,7 @@ public class NpmPackageApiController {
 
   @GetMapping("/{repoName}/{ignoredScope}")
   @RepoOperation
-  public RestResponse<PagedModel<PackageListItem>> list(
+  public RestResponse<PagedModel<NpmPackageListItem>> list(
       final RepoInfo repoInfo,
       @PathVariable final String ignoredScope,
       @RequestParam(required = false, defaultValue = "") final String name,
@@ -131,7 +131,7 @@ public class NpmPackageApiController {
     "/{repoName}/scope/{scope}",
   })
   @RepoOperation
-  public RestResponse<PagedModel<PackageListItem>> listFilterByScope(
+  public RestResponse<PagedModel<NpmPackageListItem>> listFilterByScope(
       final RepoInfo repoInfo,
       @PathVariable(required = false) final @Nullable String scope,
       @RequestParam(required = false, defaultValue = "") final String name,

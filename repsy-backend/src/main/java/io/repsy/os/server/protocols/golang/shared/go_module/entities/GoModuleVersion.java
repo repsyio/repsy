@@ -67,9 +67,6 @@ public class GoModuleVersion {
   @Column(name = "zip_hash", length = 100)
   private @Nullable String zipHash;
 
-  @Column(name = "deleted", nullable = false)
-  private boolean deleted = false;
-
   @CreationTimestamp
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;

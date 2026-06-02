@@ -20,9 +20,10 @@ import lombok.experimental.UtilityClass;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.jspecify.annotations.NonNull;
-import org.passay.CharacterRule;
-import org.passay.EnglishCharacterData;
-import org.passay.PasswordGenerator;
+import org.passay.data.CharacterData;
+import org.passay.data.EnglishCharacterData;
+import org.passay.generate.PasswordGenerator;
+import org.passay.rule.CharacterRule;
 
 @UtilityClass
 public class PasswordGeneratorUtil {
@@ -37,7 +38,7 @@ public class PasswordGeneratorUtil {
           new CharacterRule(EnglishCharacterData.UpperCase, 1),
           new CharacterRule(EnglishCharacterData.Digit, 1),
           new CharacterRule(
-              new org.passay.CharacterData() {
+              new CharacterData() {
                 @Override
                 public String getErrorCode() {
                   return "CUSTOM_SPECIAL";
@@ -50,8 +51,11 @@ public class PasswordGeneratorUtil {
               },
               1));
 
+  private static final PasswordGenerator PASSWORD_GENERATOR =
+      new PasswordGenerator(DEFAULT_PASSWORD_LENGTH, RULES);
+
   public @NonNull String generatePassword() {
-    return new PasswordGenerator().generatePassword(DEFAULT_PASSWORD_LENGTH, RULES);
+    return PASSWORD_GENERATOR.generate().toString();
   }
 
   public @NonNull String generateSalt() {

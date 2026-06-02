@@ -18,15 +18,14 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { ReleaseClassifierInfo, ReleaseDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
-import { ReleaseClassifierInfo } from '../../dto/release-classifier-info';
-import { ReleaseInfo } from '../../dto/release-info';
 import { PypiService } from '../../service/pypi.service';
 
 type Classifiers = Record<string, [string]>;
@@ -46,7 +45,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
   public installation: string;
   public activeRepo: RepoPermissionInfo;
   private readonly repositoryChanges$: Subscription;
-  public versionInfo: ReleaseInfo;
+  public versionInfo: ReleaseDetail;
   public classifiers: Classifiers;
 
   constructor(
@@ -58,11 +57,11 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
   ) {
     this.classifiers = {};
     this.baseUrl = environment.repoBaseUrl;
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
 
     this.repositoryChanges$ = this.pypiService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), registry);
+        this.activeRepo = Object.assign({}, registry);
         this.loadVersion();
       }
     });
@@ -82,24 +81,25 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
 
     this.pypiService
       .fetchRelease(this.packageName, this.versionName)
-      .then((releaseInfo: ReleaseInfo) => {
-        this.versionInfo = releaseInfo;
-        releaseInfo.classifiers.forEach((c: ReleaseClassifierInfo) =>
-          this.classifiers[c.classifier]
-            ? this.classifiers[c.classifier].push(c.value)
-            : (this.classifiers[c.classifier] = [c.value]),
-        );
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (releaseInfo: ReleaseDetail) => {
+          this.versionInfo = releaseInfo;
+          releaseInfo.classifiers.forEach((c: ReleaseClassifierInfo) =>
+            this.classifiers[c.classifier]
+              ? this.classifiers[c.classifier].push(c.value)
+              : (this.classifiers[c.classifier] = [c.value]),
+          );
 
-        releaseInfo.descriptionContentType = releaseInfo.descriptionContentType
-          ? releaseInfo.descriptionContentType.split(';')[0].trim()
-          : '';
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+          releaseInfo.descriptionContentType = releaseInfo.descriptionContentType
+            ? releaseInfo.descriptionContentType.split(';')[0].trim()
+            : '';
+        },
+        error: () => {},
       });
   }
 
@@ -108,16 +108,18 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
       this.loading = true;
       this.pypiService
         .deleteRelease(this.packageName, this.versionInfo.version)
-        .then(() => {
-          this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
-            this.toastService.show('Version deleted successfully', 'success');
-          });
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+              this.toastService.show('Version deleted successfully', 'success');
+            });
+          },
+          error: () => {},
         });
     });
   }

@@ -37,7 +37,7 @@ export class SidebarComponent implements OnInit {
 
   constructor(
     private readonly authService: AuthService,
-    private readonly profileService: ProfileService,
+    private readonly profileFacadeService: ProfileService,
     private readonly router: Router,
   ) {}
 
@@ -47,15 +47,15 @@ export class SidebarComponent implements OnInit {
   }
 
   private loadUserRole(): void {
-    this.profileService
-      .get()
-      .then((profile) => {
+    this.profileFacadeService.get().subscribe({
+      next: (profile) => {
         this.isAdmin = profile.role === 'ADMIN';
-      })
-      .catch((error) => {
+      },
+      error: (error) => {
         console.error('Failed to load user role:', error);
         this.isAdmin = false;
-      });
+      },
+    });
   }
 
   public logOut(): void {

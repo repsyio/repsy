@@ -18,11 +18,12 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, ViewEncapsulation } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
+import { finalize } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
+import { LoginForm } from '../../../../generated/api';
 import { ToastService } from '../../../panel/shared/components/toast/toast.service';
 import { AuthService } from '../service/auth.service';
-import { LoginForm } from './form/login-form';
 
 @Component({
   selector: 'app-login',
@@ -79,17 +80,19 @@ export class LoginComponent implements OnInit {
     this.loading = true;
     this.form.disable();
 
-    const form = Object.assign(new LoginForm(), this.form.value);
+    const form = this.form.getRawValue() as LoginForm;
 
     this.authService
       .logIn(form)
-      .then(() => {
-        this.loginAndRedirectPanel(form);
-      })
-      .catch((err: string) => this.toastService.show(err, 'error'))
-      .finally(() => {
-        this.loading = false;
-        this.form.enable();
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+          this.form.enable();
+        }),
+      )
+      .subscribe({
+        next: () => this.router.navigateByUrl('/'),
+        error: () => {},
       });
   }
 
@@ -106,20 +109,5 @@ export class LoginComponent implements OnInit {
   public setRandomImage() {
     const randomIndex = Math.floor(Math.random() * this.images.length);
     this.randomImage = `/assets/images/${this.images[randomIndex]}`;
-  }
-
-  private loginAndRedirectPanel(form: LoginForm) {
-    this.authService
-      .logIn(form)
-      .then(() => {
-        this.router.navigateByUrl('/');
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
-        this.form.enable();
-      });
   }
 }

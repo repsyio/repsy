@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.docker.shared.layer.services;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.os.server.protocols.docker.shared.layer.dtos.OrphanLayerInfo;
 import io.repsy.os.server.protocols.docker.shared.layer.entities.Layer;
 import io.repsy.os.server.protocols.docker.shared.layer.mappers.LayerConverter;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
@@ -122,6 +123,23 @@ public class LayerTxService implements LayerService<UUID> {
     for (final var layer : layers) {
       this.layerRepository.delete(layer);
     }
+  }
+
+  @Transactional
+  public @NonNull List<OrphanLayerInfo> deleteOrphanLayers(final @NonNull UUID repoId) {
+
+    final var orphans = this.layerRepository.findOrphansByRepoId(repoId);
+
+    final var result =
+        orphans.stream()
+            .map(layer -> new OrphanLayerInfo(layer.getDigest(), layer.getSize()))
+            .toList();
+
+    for (final var layer : orphans) {
+      this.layerRepository.delete(layer);
+    }
+
+    return result;
   }
 
   private @NonNull Layer getLayer(final @NonNull UUID repoId, final @NonNull String digest) {

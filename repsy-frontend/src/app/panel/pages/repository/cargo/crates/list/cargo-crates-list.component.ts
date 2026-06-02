@@ -16,9 +16,12 @@
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { CrateListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -31,12 +34,9 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { CargoConfigComponent } from '../../config/cargo-config.component';
-import { CrateListItem } from '../../dto/crate-list-item';
 import { CargoService } from '../../service/cargo.service';
-import moment from 'moment';
 
 @Component({
   selector: 'app-cargo-crates-list',
@@ -88,15 +88,14 @@ export class CargoCratesListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.cargoService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.fetchCrates();
       }
     });
   }
-
   public ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
   }
@@ -130,13 +129,17 @@ export class CargoCratesListComponent implements OnDestroy {
       this.loading = true;
       this.cargoService
         .deleteCrate(crate.name)
-        .then(() => {
-          this.refreshPage();
-          this.toastService.show('Crate deleted successfully', 'success');
-        })
-        .catch((err: string) => this.toastService.show(err, 'error'))
-        .finally(() => {
-          this.loading = false;
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.refreshPage();
+            this.toastService.show('Crate deleted successfully', 'success');
+          },
+          error: () => {},
         });
     });
   }
@@ -144,18 +147,19 @@ export class CargoCratesListComponent implements OnDestroy {
   private fetchCrates(): void {
     this.loading = true;
     this.cargoService
-      .fetchRepositoryCratesLikeName(this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .then((pagedData: PagedData<CrateListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.crates = pagedData.content;
-        this.error = null;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+      .searchCrates(this.searchText, this.sortOption, this.pageNum, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<CrateListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.crates = pagedData.content;
+          this.error = null;
+        },
+        error: () => {},
       });
   }
 

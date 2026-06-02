@@ -15,7 +15,6 @@
 ///
 
 export class LoginInfo {
-  public email: string;
   public username: string;
   public token: string;
   public refreshToken: string;

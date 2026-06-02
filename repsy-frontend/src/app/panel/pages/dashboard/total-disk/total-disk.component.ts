@@ -16,7 +16,7 @@
 
 import { Component, Input } from '@angular/core';
 
-import { TotalUsageInfo } from '../../../shared/dto/total-usage-info';
+import { TotalUsageInfo } from '../../../../../generated/api';
 
 @Component({
   selector: 'app-total-disk',
