@@ -19,8 +19,10 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { ArtifactVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -33,10 +35,8 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { MavenConfigComponent } from '../../config/maven-config.component';
-import { ArtifactVersionListItem } from '../../dto/artifact-version-list-item';
 import { MavenService } from '../../service/maven.service';
 
 @Component({
@@ -91,12 +91,12 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
     this.baseUrl = environment.apiBaseUrl;
     this.username = this.authService.username;
     this.pagedData = new PagedData<ArtifactVersionListItem>();
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
     this.groupName = this.route.snapshot.paramMap.get('group');
     this.artifactName = this.route.snapshot.paramMap.get('artifact');
     this.repositoryChanges$ = this.mavenService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.fetchArtifactVersions();
       }
     });
@@ -141,21 +141,23 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
       this.loading = true;
       this.mavenService
         .deleteVersion(this.groupName, this.artifactName, version.versionName)
-        .then(() => {
-          if (versionCount - 1 === 0) {
-            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            if (versionCount - 1 === 0) {
+              this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
+                this.toastService.show('Version deleted successfully', 'success');
+              });
+            } else {
+              this.refreshPage();
               this.toastService.show('Version deleted successfully', 'success');
-            });
-          } else {
-            this.refreshPage();
-            this.toastService.show('Version deleted successfully', 'success');
-          }
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
+            }
+          },
+          error: () => {},
         });
     });
   }
@@ -163,24 +165,25 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
   private fetchArtifactVersions(): void {
     this.loading = true;
     this.mavenService
-      .getArtifactVersionsLikeVersion(
-        this.searchText,
-        this.sortOption,
+      .searchArtifactVersions(
         this.groupName,
         this.artifactName,
+        this.searchText,
+        this.sortOption,
         this.pageNum,
         this.pageSize,
       )
-      .then((pagedData: PagedData<ArtifactVersionListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.versions = pagedData.content;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<ArtifactVersionListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.versions = pagedData.content;
+        },
+        error: () => {},
       });
   }
 

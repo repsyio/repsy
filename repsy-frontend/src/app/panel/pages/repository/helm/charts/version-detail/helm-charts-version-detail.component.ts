@@ -19,14 +19,14 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Highlight } from 'ngx-highlightjs';
 import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { HelmChartDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
-import { HelmChartDetail } from '../../dto/helm-chart-detail';
 import { HelmService } from '../../service/helm.service';
 
 @Component({
@@ -45,7 +45,7 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
   public ociPullCommand: string;
   public chartYaml = '';
   public formattedSize = '';
-  public activeRepo: RepoPermissionInfo;
+  public activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
 
   private readonly repositoryChanges$: Subscription;
 
@@ -56,10 +56,9 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
   ) {
-    this.activeRepo = new RepoPermissionInfo();
     this.repositoryChanges$ = this.helmService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.loadDetail();
       }
     });
@@ -80,16 +79,14 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
       this.loading = true;
       this.helmService
         .deleteChart(this.chartName, this.versionName)
-        .then(() => {
-          this.router.navigate(['..'], { relativeTo: this.route }).then(() => {
-            this.toastService.show('Version deleted successfully', 'success');
-          });
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
+        .pipe(finalize(() => { this.loading = false; }))
+        .subscribe({
+          next: () => {
+            this.router.navigate(['..'], { relativeTo: this.route }).then(() => {
+              this.toastService.show('Version deleted successfully', 'success');
+            });
+          },
+          error: () => {},
         });
     });
   }
@@ -113,26 +110,23 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
 
     this.helmService
       .getChartDetail(name, version)
-      .then((detail) => {
-        this.chart = detail;
-        this.error = null;
-        this.formattedSize = this.formatSize(this.chart.size);
-        const yaml = [
-          'apiVersion: v2',
-          `name: ${this.chart.name}`,
-          `version: ${this.chart.version}`,
-          this.chart.description ? `description: ${this.chart.description}` : null,
-          this.chart.appVersion ? `appVersion: "${this.chart.appVersion}"` : null,
-          this.chart.type ? `type: ${this.chart.type}` : null,
-        ].filter(Boolean).join('\n');
-        this.chartYaml = yaml;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+      .pipe(finalize(() => { this.loading = false; }))
+      .subscribe({
+        next: (detail) => {
+          this.chart = detail;
+          this.error = null;
+          this.formattedSize = this.formatSize(this.chart.size);
+          const yaml = [
+            'apiVersion: v2',
+            `name: ${this.chart.name}`,
+            `version: ${this.chart.version}`,
+            this.chart.description ? `description: ${this.chart.description}` : null,
+            this.chart.appVersion ? `appVersion: "${this.chart.appVersion}"` : null,
+            this.chart.type ? `type: ${this.chart.type}` : null,
+          ].filter(Boolean).join('\n');
+          this.chartYaml = yaml;
+        },
+        error: () => {},
       });
   }
 }

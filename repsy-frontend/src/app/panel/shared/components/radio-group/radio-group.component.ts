@@ -14,8 +14,8 @@
 /// limitations under the License.
 ///
 
-import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 
 export interface RadioOption<T = boolean | string | number> {
   label: string;
@@ -31,7 +31,7 @@ export interface RadioOption<T = boolean | string | number> {
 export class RadioGroupComponent<T = boolean | string | number> {
   @Input() public options: RadioOption<T>[] = [];
   @Input() public selectedValue: T | null = null;
-  @Input() public name: string = 'radio-group';
+  @Input() public name = 'radio-group';
   @Input() public disabled = false;
   @Output() public valueChange = new EventEmitter<T>();
 

@@ -26,7 +26,8 @@ public enum RepoType {
   DOCKER("docker__"),
   CARGO("cargo__"),
   GOLANG("go__"),
-  HELM("helm__");
+  HELM("helm__"),
+  NUGET("nuget__");
 
   private final @NonNull String prefix;
 

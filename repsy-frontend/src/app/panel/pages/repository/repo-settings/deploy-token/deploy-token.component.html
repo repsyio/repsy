@@ -286,6 +286,7 @@
 
 <app-deploy-token-modal
   [repoType]="this.repoType"
+  [repoName]="this.activeRepository?.repoName"
   [(open)]="showCreateTokenModal"
   (created)="fetchDeployTokens(); this.createdDeployToken = $event; showTokenInfoModal = true"
 />
@@ -370,6 +371,17 @@
         [deployToken]="true"
       >
       </app-helm-config>
+    }
+    @case (RepoType.NUGET) {
+      <app-nuget-config
+        (openChange)="openConfigure($event)"
+        [(open)]="showConfig"
+        [baseUrl]="this.environment.repoBaseUrl"
+        [username]="this.selectedDeployToken.username"
+        [repoName]="this.activeRepository.repoName"
+        [deployToken]="true"
+      >
+      </app-nuget-config>
     }
     @default {
       <p>No config available for this repository.</p>

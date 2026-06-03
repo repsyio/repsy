@@ -17,8 +17,6 @@ package io.repsy.os.server.protocols.golang.ui.facades;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.generated.model.GoModuleInfo;
 import io.repsy.os.generated.model.GoModuleListItem;
@@ -29,8 +27,6 @@ import io.repsy.os.server.protocols.golang.shared.go_module.services.GoModuleSer
 import io.repsy.os.server.protocols.golang.shared.storage.services.GolangStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.services.RepoTxService;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -44,7 +40,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class GolangApiFacade implements ProtocolApiFacade {
 
-  private final @NonNull RepoTxService repoTxService;
   private final @NonNull GolangStorageService golangStorageService;
   private final @NonNull GoModuleServiceImpl goModuleService;
   private final @NonNull GoModuleRepository goModuleRepository;
@@ -61,12 +56,6 @@ public class GolangApiFacade implements ProtocolApiFacade {
     final var free = this.golangStorageService.deleteRepo(repoInfo.getStorageKey());
 
     return BaseUsages.ofDisk(-1 * free);
-  }
-
-  public @NonNull List<StorageItemInfo> getItems(
-      final @NonNull RepoInfo repoInfo, final @NonNull RelativePath relativePath) {
-    final var storagePath = new StoragePath(repoInfo.getStorageKey(), relativePath);
-    return this.golangStorageService.listDirectory(storagePath);
   }
 
   public @NonNull Page<GoModuleListItem> getModules(
@@ -125,8 +114,6 @@ public class GolangApiFacade implements ProtocolApiFacade {
         StoragePath.of(repoInfo.getStorageKey(), "/" + modulePath + "/@v/" + version);
     this.golangStorageService.deleteVersionFiles(versionStoragePath, repoInfo.getName());
 
-    // Soft-delete: keep the DB record so GOPROXY requests return 410 Gone instead of 404
-    moduleVersion.setDeleted(true);
-    this.goModuleVersionRepository.save(moduleVersion);
+    this.goModuleVersionRepository.delete(moduleVersion);
   }
 }

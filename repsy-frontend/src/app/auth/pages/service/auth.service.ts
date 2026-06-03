@@ -15,20 +15,11 @@
 ///
 
 import { isPlatformBrowser } from '@angular/common';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Inject, Injectable, PLATFORM_ID } from '@angular/core';
-import { jwtDecode } from 'jwt-decode';
-import { Observable, Subscriber, throwError } from 'rxjs';
+import { map, Observable, throwError } from 'rxjs';
 
-import { environment } from '../../../../environments/environment';
-import { LoginInfo } from '../../../panel/shared/dto/login-info';
-import { RestResponse } from '../../../panel/shared/dto/rest-response';
-import { ErrorHandlerService } from '../../../shared/error-handler/error-handler.service';
-import { LoginForm } from '../login/form/login-form';
-
-interface TokenPayload {
-  username?: string;
-}
+import { LoginForm } from '../../../../generated/api';
+import { AuthControllerService } from '../../../../generated/api/api/auth-controller.service';
 
 @Injectable({
   providedIn: 'root',
@@ -37,25 +28,18 @@ export class AuthService {
   private _accessToken: string;
   private _refreshToken: string;
   private _username: string;
-  private _email: string;
   private readonly isBrowser: boolean;
 
   constructor(
-    private readonly http: HttpClient,
-    private readonly errorHandlerService: ErrorHandlerService,
+    private readonly authControllerService: AuthControllerService,
     @Inject(PLATFORM_ID) platformId: object,
   ) {
     this.isBrowser = isPlatformBrowser(platformId);
     if (this.isBrowser) {
-      this._email = localStorage.getItem('email');
       this._username = localStorage.getItem('username');
       this._accessToken = localStorage.getItem('token');
       this._refreshToken = localStorage.getItem('refresh-token');
     }
-  }
-
-  public get email(): string {
-    return this._email;
   }
 
   public get username(): string {
@@ -66,109 +50,51 @@ export class AuthService {
     return this._accessToken;
   }
 
-  public isAuthorized(username: string): boolean {
-    if (!this.isAuthenticated()) {
-      return false;
-    }
-
-    const decoded = jwtDecode<TokenPayload>(this._accessToken);
-
-    return decoded.username === username;
-  }
-
   public isAuthenticated(): boolean {
     return !!(this._accessToken && this._refreshToken);
+  }
+
+  public logIn(form: LoginForm): Observable<void> {
+    return this.authControllerService.login(form).pipe(
+      map((r) => {
+        this._update(r.data!.username!, r.data!.token!, r.data!.refreshToken!);
+      }),
+    );
   }
 
   public refreshToken(): Observable<string> {
     if (!this._refreshToken) {
       return throwError(new Error('No refresh token presents.'));
     }
-
-    return new Observable<string>((observer: Subscriber<string>) => {
-      const url = environment.apiBaseUrl + '/api/auth/tokens/refresh';
-
-      this.http.post<RestResponse<LoginInfo>>(url, { refreshToken: this._refreshToken }).subscribe(
-        (res: RestResponse<LoginInfo>) => {
-          this._update(res.data.email, res.data.username, res.data.token, res.data.refreshToken);
-          observer.next(res.data.token);
-          observer.complete();
-        },
-        (error: HttpErrorResponse) => {
-          observer.error(error);
-          observer.complete();
-        },
-      );
-    });
+    return this.authControllerService.refreshToken({ refreshToken: this._refreshToken }).pipe(
+      map((r) => {
+        this._update(r.data!.username!, r.data!.token!, r.data!.refreshToken!);
+        return r.data!.token!;
+      }),
+    );
   }
-
-  public logIn(form: LoginForm): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const url = environment.apiBaseUrl + '/api/auth/login';
-      this.http
-        .post<RestResponse<LoginInfo>>(url, form)
-        .toPromise()
-        .then((res: RestResponse<LoginInfo>) => {
-          this._update(res.data.email, res.data.username, res.data.token, res.data.refreshToken);
-          resolve();
-        })
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  // public preLogIn(form: LoginForm): Promise<PreLoginInfo> {
-  //   return new Promise((resolve, reject) => {
-  //     const url = environment.apiBaseUrl + '/api/auth/pre-login';
-  //     this.http
-  //       .post<RestResponse<PreLoginInfo>>(url, form)
-  //       .toPromise()
-  //       .then((res: RestResponse<PreLoginInfo>) => resolve(res.data))
-  //       .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-  //   });
-  // }
-  //
-  // public async register(form: RegistrationForm): Promise<LoginInfo> {
-  //   return new Promise<LoginInfo>((resolve, reject) => {
-  //     return this.http
-  //       .post<RestResponse<LoginInfo>>(environment.apiBaseUrl + '/api/auth/register', form)
-  //       .toPromise()
-  //       .then((res: RestResponse<LoginInfo>) => {
-  //         this._update(res.data.email, res.data.username, res.data.token, res.data.refreshToken);
-  //         resolve(res.data);
-  //       })
-  //       .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-  //   });
-  // }
 
   public logOut(): void {
-    this._email = null;
     this._username = null;
     this._accessToken = null;
     this._refreshToken = null;
 
     if (this.isBrowser) {
-      localStorage.removeItem('email');
       localStorage.removeItem('username');
       localStorage.removeItem('token');
       localStorage.removeItem('refresh-token');
     }
   }
 
-  private _update(email: string, username: string, accessToken: string, refreshToken: string): void {
-    this._email = email;
+  private _update(username: string, accessToken: string, refreshToken: string): void {
     this._username = username;
     this._accessToken = accessToken;
     this._refreshToken = refreshToken;
 
     if (this.isBrowser) {
-      localStorage.setItem('email', this._email);
       localStorage.setItem('username', this._username);
       localStorage.setItem('token', this._accessToken);
       localStorage.setItem('refresh-token', this._refreshToken);
     }
-  }
-
-  public updateLoginInfo(info: LoginInfo) {
-    this._update(info.email, info.username, info.token, info.refreshToken);
   }
 }

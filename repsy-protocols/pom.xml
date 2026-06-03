@@ -41,6 +41,7 @@
     <module>docker</module>
     <module>cargo</module>
     <module>golang</module>
+    <module>nuget</module>
     <module>shared</module>
     <module>helm</module>
   </modules>

@@ -18,15 +18,13 @@ import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { finalize } from 'rxjs/operators';
 
-import { CargoService } from '../../../../pages/repository/cargo/service/cargo.service';
-import { DockerService } from '../../../../pages/repository/docker/service/docker.service';
-import { GolangService } from '../../../../pages/repository/golang/service/golang.service';
-import { HelmService } from '../../../../pages/repository/helm/service/helm.service';
-import { MavenService } from '../../../../pages/repository/maven/service/maven.service';
-import { NpmService } from '../../../../pages/repository/npm/service/npm.service';
-import { PypiService } from '../../../../pages/repository/pypi/service/pypi.service';
-import { RepoForm } from '../../../dto/repo/repo-form';
+import {
+  ProtocolRepoControllerService,
+  RepoCreateForm,
+  RepoType as ApiRepoType,
+} from '../../../../../../generated/api';
 import { RepoType } from '../../../dto/repo/repo-type';
 import { SelectorComponent } from '../../selector/selector.component';
 import { ToastService } from '../../toast/toast.service';
@@ -45,19 +43,22 @@ export class RepositoryCreateModalComponent implements OnInit {
   @Input() public open: boolean;
   @Input() selectedOption: RepoType;
 
-  public options = [RepoType.DOCKER, RepoType.MAVEN, RepoType.NPM, RepoType.PYPI, RepoType.CARGO, RepoType.GOLANG, RepoType.HELM];
+  public options = [
+    RepoType.DOCKER,
+    RepoType.MAVEN,
+    RepoType.NPM,
+    RepoType.PYPI,
+    RepoType.CARGO,
+    RepoType.GOLANG,
+    RepoType.HELM,
+    RepoType.NUGET,
+  ];
   public form: FormGroup;
 
   public loading = false;
 
   constructor(
-    private readonly mavenService: MavenService,
-    private readonly npmService: NpmService,
-    private readonly pypiService: PypiService,
-    private readonly dockerService: DockerService,
-    private readonly cargoService: CargoService,
-    private readonly golangService: GolangService,
-    private readonly helmService: HelmService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly fb: FormBuilder,
     private readonly router: Router,
     private readonly toastService: ToastService,
@@ -89,44 +90,27 @@ export class RepositoryCreateModalComponent implements OnInit {
     this.loading = true;
     this.form.disable();
 
-    const form: RepoForm = Object.assign(new RepoForm(), this.form.value);
+    const form = this.form.getRawValue() as RepoCreateForm;
+    const apiRepoType = this.selectedOption.toUpperCase() as ApiRepoType;
 
-    this.createRepositoryService(form)
-      .then(() => {
-        this.router.navigate(['/repositories']).then(() => {
-          this.toastService.show('Repository created successfully', 'success');
-        });
+    this.protocolRepoControllerService
+      .createRepo(apiRepoType, form)
+      .pipe(
+        finalize(() => {
+          this.form.enable();
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: () => {
+          this.router.navigate(['/repositories']).then(() => {
+            this.toastService.show('Repository created successfully', 'success');
+          });
 
-        this.created.emit();
-        this.closeModal();
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.form.enable();
-        this.loading = false;
+          this.created.emit();
+          this.closeModal();
+        },
+        error: () => {},
       });
-  }
-
-  private createRepositoryService(form: RepoForm) {
-    switch (this.selectedOption) {
-      case RepoType.MAVEN:
-        return this.mavenService.createRepository(form);
-      case RepoType.NPM:
-        return this.npmService.createRegistry(form);
-      case RepoType.PYPI:
-        return this.pypiService.createRepository(form);
-      case RepoType.DOCKER:
-        return this.dockerService.createRepository(form);
-      case RepoType.GOLANG:
-        return this.golangService.createRepository(form);
-      case RepoType.CARGO:
-        return this.cargoService.createRepository(form);
-      case RepoType.HELM:
-        return this.helmService.createRepository(form);
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
   }
 }

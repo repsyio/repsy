@@ -84,3 +84,6 @@ os:
         helm:
           base-path: ${storage-gateway.fs.base-path}/helm
           trash-path: ${storage-gateway.fs.base-path}/helm/trash
+        nuget:
+          base-path: ${storage-gateway.fs.base-path}/nuget
+          trash-path: ${storage-gateway.fs.base-path}/nuget/trash

@@ -18,8 +18,10 @@ import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { HelmChartListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -32,10 +34,8 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { HelmConfigComponent } from '../../config/helm-config.component';
-import { HelmChartListItem } from '../../dto/helm-chart-list-item';
 import { HelmService } from '../../service/helm.service';
 
 @Component({
@@ -66,7 +66,7 @@ export class HelmChartsListComponent implements OnDestroy {
   public error: string;
   public charts: HelmChartListItem[] = [];
   public pagedData = new PagedData<HelmChartListItem>();
-  public activeRepo: RepoPermissionInfo;
+  public activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
 
   public sortOption: Sort = { name: 'Newest', column: 'lastUpdatedAt', type: 'DESC' };
   public sortOptions: Sort[] = [
@@ -88,10 +88,9 @@ export class HelmChartsListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
-    this.activeRepo = new RepoPermissionInfo();
     this.repositoryChanges$ = this.helmService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.fetchCharts();
       }
     });
@@ -130,13 +129,13 @@ export class HelmChartsListComponent implements OnDestroy {
       this.loading = true;
       this.helmService
         .deleteChart(chart.name, chart.latestVersion)
-        .then(() => {
-          this.refreshPage();
-          this.toastService.show('Chart deleted successfully', 'success');
-        })
-        .catch((err: string) => this.toastService.show(err, 'error'))
-        .finally(() => {
-          this.loading = false;
+        .pipe(finalize(() => { this.loading = false; }))
+        .subscribe({
+          next: () => {
+            this.refreshPage();
+            this.toastService.show('Chart deleted successfully', 'success');
+          },
+          error: () => {},
         });
     });
   }
@@ -153,17 +152,14 @@ export class HelmChartsListComponent implements OnDestroy {
     this.loading = true;
     this.helmService
       .searchCharts(this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .then((pagedData: PagedData<HelmChartListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.charts = pagedData.content;
-        this.error = null;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+      .pipe(finalize(() => { this.loading = false; }))
+      .subscribe({
+        next: (pagedData: PagedData<HelmChartListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.charts = pagedData.content;
+          this.error = null;
+        },
+        error: () => {},
       });
   }
 }

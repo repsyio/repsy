@@ -7,8 +7,9 @@
 
       <div>
         <app-visibility
-          [parentForm]="repoType === 'maven' ? mavenSettingsForm : generalSettingsForm"
+          [parentForm]="repoType === 'maven' || repoType === 'nuget' ? mavenSettingsForm : generalSettingsForm"
           [repoType]="repoType"
+          [repoName]="activeRepository?.repoName"
           (fetch)="getRepoSettings()"
         />
       </div>
@@ -16,16 +17,22 @@
       <div>
         @if (repoType !== 'cargo' && repoType !== 'golang') {
           <app-package-override
-            [parentForm]="repoType === 'maven' ? mavenSettingsForm : generalSettingsForm"
+            [parentForm]="repoType === 'maven' || repoType === 'nuget' ? mavenSettingsForm : generalSettingsForm"
             [repoType]="repoType"
+            [repoName]="activeRepository?.repoName"
             (fetch)="getRepoSettings()"
           />
         }
       </div>
 
       <div>
-        @if (repoType === 'maven') {
-          <app-maven-version-allowence [parentForm]="mavenSettingsForm" (fetch)="getRepoSettings()" />
+        @if (repoType === 'maven' || repoType === 'nuget') {
+          <app-maven-version-allowence
+            [parentForm]="mavenSettingsForm"
+            [repoType]="repoType"
+            [repoName]="activeRepository?.repoName"
+            (fetch)="getRepoSettings()"
+          />
         }
       </div>
 
@@ -33,8 +40,11 @@
         <div><app-signature [repoType]="repoType" [activeRepository]="activeRepository" /></div>
       }
       <div><app-deploy-token [repoType]="repoType" [activeRepository]="activeRepository"></app-deploy-token></div>
-      <div><app-repo-storage [repoType]="repoType" /></div>
+      <div><app-repo-storage [repoType]="repoType" [repoName]="activeRepository?.repoName" /></div>
       <div><app-repo-info [repoType]="repoType" [activeRepository]="activeRepository" /></div>
+      @if (repoType === 'docker') {
+        <div><app-delete-orphan-layers [activeRepository]="activeRepository" /></div>
+      }
       <div><app-delete-repo [repoType]="repoType" [activeRepository]="activeRepository" /></div>
     </div>
   } @else {

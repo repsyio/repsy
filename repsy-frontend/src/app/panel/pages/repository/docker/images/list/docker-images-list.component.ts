@@ -19,8 +19,10 @@ import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { ImageListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -33,11 +35,9 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { ByteFormatter } from '../../../../../shared/util/byte-formatter';
 import { DockerConfigComponent } from '../../config/docker-config.component';
-import { ImageListItem } from '../../dto/image-list-item';
 import { DockerService } from '../../service/docker.service';
 
 @Component({
@@ -87,11 +87,11 @@ export class DockerImagesListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.apiBaseUrl;
     this.pagedData = new PagedData<ImageListItem>();
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
     this.username = this.authService.username;
     this.repositoryChanges$ = this.dockerService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.fetchImages();
       }
     });
@@ -138,15 +138,17 @@ export class DockerImagesListComponent implements OnDestroy {
       this.loading = true;
       this.dockerService
         .deleteImage(image.name)
-        .then(() => {
-          this.refreshPage();
-          this.toastService.show('Image deleted successfully', 'success');
-        })
-        .catch((err: string) => {
-          this.toastService.show(err, 'error');
-        })
-        .finally(() => {
-          this.loading = false;
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
+        .subscribe({
+          next: () => {
+            this.refreshPage();
+            this.toastService.show('Image deleted successfully', 'success');
+          },
+          error: () => {},
         });
     });
   }
@@ -154,17 +156,18 @@ export class DockerImagesListComponent implements OnDestroy {
   private fetchImages(): void {
     this.loading = true;
     this.dockerService
-      .fetchRepositoryImagesLikeName(this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .then((pagedData: PagedData<ImageListItem>) => {
-        this.pagedData.page = pagedData.page;
-        this.images = pagedData.content;
-      })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+      .searchImages(this.searchText, this.sortOption, this.pageNum, this.pageSize)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (pagedData: PagedData<ImageListItem>) => {
+          this.pagedData.page = pagedData.page;
+          this.images = pagedData.content;
+        },
+        error: () => {},
       });
   }
 

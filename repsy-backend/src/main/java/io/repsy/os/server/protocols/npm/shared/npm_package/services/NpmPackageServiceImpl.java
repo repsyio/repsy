@@ -341,7 +341,7 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
     distTagOptional.ifPresent(this.packageDistTagRepository::delete);
   }
 
-  public Page<io.repsy.os.generated.model.PackageListItem> getPackagesContainsScope(
+  public Page<io.repsy.os.generated.model.NpmPackageListItem> getPackagesContainsScope(
       final UUID repoId, final @Nullable String scope, final Pageable pageable) {
 
     return this.npmPackageRepository
@@ -349,7 +349,7 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
         .map(this.npmPackageConverter::toPackageListItemDto);
   }
 
-  public Page<io.repsy.os.generated.model.PackageListItem> getPackagesContainsName(
+  public Page<io.repsy.os.generated.model.NpmPackageListItem> getPackagesContainsName(
       final UUID repoId, final String name, final Pageable pageable) {
 
     return this.npmPackageRepository
@@ -357,7 +357,7 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
         .map(this.npmPackageConverter::toPackageListItemDto);
   }
 
-  public Page<io.repsy.os.generated.model.PackageListItem> getPackagesByScopeContainsName(
+  public Page<io.repsy.os.generated.model.NpmPackageListItem> getPackagesByScopeContainsName(
       final UUID repoId, final @Nullable String scope, final String name, final Pageable pageable) {
 
     if (scope == null) {

@@ -73,6 +73,7 @@ public class ProtocolEndpointDispatcher implements WebMvcConfigurer {
         .addPathPatterns("/api/mvn/key-stores/**")
         .addPathPatterns("/api/cargo/crates/**")
         .addPathPatterns("/api/go/modules/**")
+        .addPathPatterns("/api/nuget/packages/**")
         .addPathPatterns("/api/docker/images/**")
         .addPathPatterns("/api/helm/charts/**");
   }

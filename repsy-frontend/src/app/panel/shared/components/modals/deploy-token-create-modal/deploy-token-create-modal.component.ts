@@ -18,19 +18,12 @@ import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ReactiveFormsModule } from '@angular/forms';
 import moment, { Moment } from 'moment';
+import { finalize } from 'rxjs/operators';
 
-import { DockerService } from '../../../../pages/repository/docker/service/docker.service';
-import { GolangService } from '../../../../pages/repository/golang/service/golang.service';
-import { MavenService } from '../../../../pages/repository/maven/service/maven.service';
-import { NpmService } from '../../../../pages/repository/npm/service/npm.service';
-import { PypiService } from '../../../../pages/repository/pypi/service/pypi.service';
-import { CargoService } from '../../../../pages/repository/cargo/service/cargo.service';
-import { HelmService } from '../../../../pages/repository/helm/service/helm.service';
+import { DeployTokenForm, ProtocolDeployTokenControllerService } from '../../../../../../generated/api';
 import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dto/token-create-info';
-import { DeployTokenForm } from '../../../../pages/repository/repo-settings/deploy-token/form/deploy-token-form';
-import { RepoType } from '../../../dto/repo/repo-type';
-import { ToastService } from '../../toast/toast.service';
 import { RadioGroupComponent, RadioOption } from '../../radio-group/radio-group.component';
+import { ToastService } from '../../toast/toast.service';
 
 @Component({
   selector: 'app-deploy-token-modal',
@@ -44,6 +37,7 @@ export class DeployTokenCreateModalComponent implements OnInit {
   @Output() created = new EventEmitter<TokenCreateInfo>();
   @Input() public open: boolean;
   @Input() public repoType: string;
+  @Input() public repoName: string;
 
   public loading = false;
 
@@ -60,13 +54,7 @@ export class DeployTokenCreateModalComponent implements OnInit {
   private oneYearLaterUtc = this.todayUtc.clone().add(365, 'days').format('YYYY-MM-DD');
 
   constructor(
-    private readonly dockerService: DockerService,
-    private readonly golangService: GolangService,
-    private readonly npmService: NpmService,
-    private readonly mavenService: MavenService,
-    private readonly pypiService: PypiService,
-    private readonly cargoService: CargoService,
-    private readonly helmService: HelmService,
+    private readonly protocolDeployTokenControllerService: ProtocolDeployTokenControllerService,
     private readonly fb: FormBuilder,
     private readonly toastService: ToastService,
   ) {
@@ -108,21 +96,22 @@ export class DeployTokenCreateModalComponent implements OnInit {
       return;
     }
 
-    const onSuccess = (tokenInfo: TokenCreateInfo) => {
-      this.closeModal();
-      this.created.emit(tokenInfo);
-
-      this.toastService.show('Deploy token created successfully.', 'success');
-    };
-
-    this.serviceCall(payload)
-      .then((tokenInfo) => onSuccess(tokenInfo))
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.form.enable();
-        this.loading = false;
+    this.protocolDeployTokenControllerService
+      .createDeployToken(this.repoName, payload)
+      .pipe(
+        finalize(() => {
+          this.form.enable();
+          this.loading = false;
+        }),
+      )
+      .subscribe({
+        next: (r) => {
+          const tokenInfo = r.data as unknown as TokenCreateInfo;
+          this.closeModal();
+          this.created.emit(tokenInfo);
+          this.toastService.show('Deploy token created successfully.', 'success');
+        },
+        error: () => {},
       });
   }
 
@@ -161,27 +150,6 @@ export class DeployTokenCreateModalComponent implements OnInit {
       second: now.second(),
       millisecond: now.millisecond(),
     };
-  }
-
-  serviceCall(form: DeployTokenForm): Promise<TokenCreateInfo> {
-    switch (this.repoType) {
-      case RepoType.DOCKER:
-        return this.dockerService.createDeployToken(form);
-      case RepoType.MAVEN:
-        return this.mavenService.createDeployToken(form);
-      case RepoType.NPM:
-        return this.npmService.createDeployToken(form);
-      case RepoType.PYPI:
-        return this.pypiService.createDeployToken(form);
-      case RepoType.CARGO:
-        return this.cargoService.createDeployToken(form);
-      case RepoType.GOLANG:
-        return this.golangService.createDeployToken(form);
-      case RepoType.HELM:
-        return this.helmService.createDeployToken(form);
-      default:
-        return Promise.reject('Unsupported repository type: ' + this.repoType);
-    }
   }
 
   protected readonly Date = Date;

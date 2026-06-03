@@ -18,18 +18,12 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
+import { ProtocolRepoControllerService } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
 import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
-import { CargoService } from '../../cargo/service/cargo.service';
-import { DockerService } from '../../docker/service/docker.service';
-import { GolangService } from '../../golang/service/golang.service';
-import { HelmService } from '../../helm/service/helm.service';
 import { MavenRepoSettingsForm } from '../../maven/dto/maven-repo-settings-form';
-import { MavenService } from '../../maven/service/maven.service';
-import { NpmService } from '../../npm/service/npm.service';
-import { PypiService } from '../../pypi/service/pypi.service';
 
 @Component({
   selector: 'app-visibility',
@@ -40,17 +34,12 @@ import { PypiService } from '../../pypi/service/pypi.service';
 })
 export class VisibilityComponent {
   @Input() public repoType: string;
+  @Input() public repoName: string;
   @Input() public parentForm: FormGroup;
   @Output() public fetch = new EventEmitter<void>();
 
   constructor(
-    private readonly mavenService: MavenService,
-    private readonly npmService: NpmService,
-    private readonly pypiService: PypiService,
-    private readonly dockerService: DockerService,
-    private readonly cargoService: CargoService,
-    private readonly golangService: GolangService,
-    private readonly helmService: HelmService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly toastService: ToastService,
   ) {}
 
@@ -59,48 +48,30 @@ export class VisibilityComponent {
 
     const privacy = this.parentForm.get('privateRepository').value;
 
-    let form;
+    let form: RepoSettingsForm | MavenRepoSettingsForm;
 
     if (this.repoType === RepoType.MAVEN) {
-      form = new MavenRepoSettingsForm();
-
-      (form as MavenRepoSettingsForm) = Object.assign(new MavenRepoSettingsForm(), this.parentForm.value);
+      form = Object.assign(new MavenRepoSettingsForm(), this.parentForm.value);
+      (form as MavenRepoSettingsForm).privateRepo = this.parentForm.get('privateRepository').value;
+      (form as MavenRepoSettingsForm).allowOverride = this.parentForm.get('allowOverride').value;
+    } else if (this.repoType === RepoType.NUGET) {
+      form = new RepoSettingsForm();
       form.privateRepo = this.parentForm.get('privateRepository').value;
       form.allowOverride = this.parentForm.get('allowOverride').value;
+      form.releases = this.parentForm.get('releases').value;
+      form.snapshots = this.parentForm.get('snapshots').value;
     } else {
       form = new RepoSettingsForm();
       form.privateRepo = this.parentForm.get('privateRepository').value;
       form.allowOverride = this.parentForm.get('allowOverride').value;
     }
 
-    this.changePrivacyService(form)
-      .then(() => {
+    this.protocolRepoControllerService.updateSettings(this.repoName, form).subscribe({
+      next: () => {
         this.fetch.emit();
         this.toastService.show(`Repository visibility has changed as ${privacy ? 'private' : 'public'}`, 'success');
-      })
-      .catch((err: string) => {
-        this.toastService.show(err, 'error');
-      });
-  }
-
-  private changePrivacyService(form: RepoSettingsForm) {
-    switch (this.repoType) {
-      case RepoType.MAVEN:
-        return this.mavenService.updateRepoSettings(form);
-      case RepoType.NPM:
-        return this.npmService.updateRepoSettings(form);
-      case RepoType.PYPI:
-        return this.pypiService.updateRepoSettings(form);
-      case RepoType.DOCKER:
-        return this.dockerService.updateRepoSettings(form);
-      case RepoType.GOLANG:
-        return this.golangService.updateRepoSettings(form);
-      case RepoType.CARGO:
-        return this.cargoService.updateRepoSettings(form);
-      case RepoType.HELM:
-        return this.helmService.updateRepoSettings(form);
-      default:
-        return Promise.reject('Unsupported repository type');
-    }
+      },
+      error: () => {},
+    });
   }
 }

@@ -14,35 +14,23 @@
 /// limitations under the License.
 ///
 
-import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, Subscriber } from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { map, tap } from 'rxjs/operators';
 
-import { environment } from '../../../../../../environments/environment';
-import { ErrorHandlerService } from '../../../../../shared/error-handler/error-handler.service';
+import {
+  ArtifactListItem,
+  ArtifactVersionInfo,
+  ArtifactVersionListItem,
+  MavenArtifactControllerService,
+  ProtocolRepoControllerService,
+  RepoPermissionInfo,
+  RepoSettingsForm,
+} from '../../../../../../generated/api';
 import { PagedData } from '../../../../shared/dto/paged-data';
-import { RepoDescriptionForm } from '../../../../shared/dto/repo/repo-description-form';
-import { RepoForm } from '../../../../shared/dto/repo/repo-form';
-import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
-import { RepoNameForm } from '../../../../shared/dto/repo/repo-name-form';
-import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
-import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
-import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
-import { RestResponse } from '../../../../shared/dto/rest-response';
 import { Sort } from '../../../../shared/dto/sort';
-import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
-import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
-import { DeployTokenForm } from '../../repo-settings/deploy-token/form/deploy-token-form';
-import { SignatureForm } from '../../repo-settings/signature/dto/signature-form';
-import { SignatureItem } from '../../repo-settings/signature/dto/signature-item';
-import { ArtifactListItem } from '../dto/artifact-list-item';
-import { ArtifactVersionInfo } from '../dto/artifact-version-info';
-import { ArtifactVersionListItem } from '../dto/artifact-version-list-item';
 import { DeletedItem } from '../dto/deleted-item';
 import { FsItemInfo } from '../dto/fs-item-info';
-import { MavenRepoSettingsInfo } from '../dto/maven-repo-settings-info';
-import { RepoSettingsInfo } from '../../docker/dto/repo-settings-info';
-import { RepositorySettingsInfo } from '../../pypi/dto/repository-settings-info';
 
 @Injectable({
   providedIn: 'root',
@@ -50,438 +38,121 @@ import { RepositorySettingsInfo } from '../../pypi/dto/repository-settings-info'
 export class MavenService {
   public readonly repoChanges: Observable<RepoPermissionInfo>;
 
-  private readonly repoSub = new BehaviorSubject<RepoPermissionInfo>(null);
-
-  private readonly apiBaseUrl = environment.apiBaseUrl;
-
-  private activeRepo: RepoPermissionInfo;
+  private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
   constructor(
-    private readonly http: HttpClient,
-    private readonly errorHandlerService: ErrorHandlerService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly mavenArtifactControllerService: MavenArtifactControllerService,
   ) {
-    this.repoChanges = this.repoSub.asObservable();
+    this.repoChanges = this.repoSubject.asObservable();
   }
 
-  public async createRepository(form: RepoForm): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      return this.http
-        .post<RestResponse<null>>(`${this.apiBaseUrl}/api/repos/MAVEN`, form)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  private get repoName(): string {
+    return this.repoSubject.getValue()?.repoName ?? '';
   }
 
-  public async deleteArtifact(groupName: string, artifactName: string): Promise<DeletedItem> {
-    const url = `${this.apiBaseUrl}/api/mvn/artifacts/${this.activeRepo.repoName}/${groupName}/${artifactName}`;
-
-    return new Promise<DeletedItem>((resolve, reject) => {
-      return this.http
-        .delete<RestResponse<DeletedItem>>(url)
-        .toPromise()
-        .then((res: RestResponse<DeletedItem>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public getRepository(repoName: string): Observable<RepoPermissionInfo> {
+    return this.protocolRepoControllerService.getPermission(repoName).pipe(
+      map((r) => r.data!),
+      tap((info) => this.repoSubject.next(info)),
+    );
   }
 
-  public async deleteGroup(groupName: string): Promise<DeletedItem> {
-    const url = `${this.apiBaseUrl}/api/mvn/artifacts/` + `${this.activeRepo.repoName}/${groupName}`;
-
-    return new Promise<DeletedItem>((resolve, reject) => {
-      return this.http
-        .delete<RestResponse<DeletedItem>>(url)
-        .toPromise()
-        .then((res: RestResponse<DeletedItem>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public updateRepoSettings(form: RepoSettingsForm): Observable<void> {
+    return this.protocolRepoControllerService.updateSettings(this.repoName, form).pipe(map(() => undefined));
   }
 
-  public async deleteRepository(repo: string): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/repos/${repo}`;
-
-    return new Promise<void>((resolve, reject) => {
-      return this.http
-        .delete<RestResponse<null>>(url)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public getPathContent(path: string): Observable<FsItemInfo[]> {
+    return this.protocolRepoControllerService
+      .getPathContent(path, this.repoName)
+      .pipe(map((r) => r.data as unknown as FsItemInfo[]));
   }
 
-  public async deleteVersion(groupName: string, artifactName: string, versionName: string): Promise<DeletedItem> {
-    const url =
-      `${this.apiBaseUrl}/api/mvn/artifacts/` +
-      this.activeRepo.repoName +
-      '/' +
-      `${groupName}/${artifactName}/versions/${versionName}`;
-
-    return new Promise<DeletedItem>((resolve, reject) => {
-      return this.http
-        .delete<RestResponse<DeletedItem>>(url)
-        .toPromise()
-        .then((res: RestResponse<DeletedItem>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async fetchRepos(): Promise<RepoListItem[]> {
-    return new Promise<RepoListItem[]>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/MAVEN/info`;
-
-      this.http
-        .get<RestResponse<RepoListItem[]>>(url)
-        .toPromise()
-        .then((res: RestResponse<RepoListItem[]>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async getArtifactVersion(
-    groupName: string,
-    artifactName: string,
-    versionName: string,
-  ): Promise<ArtifactVersionInfo> {
-    const url =
-      `${this.apiBaseUrl}/api/mvn/artifacts/` +
-      this.activeRepo.repoName +
-      '/' +
-      `${groupName}/${artifactName}/versions/${versionName}`;
-
-    return new Promise<ArtifactVersionInfo>((resolve, reject) => {
-      this.http
-        .get<RestResponse<ArtifactVersionInfo>>(url)
-        .toPromise()
-        .then((res: RestResponse<ArtifactVersionInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async getArtifactVersions(
-    groupName: string,
-    artifactName: string,
-    pageNumber: number,
-    pageSize: number,
-  ): Promise<PagedData<ArtifactVersionListItem>> {
-    const params = new HttpParams()
-      .set('page', pageNumber.toString())
-      .set('size', pageSize.toString())
-      .set('sort', 'versionName');
-
-    const url =
-      `${this.apiBaseUrl}/api/mvn/artifacts/` +
-      this.activeRepo.repoName +
-      '/' +
-      `${groupName}/${artifactName}/versions`;
-
-    return new Promise<PagedData<ArtifactVersionListItem>>((resolve, reject) => {
-      this.http
-        .get<RestResponse<PagedData<ArtifactVersionListItem>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<ArtifactVersionListItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async getArtifactVersionsLikeVersion(
-    versionName: string,
-    sortOption: Sort,
-    groupName: string,
-    artifactName: string,
-    pageNumber: number,
-    pageSize: number,
-  ): Promise<PagedData<ArtifactVersionListItem>> {
-    const params = new HttpParams()
-      .set('version', versionName)
-      .set('page', pageNumber.toString())
-      .set('size', pageSize.toString())
-      .set('sort', `${sortOption.column},${sortOption.type}`);
-
-    const url =
-      `${this.apiBaseUrl}/api/mvn/artifacts/` +
-      this.activeRepo.repoName +
-      '/' +
-      `${groupName}/${artifactName}/versions`;
-
-    return new Promise<PagedData<ArtifactVersionListItem>>((resolve, reject) => {
-      this.http
-        .get<RestResponse<PagedData<ArtifactVersionListItem>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<ArtifactVersionListItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async getGroupArtifacts(
-    groupName: string,
-    pageNumber: number,
-    pageSize: number,
-  ): Promise<PagedData<ArtifactListItem>> {
-    const params = new HttpParams()
-      .set('page', pageNumber + '')
-      .set('size', pageSize.toString())
-      .set('sort', 'artifactName');
-
-    const url = `${this.apiBaseUrl}/api/mvn/artifacts/` + `${this.activeRepo.repoName}/${groupName}`;
-
-    return new Promise<PagedData<ArtifactListItem>>((resolve, reject) => {
-      this.http
-        .get<RestResponse<PagedData<ArtifactListItem>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<ArtifactListItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async getGroupArtifactsLikeArtifactName(
-    groupName: string,
-    artifactName: string,
-    sortOption: Sort,
-    pageNumber: number,
-    pageSize: number,
-  ): Promise<PagedData<ArtifactListItem>> {
-    const params = new HttpParams()
-      .set('artifactName', artifactName)
-      .set('page', pageNumber + '')
-      .set('size', pageSize.toString())
-      .set('sort', `${sortOption.column},${sortOption.type}`);
-
-    const url = `${this.apiBaseUrl}/api/mvn/artifacts/` + `${this.activeRepo.repoName}/${groupName}`;
-
-    return new Promise<PagedData<ArtifactListItem>>((resolve, reject) => {
-      this.http
-        .get<RestResponse<PagedData<ArtifactListItem>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<ArtifactListItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async getPathContent(path: string): Promise<FsItemInfo[]> {
-    const params = new HttpParams().set('path', path);
-
-    const url = `${this.apiBaseUrl}/api/repos/` + `${this.activeRepo.repoName}/contents`;
-
-    return new Promise<FsItemInfo[]>((resolve, reject) => {
-      this.http
-        .get<RestResponse<FsItemInfo[]>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<FsItemInfo[]>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async getRepoArtifacts(pageNumber: number, pageSize: number): Promise<PagedData<ArtifactListItem>> {
-    const params = new HttpParams()
-      .set('page', pageNumber.toString())
-      .set('sort', 'groupName,DESC')
-      .set('size', pageSize.toString());
-
-    const url = `${this.apiBaseUrl}/api/mvn/artifacts/` + `${this.activeRepo.repoName}`;
-
-    return new Promise<PagedData<ArtifactListItem>>((resolve, reject) => {
-      this.http
-        .get<RestResponse<PagedData<ArtifactListItem>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<ArtifactListItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async getRepoArtifactsLikeGroupName(
+  public searchGroups(
     groupName: string,
     sortOption: Sort,
-    pageNumber: number,
+    pageIndex: number,
     pageSize: number,
-  ): Promise<PagedData<ArtifactListItem>> {
-    const params = new HttpParams()
-      .set('groupName', groupName)
-      .set('page', pageNumber.toString())
-      .set('sort', `${sortOption.column},${sortOption.type}`)
-      .set('size', pageSize.toString());
-
-    const url = `${this.apiBaseUrl}/api/mvn/artifacts/` + `${this.activeRepo.repoName}`;
-
-    return new Promise<PagedData<ArtifactListItem>>((resolve, reject) => {
-      this.http
-        .get<RestResponse<PagedData<ArtifactListItem>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<ArtifactListItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async getRepoSettings(): Promise<RepositorySettingsInfo> {
-    const url = `${this.apiBaseUrl}/api/repos/` + `${this.activeRepo.repoName}/settings`;
-
-    return new Promise<RepositorySettingsInfo>((resolve, reject) => {
-      this.http
-        .get<RestResponse<RepositorySettingsInfo>>(url)
-        .toPromise()
-        .then((res: RestResponse<RepositorySettingsInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async getRepoUsage(): Promise<RepoUsageInfo> {
-    const url = `${this.apiBaseUrl}/api/repos/` + `${this.activeRepo.repoName}/usage`;
-
-    return new Promise<RepoUsageInfo>((resolve, reject) => {
-      return this.http
-        .get<RestResponse<RepoUsageInfo>>(url)
-        .toPromise()
-        .then((res: RestResponse<RepoUsageInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async updateRepositoryName(repositoryNameForm: RepoNameForm): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/repos/` + `${this.activeRepo.repoName}/name`;
-
-    return new Promise<void>((resolve, reject) => {
-      return this.http
-        .patch<RestResponse<null>>(url, repositoryNameForm)
-        .toPromise()
-        .then(() => {
-          if (this.activeRepo) {
-            this.activeRepo.repoName = repositoryNameForm.name;
-            this.repoSub.next(this.activeRepo);
-          }
-          resolve();
-        })
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async updateRepoDescription(repoDescriptionForm: RepoDescriptionForm): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/repos/` + `${this.activeRepo.repoName}/description`;
-
-    return new Promise<void>((resolve, reject) => {
-      return this.http
-        .patch<RestResponse<null>>(url, repoDescriptionForm)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public async updateRepoSettings(form: RepoSettingsForm): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/settings`;
-
-    return new Promise<void>((resolve, reject) => {
-      return this.http
-        .put<RestResponse<null>>(url, form)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  public getRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
-    const url = `${this.apiBaseUrl}/api/repos/${repoName}/permissions`;
-
-    return new Observable<RepoPermissionInfo>((subscriber: Subscriber<RepoPermissionInfo>) => {
-      this.http.get<RestResponse<RepoPermissionInfo>>(url).subscribe(
-        (res: RestResponse<RepoPermissionInfo>) => {
-          this.activeRepo = res.data;
-          this.repoSub.next(res.data);
-
-          subscriber.next(res.data);
-          subscriber.complete();
-        },
-        (res: HttpErrorResponse) => {
-          subscriber.error(this.errorHandlerService.handle(res));
-          subscriber.complete();
-        },
+  ): Observable<PagedData<ArtifactListItem>> {
+    return this.mavenArtifactControllerService
+      .listContainsGroupName(
+        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
+        this.repoName,
+        groupName || undefined,
+      )
+      .pipe(
+        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<ArtifactListItem>),
       );
-    });
   }
 
-  public async getDeployTokens(pageNumber: number, pageSize: number): Promise<PagedData<DeployTokenInfo>> {
-    const params = new HttpParams().set('page', pageNumber.toString()).set('size', pageSize.toString());
-
-    const url = `${this.apiBaseUrl}/api/repos/` + this.activeRepo.repoName + '/deploy-tokens';
-
-    return new Promise<PagedData<DeployTokenInfo>>((resolve, reject) => {
-      this.http
-        .get<RestResponse<PagedData<DeployTokenInfo>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<DeployTokenInfo>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public searchArtifacts(
+    groupName: string,
+    artifactName: string,
+    sortOption: Sort,
+    pageIndex: number,
+    pageSize: number,
+  ): Observable<PagedData<ArtifactListItem>> {
+    return this.mavenArtifactControllerService
+      .listContainsArtifactName(
+        groupName,
+        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
+        this.repoName,
+        artifactName || undefined,
+      )
+      .pipe(
+        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<ArtifactListItem>),
+      );
   }
 
-  public async rotateDeployToken(tokenUuid: string): Promise<string> {
-    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens/` + tokenUuid;
-
-    return new Promise<string>((resolve, reject) => {
-      this.http
-        .put(url, {})
-        .toPromise()
-        .then((res: RestResponse<string>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public searchArtifactVersions(
+    groupName: string,
+    artifactName: string,
+    version: string,
+    sortOption: Sort,
+    pageIndex: number,
+    pageSize: number,
+  ): Observable<PagedData<ArtifactVersionListItem>> {
+    return this.mavenArtifactControllerService
+      .listMavenArtifactVersions(
+        groupName,
+        artifactName,
+        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
+        this.repoName,
+        version || undefined,
+      )
+      .pipe(
+        map(
+          (r) =>
+            ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<ArtifactVersionListItem>,
+        ),
+      );
   }
 
-  public async createDeployToken(form: DeployTokenForm): Promise<TokenCreateInfo> {
-    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens`;
-
-    return new Promise<TokenCreateInfo>((resolve, reject) => {
-      this.http
-        .post(url, form)
-        .toPromise()
-        .then((res: RestResponse<TokenCreateInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public fetchArtifactVersion(
+    groupName: string,
+    artifactName: string,
+    versionName: string,
+  ): Observable<ArtifactVersionInfo> {
+    return this.mavenArtifactControllerService
+      .getMavenArtifactVersion(groupName, artifactName, versionName, this.repoName)
+      .pipe(map((r) => r.data!));
   }
 
-  public async revokeDeployToken(tokenId: string): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens/` + tokenId;
-
-    return new Promise((resolve, reject) => {
-      this.http
-        .delete(url, {})
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public deleteGroup(groupName: string): Observable<DeletedItem> {
+    return this.mavenArtifactControllerService
+      .deleteGroup(groupName, this.repoName)
+      .pipe(map((r) => r.data as unknown as DeletedItem));
   }
 
-  fetchKeyStores(pageIndex: number, pageSize: number) {
-    const params = new HttpParams().set('page', pageIndex.toString()).set('size', pageSize.toString());
-
-    const url = `${this.apiBaseUrl}/api/mvn/key-stores/${this.activeRepo.repoName}`;
-
-    return new Promise<PagedData<SignatureItem>>((resolve, reject) => {
-      this.http
-        .get<RestResponse<PagedData<SignatureItem>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<SignatureItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public deleteArtifact(groupName: string, artifactName: string): Observable<DeletedItem> {
+    return this.mavenArtifactControllerService
+      .deleteMavenArtifact(groupName, artifactName, this.repoName)
+      .pipe(map((r) => r.data as unknown as DeletedItem));
   }
 
-  createKeyStore(form: SignatureForm) {
-    const url = `${this.apiBaseUrl}/api/mvn/key-stores/${this.activeRepo.repoName}`;
-
-    return new Promise<void>((resolve, reject) => {
-      this.http
-        .post(url, form)
-        .toPromise()
-        .then((res: RestResponse<void>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
-  }
-
-  deleteKeyStore(uuid: string) {
-    const url = `${this.apiBaseUrl}/api/mvn/key-stores/${this.activeRepo.repoName}/${uuid}`;
-
-    return new Promise<void>((resolve, reject) => {
-      this.http
-        .delete(url)
-        .toPromise()
-        .then((res: RestResponse<void>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public deleteVersion(groupName: string, artifactName: string, versionName: string): Observable<DeletedItem> {
+    return this.mavenArtifactControllerService
+      .deleteMavenArtifactVersion(groupName, artifactName, versionName, this.repoName)
+      .pipe(map((r) => r.data as unknown as DeletedItem));
   }
 }

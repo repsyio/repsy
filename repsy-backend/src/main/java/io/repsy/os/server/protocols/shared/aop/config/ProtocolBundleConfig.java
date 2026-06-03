@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.shared.aop.config;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.util.HashMap;
 import java.util.Map;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -36,16 +37,19 @@ public class ProtocolBundleConfig {
       @Qualifier("dockerAuthComponent") final ProtocolAuthService docker,
       @Qualifier("pypiAuthComponent") final ProtocolAuthService pypi,
       @Qualifier("golangAuthComponent") final ProtocolAuthService golang,
-      @Qualifier("helmAuthComponent") final ProtocolAuthService helm) {
+      @Qualifier("helmAuthComponent") final ProtocolAuthService helm,
+      @Qualifier("nuGetAuthComponent") final ProtocolAuthService nuget) {
 
-    return Map.ofEntries(
-        Map.entry(RepoType.CARGO, cargo),
-        Map.entry(RepoType.MAVEN, maven),
-        Map.entry(RepoType.NPM, npm),
-        Map.entry(RepoType.DOCKER, docker),
-        Map.entry(RepoType.PYPI, pypi),
-        Map.entry(RepoType.GOLANG, golang),
-        Map.entry(RepoType.HELM, helm));
+    final var map = new HashMap<RepoType, ProtocolAuthService>();
+    map.put(RepoType.CARGO, cargo);
+    map.put(RepoType.MAVEN, maven);
+    map.put(RepoType.NPM, npm);
+    map.put(RepoType.DOCKER, docker);
+    map.put(RepoType.PYPI, pypi);
+    map.put(RepoType.GOLANG, golang);
+    map.put(RepoType.HELM, helm);
+    map.put(RepoType.NUGET, nuget);
+    return map;
   }
 
   @Bean
@@ -56,15 +60,18 @@ public class ProtocolBundleConfig {
       @Qualifier("dockerApiFacade") final ProtocolApiFacade docker,
       @Qualifier("pypiApiFacade") final ProtocolApiFacade pypi,
       @Qualifier("golangApiFacade") final ProtocolApiFacade golang,
-      @Qualifier("helmApiFacade") final ProtocolApiFacade helm) {
+      @Qualifier("helmApiFacade") final ProtocolApiFacade helm,
+      @Qualifier("nugetApiFacade") final ProtocolApiFacade nuget) {
 
-    return Map.ofEntries(
-        Map.entry(RepoType.CARGO, cargo),
-        Map.entry(RepoType.MAVEN, maven),
-        Map.entry(RepoType.NPM, npm),
-        Map.entry(RepoType.DOCKER, docker),
-        Map.entry(RepoType.PYPI, pypi),
-        Map.entry(RepoType.GOLANG, golang),
-        Map.entry(RepoType.HELM, helm));
+    final var map = new HashMap<RepoType, ProtocolApiFacade>();
+    map.put(RepoType.CARGO, cargo);
+    map.put(RepoType.MAVEN, maven);
+    map.put(RepoType.NPM, npm);
+    map.put(RepoType.DOCKER, docker);
+    map.put(RepoType.PYPI, pypi);
+    map.put(RepoType.GOLANG, golang);
+    map.put(RepoType.HELM, helm);
+    map.put(RepoType.NUGET, nuget);
+    return map;
   }
 }

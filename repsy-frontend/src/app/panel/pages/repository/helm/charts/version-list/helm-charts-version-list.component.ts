@@ -18,8 +18,10 @@ import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
+import { HelmChartVersionItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -27,9 +29,7 @@ import { EmptyListComponent } from '../../../../../shared/components/empty-list/
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { HelmConfigComponent } from '../../config/helm-config.component';
-import { HelmChartVersionItem } from '../../dto/helm-chart-version-item';
 import { HelmService } from '../../service/helm.service';
 
 @Component({
@@ -53,7 +53,7 @@ export class HelmChartsVersionListComponent implements OnDestroy {
   public error: string;
   public chartName: string;
   public versions: HelmChartVersionItem[] = [];
-  public activeRepo: RepoPermissionInfo;
+  public activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
   public readonly baseUrl: string;
   public readonly username: string;
 
@@ -69,10 +69,9 @@ export class HelmChartsVersionListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
-    this.activeRepo = new RepoPermissionInfo();
     this.repositoryChanges$ = this.helmService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.chartName = this.route.snapshot.paramMap.get('name');
         this.fetchVersions();
       }
@@ -107,17 +106,17 @@ export class HelmChartsVersionListComponent implements OnDestroy {
       this.loading = true;
       this.helmService
         .deleteChart(this.chartName, version.version)
-        .then(() => {
-          this.toastService.show('Version deleted successfully', 'success');
-          if (isLastVersion) {
-            this.router.navigate(['..'], { relativeTo: this.route });
-          } else {
-            this.fetchVersions();
-          }
-        })
-        .catch((err: string) => {
-          this.loading = false;
-          this.toastService.show(err, 'error');
+        .pipe(finalize(() => { this.loading = false; }))
+        .subscribe({
+          next: () => {
+            this.toastService.show('Version deleted successfully', 'success');
+            if (isLastVersion) {
+              this.router.navigate(['..'], { relativeTo: this.route });
+            } else {
+              this.fetchVersions();
+            }
+          },
+          error: () => {},
         });
     });
   }
@@ -130,20 +129,13 @@ export class HelmChartsVersionListComponent implements OnDestroy {
     this.loading = true;
     this.helmService
       .getChartVersions(this.chartName)
-      .then((versions: HelmChartVersionItem[]) => {
-        this.versions = versions;
-        this.error = null;
-      })
-      .catch((err: string) => {
-        if (err === 'Chart is not Found.') {
-          this.router.navigateByUrl(`/${this.activeRepo.repoName}`);
-          return;
-        }
-        this.error = err;
-        this.toastService.show(err, 'error');
-      })
-      .finally(() => {
-        this.loading = false;
+      .pipe(finalize(() => { this.loading = false; }))
+      .subscribe({
+        next: (versions: HelmChartVersionItem[]) => {
+          this.versions = versions;
+          this.error = null;
+        },
+        error: () => {},
       });
   }
 }

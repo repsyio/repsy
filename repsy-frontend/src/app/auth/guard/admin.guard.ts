@@ -16,18 +16,21 @@
 
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
+import { map } from 'rxjs';
 
 import { ProfileService } from '../../panel/pages/profile/service/profile.service';
 
-export const adminGuard: CanActivateFn = async () => {
-  const profileService = inject(ProfileService);
+export const adminGuard: CanActivateFn = () => {
+  const profileFacadeService = inject(ProfileService);
   const router = inject(Router);
 
-  const profile = await profileService.get();
-  if (profile.role === 'ADMIN') {
-    return true;
-  }
-
-  router.navigate(['/']);
-  return false;
+  return profileFacadeService.get().pipe(
+    map((profile) => {
+      if (profile.role === 'ADMIN') {
+        return true;
+      }
+      router.navigate(['/']);
+      return false;
+    }),
+  );
 };

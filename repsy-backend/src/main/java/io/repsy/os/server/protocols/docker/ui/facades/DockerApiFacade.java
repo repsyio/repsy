@@ -20,18 +20,16 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.generated.model.ManifestListItem;
-import io.repsy.os.generated.model.RepoSettingsForm;
-import io.repsy.os.generated.model.RepoSettingsInfo;
 import io.repsy.os.generated.model.TagDetail;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.layer.services.LayerTxService;
+import io.repsy.os.server.protocols.docker.shared.layer.services.OrphanLayerCleanupService;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
 import io.repsy.os.server.protocols.docker.ui.utils.RepoUtils;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
 import java.io.IOException;
@@ -59,11 +57,11 @@ public class DockerApiFacade implements ProtocolApiFacade {
   private static final @NonNull String BLOBS_PATH = "blobs";
   private static final @NonNull String MANIFESTS_PATH = "manifests";
 
-  private final @NonNull RepoTxService repoTxService;
   private final @NonNull ImageTxService imageTxService;
   private final @NonNull LayerTxService layerTxService;
   private final @NonNull ManifestTxService manifestService;
   private final @NonNull DockerStorageService dockerStorageService;
+  private final @NonNull OrphanLayerCleanupService orphanLayerCleanupService;
 
   public @NonNull BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
 
@@ -81,28 +79,6 @@ public class DockerApiFacade implements ProtocolApiFacade {
     final var free = this.dockerStorageService.deleteRepo(repoInfo.getStorageKey());
 
     return BaseUsages.builder().diskUsage(-1L * free).build();
-  }
-
-  @Transactional(readOnly = true)
-  public @NonNull RepoSettingsInfo getSettings(final @NonNull RepoInfo repoInfo) {
-
-    RepoUtils.validateRepoName(repoInfo.getName());
-
-    return RepoSettingsInfo.builder()
-        .privateRepo(repoInfo.isPrivateRepo())
-        .searchable(repoInfo.isSearchable())
-        .releases(repoInfo.getReleases())
-        .snapshots(repoInfo.getSnapshots())
-        .allowOverride(repoInfo.isAllowOverride())
-        .build();
-  }
-
-  public void updateSettings(
-      final @NonNull RepoInfo repoInfo, final @NonNull RepoSettingsForm settings) {
-
-    RepoUtils.validateRepoName(repoInfo.getName());
-
-    this.repoTxService.updateSettings(repoInfo.getStorageKey(), settings);
   }
 
   public @NonNull BaseUsages deleteImage(
@@ -215,6 +191,13 @@ public class DockerApiFacade implements ProtocolApiFacade {
     return this.dockerStorageService
         .getResource(storagePath, repoInfo.getName())
         .orElseThrow(() -> new ItemNotFoundException("manifestNotFound"));
+  }
+
+  public void deleteOrphanLayers(final @NonNull RepoInfo repoInfo) {
+
+    final var orphans = this.layerTxService.deleteOrphanLayers(repoInfo.getStorageKey());
+
+    this.orphanLayerCleanupService.cleanupBlobs(repoInfo.getStorageKey(), orphans);
   }
 
   public void createRepo(final @NonNull UUID repoId) {

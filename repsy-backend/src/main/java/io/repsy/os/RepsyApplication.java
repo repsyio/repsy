@@ -22,12 +22,14 @@ import io.repsy.os.server.protocols.golang.shared.storage.configs.GolangFileSyst
 import io.repsy.os.server.protocols.helm.shared.storage.configs.HelmFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.maven.shared.storage.configs.MavenFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.npm.shared.storage.configs.NpmFileSystemStorageBackendConfigProps;
+import io.repsy.os.server.protocols.nuget.shared.storage.configs.NuGetFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.pypi.shared.storage.configs.PypiFileSystemStorageBackendConfigProps;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 @Slf4j
 @EnableConfigurationProperties({
@@ -37,8 +39,10 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
   DockerFileSystemStorageBackendConfigProps.class,
   GolangFileSystemStorageBackendConfigProps.class,
   CargoFileSystemStorageBackendConfigProps.class,
-  HelmFileSystemStorageBackendConfigProps.class
+  HelmFileSystemStorageBackendConfigProps.class,
+  NuGetFileSystemStorageBackendConfigProps.class,
 })
+@EnableAsync
 @SpringBootApplication(
     scanBasePackages = {"io.repsy.os", "io.repsy.core", "io.repsy.libs", "io.repsy.protocols"})
 @EnableMultiport
