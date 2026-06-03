@@ -16,10 +16,10 @@
 import { Routes } from '@angular/router';
 
 import { RepositorySettingsComponent } from '../repo-settings/repository-settings.component';
-import { HelmComponent } from './helm.component';
 import { HelmChartsListComponent } from './charts/list/helm-charts-list.component';
 import { HelmChartsVersionDetailComponent } from './charts/version-detail/helm-charts-version-detail.component';
 import { HelmChartsVersionListComponent } from './charts/version-list/helm-charts-version-list.component';
+import { HelmComponent } from './helm.component';
 
 export const HELM_ROUTES: Routes = [
   {
