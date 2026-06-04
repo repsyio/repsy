@@ -115,9 +115,9 @@ public abstract class AbstractHelmOciManifestCheckProtocolMethodHandler<ID>
     final var manifest = manifestOpt.get();
 
     return ResponseEntity.ok()
-        .header(CONTENT_TYPE, manifest.getMediaType())
-        .header(CONTENT_LENGTH, String.valueOf(manifest.getContent().getBytes(UTF_8).length))
-        .header(DOCKER_CONTENT_DIGEST, manifest.getDigest())
+        .header(CONTENT_TYPE, manifest.mediaType())
+        .header(CONTENT_LENGTH, String.valueOf(manifest.content().getBytes(UTF_8).length))
+        .header(DOCKER_CONTENT_DIGEST, manifest.digest())
         .build();
   }
 }

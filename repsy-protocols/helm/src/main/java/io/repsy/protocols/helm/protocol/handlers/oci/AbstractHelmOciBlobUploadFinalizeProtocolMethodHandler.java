@@ -129,12 +129,12 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
     final var blobsBasePath = requestPath.substring(0, requestPath.lastIndexOf("/uploads/"));
     final var location =
         ServletUriComponentsBuilder.fromCurrentContextPath()
-            .path(blobsBasePath + "/" + blobInfo.getDigest())
+            .path(blobsBasePath + "/" + blobInfo.digest())
             .build()
             .toUriString();
 
     return ResponseEntity.status(HttpStatus.CREATED)
-        .header(DOCKER_CONTENT_DIGEST, blobInfo.getDigest())
+        .header(DOCKER_CONTENT_DIGEST, blobInfo.digest())
         .header(DOCKER_UPLOAD_UUID, uploadId.toString())
         .header(LOCATION, location)
         .build();

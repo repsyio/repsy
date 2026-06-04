@@ -21,11 +21,11 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public interface HelmOciBlobInfo {
 
-  UUID getId();
+  UUID id();
 
-  String getDigest();
+  String digest();
 
-  long getSize();
+  long size();
 
-  String getMediaType();
+  String mediaType();
 }

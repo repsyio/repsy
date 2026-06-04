@@ -70,22 +70,22 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
       final var url =
           HelmConstants.CHARTS_PATH
               + "/"
-              + chart.getName()
+              + chart.name()
               + "-"
-              + chart.getVersion()
+              + chart.version()
               + HelmConstants.TGZ_EXTENSION;
       final var entry =
           HelmIndexEntryDto.builder()
-              .name(chart.getName())
-              .version(chart.getVersion())
-              .description(chart.getDescription())
-              .appVersion(chart.getAppVersion())
-              .type(chart.getType())
-              .digest(chart.getDigest())
+              .name(chart.name())
+              .version(chart.version())
+              .description(chart.description())
+              .appVersion(chart.appVersion())
+              .type(chart.type())
+              .digest(chart.digest())
               .urls(List.of(url))
-              .created(chart.getCreatedAt().toString())
+              .created(chart.createdAt().toString())
               .build();
-      entries.computeIfAbsent(chart.getName(), _ -> new ArrayList<>()).add(entry);
+      entries.computeIfAbsent(chart.name(), _ -> new ArrayList<>()).add(entry);
     }
 
     return HelmIndexDto.builder()
@@ -142,7 +142,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
       if (!repoInfo.isAllowOverride()) {
         throw new ItemAlreadyExistException("chartAlreadyExists: " + name + ":" + version);
       }
-      final var oldSize = existingOpt.get().getSize();
+      final var oldSize = existingOpt.get().size();
       final var chartInfo = this.chartService.update(repoInfo.getId(), form);
       this.helmStorageService.saveChart(repoInfo.getName(), storagePath, chartStream);
       context.addProperty("usages", BaseUsages.ofDisk(size - oldSize));
@@ -162,26 +162,23 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
     final var chartInfo =
         this.chartService.findByRepoIdAndNameAndVersion(repoInfo.getId(), name, version);
 
-    final var manifests = this.ociManifestService.findAllByChartId(chartInfo.getId());
+    final var manifests = this.ociManifestService.findAllByChartId(chartInfo.id());
 
     this.chartService.delete(repoInfo.getId(), name, version);
 
     final var filename = name + "-" + version + HelmConstants.TGZ_EXTENSION;
     final var freed =
         this.helmStorageService.deleteChartFile(
-            repoInfo.getStorageKey(), filename, chartInfo.getDigest(), repoInfo.getName());
+            repoInfo.getStorageKey(), filename, chartInfo.digest(), repoInfo.getName());
 
     for (final var manifest : manifests) {
       this.helmStorageService.deleteManifestFile(
-          repoInfo.getStorageKey(),
-          manifest.getName(),
-          manifest.getReference(),
-          repoInfo.getName());
+          repoInfo.getStorageKey(), manifest.name(), manifest.reference(), repoInfo.getName());
     }
 
     if (!manifests.isEmpty()
-        && !this.chartService.existsByRepoIdAndDigest(repoInfo.getId(), chartInfo.getDigest())) {
-      this.ociBlobService.deleteByRepoIdAndDigest(repoInfo.getId(), chartInfo.getDigest());
+        && !this.chartService.existsByRepoIdAndDigest(repoInfo.getId(), chartInfo.digest())) {
+      this.ociBlobService.deleteByRepoIdAndDigest(repoInfo.getId(), chartInfo.digest());
     }
 
     context.addProperty("usages", BaseUsages.ofDisk(-freed));

@@ -90,28 +90,28 @@ public class HelmApiFacade implements ProtocolApiFacade {
         this.helmChartService.findByRepoIdAndNameAndVersion(
             repoInfo.getStorageKey(), name, version);
 
-    final var manifests = this.helmOciManifestService.findAllByChartId(chartInfo.getId());
+    final var manifests = this.helmOciManifestService.findAllByChartId(chartInfo.id());
 
     this.helmChartService.delete(repoInfo.getStorageKey(), name, version);
 
     final var filename = name + "-" + version + HelmConstants.TGZ_EXTENSION;
     final var freed =
         this.helmStorageService.deleteChartFile(
-            repoInfo.getStorageKey(), filename, chartInfo.getDigest(), repoInfo.getName());
+            repoInfo.getStorageKey(), filename, chartInfo.digest(), repoInfo.getName());
 
     for (final var manifest : manifests) {
       this.helmStorageService.deleteManifestFile(
           repoInfo.getStorageKey(),
-          manifest.getName(),
-          manifest.getReference(),
+          manifest.name(),
+          manifest.reference(),
           repoInfo.getName());
     }
 
     if (!manifests.isEmpty()
         && !this.helmChartService.existsByRepoIdAndDigest(
-            repoInfo.getStorageKey(), chartInfo.getDigest())) {
+            repoInfo.getStorageKey(), chartInfo.digest())) {
       this.helmOciBlobService.deleteByRepoIdAndDigest(
-          repoInfo.getStorageKey(), chartInfo.getDigest());
+          repoInfo.getStorageKey(), chartInfo.digest());
     }
 
     return BaseUsages.ofDisk(-freed);

@@ -28,37 +28,37 @@ public class HelmChartMapper {
 
   public HelmChartListItem toListItem(final HelmChartInfo info) {
     return HelmChartListItem.builder()
-        .name(info.getName())
-        .latestVersion(info.getVersion())
-        .description(info.getDescription())
-        .type(info.getType())
-        .updatedAt(info.getLastUpdatedAt())
+        .name(info.name())
+        .latestVersion(info.version())
+        .description(info.description())
+        .type(info.type())
+        .updatedAt(info.lastUpdatedAt())
         .build();
   }
 
   public HelmChartVersionItem toVersionItem(final HelmChartInfo info) {
     return HelmChartVersionItem.builder()
-        .version(info.getVersion())
-        .appVersion(info.getAppVersion())
-        .description(info.getDescription())
-        .type(info.getType())
-        .digest(info.getDigest())
-        .size(info.getSize())
-        .createdAt(info.getCreatedAt())
+        .version(info.version())
+        .appVersion(info.appVersion())
+        .description(info.description())
+        .type(info.type())
+        .digest(info.digest())
+        .size(info.size())
+        .createdAt(info.createdAt())
         .build();
   }
 
   public HelmChartDetail toDetail(final HelmChartInfo info) {
     return HelmChartDetail.builder()
-        .name(info.getName())
-        .version(info.getVersion())
-        .description(info.getDescription())
-        .appVersion(info.getAppVersion())
-        .type(info.getType())
-        .digest(info.getDigest())
-        .size(info.getSize())
-        .createdAt(info.getCreatedAt())
-        .lastUpdatedAt(info.getLastUpdatedAt())
+        .name(info.name())
+        .version(info.version())
+        .description(info.description())
+        .appVersion(info.appVersion())
+        .type(info.type())
+        .digest(info.digest())
+        .size(info.size())
+        .createdAt(info.createdAt())
+        .lastUpdatedAt(info.lastUpdatedAt())
         .build();
   }
 }

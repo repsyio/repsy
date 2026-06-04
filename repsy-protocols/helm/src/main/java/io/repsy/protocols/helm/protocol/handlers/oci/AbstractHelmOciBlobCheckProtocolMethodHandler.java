@@ -113,8 +113,8 @@ public abstract class AbstractHelmOciBlobCheckProtocolMethodHandler<ID>
     final var blob = blobOpt.get();
 
     return ResponseEntity.ok()
-        .header(CONTENT_LENGTH, String.valueOf(blob.getSize()))
-        .header(CONTENT_TYPE, blob.getMediaType())
+        .header(CONTENT_LENGTH, String.valueOf(blob.size()))
+        .header(CONTENT_TYPE, blob.mediaType())
         .header(DOCKER_CONTENT_DIGEST, digest)
         .build();
   }

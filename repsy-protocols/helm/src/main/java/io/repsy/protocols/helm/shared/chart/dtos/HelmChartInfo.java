@@ -23,23 +23,23 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public interface HelmChartInfo {
 
-  UUID getId();
+  UUID id();
 
-  String getName();
+  String name();
 
-  String getVersion();
+  String version();
 
-  @Nullable String getDescription();
+  @Nullable String description();
 
-  @Nullable String getAppVersion();
+  @Nullable String appVersion();
 
-  @Nullable String getType();
+  @Nullable String type();
 
-  String getDigest();
+  String digest();
 
-  long getSize();
+  long size();
 
-  Instant getCreatedAt();
+  Instant createdAt();
 
-  Instant getLastUpdatedAt();
+  Instant lastUpdatedAt();
 }

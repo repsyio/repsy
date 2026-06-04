@@ -21,17 +21,17 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public interface HelmOciManifestInfo {
 
-  UUID getId();
+  UUID id();
 
-  UUID getChartId();
+  UUID chartId();
 
-  String getName();
+  String name();
 
-  String getReference();
+  String reference();
 
-  String getDigest();
+  String digest();
 
-  String getMediaType();
+  String mediaType();
 
-  String getContent();
+  String content();
 }

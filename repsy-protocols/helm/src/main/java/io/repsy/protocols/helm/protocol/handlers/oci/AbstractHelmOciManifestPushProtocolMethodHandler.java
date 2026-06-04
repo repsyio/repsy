@@ -162,7 +162,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
 
     final var manifestForm =
         HelmOciManifestForm.builder()
-            .chartId(chartInfo.getId())
+            .chartId(chartInfo.id())
             .name(name)
             .reference(reference)
             .digest(digest)
@@ -180,13 +180,13 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     final var manifestsBasePath = requestPath.substring(0, requestPath.lastIndexOf('/') + 1);
     final var location =
         ServletUriComponentsBuilder.fromCurrentContextPath()
-            .path(manifestsBasePath + manifestInfo.getDigest())
+            .path(manifestsBasePath + manifestInfo.digest())
             .build()
             .toUriString();
 
     return ResponseEntity.status(HttpStatus.CREATED)
         .header(LOCATION, location)
-        .header(DOCKER_CONTENT_DIGEST, manifestInfo.getDigest())
+        .header(DOCKER_CONTENT_DIGEST, manifestInfo.digest())
         .header(CONTENT_TYPE, mediaType)
         .build();
   }
