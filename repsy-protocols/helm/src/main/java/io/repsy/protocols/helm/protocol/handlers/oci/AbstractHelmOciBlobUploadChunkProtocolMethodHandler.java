@@ -99,7 +99,6 @@ public abstract class AbstractHelmOciBlobUploadChunkProtocolMethodHandler<ID>
       final HttpServletResponse response)
       throws Exception {
 
-    final var urlProperties = ProtocolContextUtils.getUrlProperties(context);
     final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
     final var matcher = UPLOAD_CHUNK_PATTERN.matcher(relativePath);
 
@@ -107,7 +106,6 @@ public abstract class AbstractHelmOciBlobUploadChunkProtocolMethodHandler<ID>
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
 
-    final var chartName = matcher.group(1);
     final var uploadId = UUID.fromString(matcher.group(2));
 
     final var currentSize =
@@ -116,8 +114,8 @@ public abstract class AbstractHelmOciBlobUploadChunkProtocolMethodHandler<ID>
 
     final var location =
         ServletUriComponentsBuilder.fromCurrentContextPath()
-            .path("/v2/{repoName}/{chartName}/blobs/uploads/{uploadId}")
-            .buildAndExpand(urlProperties.getRepoName(), chartName, uploadId)
+            .path(request.getRequestURI())
+            .build()
             .toUriString();
 
     return ResponseEntity.accepted()

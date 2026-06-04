@@ -94,7 +94,6 @@ public abstract class AbstractHelmOciBlobUploadStartProtocolMethodHandler<ID>
       final HttpServletRequest request,
       final HttpServletResponse response) {
 
-    final var urlProperties = ProtocolContextUtils.getUrlProperties(context);
     final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
     final var matcher = UPLOAD_START_PATTERN.matcher(relativePath);
 
@@ -102,13 +101,13 @@ public abstract class AbstractHelmOciBlobUploadStartProtocolMethodHandler<ID>
       return ResponseEntity.internalServerError().build();
     }
 
-    final var chartName = matcher.group(1);
     final var uploadId = this.helmFacade.startBlobUpload(context);
 
+    final var requestPath = request.getRequestURI().replaceAll("/+$", "");
     final var location =
         ServletUriComponentsBuilder.fromCurrentContextPath()
-            .path("/v2/{repoName}/{chartName}/blobs/uploads/{uploadId}")
-            .buildAndExpand(urlProperties.getRepoName(), chartName, uploadId)
+            .path(requestPath + "/" + uploadId)
+            .build()
             .toUriString();
 
     return ResponseEntity.accepted()

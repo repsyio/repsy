@@ -94,7 +94,7 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
-    this.authenticateRequest(authHeader, repoInfo.getStorageKey(), properties);
+    this.authenticateRequest(authHeader, repoInfo.getId(), properties);
 
     return ProcessorResult.next();
   }

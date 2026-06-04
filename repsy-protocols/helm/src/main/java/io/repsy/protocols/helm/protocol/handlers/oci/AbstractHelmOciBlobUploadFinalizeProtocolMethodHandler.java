@@ -99,7 +99,6 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
       final HttpServletResponse response)
       throws Exception {
 
-    final var urlProperties = ProtocolContextUtils.getUrlProperties(context);
     final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
     final var matcher = UPLOAD_FINALIZE_PATTERN.matcher(relativePath);
 
@@ -107,7 +106,6 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
 
-    final var chartName = matcher.group(1);
     final var uploadId = UUID.fromString(matcher.group(2));
     final var digest = request.getParameter("digest");
     final var mediaType = request.getContentType();
@@ -126,10 +124,13 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
             request.getInputStream(),
             contentLength);
 
+    // Derive base blob path from request URI: strip "/uploads/{uuid}" → ".../blobs/{digest}"
+    final var requestPath = request.getRequestURI();
+    final var blobsBasePath = requestPath.substring(0, requestPath.lastIndexOf("/uploads/"));
     final var location =
         ServletUriComponentsBuilder.fromCurrentContextPath()
-            .path("/v2/{repoName}/{chartName}/blobs/{digest}")
-            .buildAndExpand(urlProperties.getRepoName(), chartName, blobInfo.getDigest())
+            .path(blobsBasePath + "/" + blobInfo.getDigest())
+            .build()
             .toUriString();
 
     return ResponseEntity.status(HttpStatus.CREATED)

@@ -114,7 +114,6 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
       final HttpServletResponse response)
       throws Exception {
 
-    final var urlProperties = ProtocolContextUtils.getUrlProperties(context);
     final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
     final var matcher = MANIFEST_PUSH_PATTERN.matcher(relativePath);
 
@@ -176,10 +175,13 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
 
     context.addProperty("usages", BaseUsages.ofDisk(layerSize));
 
+    // Replace the last path segment (reference) with the digest
+    final var requestPath = request.getRequestURI();
+    final var manifestsBasePath = requestPath.substring(0, requestPath.lastIndexOf('/') + 1);
     final var location =
         ServletUriComponentsBuilder.fromCurrentContextPath()
-            .path("/v2/{repoName}/{name}/manifests/{digest}")
-            .buildAndExpand(urlProperties.getRepoName(), name, manifestInfo.getDigest())
+            .path(manifestsBasePath + manifestInfo.getDigest())
+            .build()
             .toUriString();
 
     return ResponseEntity.status(HttpStatus.CREATED)
