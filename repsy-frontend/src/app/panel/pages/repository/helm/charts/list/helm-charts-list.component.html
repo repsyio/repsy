@@ -193,7 +193,7 @@
         <app-pagination
           (pageNumChange)="loadPage($event)"
           [pageNum]="pageNum"
-          [totalPages]="pagedData.page.totalPages"
+          [totalPages]="pagedData.page?.totalPages ?? 0"
         />
       </div>
     } @else {

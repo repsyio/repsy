@@ -135,7 +135,7 @@ export class HelmChartsListComponent implements OnDestroy {
             this.refreshPage();
             this.toastService.show('Chart deleted successfully', 'success');
           },
-          error: () => {},
+          error: (err: string) => this.toastService.show(err, 'error'),
         });
     });
   }
@@ -156,10 +156,23 @@ export class HelmChartsListComponent implements OnDestroy {
       .subscribe({
         next: (pagedData: PagedData<HelmChartListItem>) => {
           this.pagedData.page = pagedData.page;
-          this.charts = pagedData.content;
+          // Deduplicate by chart name: keep the entry with the latest updatedAt.
+          // The backend may return multiple versions per name; the @for track
+          // expression uses chart.name, so duplicates would cause NG0955.
+          const seen = new Map<string, HelmChartListItem>();
+          for (const chart of pagedData.content) {
+            const existing = seen.get(chart.name);
+            if (!existing || (chart.updatedAt ?? '') > (existing.updatedAt ?? '')) {
+              seen.set(chart.name, chart);
+            }
+          }
+          this.charts = [...seen.values()];
           this.error = null;
         },
-        error: () => {},
+        error: (err: string) => {
+          this.error = err;
+          this.toastService.show(err, 'error');
+        },
       });
   }
 }

@@ -33,6 +33,8 @@ public interface OciManifestService<ID> {
 
   void deleteById(UUID manifestId);
 
+  void deleteAllByChartId(UUID chartId);
+
   List<HelmOciManifestInfo> findAllByChartId(UUID chartId);
 
   List<String> listTagsByName(ID repoId, String name);

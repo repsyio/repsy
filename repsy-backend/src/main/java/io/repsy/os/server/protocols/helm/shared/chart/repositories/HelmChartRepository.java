@@ -25,6 +25,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -35,8 +36,21 @@ public interface HelmChartRepository extends JpaRepository<HelmChart, UUID> {
 
   List<HelmChart> findAllByRepoIdAndName(UUID repoId, String name);
 
-  Page<HelmChart> findAllByRepoIdAndNameContainingIgnoreCase(
-      UUID repoId, String name, Pageable pageable);
+  @Query("""
+      SELECT h FROM HelmChart h
+      WHERE h.repo.id = :repoId
+        AND (:query = '' OR LOWER(h.name) LIKE LOWER(CONCAT('%', :query, '%')))
+        AND NOT EXISTS (
+          SELECT 1 FROM HelmChart h2
+          WHERE h2.repo.id = :repoId
+            AND h2.name = h.name
+            AND h2.lastUpdatedAt > h.lastUpdatedAt
+        )
+      """)
+  Page<HelmChart> findLatestByRepoIdAndQuery(
+      @Param("repoId") UUID repoId,
+      @Param("query") String query,
+      Pageable pageable);
 
   Optional<HelmChart> findByRepoIdAndNameAndVersion(UUID repoId, String name, String version);
 

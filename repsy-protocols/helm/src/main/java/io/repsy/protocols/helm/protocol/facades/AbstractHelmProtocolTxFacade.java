@@ -164,6 +164,11 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
 
     final var manifests = this.ociManifestService.findAllByChartId(chartInfo.id());
 
+    // Soft-delete manifests before the chart so the chart FK join still resolves
+    // when @SQLRestriction("DELETED = false") is applied. If the chart were deleted
+    // first, the join in softDeleteByChartUuid would return no rows.
+    this.ociManifestService.deleteAllByChartId(chartInfo.id());
+
     this.chartService.delete(repoInfo.getId(), name, version);
 
     final var filename = name + "-" + version + HelmConstants.TGZ_EXTENSION;

@@ -16,18 +16,22 @@
 package io.repsy.os.server.protocols.helm.shared.chart.services;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
-import io.repsy.os.server.protocols.helm.shared.chart.dtos.HelmChartDetail;
 import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChart;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
+
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -94,7 +98,7 @@ public class HelmChartService implements ChartService<UUID> {
   public Page<HelmChartInfo> search(
       final UUID repoId, final String query, final Pageable pageable) {
     return this.helmChartRepository
-        .findAllByRepoIdAndNameContainingIgnoreCase(repoId, query, pageable)
+        .findLatestByRepoIdAndQuery(repoId, query, pageable)
         .map(this::toDetail);
   }
 
@@ -134,8 +138,8 @@ public class HelmChartService implements ChartService<UUID> {
     return chart;
   }
 
-  private HelmChartDetail toDetail(final HelmChart chart) {
-    return HelmChartDetail.builder()
+  private ChartDetail toDetail(final HelmChart chart) {
+    return ChartDetail.builder()
         .id(chart.getId())
         .name(chart.getName())
         .version(chart.getVersion())
@@ -148,4 +152,19 @@ public class HelmChartService implements ChartService<UUID> {
         .lastUpdatedAt(chart.getLastUpdatedAt())
         .build();
   }
+
+  @Builder
+  @NullMarked
+  private record ChartDetail(
+    UUID id,
+    String name,
+    String version,
+    @Nullable String description,
+    @Nullable String appVersion,
+    @Nullable String type,
+    String digest,
+    long size,
+    Instant createdAt,
+    Instant lastUpdatedAt)
+    implements HelmChartInfo {}
 }

@@ -47,7 +47,7 @@ public abstract class AbstractHelmIndexPullProtocolMethodHandler<ID>
   private static final Pattern INDEX_PATTERN = Pattern.compile("^/index\\.yaml$");
 
   private final PathParser basePathParser;
-  private final HelmFacade<ID> helmFacade;
+  protected final HelmFacade<ID> helmFacade;
 
   public AbstractHelmIndexPullProtocolMethodHandler(
       final PathParser basePathParser,
@@ -105,7 +105,7 @@ public abstract class AbstractHelmIndexPullProtocolMethodHandler<ID>
         .body(yamlBody);
   }
 
-  private static String serializeToYaml(final HelmIndexDto dto) {
+  protected static String serializeToYaml(final HelmIndexDto dto) {
     final var options = new DumperOptions();
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
     options.setPrettyFlow(false);

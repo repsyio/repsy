@@ -77,6 +77,12 @@ public class HelmOciManifestService implements OciManifestService<UUID> {
   }
 
   @Override
+  @Transactional
+  public void deleteAllByChartId(final UUID chartId) {
+    this.helmOciManifestRepository.deleteAllByChartId(chartId);
+  }
+
+  @Override
   public List<HelmOciManifestInfo> findAllByChartId(final UUID chartId) {
     return this.helmOciManifestRepository.findAllByChartId(chartId).stream()
         .<HelmOciManifestInfo>map(this::toDetail)
@@ -118,16 +124,15 @@ public class HelmOciManifestService implements OciManifestService<UUID> {
         .build();
   }
 
-  @Value
   @Builder
   @NullMarked
-  private static final class ManifestDetail implements HelmOciManifestInfo {
-    UUID id;
-    UUID chartId;
-    String name;
-    String reference;
-    String digest;
-    String mediaType;
-    String content;
-  }
+  private record ManifestDetail(
+    UUID id,
+    UUID chartId,
+    String name,
+    String reference,
+    String digest,
+    String mediaType,
+    String content)
+    implements HelmOciManifestInfo {}
 }
