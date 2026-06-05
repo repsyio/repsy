@@ -15,7 +15,7 @@
  */
 package io.repsy.os.server.protocols.helm.shared.oci.services;
 
-import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChart;
+import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChartVersion;
 import io.repsy.os.server.protocols.helm.shared.oci.entities.HelmOciManifest;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifestRepository;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -77,13 +77,13 @@ public class HelmOciManifestService implements OciManifestService<UUID> {
 
   @Override
   @Transactional
-  public void deleteAllByChartId(final UUID chartId) {
-    this.helmOciManifestRepository.deleteAllByChartId(chartId);
+  public void deleteAllByChartId(final UUID chartVersionId) {
+    this.helmOciManifestRepository.deleteAllByChartVersionId(chartVersionId);
   }
 
   @Override
-  public List<HelmOciManifestInfo> findAllByChartId(final UUID chartId) {
-    return this.helmOciManifestRepository.findAllByChartId(chartId).stream()
+  public List<HelmOciManifestInfo> findAllByChartId(final UUID chartVersionId) {
+    return this.helmOciManifestRepository.findAllByChartVersionId(chartVersionId).stream()
         .<HelmOciManifestInfo>map(this::toDetail)
         .toList();
   }
@@ -97,12 +97,12 @@ public class HelmOciManifestService implements OciManifestService<UUID> {
     final var repo = new Repo();
     repo.setId(repoId);
 
-    final var chart = new HelmChart();
-    chart.setId(form.getChartId());
+    final var chartVersion = new HelmChartVersion();
+    chartVersion.setId(form.getChartId());
 
     final var manifest = new HelmOciManifest();
     manifest.setRepo(repo);
-    manifest.setChart(chart);
+    manifest.setChartVersion(chartVersion);
     manifest.setName(form.getName());
     manifest.setReference(form.getReference());
     manifest.setDigest(form.getDigest());
@@ -114,7 +114,7 @@ public class HelmOciManifestService implements OciManifestService<UUID> {
   private ManifestDetail toDetail(final HelmOciManifest manifest) {
     return ManifestDetail.builder()
         .id(manifest.getId())
-        .chartId(manifest.getChart().getId())
+        .chartId(manifest.getChartVersion().getId())
         .name(manifest.getName())
         .reference(manifest.getReference())
         .digest(manifest.getDigest())
@@ -126,12 +126,12 @@ public class HelmOciManifestService implements OciManifestService<UUID> {
   @Builder
   @NullMarked
   private record ManifestDetail(
-    UUID id,
-    UUID chartId,
-    String name,
-    String reference,
-    String digest,
-    String mediaType,
-    String content)
-    implements HelmOciManifestInfo {}
+      UUID id,
+      UUID chartId,
+      String name,
+      String reference,
+      String digest,
+      String mediaType,
+      String content)
+      implements HelmOciManifestInfo {}
 }

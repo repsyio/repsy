@@ -17,17 +17,17 @@ package io.repsy.os.server.protocols.helm.shared.chart.services;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChart;
+import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChartVersion;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepository;
+import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -44,21 +44,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class HelmChartService implements ChartService<UUID> {
 
   private final HelmChartRepository helmChartRepository;
+  private final HelmChartVersionRepository helmChartVersionRepository;
 
   @Override
   @Transactional
   public HelmChartInfo findOrCreate(final HelmChartForm form, final UUID repoId) {
-    return this.helmChartRepository
-        .findByRepoIdAndNameAndVersion(repoId, form.getName(), form.getVersion())
-        .map(this::toDetail)
-        .orElseGet(
-            () -> this.toDetail(this.helmChartRepository.save(this.buildEntity(form, repoId))));
+    final var chart = this.findOrCreateChart(repoId, form.getName());
+    final var version = this.findOrCreateVersion(chart, form);
+    return this.toDetail(version);
   }
 
   @Override
   public Optional<HelmChartInfo> findOptionalByNameAndVersion(
       final UUID repoId, final String name, final String version) {
-    return this.helmChartRepository
+    return this.helmChartVersionRepository
         .findByRepoIdAndNameAndVersion(repoId, name, version)
         .map(this::toDetail);
   }
@@ -66,22 +65,22 @@ public class HelmChartService implements ChartService<UUID> {
   @Override
   @Transactional
   public HelmChartInfo update(final UUID repoId, final HelmChartForm form) {
-    final var chart =
-        this.helmChartRepository
+    final var version =
+        this.helmChartVersionRepository
             .findByRepoIdAndNameAndVersion(repoId, form.getName(), form.getVersion())
             .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
-    chart.setDescription(form.getDescription());
-    chart.setAppVersion(form.getAppVersion());
-    chart.setType(form.getType());
-    chart.setDigest(form.getDigest());
-    chart.setSize(form.getSize());
-    return this.toDetail(this.helmChartRepository.save(chart));
+    version.setDescription(form.getDescription());
+    version.setAppVersion(form.getAppVersion());
+    version.setType(form.getType());
+    version.setDigest(form.getDigest());
+    version.setSize(form.getSize());
+    return this.toDetail(this.helmChartVersionRepository.save(version));
   }
 
   @Override
   public HelmChartInfo findByRepoIdAndNameAndVersion(
       final UUID repoId, final String name, final String version) {
-    return this.helmChartRepository
+    return this.helmChartVersionRepository
         .findByRepoIdAndNameAndVersion(repoId, name, version)
         .map(this::toDetail)
         .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
@@ -89,82 +88,124 @@ public class HelmChartService implements ChartService<UUID> {
 
   @Override
   public List<HelmChartInfo> findAllByRepoId(final UUID repoId) {
-    return this.helmChartRepository.findAllByRepoId(repoId).stream()
-        .map(this::toDetail)
-        .map(HelmChartInfo.class::cast)
+    return this.helmChartVersionRepository.findAllByChartRepoId(repoId).stream()
+        .<HelmChartInfo>map(this::toDetail)
         .toList();
   }
 
   public Page<HelmChartInfo> search(
       final UUID repoId, final String query, final Pageable pageable) {
-    return this.helmChartRepository
+    return this.helmChartVersionRepository
         .findLatestByRepoIdAndQuery(repoId, query, pageable)
         .map(this::toDetail);
   }
 
   public List<HelmChartInfo> findAllVersionsByName(final UUID repoId, final String name) {
-    return this.helmChartRepository.findAllByRepoIdAndName(repoId, name).stream()
-        .map(chart -> (HelmChartInfo) this.toDetail(chart))
-        .toList();
+    return this.helmChartRepository
+        .findByRepoIdAndName(repoId, name)
+        .map(chart -> this.helmChartVersionRepository.findAllByChart(chart).stream()
+            .<HelmChartInfo>map(this::toDetail)
+            .toList())
+        .orElse(List.of());
   }
 
   @Override
   @Transactional
   public void delete(final UUID repoId, final String name, final String version) {
-    if (this.helmChartRepository.findByRepoIdAndNameAndVersion(repoId, name, version).isEmpty()) {
-      throw new ItemNotFoundException("chartNotFound");
+    this.deleteVersion(repoId, name, version);
+  }
+
+  @Transactional
+  public void deleteVersion(final UUID repoId, final String name, final String version) {
+    final var chart =
+        this.helmChartRepository
+            .findByRepoIdAndName(repoId, name)
+            .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+    final var chartVersion =
+        this.helmChartVersionRepository
+            .findByChartAndVersion(chart, version)
+            .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+    this.helmChartVersionRepository.delete(chartVersion);
+    if (this.helmChartVersionRepository.findAllByChart(chart).isEmpty()) {
+      this.helmChartRepository.delete(chart);
     }
-    this.helmChartRepository.deleteByRepoIdAndNameAndVersion(repoId, name, version);
+  }
+
+  @Transactional
+  public void deleteChart(final UUID repoId, final String name) {
+    final var chart =
+        this.helmChartRepository
+            .findByRepoIdAndName(repoId, name)
+            .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+    this.helmChartVersionRepository.deleteAllByChart(chart);
+    this.helmChartRepository.delete(chart);
   }
 
   @Override
   public boolean existsByRepoIdAndDigest(final UUID repoId, final String digest) {
-    return this.helmChartRepository.existsByRepoIdAndDigest(repoId, digest);
+    return this.helmChartVersionRepository.existsByChartRepoIdAndDigest(repoId, digest);
   }
 
-  private HelmChart buildEntity(final HelmChartForm form, final UUID repoId) {
-    final var repo = new Repo();
-    repo.setId(repoId);
-
-    final var chart = new HelmChart();
-    chart.setRepo(repo);
-    chart.setName(form.getName());
-    chart.setVersion(form.getVersion());
-    chart.setDescription(form.getDescription());
-    chart.setAppVersion(form.getAppVersion());
-    chart.setType(form.getType());
-    chart.setDigest(form.getDigest());
-    chart.setSize(form.getSize());
-    return chart;
+  private HelmChart findOrCreateChart(final UUID repoId, final String name) {
+    return this.helmChartRepository
+        .findByRepoIdAndName(repoId, name)
+        .orElseGet(() -> {
+          final var repo = new Repo();
+          repo.setId(repoId);
+          final var chart = new HelmChart();
+          chart.setRepo(repo);
+          chart.setName(name);
+          return this.helmChartRepository.save(chart);
+        });
   }
 
-  private ChartDetail toDetail(final HelmChart chart) {
+  private HelmChartVersion findOrCreateVersion(
+      final HelmChart chart, final HelmChartForm form) {
+    return this.helmChartVersionRepository
+        .findByChartAndVersion(chart, form.getVersion())
+        .orElseGet(() -> {
+          final var version = new HelmChartVersion();
+          version.setChart(chart);
+          version.setVersion(form.getVersion());
+          version.setDescription(form.getDescription());
+          version.setAppVersion(form.getAppVersion());
+          version.setType(form.getType());
+          version.setDigest(form.getDigest());
+          version.setSize(form.getSize());
+          return this.helmChartVersionRepository.save(version);
+        });
+  }
+
+  private ChartDetail toDetail(final HelmChartVersion version) {
     return ChartDetail.builder()
-        .id(chart.getId())
-        .name(chart.getName())
-        .version(chart.getVersion())
-        .description(chart.getDescription())
-        .appVersion(chart.getAppVersion())
-        .type(chart.getType())
-        .digest(chart.getDigest())
-        .size(chart.getSize())
-        .createdAt(chart.getCreatedAt())
-        .lastUpdatedAt(chart.getLastUpdatedAt())
+        .id(version.getId())
+        .name(version.getChart().getName())
+        .version(version.getVersion())
+        .description(version.getDescription())
+        .appVersion(version.getAppVersion())
+        .type(version.getType())
+        .digest(version.getDigest())
+        .size(version.getSize())
+        .createdAt(version.getCreatedAt())
+        .lastUpdatedAt(
+            version.getLastUpdatedAt() != null
+                ? version.getLastUpdatedAt()
+                : version.getCreatedAt())
         .build();
   }
 
   @Builder
   @NullMarked
   private record ChartDetail(
-    UUID id,
-    String name,
-    String version,
-    @Nullable String description,
-    @Nullable String appVersion,
-    @Nullable String type,
-    String digest,
-    long size,
-    Instant createdAt,
-    Instant lastUpdatedAt)
-    implements HelmChartInfo {}
+      UUID id,
+      String name,
+      String version,
+      @Nullable String description,
+      @Nullable String appVersion,
+      @Nullable String type,
+      String digest,
+      long size,
+      Instant createdAt,
+      Instant lastUpdatedAt)
+      implements HelmChartInfo {}
 }

@@ -13,17 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.helm.shared.oci.entities;
+package io.repsy.os.server.protocols.helm.shared.chart.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
-import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChartVersion;
-import io.repsy.os.shared.repo.entities.Repo;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -31,22 +28,27 @@ import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
 @Table(
-    name = "helm_oci_manifest",
+    name = "helm_chart_version",
     uniqueConstraints =
         @UniqueConstraint(
-            name = "ux_helm_oci_manifest__repo_id_name_reference",
-            columnNames = {"repo_id", "name", "reference"}))
+            name = "ux_helm_chart_version__chart_id_version",
+            columnNames = {"chart_id", "version"}))
 @NoArgsConstructor
-public class HelmOciManifest {
+@ToString(exclude = "chart")
+@EqualsAndHashCode(exclude = "chart")
+public class HelmChartVersion {
 
   @Id
   @UuidV7
@@ -58,30 +60,27 @@ public class HelmOciManifest {
   private Integer versionLock = 0;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "repo_id", nullable = false)
+  @JoinColumn(name = "chart_id", nullable = false)
   @OnDelete(action = OnDeleteAction.CASCADE)
-  private Repo repo;
+  private HelmChart chart;
 
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "chart_version_id", nullable = false)
-  @OnDelete(action = OnDeleteAction.CASCADE)
-  private HelmChartVersion chartVersion;
+  @Column(name = "version", nullable = false)
+  private String version;
 
-  @Column(name = "name", nullable = false)
-  private String name;
+  @Column(name = "description")
+  private @Nullable String description;
 
-  @Column(name = "reference", nullable = false)
-  private String reference;
+  @Column(name = "app_version")
+  private @Nullable String appVersion;
+
+  @Column(name = "type")
+  private @Nullable String type;
 
   @Column(name = "digest", nullable = false)
   private String digest;
 
-  @Column(name = "media_type", nullable = false)
-  private String mediaType;
-
-  @Lob
-  @Column(name = "content", nullable = false)
-  private String content;
+  @Column(name = "size", nullable = false)
+  private long size;
 
   @Column(name = "created_at", nullable = false)
   @CreationTimestamp
@@ -89,5 +88,5 @@ public class HelmOciManifest {
 
   @Column(name = "last_updated_at")
   @UpdateTimestamp
-  private Instant lastUpdatedAt;
+  private @Nullable Instant lastUpdatedAt;
 }

@@ -33,11 +33,11 @@ public interface HelmOciManifestRepository extends JpaRepository<HelmOciManifest
   Optional<HelmOciManifest> findByRepoIdAndNameAndReference(
       UUID repoId, String name, String reference);
 
-  List<HelmOciManifest> findAllByChartId(UUID chartId);
+  List<HelmOciManifest> findAllByChartVersionId(UUID chartVersionId);
 
   @Modifying
-  @Query("delete from HelmOciManifest m where m.chart.id = :chartId")
-  void deleteAllByChartId(@Param("chartId") UUID chartId);
+  @Query("delete from HelmOciManifest m where m.chartVersion.id = :chartVersionId")
+  void deleteAllByChartVersionId(@Param("chartVersionId") UUID chartVersionId);
 
   @Query(
       """

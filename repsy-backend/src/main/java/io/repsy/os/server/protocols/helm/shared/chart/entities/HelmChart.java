@@ -33,8 +33,6 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
-import org.hibernate.annotations.UpdateTimestamp;
-import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
@@ -42,8 +40,8 @@ import org.jspecify.annotations.Nullable;
     name = "helm_chart",
     uniqueConstraints =
         @UniqueConstraint(
-            name = "ux_helm_chart__repo_id_name_version",
-            columnNames = {"repo_id", "name", "version"}))
+            name = "ux_helm_chart__repo_id_name",
+            columnNames = {"repo_id", "name"}))
 @NoArgsConstructor
 public class HelmChart {
 
@@ -64,29 +62,7 @@ public class HelmChart {
   @Column(name = "name", nullable = false)
   private String name;
 
-  @Column(name = "version", nullable = false)
-  private String version;
-
-  @Column(name = "description")
-  private @Nullable String description;
-
-  @Column(name = "app_version")
-  private @Nullable String appVersion;
-
-  @Column(name = "type")
-  private @Nullable String type;
-
-  @Column(name = "digest", nullable = false)
-  private String digest;
-
-  @Column(name = "size", nullable = false)
-  private long size;
-
   @Column(name = "created_at", nullable = false)
   @CreationTimestamp
   private Instant createdAt;
-
-  @Column(name = "last_updated_at")
-  @UpdateTimestamp
-  private Instant lastUpdatedAt;
 }

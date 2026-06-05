@@ -92,7 +92,7 @@ public class HelmApiFacade implements ProtocolApiFacade {
 
     final var manifests = this.helmOciManifestService.findAllByChartId(chartInfo.id());
 
-    this.helmChartService.delete(repoInfo.getStorageKey(), name, version);
+    this.helmChartService.deleteVersion(repoInfo.getStorageKey(), name, version);
 
     final var filename = name + "-" + version + HelmConstants.TGZ_EXTENSION;
     final var freed =
