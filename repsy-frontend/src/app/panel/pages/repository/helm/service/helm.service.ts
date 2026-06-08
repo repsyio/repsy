@@ -67,13 +67,7 @@ export class HelmService {
         query || undefined,
       )
       .pipe(
-        map(
-          (r) =>
-            ({
-              content: r.data?.content ?? [],
-              page: r.data?.page,
-            }) as unknown as PagedData<HelmChartListItem>,
-        ),
+        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<HelmChartListItem>),
       );
   }
 
@@ -87,6 +81,12 @@ export class HelmService {
     return this.helmChartControllerService
       .getHelmChartDetail(this.repoName, name, version)
       .pipe(map((r) => r.data!));
+  }
+
+  public deleteAllVersions(name: string): Observable<void> {
+    return this.helmChartControllerService
+      .deleteAllHelmChartVersions(this.repoName, name)
+      .pipe(map(() => undefined));
   }
 
   public deleteChart(name: string, version: string): Observable<void> {

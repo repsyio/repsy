@@ -13,21 +13,21 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 ///
-import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component, OnDestroy } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
-import { Highlight } from 'ngx-highlightjs';
-import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
-import { Subscription } from 'rxjs';
-import { finalize } from 'rxjs/operators';
+import {CommonModule, NgOptimizedImage} from '@angular/common';
+import {Component, OnDestroy} from '@angular/core';
+import {ActivatedRoute, Router} from '@angular/router';
+import {Highlight} from 'ngx-highlightjs';
+import {HighlightLineNumbers} from 'ngx-highlightjs/line-numbers';
+import {Subscription} from 'rxjs';
+import {finalize} from 'rxjs/operators';
 
-import { environment } from '../../../../../../../environments/environment';
-import { HelmChartDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
-import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
-import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
-import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
-import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { HelmService } from '../../service/helm.service';
+import {environment} from '../../../../../../../environments/environment';
+import {HelmChartDetail, RepoPermissionInfo} from '../../../../../../../generated/api';
+import {SpinnerComponent} from '../../../../../../shared/components/spinner/spinner.component';
+import {CopyClipboardComponent} from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
+import {DangerModalService} from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import {ToastService} from '../../../../../shared/components/toast/toast.service';
+import {HelmService} from '../../service/helm.service';
 
 @Component({
   selector: 'app-helm-charts-version-detail',
@@ -86,7 +86,7 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
               this.toastService.show('Version deleted successfully', 'success');
             });
           },
-          error: () => {},
+          error: (err: string) => this.toastService.show(err, 'error'),
         });
     });
   }
@@ -116,7 +116,7 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
           this.chart = detail;
           this.error = null;
           this.formattedSize = this.formatSize(this.chart.size);
-          const yaml = [
+          this.chartYaml = [
             'apiVersion: v2',
             `name: ${this.chart.name}`,
             `version: ${this.chart.version}`,
@@ -124,7 +124,6 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
             this.chart.appVersion ? `appVersion: "${this.chart.appVersion}"` : null,
             this.chart.type ? `type: ${this.chart.type}` : null,
           ].filter(Boolean).join('\n');
-          this.chartYaml = yaml;
         },
         error: () => {},
       });

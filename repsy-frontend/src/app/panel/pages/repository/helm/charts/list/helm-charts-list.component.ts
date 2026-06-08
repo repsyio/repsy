@@ -128,7 +128,7 @@ export class HelmChartsListComponent implements OnDestroy {
     this.dangerModalService.show('Delete Chart', 'Delete', () => {
       this.loading = true;
       this.helmService
-        .deleteChart(chart.name, chart.latestVersion)
+        .deleteAllVersions(chart.name)
         .pipe(finalize(() => { this.loading = false; }))
         .subscribe({
           next: () => {

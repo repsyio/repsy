@@ -90,6 +90,17 @@ public class HelmChartController {
     return this.restResponseFactory.success("chartDetailFetched", detail);
   }
 
+  @DeleteMapping("/{repoName}/{name}")
+  @RepoOperation(permission = Permission.MANAGE)
+  public RestResponse<Void> deleteAllHelmChartVersions(
+      final RepoInfo repoInfo, @PathVariable final String name) throws IOException {
+
+    final var usages = this.helmApiFacade.deleteAllVersions(repoInfo, name);
+    this.usageUpdateService.updateUsage(new UsageChangedInfo(repoInfo.getId(), usages));
+
+    return this.restResponseFactory.success("chartDeleted");
+  }
+
   @DeleteMapping("/{repoName}/{name}/{version}")
   @RepoOperation(permission = Permission.MANAGE)
   public RestResponse<Void> deleteHelmChart(

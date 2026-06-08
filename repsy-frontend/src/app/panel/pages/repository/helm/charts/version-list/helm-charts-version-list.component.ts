@@ -27,8 +27,11 @@ import { SpinnerComponent } from '../../../../../../shared/components/spinner/sp
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { SearchboxComponent } from '../../../../../shared/components/searchbox/searchbox.component';
+import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
+import { Sort } from '../../../../../shared/dto/sort';
 import { HelmConfigComponent } from '../../config/helm-config.component';
 import { HelmService } from '../../service/helm.service';
 
@@ -40,6 +43,8 @@ import { HelmService } from '../../service/helm.service';
     RouterLink,
     SpinnerComponent,
     HelmConfigComponent,
+    SearchboxComponent,
+    SortSelectorComponent,
     DropdownComponent,
     TooltipComponent,
     EmptyListComponent,
@@ -53,10 +58,17 @@ export class HelmChartsVersionListComponent implements OnDestroy {
   public error: string;
   public chartName: string;
   public versions: HelmChartVersionItem[] = [];
+  public searchText = '';
+  public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
+  public sortOptions: Sort[] = [
+    { name: 'Newest', column: 'createdAt', type: 'DESC' },
+    { name: 'Oldest', column: 'createdAt', type: 'ASC' },
+  ];
   public activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
   public readonly baseUrl: string;
   public readonly username: string;
 
+  private allVersions: HelmChartVersionItem[] = [];
   private readonly repositoryChanges$: Subscription;
 
   constructor(
@@ -82,6 +94,16 @@ export class HelmChartsVersionListComponent implements OnDestroy {
     this.repositoryChanges$.unsubscribe();
   }
 
+  public search(text: string): void {
+    this.searchText = text;
+    this.applyFilterAndSort();
+  }
+
+  public sort(option: Sort): void {
+    this.sortOption = option;
+    this.applyFilterAndSort();
+  }
+
   public openConfig(open: boolean): void {
     this.showConfig = open;
   }
@@ -92,12 +114,6 @@ export class HelmChartsVersionListComponent implements OnDestroy {
 
   public timeAgo(date: string): string {
     return moment(date).fromNow();
-  }
-
-  public formatSize(bytes: number): string {
-    if (bytes < 1024) {return `${bytes} B`;}
-    if (bytes < 1024 * 1024) {return `${(bytes / 1024).toFixed(1)} KB`;}
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   }
 
   public deleteVersion(version: HelmChartVersionItem): void {
@@ -132,10 +148,22 @@ export class HelmChartsVersionListComponent implements OnDestroy {
       .pipe(finalize(() => { this.loading = false; }))
       .subscribe({
         next: (versions: HelmChartVersionItem[]) => {
-          this.versions = versions;
+          this.allVersions = versions;
+          this.applyFilterAndSort();
           this.error = null;
         },
-        error: () => {},
+        error: (err: string) => this.toastService.show(err, 'error'),
       });
+  }
+
+  private applyFilterAndSort(): void {
+    const text = this.searchText.toLowerCase();
+    const filtered = text
+      ? this.allVersions.filter((v) => v.version.toLowerCase().includes(text))
+      : [...this.allVersions];
+    this.versions = filtered.sort((a, b) => {
+      const diff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      return this.sortOption.type === 'DESC' ? -diff : diff;
+    });
   }
 }

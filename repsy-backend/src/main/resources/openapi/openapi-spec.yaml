@@ -2322,7 +2322,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelHelmChartListItem"
       summary: List and search charts in a Helm repository
@@ -2342,10 +2342,23 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListHelmChartVersionItem"
       summary: List all versions of a chart
+    delete:
+      tags:
+        - helm-chart-controller
+      operationId: deleteAllHelmChartVersions
+      parameters: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete all versions of a chart
     parameters:
       - name: repoName
         in: path
@@ -2367,7 +2380,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListString"
       summary: List OCI tags for a chart
@@ -2392,7 +2405,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseHelmChartDetail"
       summary: Get a specific chart version detail
@@ -2405,7 +2418,7 @@ paths:
         '200':
           description: OK
           content:
-            "*/*":
+            application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Delete a specific chart version

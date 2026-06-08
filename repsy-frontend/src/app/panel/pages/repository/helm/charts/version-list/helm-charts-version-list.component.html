@@ -5,9 +5,20 @@
   class="mb-7 flex flex-col flex-col-reverse items-start justify-between gap-4 md:items-start lg:flex-row lg:items-center"
 >
   <div class="flex w-full flex-col items-start gap-4 sm:w-auto sm:flex-row sm:items-center">
-    <div class="flex items-center gap-2">
-      <img class="h-[20px] w-[20px]" src="/assets/icons/helm/helm.svg" alt="Helm" />
-      <span class="text-[18px] font-medium text-[#FDFDFD]">{{ chartName }}</span>
+    <app-searchbox class="w-full sm:max-w-[192px]" placeholder="version" (filter)="search($event)" />
+    <div class="flex w-full gap-2 sm:w-auto">
+      <app-sort-selector
+        [options]="sortOptions"
+        [(selectedOption)]="sortOption"
+        (choose)="sort($event)"
+        class="w-full sm:w-auto"
+      />
+      <button
+        (click)="refreshPage()"
+        class="flex h-[40px] w-[40px] items-center justify-center hover:brightness-0 hover:invert"
+      >
+        <img ngSrc="/assets/icons/input/refresh.svg" alt="refresh" height="22" width="22" />
+      </button>
     </div>
   </div>
   <div class="flex w-full items-center justify-end gap-2 sm:w-auto">
@@ -32,12 +43,12 @@
       <div class="text-body1">
         <!-- Desktop grid -->
         <div
-          class="hidden grid-cols-[1fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[3fr_2fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Version</div>
-          <div>Size</div>
-          <div>Created</div>
+          <div>App Version</div>
+          <div>Published</div>
           <div></div>
         </div>
         <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
@@ -46,15 +57,15 @@
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === versions.length - 1 }"
-                class="grid grid-cols-[1fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="grid grid-cols-[3fr_2fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
                 <div class="flex items-center gap-2">
                   <img ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" class="mb-1" height="18" width="18" />
-                  <app-tooltip class="text-[#FDFDFD]" [text]="version.version" [textHover]="version.version" />
+                  <app-tooltip class="group-hover:underline text-[#FDFDFD]" [text]="version.version" [textHover]="version.version" />
                 </div>
-                <span class="text-[#9FA0A0]">{{ formatSize(version.size) }}</span>
+                <span class="text-[#9FA0A0]">{{ version.appVersion || '—' }}</span>
                 <app-tooltip
-                  class="text-[#9FA0A0]"
+                  class="text-secondary-500"
                   [text]="timeAgo(version.createdAt)"
                   [textHover]="version.createdAt | date: 'medium'"
                   [always]="true"
@@ -99,18 +110,20 @@
                   </button>
                 </app-dropdown>
               }
+              <div class="group text-secondary-500 flex items-start gap-2 text-[14px]">
+                <img class="mt-[2px]" ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
+                <span class="text-right break-all text-[#FDFDFD]">{{ version.version }}</span>
+              </div>
               <div class="space-y-2">
-                <div class="flex items-center gap-2">
-                  <img ngSrc="/assets/icons/repo/bookmark.svg" alt="version" height="16" width="16" />
-                  <span class="font-medium text-[#FDFDFD]">{{ version.version }}</span>
+                <div class="flex justify-between gap-2">
+                  <span class="text-sm text-[#9FA0A0]">App Version:</span>
+                  <span class="text-right break-all text-[#9FA0A0]">{{ version.appVersion || '—' }}</span>
                 </div>
                 <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Size:</span>
-                  <span class="text-right text-[#FDFDFD]">{{ formatSize(version.size) }}</span>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Created:</span>
-                  <span class="text-right text-[#FDFDFD]">{{ timeAgo(version.createdAt) }}</span>
+                  <span class="text-sm text-[#9FA0A0]">Published:</span>
+                  <span class="text-secondary-500 text-right break-all">
+                    {{ version.createdAt | date: 'medium' }} {{ '(' + timeAgo(version.createdAt) + ')' }}
+                  </span>
                 </div>
               </div>
             </div>

@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.helm.ui.facades;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.HelmChartDetail;
 import io.repsy.os.generated.model.HelmChartListItem;
@@ -82,6 +83,43 @@ public class HelmApiFacade implements ProtocolApiFacade {
         this.helmChartService.findByRepoIdAndNameAndVersion(
             repoInfo.getStorageKey(), name, version);
     return this.helmChartMapper.toDetail(info);
+  }
+
+  public BaseUsages deleteAllVersions(final RepoInfo repoInfo, final String name)
+      throws IOException {
+
+    final var versions =
+        this.helmChartService.findAllVersionsByName(repoInfo.getStorageKey(), name);
+
+    if (versions.isEmpty()) {
+      throw new ItemNotFoundException("chartNotFound");
+    }
+
+    final var allManifests =
+        versions.stream()
+            .flatMap(v -> this.helmOciManifestService.findAllByChartId(v.id()).stream())
+            .toList();
+
+    for (final var version : versions) {
+      this.helmOciManifestService.deleteAllByChartId(version.id());
+    }
+
+    this.helmChartService.deleteChart(repoInfo.getStorageKey(), name);
+
+    var freed = 0L;
+    for (final var version : versions) {
+      final var filename = name + "-" + version.version() + HelmConstants.TGZ_EXTENSION;
+      freed +=
+          this.helmStorageService.deleteChartFile(
+              repoInfo.getStorageKey(), filename, version.digest(), repoInfo.getName());
+    }
+
+    for (final var manifest : allManifests) {
+      this.helmStorageService.deleteManifestFile(
+          repoInfo.getStorageKey(), manifest.name(), manifest.reference(), repoInfo.getName());
+    }
+
+    return BaseUsages.ofDisk(-freed);
   }
 
   public BaseUsages delete(final RepoInfo repoInfo, final String name, final String version)
