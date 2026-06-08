@@ -44,12 +44,12 @@
       <div class="text-body1">
         <!-- Desktop grid -->
         <div
-          class="hidden grid-cols-[2fr_1fr_100px_1fr_30px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[2fr_1fr_2fr_1fr_30px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Name</div>
           <div>Latest Version</div>
-          <div>Type</div>
+          <div>Description</div>
           <div>Updated</div>
           <div></div>
         </div>
@@ -59,7 +59,7 @@
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === charts.length - 1 }"
-                class="grid grid-cols-[2fr_1fr_100px_1fr_30px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="grid grid-cols-[2fr_1fr_2fr_1fr_30px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
                 <div class="flex items-center gap-2">
                   <img class="h-[18px] w-[18px]" src="/assets/icons/helm/helm.svg" alt="Helm" />
@@ -94,15 +94,7 @@
                     />
                   </svg>
                 </a>
-                <div class="flex">
-                  @if (chart.type) {
-                    <span class="inline-block rounded-full bg-[#1D1C1C] px-2 py-0.5 text-[12px] text-[#9FA0A0]">
-                      {{ chart.type }}
-                    </span>
-                  } @else {
-                    <span class="text-[#9FA0A0]">—</span>
-                  }
-                </div>
+                <app-tooltip class="text-[#9FA0A0]" [text]="(chart.description | ellipsis: 40) || '—'" [textHover]="chart.description || ''" />
                 @if (chart.updatedAt) {
                   <app-tooltip
                     class="text-[#9FA0A0]"
@@ -157,12 +149,10 @@
                 <div class="flex items-center gap-2">
                   <img class="h-[16px] w-[16px]" src="/assets/icons/helm/helm.svg" alt="Helm" />
                   <span class="text-secondary-500 font-medium break-all">{{ chart.name }}</span>
-                  @if (chart.type) {
-                    <span class="ml-auto inline-block rounded-full bg-[#1D1C1C] px-2 py-0.5 text-[11px] text-[#9FA0A0]">
-                      {{ chart.type }}
-                    </span>
-                  }
                 </div>
+                @if (chart.description) {
+                  <span class="text-sm text-[#9FA0A0] break-all">{{ chart.description | ellipsis: 60 }}</span>
+                }
                 <div class="flex justify-between gap-2">
                   <span class="text-sm text-[#9FA0A0]">Latest:</span>
                   <a
