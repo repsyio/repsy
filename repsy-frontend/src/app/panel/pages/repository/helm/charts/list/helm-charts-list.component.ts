@@ -68,10 +68,10 @@ export class HelmChartsListComponent implements OnDestroy {
   public pagedData = new PagedData<HelmChartListItem>();
   public activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
 
-  public sortOption: Sort = { name: 'Newest', column: 'lastUpdatedAt', type: 'DESC' };
+  public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
   public sortOptions: Sort[] = [
-    { name: 'Newest', column: 'lastUpdatedAt', type: 'DESC' },
-    { name: 'Oldest', column: 'lastUpdatedAt', type: 'ASC' },
+    { name: 'Newest', column: 'createdAt', type: 'DESC' },
+    { name: 'Oldest', column: 'createdAt', type: 'ASC' },
     { name: 'Name (A-Z)', column: 'name', type: 'ASC' },
     { name: 'Name (Z-A)', column: 'name', type: 'DESC' },
   ];
@@ -156,17 +156,7 @@ export class HelmChartsListComponent implements OnDestroy {
       .subscribe({
         next: (pagedData: PagedData<HelmChartListItem>) => {
           this.pagedData.page = pagedData.page;
-          // Deduplicate by chart name: keep the entry with the latest updatedAt.
-          // The backend may return multiple versions per name; the @for track
-          // expression uses chart.name, so duplicates would cause NG0955.
-          const seen = new Map<string, HelmChartListItem>();
-          for (const chart of pagedData.content) {
-            const existing = seen.get(chart.name);
-            if (!existing || (chart.updatedAt ?? '') > (existing.updatedAt ?? '')) {
-              seen.set(chart.name, chart);
-            }
-          }
-          this.charts = [...seen.values()];
+          this.charts = pagedData.content;
           this.error = null;
         },
         error: (err: string) => {

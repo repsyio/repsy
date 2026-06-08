@@ -103,9 +103,11 @@ public class HelmChartService implements ChartService<UUID> {
   public List<HelmChartInfo> findAllVersionsByName(final UUID repoId, final String name) {
     return this.helmChartRepository
         .findByRepoIdAndName(repoId, name)
-        .map(chart -> this.helmChartVersionRepository.findAllByChart(chart).stream()
-            .<HelmChartInfo>map(this::toDetail)
-            .toList())
+        .map(
+            chart ->
+                this.helmChartVersionRepository.findAllByChart(chart).stream()
+                    .<HelmChartInfo>map(this::toDetail)
+                    .toList())
         .orElse(List.of());
   }
 
@@ -149,31 +151,32 @@ public class HelmChartService implements ChartService<UUID> {
   private HelmChart findOrCreateChart(final UUID repoId, final String name) {
     return this.helmChartRepository
         .findByRepoIdAndName(repoId, name)
-        .orElseGet(() -> {
-          final var repo = new Repo();
-          repo.setId(repoId);
-          final var chart = new HelmChart();
-          chart.setRepo(repo);
-          chart.setName(name);
-          return this.helmChartRepository.save(chart);
-        });
+        .orElseGet(
+            () -> {
+              final var repo = new Repo();
+              repo.setId(repoId);
+              final var chart = new HelmChart();
+              chart.setRepo(repo);
+              chart.setName(name);
+              return this.helmChartRepository.save(chart);
+            });
   }
 
-  private HelmChartVersion findOrCreateVersion(
-      final HelmChart chart, final HelmChartForm form) {
+  private HelmChartVersion findOrCreateVersion(final HelmChart chart, final HelmChartForm form) {
     return this.helmChartVersionRepository
         .findByChartAndVersion(chart, form.getVersion())
-        .orElseGet(() -> {
-          final var version = new HelmChartVersion();
-          version.setChart(chart);
-          version.setVersion(form.getVersion());
-          version.setDescription(form.getDescription());
-          version.setAppVersion(form.getAppVersion());
-          version.setType(form.getType());
-          version.setDigest(form.getDigest());
-          version.setSize(form.getSize());
-          return this.helmChartVersionRepository.save(version);
-        });
+        .orElseGet(
+            () -> {
+              final var version = new HelmChartVersion();
+              version.setChart(chart);
+              version.setVersion(form.getVersion());
+              version.setDescription(form.getDescription());
+              version.setAppVersion(form.getAppVersion());
+              version.setType(form.getType());
+              version.setDigest(form.getDigest());
+              version.setSize(form.getSize());
+              return this.helmChartVersionRepository.save(version);
+            });
   }
 
   private ChartDetail toDetail(final HelmChartVersion version) {

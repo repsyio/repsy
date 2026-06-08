@@ -79,9 +79,8 @@ public class HelmOciBlobService implements OciBlobService<UUID> {
         .build();
   }
 
-
   @Builder
   @NullMarked
   private record BlobDetail(UUID id, String digest, long size, String mediaType)
-    implements HelmOciBlobInfo {}
+      implements HelmOciBlobInfo {}
 }

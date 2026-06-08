@@ -101,17 +101,13 @@ public class HelmApiFacade implements ProtocolApiFacade {
 
     for (final var manifest : manifests) {
       this.helmStorageService.deleteManifestFile(
-          repoInfo.getStorageKey(),
-          manifest.name(),
-          manifest.reference(),
-          repoInfo.getName());
+          repoInfo.getStorageKey(), manifest.name(), manifest.reference(), repoInfo.getName());
     }
 
     if (!manifests.isEmpty()
         && !this.helmChartService.existsByRepoIdAndDigest(
             repoInfo.getStorageKey(), chartInfo.digest())) {
-      this.helmOciBlobService.deleteByRepoIdAndDigest(
-          repoInfo.getStorageKey(), chartInfo.digest());
+      this.helmOciBlobService.deleteByRepoIdAndDigest(repoInfo.getStorageKey(), chartInfo.digest());
     }
 
     return BaseUsages.ofDisk(-freed);

@@ -31,7 +31,6 @@ public interface HelmOciBlobRepository extends JpaRepository<HelmOciBlob, UUID> 
   Optional<HelmOciBlob> findByRepoIdAndDigest(UUID repoId, String digest);
 
   @Modifying
-  @Query(
-      "delete from HelmOciBlob b where b.repo.id = :repoId and b.digest = :digest")
+  @Query("delete from HelmOciBlob b where b.repo.id = :repoId and b.digest = :digest")
   void deleteByRepoIdAndDigest(UUID repoId, String digest);
 }

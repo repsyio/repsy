@@ -50,9 +50,7 @@ public interface HelmChartVersionRepository extends JpaRepository<HelmChartVersi
         AND v.version = :version
       """)
   Optional<HelmChartVersion> findByRepoIdAndNameAndVersion(
-      @Param("repoId") UUID repoId,
-      @Param("name") String name,
-      @Param("version") String version);
+      @Param("repoId") UUID repoId, @Param("name") String name, @Param("version") String version);
 
   @Query(
       value =
