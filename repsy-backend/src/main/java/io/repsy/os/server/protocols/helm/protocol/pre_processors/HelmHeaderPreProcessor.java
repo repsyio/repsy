@@ -29,6 +29,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -38,6 +39,7 @@ import org.springframework.stereotype.Component;
  * Returns 401 + WWW-Authenticate: Basic when no credentials are present on private-repo requests,
  * so that OCI clients (helm push/pull) know to retry with Basic auth.
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 @NullMarked
@@ -69,9 +71,11 @@ public class HelmHeaderPreProcessor extends ProtocolProcessor {
       final Map<String, Object> properties) {
 
     if (this.shouldSkipAuthentication(request, context, properties)) {
+      log.warn("[HelmHeader] skipped method={} path={}", request.getMethod(), request.getRequestURI());
       return ProcessorResult.next();
     }
 
+    log.warn("[HelmHeader] returning 401 method={} path={}", request.getMethod(), request.getRequestURI());
     return ProcessorResult.of(
         ResponseEntity.status(HttpStatus.UNAUTHORIZED)
             .header(WWW_AUTHENTICATE, WWW_AUTHENTICATE_VALUE)
