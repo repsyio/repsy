@@ -71,11 +71,15 @@ public class HelmHeaderPreProcessor extends ProtocolProcessor {
       final Map<String, Object> properties) {
 
     if (this.shouldSkipAuthentication(request, context, properties)) {
-      log.warn("[HelmHeader] skipped method={} path={}", request.getMethod(), request.getRequestURI());
+      log.warn(
+          "[HelmHeader] skipped method={} path={}", request.getMethod(), request.getRequestURI());
       return ProcessorResult.next();
     }
 
-    log.warn("[HelmHeader] returning 401 method={} path={}", request.getMethod(), request.getRequestURI());
+    log.warn(
+        "[HelmHeader] returning 401 method={} path={}",
+        request.getMethod(),
+        request.getRequestURI());
     return ProcessorResult.of(
         ResponseEntity.status(HttpStatus.UNAUTHORIZED)
             .header(WWW_AUTHENTICATE, WWW_AUTHENTICATE_VALUE)
