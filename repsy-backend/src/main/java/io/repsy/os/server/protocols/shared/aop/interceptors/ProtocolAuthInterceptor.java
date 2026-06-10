@@ -57,7 +57,9 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
       return true;
     }
 
-    this.checkRepoOperationAnnotationExists(methodHandler);
+    if (methodHandler.getMethodAnnotation(RepoOperation.class) == null) {
+      return true;
+    }
 
     final var repoInfoOpt = this.getRepoInfo(request);
 
@@ -118,15 +120,6 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
     }
 
     return uriVariables;
-  }
-
-  private void checkRepoOperationAnnotationExists(final HandlerMethod handler) {
-
-    final var annotation = handler.getMethodAnnotation(RepoOperation.class);
-
-    if (annotation == null) {
-      throw new IllegalArgumentException("RepoOperation Annotations is missing.");
-    }
   }
 
   private void putRepoPermission(

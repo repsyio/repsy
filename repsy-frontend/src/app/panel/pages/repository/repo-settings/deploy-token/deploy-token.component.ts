@@ -40,6 +40,7 @@ import { RepoType } from '../../../../shared/dto/repo/repo-type';
 import { CargoConfigComponent } from '../../cargo/config/cargo-config.component';
 import { DockerConfigComponent } from '../../docker/config/docker-config.component';
 import { GolangConfigComponent } from '../../golang/config/golang-config.component';
+import { HelmConfigComponent } from '../../helm/config/helm-config.component';
 import { MavenConfigComponent } from '../../maven/config/maven-config.component';
 import { NpmConfigComponent } from '../../npm/config/npm-config.component';
 import { NugetConfigComponent } from '../../nuget/config/nuget-config.component';
@@ -60,6 +61,7 @@ import { TokenCreateInfo } from './dto/token-create-info';
     DockerConfigComponent,
     CargoConfigComponent,
     GolangConfigComponent,
+    HelmConfigComponent,
     NgClass,
     MavenConfigComponent,
     NugetConfigComponent,

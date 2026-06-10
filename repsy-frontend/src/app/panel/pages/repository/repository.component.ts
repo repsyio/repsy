@@ -72,6 +72,7 @@ export class RepositoryComponent {
     RepoType.PYPI,
     RepoType.CARGO,
     RepoType.GOLANG,
+    RepoType.HELM,
     RepoType.NUGET,
   ];
   public loading = true;
@@ -171,6 +172,7 @@ export class RepositoryComponent {
     this.fetchRepositories(RepoType.DOCKER);
     this.fetchRepositories(RepoType.CARGO);
     this.fetchRepositories(RepoType.GOLANG);
+    this.fetchRepositories(RepoType.HELM);
     this.fetchRepositories(RepoType.NUGET);
   }
 

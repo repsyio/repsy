@@ -37,6 +37,7 @@ public class ProtocolBundleConfig {
       @Qualifier("dockerAuthComponent") final ProtocolAuthService docker,
       @Qualifier("pypiAuthComponent") final ProtocolAuthService pypi,
       @Qualifier("golangAuthComponent") final ProtocolAuthService golang,
+      @Qualifier("helmAuthComponent") final ProtocolAuthService helm,
       @Qualifier("nuGetAuthComponent") final ProtocolAuthService nuget) {
 
     final var map = new HashMap<RepoType, ProtocolAuthService>();
@@ -46,6 +47,7 @@ public class ProtocolBundleConfig {
     map.put(RepoType.DOCKER, docker);
     map.put(RepoType.PYPI, pypi);
     map.put(RepoType.GOLANG, golang);
+    map.put(RepoType.HELM, helm);
     map.put(RepoType.NUGET, nuget);
     return map;
   }
@@ -58,6 +60,7 @@ public class ProtocolBundleConfig {
       @Qualifier("dockerApiFacade") final ProtocolApiFacade docker,
       @Qualifier("pypiApiFacade") final ProtocolApiFacade pypi,
       @Qualifier("golangApiFacade") final ProtocolApiFacade golang,
+      @Qualifier("helmApiFacade") final ProtocolApiFacade helm,
       @Qualifier("nugetApiFacade") final ProtocolApiFacade nuget) {
 
     final var map = new HashMap<RepoType, ProtocolApiFacade>();
@@ -67,6 +70,7 @@ public class ProtocolBundleConfig {
     map.put(RepoType.DOCKER, docker);
     map.put(RepoType.PYPI, pypi);
     map.put(RepoType.GOLANG, golang);
+    map.put(RepoType.HELM, helm);
     map.put(RepoType.NUGET, nuget);
     return map;
   }

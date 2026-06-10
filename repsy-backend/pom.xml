@@ -91,6 +91,12 @@
 
         <dependency>
             <groupId>io.repsy.protocols</groupId>
+            <artifactId>helm</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.repsy.protocols</groupId>
             <artifactId>nuget</artifactId>
             <version>${project.version}</version>
         </dependency>

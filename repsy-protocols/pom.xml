@@ -43,5 +43,6 @@
     <module>golang</module>
     <module>nuget</module>
     <module>shared</module>
+    <module>helm</module>
   </modules>
 </project>

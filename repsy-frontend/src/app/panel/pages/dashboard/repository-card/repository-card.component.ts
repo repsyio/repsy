@@ -32,6 +32,7 @@ export class RepositoryCardComponent {
   @Input() dockerRepoCount: number;
   @Input() golangRepoCount: number;
   @Input() cargoRepoCount: number;
+  @Input() helmRepoCount: number;
   @Input() nugetRepoCount: number;
 
   routeMaven() {
@@ -67,6 +68,12 @@ export class RepositoryCardComponent {
   routeGolang() {
     this.router.navigate(['/repositories'], {
       state: { repoType: 'golang' },
+    });
+  }
+
+  routeHelm() {
+    this.router.navigate(['/repositories'], {
+      state: { repoType: 'helm' },
     });
   }
 

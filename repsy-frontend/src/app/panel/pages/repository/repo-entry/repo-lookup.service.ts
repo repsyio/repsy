@@ -19,7 +19,7 @@ import { BehaviorSubject, map, Observable, of, tap } from 'rxjs';
 
 import { ProtocolRepoControllerService } from '../../../../../generated/api';
 
-export type RepoType = 'maven' | 'npm' | 'pypi' | 'docker' | 'golang' | 'cargo' | 'nuget';
+export type RepoType = 'maven' | 'npm' | 'pypi' | 'docker' | 'golang' | 'cargo' | 'helm' | 'nuget';
 
 export interface RepoContext {
   repoName: string;

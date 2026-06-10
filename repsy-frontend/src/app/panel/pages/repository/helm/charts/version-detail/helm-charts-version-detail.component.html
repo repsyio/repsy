@@ -1,0 +1,110 @@
+@if (loading) {
+  <app-spinner />
+} @else {
+  @if (!this.error) {
+    @if (chart) {
+      <div animate.enter="fade-in-up">
+        <!-- Header -->
+        <div class="mb-6 flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-2">
+            <img class="h-[20px] w-[20px]" src="assets/icons/helm/helm.svg" alt="Helm" />
+            <span class="text-[18px] font-medium text-[#FDFDFD]">{{ chart.name }}</span>
+          </div>
+          <div
+            class="inline-flex items-center gap-1 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[12px] py-[4px] text-[13px] text-[#FDFDFD]"
+          >
+            <img ngSrc="/assets/icons/repo/bookmark.svg" alt="version" height="14" width="14" />
+            {{ chart.version }}
+          </div>
+          @if (chart.type) {
+            <span class="inline-block rounded-full bg-[#1D1C1C] px-3 py-0.5 text-[12px] text-[#9FA0A0]">
+              {{ chart.type }}
+            </span>
+          }
+        </div>
+
+        <!-- Metadata -->
+        <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Metadata</h2>
+        <div class="mb-8 flex flex-col gap-2 text-[14px]">
+          @if (chart.createdAt) {
+            <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+              <span class="text-white">Published: </span>
+              <span class="text-[#9C9C9D]">{{ chart.createdAt | date: 'medium' }}</span>
+            </div>
+          }
+          @if (chart.description) {
+            <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+              <span class="text-white">Description: </span>
+              <span class="text-[#9C9C9D]">{{ chart.description }}</span>
+            </div>
+          }
+          @if (chart.appVersion) {
+            <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+              <span class="text-white">App Version: </span>
+              <span class="text-[#9C9C9D]">{{ chart.appVersion }}</span>
+            </div>
+          }
+          <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+            <span class="text-white">Size: </span>
+            <span class="text-[#9C9C9D]">{{ formattedSize }}</span>
+            <span class="text-[#2A2A2A]">|</span>
+            <span class="text-white">Digest: </span>
+            <span class="font-mono text-[#9C9C9D] break-all">{{ chart.digest }}</span>
+            <app-copy-clipboard [text]="chart.digest" />
+          </div>
+        </div>
+
+        <!-- Installation -->
+        <h2 class="mb-4 text-[16px] text-[#9FA0A0]">Installation</h2>
+
+        <div class="mb-4 overflow-x-auto rounded-[12px] border border-[#2A2A2A] bg-[#0C0C0C]">
+          <div class="flex items-center justify-between gap-2 border-b border-[#2A2A2A] px-4 py-3">
+            <span class="text-[13px] text-[#9FA0A0]">Classic Helm</span>
+            <app-copy-clipboard [text]="classicInstallCommand" />
+          </div>
+          <pre class="text-[13px]"><code [highlight]="classicInstallCommand" language="bash" lineNumbers></code></pre>
+        </div>
+
+        <div class="mb-4 overflow-x-auto rounded-[12px] border border-[#2A2A2A] bg-[#0C0C0C]">
+          <div class="flex items-center justify-between gap-2 border-b border-[#2A2A2A] px-4 py-3">
+            <span class="text-[13px] text-[#9FA0A0]">OCI</span>
+            <app-copy-clipboard [text]="ociPullCommand" />
+          </div>
+          <pre class="text-[13px]"><code [highlight]="ociPullCommand" language="bash" lineNumbers></code></pre>
+        </div>
+
+        <!-- Chart.yaml -->
+        <div class="relative mb-8 overflow-x-auto rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+          <div class="flex items-center justify-between gap-2 border-b border-[#2A2A2A] p-4">
+            <span class="text-[14px] text-[#FDFDFD]">Chart.yaml</span>
+            <app-copy-clipboard [text]="chartYaml" />
+          </div>
+          <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]"><code [highlight]="chartYaml" language="yaml" lineNumbers></code></pre>
+        </div>
+
+        <!-- Delete -->
+        @if (activeRepo.canManage) {
+          <button
+            (click)="deleteVersion()"
+            [disabled]="loading"
+            class="repsy-btn-danger ml-auto w-full sm:w-auto"
+          >
+            <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+            Delete Version
+          </button>
+        }
+      </div>
+    }
+  } @else {
+    <div animate.enter="fade-in-up" class="p-8 text-center">
+      <img
+        class="mx-auto mb-[70px]"
+        ngSrc="/assets/images/hippo-empty.svg"
+        alt="hippo-empty"
+        height="243"
+        width="510"
+      />
+      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+    </div>
+  }
+}

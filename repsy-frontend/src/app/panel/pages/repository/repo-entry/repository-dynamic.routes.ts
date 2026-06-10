@@ -86,6 +86,11 @@ export const REPOSITORY_DYNAMIC_ROUTES: Routes = [
   },
   {
     path: '',
+    canMatch: [canMatchRepoType('helm')],
+    loadChildren: () => import('../helm/helm.routes').then((m) => m.HELM_ROUTES),
+  },
+  {
+    path: '',
     canMatch: [canMatchRepoType('nuget')],
     loadChildren: () => import('../nuget/nuget.routes').then((m) => m.NUGET_ROUTES),
   },

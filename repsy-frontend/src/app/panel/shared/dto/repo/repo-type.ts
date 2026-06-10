@@ -22,6 +22,7 @@ export enum RepoType {
   DOCKER = 'docker',
   CARGO = 'cargo',
   GOLANG = 'golang',
+  HELM = 'helm',
   NUGET = 'nuget',
 }
 

@@ -39,7 +39,6 @@ public class UsageUpdateService {
   }
 
   private void updateRepoUsage(final @NonNull UUID repoId, final long diskUsageDiff) {
-
     final var repo = this.repoTxService.getRepoEntity(repoId);
 
     this.repoTxService.updateDiskUsage(repoId, diskUsageDiff);

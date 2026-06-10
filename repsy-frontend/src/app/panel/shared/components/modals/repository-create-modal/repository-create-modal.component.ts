@@ -50,6 +50,7 @@ export class RepositoryCreateModalComponent implements OnInit {
     RepoType.PYPI,
     RepoType.CARGO,
     RepoType.GOLANG,
+    RepoType.HELM,
     RepoType.NUGET,
   ];
   public form: FormGroup;

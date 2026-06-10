@@ -53,6 +53,7 @@ export class DashboardContentComponent {
   public dockerRepoCount = 0;
   public cargoRepoCount = 0;
   public golangRepoCount = 0;
+  public helmRepoCount = 0;
   public nugetRepoCount = 0;
   public repositories: Repository[] = [];
   public repoListInfos: RepoListInfo[] = [];
@@ -131,6 +132,14 @@ export class DashboardContentComponent {
       });
 
     this.protocolRepoControllerService
+      .getCount(RepoType.Helm)
+      .pipe(map((r) => r.data ?? 0))
+      .subscribe((c) => {
+        this.helmRepoCount = c;
+        this.cdRef.markForCheck();
+      });
+
+    this.protocolRepoControllerService
       .getCount(RepoType.Nuget)
       .pipe(map((r) => r.data ?? 0))
       .subscribe((c) => {
@@ -177,6 +186,7 @@ export class DashboardContentComponent {
     this.fetchRepoInfo(RepoType.Docker);
     this.fetchRepoInfo(RepoType.Cargo);
     this.fetchRepoInfo(RepoType.Golang);
+    this.fetchRepoInfo(RepoType.Helm);
     this.fetchRepoInfo(RepoType.Nuget);
   }
 }
