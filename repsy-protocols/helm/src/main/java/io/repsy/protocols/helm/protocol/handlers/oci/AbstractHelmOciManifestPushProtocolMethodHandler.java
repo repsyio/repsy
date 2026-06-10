@@ -173,7 +173,11 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
 
     this.helmFacade.pushManifest(context, name, reference, contentBytes);
 
-    context.addProperty("usages", BaseUsages.ofDisk(layerSize));
+    // Only count disk usage on version-tagged pushes. Helm also pushes the manifest a second time
+    // addressed by its content digest (sha256:...) — same blob, no additional storage consumed.
+    if (!reference.startsWith(HelmConstants.SHA256_PREFIX)) {
+      context.addProperty("usages", BaseUsages.ofDisk(layerSize));
+    }
 
     // Replace the last path segment (reference) with the digest
     final var requestPath = request.getRequestURI();
