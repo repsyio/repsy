@@ -281,7 +281,8 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
     final var authType = this.extractAuthenticationTypeSafely(authHeader);
 
     if (authType == AuthenticationType.DEPLOY_TOKEN) {
-      this.authorizeTokenRequestTokenId(repoId, this.jwtUtils.extractUserId(authHeader), permission);
+      this.authorizeTokenRequestTokenId(
+          repoId, this.jwtUtils.extractUserId(authHeader), permission);
       return;
     }
 

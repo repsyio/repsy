@@ -45,7 +45,8 @@ public class HelmAuthComponent extends ProtocolAuthService {
     final var authType = this.jwtUtils.extractAuthenticationType(authHeader);
 
     if (authType == AuthenticationType.DEPLOY_TOKEN) {
-      this.authorizeTokenRequestTokenId(repoId, this.jwtUtils.extractUserId(authHeader), permission);
+      this.authorizeTokenRequestTokenId(
+          repoId, this.jwtUtils.extractUserId(authHeader), permission);
       return;
     }
 
