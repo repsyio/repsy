@@ -273,4 +273,25 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
 
     return Optional.of(token);
   }
+
+  @Override
+  public void handleBearerAuth(
+      final String authHeader, final UUID repoId, final Permission permission) {
+
+    final var authType = this.extractAuthenticationTypeSafely(authHeader);
+
+    if (authType == AuthenticationType.DEPLOY_TOKEN) {
+      this.authorizeTokenRequestTokenId(repoId, this.jwtUtils.extractUserId(authHeader), permission);
+      return;
+    }
+
+    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader);
+    final var userInfo = this.userTxService.getUserByUsernameOptional(username).orElse(null);
+
+    if (userInfo == null) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    this.authorizeUser(userInfo, permission);
+  }
 }

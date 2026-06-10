@@ -65,7 +65,7 @@ public abstract class AbstractHelmIndexPullProtocolMethodHandler<ID>
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ);
+    return Map.of("permission", Permission.READ, "writeOperation", false);
   }
 
   @Override

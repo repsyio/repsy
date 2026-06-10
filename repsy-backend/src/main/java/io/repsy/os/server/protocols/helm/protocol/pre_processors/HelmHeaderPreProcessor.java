@@ -46,7 +46,6 @@ import org.springframework.stereotype.Component;
 public class HelmHeaderPreProcessor extends ProtocolProcessor {
 
   private static final int PRIORITY = 50;
-  private static final String SKIP_PRE_PROCESSOR_KEY = "skipPreProcessor";
   private static final String SKIP_HEADER_PRE_PROCESSOR_KEY = "skipHeaderPreProcessor";
   private static final String PERMISSION_KEY = "permission";
   private static final String WWW_AUTHENTICATE_VALUE = "Basic realm=\"Repsy\"";
@@ -71,15 +70,9 @@ public class HelmHeaderPreProcessor extends ProtocolProcessor {
       final Map<String, Object> properties) {
 
     if (this.shouldSkipAuthentication(request, context, properties)) {
-      log.warn(
-          "[HelmHeader] skipped method={} path={}", request.getMethod(), request.getRequestURI());
       return ProcessorResult.next();
     }
 
-    log.warn(
-        "[HelmHeader] returning 401 method={} path={}",
-        request.getMethod(),
-        request.getRequestURI());
     return ProcessorResult.of(
         ResponseEntity.status(HttpStatus.UNAUTHORIZED)
             .header(WWW_AUTHENTICATE, WWW_AUTHENTICATE_VALUE)
@@ -106,8 +99,7 @@ public class HelmHeaderPreProcessor extends ProtocolProcessor {
   }
 
   private boolean isSkipFlagSet(final Map<String, Object> properties) {
-    return (boolean) properties.getOrDefault(SKIP_PRE_PROCESSOR_KEY, false)
-        || (boolean) properties.getOrDefault(SKIP_HEADER_PRE_PROCESSOR_KEY, false);
+    return (boolean) properties.getOrDefault(SKIP_HEADER_PRE_PROCESSOR_KEY, false);
   }
 
   private boolean isWritePermission(final Permission permission) {

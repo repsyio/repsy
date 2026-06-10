@@ -60,7 +60,7 @@ public abstract class AbstractHelmChartDeleteProtocolMethodHandler<ID>
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE);
+    return Map.of("permission", Permission.WRITE, "writeOperation", true);
   }
 
   @Override

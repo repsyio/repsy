@@ -15,19 +15,17 @@
  */
 package io.repsy.os.server.protocols.helm.protocol.pre_processors;
 
+import static io.repsy.os.shared.auth.utils.AuthUtils.AUTH_BASIC;
+import static io.repsy.os.shared.auth.utils.AuthUtils.AUTH_BEARER;
+import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
+
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.helm.shared.auth.HelmAuthComponent;
-import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
-import io.repsy.os.shared.auth.dtos.AuthenticationType;
-import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.user.dtos.UserInfo;
-import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.annotation.PostConstruct;
@@ -36,28 +34,24 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
 @NullMarked
 public class HelmAuthPreProcessor extends ProtocolProcessor {
 
   private static final int PRIORITY = 100;
-  private static final String AUTH_BASIC = "Basic ";
-  private static final String AUTH_BEARER = "Bearer ";
   private static final String SKIP_PRE_PROCESSOR_KEY = "skipPreProcessor";
   private static final String PERMISSION_KEY = "permission";
+  private static final String WRITE_OPERATION_KEY = "writeOperation";
+  private static final String WWW_AUTHENTICATE_VALUE = "Basic realm=\"Repsy\"";
 
-  private final HelmAuthComponent authComponent;
-  private final DeployTokenService deployTokenService;
-  private final JwtUtils jwtUtils;
-  private final UserTxService userTxService;
   private final HelmProtocolProvider provider;
+  private final HelmAuthComponent authComponent;
 
   @PostConstruct
   public void register() {
@@ -84,14 +78,11 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
 
     final var authHeader = this.authComponent.emulateAuthHeader(request);
 
-    log.debug(
-        "[HelmAuth] method={} path={} authHeader={}",
-        request.getMethod(),
-        request.getRequestURI(),
-        authHeader == null ? "null" : authHeader.split(" ")[0]);
-
     if (authHeader == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      return ProcessorResult.of(
+          ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+              .header(WWW_AUTHENTICATE, WWW_AUTHENTICATE_VALUE)
+              .build());
     }
 
     this.authenticateRequest(authHeader, repoInfo.getId(), properties);
@@ -108,64 +99,9 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
       case final String h when h.startsWith(AUTH_BASIC) ->
           this.authComponent.handleBasicAuth(h, permission, repoId);
       case final String h when h.startsWith(AUTH_BEARER) ->
-          this.handleBearerAuth(h, repoId, permission);
-      default -> throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+          this.authComponent.handleBearerAuth(h, repoId, permission);
+      default -> throw new UnAuthorizedException("unAuthorized");
     }
-  }
-
-  private void handleBearerAuth(
-      final String authHeader, final UUID repoId, final Permission permission) {
-
-    final var authType = this.jwtUtils.extractAuthenticationType(authHeader);
-
-    if (authType == AuthenticationType.DEPLOY_TOKEN) {
-      final var tokenId = this.jwtUtils.extractUserId(authHeader);
-      this.authorizeDeployTokenRequest(repoId, tokenId, permission);
-      return;
-    }
-
-    this.authorizeJWTRequest(authHeader, permission);
-  }
-
-  private void authorizeJWTRequest(final String authHeader, final Permission permission) {
-    final var userInfo = this.getUserInfoForBearerAuth(authHeader);
-
-    if (userInfo == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    this.authComponent.authorizeUser(userInfo, permission);
-  }
-
-  private void authorizeDeployTokenRequest(
-      final UUID repoId, final UUID tokenId, final Permission permission) {
-
-    final var deployTokenInfo = this.deployTokenService.findByRepoIdAndTokenId(repoId, tokenId);
-
-    if (deployTokenInfo.isEmpty()) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    final var deployToken = deployTokenInfo.get();
-
-    if (deployToken.isExpired()) {
-      throw new UnAuthorizedException("deployTokenExpired");
-    }
-
-    if (this.isWritePermissionRequired(permission) && deployToken.isReadOnly()) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    this.deployTokenService.updateLastUsedTime(deployToken.getId());
-  }
-
-  private boolean isWritePermissionRequired(final Permission permission) {
-    return permission == Permission.MANAGE || permission == Permission.WRITE;
-  }
-
-  private @Nullable UserInfo getUserInfoForBearerAuth(final String authHeader) {
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader);
-    return this.userTxService.getUserByUsernameOptional(username).orElse(null);
   }
 
   private boolean shouldSkipAuthentication(
@@ -177,12 +113,8 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
       return true;
     }
 
-    final var permission = (Permission) properties.get(PERMISSION_KEY);
+    final var writeOperation = (boolean) properties.getOrDefault(WRITE_OPERATION_KEY, false);
 
-    if (this.isWritePermissionRequired(permission)) {
-      return false;
-    }
-
-    return !repoInfo.isPrivateRepo();
+    return !repoInfo.isPrivateRepo() && !writeOperation;
   }
 }

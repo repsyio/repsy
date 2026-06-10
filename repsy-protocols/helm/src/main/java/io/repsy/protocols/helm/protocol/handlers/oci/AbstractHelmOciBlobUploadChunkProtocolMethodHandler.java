@@ -66,7 +66,8 @@ public abstract class AbstractHelmOciBlobUploadChunkProtocolMethodHandler<ID>
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE, "skipHeaderPreProcessor", true);
+    return Map.of(
+        "permission", Permission.WRITE, "skipHeaderPreProcessor", true, "writeOperation", true);
   }
 
   @Override

@@ -37,7 +37,8 @@ import org.springframework.stereotype.Component;
 @NullMarked
 public class HelmChartMuseumPathParser implements PathParser {
 
-  private static final Pattern PATTERN = Pattern.compile("^/api/([^/]+)/charts$");
+  private static final Pattern PATTERN =
+      Pattern.compile("^/api/(?<repoName>[a-zA-Z0-9_\\-]+)(?<suffix>/[^\\s#?&${}\\\\]*)?$");
 
   private final RepoTxService repoTxService;
 
@@ -50,20 +51,23 @@ public class HelmChartMuseumPathParser implements PathParser {
       return Optional.empty();
     }
 
-    final var repoName = matcher.group(1).toLowerCase(Locale.getDefault());
-    final var repoInfoOpt = this.repoTxService.getRepoByNameAndType(repoName, RepoType.HELM);
+    final var repoName = matcher.group("repoName").toLowerCase(Locale.getDefault());
+    final var rawSuffix = matcher.group("suffix");
+    final var relativePath = rawSuffix != null ? "/api" + rawSuffix : "";
 
-    return repoInfoOpt.flatMap(repoInfo -> this.createProtocolContext(repoInfo, repoName));
+    return this.repoTxService
+        .getRepoByNameAndType(repoName, RepoType.HELM)
+        .flatMap(repoInfo -> this.createProtocolContext(repoInfo, repoName, relativePath));
   }
 
   private Optional<ProtocolContext> createProtocolContext(
-      final RepoInfo repoInfo, final String repoName) {
+      final RepoInfo repoInfo, final String repoName, final String relativePath) {
 
     final var context = new ProtocolContext();
     final var urlProperties =
         UrlParserProperties.builder()
             .repoName(repoName)
-            .relativePath(new RelativePath("/api/charts"))
+            .relativePath(new RelativePath(relativePath))
             .repoInfo(repoInfo)
             .build();
 
