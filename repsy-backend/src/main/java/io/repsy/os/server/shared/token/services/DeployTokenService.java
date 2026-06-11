@@ -71,6 +71,13 @@ public class DeployTokenService {
         .map(this.deployTokenConverter::toDeployTokenInfo);
   }
 
+  public @NonNull Optional<DeployTokenInfo> findByToken(final @NonNull String token) {
+
+    return this.deployTokenRepository
+        .findByToken(token)
+        .map(this.deployTokenConverter::toDeployTokenInfo);
+  }
+
   public @NonNull Optional<DeployTokenInfo> findByRepoIdAndToken(
       final @NonNull UUID repoId, final @NonNull String token) {
 

@@ -40,6 +40,8 @@ public interface RepoDeployTokenRepository extends JpaRepository<RepoDeployToken
   @NonNull Optional<RepoDeployToken> findByTokenAndRepoType(
       @NonNull String token, @NonNull RepoType repoType);
 
+  @NonNull Optional<RepoDeployToken> findByToken(@NonNull String token);
+
   @NonNull Page<DeployTokenInfoListItem> findAllByRepoId(
       @NonNull UUID repoId, @NonNull Pageable pageable);
 
