@@ -22,6 +22,7 @@ import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromBasi
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBearerToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.removeBasicPrefix;
+
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
@@ -249,8 +250,7 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
 
   private Optional<String> authenticateWithDeployToken(final Credentials credentials) {
 
-    final var deployTokenOpt =
-        this.deployTokenService.findByToken(credentials.getPassword());
+    final var deployTokenOpt = this.deployTokenService.findByToken(credentials.getPassword());
 
     if (deployTokenOpt.isEmpty()) {
       return Optional.empty();
