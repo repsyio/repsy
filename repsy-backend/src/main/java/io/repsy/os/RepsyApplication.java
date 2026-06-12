@@ -16,6 +16,7 @@
 package io.repsy.os;
 
 import io.repsy.libs.multiport.annotations.EnableMultiport;
+import io.repsy.os.config.ssl.RepsySslProperties;
 import io.repsy.os.server.protocols.cargo.shared.crate.storage.configs.CargoFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.docker.shared.storage.configs.DockerFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.golang.shared.storage.configs.GolangFileSystemStorageBackendConfigProps;
@@ -33,6 +34,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 
 @Slf4j
 @EnableConfigurationProperties({
+  RepsySslProperties.class,
   MavenFileSystemStorageBackendConfigProps.class,
   NpmFileSystemStorageBackendConfigProps.class,
   PypiFileSystemStorageBackendConfigProps.class,

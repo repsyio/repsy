@@ -26,6 +26,12 @@
       "description": "Logical name to port mapping"
     },
     {
+      "name": "multiport.port-aliases",
+      "type": "java.util.Map<java.lang.Integer,java.lang.String>",
+      "sourceType": "io.repsy.libs.multiport.configs.props.MultiPortProperties",
+      "description": "Map of SSL port numbers to logical port names. Use empty string for the main port. Example: {8443: 'api', 9443: ''}"
+    },
+    {
       "name": "multiport.tomcat.connection-timeout",
       "type": "java.lang.Integer",
       "sourceType": "io.repsy.libs.multiport.configs.props.MultiPortProperties$TomcatProperties",

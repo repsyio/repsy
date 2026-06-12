@@ -131,6 +131,23 @@ public class RequestMappingConfiguration {
             .computeIfAbsent(port, _ -> new ArrayList<>())
             .add(new MatchedHandler(mappingInfo, handlerMethod));
       }
+
+      // Alias ports share the handler list of their target port.
+      // validatePorts() guarantees every non-empty alias name exists in multiport.ports,
+      // so getPortFor() is null-safe here.
+      for (final var alias :
+          RequestMappingConfiguration.this.multiPortProperties.getPortAliases().entrySet()) {
+
+        final var aliasPort = alias.getKey();
+        final var targetName = alias.getValue();
+        final var targetPort =
+            targetName.isEmpty()
+                ? mainPort
+                : RequestMappingConfiguration.this.multiPortProperties.getPortFor(targetName);
+
+        this.portHandlerCache.put(
+            aliasPort, this.portHandlerCache.getOrDefault(targetPort, List.of()));
+      }
     }
 
     private int resolvePort(final @NonNull HandlerMethod handlerMethod, final int mainPort) {
