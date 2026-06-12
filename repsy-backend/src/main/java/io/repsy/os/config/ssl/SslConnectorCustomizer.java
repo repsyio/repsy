@@ -79,7 +79,7 @@ public class SslConnectorCustomizer
     final var certConfig =
         new SSLHostConfigCertificate(sslHostConfig, SSLHostConfigCertificate.Type.RSA);
 
-    certConfig.setCertificateKeystoreFile(stripFilePrefix(props.keyStore()));
+    certConfig.setCertificateKeystoreFile(this.stripFilePrefix(props.keyStore()));
     certConfig.setCertificateKeystorePassword(props.keyStorePassword());
     certConfig.setCertificateKeystoreType(props.keyStoreType());
     certConfig.setCertificateKeyAlias(props.keyAlias());
