@@ -38,7 +38,7 @@ docker run -d \
   --name repsy \
   -p 8080:8080 \
   -p 9090:9090 \
-  repo.repsy.io/repsy/os/repsy:26.06.0
+  repo.repsy.io/repsy/os/repsy:latest
 ```
 
 Access the application:
@@ -133,7 +133,7 @@ docker run -d \
   -p 9090:9090 \
   -e ADMIN_INITIAL_PASSWORD=YourSecurePassword123 \
   -v repsy-data:/app/data \
-  repo.repsy.io/repsy/os/repsy:26.06.0
+  repo.repsy.io/repsy/os/repsy:latest
 ```
 
 > The `-v repsy-data:/app/data` flag persists the H2 database across container restarts. Setting `STORAGE_BASE_PATH=/app/data/storage` ensures artifact file storage is also kept inside the same volume. Without it, artifacts default to `~/.repsy` on the host and are **not** covered by the volume mount.
@@ -164,7 +164,7 @@ docker run -d \
   -e DB_USERNAME=repsy \
   -e DB_PASSWORD=repsy123 \
   -e ADMIN_INITIAL_PASSWORD=YourSecurePassword123 \
-  repo.repsy.io/repsy/os/repsy:26.06.0
+  repo.repsy.io/repsy/os/repsy:latest
 ```
 
 ### Option 3: Docker Compose with PostgreSQL
@@ -186,7 +186,7 @@ services:
 
   repsy:
     container_name: repsy
-    image: repo.repsy.io/repsy/os/repsy:26.06.0
+    image: repo.repsy.io/repsy/os/repsy:latest
     depends_on:
       - postgres
     ports:
@@ -343,7 +343,7 @@ docker run -d \
   -e ADMIN_INITIAL_PASSWORD=YourSecurePassword123 \
   -e STORAGE_BASE_PATH=/app/data/storage \
   -v repsy-data:/app/data \
-  repo.repsy.io/repsy/os/repsy:26.06.0
+  repo.repsy.io/repsy/os/repsy:latest
 ```
 
 ## Development
