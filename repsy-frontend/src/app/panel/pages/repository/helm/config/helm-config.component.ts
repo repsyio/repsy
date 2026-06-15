@@ -49,28 +49,48 @@ export class HelmConfigComponent implements OnInit, OnChanges {
   }
 
   private updateMarkdown(): void {
-    const classicUrl = `${this.baseUrl}/${this.repoName}`;
-    const host = this.baseUrl.replace(/^https?:\/\//, '');
+    const ociHost = this.baseUrl ? this.baseUrl.replace(/^https?:\/\//, '') : '<host>';
 
     this.markdown = `
-**Classic Helm Repository:**
+**Classic Helm (Chart Museum protocol):**
 
 \`\`\`bash
-helm repo add ${this.repoName} ${classicUrl} --username ${this.username} --password <YOUR_DEPLOY_TOKEN>
+# Add repository
+helm repo add ${this.repoName} ${this.baseUrl}/${this.repoName}
+
+# Authenticate (if private)
+helm repo add ${this.repoName} ${this.baseUrl}/${this.repoName} \\
+  --username ${this.username} --password <YOUR_PASSWORD_OR_DEPLOY_TOKEN>
+
+# Update repository index
 helm repo update
-helm install ${this.repoName} ${this.repoName}/<chart_name> --version <version>
+
+# Push a chart (requires helm-push plugin)
+helm plugin install https://github.com/chartmuseum/helm-push
+helm cm-push <chart>.tgz ${this.repoName}
+
+# Install chart
+helm install <release-name> ${this.repoName}/<chart>
+
+# Pull chart
+helm pull ${this.repoName}/<chart> --version <version>
 \`\`\`
 
-**OCI Registry:**
+**OCI (Helm OCI protocol):**
 
 \`\`\`bash
-helm registry login ${host} --username ${this.username} --password <YOUR_DEPLOY_TOKEN>
-helm push <chart>.tgz oci://${host}/${this.repoName}
-helm pull oci://${host}/${this.repoName}/<chart_name> --version <version>
-helm registry logout ${host}
-\`\`\`
+# Login
+helm registry login ${ociHost} --username ${this.username} --password <YOUR_PASSWORD_OR_DEPLOY_TOKEN>
 
-You should use a Deploy Token. If you do not have one, go to \`settings > Deploy Tokens\` to create it.
+# Push chart
+helm push <chart>.tgz oci://${ociHost}/${this.repoName}
+
+# Pull chart
+helm pull oci://${ociHost}/${this.repoName}/<chart> --version <version>
+
+# Install chart
+helm install <release-name> oci://${ociHost}/${this.repoName}/<chart> --version <version>
+\`\`\`
 `;
   }
 }
