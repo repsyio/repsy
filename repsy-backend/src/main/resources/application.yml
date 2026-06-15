@@ -39,6 +39,28 @@ multiport:
     connection-timeout: ${server.tomcat.connection-timeout}
   ports:
     api: ${API_PORT:8080}
+  port-aliases:
+    8443: api
+    9443: ""
+
+repsy:
+  ssl:
+    api:
+      enabled: ${API_SSL_ENABLED:false}
+      port: ${API_SSL_PORT:8443}
+      key-store: ${API_SSL_KEY_STORE_PATH:}
+      key-store-password: ${API_SSL_KEY_STORE_PASSWORD:}
+      key-store-type: ${API_SSL_KEY_STORE_TYPE:PKCS12}
+      key-alias: ${API_SSL_KEY_ALIAS:repsy}
+      key-password: ${API_SSL_KEY_PASSWORD:}
+    repo:
+      enabled: ${REPO_SSL_ENABLED:false}
+      port: ${REPO_SSL_PORT:9443}
+      key-store: ${REPO_SSL_KEY_STORE_PATH:}
+      key-store-password: ${REPO_SSL_KEY_STORE_PASSWORD:}
+      key-store-type: ${REPO_SSL_KEY_STORE_TYPE:PKCS12}
+      key-alias: ${REPO_SSL_KEY_ALIAS:repsy}
+      key-password: ${REPO_SSL_KEY_PASSWORD:}
 
 logging:
   level:

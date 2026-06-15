@@ -15,6 +15,7 @@
  */
 package io.repsy.libs.multiport.configs.props;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.Data;
@@ -32,6 +33,7 @@ public class MultiPortProperties {
 
   private String mainPort = DEFAULT_MAIN_PORT;
   private Map<String, Integer> ports;
+  private Map<Integer, String> portAliases = new HashMap<>();
   private TomcatProperties tomcat = new TomcatProperties();
 
   public int getPortFor(final @NonNull String logicalName) {
@@ -55,6 +57,10 @@ public class MultiPortProperties {
 
       this.checkPort(name, port, Integer.parseInt(this.mainPort));
     }
+
+    for (final var alias : this.portAliases.entrySet()) {
+      this.checkAlias(alias.getKey(), alias.getValue());
+    }
   }
 
   private void checkPort(final @NonNull String name, final int port, final int mainPort) {
@@ -62,6 +68,15 @@ public class MultiPortProperties {
     if (port == Integer.parseInt(this.mainPort)) {
       throw new IllegalStateException(
           "Port %s (%d) cannot equal main-port (%d)".formatted(name, port, mainPort));
+    }
+  }
+
+  private void checkAlias(final int aliasPort, final @NonNull String logicalName) {
+
+    if (!logicalName.isEmpty() && !this.ports.containsKey(logicalName)) {
+      throw new IllegalArgumentException(
+          "multiport.port-aliases entry '%d' references unknown port name '%s'. Available ports: %s"
+              .formatted(aliasPort, logicalName, this.ports.keySet()));
     }
   }
 

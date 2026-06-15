@@ -138,8 +138,8 @@ FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
-    mkdir -p /app/data && \
-    chown -R appuser:appgroup /app/data
+    mkdir -p /app/data /app/certs && \
+    chown -R appuser:appgroup /app/data /app/certs
 USER appuser
 
 COPY --from=backend-build \
@@ -150,6 +150,6 @@ COPY --from=frontend-build /app/dist/panel-frontend/browser ./static/
 
 VOLUME /app/data
 
-EXPOSE 8080 9090
+EXPOSE 8080 8443 9090 9443
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

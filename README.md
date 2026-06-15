@@ -6,6 +6,7 @@
 
 - [Features](#features)
 - [Quick Start](#quick-start)
+- [HTTPS / SSL](#https--ssl)
 - [Installation](#installation)
     - [Using Docker (H2 - Embedded)](#option-1-docker-with-h2-embedded-database)
     - [Using Docker (PostgreSQL)](#option-2-docker-with-postgresql)
@@ -37,7 +38,7 @@ docker run -d \
   --name repsy \
   -p 8080:8080 \
   -p 9090:9090 \
-  repo.repsy.io/repsy/os/repsy:26.04.0
+  repo.repsy.io/repsy/os/repsy:26.06.0
 ```
 
 Access the application:
@@ -53,6 +54,72 @@ Access the application:
 
 > **Note:** The H2 database is stored at `/app/data` inside the container. File storage defaults to `~/.repsy` on the host and is **not** covered by the volume mount. Set `STORAGE_BASE_PATH` to persist artifacts inside the same volume (see [Option 1](#option-1-docker-with-h2-embedded-database)).
 
+## HTTPS / SSL
+
+Repsy OS supports optional, per-port HTTPS. HTTP ports (8080, 9090) remain open at all times — SSL adds new ports alongside them and does not replace them.
+
+### Generating a self-signed certificate
+
+```bash
+keytool -genkeypair \
+  -alias repsy \
+  -keyalg RSA \
+  -keysize 2048 \
+  -storetype PKCS12 \
+  -keystore keystore.p12 \
+  -validity 365 \
+  -storepass changeit \
+  -keypass changeit \
+  -dname "CN=localhost, O=Repsy" \
+  -ext "SAN=DNS:localhost,IP:127.0.0.1"
+```
+
+### Environment variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `API_SSL_ENABLED` | Enable HTTPS for the API port | `false` |
+| `API_SSL_PORT` | HTTPS port for the API | `8443` |
+| `API_SSL_KEY_STORE_PATH` | Path to keystore file (e.g. `file:/app/certs/api.p12`) | — |
+| `API_SSL_KEY_STORE_PASSWORD` | Keystore password | — |
+| `API_SSL_KEY_STORE_TYPE` | Keystore type | `PKCS12` |
+| `API_SSL_KEY_ALIAS` | Key alias inside the keystore | `repsy` |
+| `REPO_SSL_ENABLED` | Enable HTTPS for the repo port | `false` |
+| `REPO_SSL_PORT` | HTTPS port for the repo | `9443` |
+| `REPO_SSL_KEY_STORE_PATH` | Path to keystore file (e.g. `file:/app/certs/repo.p12`) | — |
+| `REPO_SSL_KEY_STORE_PASSWORD` | Keystore password | — |
+| `REPO_SSL_KEY_STORE_TYPE` | Keystore type | `PKCS12` |
+| `REPO_SSL_KEY_ALIAS` | Key alias inside the keystore | `repsy` |
+
+### Docker run example
+
+```bash
+docker run \
+  -v /host/certs/keystore.p12:/app/certs/keystore.p12 \
+  -e API_SSL_ENABLED=true \
+  -e API_SSL_KEY_STORE_PATH=file:/app/certs/keystore.p12 \
+  -e API_SSL_KEY_STORE_PASSWORD=changeit \
+  -e REPO_SSL_ENABLED=true \
+  -e REPO_SSL_KEY_STORE_PATH=file:/app/certs/keystore.p12 \
+  -e REPO_SSL_KEY_STORE_PASSWORD=changeit \
+  -p 8080:8080 -p 8443:8443 -p 9090:9090 -p 9443:9443 \
+  repsy-os:latest
+```
+
+### File permission note
+
+> Mounted keystore files must be readable by the container user.
+> On the host, ensure the file has at least mode `644`:
+> ```bash
+> chmod 644 /host/certs/keystore.p12
+> ```
+
+### Production note
+
+> For production deployments, use a CA-signed certificate instead of a self-signed one.
+> Self-signed certificates will cause `x509: certificate signed by unknown authority` errors
+> in clients unless the certificate is explicitly trusted.
+
 ## Installation
 
 ### Option 1: Docker with H2 (Embedded Database)
@@ -66,7 +133,7 @@ docker run -d \
   -p 9090:9090 \
   -e ADMIN_INITIAL_PASSWORD=YourSecurePassword123 \
   -v repsy-data:/app/data \
-  repo.repsy.io/repsy/os/repsy:26.04.0
+  repo.repsy.io/repsy/os/repsy:26.06.0
 ```
 
 > The `-v repsy-data:/app/data` flag persists the H2 database across container restarts. Setting `STORAGE_BASE_PATH=/app/data/storage` ensures artifact file storage is also kept inside the same volume. Without it, artifacts default to `~/.repsy` on the host and are **not** covered by the volume mount.
@@ -97,7 +164,7 @@ docker run -d \
   -e DB_USERNAME=repsy \
   -e DB_PASSWORD=repsy123 \
   -e ADMIN_INITIAL_PASSWORD=YourSecurePassword123 \
-  repo.repsy.io/repsy/os/repsy:26.04.0
+  repo.repsy.io/repsy/os/repsy:26.06.0
 ```
 
 ### Option 3: Docker Compose with PostgreSQL
@@ -119,7 +186,7 @@ services:
 
   repsy:
     container_name: repsy
-    image: repo.repsy.io/repsy/os/repsy:26.04.0
+    image: repo.repsy.io/repsy/os/repsy:26.06.0
     depends_on:
       - postgres
     ports:
@@ -276,7 +343,7 @@ docker run -d \
   -e ADMIN_INITIAL_PASSWORD=YourSecurePassword123 \
   -e STORAGE_BASE_PATH=/app/data/storage \
   -v repsy-data:/app/data \
-  repo.repsy.io/repsy/os/repsy:26.04.0
+  repo.repsy.io/repsy/os/repsy:26.06.0
 ```
 
 ## Development
