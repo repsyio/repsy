@@ -15,15 +15,19 @@
  */
 package io.repsy.os.shared.usage.controllers;
 
+import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.TotalUsageInfo;
+import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.usage.services.UsageService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -33,11 +37,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class UsageController {
 
+  private final @NonNull PanelAuthHelper panelAuthHelper;
   private final @NonNull RestResponseFactory responseFactory;
   private final @NonNull UsageService usageService;
 
   @GetMapping
-  public @NonNull RestResponse<TotalUsageInfo> getTotalUsage() {
+  public @NonNull RestResponse<TotalUsageInfo> getTotalUsage(
+      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
+
+    this.panelAuthHelper.authenticate(authHeader);
 
     final var totalUsageInfo = this.usageService.getTotalUsageInfo();
 
