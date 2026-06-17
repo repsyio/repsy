@@ -20,10 +20,10 @@ import { forkJoin, map, of, switchMap } from 'rxjs';
 
 import { RepoListInfo, RepoType, TotalUsageInfo } from '../../../../../generated/api';
 import { ProtocolRepoControllerService } from '../../../../../generated/api';
-import { UsageControllerService } from '../../../../../generated/api';
 import { RepositoryCreateModalComponent } from '../../../shared/components/modals/repository-create-modal/repository-create-modal.component';
 import { RecentActivityComponent } from '../recent-activity/recent-activity.component';
 import { RepositoryCardComponent } from '../repository-card/repository-card.component';
+import { UsageService } from '../service/usage.service';
 import { TotalDiskComponent } from '../total-disk/total-disk.component';
 import { WelcomeCardComponent } from '../welcome-card/welcome-card.component';
 
@@ -61,16 +61,12 @@ export class DashboardContentComponent {
 
   constructor(
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
-    private readonly usageControllerService: UsageControllerService,
+    private readonly usageService: UsageService,
     private readonly cdRef: ChangeDetectorRef,
   ) {
-    this.usageControllerService
+    this.usageService
       .getTotalUsage()
-      .pipe(map((r) => r.data))
       .subscribe((usage) => {
-        if (!usage) {
-          return;
-        }
         Object.assign(this.usage, usage);
       });
 
