@@ -128,10 +128,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   @SneakyThrows
   @Override
   public @NonNull List<StorageItemInfo> listStorageItems(final @NonNull StoragePath storagePath) {
-    final Path path =
-        (storagePath.getStorageKey() == null)
-            ? this.basePath.resolve(storagePath.getPath())
-            : this.toPhysicalPath(storagePath);
+    final Path path = this.toPhysicalPath(storagePath);
 
     try (final Stream<Path> stream =
         storagePath.getStorageKey() == null ? Files.list(path) : Files.walk(path)) {
