@@ -239,8 +239,7 @@ public final class NuGetPackageUtils {
       return List.of();
     }
     try {
-      return OBJECT_MAPPER.readValue(json, new TypeReference<>() {
-      });
+      return OBJECT_MAPPER.readValue(json, new TypeReference<>() {});
     } catch (final Exception e) {
       log.debug("Failed to parse dependencies JSON", e);
       return List.of();

@@ -27,8 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 public final class PackageStorageUtils {
   public static final String HASH_ALGORITHM = "sha256";
 
-  private static final String NAME_PART =
-          "[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]";
+  private static final String NAME_PART = "[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]";
   private static final String VERSION_PART =
       "(?<version>(?:[1-9][0-9]*!)?(?:0|[1-9][0-9]*)(?:\\.(?:0|[1-9][0-9]*))*"
           + "(?:(?:a|b|rc)(?:0|[1-9][0-9]*))?(?:\\.post(?:0|[1-9][0-9]*))?(?:\\.dev(?:0|[1-9][0-9]*))?)";
@@ -38,8 +37,7 @@ public final class PackageStorageUtils {
 
   private static final Pattern ARCHIVE_UPLOAD_PATTERN =
       Pattern.compile(
-          "^" + NAME_PART + "-" + VERSION_PART
-              + "(?:-[a-zA-Z0-9._]+)*\\.(?:tar\\.gz|whl|zip)$");
+          "^" + NAME_PART + "-" + VERSION_PART + "(?:-[a-zA-Z0-9._]+)*\\.(?:tar\\.gz|whl|zip)$");
 
   @Nullable
   public static String extractVersionFromArchiveFilename(final String filename) {
