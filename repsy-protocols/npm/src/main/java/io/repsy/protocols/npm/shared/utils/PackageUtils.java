@@ -16,6 +16,8 @@
 package io.repsy.protocols.npm.shared.utils;
 
 import com.vdurmont.semver4j.Semver;
+import com.vdurmont.semver4j.SemverException;
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -180,8 +182,13 @@ public final class PackageUtils {
 
     final var version =
         ((Map<String, Object>) payload.get(NpmConstants.VERSIONS)).entrySet().iterator().next();
-
-    return version.getKey();
+    final var versionName = version.getKey();
+    try {
+      new Semver(versionName, Semver.SemverType.NPM);
+    } catch (final SemverException e) {
+      throw new BadRequestException("invalidPackageVersion");
+    }
+    return versionName;
   }
 
   /**

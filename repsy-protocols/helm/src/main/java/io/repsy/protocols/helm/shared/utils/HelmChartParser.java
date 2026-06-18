@@ -21,6 +21,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
@@ -31,6 +32,13 @@ import org.yaml.snakeyaml.Yaml;
 @UtilityClass
 @NullMarked
 public class HelmChartParser {
+
+  private static final Pattern CHART_NAME_PATTERN = Pattern.compile("^[a-z0-9][a-z0-9-]*$");
+  private static final Pattern SEMVER_PATTERN =
+      Pattern.compile(
+          "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)"
+              + "(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))"
+              + "?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$");
 
   public static HelmChartMetadata parseChartYaml(final InputStream tgzStream) throws IOException {
     try (final var gzip = new GZIPInputStream(tgzStream);
@@ -52,21 +60,11 @@ public class HelmChartParser {
         || entryName.endsWith("/" + HelmConstants.CHART_YAML);
   }
 
-  @SuppressWarnings("unchecked")
   private static HelmChartMetadata parseYaml(final byte[] bytes) {
     final var yaml = new Yaml();
     final Map<String, Object> parsed = yaml.load(new ByteArrayInputStream(bytes));
-
-    final var name = (String) parsed.get("name");
-    final var version = (String) parsed.get("version");
-
-    if (name == null || name.isBlank()) {
-      throw new BadRequestException("chartNameMissing");
-    }
-    if (version == null || version.isBlank()) {
-      throw new BadRequestException("chartVersionMissing");
-    }
-
+    final var name = validateName((String) parsed.get("name"));
+    final var version = validateVersion((String) parsed.get("version"));
     return HelmChartMetadata.builder()
         .name(name)
         .version(version)
@@ -74,5 +72,25 @@ public class HelmChartParser {
         .appVersion((String) parsed.get("appVersion"))
         .type((String) parsed.get("type"))
         .build();
+  }
+
+  private static String validateName(final String name) {
+    if (name == null || name.isBlank()) {
+      throw new BadRequestException("chartNameMissing");
+    }
+    if (!CHART_NAME_PATTERN.matcher(name).matches()) {
+      throw new BadRequestException("chartNameInvalid");
+    }
+    return name;
+  }
+
+  private static String validateVersion(final String version) {
+    if (version == null || version.isBlank()) {
+      throw new BadRequestException("chartVersionMissing");
+    }
+    if (!SEMVER_PATTERN.matcher(version).matches()) {
+      throw new BadRequestException("chartVersionInvalid");
+    }
+    return version;
   }
 }

@@ -66,6 +66,13 @@ public final class NuGetPackageUtils {
   private static final int THREE = 3;
   private static final int FOUR = 4;
   private static final int REGISTRATION_PAGE_SIZE = 64;
+  private static final Pattern NUGET_ID_PATTERN =
+      Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$");
+  private static final Pattern NUGET_VERSION_PATTERN =
+      Pattern.compile(
+          "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)"
+              + "(?:\\.(0|[1-9][0-9]*))?(?:-[a-zA-Z0-9][a-zA-Z0-9.-]*)?"
+              + "(?:\\+[a-zA-Z0-9][a-zA-Z0-9.-]*)?$");
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private static final Comparator<String> VERSION_COMPARATOR =
@@ -232,7 +239,8 @@ public final class NuGetPackageUtils {
       return List.of();
     }
     try {
-      return OBJECT_MAPPER.readValue(json, new TypeReference<List<NuGetDependencyInfo>>() {});
+      return OBJECT_MAPPER.readValue(json, new TypeReference<>() {
+      });
     } catch (final Exception e) {
       log.debug("Failed to parse dependencies JSON", e);
       return List.of();
@@ -296,8 +304,22 @@ public final class NuGetPackageUtils {
     if (packageId == null || packageId.isBlank() || version == null || version.isBlank()) {
       throw new IllegalArgumentException("Missing 'id' or 'version' in nuspec.");
     }
+    validatePackageId(packageId);
+    validatePackageVersion(version);
 
     return new NuspecMetadata(packageId, normalizeNuGetVersion(version), nuspecXml);
+  }
+
+  private static void validatePackageId(final String id) {
+    if (!NUGET_ID_PATTERN.matcher(id).matches()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid NuGet package id.");
+    }
+  }
+
+  private static void validatePackageVersion(final String version) {
+    if (!NUGET_VERSION_PATTERN.matcher(version.strip()).matches()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid NuGet version format.");
+    }
   }
 
   public static void copyStreamToFile(final InputStream stream, final Path target)
