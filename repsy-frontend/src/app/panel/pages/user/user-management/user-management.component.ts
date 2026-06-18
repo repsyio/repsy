@@ -18,10 +18,9 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import moment from 'moment';
-import { finalize, map } from 'rxjs';
+import { finalize } from 'rxjs';
 
 import { PagedModelUserResponse, UserResponse } from '../../../../../generated/api';
-import { UserControllerService } from '../../../../../generated/api/api/user-controller.service';
 import { DropdownComponent } from '../../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../../shared/components/ellipsis/ellipsis.pipe';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -32,6 +31,7 @@ import { PaginationComponent } from '../../../shared/components/pagination/pagin
 import { SearchboxComponent } from '../../../shared/components/searchbox/searchbox.component';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../shared/components/tooltip/tooltip.component';
+import { UserService } from '../service/user.service';
 
 @Component({
   selector: 'app-user-management',
@@ -66,7 +66,7 @@ export class UserManagementComponent implements OnInit {
   public newPassword: string;
 
   constructor(
-    private readonly userControllerService: UserControllerService,
+    private readonly userService: UserService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
   ) {}
@@ -76,9 +76,8 @@ export class UserManagementComponent implements OnInit {
   }
 
   public fetchUsers(): void {
-    this.userControllerService
+    this.userService
       .listUsers(this.searchQuery || undefined, this.pageNum, this.pageSize)
-      .pipe(map((r) => r.data!))
       .subscribe((pagedModel) => {
         this.pagedData = pagedModel;
         this.users = pagedModel.content ?? [];
@@ -115,10 +114,9 @@ export class UserManagementComponent implements OnInit {
     this.dangerModalService.show('Reset Password', 'Reset', () => {
       this.operationLock = true;
 
-      this.userControllerService
+      this.userService
         .resetPassword(user.id)
         .pipe(
-          map((r) => r.data!),
           finalize(() => {
             this.operationLock = false;
           }),
@@ -143,7 +141,7 @@ export class UserManagementComponent implements OnInit {
     this.dangerModalService.show('Delete User', 'Delete', () => {
       this.operationLock = true;
 
-      this.userControllerService
+      this.userService
         .deleteUser(user.id)
         .pipe(
           finalize(() => {

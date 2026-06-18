@@ -20,7 +20,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 
 import { UserResponse, UserUpdateForm } from '../../../../../../generated/api';
-import { UserControllerService } from '../../../../../../generated/api';
+import { UserService } from '../../../../pages/user/service/user.service';
 import { ToastService } from '../../toast/toast.service';
 import { ToggleComponent } from '../../toggle/toggle.component';
 
@@ -43,7 +43,7 @@ export class UserEditModalComponent implements OnChanges {
 
   constructor(
     private readonly fb: FormBuilder,
-    private readonly userControllerService: UserControllerService,
+    private readonly userService: UserService,
     private readonly toastService: ToastService,
   ) {
     this.form = this.fb.group({
@@ -95,7 +95,7 @@ export class UserEditModalComponent implements OnChanges {
       role: formValue.isAdmin ? 'ADMIN' : 'USER',
     };
 
-    this.userControllerService
+    this.userService
       .updateUser(this.user.id, updateForm)
       .pipe(
         finalize(() => {

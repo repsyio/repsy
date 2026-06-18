@@ -15,12 +15,15 @@
  */
 package io.repsy.os.shared.user.controllers;
 
+import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.UserCreateForm;
 import io.repsy.os.generated.model.UserResponse;
 import io.repsy.os.generated.model.UserUpdateForm;
+import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import jakarta.validation.Valid;
@@ -36,6 +39,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -46,14 +50,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 final class UserController {
 
+  private final @NonNull PanelAuthHelper panelAuthHelper;
   private final @NonNull UserTxService userTxService;
   private final @NonNull RestResponseFactory resp;
 
   @GetMapping
   public @NonNull RestResponse<PagedModel<UserResponse>> list(
+      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestParam(required = false, defaultValue = "") final @NonNull String search,
       @RequestParam(defaultValue = "0") final int page,
       @RequestParam(defaultValue = "10") final int size) {
+
+    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
     final var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
     final var usersPage = this.userTxService.getAllUsers(search, pageable);
@@ -63,7 +71,10 @@ final class UserController {
 
   @PostMapping
   public @NonNull RestResponse<UserResponse> createUser(
+      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @Valid @RequestBody final @NonNull UserCreateForm dto) {
+
+    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
     final var createdUser = this.userTxService.createUserWithRole(dto);
 
@@ -72,8 +83,11 @@ final class UserController {
 
   @PutMapping("/{userId}")
   public @NonNull RestResponse<UserResponse> updateUser(
+      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @PathVariable final @NonNull UUID userId,
       @Valid @RequestBody final @NonNull UserUpdateForm dto) {
+
+    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
     final var updatedUser = this.userTxService.updateUserDetails(userId, dto);
 
@@ -81,7 +95,11 @@ final class UserController {
   }
 
   @DeleteMapping("/{userId}")
-  public @NonNull RestResponse<Void> deleteUser(@PathVariable final @NonNull UUID userId) {
+  public @NonNull RestResponse<Void> deleteUser(
+      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
+      @PathVariable final @NonNull UUID userId) {
+
+    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
     this.userTxService.deleteUserById(userId);
 
@@ -89,7 +107,11 @@ final class UserController {
   }
 
   @PostMapping("/{userId}/actions/reset-password")
-  public @NonNull RestResponse<String> resetPassword(@PathVariable final @NonNull UUID userId) {
+  public @NonNull RestResponse<String> resetPassword(
+      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
+      @PathVariable final @NonNull UUID userId) {
+
+    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
     final var newPassword = this.userTxService.resetUserPassword(userId);
 

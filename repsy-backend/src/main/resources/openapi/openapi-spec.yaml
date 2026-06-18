@@ -10,6 +10,11 @@ paths:
         - user-controller
       operationId: updateUser
       parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
         - name: userId
           in: path
           required: true
@@ -29,12 +34,21 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseUserResponse"
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Admin role required
       summary: Update a user
     delete:
       tags:
         - user-controller
       operationId: deleteUser
       parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
         - name: userId
           in: path
           required: true
@@ -48,6 +62,10 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Admin role required
       summary: Delete a user
   "/api/repos/{repoName}/settings":
     get:
@@ -187,6 +205,11 @@ paths:
         - user-controller
       operationId: listUsers
       parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
         - name: search
           in: query
           required: false
@@ -214,11 +237,21 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelUserResponse"
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Admin role required
       summary: List all users
     post:
       tags:
         - user-controller
       operationId: createUser
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
       requestBody:
         content:
           application/json:
@@ -232,6 +265,10 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseUserResponse"
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Admin role required
       summary: Create a new user
   "/api/users/{userId}/actions/reset-password":
     post:
@@ -239,6 +276,11 @@ paths:
         - user-controller
       operationId: resetPassword
       parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
         - name: userId
           in: path
           required: true
@@ -252,6 +294,10 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Admin role required
       summary: Reset a user's password
   "/api/repos/{repoType}":
     post:
@@ -457,6 +503,12 @@ paths:
       tags:
         - usage-controller
       operationId: getTotalUsage
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: OK
@@ -464,6 +516,8 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseTotalUsageInfo"
+        '401':
+          description: Missing or invalid token
       summary: Get total usage statistics
   "/api/repos/{repoType}/info":
     get:

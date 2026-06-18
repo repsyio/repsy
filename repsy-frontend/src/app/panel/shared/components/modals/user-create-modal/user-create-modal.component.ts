@@ -21,7 +21,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 
 import { UserCreateForm } from '../../../../../../generated/api';
-import { UserControllerService } from '../../../../../../generated/api/api/user-controller.service';
+import { UserService } from '../../../../pages/user/service/user.service';
 import { ToastService } from '../../toast/toast.service';
 import { ToggleComponent } from '../../toggle/toggle.component';
 
@@ -43,7 +43,7 @@ export class UserCreateModalComponent {
   public showConfirmPassword = false;
 
   constructor(
-    private readonly userControllerService: UserControllerService,
+    private readonly userService: UserService,
     private readonly fb: FormBuilder,
     private readonly toastService: ToastService,
   ) {
@@ -117,7 +117,7 @@ export class UserCreateModalComponent {
       role: this.form.value.isAdmin ? 'ADMIN' : 'USER',
     };
 
-    this.userControllerService
+    this.userService
       .createUser(payload)
       .pipe(
         finalize(() => {
