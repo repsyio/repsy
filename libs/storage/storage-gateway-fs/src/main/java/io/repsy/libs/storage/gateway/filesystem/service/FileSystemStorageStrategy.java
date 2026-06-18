@@ -22,6 +22,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
+import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import io.repsy.libs.storage.core.exceptions.IsADirectoryException;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import java.io.File;
@@ -80,8 +81,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   public @NonNull Optional<Resource> get(
       final @NonNull StoragePath storagePath, final @NonNull String repoName)
       throws IsADirectoryException {
-    final UrlResource urlResource =
-        new UrlResource(this.basePath.resolve(storagePath.getPath()).toUri());
+    final UrlResource urlResource = new UrlResource(this.toPhysicalPath(storagePath).toUri());
 
     if (!urlResource.exists()) {
       return Optional.empty();
@@ -128,10 +128,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   @SneakyThrows
   @Override
   public @NonNull List<StorageItemInfo> listStorageItems(final @NonNull StoragePath storagePath) {
-    final Path path =
-        (storagePath.getStorageKey() == null)
-            ? this.basePath.resolve(storagePath.getPath())
-            : this.toPhysicalPath(storagePath);
+    final Path path = this.toPhysicalPath(storagePath);
 
     try (final Stream<Path> stream =
         storagePath.getStorageKey() == null ? Files.list(path) : Files.walk(path)) {
@@ -248,7 +245,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   @SneakyThrows
   @Override
   public void deleteDirectory(final @NonNull StoragePath storagePath) {
-    final Path basePathObj = this.basePath.resolve(storagePath.getPath());
+    final Path basePathObj = this.toPhysicalPath(storagePath);
     final String relativePath =
         String.join(
             "/",
@@ -326,13 +323,18 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   @SneakyThrows
   @Override
   public void renameObject(final @NonNull StoragePath storagePath, final @NonNull String digest) {
-    final Path basePathObj = this.basePath.resolve(storagePath.getPath());
+    final Path basePathObj = this.toPhysicalPath(storagePath);
     final Path renamedPath = basePathObj.resolveSibling(digest);
     Files.move(basePathObj, renamedPath);
   }
 
   private @NonNull Path toPhysicalPath(final @NonNull StoragePath storagePath) {
-    return this.basePath.resolve(storagePath.getPath());
+    final var normalized = this.basePath.normalize();
+    final var resolved = normalized.resolve(storagePath.getPath()).normalize();
+    if (!resolved.startsWith(normalized)) {
+      throw new InvalidStoragePathException("invalidStoragePath");
+    }
+    return resolved;
   }
 
   private void addItems(

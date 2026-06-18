@@ -28,6 +28,7 @@ import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
+import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import io.repsy.protocols.golang.shared.exceptions.GoVersionGoneException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -159,6 +160,24 @@ public class ErrorHandler {
     return ResponseEntity.status(HttpStatus.FORBIDDEN)
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(messageText, ex.getMessage()));
+  }
+
+  @ExceptionHandler(InvalidStoragePathException.class)
+  @Nullable ResponseEntity<RestResponse<String>> handleException(
+      final @NonNull InvalidStoragePathException ex,
+      final @NonNull HttpServletRequest request,
+      final @Nullable HttpServletResponse response) {
+
+    if (response == null) {
+      log.debug("Invalid storage path", ex);
+      return null;
+    }
+
+    log.info(exceptionToString(ex, request));
+
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(this.resp.error("invalidStoragePath", ex.getMessage()));
   }
 
   @ExceptionHandler(BadRequestException.class)
