@@ -27,7 +27,8 @@ public enum RepoType {
   CARGO("cargo__"),
   GOLANG("go__"),
   HELM("helm__"),
-  NUGET("nuget__");
+  NUGET("nuget__"),
+  RUBY("ruby__");
 
   private final @NonNull String prefix;
 

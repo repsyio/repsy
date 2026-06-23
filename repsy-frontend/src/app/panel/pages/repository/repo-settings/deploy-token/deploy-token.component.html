@@ -383,6 +383,17 @@
       >
       </app-nuget-config>
     }
+    @case (RepoType.RUBY) {
+      <app-ruby-config
+        (openChange)="openConfigure($event)"
+        [(open)]="showConfig"
+        [baseUrl]="this.environment.repoBaseUrl"
+        [username]="this.selectedDeployToken.username"
+        [repoName]="this.activeRepository.repoName"
+        [deployToken]="true"
+      >
+      </app-ruby-config>
+    }
     @default {
       <p>No config available for this repository.</p>
     }

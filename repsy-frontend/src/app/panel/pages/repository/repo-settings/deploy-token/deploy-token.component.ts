@@ -45,6 +45,7 @@ import { MavenConfigComponent } from '../../maven/config/maven-config.component'
 import { NpmConfigComponent } from '../../npm/config/npm-config.component';
 import { NugetConfigComponent } from '../../nuget/config/nuget-config.component';
 import { PypiConfigComponent } from '../../pypi/config/pypi-config.component';
+import { RubyConfigComponent } from '../../ruby/config/ruby-config.component';
 import { DeployTokenInfo } from './dto/deploy-token-info';
 import { TokenCreateInfo } from './dto/token-create-info';
 
@@ -67,6 +68,7 @@ import { TokenCreateInfo } from './dto/token-create-info';
     NugetConfigComponent,
     PypiConfigComponent,
     NpmConfigComponent,
+    RubyConfigComponent,
     EllipsisPipe,
     CommonModule,
     RouterLink,

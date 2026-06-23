@@ -2355,6 +2355,163 @@ paths:
         required: true
         schema:
           type: string
+  "/api/ruby/gems/{repoName}":
+    get:
+      tags:
+        - ruby-gem-api-controller
+      operationId: listGems
+      parameters:
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelGemListItem"
+      summary: List gems in a Ruby repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/ruby/gems/{repoName}/{gemName}":
+    delete:
+      tags:
+        - ruby-gem-api-controller
+      operationId: deleteGem
+      parameters:
+        - name: gemName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a Ruby gem
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/ruby/gems/{repoName}/{gemName}/versions":
+    get:
+      tags:
+        - ruby-gem-api-controller
+      operationId: listGemVersions
+      parameters:
+        - name: gemName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelGemVersionListItem"
+      summary: List versions of a Ruby gem
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/ruby/gems/{repoName}/{gemName}/versions/{versionName}":
+    get:
+      tags:
+        - ruby-gem-api-controller
+      operationId: getGemVersion
+      parameters:
+        - name: gemName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: platform
+          in: query
+          required: false
+          schema:
+            type: string
+            default: 'ruby'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseGemVersionInfo"
+      summary: Get a specific Ruby gem version
+    delete:
+      tags:
+        - ruby-gem-api-controller
+      operationId: deleteGemVersion
+      parameters:
+        - name: gemName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versionName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: platform
+          in: query
+          required: false
+          schema:
+            type: string
+            default: 'ruby'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Delete a specific Ruby gem version
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
   "/api/helm/charts/{repoName}":
     get:
       tags:
@@ -4471,3 +4628,125 @@ components:
         - NUGET
         - GOLANG
         - HELM
+        - RUBY
+    GemListItem:
+      type: object
+      properties:
+        name:
+          type: string
+        latest:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+    PagedModelGemListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/GemListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelGemListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelGemListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    GemVersionListItem:
+      type: object
+      properties:
+        version:
+          type: string
+        platform:
+          type: string
+        yanked:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    PagedModelGemVersionListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/GemVersionListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelGemVersionListItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelGemVersionListItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    GemDependencyInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        requirements:
+          type: string
+        type:
+          type: string
+    GemVersionInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: string
+        platform:
+          type: string
+        checksum:
+          type: string
+        authors:
+          type: string
+        description:
+          type: string
+        homepage:
+          type: string
+        requiredRubyVersion:
+          type: string
+        yanked:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        runtimeDependencies:
+          type: array
+          items:
+            "$ref": "#/components/schemas/GemDependencyInfo"
+        developmentDependencies:
+          type: array
+          items:
+            "$ref": "#/components/schemas/GemDependencyInfo"
+    RestResponseGemVersionInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/GemVersionInfo"
+        errorCode:
+          type: string
+        text:
+          type: string

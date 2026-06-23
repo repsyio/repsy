@@ -74,6 +74,7 @@ export class RepositoryComponent {
     RepoType.GOLANG,
     RepoType.HELM,
     RepoType.NUGET,
+    RepoType.RUBY,
   ];
   public loading = true;
   public operationLock = false;
@@ -174,6 +175,7 @@ export class RepositoryComponent {
     this.fetchRepositories(RepoType.GOLANG);
     this.fetchRepositories(RepoType.HELM);
     this.fetchRepositories(RepoType.NUGET);
+    this.fetchRepositories(RepoType.RUBY);
   }
 
   private fetchRepositories(repoType: RepoType): void {

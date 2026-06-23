@@ -94,4 +94,9 @@ export const REPOSITORY_DYNAMIC_ROUTES: Routes = [
     canMatch: [canMatchRepoType('nuget')],
     loadChildren: () => import('../nuget/nuget.routes').then((m) => m.NUGET_ROUTES),
   },
+  {
+    path: '',
+    canMatch: [canMatchRepoType('ruby')],
+    loadChildren: () => import('../ruby/ruby.routes').then((m) => m.RUBY_ROUTES),
+  },
 ];

@@ -18,10 +18,14 @@ package io.repsy.os.server.protocols.shared.aop.config;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -38,7 +42,8 @@ public class ProtocolBundleConfig {
       @Qualifier("pypiAuthComponent") final ProtocolAuthService pypi,
       @Qualifier("golangAuthComponent") final ProtocolAuthService golang,
       @Qualifier("helmAuthComponent") final ProtocolAuthService helm,
-      @Qualifier("nuGetAuthComponent") final ProtocolAuthService nuget) {
+      @Qualifier("nuGetAuthComponent") final ProtocolAuthService nuget,
+      @Qualifier("rubyAuthComponent") final ProtocolAuthService ruby) {
 
     final var map = new HashMap<RepoType, ProtocolAuthService>();
     map.put(RepoType.CARGO, cargo);
@@ -49,6 +54,7 @@ public class ProtocolBundleConfig {
     map.put(RepoType.GOLANG, golang);
     map.put(RepoType.HELM, helm);
     map.put(RepoType.NUGET, nuget);
+    map.put(RepoType.RUBY, ruby);
     return map;
   }
 
@@ -61,7 +67,8 @@ public class ProtocolBundleConfig {
       @Qualifier("pypiApiFacade") final ProtocolApiFacade pypi,
       @Qualifier("golangApiFacade") final ProtocolApiFacade golang,
       @Qualifier("helmApiFacade") final ProtocolApiFacade helm,
-      @Qualifier("nugetApiFacade") final ProtocolApiFacade nuget) {
+      @Qualifier("nugetApiFacade") final ProtocolApiFacade nuget,
+      @Qualifier("rubyApiFacade") final ProtocolApiFacade ruby) {
 
     final var map = new HashMap<RepoType, ProtocolApiFacade>();
     map.put(RepoType.CARGO, cargo);
@@ -72,6 +79,35 @@ public class ProtocolBundleConfig {
     map.put(RepoType.GOLANG, golang);
     map.put(RepoType.HELM, helm);
     map.put(RepoType.NUGET, nuget);
+    map.put(RepoType.RUBY, ruby);
     return map;
+  }
+
+  @Bean
+  public ApplicationListener<ApplicationReadyEvent> protocolRegistryValidator(
+      final Map<RepoType, ProtocolAuthService> protocolAuthServiceMap,
+      final Map<RepoType, ProtocolApiFacade> protocolApiFacadeMap) {
+
+    return event -> {
+      assertComplete("protocolAuthServiceMap", protocolAuthServiceMap);
+      assertComplete("protocolApiFacadeMap", protocolApiFacadeMap);
+    };
+  }
+
+  private static void assertComplete(final String mapName, final Map<RepoType, ?> map) {
+    final var missing =
+        Arrays.stream(RepoType.values())
+            .filter(type -> !map.containsKey(type))
+            .map(Enum::name)
+            .collect(Collectors.joining(", "));
+
+    if (!missing.isEmpty()) {
+      throw new IllegalStateException(
+          "ProtocolBundleConfig: "
+              + mapName
+              + " is missing entries for RepoType(s): "
+              + missing
+              + " — add the @Qualifier parameter and map.put() for each.");
+    }
   }
 }

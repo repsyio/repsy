@@ -1,0 +1,129 @@
+@if (loading) {
+  <app-spinner />
+} @else {
+  @if (!this.error) {
+    @if (gemVersion) {
+      <div class="mb-4" animate.enter="fade-in-up">
+        <div
+          class="mb-4 inline-flex gap-2 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[16px] py-[6px] text-[14px] text-[#FDFDFD]"
+        >
+          <img ngSrc="/assets/icons/cursor/tick.svg" alt="tick" height="12" width="16" />
+          {{ gemVersion.version }}
+          @if (gemVersion.yanked) {
+            <span class="text-error-500 ml-1">(yanked)</span>
+          }
+        </div>
+        <p class="font-courier mb-8 text-[12px] text-[#9C9C9D]">
+          Published: {{ gemVersion.createdAt | date: 'medium' }}
+        </p>
+
+        <h3 class="mb-2 text-[13px] text-white">Install:</h3>
+        <div class="mb-8 inline-flex items-start gap-2 rounded-lg bg-[#101112] p-[14px]">
+          <img class="h-5 w-5" ngSrc="/assets/icons/ruby/ruby.svg" alt="Ruby" height="20" width="20" />
+          <span class="text-[13px] break-all text-[#9C9C9D]">{{ installCommand }}</span>
+          <app-copy-clipboard [text]="installCommand" />
+        </div>
+
+        <h3 class="mb-2 text-[13px] text-white">Gemfile:</h3>
+        <div class="relative mb-6 overflow-x-auto rounded-lg border border-[#2A2A2A] bg-[#0C0C0C]">
+          <div class="flex items-center justify-between gap-2 border-b border-[#2A2A2A] p-4">
+            <span class="text-[14px] text-[#FDFDFD]">Gemfile</span>
+            <app-copy-clipboard [text]="gemfileSnippet" />
+          </div>
+          <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
+        <code [highlight]="gemfileSnippet" language="ruby" lineNumbers>
+        </code>
+      </pre>
+        </div>
+
+        <div class="mb-8 rounded-lg bg-[#101112] p-[22px] text-[24px]">
+          <h3 class="text-neutral-200">{{ gemName }}</h3>
+        </div>
+
+        <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Metadata</h2>
+        <div class="mb-8 flex flex-col gap-2 text-[14px]">
+          <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+            <span class="text-white">Platform: </span>
+            <span class="text-[#9C9C9D]">{{ gemVersion.platform }}</span>
+          </div>
+          <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+            <span class="text-white">Checksum (SHA256): </span>
+            <span class="font-courier break-all text-[12px] text-[#9C9C9D]">{{ gemVersion.checksum }}</span>
+          </div>
+          @if (gemVersion.requiredRubyVersion) {
+            <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+              <span class="text-white">Required Ruby: </span>
+              <span class="text-[#9C9C9D]">{{ gemVersion.requiredRubyVersion }}</span>
+            </div>
+          }
+          @if (gemVersion.authors) {
+            <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+              <span class="text-white">Authors: </span>
+              <span class="text-[#9C9C9D]">{{ gemVersion.authors }}</span>
+            </div>
+          }
+          @if (gemVersion.homepage) {
+            <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+              <span class="text-white">Homepage: </span>
+              <a class="text-blue-400 hover:underline break-all" [href]="gemVersion.homepage" target="_blank" rel="noopener">
+                {{ gemVersion.homepage }}
+              </a>
+            </div>
+          }
+          @if (gemVersion.description) {
+            <div class="inline-flex flex-wrap items-start gap-2 rounded-lg bg-[#101112] p-[14px]">
+              <span class="text-white">Description: </span>
+              <span class="text-[#9C9C9D]">{{ gemVersion.description }}</span>
+            </div>
+          }
+        </div>
+
+        @if (gemVersion.runtimeDependencies && gemVersion.runtimeDependencies.length > 0) {
+          <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Runtime Dependencies</h2>
+          <div class="mb-8 flex flex-col gap-2 text-[14px]">
+            @for (dep of gemVersion.runtimeDependencies; track dep.name) {
+              <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+                <span class="text-white">{{ dep.name }}</span>
+                <span class="text-[#9C9C9D]">{{ dep.requirements }}</span>
+              </div>
+            }
+          </div>
+        }
+
+        @if (gemVersion.developmentDependencies && gemVersion.developmentDependencies.length > 0) {
+          <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Development Dependencies</h2>
+          <div class="mb-8 flex flex-col gap-2 text-[14px]">
+            @for (dep of gemVersion.developmentDependencies; track dep.name) {
+              <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
+                <span class="text-white">{{ dep.name }}</span>
+                <span class="text-[#9C9C9D]">{{ dep.requirements }}</span>
+              </div>
+            }
+          </div>
+        }
+
+        @if (activeRepo.canManage) {
+          <button
+            (click)="deleteVersion()"
+            [disabled]="loading"
+            class="repsy-btn-danger group ml-auto w-full sm:w-auto"
+          >
+            <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+            Delete Version
+          </button>
+        }
+      </div>
+    }
+  } @else {
+    <div animate.enter="fade-in-up" class="p-8 text-center">
+      <img
+        class="mx-auto mb-[70px]"
+        ngSrc="/assets/images/hippo-empty.svg"
+        alt="hippo-empty"
+        height="243"
+        width="510"
+      />
+      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+    </div>
+  }
+}

@@ -24,6 +24,7 @@ export enum RepoType {
   GOLANG = 'golang',
   HELM = 'helm',
   NUGET = 'nuget',
+  RUBY = 'ruby',
 }
 
 export enum RepoSupport {

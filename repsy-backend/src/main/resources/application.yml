@@ -109,3 +109,6 @@ os:
         nuget:
           base-path: ${storage-gateway.fs.base-path}/nuget
           trash-path: ${storage-gateway.fs.base-path}/nuget/trash
+        ruby:
+          base-path: ${storage-gateway.fs.base-path}/ruby
+          trash-path: ${storage-gateway.fs.base-path}/ruby/trash

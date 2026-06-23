@@ -52,6 +52,7 @@ export class RepositoryCreateModalComponent implements OnInit {
     RepoType.GOLANG,
     RepoType.HELM,
     RepoType.NUGET,
+    RepoType.RUBY,
   ];
   public form: FormGroup;
 
