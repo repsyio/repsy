@@ -16,9 +16,9 @@
 package io.repsy.os.server.protocols.ruby.ui.facades;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemListItem;
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemVersionInfo;
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemVersionListItem;
+import io.repsy.os.generated.model.GemListItem;
+import io.repsy.os.generated.model.GemVersionInfo;
+import io.repsy.os.generated.model.GemVersionListItem;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.services.RubyGemServiceImpl;
 import io.repsy.os.server.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;

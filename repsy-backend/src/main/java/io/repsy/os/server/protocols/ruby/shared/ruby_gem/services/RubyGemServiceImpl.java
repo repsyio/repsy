@@ -18,10 +18,15 @@ package io.repsy.os.server.protocols.ruby.shared.ruby_gem.services;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.*;
+import io.repsy.os.generated.model.GemListItem;
+import io.repsy.os.generated.model.GemVersionInfo;
+import io.repsy.os.generated.model.GemVersionListItem;
+import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemNameProjection;
+import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemVersionCompactItem;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGem;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGemDependency;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGemVersion;
+import io.repsy.os.server.protocols.ruby.shared.ruby_gem.mappers.RubyGemConverter;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemDependencyRepository;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemRepository;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemVersionRepository;
@@ -56,6 +61,7 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
   private final RubyGemVersionRepository versionRepository;
   private final RubyGemDependencyRepository dependencyRepository;
   private final RepoRepository repoRepository;
+  private final RubyGemConverter converter;
 
   @Override
   public List<String> getGemNames(final BaseRepoInfo<UUID> repoInfo) {
@@ -126,12 +132,16 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
 
   public Page<GemListItem> findAllGems(
       final UUID repoId, final String name, final Pageable pageable) {
-    return this.gemRepository.findAllByRepoIdContainsName(repoId, name, pageable);
+    return this.gemRepository
+        .findAllByRepoIdContainsName(repoId, name, pageable)
+        .map(this.converter::toGemListItemDto);
   }
 
   public Page<GemVersionListItem> findAllVersions(
       final UUID gemId, final String version, final Pageable pageable) {
-    return this.versionRepository.findAllByGemId(gemId, version, pageable);
+    return this.versionRepository
+        .findAllByGemId(gemId, version, pageable)
+        .map(this.converter::toGemVersionListItemDto);
   }
 
   public GemVersionInfo getVersionInfo(
@@ -140,45 +150,8 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
         this.versionRepository
             .findByGemIdAndVersionAndPlatform(gemId, version, platform)
             .orElseThrow(() -> new ItemNotFoundException(GEM_VERSION_NOT_FOUND));
-
     final var deps = this.dependencyRepository.findAllByGemVersionId(gemVersion.getId());
-    final var runtimeDeps =
-        deps.stream()
-            .filter(d -> RUNTIME_TYPE.equals(d.getType()))
-            .map(
-                d ->
-                    GemDependencyInfo.builder()
-                        .name(d.getName())
-                        .requirements(d.getRequirements())
-                        .type(d.getType())
-                        .build())
-            .toList();
-    final var devDeps =
-        deps.stream()
-            .filter(d -> !RUNTIME_TYPE.equals(d.getType()))
-            .map(
-                d ->
-                    GemDependencyInfo.builder()
-                        .name(d.getName())
-                        .requirements(d.getRequirements())
-                        .type(d.getType())
-                        .build())
-            .toList();
-
-    return GemVersionInfo.builder()
-        .id(gemVersion.getId())
-        .version(gemVersion.getVersion())
-        .platform(gemVersion.getPlatform())
-        .checksum(gemVersion.getChecksum())
-        .authors(gemVersion.getAuthors())
-        .description(gemVersion.getDescription())
-        .homepage(gemVersion.getHomepage())
-        .requiredRubyVersion(gemVersion.getRequiredRubyVersion())
-        .yanked(gemVersion.isYanked())
-        .createdAt(gemVersion.getCreatedAt())
-        .runtimeDependencies(runtimeDeps)
-        .developmentDependencies(devDeps)
-        .build();
+    return this.converter.toGemVersionInfoDto(gemVersion, deps);
   }
 
   public UUID getGemId(final UUID repoId, final String gemName) {

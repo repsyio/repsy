@@ -16,8 +16,10 @@
 package io.repsy.os.server.protocols.ruby.shared.ruby_gem.mappers;
 
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemInfo;
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemVersionInfo;
+import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemListItem;
+import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemVersionListItem;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGem;
+import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGemDependency;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGemVersion;
 import io.repsy.os.shared.repo.entities.Repo;
 import java.util.List;
@@ -29,18 +31,28 @@ import org.mapstruct.MappingConstants;
 @NullMarked
 public interface RubyGemConverter {
 
-  default GemInfo toGemInfo(final RubyGem gem, final Repo repo) {
-    return GemInfo.builder()
-        .id(gem.getId())
-        .repoName(repo.getName())
-        .name(gem.getName())
-        .latest(gem.getLatest())
-        .createdAt(gem.getCreatedAt())
-        .build();
-  }
+  io.repsy.os.generated.model.GemListItem toGemListItemDto(GemListItem source);
 
-  default GemVersionInfo toGemVersionInfo(final RubyGemVersion version) {
-    return GemVersionInfo.builder()
+  io.repsy.os.generated.model.GemVersionListItem toGemVersionListItemDto(GemVersionListItem source);
+
+  io.repsy.os.generated.model.GemDependencyInfo toDependencyInfoDto(RubyGemDependency entity);
+
+  default io.repsy.os.generated.model.GemVersionInfo toGemVersionInfoDto(
+      final RubyGemVersion version, final List<RubyGemDependency> deps) {
+
+    final var runtimeDeps =
+        deps.stream()
+            .filter(d -> "runtime".equals(d.getType()))
+            .map(this::toDependencyInfoDto)
+            .toList();
+
+    final var devDeps =
+        deps.stream()
+            .filter(d -> !"runtime".equals(d.getType()))
+            .map(this::toDependencyInfoDto)
+            .toList();
+
+    return io.repsy.os.generated.model.GemVersionInfo.builder()
         .id(version.getId())
         .version(version.getVersion())
         .platform(version.getPlatform())
@@ -51,8 +63,18 @@ public interface RubyGemConverter {
         .requiredRubyVersion(version.getRequiredRubyVersion())
         .yanked(version.isYanked())
         .createdAt(version.getCreatedAt())
-        .runtimeDependencies(List.of())
-        .developmentDependencies(List.of())
+        .runtimeDependencies(runtimeDeps)
+        .developmentDependencies(devDeps)
+        .build();
+  }
+
+  default GemInfo toGemInfo(final RubyGem gem, final Repo repo) {
+    return GemInfo.builder()
+        .id(gem.getId())
+        .repoName(repo.getName())
+        .name(gem.getName())
+        .latest(gem.getLatest())
+        .createdAt(gem.getCreatedAt())
         .build();
   }
 }
