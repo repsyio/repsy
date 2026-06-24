@@ -73,12 +73,6 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
   }
 
   @Override
-  public List<GemCompactEntry> getAllCompactEntries(final BaseRepoInfo<UUID> repoInfo) {
-    final var rows = this.versionRepository.findAllCompactByRepoId(repoInfo.getId());
-    return this.toCompactEntries(rows);
-  }
-
-  @Override
   public List<GemCompactEntry> getCompactEntriesByGemName(
       final BaseRepoInfo<UUID> repoInfo, final String gemName) {
     final var gem =
