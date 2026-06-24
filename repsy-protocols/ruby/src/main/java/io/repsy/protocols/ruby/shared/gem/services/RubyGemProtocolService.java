@@ -27,7 +27,6 @@ public interface RubyGemProtocolService<ID> {
 
   List<String> getGemNames(BaseRepoInfo<ID> repoInfo);
 
-
   List<GemCompactEntry> getCompactEntriesByGemName(BaseRepoInfo<ID> repoInfo, String gemName);
 
   void publishGem(BaseRepoInfo<ID> repoInfo, GemMetadata metadata, String checksum);
