@@ -39,7 +39,7 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
   @Query(
       """
       select gv.version as version, gv.platform as platform,
-             gv.yanked as yanked, gv.createdAt as createdAt
+        gv.yanked as yanked, gv.createdAt as createdAt
       from RubyGemVersion gv
       where gv.gem.id = :gemId
         and (:version is null or gv.version like %:version%)
@@ -49,9 +49,9 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
   @Query(
       """
       select gv.id as gemVersionId, g.name as gemName,
-             gv.version as version, gv.platform as platform,
-             gv.checksum as checksum, gv.yanked as yanked,
-             gv.createdAt as createdAt
+        gv.version as version, gv.platform as platform,
+        gv.checksum as checksum, gv.yanked as yanked,
+        gv.createdAt as createdAt
       from RubyGemVersion gv join gv.gem g
       where gv.gem.id = :gemId
       order by gv.createdAt
@@ -61,9 +61,9 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
   @Query(
       """
       select gv.id as gemVersionId, g.name as gemName,
-             gv.version as version, gv.platform as platform,
-             gv.checksum as checksum, gv.yanked as yanked,
-             gv.createdAt as createdAt
+        gv.version as version, gv.platform as platform,
+        gv.checksum as checksum, gv.yanked as yanked,
+        gv.createdAt as createdAt
       from RubyGemVersion gv join gv.gem g join g.repo r
       where r.id = :repoId
       order by g.name, gv.createdAt

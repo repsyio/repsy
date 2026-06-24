@@ -59,16 +59,39 @@
                 [ngClass]="{ 'rounded-b-[12px]': i === gems.length - 1 }"
                 class="grid grid-cols-[2fr_2fr_2fr_30px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
-                <app-tooltip
-                  class="text-secondary-500 group-hover:underline"
-                  [text]="gem.name | ellipsis: 35"
-                  [textHover]="gem.name"
-                />
-                <app-tooltip
-                  class="text-[#FDFDFD]"
-                  [text]="gem.latest | ellipsis: 20"
-                  [textHover]="gem.latest"
-                />
+                <div class="flex items-center gap-2">
+                  <img ngSrc="/assets/icons/repo/cube-outline.svg" alt="cube" height="20" width="20" />
+                  <app-tooltip
+                    class="text-secondary-500 group-hover:underline"
+                    [text]="gem.name | ellipsis: 35"
+                    [textHover]="gem.name"
+                  />
+                </div>
+                <a
+                  class="group text-secondary-500 flex w-max gap-2 text-[14px]"
+                  [routerLink]="'/' + activeRepo.repoName + '/' + gem.name + '/' + gem.latest"
+                  (click)="$event.stopPropagation()"
+                >
+                  <app-tooltip
+                    class="group-hover:underline"
+                    [text]="gem.latest | ellipsis: 20"
+                    [textHover]="gem.latest"
+                  />
+                  <svg
+                    class="mt-[2px] h-[14px] w-[14px] text-[#9FA0A0] group-hover:text-white"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M4.93386 4.13083L9.90503 4.13076M9.90503 4.13076L9.90503 9.03122M9.90503 4.13076L4.13032 9.90547"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </a>
                 @if (gem.updatedAt) {
                   <app-tooltip
                     class="text-secondary-500 group-hover:underline"
@@ -121,11 +144,34 @@
               <div class="space-y-2">
                 <div class="flex justify-between gap-2">
                   <span class="text-sm text-[#9FA0A0]">Gem:</span>
-                  <span class="text-secondary-500 text-right break-all">{{ gem.name }}</span>
+                  <span class="text-secondary-500 flex items-center gap-1 text-right break-all">
+                    <img ngSrc="/assets/icons/repo/cube-outline.svg" alt="cube" height="16" width="16" />
+                    {{ gem.name }}
+                  </span>
                 </div>
                 <div class="flex justify-between gap-2">
                   <span class="text-sm text-[#9FA0A0]">Latest:</span>
-                  <span class="text-right break-all text-[#FDFDFD]">{{ gem.latest }}</span>
+                  <a
+                    class="group text-secondary-500 flex items-center gap-1 text-right text-sm break-all hover:underline"
+                    [routerLink]="'/' + activeRepo.repoName + '/' + gem.name + '/' + gem.latest"
+                    (click)="$event.stopPropagation()"
+                  >
+                    {{ gem.latest }}
+                    <svg
+                      class="h-[12px] w-[12px] shrink-0 text-[#9FA0A0] group-hover:text-white"
+                      viewBox="0 0 14 14"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M4.93386 4.13083L9.90503 4.13076M9.90503 4.13076L9.90503 9.03122M9.90503 4.13076L4.13032 9.90547"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </a>
                 </div>
                 <div class="flex justify-between gap-2">
                   <span class="text-sm text-[#9FA0A0]">Last Updated:</span>

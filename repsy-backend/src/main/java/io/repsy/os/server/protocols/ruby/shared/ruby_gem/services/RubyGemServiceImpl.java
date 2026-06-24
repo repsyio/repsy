@@ -18,15 +18,10 @@ package io.repsy.os.server.protocols.ruby.shared.ruby_gem.services;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemDependencyInfo;
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemListItem;
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemVersionCompactItem;
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemVersionInfo;
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemVersionListItem;
+import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.*;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGem;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGemDependency;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGemVersion;
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.mappers.RubyGemConverter;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemDependencyRepository;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemRepository;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemVersionRepository;
@@ -61,12 +56,11 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
   private final RubyGemVersionRepository versionRepository;
   private final RubyGemDependencyRepository dependencyRepository;
   private final RepoRepository repoRepository;
-  private final RubyGemConverter converter;
 
   @Override
   public List<String> getGemNames(final BaseRepoInfo<UUID> repoInfo) {
     return this.gemRepository.findAllNamesByRepoId(repoInfo.getId()).stream()
-        .map(p -> p.getName())
+        .map(GemNameProjection::getName)
         .toList();
   }
 
@@ -93,7 +87,7 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
       final BaseRepoInfo<UUID> repoInfo, final GemMetadata metadata, final String checksum) {
     final var repo = this.requireRepo(repoInfo.getId());
     final var gem = this.upsertGem(repo, metadata.getName(), metadata.getVersion());
-    this.upsertVersion(gem, metadata, checksum);
+    this.upsertVersion(gem, metadata, checksum, repoInfo.isAllowOverride());
   }
 
   @Override
@@ -122,10 +116,11 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
     if (gem.getLatest().equals(version)) {
       this.versionRepository
           .findFirstByGemIdAndYankedFalseOrderByCreatedAtDesc(gem.getId())
-          .ifPresent(v -> {
-            gem.setLatest(v.getVersion());
-            this.gemRepository.save(gem);
-          });
+          .ifPresent(
+              v -> {
+                gem.setLatest(v.getVersion());
+                this.gemRepository.save(gem);
+              });
     }
   }
 
@@ -150,20 +145,24 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
     final var runtimeDeps =
         deps.stream()
             .filter(d -> RUNTIME_TYPE.equals(d.getType()))
-            .map(d -> GemDependencyInfo.builder()
-                .name(d.getName())
-                .requirements(d.getRequirements())
-                .type(d.getType())
-                .build())
+            .map(
+                d ->
+                    GemDependencyInfo.builder()
+                        .name(d.getName())
+                        .requirements(d.getRequirements())
+                        .type(d.getType())
+                        .build())
             .toList();
     final var devDeps =
         deps.stream()
             .filter(d -> !RUNTIME_TYPE.equals(d.getType()))
-            .map(d -> GemDependencyInfo.builder()
-                .name(d.getName())
-                .requirements(d.getRequirements())
-                .type(d.getType())
-                .build())
+            .map(
+                d ->
+                    GemDependencyInfo.builder()
+                        .name(d.getName())
+                        .requirements(d.getRequirements())
+                        .type(d.getType())
+                        .build())
             .toList();
 
     return GemVersionInfo.builder()
@@ -245,37 +244,58 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
   private RubyGem upsertGem(final Repo repo, final String name, final String version) {
     return this.gemRepository
         .findByRepoIdAndName(repo.getId(), name)
-        .map(g -> {
-          g.setLatest(version);
-          return this.gemRepository.save(g);
-        })
-        .orElseGet(() -> {
-          final var gem = new RubyGem();
-          gem.setRepo(repo);
-          gem.setName(name);
-          gem.setLatest(version);
-          return this.gemRepository.save(gem);
-        });
+        .map(
+            g -> {
+              g.setLatest(version);
+              return this.gemRepository.save(g);
+            })
+        .orElseGet(
+            () -> {
+              final var gem = new RubyGem();
+              gem.setRepo(repo);
+              gem.setName(name);
+              gem.setLatest(version);
+              return this.gemRepository.save(gem);
+            });
   }
 
   private void upsertVersion(
-      final RubyGem gem, final GemMetadata metadata, final String checksum) {
+      final RubyGem gem,
+      final GemMetadata metadata,
+      final String checksum,
+      final boolean allowOverride) {
     final var existing =
         this.versionRepository.findByGemIdAndVersionAndPlatform(
             gem.getId(), metadata.getVersion(), metadata.getPlatform());
 
     if (existing.isPresent()) {
       final var v = existing.get();
-      if (!v.isYanked()) {
+      if (!v.isYanked() && !allowOverride) {
         throw new ItemAlreadyExistException("gemVersionAlreadyExists");
       }
-      // re-publish a yanked version: un-yank and update checksum
-      v.setYanked(false);
-      v.setChecksum(checksum);
-      this.versionRepository.save(v);
+      this.overrideVersion(v, metadata, checksum);
       return;
     }
 
+    this.createVersion(gem, metadata, checksum);
+  }
+
+  private void overrideVersion(
+      final RubyGemVersion existing, final GemMetadata metadata, final String checksum) {
+    existing.setYanked(false);
+    existing.setChecksum(checksum);
+    existing.setAuthors(metadata.getAuthors());
+    existing.setDescription(metadata.getDescription());
+    existing.setHomepage(metadata.getHomepage());
+    existing.setRequiredRubyVersion(metadata.getRequiredRubyVersion());
+    this.versionRepository.save(existing);
+
+    final var oldDeps = this.dependencyRepository.findAllByGemVersionId(existing.getId());
+    this.dependencyRepository.deleteAll(oldDeps);
+    this.saveDependencies(existing, metadata);
+  }
+
+  private void createVersion(final RubyGem gem, final GemMetadata metadata, final String checksum) {
     final var version = new RubyGemVersion();
     version.setGem(gem);
     version.setVersion(metadata.getVersion());
@@ -286,7 +306,6 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
     version.setHomepage(metadata.getHomepage());
     version.setRequiredRubyVersion(metadata.getRequiredRubyVersion());
     final var saved = this.versionRepository.save(version);
-
     this.saveDependencies(saved, metadata);
   }
 

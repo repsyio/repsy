@@ -23,7 +23,6 @@ import io.repsy.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
 import io.repsy.protocols.ruby.shared.utils.GemspecParser;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
-import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
@@ -67,7 +66,7 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
   }
 
   @Override
-  public void publishGem(final ProtocolContext context, final byte[] gemBytes) throws IOException {
+  public void publishGem(final ProtocolContext context, final byte[] gemBytes) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var metadata = GemspecParser.parse(gemBytes);
     final var checksum = CompactIndexFormatter.sha256Hex(gemBytes);

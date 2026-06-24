@@ -39,8 +39,7 @@ public class RubyAuthListener {
   @Async
   @EventListener
   public void onRegistrationCompleted(final UserCreatedEvent<UUID> ignoredEvent) {
-    final var repoInfo =
-        this.repoTxService.createRepo(RUBY_REPO_NAME, RepoType.RUBY, true, null);
+    final var repoInfo = this.repoTxService.createRepo(RUBY_REPO_NAME, RepoType.RUBY, true, null);
     this.rubyStorageService.createRepo(repoInfo.getStorageKey());
   }
 }

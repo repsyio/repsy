@@ -51,7 +51,10 @@ public class RubyApiFacade implements ProtocolApiFacade {
   }
 
   public Page<GemVersionListItem> listVersions(
-      final RepoInfo repoInfo, final String gemName, final String version, final Pageable pageable) {
+      final RepoInfo repoInfo,
+      final String gemName,
+      final String version,
+      final Pageable pageable) {
     final var gemId = this.gemService.getGemId(repoInfo.getStorageKey(), gemName);
     return this.gemService.findAllVersions(gemId, version, pageable);
   }

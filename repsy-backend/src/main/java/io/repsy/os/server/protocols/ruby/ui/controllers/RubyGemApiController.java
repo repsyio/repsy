@@ -73,8 +73,7 @@ public class RubyGemApiController {
 
   @DeleteMapping("/{repoName}/{gemName}")
   @RepoOperation(permission = Permission.MANAGE)
-  public RestResponse<Void> deleteGem(
-      final RepoInfo repoInfo, @PathVariable final String gemName) {
+  public RestResponse<Void> deleteGem(final RepoInfo repoInfo, @PathVariable final String gemName) {
     final var usages = this.rubyApiFacade.deleteGem(repoInfo, gemName);
     this.usageUpdateService.updateUsage(new UsageChangedInfo(repoInfo.getId(), usages));
     return this.responseFactory.success("gemDeleted");
@@ -98,7 +97,8 @@ public class RubyGemApiController {
       @PathVariable final String gemName,
       @PathVariable final String versionName,
       @RequestParam(defaultValue = "ruby") final String platform) {
-    final var usages = this.rubyApiFacade.deleteGemVersion(repoInfo, gemName, versionName, platform);
+    final var usages =
+        this.rubyApiFacade.deleteGemVersion(repoInfo, gemName, versionName, platform);
     this.usageUpdateService.updateUsage(new UsageChangedInfo(repoInfo.getId(), usages));
     return this.responseFactory.success("gemVersionDeleted");
   }

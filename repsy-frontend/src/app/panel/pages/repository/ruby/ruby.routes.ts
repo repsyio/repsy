@@ -16,10 +16,10 @@
 import { Routes } from '@angular/router';
 
 import { RepositorySettingsComponent } from '../repo-settings/repository-settings.component';
-import { RubyComponent } from './ruby.component';
 import { RubyGemsListComponent } from './gems/list/ruby-gems-list.component';
 import { RubyGemsVersionDetailComponent } from './gems/version-detail/ruby-gems-version-detail.component';
 import { RubyGemsVersionListComponent } from './gems/version-list/ruby-gems-version-list.component';
+import { RubyComponent } from './ruby.component';
 
 export const RUBY_ROUTES: Routes = [
   {
