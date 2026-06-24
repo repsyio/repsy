@@ -37,7 +37,6 @@ public class CompactIndexFormatter {
 
   private static final String SEPARATOR = "---";
   private static final String CREATED_AT_PREFIX = "created_at: ";
-  private static final String DEFAULT_PLATFORM = "ruby";
 
   public static String formatNames(final List<String> gemNames) {
     final var sb = new StringBuilder();
@@ -48,23 +47,17 @@ public class CompactIndexFormatter {
     return sb.toString();
   }
 
-  public static String formatVersionsIndex(final List<GemCompactEntry> allEntries) {
-    final var infoByGem =
-        allEntries.stream().collect(Collectors.groupingBy(GemCompactEntry::getGemName));
-
+  public static String formatVersionsIndex(final Map<String, String> gemChecksums) {
     final var sb = new StringBuilder();
     appendPreamble(sb, Instant.now());
-
-    infoByGem.entrySet().stream()
+    gemChecksums.entrySet().stream()
         .sorted(Map.Entry.comparingByKey())
-        .forEach(
-            e -> {
-              final var infoBody = buildInfoBody(e.getValue());
-              final var md5 = DigestUtils.md5Hex(infoBody);
-              sb.append(e.getKey()).append(' ').append(md5).append('\n');
-            });
-
+        .forEach(e -> sb.append(e.getKey()).append(' ').append(e.getValue()).append('\n'));
     return sb.toString();
+  }
+
+  public static String md5Hex(final String text) {
+    return DigestUtils.md5Hex(text);
   }
 
   public static String formatGemInfo(final List<GemCompactEntry> entries) {

@@ -28,7 +28,10 @@ import lombok.experimental.UtilityClass;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.Constructor;
+import org.yaml.snakeyaml.nodes.Tag;
 
 /**
  * Parses metadata.gz from a .gem tar archive without extracting to disk.
@@ -62,7 +65,14 @@ public class GemspecParser {
   private static GemMetadata parseMetadataGz(final byte[] gzBytes) {
     final Map<String, Object> spec;
     try (final var gzip = new GZIPInputStream(new ByteArrayInputStream(gzBytes))) {
-      spec = new Yaml().load(gzip);
+      final var opts = new LoaderOptions();
+      final var constructor =
+          new Constructor(opts) {
+            {
+              this.yamlConstructors.put(null, this.yamlConstructors.get(Tag.MAP));
+            }
+          };
+      spec = new Yaml(constructor).load(gzip);
     } catch (final IOException e) {
       throw new BadRequestException("invalidGemFile");
     }

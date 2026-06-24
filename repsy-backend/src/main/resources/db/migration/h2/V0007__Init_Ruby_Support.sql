@@ -1,12 +1,13 @@
 create table "public"."ruby_gem"
 (
-    "id"         uuid         not null
+    "id"                uuid         not null
         constraint "pk_ruby_gem"
             primary key,
-    "repo_id"    uuid         not null,
-    "name"       varchar(255) not null,
-    "latest"     varchar(64)  not null,
-    "created_at" timestamp    not null
+    "repo_id"           uuid         not null,
+    "name"              varchar(255) not null,
+    "latest"            varchar(64)  not null,
+    "versions_checksum" varchar(32),
+    "created_at"        timestamp    not null
 );
 
 alter table "public"."ruby_gem"

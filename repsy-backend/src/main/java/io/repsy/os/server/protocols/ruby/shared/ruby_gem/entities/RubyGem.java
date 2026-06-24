@@ -38,6 +38,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
@@ -62,6 +63,9 @@ public class RubyGem {
 
   @Column(name = "latest", nullable = false, length = 64)
   private String latest;
+
+  @Column(name = "versions_checksum", length = 32)
+  private @Nullable String versionsChecksum;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false)

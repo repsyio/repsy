@@ -49,7 +49,7 @@ export class RubyConfigComponent implements OnInit, OnChanges {
   }
 
   private updateMarkdown(): void {
-    const registryUrl = `${this.baseUrl}/rubygems/${this.repoName}`;
+    const registryUrl = `${this.baseUrl}/${this.repoName}`;
     this.markdown = `
 **Configure Bundler to use this registry:**
 
@@ -65,6 +65,15 @@ end
 
 You should use a Deploy Token. If you do not have one, go to \`settings > Deploy Tokens\` to create it.
 
+\`gem push\` reads credentials from \`~/.gem/credentials\`. The value must be pre-encoded as a Basic auth header:
+
+\`\`\`bash
+echo ":repsy: Basic $(echo -n '<username>:<DEPLOY_TOKEN>' | base64)" >> ~/.gem/credentials
+chmod 600 ~/.gem/credentials
+\`\`\`
+
+For Bundler:
+
 \`\`\`bash
 bundle config ${registryUrl} <username>:<DEPLOY_TOKEN>
 \`\`\`
@@ -72,13 +81,13 @@ bundle config ${registryUrl} <username>:<DEPLOY_TOKEN>
 **Publish:**
 
 \`\`\`bash
-gem push your_gem-1.0.0.gem --host ${registryUrl} --key <DEPLOY_TOKEN>
+gem push your_gem-1.0.0.gem --host ${registryUrl} --key repsy
 \`\`\`
 
 **Yank a version:**
 
 \`\`\`bash
-gem yank your_gem -v 1.0.0 --host ${registryUrl} --key <DEPLOY_TOKEN>
+gem yank your_gem -v 1.0.0 --host ${registryUrl} --key repsy
 \`\`\`
 `;
   }

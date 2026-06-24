@@ -38,7 +38,9 @@ import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
 import io.repsy.protocols.ruby.shared.gem.services.RubyGemProtocolService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
@@ -117,7 +119,8 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
       throw new BadRequestException("gemVersionAlreadyYanked");
     }
 
-    this.versionRepository.markAsYanked(gemVersion.getId());
+    gemVersion.setYanked(true);
+    this.versionRepository.save(gemVersion);
 
     if (gem.getLatest().equals(version)) {
       this.versionRepository
@@ -175,6 +178,20 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
 
   public long countNonYankedVersions(final UUID gemId) {
     return this.versionRepository.countByGemIdAndYankedFalse(gemId);
+  }
+
+  @Override
+  public Map<String, String> getVersionsChecksums(final BaseRepoInfo<UUID> repoInfo) {
+    return this.gemRepository.findAllByRepoId(repoInfo.getId()).stream()
+        .filter(g -> g.getVersionsChecksum() != null)
+        .collect(Collectors.toMap(RubyGem::getName, RubyGem::getVersionsChecksum));
+  }
+
+  @Override
+  @Transactional
+  public void saveVersionsChecksum(
+      final BaseRepoInfo<UUID> repoInfo, final String gemName, final String checksum) {
+    this.gemRepository.updateVersionsChecksum(repoInfo.getId(), gemName, checksum);
   }
 
   private List<GemCompactEntry> toCompactEntries(final List<GemVersionCompactItem> rows) {

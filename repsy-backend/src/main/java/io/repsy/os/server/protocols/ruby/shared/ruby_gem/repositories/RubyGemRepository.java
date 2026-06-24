@@ -24,6 +24,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 public interface RubyGemRepository extends JpaRepository<RubyGem, UUID> {
@@ -47,4 +48,15 @@ public interface RubyGemRepository extends JpaRepository<RubyGem, UUID> {
         and (:name is null or g.name like %:name%)
       """)
   Page<GemListItem> findAllByRepoIdContainsName(UUID repoId, String name, Pageable pageable);
+
+  @Query("select g from RubyGem g where g.repo.id = :repoId order by g.name")
+  List<RubyGem> findAllByRepoId(UUID repoId);
+
+  @Modifying
+  @Query(
+      """
+      update RubyGem g set g.versionsChecksum = :checksum
+      where g.repo.id = :repoId and g.name = :gemName
+      """)
+  void updateVersionsChecksum(UUID repoId, String gemName, String checksum);
 }

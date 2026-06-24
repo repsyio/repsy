@@ -22,6 +22,7 @@ import io.repsy.protocols.ruby.shared.gem.services.RubyGemProtocolService;
 import io.repsy.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
 import io.repsy.protocols.ruby.shared.utils.GemspecParser;
+import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -48,8 +49,8 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
   @Override
   public String getVersionsIndex(final ProtocolContext context) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var entries = this.gemService.getAllCompactEntries(repoInfo);
-    return CompactIndexFormatter.formatVersionsIndex(entries);
+    return CompactIndexFormatter.formatVersionsIndex(
+        this.gemService.getVersionsChecksums(repoInfo));
   }
 
   @Override
@@ -81,6 +82,7 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
             gemBytes);
 
     this.gemService.publishGem(repoInfo, metadata, checksum);
+    this.refreshVersionsChecksum(repoInfo, metadata.getName());
 
     context.addProperty(USAGES, usages);
     context.addProperty(GEM_NAME, metadata.getName());
@@ -95,6 +97,13 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
       final String platform) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     this.gemService.yankGem(repoInfo, gemName, version, platform);
+    this.refreshVersionsChecksum(repoInfo, gemName);
+  }
+
+  private void refreshVersionsChecksum(final BaseRepoInfo<ID> repoInfo, final String gemName) {
+    final var entries = this.gemService.getCompactEntriesByGemName(repoInfo, gemName);
+    final var checksum = CompactIndexFormatter.md5Hex(CompactIndexFormatter.formatGemInfo(entries));
+    this.gemService.saveVersionsChecksum(repoInfo, gemName, checksum);
   }
 
   public BaseUsages deleteRepo(final ProtocolContext context) {

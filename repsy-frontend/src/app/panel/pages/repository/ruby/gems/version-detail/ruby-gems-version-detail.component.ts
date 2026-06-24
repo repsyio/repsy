@@ -75,7 +75,7 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
     }
     this.gemName = gemName;
     this.versionName = version;
-    const repoUrl = `${environment.repoBaseUrl}/rubygems/${this.activeRepo.repoName}/`;
+    const repoUrl = `${environment.repoBaseUrl}/${this.activeRepo.repoName}/`;
     this.installCommand = `gem install ${gemName} -v ${version} --source ${repoUrl}`;
 
     this.loading = true;
