@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.ruby.protocol.facades;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.ruby.protocol.facades.contract.RubyProtocolFacade;
@@ -22,6 +23,7 @@ import io.repsy.protocols.ruby.shared.gem.services.RubyGemProtocolService;
 import io.repsy.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
 import io.repsy.protocols.ruby.shared.utils.GemspecParser;
+import io.repsy.protocols.ruby.shared.utils.RubyGemspecMarshalWriter;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +53,19 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     return CompactIndexFormatter.formatVersionsIndex(
         this.gemService.getVersionsChecksums(repoInfo));
+  }
+
+  @Override
+  public byte[] getGemspec(final ProtocolContext context, final String name, final String version) {
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var found =
+        this.gemService.getCompactEntriesByGemName(repoInfo, name).stream()
+            .filter(e -> !e.isYanked() && version.equals(e.getVersion()))
+            .findFirst();
+    if (found.isEmpty()) {
+      throw new ItemNotFoundException("gemVersionNotFound");
+    }
+    return RubyGemspecMarshalWriter.dumpGemspec(name, version);
   }
 
   @Override

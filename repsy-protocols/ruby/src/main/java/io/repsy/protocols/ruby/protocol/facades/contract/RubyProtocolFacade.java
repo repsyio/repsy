@@ -31,6 +31,8 @@ public interface RubyProtocolFacade {
 
   Resource downloadGem(ProtocolContext context, String filename);
 
+  byte[] getGemspec(ProtocolContext context, String name, String version);
+
   void publishGem(ProtocolContext context, byte[] gemBytes) throws IOException;
 
   void yankGem(ProtocolContext context, String gemName, String version, String platform);
