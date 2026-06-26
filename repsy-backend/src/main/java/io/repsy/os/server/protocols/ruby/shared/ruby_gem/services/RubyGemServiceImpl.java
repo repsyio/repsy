@@ -280,7 +280,7 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
 
     if (existing.isPresent()) {
       final var v = existing.get();
-      if (!v.isYanked() && !allowOverride) {
+      if (v.isYanked() || !allowOverride) {
         throw new ItemAlreadyExistException("gemVersionAlreadyExists");
       }
       this.overrideVersion(v, metadata, checksum);
