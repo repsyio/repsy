@@ -200,8 +200,7 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
   }
 
   private GemCompactEntry toCompactEntry(
-      final GemVersionCompactItem row,
-      final Map<UUID, List<RubyGemDependency>> depsByVersionId) {
+      final GemVersionCompactItem row, final Map<UUID, List<RubyGemDependency>> depsByVersionId) {
     final var deps = depsByVersionId.getOrDefault(row.getGemVersionId(), List.of());
     final var runtimeDeps =
         deps.stream()

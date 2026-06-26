@@ -27,7 +27,6 @@ public interface RubyGemDependencyRepository extends JpaRepository<RubyGemDepend
 
   List<RubyGemDependency> findAllByGemVersionId(UUID versionId);
 
-  @Query(
-      "select d from RubyGemDependency d where d.gemVersion.id in :versionIds order by d.name")
+  @Query("select d from RubyGemDependency d where d.gemVersion.id in :versionIds order by d.name")
   List<RubyGemDependency> findAllByGemVersionIdIn(@NonNull Collection<UUID> versionIds);
 }
