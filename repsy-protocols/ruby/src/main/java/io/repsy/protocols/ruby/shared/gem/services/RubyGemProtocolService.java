@@ -36,4 +36,6 @@ public interface RubyGemProtocolService<ID> {
   Map<String, String> getVersionsChecksums(BaseRepoInfo<ID> repoInfo);
 
   void saveVersionsChecksum(BaseRepoInfo<ID> repoInfo, String gemName, String checksum);
+
+  List<GemCompactEntry> getAllNonYankedEntries(BaseRepoInfo<ID> repoInfo);
 }

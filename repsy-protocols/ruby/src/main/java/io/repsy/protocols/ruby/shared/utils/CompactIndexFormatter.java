@@ -37,6 +37,8 @@ public class CompactIndexFormatter {
 
   private static final String SEPARATOR = "---";
   private static final String CREATED_AT_PREFIX = "created_at: ";
+  private static final String DEFAULT_PLATFORM = "ruby";
+  private static final String CHECKSUM_PREFIX = "checksum:sha256:";
 
   public static String formatNames(final List<String> gemNames) {
     final var sb = new StringBuilder();
@@ -87,13 +89,15 @@ public class CompactIndexFormatter {
     if (entry.isYanked()) {
       sb.append('-');
     }
-    sb.append(entry.getVersion()).append('|').append(entry.getPlatform()).append('|');
-
+    sb.append(entry.getVersion());
+    if (!DEFAULT_PLATFORM.equals(entry.getPlatform())) {
+      sb.append('-').append(entry.getPlatform());
+    }
+    sb.append(' ');
     if (!entry.isYanked()) {
       sb.append(formatDeps(entry.getRuntimeDependencies()));
     }
-
-    sb.append('|').append(entry.getChecksum()).append('\n');
+    sb.append('|').append(CHECKSUM_PREFIX).append(entry.getChecksum()).append('\n');
   }
 
   private static String formatDeps(final List<GemDependency> deps) {
@@ -101,7 +105,7 @@ public class CompactIndexFormatter {
       return "";
     }
     return deps.stream()
-        .map(d -> d.getName() + ":" + d.getRequirements())
+        .map(d -> d.getName() + ":" + d.getRequirements().replace(", ", "&"))
         .collect(Collectors.joining(","));
   }
 

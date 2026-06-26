@@ -188,6 +188,25 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
     this.gemRepository.updateVersionsChecksum(repoInfo.getId(), gemName, checksum);
   }
 
+  @Override
+  public List<GemCompactEntry> getAllNonYankedEntries(final BaseRepoInfo<UUID> repoInfo) {
+    return this.versionRepository.findAllNonYankedCompactByRepoId(repoInfo.getId()).stream()
+        .map(this::toSpecsEntry)
+        .toList();
+  }
+
+  private GemCompactEntry toSpecsEntry(final GemVersionCompactItem row) {
+    return GemCompactEntry.builder()
+        .gemName(row.getGemName())
+        .version(row.getVersion())
+        .platform(row.getPlatform())
+        .checksum(row.getChecksum())
+        .yanked(row.isYanked())
+        .createdAt(row.getCreatedAt())
+        .runtimeDependencies(List.of())
+        .build();
+  }
+
   private List<GemCompactEntry> toCompactEntries(final List<GemVersionCompactItem> rows) {
     if (rows.isEmpty()) {
       return List.of();

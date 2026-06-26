@@ -24,6 +24,7 @@ import io.repsy.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
 import io.repsy.protocols.ruby.shared.utils.GemspecParser;
 import io.repsy.protocols.ruby.shared.utils.RubyGemspecMarshalWriter;
+import io.repsy.protocols.ruby.shared.utils.RubySpecsIndexWriter;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import lombok.RequiredArgsConstructor;
@@ -161,6 +162,25 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     this.gemService.yankGem(repoInfo, gemName, version, platform);
     this.refreshVersionsChecksum(repoInfo, gemName);
+  }
+
+  @Override
+  public byte[] getSpecs(final ProtocolContext context) {
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    return RubySpecsIndexWriter.dumpSpecs(this.gemService.getAllNonYankedEntries(repoInfo));
+  }
+
+  @Override
+  public byte[] getLatestSpecs(final ProtocolContext context) {
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    return RubySpecsIndexWriter.dumpLatestSpecs(this.gemService.getAllNonYankedEntries(repoInfo));
+  }
+
+  @Override
+  public byte[] getPrereleaseSpecs(final ProtocolContext context) {
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    return RubySpecsIndexWriter.dumpPrereleaseSpecs(
+        this.gemService.getAllNonYankedEntries(repoInfo));
   }
 
   private void refreshVersionsChecksum(final BaseRepoInfo<ID> repoInfo, final String gemName) {

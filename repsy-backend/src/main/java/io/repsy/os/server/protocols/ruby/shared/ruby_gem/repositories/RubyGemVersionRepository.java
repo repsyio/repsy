@@ -24,7 +24,6 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, UUID> {
@@ -65,12 +64,8 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
         gv.checksum as checksum, gv.yanked as yanked,
         gv.createdAt as createdAt
       from RubyGemVersion gv join gv.gem g join g.repo r
-      where r.id = :repoId
+      where r.id = :repoId and gv.yanked = false
       order by g.name, gv.createdAt
       """)
-  List<GemVersionCompactItem> findAllCompactByRepoId(UUID repoId);
-
-  @Modifying
-  @Query("update RubyGemVersion gv set gv.yanked = true where gv.id = :versionId")
-  void markAsYanked(UUID versionId);
+  List<GemVersionCompactItem> findAllNonYankedCompactByRepoId(UUID repoId);
 }
