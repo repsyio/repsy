@@ -28,6 +28,7 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
 @NullMarked
@@ -78,7 +79,54 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
   @Override
   public Resource downloadGem(final ProtocolContext context, final String filename) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    this.checkNotYanked(repoInfo, filename);
     return this.storageService.getGem(repoInfo.getStorageKey(), repoInfo.getName(), filename);
+  }
+
+  private void checkNotYanked(final BaseRepoInfo<ID> repoInfo, final String filename) {
+    final var parsed = parseGemFilename(filename);
+    if (parsed == null) {
+      return;
+    }
+    final var yanked =
+        this.gemService.getCompactEntriesByGemName(repoInfo, parsed[0]).stream()
+            .anyMatch(e -> e.isYanked() && parsed[1].equals(e.getVersion()));
+    if (yanked) {
+      throw new ItemNotFoundException("gemVersionNotFound");
+    }
+  }
+
+  private static String @Nullable [] parseGemFilename(final String filename) {
+    if (!filename.endsWith(".gem")) {
+      return null;
+    }
+    final var base = filename.substring(0, filename.length() - ".gem".length());
+    final var boundary = findBoundary(base);
+    if (boundary < 0) {
+      return null;
+    }
+    return new String[] {base.substring(0, boundary), parseVersion(base.substring(boundary + 1))};
+  }
+
+  private static int findBoundary(final String s) {
+    for (var i = 0; i < s.length() - 1; i++) {
+      if (s.charAt(i) == '-' && Character.isDigit(s.charAt(i + 1))) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  private static String parseVersion(final String versionAndPlatform) {
+    final var lastDash = versionAndPlatform.lastIndexOf('-');
+    if (lastDash < 0) {
+      return versionAndPlatform;
+    }
+    final var platformPart = versionAndPlatform.substring(lastDash + 1);
+    if (platformPart.isEmpty() || Character.isDigit(platformPart.charAt(0))) {
+      return versionAndPlatform;
+    }
+    return versionAndPlatform.substring(0, lastDash);
   }
 
   @Override

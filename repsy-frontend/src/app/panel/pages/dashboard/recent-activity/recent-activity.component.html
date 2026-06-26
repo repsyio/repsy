@@ -9,7 +9,7 @@
   </div>
 
   <!-- Activity Items -->
-  @for (repo of repoListInfos; track repo.createdAt;) {
+  @for (repo of repoListInfos; track repo.createdAt) {
     <div
       [routerLink]="repo.name"
       role="button"

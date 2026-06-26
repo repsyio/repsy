@@ -16,11 +16,18 @@
 package io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories;
 
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGemDependency;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 public interface RubyGemDependencyRepository extends JpaRepository<RubyGemDependency, UUID> {
 
   List<RubyGemDependency> findAllByGemVersionId(UUID versionId);
+
+  @Query(
+      "select d from RubyGemDependency d where d.gemVersion.id in :versionIds order by d.name")
+  List<RubyGemDependency> findAllByGemVersionIdIn(@NonNull Collection<UUID> versionIds);
 }

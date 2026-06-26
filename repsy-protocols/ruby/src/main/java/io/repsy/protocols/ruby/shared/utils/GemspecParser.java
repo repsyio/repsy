@@ -73,7 +73,7 @@ public class GemspecParser {
             }
           };
       spec = new Yaml(constructor).load(gzip);
-    } catch (final IOException e) {
+    } catch (final IOException | RuntimeException e) {
       throw new BadRequestException("invalidGemFile");
     }
 

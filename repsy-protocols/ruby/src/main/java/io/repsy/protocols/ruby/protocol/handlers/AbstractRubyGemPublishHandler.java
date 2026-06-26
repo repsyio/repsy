@@ -91,7 +91,7 @@ public abstract class AbstractRubyGemPublishHandler implements ProtocolMethodHan
           .contentType(MediaType.TEXT_PLAIN)
           .body("Successfully registered gem: " + gemName + " (" + gemVersion + ")");
     } catch (final IOException e) {
-      return ResponseEntity.badRequest().contentType(MediaType.TEXT_PLAIN).body(e.getMessage());
+      return ResponseEntity.badRequest().contentType(MediaType.TEXT_PLAIN).body("invalidGemFile");
     }
   }
 }

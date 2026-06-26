@@ -189,17 +189,25 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
   }
 
   private List<GemCompactEntry> toCompactEntries(final List<GemVersionCompactItem> rows) {
-    return rows.stream().map(this::toCompactEntry).toList();
+    if (rows.isEmpty()) {
+      return List.of();
+    }
+    final var versionIds = rows.stream().map(GemVersionCompactItem::getGemVersionId).toList();
+    final var depsByVersionId =
+        this.dependencyRepository.findAllByGemVersionIdIn(versionIds).stream()
+            .collect(Collectors.groupingBy(d -> d.getGemVersion().getId()));
+    return rows.stream().map(row -> this.toCompactEntry(row, depsByVersionId)).toList();
   }
 
-  private GemCompactEntry toCompactEntry(final GemVersionCompactItem row) {
-    final var deps = this.dependencyRepository.findAllByGemVersionId(row.getGemVersionId());
+  private GemCompactEntry toCompactEntry(
+      final GemVersionCompactItem row,
+      final Map<UUID, List<RubyGemDependency>> depsByVersionId) {
+    final var deps = depsByVersionId.getOrDefault(row.getGemVersionId(), List.of());
     final var runtimeDeps =
         deps.stream()
             .filter(d -> RUNTIME_TYPE.equals(d.getType()))
             .map(this::toDependencyDto)
             .toList();
-
     return GemCompactEntry.builder()
         .gemName(row.getGemName())
         .version(row.getVersion())
