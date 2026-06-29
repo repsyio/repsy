@@ -20,12 +20,10 @@ import static org.bouncycastle.openpgp.PGPUtil.getDecoderStream;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
-import io.repsy.os.server.protocols.maven.shared.keystore.dtos.KeyStoreItem;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.Security;
-import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -47,15 +45,13 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.util.UriComponentsBuilder;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class PGPVerifierService {
-  private static final String KEY_ID_FORMAT = "%016X";
 
-  private static final @NonNull Duration TIMEOUT = Duration.ofSeconds(30);
+  private static final String KEY_ID_FORMAT = "%016X";
   private static final int PGP_BUFFER_SIZE = 4_096;
   private static final @NonNull Set<String> KEY_SERVERS =
       Set.of(
@@ -70,7 +66,7 @@ public class PGPVerifierService {
   public void verify(
       final @NonNull Resource file,
       final @NonNull Resource signedFile,
-      final @Nullable List<KeyStoreItem> customKeyServers) {
+      final @Nullable List<String> customHosts) {
 
     try (final var dataStream = file.getInputStream();
         final var signatureStream = signedFile.getInputStream()) {
@@ -82,7 +78,7 @@ public class PGPVerifierService {
       final var signature = this.extractSignature(signatureStream);
 
       final var publicKey =
-          this.getPublicKey(signature.getKeyID(), customKeyServers)
+          this.getPublicKey(signature.getKeyID(), customHosts)
               .orElseThrow(
                   () ->
                       new ItemNotFoundException(
@@ -109,19 +105,16 @@ public class PGPVerifierService {
   }
 
   private @NonNull Optional<PGPPublicKey> getPublicKey(
-      final long keyId, @Nullable final List<KeyStoreItem> customKeyServers)
+      final long keyId, @Nullable final List<String> customHosts)
       throws PGPException, IOException {
 
     final var keyIdHex = String.format(KEY_ID_FORMAT, keyId);
 
-    // Find and get users' servers
-    final var customServerKey = this.findInCustomServers(customKeyServers, keyId);
-
-    if (customServerKey.isPresent()) {
-      return customServerKey;
+    final var customKey = this.findInCustomHosts(customHosts, keyIdHex, keyId);
+    if (customKey.isPresent()) {
+      return customKey;
     }
 
-    // Find in pre-defined key stores
     for (final var serverTemplate : KEY_SERVERS) {
       final var key = this.fetchKeyFromServer(serverTemplate.formatted(keyIdHex), keyId);
 
@@ -133,17 +126,16 @@ public class PGPVerifierService {
     return Optional.empty();
   }
 
-  private @NonNull Optional<PGPPublicKey> findInCustomServers(
-      final @Nullable List<KeyStoreItem> customKeyServers, final long keyId)
+  private @NonNull Optional<PGPPublicKey> findInCustomHosts(
+      final @Nullable List<String> hosts, final @NonNull String keyIdHex, final long keyId)
       throws PGPException, IOException {
 
-    if (customKeyServers == null || customKeyServers.isEmpty()) {
+    if (hosts == null || hosts.isEmpty()) {
       return Optional.empty();
     }
 
-    for (final var serverUrl : customKeyServers) {
-      final var url = this.normalizeUrl(serverUrl.getUrl(), String.format(KEY_ID_FORMAT, keyId));
-
+    for (final var host : hosts) {
+      final var url = this.buildUrl(host, keyIdHex);
       final var key = this.fetchKeyFromServer(url, keyId);
 
       if (key.isPresent()) {
@@ -152,6 +144,11 @@ public class PGPVerifierService {
     }
 
     return Optional.empty();
+  }
+
+  private @NonNull String buildUrl(final @NonNull String host, final @NonNull String keyIdHex) {
+
+    return "https://" + host + "/pks/lookup?op=get&search=0x" + keyIdHex;
   }
 
   private @NonNull PGPSignature extractSignature(final @NonNull InputStream signatureStream)
@@ -184,7 +181,6 @@ public class PGPVerifierService {
             .uri(serverUrl)
             .retrieve()
             .bodyToMono(String.class)
-            .timeout(TIMEOUT)
             .doOnError(
                 error ->
                     log.debug(
@@ -207,20 +203,5 @@ public class PGPVerifierService {
 
       return Optional.ofNullable(collection.getPublicKey(keyId));
     }
-  }
-
-  private @NonNull String normalizeUrl(
-      final @NonNull String server, final @NonNull String keyIdHex) {
-
-    if (server.isBlank()) {
-      throw new IllegalArgumentException("server blank");
-    }
-
-    return UriComponentsBuilder.fromUriString("https://" + server.trim())
-        .replacePath("/pks/lookup")
-        .queryParam("op", "get")
-        .queryParam("search", keyIdHex)
-        .build(true)
-        .toUriString();
   }
 }

@@ -17,10 +17,12 @@ package io.repsy.os.server.protocols.maven.shared.keystore.services;
 
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.os.generated.model.AllowedKeyserverItem;
 import io.repsy.os.generated.model.KeyStoreForm;
 import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactConverter;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.KeyStoreItem;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.KeyStore;
+import io.repsy.os.server.protocols.maven.shared.keystore.repositories.AllowedKeyserverRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.KeyStoreRepository;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
@@ -30,30 +32,43 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
+@NullMarked
 public class KeyStoreService {
 
-  private static final @NonNull Set<String> WELL_KNOWN_HOSTS =
+  private static final Set<String> WELL_KNOWN_HOSTS =
       Set.of("keyserver.ubuntu.com", "pgp.mit.edu", "keys.openpgp.org");
 
-  private final @NonNull KeyStoreRepository keyStoreRepository;
-  private final @NonNull RepoRepository repoRepository;
-  private final @NonNull ArtifactConverter artifactConverter;
+  private final AllowedKeyserverRepository allowedKeyserverRepository;
+  private final KeyStoreRepository keyStoreRepository;
+  private final RepoRepository repoRepository;
+  private final ArtifactConverter artifactConverter;
 
-  public void create(final @NonNull RepoInfo repoInfo, final @NonNull KeyStoreForm form) {
+  @Transactional
+  public void create(final RepoInfo repoInfo, final KeyStoreForm form) {
 
-    if (this.hasWellKnownHosts(form.getUrl())) {
+    final var keyserverId = UUID.fromString(form.getAllowedKeyserverId());
+
+    final var allowedKeyserver =
+        this.allowedKeyserverRepository
+            .findByIdAndActiveTrue(keyserverId)
+            .orElseThrow(() -> new ItemNotFoundException("allowedKeyserverNotFound"));
+
+    if (this.hasWellKnownHosts(allowedKeyserver.getHost())) {
       throw new ItemAlreadyExistException("wellknownKeyStoreHost");
     }
 
-    if (this.keyStoreRepository.existsByUrlAndRepoId(form.getUrl(), repoInfo.getStorageKey())) {
-      throw new ItemAlreadyExistException("keyStoreUrlAlreadyExists");
+    if (this.keyStoreRepository.existsByAllowedKeyserverIdAndRepoId(
+        allowedKeyserver.getId(), repoInfo.getStorageKey())) {
+      throw new ItemAlreadyExistException("keyStoreAlreadyExists");
     }
 
     final var repo =
@@ -62,49 +77,52 @@ public class KeyStoreService {
             .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
 
     final var keyStore = new KeyStore();
-
-    keyStore.setUrl(form.getUrl());
     keyStore.setRepo(repo);
+    keyStore.setAllowedKeyserver(allowedKeyserver);
 
     this.keyStoreRepository.save(keyStore);
   }
 
-  public void delete(final @NonNull RepoInfo repoInfo, final @NonNull UUID keyStoreId) {
+  @Transactional
+  public void delete(final RepoInfo repoInfo, final UUID keyStoreId) {
 
-    final var keyStoreOptional =
-        this.keyStoreRepository.findByIdAndRepoId(keyStoreId, repoInfo.getStorageKey());
-
-    if (keyStoreOptional.isEmpty()) {
-      throw new ItemNotFoundException("keyStoreNotFound");
-    }
-
-    final var keyStore = keyStoreOptional.get();
+    final var keyStore =
+        this.keyStoreRepository
+            .findByIdAndRepoId(keyStoreId, repoInfo.getStorageKey())
+            .orElseThrow(() -> new ItemNotFoundException("keyStoreNotFound"));
 
     this.keyStoreRepository.delete(keyStore);
   }
 
-  public @NonNull Page<io.repsy.os.generated.model.KeyStoreItem> findAll(
-      final @NonNull RepoInfo repoInfo, final @NonNull Pageable pageable) {
+  public Page<io.repsy.os.generated.model.KeyStoreItem> findAll(
+      final RepoInfo repoInfo, final Pageable pageable) {
 
-    final var keyStores =
-        this.keyStoreRepository.findAllByRepoId(repoInfo.getStorageKey(), pageable);
-
-    if (keyStores.isEmpty()) {
-      Page.empty();
-    }
-
-    return keyStores.map(this.artifactConverter::toKeyStoreItemDto);
+    return this.keyStoreRepository
+        .findAllByRepoId(repoInfo.getStorageKey(), pageable)
+        .map(this.artifactConverter::toKeyStoreItemDto);
   }
 
-  public @NonNull List<KeyStoreItem> findByRepoId(final UUID repoId) {
+  public List<String> findHostsByRepoId(final UUID repoId) {
 
-    return this.keyStoreRepository.findAllByRepoId(repoId);
+    return this.keyStoreRepository.findAllByRepoId(repoId).stream()
+        .map(KeyStoreItem::getHost)
+        .toList();
   }
 
-  private boolean hasWellKnownHosts(final @NonNull String url) {
+  public List<AllowedKeyserverItem> findAllActiveKeyservers() {
+
+    return this.allowedKeyserverRepository.findAllByActiveTrue().stream()
+        .map(aks -> AllowedKeyserverItem.builder()
+            .id(aks.getId().toString())
+            .host(aks.getHost())
+            .displayName(aks.getDisplayName())
+            .build())
+        .toList();
+  }
+
+  private boolean hasWellKnownHosts(final String url) {
 
     final var noScheme = url.replaceFirst("^https?://", "");
-
     final var host = noScheme.split(Pattern.quote("/"), -1)[0];
 
     return host != null && WELL_KNOWN_HOSTS.contains(host.toLowerCase(Locale.ROOT));

@@ -16,38 +16,46 @@
 
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnInit } from '@angular/core';
-import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../environments/environment';
 import {
+  AllowedKeyserverItem,
   KeyStoreControllerService,
   KeyStoreForm,
+  KeyStoreItem,
   ProtocolRepoControllerService,
   RepoPermissionInfo,
 } from '../../../../../../generated/api';
+import { SelectorComponent } from '../../../../shared/components/selector/selector.component';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { SignatureForm } from './dto/signature-form';
-import { SignatureItem } from './dto/signature-item';
 
 @Component({
   selector: 'app-signature',
   templateUrl: './signature.component.html',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink],
+  imports: [CommonModule, SelectorComponent, RouterLink],
 })
 export class SignatureComponent implements OnInit {
   @Input() public activeRepository: RepoPermissionInfo;
   @Input() public repoType: string;
   public pageNum = 1;
   public pageSize = 5;
-  public keyStores: SignatureItem[] = [];
-  public wellKnowns: string[] = ['keyserver.ubuntu.com', 'pgp.mit.edu', 'keys.openpgp.org'];
-  public keyStoreForm: FormGroup;
+  public keyStores: KeyStoreItem[] = [];
+  public serverLabels: string[] = [];
+  public selectedServerLabel = '';
   public isSubmitting = false;
   public docsBaseUrl: string;
+
+  public readonly wellKnownServers = [
+    { host: 'keyserver.ubuntu.com', displayName: 'Ubuntu Keyserver' },
+    { host: 'pgp.mit.edu', displayName: 'MIT PGP Public Key Server' },
+    { host: 'keys.openpgp.org', displayName: 'OpenPGP Keyserver' },
+  ];
+
+  private allowedKeyservers: AllowedKeyserverItem[] = [];
 
   constructor(
     private readonly toastService: ToastService,
@@ -56,29 +64,28 @@ export class SignatureComponent implements OnInit {
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
   ) {
     this.docsBaseUrl = environment.docsBase;
-    this.initForm();
   }
 
   ngOnInit(): void {
     this.fetchRepoSettings();
     this.fetchKeyStores();
+    this.fetchAllowedKeyservers();
   }
 
-  private initForm(): void {
-    this.keyStoreForm = new FormGroup({
-      url: new FormControl('', [
-        Validators.required,
-        Validators.pattern(/^(?!:\/\/)(?:([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|\d{1,3}(?:\.\d{1,3}){3})(:\d{1,5})?$/),
-      ]),
+  private fetchAllowedKeyservers(): void {
+    this.keyStoreControllerService.listAllowedKeyServers().subscribe({
+      next: (r) => {
+        this.allowedKeyservers = r.data ?? [];
+        this.serverLabels = this.allowedKeyservers.map((s) => `${s.displayName} (${s.host})`);
+        this.selectedServerLabel = this.serverLabels[0] ?? '';
+      },
+      error: () => {},
     });
   }
 
   private fetchRepoSettings(): void {
     this.protocolRepoControllerService.getSettings(this.activeRepository.repoName).subscribe({
-      next: () => {
-        this.keyStoreForm.patchValue({ url: '' });
-        this.keyStoreForm.get('url')?.enable();
-      },
+      next: () => {},
       error: () => {},
     });
   }
@@ -88,14 +95,18 @@ export class SignatureComponent implements OnInit {
       return;
     }
 
+    const item = this.allowedKeyservers.find((s) => `${s.displayName} (${s.host})` === this.selectedServerLabel);
+    if (!item) {
+      this.toastService.show('Please select a keyserver', 'error');
+      return;
+    }
+
     this.isSubmitting = true;
 
-    const keyStoreForm: SignatureForm = {
-      url: this.keyStoreForm.get('url')?.value,
-    };
+    const keyStoreForm: KeyStoreForm = { allowedKeyserverId: item.id };
 
     this.keyStoreControllerService
-      .createMavenKeyStore(this.activeRepository.repoName, keyStoreForm as unknown as KeyStoreForm)
+      .createMavenKeyStore(this.activeRepository.repoName, keyStoreForm)
       .pipe(
         finalize(() => {
           this.isSubmitting = false;
@@ -105,8 +116,7 @@ export class SignatureComponent implements OnInit {
         next: () => {
           this.pageNum = 1;
           this.fetchKeyStores();
-          this.keyStoreForm.reset({ active: true });
-          this.toastService.show('Key Store URL added', 'success');
+          this.toastService.show('Key Store added', 'success');
         },
         error: () => {},
       });
@@ -118,7 +128,7 @@ export class SignatureComponent implements OnInit {
       .listMavenKeyStores({ page: 0, size: this.pageSize }, this.activeRepository.repoName)
       .subscribe({
         next: (r) => {
-          this.keyStores = (r.data?.content ?? []) as unknown as SignatureItem[];
+          this.keyStores = r.data?.content ?? [];
         },
         error: () => {},
       });
@@ -129,7 +139,7 @@ export class SignatureComponent implements OnInit {
       .listMavenKeyStores({ page: this.pageNum, size: this.pageSize }, this.activeRepository.repoName)
       .subscribe({
         next: (r) => {
-          const newItems = (r.data?.content ?? []) as unknown as SignatureItem[];
+          const newItems = r.data?.content ?? [];
           this.keyStores = [...this.keyStores, ...newItems];
           this.pageNum++;
         },
@@ -145,13 +155,13 @@ export class SignatureComponent implements OnInit {
     }
   }
 
-  public deleteKeyStore(uuid: string): void {
+  public deleteKeyStore(id: string): void {
     this.dangerModalService.show('Delete Key Store', 'Delete', () => {
-      this.keyStoreControllerService.deleteMavenKeyStore(uuid, this.activeRepository.repoName).subscribe({
+      this.keyStoreControllerService.deleteMavenKeyStore(id, this.activeRepository.repoName).subscribe({
         next: () => {
           this.pageNum = 1;
           this.fetchKeyStores();
-          this.toastService.show('Key Store URL deleted', 'success');
+          this.toastService.show('Key Store deleted', 'success');
         },
         error: () => {},
       });

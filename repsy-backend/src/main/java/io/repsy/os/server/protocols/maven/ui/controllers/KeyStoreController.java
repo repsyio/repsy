@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.maven.ui.controllers;
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
+import io.repsy.os.generated.model.AllowedKeyserverItem;
 import io.repsy.os.generated.model.KeyStoreForm;
 import io.repsy.os.generated.model.KeyStoreItem;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
@@ -25,6 +26,7 @@ import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -50,6 +52,13 @@ public class KeyStoreController {
 
   private final KeyStoreService keyStoreService;
   private final RestResponseFactory restResponseFactory;
+
+  @GetMapping("/allowed-servers")
+  public RestResponse<List<AllowedKeyserverItem>> listAllowedServers() {
+
+    return this.restResponseFactory.success(
+        "allowedKeyserversFetched", this.keyStoreService.findAllActiveKeyservers());
+  }
 
   @PostMapping("/{repoName}")
   @RepoOperation(permission = Permission.WRITE)

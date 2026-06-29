@@ -24,16 +24,35 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public interface KeyStoreRepository extends JpaRepository<KeyStore, UUID> {
 
-  boolean existsByUrlAndRepoId(@NonNull String url, @NonNull UUID repoId);
+  boolean existsByAllowedKeyserverIdAndRepoId(@NonNull UUID allowedKeyserverId, @NonNull UUID repoId);
 
   @NonNull Optional<KeyStore> findByIdAndRepoId(@NonNull UUID id, @NonNull UUID repoId);
 
+  @Query("""
+      SELECT ks.id                     AS id,
+             ak.id                     AS allowedKeyserverId,
+             ak.host                   AS host,
+             ak.displayName            AS displayName
+      FROM KeyStore ks
+      JOIN ks.allowedKeyserver ak
+      WHERE ks.repo.id = :repoId
+      """)
   @NonNull Page<KeyStoreItem> findAllByRepoId(@NonNull UUID repoId, @NonNull Pageable pageable);
 
+  @Query("""
+      SELECT ks.id                     AS id,
+             ak.id                     AS allowedKeyserverId,
+             ak.host                   AS host,
+             ak.displayName            AS displayName
+      FROM KeyStore ks
+      JOIN ks.allowedKeyserver ak
+      WHERE ks.repo.id = :repoId
+      """)
   @NonNull List<KeyStoreItem> findAllByRepoId(@NonNull UUID repoId);
 }
