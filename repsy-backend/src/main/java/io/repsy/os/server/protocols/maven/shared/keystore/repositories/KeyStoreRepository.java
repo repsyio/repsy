@@ -38,9 +38,9 @@ public interface KeyStoreRepository extends JpaRepository<KeyStore, UUID> {
   @Query(
       """
       SELECT ks.id                     AS id,
-             ak.id                     AS allowedKeyserverId,
-             ak.host                   AS host,
-             ak.displayName            AS displayName
+        ak.id                     AS allowedKeyserverId,
+        ak.host                   AS host,
+        ak.displayName            AS displayName
       FROM KeyStore ks
       JOIN ks.allowedKeyserver ak
       WHERE ks.repo.id = :repoId
@@ -50,9 +50,9 @@ public interface KeyStoreRepository extends JpaRepository<KeyStore, UUID> {
   @Query(
       """
       SELECT ks.id                     AS id,
-             ak.id                     AS allowedKeyserverId,
-             ak.host                   AS host,
-             ak.displayName            AS displayName
+        ak.id                     AS allowedKeyserverId,
+        ak.host                   AS host,
+        ak.displayName            AS displayName
       FROM KeyStore ks
       JOIN ks.allowedKeyserver ak
       WHERE ks.repo.id = :repoId
