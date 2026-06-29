@@ -112,11 +112,13 @@ public class KeyStoreService {
   public List<AllowedKeyserverItem> findAllActiveKeyservers() {
 
     return this.allowedKeyserverRepository.findAllByActiveTrue().stream()
-        .map(aks -> AllowedKeyserverItem.builder()
-            .id(aks.getId().toString())
-            .host(aks.getHost())
-            .displayName(aks.getDisplayName())
-            .build())
+        .map(
+            aks ->
+                AllowedKeyserverItem.builder()
+                    .id(aks.getId().toString())
+                    .host(aks.getHost())
+                    .displayName(aks.getDisplayName())
+                    .build())
         .toList();
   }
 

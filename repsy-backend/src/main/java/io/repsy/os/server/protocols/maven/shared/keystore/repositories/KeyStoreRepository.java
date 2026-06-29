@@ -30,11 +30,13 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface KeyStoreRepository extends JpaRepository<KeyStore, UUID> {
 
-  boolean existsByAllowedKeyserverIdAndRepoId(@NonNull UUID allowedKeyserverId, @NonNull UUID repoId);
+  boolean existsByAllowedKeyserverIdAndRepoId(
+      @NonNull UUID allowedKeyserverId, @NonNull UUID repoId);
 
   @NonNull Optional<KeyStore> findByIdAndRepoId(@NonNull UUID id, @NonNull UUID repoId);
 
-  @Query("""
+  @Query(
+      """
       SELECT ks.id                     AS id,
              ak.id                     AS allowedKeyserverId,
              ak.host                   AS host,
@@ -45,7 +47,8 @@ public interface KeyStoreRepository extends JpaRepository<KeyStore, UUID> {
       """)
   @NonNull Page<KeyStoreItem> findAllByRepoId(@NonNull UUID repoId, @NonNull Pageable pageable);
 
-  @Query("""
+  @Query(
+      """
       SELECT ks.id                     AS id,
              ak.id                     AS allowedKeyserverId,
              ak.host                   AS host,

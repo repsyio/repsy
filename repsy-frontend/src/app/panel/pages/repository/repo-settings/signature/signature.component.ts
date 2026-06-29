@@ -28,8 +28,8 @@ import {
   ProtocolRepoControllerService,
   RepoPermissionInfo,
 } from '../../../../../../generated/api';
-import { SelectorComponent } from '../../../../shared/components/selector/selector.component';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { SelectorComponent } from '../../../../shared/components/selector/selector.component';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 
 @Component({

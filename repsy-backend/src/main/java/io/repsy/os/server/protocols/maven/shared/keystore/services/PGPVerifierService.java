@@ -105,8 +105,7 @@ public class PGPVerifierService {
   }
 
   private @NonNull Optional<PGPPublicKey> getPublicKey(
-      final long keyId, @Nullable final List<String> customHosts)
-      throws PGPException, IOException {
+      final long keyId, @Nullable final List<String> customHosts) throws PGPException, IOException {
 
     final var keyIdHex = String.format(KEY_ID_FORMAT, keyId);
 
