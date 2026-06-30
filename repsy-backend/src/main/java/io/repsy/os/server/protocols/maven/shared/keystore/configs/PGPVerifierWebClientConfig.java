@@ -15,17 +15,34 @@
  */
 package io.repsy.os.server.protocols.maven.shared.keystore.configs;
 
+import io.netty.channel.ChannelOption;
+import java.time.Duration;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
 
 @Configuration
 public class PGPVerifierWebClientConfig {
 
+  private static final int CONNECT_TIMEOUT_MS = 3_000;
+  private static final @NonNull Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
+  private static final int MAX_RESPONSE_BYTES = 512 * 1024;
+
   @Bean
   public @NonNull WebClient pgpVerifierWebClient() {
 
-    return WebClient.builder().build();
+    final var httpClient =
+        HttpClient.create()
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MS)
+            .responseTimeout(RESPONSE_TIMEOUT)
+            .followRedirect(false);
+
+    return WebClient.builder()
+        .clientConnector(new ReactorClientHttpConnector(httpClient))
+        .codecs(config -> config.defaultCodecs().maxInMemorySize(MAX_RESPONSE_BYTES))
+        .build();
   }
 }

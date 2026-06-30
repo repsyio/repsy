@@ -18,13 +18,16 @@ package io.repsy.os.server.protocols.maven.ui.controllers;
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
+import io.repsy.os.generated.model.AllowedKeyserverItem;
 import io.repsy.os.generated.model.KeyStoreForm;
 import io.repsy.os.generated.model.KeyStoreItem;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
+import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -32,11 +35,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -50,6 +55,17 @@ public class KeyStoreController {
 
   private final KeyStoreService keyStoreService;
   private final RestResponseFactory restResponseFactory;
+  private final JwtUtils jwtUtils;
+
+  @GetMapping("/allowed-servers")
+  public RestResponse<List<AllowedKeyserverItem>> listAllowedServers(
+      @RequestHeader(HttpHeaders.AUTHORIZATION) final String authHeader) {
+
+    this.jwtUtils.verify(authHeader);
+
+    return this.restResponseFactory.success(
+        "allowedKeyserversFetched", this.keyStoreService.findAllActiveKeyservers());
+  }
 
   @PostMapping("/{repoName}")
   @RepoOperation(permission = Permission.WRITE)

@@ -521,7 +521,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
             .get(nonSignedStoragePath, repo.getName())
             .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
 
-    final var customKeys = this.keyStoreService.findByRepoId(repo.getId());
+    final var customKeys = this.keyStoreService.findHostsByRepoId(repo.getId());
 
     this.pgpVerifierService.verify(nonSignedFileResource, signedFileResource, customKeys);
   }

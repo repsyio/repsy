@@ -13,18 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.maven.shared.keystore.dtos;
+package io.repsy.os.server.protocols.maven.shared.keystore.repositories;
 
+import io.repsy.os.server.protocols.maven.shared.keystore.entities.AllowedKeyserver;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-public interface KeyStoreItem {
+@Repository
+public interface AllowedKeyserverRepository extends JpaRepository<AllowedKeyserver, UUID> {
 
-  @NonNull UUID getId();
+  @NonNull List<AllowedKeyserver> findAllByActiveTrue();
 
-  @NonNull UUID getAllowedKeyserverId();
-
-  @NonNull String getHost();
-
-  @NonNull String getDisplayName();
+  @NonNull Optional<AllowedKeyserver> findByIdAndActiveTrue(@NonNull UUID id);
 }

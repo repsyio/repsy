@@ -16,48 +16,37 @@
 package io.repsy.os.server.protocols.maven.shared.keystore.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
-import io.repsy.os.shared.repo.entities.Repo;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.OnDelete;
-import org.hibernate.annotations.OnDeleteAction;
 
 @Data
 @Entity
-@Table(name = "key_store")
+@Table(name = "allowed_keyserver")
 @NoArgsConstructor
-@ToString(exclude = {"repo", "allowedKeyserver"})
-@EqualsAndHashCode(exclude = {"repo", "allowedKeyserver"})
-public class KeyStore {
+public class AllowedKeyserver {
 
   @Id
   @UuidV7
   @Column(name = "id", columnDefinition = "uuid", nullable = false)
   private UUID id;
 
+  @Column(name = "host", nullable = false, unique = true)
+  private String host;
+
+  @Column(name = "display_name", nullable = false)
+  private String displayName;
+
+  @Column(name = "is_active", nullable = false)
+  private boolean active;
+
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
-
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "repo_id", nullable = false)
-  @OnDelete(action = OnDeleteAction.CASCADE)
-  private Repo repo;
-
-  @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "allowed_keyserver_id", nullable = false)
-  @OnDelete(action = OnDeleteAction.CASCADE)
-  private AllowedKeyserver allowedKeyserver;
 }

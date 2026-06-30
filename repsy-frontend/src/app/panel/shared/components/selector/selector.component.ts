@@ -45,6 +45,7 @@ export class SelectorComponent implements OnInit {
 
   selectOption(option: string) {
     this.selectedOption = option;
+    this.isOpen = false;
     this.selectedOptionChange.emit(option);
     this.choose.emit(option);
   }

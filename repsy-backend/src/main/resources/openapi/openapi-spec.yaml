@@ -367,6 +367,27 @@ paths:
         required: true
         schema:
           type: string
+  "/api/mvn/key-stores/allowed-servers":
+    get:
+      tags:
+        - key-store-controller
+      operationId: listAllowedKeyServers
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseListAllowedKeyserverItem"
+        '401':
+          description: Missing or invalid token
+      summary: List allowed keyservers for the authenticated user
   "/api/mvn/key-stores/{repoName}":
     get:
       tags:
@@ -2979,21 +3000,61 @@ components:
           type: string
         username:
           type: string
+    AllowedKeyserverItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        host:
+          type: string
+        displayName:
+          type: string
+      required:
+        - id
+        - host
+        - displayName
+    RestResponseListAllowedKeyserverItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          type: array
+          items:
+            "$ref": "#/components/schemas/AllowedKeyserverItem"
+        errorCode:
+          type: string
+        text:
+          type: string
     KeyStoreForm:
       type: object
       properties:
-        url:
+        allowedKeyserverId:
           type: string
+          format: uuid
+      required:
+        - allowedKeyserverId
     KeyStoreItem:
       type: object
       properties:
         id:
           type: string
-        url:
+          format: uuid
+        allowedKeyserverId:
+          type: string
+          format: uuid
+        host:
+          type: string
+        displayName:
           type: string
       required:
         - id
-        - url
+        - allowedKeyserverId
+        - host
+        - displayName
     RestResponseKeyStoreItem:
       type: object
       properties:
