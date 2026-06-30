@@ -3025,6 +3025,7 @@ components:
       properties:
         allowedKeyserverId:
           type: string
+          format: uuid
       required:
         - allowedKeyserverId
     KeyStoreItem:

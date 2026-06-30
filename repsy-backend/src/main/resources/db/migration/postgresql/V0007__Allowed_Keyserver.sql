@@ -15,10 +15,7 @@ CREATE TABLE IF NOT EXISTS "allowed_keyserver"
 TRUNCATE TABLE "key_store";
 
 ALTER TABLE "key_store"
-    ADD COLUMN "allowed_keyserver_id" uuid NOT NULL DEFAULT gen_random_uuid();
-
-ALTER TABLE "key_store"
-    ALTER COLUMN "allowed_keyserver_id" DROP DEFAULT;
+    ADD COLUMN "allowed_keyserver_id" uuid NOT NULL;
 
 ALTER TABLE "key_store"
     ADD CONSTRAINT "fk_key_store__allowed_keyserver_id"

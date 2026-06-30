@@ -147,7 +147,8 @@ public class PGPVerifierService {
 
   private @NonNull String buildUrl(final @NonNull String host, final @NonNull String keyIdHex) {
 
-    return "https://" + host + "/pks/lookup?op=get&search=0x" + keyIdHex;
+    final var normalizedHost = host.trim().replaceFirst("^https?://", "").split("[/?#]", 2)[0];
+    return "https://" + normalizedHost + "/pks/lookup?op=get&search=0x" + keyIdHex;
   }
 
   private @NonNull PGPSignature extractSignature(final @NonNull InputStream signatureStream)

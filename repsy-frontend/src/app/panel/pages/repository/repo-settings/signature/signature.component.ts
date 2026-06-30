@@ -25,7 +25,6 @@ import {
   KeyStoreControllerService,
   KeyStoreForm,
   KeyStoreItem,
-  ProtocolRepoControllerService,
   RepoPermissionInfo,
 } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -61,13 +60,11 @@ export class SignatureComponent implements OnInit {
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly keyStoreControllerService: KeyStoreControllerService,
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
   ) {
     this.docsBaseUrl = environment.docsBase;
   }
 
   ngOnInit(): void {
-    this.fetchRepoSettings();
     this.fetchKeyStores();
     this.fetchAllowedKeyservers();
   }
@@ -79,13 +76,6 @@ export class SignatureComponent implements OnInit {
         this.serverLabels = this.allowedKeyservers.map((s) => `${s.displayName} (${s.host})`);
         this.selectedServerLabel = this.serverLabels[0] ?? '';
       },
-      error: () => {},
-    });
-  }
-
-  private fetchRepoSettings(): void {
-    this.protocolRepoControllerService.getSettings(this.activeRepository.repoName).subscribe({
-      next: () => {},
       error: () => {},
     });
   }

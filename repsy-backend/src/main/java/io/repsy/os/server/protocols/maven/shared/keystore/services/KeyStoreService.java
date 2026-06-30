@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.maven.shared.keystore.services;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.generated.model.AllowedKeyserverItem;
@@ -55,7 +56,12 @@ public class KeyStoreService {
   @Transactional
   public void create(final RepoInfo repoInfo, final KeyStoreForm form) {
 
-    final var keyserverId = UUID.fromString(form.getAllowedKeyserverId());
+    final UUID keyserverId;
+    try {
+      keyserverId = UUID.fromString(form.getAllowedKeyserverId());
+    } catch (final IllegalArgumentException ex) {
+      throw new BadRequestException("validationError");
+    }
 
     final var allowedKeyserver =
         this.allowedKeyserverRepository
