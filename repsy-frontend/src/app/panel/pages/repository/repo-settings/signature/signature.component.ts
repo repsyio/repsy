@@ -19,7 +19,6 @@ import { Component, Input, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
-import { AuthService } from '../../../../../auth/pages/service/auth.service';
 import { environment } from '../../../../../../environments/environment';
 import {
   AllowedKeyserverItem,
@@ -28,6 +27,7 @@ import {
   KeyStoreItem,
   RepoPermissionInfo,
 } from '../../../../../../generated/api';
+import { AuthService } from '../../../../../auth/pages/service/auth.service';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SelectorComponent } from '../../../../shared/components/selector/selector.component';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
