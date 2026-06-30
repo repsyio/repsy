@@ -372,6 +372,12 @@ paths:
       tags:
         - key-store-controller
       operationId: listAllowedKeyServers
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: OK
@@ -379,7 +385,9 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseListAllowedKeyserverItem"
-      summary: List allowed keyservers (public, no auth required)
+        '401':
+          description: Missing or invalid token
+      summary: List allowed keyservers for the authenticated user
   "/api/mvn/key-stores/{repoName}":
     get:
       tags:
@@ -2997,6 +3005,7 @@ components:
       properties:
         id:
           type: string
+          format: uuid
         host:
           type: string
         displayName:
@@ -3033,8 +3042,10 @@ components:
       properties:
         id:
           type: string
+          format: uuid
         allowedKeyserverId:
           type: string
+          format: uuid
         host:
           type: string
         displayName:

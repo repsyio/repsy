@@ -19,6 +19,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
+import { AuthService } from '../../../../../auth/pages/service/auth.service';
 import { environment } from '../../../../../../environments/environment';
 import {
   AllowedKeyserverItem,
@@ -60,6 +61,7 @@ export class SignatureComponent implements OnInit {
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly keyStoreControllerService: KeyStoreControllerService,
+    private readonly authService: AuthService,
   ) {
     this.docsBaseUrl = environment.docsBase;
   }
@@ -69,8 +71,12 @@ export class SignatureComponent implements OnInit {
     this.fetchAllowedKeyservers();
   }
 
+  private get authorizationHeader(): string {
+    return `Bearer ${this.authService.accessToken}`;
+  }
+
   private fetchAllowedKeyservers(): void {
-    this.keyStoreControllerService.listAllowedKeyServers().subscribe({
+    this.keyStoreControllerService.listAllowedKeyServers(this.authorizationHeader).subscribe({
       next: (r) => {
         this.allowedKeyservers = r.data ?? [];
         this.serverLabels = this.allowedKeyservers.map((s) => `${s.displayName} (${s.host})`);

@@ -10,6 +10,10 @@ CREATE TABLE IF NOT EXISTS "allowed_keyserver"
 );
 
 -- Seed additional keyservers here as needed (well-known servers stay hardcoded in PGPVerifierService).
+INSERT INTO "allowed_keyserver" ("id", "host", "display_name", "is_active", "created_at")
+VALUES (gen_random_uuid(), 'keyserver.pgp.com', 'PGP Global Directory',    TRUE, NOW()),
+       (gen_random_uuid(), 'pgp.circl.lu',      'CIRCL OpenPGP Keyserver', TRUE, NOW()),
+       (gen_random_uuid(), 'pgpkeys.eu',         'PGP Keys EU',             TRUE, NOW());
 
 -- Truncate SSRF-vulnerable free-text URL data before restructuring.
 TRUNCATE TABLE "key_store";

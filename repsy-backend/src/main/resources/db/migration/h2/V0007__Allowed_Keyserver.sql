@@ -10,6 +10,10 @@ CREATE TABLE IF NOT EXISTS "allowed_keyserver"
 );
 
 -- Seed additional keyservers here as needed (well-known servers stay hardcoded in PGPVerifierService).
+INSERT INTO "allowed_keyserver" ("id", "host", "display_name", "is_active", "created_at")
+VALUES (random_uuid(), 'keyserver.pgp.com', 'PGP Global Directory',    TRUE, NOW()),
+       (random_uuid(), 'pgp.circl.lu',      'CIRCL OpenPGP Keyserver', TRUE, NOW()),
+       (random_uuid(), 'pgpkeys.eu',         'PGP Keys EU',             TRUE, NOW());
 
 TRUNCATE TABLE "key_store";
 
