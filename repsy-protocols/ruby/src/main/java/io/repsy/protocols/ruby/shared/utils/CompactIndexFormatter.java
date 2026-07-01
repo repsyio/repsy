@@ -17,6 +17,7 @@ package io.repsy.protocols.ruby.shared.utils;
 
 import io.repsy.protocols.ruby.shared.gem.dtos.GemCompactEntry;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
+import io.repsy.protocols.ruby.shared.gem.dtos.GemVersionsEntry;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
@@ -38,7 +39,7 @@ public class CompactIndexFormatter {
   private static final String SEPARATOR = "---";
   private static final String CREATED_AT_PREFIX = "created_at: ";
   private static final String DEFAULT_PLATFORM = "ruby";
-  private static final String CHECKSUM_PREFIX = "checksum:sha256:";
+  private static final String CHECKSUM_PREFIX = "checksum:";
 
   public static String formatNames(final List<String> gemNames) {
     final var sb = new StringBuilder();
@@ -49,12 +50,33 @@ public class CompactIndexFormatter {
     return sb.toString();
   }
 
-  public static String formatVersionsIndex(final Map<String, String> gemChecksums) {
+  public static String formatVersionsIndex(final Map<String, GemVersionsEntry> gemVersionsData) {
     final var sb = new StringBuilder();
     appendPreamble(sb, Instant.now());
-    gemChecksums.entrySet().stream()
+    gemVersionsData.entrySet().stream()
         .sorted(Map.Entry.comparingByKey())
-        .forEach(e -> sb.append(e.getKey()).append(' ').append(e.getValue()).append('\n'));
+        .forEach(
+            e ->
+                sb.append(e.getKey())
+                    .append(' ')
+                    .append(e.getValue().versionsCsv())
+                    .append(' ')
+                    .append(e.getValue().checksum())
+                    .append('\n'));
+    return sb.toString();
+  }
+
+  /** Formats a single version token for use in the /versions CSV column. */
+  public static String formatVersionEntry(
+      final String version, final String platform, final boolean yanked) {
+    final var sb = new StringBuilder();
+    if (yanked) {
+      sb.append('-');
+    }
+    sb.append(version);
+    if (!DEFAULT_PLATFORM.equals(platform)) {
+      sb.append('-').append(platform);
+    }
     return sb.toString();
   }
 

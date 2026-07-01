@@ -17,6 +17,7 @@ package io.repsy.protocols.ruby.shared.gem.services;
 
 import io.repsy.protocols.ruby.shared.gem.dtos.GemCompactEntry;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
+import io.repsy.protocols.ruby.shared.gem.dtos.GemVersionsEntry;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +34,7 @@ public interface RubyGemProtocolService<ID> {
 
   void yankGem(BaseRepoInfo<ID> repoInfo, String gemName, String version, String platform);
 
-  Map<String, String> getVersionsChecksums(BaseRepoInfo<ID> repoInfo);
+  Map<String, GemVersionsEntry> getVersionsChecksums(BaseRepoInfo<ID> repoInfo);
 
   void saveVersionsChecksum(BaseRepoInfo<ID> repoInfo, String gemName, String checksum);
 
