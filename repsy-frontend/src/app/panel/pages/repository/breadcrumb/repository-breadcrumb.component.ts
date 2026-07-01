@@ -143,6 +143,8 @@ export class RepositoryBreadcrumbComponent implements OnInit, OnDestroy {
         return 'assets/icons/repo/helm.svg';
       case 'nuget':
         return 'assets/icons/nuget/nuget.svg';
+      case 'ruby':
+        return 'assets/icons/ruby/ruby.svg';
       default:
         return '';
     }

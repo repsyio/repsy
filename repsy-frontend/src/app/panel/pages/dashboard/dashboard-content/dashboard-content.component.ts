@@ -55,6 +55,7 @@ export class DashboardContentComponent {
   public golangRepoCount = 0;
   public helmRepoCount = 0;
   public nugetRepoCount = 0;
+  public rubyRepoCount = 0;
   public repositories: Repository[] = [];
   public repoListInfos: RepoListInfo[] = [];
   public createRepoModal: boolean;
@@ -142,6 +143,14 @@ export class DashboardContentComponent {
         this.nugetRepoCount = c;
         this.cdRef.markForCheck();
       });
+
+    this.protocolRepoControllerService
+      .getCount(RepoType.Ruby)
+      .pipe(map((r) => r.data ?? 0))
+      .subscribe((c) => {
+        this.rubyRepoCount = c;
+        this.cdRef.markForCheck();
+      });
   }
 
   private fetchRepoInfo(repoType: RepoType): void {
@@ -184,5 +193,6 @@ export class DashboardContentComponent {
     this.fetchRepoInfo(RepoType.Golang);
     this.fetchRepoInfo(RepoType.Helm);
     this.fetchRepoInfo(RepoType.Nuget);
+    this.fetchRepoInfo(RepoType.Ruby);
   }
 }

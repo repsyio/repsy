@@ -23,5 +23,6 @@ public enum RepoScope {
   DOCKER,
   GOLANG,
   CARGO,
-  HELM
+  HELM,
+  RUBY
 }

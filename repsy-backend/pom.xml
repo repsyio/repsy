@@ -102,6 +102,12 @@
         </dependency>
 
         <dependency>
+            <groupId>io.repsy.protocols</groupId>
+            <artifactId>ruby</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>io.repsy.libs</groupId>
             <artifactId>storage-gateway-fs</artifactId>
             <version>${project.version}</version>
@@ -303,6 +309,13 @@
         <dependency>
             <groupId>org.springframework.retry</groupId>
             <artifactId>spring-retry</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>1.3.0</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

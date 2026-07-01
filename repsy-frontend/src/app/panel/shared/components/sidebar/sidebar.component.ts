@@ -69,7 +69,7 @@ export class SidebarComponent implements OnInit {
 
   isActive(): boolean {
     const segments = this.router.url.split('/');
-    const valid = ['maven', 'npm', 'docker', 'pypi', 'cargo', 'golang', 'helm'];
+    const valid = ['maven', 'npm', 'docker', 'pypi', 'cargo', 'golang', 'helm', 'nuget', 'ruby'];
 
     return valid.includes(segments[1]) || this.router.url === '/repositories';
   }

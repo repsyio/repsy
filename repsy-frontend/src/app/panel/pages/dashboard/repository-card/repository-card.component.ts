@@ -34,6 +34,7 @@ export class RepositoryCardComponent {
   @Input() cargoRepoCount: number;
   @Input() helmRepoCount: number;
   @Input() nugetRepoCount: number;
+  @Input() rubyRepoCount: number;
 
   routeMaven() {
     this.router.navigate(['/repositories'], {
@@ -80,6 +81,12 @@ export class RepositoryCardComponent {
   routeNuget() {
     this.router.navigate(['/repositories'], {
       state: { repoType: 'nuget' },
+    });
+  }
+
+  routeRuby() {
+    this.router.navigate(['/repositories'], {
+      state: { repoType: 'ruby' },
     });
   }
 }

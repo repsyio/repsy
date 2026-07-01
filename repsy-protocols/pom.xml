@@ -44,5 +44,6 @@
     <module>nuget</module>
     <module>shared</module>
     <module>helm</module>
+    <module>ruby</module>
   </modules>
 </project>
