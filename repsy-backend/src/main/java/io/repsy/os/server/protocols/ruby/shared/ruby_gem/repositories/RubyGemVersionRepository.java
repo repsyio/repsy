@@ -64,6 +64,18 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
         gv.checksum as checksum, gv.yanked as yanked,
         gv.createdAt as createdAt
       from RubyGemVersion gv join gv.gem g join g.repo r
+      where r.id = :repoId
+      order by g.name, gv.createdAt
+      """)
+  List<GemVersionCompactItem> findAllCompactByRepoId(UUID repoId);
+
+  @Query(
+      """
+      select gv.id as gemVersionId, g.name as gemName,
+        gv.version as version, gv.platform as platform,
+        gv.checksum as checksum, gv.yanked as yanked,
+        gv.createdAt as createdAt
+      from RubyGemVersion gv join gv.gem g join g.repo r
       where r.id = :repoId and gv.yanked = false
       order by g.name, gv.createdAt
       """)

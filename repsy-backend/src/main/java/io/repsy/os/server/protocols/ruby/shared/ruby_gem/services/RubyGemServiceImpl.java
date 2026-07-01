@@ -35,10 +35,13 @@ import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemCompactEntry;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
+import io.repsy.protocols.ruby.shared.gem.dtos.GemVersionsEntry;
 import io.repsy.protocols.ruby.shared.gem.services.RubyGemProtocolService;
+import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -175,10 +178,26 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
   }
 
   @Override
-  public Map<String, String> getVersionsChecksums(final BaseRepoInfo<UUID> repoInfo) {
+  public Map<String, GemVersionsEntry> getVersionsChecksums(final BaseRepoInfo<UUID> repoInfo) {
+    final var versionsCsvByGem =
+        this.versionRepository.findAllCompactByRepoId(repoInfo.getId()).stream()
+            .collect(
+                Collectors.groupingBy(
+                    GemVersionCompactItem::getGemName,
+                    Collectors.mapping(
+                        v ->
+                            CompactIndexFormatter.formatVersionEntry(
+                                v.getVersion(), v.getPlatform(), v.isYanked()),
+                        Collectors.joining(","))));
     return this.gemRepository.findAllByRepoId(repoInfo.getId()).stream()
         .filter(g -> g.getVersionsChecksum() != null)
-        .collect(Collectors.toMap(RubyGem::getName, RubyGem::getVersionsChecksum));
+        .collect(
+            Collectors.toMap(
+                RubyGem::getName,
+                g ->
+                    new GemVersionsEntry(
+                        versionsCsvByGem.getOrDefault(g.getName(), ""),
+                        Objects.requireNonNull(g.getVersionsChecksum()))));
   }
 
   @Override
