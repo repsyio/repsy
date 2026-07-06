@@ -61,6 +61,8 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
   private static final Pattern MANIFEST_PUSH_PATTERN = Pattern.compile("^/([^/]+)/manifests/(.+)$");
   private static final int RETRY_COUNT = 3;
   private static final long WAIT_RETRY = 100;
+  private static final String ARTIFACT_NAME = "artifactName";
+  private static final String ARTIFACT_VERSION = "artifactVersion";
 
   private final PathParser basePathParser;
   private final HelmFacade<ID> helmFacade;
@@ -177,6 +179,8 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     // Only count disk usage on version-tagged pushes. Helm also pushes the manifest a second time
     // addressed by its content digest (sha256:...) — same blob, no additional storage consumed.
     if (!reference.startsWith(HelmConstants.SHA256_PREFIX)) {
+      context.addProperty(ARTIFACT_NAME, metadata.getName());
+      context.addProperty(ARTIFACT_VERSION, metadata.getVersion());
       context.addProperty("usages", BaseUsages.ofDisk(layerSize));
     }
 

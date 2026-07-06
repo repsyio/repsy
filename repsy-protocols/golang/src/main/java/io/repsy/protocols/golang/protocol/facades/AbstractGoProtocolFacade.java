@@ -57,6 +57,8 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
   private static final String ZIP_EXTENSION = ".zip";
   private static final String USAGES = "usages";
   private static final String CONTENT_SHA256_KEY = "contentSha256";
+  private static final String ARTIFACT_NAME = "artifactName";
+  private static final String ARTIFACT_VERSION = "artifactVersion";
 
   private static final ObjectMapper OBJECT_MAPPER =
       new ObjectMapper()
@@ -139,6 +141,8 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
 
     final var totalDiskUsage =
         modUsages.getDiskUsage() + zipUsages.getDiskUsage() + infoUsages.getDiskUsage();
+    context.addProperty(ARTIFACT_NAME, normalizedPath);
+    context.addProperty(ARTIFACT_VERSION, version);
     context.addProperty(USAGES, BaseUsages.ofDisk(totalDiskUsage));
   }
 

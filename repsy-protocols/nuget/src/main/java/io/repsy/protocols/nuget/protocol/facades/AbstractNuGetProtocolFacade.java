@@ -66,6 +66,8 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
 
   public static final String USAGES = "usages";
   public static final String SUPPORTED_VERSION = "3.0.0";
+  private static final String ARTIFACT_NAME = "artifactName";
+  private static final String ARTIFACT_VERSION = "artifactVersion";
   private static final List<String> REGISTRATION_INDEX_TYPES =
       List.of("catalog:CatalogRoot", "PackageRegistration", "catalog:Permalink");
 
@@ -119,6 +121,8 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
           metadata.packageId(),
           metadata.version());
 
+      context.addProperty(ARTIFACT_NAME, metadata.packageId());
+      context.addProperty(ARTIFACT_VERSION, metadata.version());
       context.addProperty(USAGES, usages);
     } finally {
       Files.deleteIfExists(tempFile);

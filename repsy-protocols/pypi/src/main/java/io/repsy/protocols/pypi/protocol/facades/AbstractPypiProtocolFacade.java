@@ -43,6 +43,9 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFacade<ID> {
 
+  private static final String ARTIFACT_NAME = "artifactName";
+  private static final String ARTIFACT_VERSION = "artifactVersion";
+
   private final PypiStorageService<ID> pypiStorageService;
   private final PypiPackageService<ID> pypiPackageService;
 
@@ -65,6 +68,8 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
     // This method calculate on Disk Usages (If override calculate diff)
     final var packageUsage = this.savePackage(repoInfo, uploadForm, file);
 
+    context.addProperty(ARTIFACT_NAME, uploadForm.getNormalizedName());
+    context.addProperty(ARTIFACT_VERSION, uploadForm.getVersion());
     context.addProperty("usages", packageUsage);
   }
 

@@ -70,6 +70,8 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
   private static final String MULTIPLATFORM = "Multiplatform";
   private static final String USAGES_PROPERTY = "usages";
+  private static final String ARTIFACT_NAME_PROPERTY = "artifactName";
+  private static final String ARTIFACT_VERSION_PROPERTY = "artifactVersion";
 
   protected final DockerStorageService<ID> dockerStorageService;
   protected final LayerService<ID> layerService;
@@ -125,6 +127,10 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
         };
 
     if (usage != null) {
+      // form.getTagName() holds the real tag for tag-referenced pushes, and the digest itself
+      // for digest-referenced pushes (see #verifyTag) — either way it is the right "version".
+      context.addProperty(ARTIFACT_NAME_PROPERTY, imageInfo.getName());
+      context.addProperty(ARTIFACT_VERSION_PROPERTY, form.getTagName());
       context.addProperty(USAGES_PROPERTY, usage);
     }
 

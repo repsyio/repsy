@@ -38,6 +38,8 @@ import org.springframework.core.io.Resource;
 public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFacade<ID> {
 
   private static final String USAGES = "usages";
+  private static final String ARTIFACT_NAME = "artifactName";
+  private static final String ARTIFACT_VERSION = "artifactVersion";
 
   private final MavenStorageService<ID> mavenStorageService;
   private final ArtifactService<ID> artifactService;
@@ -91,6 +93,13 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     final var resource = this.mavenStorageService.getResource(repoInfo.getName(), storagePath);
 
     this.artifactService.createOrUpdateArtifact(repoInfo, storagePath, resource);
+
+    final var gav = ArtifactUtils.getGavByFile(storagePath);
+
+    if (gav != null) {
+      context.addProperty(ARTIFACT_NAME, gav.getGroupId() + ":" + gav.getArtifactId());
+      context.addProperty(ARTIFACT_VERSION, gav.getVersion());
+    }
 
     context.addProperty(USAGES, afterUploadUsage);
   }

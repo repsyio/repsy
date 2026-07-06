@@ -39,6 +39,8 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
   private static final String USAGES = "usages";
   private static final String GEM_NAME = "gemName";
   private static final String GEM_VERSION = "gemVersion";
+  private static final String ARTIFACT_NAME = "artifactName";
+  private static final String ARTIFACT_VERSION = "artifactVersion";
 
   private final RubyGemProtocolService<ID> gemService;
   private final RubyStorageService storageService;
@@ -151,6 +153,8 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
     context.addProperty(USAGES, usages);
     context.addProperty(GEM_NAME, metadata.getName());
     context.addProperty(GEM_VERSION, metadata.getVersion());
+    context.addProperty(ARTIFACT_NAME, metadata.getName());
+    context.addProperty(ARTIFACT_VERSION, metadata.getVersion());
   }
 
   @Override

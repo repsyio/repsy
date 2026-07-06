@@ -39,6 +39,8 @@ import tools.jackson.databind.ObjectMapper;
 public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFacade {
 
   private static final String USAGES = "usages";
+  private static final String ARTIFACT_NAME = "artifactName";
+  private static final String ARTIFACT_VERSION = "artifactVersion";
 
   private final CargoStorageService cargoStorageService;
   private final CargoCrateService<ID> cargoCrateService;
@@ -104,6 +106,8 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
 
     this.cargoCrateService.publish(repoInfo, requestWithChecksum);
 
+    context.addProperty(ARTIFACT_NAME, crateName);
+    context.addProperty(ARTIFACT_VERSION, request.vers());
     context.addProperty(USAGES, usages);
   }
 

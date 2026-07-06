@@ -42,6 +42,8 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
 
   private static final String USAGES = "usages";
   private static final String PACKAGE_JSON = "package.json";
+  private static final String ARTIFACT_NAME = "artifactName";
+  private static final String ARTIFACT_VERSION = "artifactVersion";
 
   private final NpmPackageService<ID> npmPackageService;
   private final AbstractNpmStorageService npmStorageService;
@@ -343,10 +345,16 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
         }
       }
 
+      context.addProperty(ARTIFACT_NAME, this.buildArtifactName(scopeName, packageName));
+      context.addProperty(ARTIFACT_VERSION, versionName);
       context.addProperty(USAGES, usages);
 
     } catch (final ClassCastException | URISyntaxException _) {
       throw new BadRequestException("badRequest");
     }
+  }
+
+  private String buildArtifactName(final @Nullable String scopeName, final String packageName) {
+    return scopeName == null ? packageName : "@" + scopeName + "/" + packageName;
   }
 }

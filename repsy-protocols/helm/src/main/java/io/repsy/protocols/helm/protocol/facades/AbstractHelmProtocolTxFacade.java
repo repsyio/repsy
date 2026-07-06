@@ -54,6 +54,9 @@ import org.springframework.core.io.Resource;
 @RequiredArgsConstructor
 public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID> {
 
+  private static final String ARTIFACT_NAME = "artifactName";
+  private static final String ARTIFACT_VERSION = "artifactVersion";
+
   protected final HelmStorageService<ID> helmStorageService;
   protected final ChartService<ID> chartService;
   protected final OciBlobService<ID> ociBlobService;
@@ -145,12 +148,16 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
       final var oldSize = existingOpt.get().size();
       final var chartInfo = this.chartService.update(repoInfo.getId(), form);
       this.helmStorageService.saveChart(repoInfo.getName(), storagePath, chartStream);
+      context.addProperty(ARTIFACT_NAME, name);
+      context.addProperty(ARTIFACT_VERSION, version);
       context.addProperty("usages", BaseUsages.ofDisk(size - oldSize));
       return chartInfo;
     }
 
     final var chartInfo = this.chartService.findOrCreate(form, repoInfo.getId());
     this.helmStorageService.saveChart(repoInfo.getName(), storagePath, chartStream);
+    context.addProperty(ARTIFACT_NAME, name);
+    context.addProperty(ARTIFACT_VERSION, version);
     context.addProperty("usages", BaseUsages.ofDisk(size));
     return chartInfo;
   }
