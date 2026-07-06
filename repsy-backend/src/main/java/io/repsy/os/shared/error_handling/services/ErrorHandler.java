@@ -141,7 +141,7 @@ public class ErrorHandler {
       return null;
     }
 
-    response.reset();
+    response.resetBuffer();
 
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
         .contentType(MediaType.APPLICATION_JSON)

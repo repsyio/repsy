@@ -20,7 +20,9 @@ import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersi
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import lombok.RequiredArgsConstructor;
+import org.apache.maven.model.Model;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,7 @@ class ArtifactUpsertHelper {
 
   private final ArtifactRepository artifactRepository;
   private final ArtifactVersionRepository artifactVersionRepository;
+  private final ArtifactVersionWriteService artifactVersionWriteService;
 
   /**
    * Inserts a new maven_artifact row in its own REQUIRES_NEW transaction.
@@ -47,13 +50,27 @@ class ArtifactUpsertHelper {
   }
 
   /**
-   * Inserts a new maven_artifact_version row in its own REQUIRES_NEW transaction.
+   * Inserts a new maven_artifact_version row, together with its dependent developer/license rows
+   * and the parent artifact's latest/release update, in a single REQUIRES_NEW transaction.
    *
    * <p>Same isolation rationale as {@link #insertArtifact}: a concurrent insert of the same
-   * (artifact, version) only rolls back this inner transaction.
+   * (artifact, version) only rolls back this inner transaction. The dependent writes are included
+   * in this same transaction (rather than left to the caller's outer transaction) so that a failure
+   * in any of them rolls back the version row too, instead of leaving it committed but orphaned (no
+   * developers/licenses, stale latest/release on the artifact). The dependent-write logic itself
+   * lives in {@link ArtifactVersionWriteService}, shared with {@link ArtifactServiceImpl}'s
+   * "already exists" update path, so there is a single implementation.
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
-  ArtifactVersion insertArtifactVersion(final ArtifactVersion version) {
-    return this.artifactVersionRepository.saveAndFlush(version);
+  ArtifactVersion insertArtifactVersion(
+      final ArtifactVersion version, final @Nullable Model pomModel, final Artifact artifact) {
+
+    final var savedVersion = this.artifactVersionRepository.saveAndFlush(version);
+
+    this.artifactVersionWriteService.createVersionDevelopers(pomModel, savedVersion);
+    this.artifactVersionWriteService.createVersionLicenses(pomModel, savedVersion);
+    this.artifactVersionWriteService.updateReleaseAndLatestVersion(artifact);
+
+    return savedVersion;
   }
 }
