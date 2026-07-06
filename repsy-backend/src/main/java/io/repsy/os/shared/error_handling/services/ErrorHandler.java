@@ -136,7 +136,8 @@ public class ErrorHandler {
     }
 
     if (response.isCommitted()) {
-      log.warn("Response already committed, skipping error body write for {}", ex.getClass().getName());
+      log.warn(
+          "Response already committed, skipping error body write for {}", ex.getClass().getName());
       return null;
     }
 

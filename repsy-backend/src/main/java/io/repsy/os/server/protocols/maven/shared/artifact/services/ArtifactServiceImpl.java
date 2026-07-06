@@ -806,7 +806,8 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   private void createOrUpdateArtifactByPomFile(
       final Repo repo, final Gav gav, final String versionPath, final @Nullable Model pomModel) {
 
-    final var existingArtifact = this.getArtifact(repo.getId(), gav.getArtifactId(), gav.getGroupId());
+    final var existingArtifact =
+        this.getArtifact(repo.getId(), gav.getArtifactId(), gav.getGroupId());
     final var artifact =
         existingArtifact != null
             ? this.updateArtifactProperties(existingArtifact, pomModel)
@@ -815,7 +816,8 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     this.createOrUpdateArtifactVersion(repo, artifact, gav, versionPath, pomModel);
   }
 
-  private Artifact updateArtifactProperties(final Artifact artifact, final @Nullable Model pomModel) {
+  private Artifact updateArtifactProperties(
+      final Artifact artifact, final @Nullable Model pomModel) {
 
     artifact.setLastUpdatedAt(Instant.now());
 
