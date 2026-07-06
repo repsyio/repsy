@@ -135,6 +135,13 @@ public class ErrorHandler {
       log.error(exceptionToString(ex, request));
     }
 
+    if (response.isCommitted()) {
+      log.warn("Response already committed, skipping error body write for {}", ex.getClass().getName());
+      return null;
+    }
+
+    response.reset();
+
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(ERR_ERROR_OCCURRED));

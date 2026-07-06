@@ -17,6 +17,7 @@ package io.repsy.protocols.maven.shared.utils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.shared.artifact.services.VersionComparator;
@@ -121,7 +122,12 @@ public class ArtifactUtils {
 
     final var reader = new MetadataXpp3Reader();
 
-    return reader.read(new ByteArrayInputStream(content), false);
+    try {
+      return reader.read(new ByteArrayInputStream(content), false);
+    } catch (final IOException | XmlPullParserException e) {
+      log.warn("Malformed or incomplete maven-metadata.xml received: {}", e.getMessage());
+      throw new BadRequestException("malformedMetadataFile");
+    }
   }
 
   @SneakyThrows
