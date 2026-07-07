@@ -18,7 +18,10 @@ package io.repsy.os.server.security.scan.dtos;
 public enum FixStatus {
   FIXED,
   AFFECTED,
+  NOT_AFFECTED,
   WILL_NOT_FIX,
+  FIX_DEFERRED,
+  END_OF_LIFE,
   UNDER_INVESTIGATION,
   UNKNOWN
 }
