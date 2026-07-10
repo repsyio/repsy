@@ -13,20 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.security.scanner;
+package io.repsy.scanner.trivy.dtos;
 
-import io.repsy.os.server.security.scanner.dtos.ScanOutcome;
-import io.repsy.os.server.security.scanner.dtos.ScanRequest;
-import java.util.Set;
-import org.jspecify.annotations.NonNull;
-
-public interface VulnerabilityScanner {
-
-  String ALL_REPO_TYPES = "*";
-
-  @NonNull ScanOutcome scan(@NonNull ScanRequest request);
-
-  @NonNull String getName();
-
-  @NonNull Set<String> getSupportedRepoTypes();
+public enum Severity {
+  CRITICAL,
+  HIGH,
+  MEDIUM,
+  LOW,
+  UNKNOWN
 }

@@ -446,7 +446,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
   private ManifestDetails performDatabaseLookupForManifest(
       final ProtocolContext context,
-      final String manifestDigest,
+      final String manifestReference,
       final String imageName,
       final String requestPath)
       throws IOException {
@@ -456,11 +456,17 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     final var imageInfo =
         this.imageService.findImageInfoByRepoIdAndName(repoInfo.getId(), imageName);
 
+    final var digest = this.resolveManifestDigest(repoInfo, imageName, manifestReference);
+
     final var manifest =
         this.manifestService.findManifestByRepoIdAndImageNameAndDigest(
-            repoInfo.getId(), imageInfo, manifestDigest);
+            repoInfo.getId(), imageInfo, digest);
 
-    final var fileName = generate(repoInfo.getStorageKey(), imageName, manifest.getName());
+    // The stored filename is hashed from whatever reference the client used at push time
+    // (see AbstractDockerManifestPushProtocolMethodHandler) — a tag push hashes the tag, so the
+    // GET side must rehash the same original manifestReference, not manifest.getName() (which
+    // holds the resolved digest and would only coincidentally match a digest-referenced push).
+    final var fileName = generate(repoInfo.getStorageKey(), imageName, manifestReference);
 
     final var parsedPath = this.parseForManifest(requestPath, fileName);
 
@@ -468,6 +474,26 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     final var manifestStr = manifestResource.getContentAsString(StandardCharsets.UTF_8);
 
     return new ManifestDetails(manifest.getMediaType(), manifest.getDigest(), manifestStr);
+  }
+
+  /**
+   * The GET manifest path (Docker registry {@code manifests/<reference>}) accepts either a tag name
+   * or a content digest as {@code <reference>} — only a literal {@code sha256:} value can be
+   * matched directly against the stored digest column, so a tag must first be resolved to its
+   * current digest, mirroring what the HEAD/manifest-exists path already does via {@link
+   * #findTagByNameAndRepoAndImageName}.
+   */
+  private String resolveManifestDigest(
+      final BaseRepoInfo<ID> repoInfo, final String imageName, final String reference) {
+
+    if (reference.startsWith(DockerConstants.SHA256_PREFIX)) {
+      return reference;
+    }
+
+    return this.manifestService
+        .findActiveTagByNameAndRepoAndImage(repoInfo.getId(), imageName, reference)
+        .map(BaseTagDetail::getDigest)
+        .orElseThrow(() -> new ItemNotFoundException("tagNotFound"));
   }
 
   private Resource getLayerResource(

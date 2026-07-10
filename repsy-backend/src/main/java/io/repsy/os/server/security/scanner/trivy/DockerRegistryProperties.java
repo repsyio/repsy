@@ -13,20 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.security.scanner;
+package io.repsy.os.server.security.scanner.trivy;
 
-import io.repsy.os.server.security.scanner.dtos.ScanOutcome;
-import io.repsy.os.server.security.scanner.dtos.ScanRequest;
-import java.util.Set;
 import org.jspecify.annotations.NonNull;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
-public interface VulnerabilityScanner {
-
-  String ALL_REPO_TYPES = "*";
-
-  @NonNull ScanOutcome scan(@NonNull ScanRequest request);
-
-  @NonNull String getName();
-
-  @NonNull Set<String> getSupportedRepoTypes();
-}
+/**
+ * The base URL at which repsy-os's own Docker registry (this application's {@code /v2/...}
+ * endpoints) is reachable from the {@code repsy-scanner-trivy} adapter — deliberately a static
+ * config value, not derived from any request's {@code Host} header, since the scanner runs as a
+ * separate container/process and cannot resolve whatever host a client used to push.
+ */
+@ConfigurationProperties(prefix = "repsy.security.docker")
+public record DockerRegistryProperties(@NonNull String internalRegistryBaseUrl) {}

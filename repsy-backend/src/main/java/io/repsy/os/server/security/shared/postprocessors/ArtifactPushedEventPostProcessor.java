@@ -41,6 +41,7 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
   private static final int PRIORITY = Integer.MAX_VALUE - 1;
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
+  private static final String STORAGE_PATH = "storagePath";
   private static final String WRITE_OPERATION = "writeOperation";
 
   private final @NonNull ApplicationEventPublisher eventPublisher;
@@ -74,20 +75,24 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
 
     final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
     final var relativePath = ProtocolContextUtils.getRelativePath(context);
+    final var storagePathOverride = context.<String>getProperty(STORAGE_PATH);
+    final var storagePath =
+        storagePathOverride != null ? storagePathOverride : relativePath.getPath();
 
     this.eventPublisher.publishEvent(
         new ArtifactPushedEvent(
             repoInfo.getStorageKey(),
             repoInfo.getType().name(),
             repoInfo.getName(),
-            relativePath.getPath(),
+            storagePath,
             context.<String>getProperty(ARTIFACT_NAME),
             context.<String>getProperty(ARTIFACT_VERSION)));
 
     return ProcessorResult.next();
   }
 
-  private boolean isWriteOperation(final @NonNull Map<@NonNull String, @NonNull Object> properties) {
+  private boolean isWriteOperation(
+      final @NonNull Map<@NonNull String, @NonNull Object> properties) {
     return (boolean) properties.getOrDefault(WRITE_OPERATION, false);
   }
 }

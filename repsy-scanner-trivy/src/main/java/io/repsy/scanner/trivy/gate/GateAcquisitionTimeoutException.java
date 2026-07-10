@@ -13,20 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.security.scanner;
+package io.repsy.scanner.trivy.gate;
 
-import io.repsy.os.server.security.scanner.dtos.ScanOutcome;
-import io.repsy.os.server.security.scanner.dtos.ScanRequest;
-import java.util.Set;
 import org.jspecify.annotations.NonNull;
 
-public interface VulnerabilityScanner {
+/** Thrown by a {@link TrivyExecutionGate} when no permit becomes available within the timeout. */
+public final class GateAcquisitionTimeoutException extends RuntimeException {
 
-  String ALL_REPO_TYPES = "*";
-
-  @NonNull ScanOutcome scan(@NonNull ScanRequest request);
-
-  @NonNull String getName();
-
-  @NonNull Set<String> getSupportedRepoTypes();
+  public GateAcquisitionTimeoutException(final @NonNull String message) {
+    super(message);
+  }
 }

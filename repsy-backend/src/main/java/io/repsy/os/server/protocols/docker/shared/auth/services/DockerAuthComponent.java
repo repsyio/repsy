@@ -284,6 +284,11 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
       return;
     }
 
+    if (authType == AuthenticationType.DOCKER_SCAN) {
+      this.authorizeScannerToken(authHeader, repoId, permission);
+      return;
+    }
+
     final var username = this.jwtUtils.verifyAndExtractUsername(authHeader);
     final var userInfo = this.userTxService.getUserByUsernameOptional(username).orElse(null);
 
@@ -292,5 +297,24 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
     }
 
     this.authorizeUser(userInfo, permission);
+  }
+
+  /**
+   * Authorizes a {@link AuthenticationType#DOCKER_SCAN} token minted for the vulnerability scanner:
+   * valid only for {@link Permission#READ} and only for the exact repo it was minted for (its
+   * subject is the repo id, not a user id) — never a wildcard, never write/manage.
+   */
+  private void authorizeScannerToken(
+      final String authHeader, final UUID repoId, final Permission permission) {
+
+    if (permission != Permission.READ) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    final var tokenRepoId = this.jwtUtils.extractUserId(authHeader);
+
+    if (!tokenRepoId.equals(repoId)) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
   }
 }

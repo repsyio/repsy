@@ -13,20 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.security.scanner;
+package io.repsy.scanner.trivy.dtos.trivy;
 
-import io.repsy.os.server.security.scanner.dtos.ScanOutcome;
-import io.repsy.os.server.security.scanner.dtos.ScanRequest;
-import java.util.Set;
-import org.jspecify.annotations.NonNull;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import org.jspecify.annotations.Nullable;
 
-public interface VulnerabilityScanner {
-
-  String ALL_REPO_TYPES = "*";
-
-  @NonNull ScanOutcome scan(@NonNull ScanRequest request);
-
-  @NonNull String getName();
-
-  @NonNull Set<String> getSupportedRepoTypes();
-}
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record TrivyVersion(@JsonProperty("Version") @Nullable String version) {}

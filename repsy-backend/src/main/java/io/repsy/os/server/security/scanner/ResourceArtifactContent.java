@@ -15,18 +15,21 @@
  */
 package io.repsy.os.server.security.scanner;
 
-import io.repsy.os.server.security.scanner.dtos.ScanOutcome;
-import io.repsy.os.server.security.scanner.dtos.ScanRequest;
-import java.util.Set;
+import java.io.IOException;
+import java.io.InputStream;
 import org.jspecify.annotations.NonNull;
+import org.springframework.core.io.Resource;
 
-public interface VulnerabilityScanner {
+/**
+ * Wraps a storage-backed {@link Resource} (e.g. {@code UrlResource} for filesystem storage). {@code
+ * Resource.getInputStream()} opens a fresh stream from the backing path on every call rather than
+ * holding one open, so no disk copy is needed here.
+ */
+public record ResourceArtifactContent(@NonNull Resource resource, @NonNull String fileName)
+    implements ArtifactContent {
 
-  String ALL_REPO_TYPES = "*";
-
-  @NonNull ScanOutcome scan(@NonNull ScanRequest request);
-
-  @NonNull String getName();
-
-  @NonNull Set<String> getSupportedRepoTypes();
+  @Override
+  public @NonNull InputStream openStream() throws IOException {
+    return this.resource.getInputStream();
+  }
 }

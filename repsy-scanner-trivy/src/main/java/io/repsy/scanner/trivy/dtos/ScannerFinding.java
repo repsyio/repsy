@@ -13,20 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.security.scanner;
+package io.repsy.scanner.trivy.dtos;
 
-import io.repsy.os.server.security.scanner.dtos.ScanOutcome;
-import io.repsy.os.server.security.scanner.dtos.ScanRequest;
-import java.util.Set;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
-public interface VulnerabilityScanner {
-
-  String ALL_REPO_TYPES = "*";
-
-  @NonNull ScanOutcome scan(@NonNull ScanRequest request);
-
-  @NonNull String getName();
-
-  @NonNull Set<String> getSupportedRepoTypes();
-}
+/** Field-for-field mirror of {@code io.repsy.os.server.security.scanner.dtos.ScannerFinding}. */
+public record ScannerFinding(
+    @NonNull String cveId,
+    @NonNull Severity severity,
+    @NonNull String packageName,
+    @NonNull String packageVersion,
+    @Nullable String fixedVersion,
+    @Nullable String description,
+    @Nullable String referenceUrl,
+    @NonNull FixStatus fixStatus,
+    @Nullable Double cvssScore,
+    @Nullable String cvssVector) {}

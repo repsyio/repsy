@@ -40,6 +40,7 @@ public class JwtUtils {
 
   private static final @NonNull String CLAIM_USERNAME = "username";
   private static final @NonNull String AUTH_TYPE = "authentication_type";
+  private static final @NonNull String CLAIM_SCOPE = "scope";
   private static final int SECRET_BYTE_LENGTH = 32;
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -102,6 +103,24 @@ public class JwtUtils {
         .withSubject(userId.toString())
         .withClaim(CLAIM_USERNAME, username)
         .withClaim(AUTH_TYPE, authenticationType.getValue())
+        .withExpiresAt(Instant.now().plus(timeoutDuration))
+        .sign(Algorithm.HMAC512(this.secret));
+  }
+
+  /**
+   * Mints a token whose subject is a repo id rather than a user id, scoped to a single {@code
+   * scope} string (e.g. {@code repository:{repoName}:pull}) and typed {@link
+   * AuthenticationType#DOCKER_SCAN}. Callers authorize it by comparing the subject against the repo
+   * being accessed — it never resolves to a real user or deploy token.
+   */
+  public @NonNull String createRepoScopedToken(
+      final @NonNull UUID repoId,
+      final @NonNull String scope,
+      final @NonNull TemporalAmount timeoutDuration) {
+    return JWT.create()
+        .withSubject(repoId.toString())
+        .withClaim(AUTH_TYPE, AuthenticationType.DOCKER_SCAN.getValue())
+        .withClaim(CLAIM_SCOPE, scope)
         .withExpiresAt(Instant.now().plus(timeoutDuration))
         .sign(Algorithm.HMAC512(this.secret));
   }

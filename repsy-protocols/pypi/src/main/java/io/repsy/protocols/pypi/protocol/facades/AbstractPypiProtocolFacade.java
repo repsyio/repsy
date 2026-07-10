@@ -30,6 +30,7 @@ import io.repsy.protocols.pypi.shared.utils.PackageUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -45,6 +46,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
 
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
+  private static final String STORAGE_PATH = "storagePath";
 
   private final PypiStorageService<ID> pypiStorageService;
   private final PypiPackageService<ID> pypiPackageService;
@@ -70,6 +72,9 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
 
     context.addProperty(ARTIFACT_NAME, uploadForm.getNormalizedName());
     context.addProperty(ARTIFACT_VERSION, uploadForm.getVersion());
+    context.addProperty(
+        STORAGE_PATH,
+        Paths.get(uploadForm.getNormalizedName(), file.getOriginalFilename()).toString());
     context.addProperty("usages", packageUsage);
   }
 

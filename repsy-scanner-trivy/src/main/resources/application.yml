@@ -1,0 +1,22 @@
+server:
+  port: ${SERVER_PORT:8090}
+
+spring:
+  application:
+    name: repsy-scanner-trivy
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 500MB
+
+scanner:
+  security:
+    api-key: ${SCANNER_API_KEY}
+  trivy:
+    binary-path: ${TRIVY_BINARY_PATH:trivy}
+    timeout-seconds: ${TRIVY_TIMEOUT_SECONDS:300}
+    gate-acquire-timeout-seconds: ${TRIVY_GATE_ACQUIRE_TIMEOUT_SECONDS:60}
+
+logging:
+  level:
+    io.repsy.scanner: INFO

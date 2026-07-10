@@ -15,12 +15,17 @@
  */
 package io.repsy.os.server.security.scanner.dtos;
 
+import io.repsy.os.server.security.scanner.ArtifactContent;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 public record ScanRequest(
     @NonNull String repoType,
     @NonNull UUID repoId,
     @NonNull String artifactName,
     @NonNull String artifactVersion,
-    @NonNull String storagePath) {}
+    @NonNull String storagePath,
+    @Nullable ArtifactContent artifactContent,
+    @Nullable String dockerRegistryReference,
+    @Nullable String registryAuthToken) {}

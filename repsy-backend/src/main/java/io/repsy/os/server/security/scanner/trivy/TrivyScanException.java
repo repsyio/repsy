@@ -13,20 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.security.scanner;
+package io.repsy.os.server.security.scanner.trivy;
 
-import io.repsy.os.server.security.scanner.dtos.ScanOutcome;
-import io.repsy.os.server.security.scanner.dtos.ScanRequest;
-import java.util.Set;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
-public interface VulnerabilityScanner {
+final class TrivyScanException extends RuntimeException {
 
-  String ALL_REPO_TYPES = "*";
+  TrivyScanException(final @NonNull String message) {
+    super(message);
+  }
 
-  @NonNull ScanOutcome scan(@NonNull ScanRequest request);
-
-  @NonNull String getName();
-
-  @NonNull Set<String> getSupportedRepoTypes();
+  TrivyScanException(final @NonNull String message, final @Nullable Throwable cause) {
+    super(message, cause);
+  }
 }

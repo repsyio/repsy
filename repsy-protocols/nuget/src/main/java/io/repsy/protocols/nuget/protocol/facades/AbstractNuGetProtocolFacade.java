@@ -23,6 +23,7 @@ import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.checkVersi
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.copyStreamToFile;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.extractPackageId;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.extractPackageIdAndVersion;
+import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.normalizeNuGetVersion;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.readNuspecMetadata;
 import static io.repsy.protocols.nuget.shared.utils.NuGetServiceIndexResources.build;
 
@@ -68,6 +69,8 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   public static final String SUPPORTED_VERSION = "3.0.0";
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
+  private static final String STORAGE_PATH = "storagePath";
+  private static final String NUPKG_STORAGE_PATH_FMT = "packages/%s/%s/%s.%s.nupkg";
   private static final List<String> REGISTRATION_INDEX_TYPES =
       List.of("catalog:CatalogRoot", "PackageRegistration", "catalog:Permalink");
 
@@ -121,8 +124,19 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
           metadata.packageId(),
           metadata.version());
 
+      final var normalizedId = metadata.packageId().toLowerCase(Locale.ROOT);
+      final var normalizedVersion = normalizeNuGetVersion(metadata.version());
+
       context.addProperty(ARTIFACT_NAME, metadata.packageId());
       context.addProperty(ARTIFACT_VERSION, metadata.version());
+      context.addProperty(
+          STORAGE_PATH,
+          String.format(
+              NUPKG_STORAGE_PATH_FMT,
+              normalizedId,
+              normalizedVersion,
+              normalizedId,
+              normalizedVersion));
       context.addProperty(USAGES, usages);
     } finally {
       Files.deleteIfExists(tempFile);

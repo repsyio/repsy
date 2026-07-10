@@ -56,6 +56,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
 
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
+  private static final String STORAGE_PATH = "storagePath";
 
   protected final HelmStorageService<ID> helmStorageService;
   protected final ChartService<ID> chartService;
@@ -150,6 +151,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
       this.helmStorageService.saveChart(repoInfo.getName(), storagePath, chartStream);
       context.addProperty(ARTIFACT_NAME, name);
       context.addProperty(ARTIFACT_VERSION, version);
+      context.addProperty(STORAGE_PATH, storagePath.getRelativePath().getPath());
       context.addProperty("usages", BaseUsages.ofDisk(size - oldSize));
       return chartInfo;
     }
@@ -158,6 +160,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
     this.helmStorageService.saveChart(repoInfo.getName(), storagePath, chartStream);
     context.addProperty(ARTIFACT_NAME, name);
     context.addProperty(ARTIFACT_VERSION, version);
+    context.addProperty(STORAGE_PATH, storagePath.getRelativePath().getPath());
     context.addProperty("usages", BaseUsages.ofDisk(size));
     return chartInfo;
   }

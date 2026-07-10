@@ -15,18 +15,19 @@
  */
 package io.repsy.os.server.security.scanner;
 
-import io.repsy.os.server.security.scanner.dtos.ScanOutcome;
-import io.repsy.os.server.security.scanner.dtos.ScanRequest;
-import java.util.Set;
+import java.io.IOException;
+import java.io.InputStream;
 import org.jspecify.annotations.NonNull;
 
-public interface VulnerabilityScanner {
+/**
+ * A scannable artifact's bytes, decoupled from where they physically live (storage-backed resource,
+ * temp file, etc). {@link #openStream()} may be called at most once per scan attempt by a given
+ * caller — implementations are not required to support concurrent reads, only repeated sequential
+ * opens (e.g. across retries).
+ */
+public interface ArtifactContent {
 
-  String ALL_REPO_TYPES = "*";
+  @NonNull String fileName();
 
-  @NonNull ScanOutcome scan(@NonNull ScanRequest request);
-
-  @NonNull String getName();
-
-  @NonNull Set<String> getSupportedRepoTypes();
+  @NonNull InputStream openStream() throws IOException;
 }

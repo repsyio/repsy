@@ -61,6 +61,14 @@ repsy:
       key-store-type: ${REPO_SSL_KEY_STORE_TYPE:PKCS12}
       key-alias: ${REPO_SSL_KEY_ALIAS:repsy}
       key-password: ${REPO_SSL_KEY_PASSWORD:}
+  security:
+    scanner: ${SECURITY_SCANNER:disabled}
+    trivy:
+      scanner-base-url: ${TRIVY_SCANNER_BASE_URL:http://localhost:8090}
+      api-key: ${TRIVY_SCANNER_API_KEY:}
+      timeout-seconds: ${TRIVY_TIMEOUT_SECONDS:300}
+    docker:
+      internal-registry-base-url: ${DOCKER_INTERNAL_REGISTRY_BASE_URL:http://localhost:9090}
 
 logging:
   level:

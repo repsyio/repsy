@@ -41,6 +41,8 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   private static final String USAGES = "usages";
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
+  private static final String STORAGE_PATH = "storagePath";
+  private static final String CRATE_STORAGE_PATH_FMT = "crates/%s/%s-%s.crate";
 
   private final CargoStorageService cargoStorageService;
   private final CargoCrateService<ID> cargoCrateService;
@@ -108,6 +110,8 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
 
     context.addProperty(ARTIFACT_NAME, crateName);
     context.addProperty(ARTIFACT_VERSION, request.vers());
+    context.addProperty(
+        STORAGE_PATH, String.format(CRATE_STORAGE_PATH_FMT, crateName, crateName, request.vers()));
     context.addProperty(USAGES, usages);
   }
 
