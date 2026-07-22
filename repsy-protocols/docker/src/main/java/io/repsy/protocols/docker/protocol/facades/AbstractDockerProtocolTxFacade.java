@@ -462,11 +462,12 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
         this.manifestService.findManifestByRepoIdAndImageNameAndDigest(
             repoInfo.getId(), imageInfo, digest);
 
-    // The stored filename is hashed from whatever reference the client used at push time
-    // (see AbstractDockerManifestPushProtocolMethodHandler) — a tag push hashes the tag, so the
-    // GET side must rehash the same original manifestReference, not manifest.getName() (which
-    // holds the resolved digest and would only coincidentally match a digest-referenced push).
-    final var fileName = generate(repoInfo.getStorageKey(), imageName, manifestReference);
+    // The stored filename is hashed from the tag used at push time (manifest.getName() — see
+    // ManifestTxService, which always persists the push-time tag there), not from whatever
+    // reference this particular GET happens to use: a standard docker pull does HEAD by tag
+    // followed by GET by digest, so rehashing the raw manifestReference here would recompute the
+    // wrong filename for that (the common) digest-referenced GET.
+    final var fileName = generate(repoInfo.getStorageKey(), imageName, manifest.getName());
 
     final var parsedPath = this.parseForManifest(requestPath, fileName);
 
