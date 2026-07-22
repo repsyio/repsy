@@ -42,21 +42,23 @@
     @if (versions?.length > 0) {
       <div class="text-body1">
         <div
-          class="hidden grid-cols-[3fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[2fr_1.2fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Version</div>
+          <div>Security</div>
           <div>Platform</div>
           <div>Uploaded</div>
           <div></div>
         </div>
         <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
           @for (version of versions; track version.version; let i = $index) {
-            <div role="button" [routerLink]="['/' + activeRepo.repoName + '/' + gemName + '/' + version.version]">
+            <div role="button" [routerLink]="['/' + activeRepo.repoName + '/' + gemName + '/' + version.version]"
+              fragment="security">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === versions.length - 1 }"
-                class="grid grid-cols-[3fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="grid grid-cols-[2fr_1.2fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
                 <div class="flex items-center gap-2 text-[14px] text-white">
                   <img class="mb-1" ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
@@ -65,6 +67,13 @@
                     <span class="rounded bg-[#3B1414] px-2 py-0.5 text-[11px] text-[#FF6B6B]">yanked</span>
                   }
                 </div>
+                <app-version-security-badge
+                  [repoName]="activeRepo.repoName"
+                  repoType="ruby"
+                  [artifactName]="gemName"
+                  [versionName]="version.version"
+                  [severity]="securitySummary[version.version]?.severity ?? null"
+                />
                 <span class="text-[14px] text-[#9FA0A0]">{{ version.platform }}</span>
                 <app-tooltip
                   class="text-secondary-500 group-hover:underline"
@@ -97,6 +106,7 @@
             <div
               role="button"
               [routerLink]="['/' + activeRepo.repoName + '/' + gemName + '/' + version.version]"
+              fragment="security"
               class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
             >
               @if (activeRepo.canManage) {
@@ -120,6 +130,16 @@
                       <span class="rounded bg-[#3B1414] px-2 py-0.5 text-[11px] text-[#FF6B6B]">yanked</span>
                     }
                   </div>
+                </div>
+                <div class="flex justify-between gap-2">
+                  <span class="text-sm text-[#9FA0A0]">Security:</span>
+                  <app-version-security-badge
+                    [repoName]="activeRepo.repoName"
+                    repoType="ruby"
+                    [artifactName]="gemName"
+                    [versionName]="version.version"
+                    [severity]="securitySummary[version.version]?.severity ?? null"
+                  />
                 </div>
                 <div class="flex justify-between gap-2">
                   <span class="text-sm text-[#9FA0A0]">Platform:</span>

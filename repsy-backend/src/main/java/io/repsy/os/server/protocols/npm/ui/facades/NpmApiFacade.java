@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.npm.ui.facades;
 
+import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.PackageVersionDetail;
 import io.repsy.os.server.protocols.npm.shared.npm_package.mappers.NpmPackageConverter;
@@ -28,6 +29,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -38,6 +40,7 @@ public class NpmApiFacade implements ProtocolApiFacade {
   private final @NonNull NpmPackageServiceImpl npmPackageService;
   private final @NonNull NpmStorageService npmStorageService;
   private final @NonNull NpmPackageConverter npmPackageConverter;
+  private final @NonNull ApplicationEventPublisher eventPublisher;
 
   public BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
 
@@ -115,7 +118,17 @@ public class NpmApiFacade implements ProtocolApiFacade {
       throws IOException {
 
     if (this.npmPackageService.isLastVersion(repoInfo.getStorageKey(), scopeName, packageName)) {
-      return this.deletePackage(repoInfo, scopeName, packageName);
+      final var result = this.deletePackage(repoInfo, scopeName, packageName);
+
+      this.eventPublisher.publishEvent(
+          new ArtifactVersionDeletedEvent(
+              repoInfo.getStorageKey(),
+              repoInfo.getType().name(),
+              repoInfo.getName(),
+              buildArtifactName(scopeName, packageName),
+              versionName));
+
+      return result;
     }
 
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
@@ -131,11 +144,24 @@ public class NpmApiFacade implements ProtocolApiFacade {
     this.npmPackageService.deletePackageVersion(
         repoInfo, scopeName, packageName, versionName, pair.getFirst());
 
+    this.eventPublisher.publishEvent(
+        new ArtifactVersionDeletedEvent(
+            repoInfo.getStorageKey(),
+            repoInfo.getType().name(),
+            repoInfo.getName(),
+            buildArtifactName(scopeName, packageName),
+            versionName));
+
     return BaseUsages.builder().diskUsage(pair.getSecond() * -1L).build();
   }
 
   public void createRepo(final @NonNull UUID repoId) {
 
     this.npmStorageService.createRepo(repoId);
+  }
+
+  private static @NonNull String buildArtifactName(
+      final @Nullable String scopeName, final @NonNull String packageName) {
+    return scopeName == null ? packageName : "@" + scopeName + "/" + packageName;
   }
 }

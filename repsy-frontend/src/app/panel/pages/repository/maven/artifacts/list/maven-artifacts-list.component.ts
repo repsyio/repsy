@@ -22,13 +22,14 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { ArtifactListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { ArtifactListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../../../../shared/components/ellipsis/ellipsis.pipe';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { PackageSecurityBadgeComponent } from '../../../../../shared/components/package-security-badge/package-security-badge.component';
 import { PaginationComponent } from '../../../../../shared/components/pagination/pagination.component';
 import { SearchboxComponent } from '../../../../../shared/components/searchbox/searchbox.component';
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
@@ -36,6 +37,7 @@ import { ToastService } from '../../../../../shared/components/toast/toast.servi
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { SecurityService } from '../../../../security/service/security.service';
 import { MavenConfigComponent } from '../../config/maven-config.component';
 import { MavenService } from '../../service/maven.service';
 
@@ -55,6 +57,7 @@ import { MavenService } from '../../service/maven.service';
     EllipsisPipe,
     NgOptimizedImage,
     SpinnerComponent,
+    PackageSecurityBadgeComponent,
   ],
   templateUrl: './maven-artifacts-list.component.html',
 })
@@ -71,6 +74,7 @@ export class MavenArtifactsListComponent implements OnDestroy {
   public searchText = '';
   public error: string;
   public groupName: string;
+  public securitySummary: Record<string, VersionSecuritySummary> = {};
   public sortOption: Sort = { name: 'Newest', column: 'groupName', type: 'DESC' };
   public sortOptions: Sort[] = [
     { name: 'Newest', column: 'groupName', type: 'DESC' },
@@ -86,6 +90,7 @@ export class MavenArtifactsListComponent implements OnDestroy {
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
+    private readonly securityService: SecurityService,
   ) {
     this.baseUrl = environment.apiBaseUrl;
     this.username = this.authService.username;
@@ -96,6 +101,7 @@ export class MavenArtifactsListComponent implements OnDestroy {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.fetchGroupArtifacts();
+        this.fetchSecuritySummary();
       }
     });
   }
@@ -183,5 +189,22 @@ export class MavenArtifactsListComponent implements OnDestroy {
 
   public get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
+  }
+
+  public packageSecurityKey(artifact: ArtifactListItem): string {
+    return `${artifact.groupName}:${artifact.artifactName}`;
+  }
+
+  public packageRoute(artifact: ArtifactListItem): string {
+    return `/${this.activeRepo.repoName}/${artifact.groupName}/${artifact.artifactName}`;
+  }
+
+  private fetchSecuritySummary(): void {
+    this.securityService.getArtifactSecuritySummary(this.activeRepo.repoName).subscribe({
+      next: (summary) => {
+        this.securitySummary = summary;
+      },
+      error: () => {},
+    });
   }
 }

@@ -15,7 +15,9 @@
  */
 package io.repsy.os.server.security.shared.listeners;
 
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.events.ArtifactPushedEvent;
+import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
@@ -53,6 +55,12 @@ public class ArtifactScanListener {
   @Qualifier("storageStrategiesByRepoType")
   private final @NonNull Map<String, StorageStrategy> storageStrategiesByRepoType;
 
+  /**
+   * {@code ArtifactPushedEventPostProcessor} already skips publishing this event entirely when
+   * {@code securityScanEnabled} is off, so no disabled-check is needed here — a later manual "Scan
+   * Now" for a version that was never auto-scanned recomputes its {@code storagePath} live via
+   * {@code ArtifactStorageResolverRegistry} instead of depending on a scan row from this listener.
+   */
   @Async("scanTaskExecutor")
   @EventListener
   public void handleArtifactPushed(final @NonNull ArtifactPushedEvent event) {
@@ -65,7 +73,42 @@ public class ArtifactScanListener {
       return;
     }
 
-    final var scanId = this.createPendingScan(event);
+    final var scanId = this.createPendingScanOrNull(event);
+
+    if (scanId == null) {
+      return;
+    }
+
+    this.executeScan(event, scanId);
+  }
+
+  /**
+   * Not {@code @Async}: this is a cheap, DB-only cleanup (no external HTTP call like the scan
+   * itself), and running it synchronously means a UI reload immediately after a delete never sees
+   * stale scan rows for the just-deleted version.
+   */
+  @EventListener
+  public void handleArtifactVersionDeleted(final @NonNull ArtifactVersionDeletedEvent event) {
+    this.scanTxService.deleteScansForVersion(
+        event.repoId(), event.artifactName(), event.artifactVersion());
+  }
+
+  /**
+   * Entry point for a manually-triggered re-scan (see {@code VulnerabilityScanTriggerService}) —
+   * unlike {@link #handleArtifactPushed}, the {@code PENDING} row already exists by the time this
+   * is called (created synchronously so the triggering HTTP request can return its id immediately),
+   * so this only needs to run the scanner/scan-execution half of the flow. Must stay {@code public}
+   * and be invoked through the injected bean (not {@code this}) for the {@code @Async} proxy to
+   * apply.
+   */
+  @Async("scanTaskExecutor")
+  public void executeManualScan(
+      final @NonNull UUID scanId, final @NonNull ArtifactPushedEvent event) {
+    this.executeScan(event, scanId);
+  }
+
+  private void executeScan(final @NonNull ArtifactPushedEvent event, final @NonNull UUID scanId) {
+
     final var scanner = this.resolveScanner(event, scanId);
 
     if (scanner == null) {
@@ -177,19 +220,37 @@ public class ArtifactScanListener {
     return new ResourceArtifactContent(resource.get(), extractFileName(event.storagePath()));
   }
 
-  private @NonNull UUID createPendingScan(final @NonNull ArtifactPushedEvent event) {
+  /**
+   * Returns {@code null} (after logging why) instead of propagating when a scan record cannot be
+   * created for this push — covers the rare case of the same artifact version being pushed twice in
+   * quick succession (e.g. a CI retry): the unique partial index on {@code vulnerability_scan}
+   * (see {@code V0009__Init_Vulnerability_Scanning}) rejects the second insert while the first scan
+   * is still PENDING/RUNNING for the identical repo/artifact/version. There is no scanId to record
+   * a failure against in that case (creation itself failed) and nothing distinct to mark failed
+   * either — the already in-flight scan already covers this exact artifact content — so the skip is
+   * logged at WARN (this app's default {@code logging.level.root} is WARN, and INFO would be
+   * silently dropped there) instead of disappearing into the default {@code @Async}
+   * uncaught-exception handler.
+   */
+  private @Nullable UUID createPendingScanOrNull(final @NonNull ArtifactPushedEvent event) {
     final var scannerName =
         this.scannerRegistry
             .findScanner(event.repoType())
             .map(VulnerabilityScanner::getName)
             .orElse(NO_SCANNER_NAME);
 
-    return this.scanTxService.createPendingScan(
-        event.repoId(),
-        event.artifactName(),
-        event.artifactVersion(),
-        event.storagePath(),
-        scannerName);
+    try {
+      return this.scanTxService.createPendingScan(
+          event.repoId(), event.artifactName(), event.artifactVersion(), scannerName);
+    } catch (final ItemAlreadyExistException exception) {
+      log.warn(
+          "Skipping vulnerability scan for {}@{} (repo={}): a scan is already PENDING/RUNNING for"
+              + " this exact artifact version",
+          event.artifactName(),
+          event.artifactVersion(),
+          event.repoName());
+      return null;
+    }
   }
 
   private @Nullable VulnerabilityScanner resolveScanner(

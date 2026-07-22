@@ -20,6 +20,7 @@ import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.libs.protocol.router.ProtocolProvider;
+import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -45,12 +46,15 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
   private static final String WRITE_OPERATION = "writeOperation";
 
   private final @NonNull ApplicationEventPublisher eventPublisher;
+  private final @NonNull VulnerabilityScannerRegistry scannerRegistry;
 
   public ArtifactPushedEventPostProcessor(
       final @NonNull ApplicationEventPublisher eventPublisher,
+      final @NonNull VulnerabilityScannerRegistry scannerRegistry,
       final @NonNull List<ProtocolProvider> protocolProviders) {
 
     this.eventPublisher = eventPublisher;
+    this.scannerRegistry = scannerRegistry;
 
     for (final var protocolProvider : protocolProviders) {
       protocolProvider.registerPostProcessor(this);
@@ -74,6 +78,22 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
     }
 
     final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
+
+    // Safe to skip the event (and therefore any scan row) entirely when scanning is disabled:
+    // a later manual "Scan Now" no longer depends on a prior scan row to know where this artifact
+    // version lives — ArtifactStorageResolverRegistry recomputes storagePath live from its
+    // coordinate instead.
+    if (!repoInfo.isSecurityScanEnabled()) {
+      return ProcessorResult.next();
+    }
+
+    // No scanner registered for this repo type (e.g. a protocol with no VulnerabilityScanner bean
+    // at all) — skip publishing entirely, same silent no-row behavior as the disabled-repo case
+    // above, rather than creating a scan row that can never be picked up.
+    if (this.scannerRegistry.findScanner(repoInfo.getType().name()).isEmpty()) {
+      return ProcessorResult.next();
+    }
+
     final var relativePath = ProtocolContextUtils.getRelativePath(context);
     final var storagePathOverride = context.<String>getProperty(STORAGE_PATH);
     final var storagePath =

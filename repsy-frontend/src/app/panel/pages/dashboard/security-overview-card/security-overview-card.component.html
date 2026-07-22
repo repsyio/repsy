@@ -1,0 +1,29 @@
+<div class="relative flex min-h-[250px] w-full flex-col rounded-[12px] border border-[#404141] bg-[#101112]">
+  <div class="flex flex-col p-[14px]">
+    <h2 class="mb-2 text-[13px] text-[#FDFDFD]">Security Overview</h2>
+
+    @if (loading) {
+      <div class="flex items-center justify-center py-3">
+        <app-spinner />
+      </div>
+    } @else {
+      <div class="flex flex-col items-center justify-center gap-3 py-3">
+        <div class="text-center">
+          <p class="text-[10px] text-[#9FA0A0]">Repositories with Critical/High Findings</p>
+          <p
+            class="mt-2 text-[32px] leading-none font-bold"
+            [ngClass]="criticalOrHighCount > 0 ? 'text-error-400' : 'text-[#FDFDFD]'"
+          >
+            {{ criticalOrHighCount }}
+          </p>
+        </div>
+        <div class="w-full max-w-[200px]">
+          <div class="rounded-lg bg-[rgba(17,16,16,0.6)] px-6 py-2">
+            <p class="text-center text-[10px] text-[#9FA0A0]">Total Repositories</p>
+            <p class="mt-1 text-center text-[24px] font-semibold text-[#FDFDFD]">{{ totalRepoCount }}</p>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

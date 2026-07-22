@@ -54,7 +54,6 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
   private static final String LATEST_SUFFIX = "/@latest";
   private static final String INFO_EXTENSION = ".info";
   private static final String MOD_EXTENSION = ".mod";
-  private static final String ZIP_EXTENSION = ".zip";
   private static final String USAGES = "usages";
   private static final String CONTENT_SHA256_KEY = "contentSha256";
   private static final String ARTIFACT_NAME = "artifactName";
@@ -132,7 +131,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     final var zipStoragePath =
         StoragePath.of(
             repoInfo.getStorageKey(),
-            PATH_SEPARATOR + normalizedPath + "/@v/" + version + ZIP_EXTENSION);
+            this.goStorageService.getModuleZipRelativePath(normalizedPath, version));
     final var zipUsages =
         this.goStorageService.writeInputStreamToPath(
             zipStoragePath, new ByteArrayInputStream(content), repoInfo.getName());

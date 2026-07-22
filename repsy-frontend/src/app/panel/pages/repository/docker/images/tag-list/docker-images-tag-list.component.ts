@@ -22,7 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { RepoPermissionInfo } from '../../../../../../../generated/api';
+import { RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
@@ -35,8 +35,10 @@ import { SearchboxComponent } from '../../../../../shared/components/searchbox/s
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
+import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { SecurityService } from '../../../../security/service/security.service';
 import { DockerConfigComponent } from '../../config/docker-config.component';
 import { getRepoDomain } from '../../docker-repo-util';
 import { TagListItem } from '../../dto/tag-list-item';
@@ -59,6 +61,7 @@ import { DockerService } from '../../service/docker.service';
     NgOptimizedImage,
     SpinnerComponent,
     CopyClipboardComponent,
+    VersionSecurityBadgeComponent,
   ],
   templateUrl: './docker-images-tag-list.component.html',
 })
@@ -74,6 +77,7 @@ export class DockerImagesTagListComponent implements OnDestroy {
   public pagedData: PagedData<TagListItem>;
   public activeRepo: RepoPermissionInfo;
   public tags: TagListItem[];
+  public securitySummary: Record<string, VersionSecuritySummary> = {};
 
   public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
   public sortOptions: Sort[] = [
@@ -91,6 +95,7 @@ export class DockerImagesTagListComponent implements OnDestroy {
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
+    private readonly securityService: SecurityService,
   ) {
     this.baseUrl = environment.apiBaseUrl;
     this.username = this.authService.username;
@@ -103,6 +108,7 @@ export class DockerImagesTagListComponent implements OnDestroy {
         this.imageName = this.route.snapshot.paramMap.get('image');
         this.installText = `docker pull ${getRepoDomain()}/${this.activeRepo.repoName}/${this.imageName}`;
         this.fetchTags();
+        this.fetchSecuritySummary();
       }
     });
   }
@@ -185,5 +191,14 @@ export class DockerImagesTagListComponent implements OnDestroy {
 
   public get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
+  }
+
+  private fetchSecuritySummary(): void {
+    this.securityService.getVersionSecuritySummary(this.activeRepo.repoName, this.imageName).subscribe({
+      next: (summary) => {
+        this.securitySummary = summary;
+      },
+      error: () => {},
+    });
   }
 }

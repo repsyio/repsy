@@ -40,4 +40,10 @@ public interface NuGetStorageService {
   long deletePackage(UUID repoId, String packageId) throws IOException;
 
   long deleteRepo(UUID repoId);
+
+  /**
+   * Storage-relative path of a package version's nupkg: {@code
+   * packages/{normalizedId}/{normalizedVersion}/{normalizedId}.{normalizedVersion}.nupkg}.
+   */
+  String getNupkgRelativePath(String packageId, String version);
 }

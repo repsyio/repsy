@@ -45,6 +45,14 @@
         <h3 class="text-neutral-200">{{ versionInfo.packageName }}</h3>
       </div>
 
+      <app-security-scan-section
+        [repoType]="'NPM'"
+        [repoName]="activeRegistry.repoName"
+        [artifactName]="securityArtifactName"
+        [artifactVersion]="versionInfo.versionName"
+        [canTriggerScan]="activeRegistry.canWrite"
+      />
+
       @if (activeRegistry.canManage) {
         <button (click)="deleteVersion()" [disabled]="loading" class="repsy-btn-danger group ml-auto w-full sm:w-auto">
           <svg

@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.docker.shared.image.dtos;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 public interface ImageListItem {
@@ -25,4 +26,6 @@ public interface ImageListItem {
   Long getSize();
 
   LocalDateTime getUpdatedAt();
+
+  Instant getLastUpdatedAt();
 }

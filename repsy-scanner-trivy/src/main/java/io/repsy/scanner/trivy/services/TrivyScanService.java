@@ -111,19 +111,22 @@ public class TrivyScanService {
   public @NonNull ScanOutcome scanDockerReference(
       final @NonNull String imageReference,
       final @Nullable String registryAuthToken,
+      final boolean registryInsecure,
       final @NonNull String repoType,
       final @NonNull String artifactName,
       final @NonNull String artifactVersion) {
 
     log.info(
-        "Scanning docker image {} ({}@{}, repoType={})",
+        "Scanning docker image {} ({}@{}, repoType={}, insecure={})",
         imageReference,
         artifactName,
         artifactVersion,
-        repoType);
+        repoType,
+        registryInsecure);
 
     final var stdout =
-        this.runTrivyLocked(this.buildImageCommand(imageReference, registryAuthToken));
+        this.runTrivyLocked(
+            this.buildImageCommand(imageReference, registryAuthToken, registryInsecure));
     final var report = this.parseReport(stdout);
     final var findings = TrivyFindingMapper.toFindings(report.results());
     final var scannerVersion = report.trivy() != null ? report.trivy().version() : null;
@@ -186,13 +189,17 @@ public class TrivyScanService {
   /**
    * {@code --registry-token} is trivy's native flag for bearer-token registry auth (used for our
    * own signed JWTs, as well as e.g. ECR/ACR-style token flows) — no custom credential helper
-   * needed. {@code --insecure} is required because the registry we scan (repsy-os's own {@code
-   * /v2/...} endpoints, reached over the internal container network) speaks plain HTTP by default;
-   * without it trivy assumes HTTPS and fails with "server gave HTTP response to HTTPS client"
-   * (confirmed against a real container-to-container run).
+   * needed. {@code --insecure} is only added when the caller reports the target registry as
+   * plain-HTTP/self-signed ({@code registryInsecure}, derived upstream from the configured registry
+   * base URL's scheme) — without it against such a registry, trivy assumes HTTPS and fails with
+   * "server gave HTTP response to HTTPS client" (confirmed against a real container-to-container
+   * run); against a registry with a valid TLS certificate, the flag must NOT be passed so
+   * certificate verification actually runs.
    */
   private @NonNull List<String> buildImageCommand(
-      final @NonNull String imageReference, final @Nullable String registryAuthToken) {
+      final @NonNull String imageReference,
+      final @Nullable String registryAuthToken,
+      final boolean registryInsecure) {
 
     final var command = new ArrayList<String>();
     command.add(this.properties.binaryPath());
@@ -200,7 +207,10 @@ public class TrivyScanService {
     command.add("--format");
     command.add("json");
     command.add("--quiet");
-    command.add("--insecure");
+
+    if (registryInsecure) {
+      command.add("--insecure");
+    }
 
     if (registryAuthToken != null) {
       command.add("--registry-token");

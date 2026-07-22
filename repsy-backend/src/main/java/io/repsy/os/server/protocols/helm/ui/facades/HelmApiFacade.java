@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.helm.ui.facades;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.HelmChartDetail;
 import io.repsy.os.generated.model.HelmChartListItem;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -50,6 +52,7 @@ public class HelmApiFacade implements ProtocolApiFacade {
   private final HelmOciManifestService helmOciManifestService;
   private final HelmOciBlobService helmOciBlobService;
   private final HelmChartMapper helmChartMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   public void createRepo(final UUID repoId) {
     this.helmStorageService.createRepo(repoId);
@@ -131,6 +134,10 @@ public class HelmApiFacade implements ProtocolApiFacade {
     final var manifests = this.helmOciManifestService.findAllByChartId(chartInfo.id());
 
     this.helmChartService.deleteVersion(repoInfo.getStorageKey(), name, version);
+
+    this.eventPublisher.publishEvent(
+        new ArtifactVersionDeletedEvent(
+            repoInfo.getStorageKey(), repoInfo.getType().name(), repoInfo.getName(), name, version));
 
     final var filename = name + "-" + version + HelmConstants.TGZ_EXTENSION;
     final var freed =

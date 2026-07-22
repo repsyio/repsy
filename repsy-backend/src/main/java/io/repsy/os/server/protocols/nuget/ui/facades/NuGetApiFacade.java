@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.nuget.ui.facades;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.NuGetDeletedItem;
 import io.repsy.os.generated.model.NuGetPackageInfo;
@@ -31,6 +32,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -46,6 +48,7 @@ public class NuGetApiFacade implements ProtocolApiFacade {
 
   private final NuGetPackageServiceImpl nugetPackageService;
   private final NuGetStorageService nugetStorageService;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Override
   public void createRepo(final UUID repoId) {
@@ -129,6 +132,14 @@ public class NuGetApiFacade implements ProtocolApiFacade {
 
     final var deletedItem =
         this.nugetPackageService.deleteVersionAndGetDeletedItem(repoInfo, packageId, version);
+
+    this.eventPublisher.publishEvent(
+        new ArtifactVersionDeletedEvent(
+            repoInfo.getStorageKey(),
+            repoInfo.getType().name(),
+            repoInfo.getName(),
+            packageId,
+            version));
 
     long freed = 0L;
 

@@ -1,0 +1,291 @@
+@if (isSupported$ | async) {
+<section
+  id="security"
+  class="mb-8 overflow-x-auto rounded-lg bg-[#101112] p-[22px]"
+  animate.enter="fade-in-up"
+>
+  <button
+    type="button"
+    (click)="toggleExpanded()"
+    class="flex w-full items-center justify-between gap-4 text-left"
+  >
+    <div class="flex flex-wrap items-center gap-3">
+      <h3 class="text-[16px] text-white">Security</h3>
+
+      @if (!loading) {
+        @if (neverScanned) {
+          <span class="text-[13px] text-[#9C9C9D]">Not scanned yet</span>
+        } @else if (worstSeverity) {
+          <app-severity-badge [severity]="worstSeverity" [compact]="true" />
+          <span class="text-[13px] text-[#9C9C9D]">
+            {{ overview?.totalCount ?? 0 }} finding{{ (overview?.totalCount ?? 0) === 1 ? '' : 's' }}
+          </span>
+        } @else if (overview?.status === ScanStatus.Completed) {
+          <span class="text-[13px] text-success-400">Clean</span>
+        }
+      }
+    </div>
+
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      class="shrink-0 text-[#9C9C9D] transition-transform"
+      [class.rotate-180]="expanded"
+    >
+      <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  </button>
+
+  @if (expanded) {
+    <div class="mt-4">
+      @if (canTriggerScan && !loading && !neverScanned) {
+        <div class="mb-4 flex justify-end">
+          <button (click)="triggerScan()" [disabled]="!canTrigger" class="repsy-btn-secondary shrink-0">
+            {{ triggering ? 'Triggering...' : 'Re-scan' }}
+          </button>
+        </div>
+      }
+
+      @if (canTriggerScan && !loading && neverScanned) {
+        <div class="mb-4 flex justify-end">
+          <button (click)="triggerScan()" [disabled]="triggering" class="repsy-btn-confirm shrink-0">
+            {{ triggering ? 'Triggering...' : 'Scan Now' }}
+          </button>
+        </div>
+      }
+
+      @if (loading) {
+        <app-spinner />
+      } @else if (neverScanned) {
+        <p class="text-[13px] text-[#9C9C9D]">No vulnerability scans yet for this version.</p>
+      } @else {
+        <div class="mb-4 flex flex-wrap items-center gap-3">
+      <span class="text-[13px] text-[#9C9C9D]">
+        Status:
+        <span
+          [class.text-success-400]="selectedScan?.status === ScanStatus.Completed"
+          [class.text-info-400]="selectedScan?.status === ScanStatus.Running"
+          [class.text-neutral-200]="selectedScan?.status === ScanStatus.Pending"
+          [class.text-error-400]="selectedScan?.status === ScanStatus.Failed"
+          class="font-medium"
+        >
+          {{ selectedScan?.status }}
+        </span>
+        @if (selectedScan?.status === ScanStatus.Pending || selectedScan?.status === ScanStatus.Running) {
+          <app-status-polling-indicator label="Scanning..." />
+        }
+      </span>
+
+      @if (selectedScan?.completedAt) {
+        <span class="text-[13px] text-[#9C9C9D]">Scanned: {{ selectedScan?.completedAt | date: 'medium' }}</span>
+      }
+    </div>
+
+    @if (findingsTotalCount > 0) {
+      <div class="mb-6 flex flex-wrap gap-2">
+        @if (selectedScanSeverityCounts.criticalCount > 0) {
+          <app-severity-badge severity="CRITICAL" [count]="selectedScanSeverityCounts.criticalCount" />
+        }
+        @if (selectedScanSeverityCounts.highCount > 0) {
+          <app-severity-badge severity="HIGH" [count]="selectedScanSeverityCounts.highCount" />
+        }
+        @if (selectedScanSeverityCounts.mediumCount > 0) {
+          <app-severity-badge severity="MEDIUM" [count]="selectedScanSeverityCounts.mediumCount" />
+        }
+        @if (selectedScanSeverityCounts.lowCount > 0) {
+          <app-severity-badge severity="LOW" [count]="selectedScanSeverityCounts.lowCount" />
+        }
+        @if (selectedScanSeverityCounts.unknownCount > 0) {
+          <app-severity-badge severity="UNKNOWN" [count]="selectedScanSeverityCounts.unknownCount" />
+        }
+      </div>
+    } @else if (selectedScan?.status === ScanStatus.Completed) {
+      <p class="mb-6 text-[13px] text-success-400">No known vulnerabilities found.</p>
+    }
+
+    @if (loadingFindings) {
+      <app-spinner />
+    } @else if (findings.length) {
+      <div class="mb-6 text-[13px]">
+        <!-- Findings Header (Desktop) -->
+        <div
+          class="hidden grid-cols-[110px_140px_1.5fr_120px_140px_130px] gap-4 rounded-t-[12px] border-t border-r border-l border-neutral-400 p-[10px] text-[#9C9C9D] lg:grid"
+        >
+          <div>CVE ID</div>
+          <div
+            role="button"
+            tabindex="0"
+            class="flex w-fit cursor-pointer items-center gap-1"
+            (click)="toggleFindingsSort()"
+            (keydown.enter)="toggleFindingsSort()"
+          >
+            Severity
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              class="shrink-0 transition-transform"
+              [class.rotate-180]="findingsSortDirection === 'DESC'"
+            >
+              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </div>
+          <div>Package</div>
+          <div>Installed Version</div>
+          <div>Fixed Version</div>
+          <div>Status</div>
+        </div>
+
+        <!-- Findings Table (Desktop) -->
+        <div class="hidden rounded-b-[12px] border border-neutral-400 lg:block">
+          @for (finding of findings; track finding.id; let i = $index) {
+            <div
+              class="grid grid-cols-[110px_140px_1.5fr_120px_140px_130px] items-center gap-4 p-[10px]"
+              [ngClass]="{ 'rounded-b-[12px]': i === findings.length - 1 }"
+            >
+              <div>
+                @if (finding.referenceUrl) {
+                  <a
+                    [href]="finding.referenceUrl"
+                    target="_blank"
+                    rel="noopener"
+                    class="text-brand-500 font-medium hover:underline"
+                    >{{ finding.cveId }}</a
+                  >
+                } @else {
+                  <span class="font-medium text-white">{{ finding.cveId }}</span>
+                }
+              </div>
+
+              <div class="flex items-center gap-1">
+                <app-severity-badge [severity]="finding.severity!" />
+                @if (finding.cvssScore !== undefined && finding.cvssScore !== null) {
+                  <span class="text-[#9C9C9D]">({{ finding.cvssScore }})</span>
+                }
+              </div>
+
+              <app-tooltip
+                class="text-[#9C9C9D]"
+                [text]="finding.packageName ?? '' | ellipsis: 30"
+                [textHover]="finding.packageName ?? ''"
+              />
+
+              <app-tooltip
+                class="text-[#9C9C9D]"
+                [text]="finding.packageVersion ?? '' | ellipsis: 20"
+                [textHover]="finding.packageVersion ?? ''"
+              />
+
+              @if (finding.fixedVersion) {
+                <app-tooltip
+                  class="text-[#9C9C9D]"
+                  [text]="finding.fixedVersion | ellipsis: 20"
+                  [textHover]="finding.fixedVersion"
+                />
+              } @else {
+                <span class="text-[#9C9C9D]">-</span>
+              }
+
+              <span class="text-[#9C9C9D]">{{ finding.fixStatus ?? '-' }}</span>
+            </div>
+            @if (i !== findings.length - 1) {
+              <div class="h-[1px] w-full bg-neutral-400"></div>
+            }
+          }
+        </div>
+
+        <!-- Findings List (Mobile) -->
+        @for (finding of findings; track finding.id; let i = $index) {
+          <div class="rounded-lg border border-neutral-400 p-[14px] lg:hidden">
+            <div class="mb-2 flex flex-wrap items-center gap-2">
+              @if (finding.referenceUrl) {
+                <a
+                  [href]="finding.referenceUrl"
+                  target="_blank"
+                  rel="noopener"
+                  class="text-brand-500 font-medium hover:underline"
+                  >{{ finding.cveId }}</a
+                >
+              } @else {
+                <span class="font-medium text-white">{{ finding.cveId }}</span>
+              }
+              <app-severity-badge [severity]="finding.severity!" />
+              @if (finding.cvssScore !== undefined && finding.cvssScore !== null) {
+                <span class="text-[#9C9C9D]">({{ finding.cvssScore }})</span>
+              }
+            </div>
+
+            <div class="space-y-2">
+              <div class="flex justify-between gap-2">
+                <span class="text-[#9C9C9D]">Package:</span>
+                <span class="text-right break-all text-white">{{ finding.packageName }}</span>
+              </div>
+              <div class="flex justify-between gap-2">
+                <span class="text-[#9C9C9D]">Installed Version:</span>
+                <span class="text-right break-all text-white">{{ finding.packageVersion }}</span>
+              </div>
+              <div class="flex justify-between gap-2">
+                <span class="text-[#9C9C9D]">Fixed Version:</span>
+                <span class="text-right break-all text-white">{{ finding.fixedVersion ?? '-' }}</span>
+              </div>
+              <div class="flex justify-between gap-2">
+                <span class="text-[#9C9C9D]">Status:</span>
+                <span class="text-right break-all text-white">{{ finding.fixStatus ?? '-' }}</span>
+              </div>
+            </div>
+          </div>
+          @if (i !== findings.length - 1) {
+            <div class="px-2 py-2 lg:hidden">
+              <div class="h-[1px] bg-neutral-400"></div>
+            </div>
+          }
+        }
+
+        @if (findingsTotalPages > 1) {
+          <app-pagination
+            [pageNum]="findingsPageNum"
+            [totalPages]="findingsTotalPages"
+            (pageNumChange)="loadFindingsPage($event)"
+          />
+        }
+      </div>
+    }
+
+    @if (scans.length > 0) {
+      <h4 class="mb-2 text-[13px] text-white">Scan History</h4>
+      <div class="flex flex-col gap-1">
+        @for (scan of scans; track scan.id) {
+          <div
+            class="flex items-center justify-between gap-2 rounded-lg border border-transparent p-[10px] text-[13px] hover:border-neutral-400"
+            [class.border-neutral-400]="scan.id === selectedScan?.id"
+          >
+            <button (click)="selectScan(scan.id!)" type="button" class="flex-1 text-left text-[#9C9C9D]">
+              {{ scan.createdAt | date: 'medium' }}
+            </button>
+            <span class="flex items-center gap-2">
+              <span
+                [class.text-success-400]="scan.status === ScanStatus.Completed"
+                [class.text-info-400]="scan.status === ScanStatus.Running"
+                [class.text-neutral-200]="scan.status === ScanStatus.Pending"
+                [class.text-error-400]="scan.status === ScanStatus.Failed"
+                >{{ scan.status }}</span
+              >
+            </span>
+          </div>
+        }
+      </div>
+
+      @if (totalPages > 1) {
+        <app-pagination [pageNum]="pageNum" [totalPages]="totalPages" (pageNumChange)="loadPage($event)" />
+      }
+    }
+      }
+    </div>
+  }
+</section>
+}

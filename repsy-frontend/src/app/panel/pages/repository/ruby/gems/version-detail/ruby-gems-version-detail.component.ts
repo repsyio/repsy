@@ -26,13 +26,22 @@ import { GemVersionInfo, RepoPermissionInfo } from '../../../../../../../generat
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { RubyService } from '../../service/ruby.service';
 
 @Component({
   selector: 'app-ruby-gems-version-detail',
   standalone: true,
-  imports: [CommonModule, SpinnerComponent, CopyClipboardComponent, NgOptimizedImage, Highlight, HighlightLineNumbers],
+  imports: [
+    CommonModule,
+    SpinnerComponent,
+    CopyClipboardComponent,
+    NgOptimizedImage,
+    Highlight,
+    HighlightLineNumbers,
+    SecurityScanSectionComponent,
+  ],
   templateUrl: './ruby-gems-version-detail.component.html',
 })
 export class RubyGemsVersionDetailComponent implements OnDestroy {

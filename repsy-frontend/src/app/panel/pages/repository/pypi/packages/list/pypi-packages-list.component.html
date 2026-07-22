@@ -68,10 +68,11 @@
       <div class="text-body1">
         <!-- Table Headers (Desktop)-->
         <div
-          class="hidden grid-cols-[1fr_1fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[1fr_1fr_1fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Package</div>
+          <div>Security</div>
           <div>Latest</div>
           <div>Stable</div>
           <div>Last Updated</div>
@@ -85,7 +86,7 @@
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === packages.length - 1 }"
-                class="grid grid-cols-[1fr_1fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="grid grid-cols-[1fr_1fr_1fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
                 <a
                   class="group text-secondary-500 flex w-max gap-2 text-[14px]"
@@ -109,6 +110,14 @@
                     />
                   </svg>
                 </a>
+
+                <app-package-security-badge
+                  repoType="pypi"
+                  [repoName]="activeRepo.repoName"
+                  [artifactName]="pkg.name"
+                  [packageRoute]="packageRoute(pkg)"
+                  [severity]="securitySummary[pkg.name]?.severity ?? null"
+                />
 
                 <a
                   class="group text-secondary-500 flex w-max gap-2 text-[14px]"
@@ -233,6 +242,16 @@
               </a>
 
               <div class="space-y-2">
+                <div class="flex justify-between gap-2">
+                  <span class="text-sm text-[#9FA0A0]">Security: </span>
+                  <app-package-security-badge
+                    repoType="pypi"
+                    [repoName]="activeRepo.repoName"
+                    [artifactName]="pkg.name"
+                    [packageRoute]="packageRoute(pkg)"
+                    [severity]="securitySummary[pkg.name]?.severity ?? null"
+                  />
+                </div>
                 <div class="flex justify-between gap-2">
                   <span class="text-sm text-[#9FA0A0]">Latest </span>
                   <a

@@ -4,6 +4,14 @@
   @if (!this.error) {
     @if (crateVersion) {
       <div class="mb-4" animate.enter="fade-in-up">
+        <app-security-scan-section
+          [repoType]="'CARGO'"
+          [repoName]="activeRepo.repoName"
+          [artifactName]="packageName"
+          [artifactVersion]="versionName"
+          [canTriggerScan]="activeRepo.canWrite"
+        />
+
         <div
           class="mb-4 inline-flex gap-2 rounded-[14px] bg-linear-to-b from-[#333333] to-[#111010] px-[16px] py-[6px] text-[14px] text-[#FDFDFD]"
         >

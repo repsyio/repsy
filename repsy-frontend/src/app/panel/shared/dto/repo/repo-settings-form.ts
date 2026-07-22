@@ -19,4 +19,5 @@ export class RepoSettingsForm {
   public allowOverride: boolean;
   public releases = false;
   public snapshots = false;
+  public securityScanEnabled = true;
 }

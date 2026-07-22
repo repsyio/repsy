@@ -26,6 +26,7 @@ import { ProfileComponent } from './panel/pages/profile/profile.component';
 import { repoTypeResolver } from './panel/pages/repository/repo-entry/repo-type.resolver';
 import { RepositoryWrapperComponent } from './panel/pages/repository/repo-entry/repository-wrapper.component';
 import { RepositoryComponent } from './panel/pages/repository/repository.component';
+import { SecurityComponent } from './panel/pages/security/security.component';
 import { UserManagementComponent } from './panel/pages/user/user-management/user-management.component';
 import { PanelLayoutComponent } from './panel/shared/layout/panel-layout.component';
 
@@ -66,6 +67,13 @@ export const routes: Routes = [
         canActivate: [AuthGuard, adminGuard],
         title: 'repsy | User Management',
         component: UserManagementComponent,
+      },
+      {
+        path: 'security',
+        pathMatch: 'full',
+        canActivate: [AuthGuard, adminGuard],
+        title: 'repsy | Security',
+        component: SecurityComponent,
       },
       {
         path: 'not-found',

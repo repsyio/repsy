@@ -22,7 +22,11 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { ReleaseListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
+import {
+  ReleaseListItem,
+  RepoPermissionInfo,
+  VersionSecuritySummary,
+} from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -34,8 +38,10 @@ import { SearchboxComponent } from '../../../../../shared/components/searchbox/s
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
+import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { SecurityService } from '../../../../security/service/security.service';
 import { PypiConfigComponent } from '../../config/pypi-config.component';
 import { PypiService } from '../../service/pypi.service';
 
@@ -55,6 +61,7 @@ import { PypiService } from '../../service/pypi.service';
     EllipsisPipe,
     NgOptimizedImage,
     SpinnerComponent,
+    VersionSecurityBadgeComponent,
   ],
   templateUrl: './pypi-packages-version-list.component.html',
 })
@@ -71,6 +78,7 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
   public versions: ReleaseListItem[];
   public pagedData: PagedData<ReleaseListItem>;
   public activeRepo: RepoPermissionInfo;
+  public securitySummary: Record<string, VersionSecuritySummary> = {};
 
   public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
   public sortOptions: Sort[] = [
@@ -89,6 +97,7 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
+    private readonly securityService: SecurityService,
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
@@ -100,6 +109,7 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
         this.packageName = this.route.snapshot.paramMap.get('package');
 
         this.fetchVersions();
+        this.fetchSecuritySummary();
       }
     });
   }
@@ -183,5 +193,14 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
 
   public get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
+  }
+
+  private fetchSecuritySummary(): void {
+    this.securityService.getVersionSecuritySummary(this.activeRepo.repoName, this.packageName).subscribe({
+      next: (summary) => {
+        this.securitySummary = summary;
+      },
+      error: () => {},
+    });
   }
 }

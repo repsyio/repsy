@@ -27,13 +27,15 @@ import { ArtifactVersionInfo, RepoPermissionInfo } from '../../../../../../../ge
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
 import { MavenService } from '../../service/maven.service';
 
 @Component({
   selector: 'app-maven-artifacts-version-detail',
   standalone: true,
-  imports: [CopyClipboardComponent, NgOptimizedImage, SpinnerComponent, HighlightLineNumbers, Highlight],
+  imports: [CopyClipboardComponent, NgOptimizedImage, SpinnerComponent, HighlightLineNumbers, Highlight, SecurityScanSectionComponent],
   templateUrl: './maven-artifacts-version-detail.component.html',
 })
 export class MavenArtifactsVersionDetailComponent implements OnDestroy {
@@ -64,6 +66,7 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
     private readonly router: Router,
     private readonly dangerModalService: DangerModalService,
     private readonly toastService: ToastService,
+    private readonly breadcrumbSecurityLinkService: BreadcrumbSecurityLinkService,
   ) {
     this.baseUrl = environment.apiBaseUrl;
     this.activeRepo = {} as RepoPermissionInfo;
@@ -73,10 +76,16 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
         this.loadVersion();
       }
     });
+    this.breadcrumbSecurityLinkService.show('MAVEN');
   }
 
   public ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
+    this.breadcrumbSecurityLinkService.clear();
+  }
+
+  public get securityArtifactName(): string {
+    return `${this.version.artifactGroupName}:${this.version.artifactName}`;
   }
 
   public loadVersion(): void {

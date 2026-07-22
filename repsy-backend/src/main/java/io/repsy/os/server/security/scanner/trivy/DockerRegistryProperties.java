@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.security.scanner.trivy;
 
+import java.net.URI;
 import org.jspecify.annotations.NonNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -25,4 +26,17 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * separate container/process and cannot resolve whatever host a client used to push.
  */
 @ConfigurationProperties(prefix = "repsy.security.docker")
-public record DockerRegistryProperties(@NonNull String internalRegistryBaseUrl) {}
+public record DockerRegistryProperties(@NonNull String internalRegistryBaseUrl) {
+
+  /**
+   * Whether the scanner should skip TLS verification when pulling from this registry, derived from
+   * {@link #internalRegistryBaseUrl}'s own scheme rather than a separate config flag — the URL is
+   * the single source of truth for how the registry is actually reached, so a second,
+   * independently-settable flag could drift out of sync with it. Anything other than an explicit
+   * {@code https://} scheme (including a malformed/schemeless value) is treated as insecure.
+   */
+  public boolean insecureRegistry() {
+    final var scheme = URI.create(this.internalRegistryBaseUrl).getScheme();
+    return !"https".equalsIgnoreCase(scheme);
+  }
+}

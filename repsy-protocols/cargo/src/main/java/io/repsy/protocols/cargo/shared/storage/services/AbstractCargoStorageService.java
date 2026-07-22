@@ -154,6 +154,13 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
   }
 
   @Override
+  public String getCrateRelativePath(final String crateName, final String versionName) {
+
+    final var crateFileName = String.format(CRATES_FILE_NAME_FMT, crateName, versionName);
+    return Paths.get(CRATES_PATH, crateName, crateFileName).toString();
+  }
+
+  @Override
   public long deleteRepo(final UUID repoUuid) {
 
     final var storagePath = StoragePath.of(repoUuid);

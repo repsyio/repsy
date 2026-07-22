@@ -135,9 +135,9 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
             .size(size)
             .build();
 
-    final var filename = name + "-" + version + HelmConstants.TGZ_EXTENSION;
     final var storagePath =
-        StoragePath.of(repoInfo.getStorageKey(), HelmConstants.CHARTS_PATH + "/" + filename);
+        StoragePath.of(
+            repoInfo.getStorageKey(), this.helmStorageService.getChartRelativePath(name, version));
 
     final var existingOpt =
         this.chartService.findOptionalByNameAndVersion(repoInfo.getId(), name, version);

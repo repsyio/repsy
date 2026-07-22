@@ -64,6 +64,9 @@ public class Repo {
   @Column(name = "searchable", nullable = false)
   private boolean searchable;
 
+  @Column(name = "security_scan_enabled", nullable = false)
+  private boolean securityScanEnabled;
+
   @Column(name = "disk_usage", nullable = false)
   private long diskUsage;
 

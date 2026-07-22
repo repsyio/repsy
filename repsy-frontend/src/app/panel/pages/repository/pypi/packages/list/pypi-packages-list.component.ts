@@ -22,13 +22,14 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { PypiPackageListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { PypiPackageListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../../../../shared/components/ellipsis/ellipsis.pipe';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { PackageSecurityBadgeComponent } from '../../../../../shared/components/package-security-badge/package-security-badge.component';
 import { PaginationComponent } from '../../../../../shared/components/pagination/pagination.component';
 import { SearchboxComponent } from '../../../../../shared/components/searchbox/searchbox.component';
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
@@ -36,6 +37,7 @@ import { ToastService } from '../../../../../shared/components/toast/toast.servi
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { SecurityService } from '../../../../security/service/security.service';
 import { PypiConfigComponent } from '../../config/pypi-config.component';
 import { PypiService } from '../../service/pypi.service';
 
@@ -55,6 +57,7 @@ import { PypiService } from '../../service/pypi.service';
     EllipsisPipe,
     NgOptimizedImage,
     SpinnerComponent,
+    PackageSecurityBadgeComponent,
   ],
   templateUrl: './pypi-packages-list.component.html',
 })
@@ -67,6 +70,7 @@ export class PypiPackagesListComponent implements OnDestroy {
   public error: string;
   public pagedData: PagedData<PypiPackageListItem>;
   public activeRepo: RepoPermissionInfo;
+  public securitySummary: Record<string, VersionSecuritySummary> = {};
 
   public packages: PypiPackageListItem[];
   public sortOption: Sort = { name: 'Newest', column: 'updatedAt', type: 'DESC' };
@@ -85,6 +89,7 @@ export class PypiPackagesListComponent implements OnDestroy {
     private readonly pypiService: PypiService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
+    private readonly securityService: SecurityService,
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
@@ -95,6 +100,7 @@ export class PypiPackagesListComponent implements OnDestroy {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.fetchPackages();
+        this.fetchSecuritySummary();
       }
     });
   }
@@ -172,5 +178,18 @@ export class PypiPackagesListComponent implements OnDestroy {
 
   public get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
+  }
+
+  public packageRoute(pkg: PypiPackageListItem): string {
+    return `/${this.activeRepo.repoName}/${pkg.name}`;
+  }
+
+  private fetchSecuritySummary(): void {
+    this.securityService.getArtifactSecuritySummary(this.activeRepo.repoName).subscribe({
+      next: (summary) => {
+        this.securitySummary = summary;
+      },
+      error: () => {},
+    });
   }
 }

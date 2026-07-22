@@ -49,6 +49,14 @@
         </div>
       }
 
+      <app-security-scan-section
+        [repoType]="'DOCKER'"
+        [repoName]="activeRepo.repoName"
+        [artifactName]="imageName"
+        [artifactVersion]="tagName"
+        [canTriggerScan]="activeRepo.canWrite"
+      />
+
       @if (activeRepo.canManage) {
         <button (click)="deleteTag()" [disabled]="loading" class="repsy-btn-danger group ml-auto w-full sm:w-auto">
           <svg

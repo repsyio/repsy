@@ -1,0 +1,68 @@
+<!-- Modal Backdrop -->
+@if (open) {
+  <button
+    animate.enter="fade-in-up"
+    class="bg-opacity-50 fixed inset-0 z-3 backdrop-blur-sm"
+    (click)="$event.stopPropagation(); closeModal()"
+  >
+    <div></div>
+  </button>
+
+  <!-- Modal Content -->
+  <div
+    class="fixed top-1/2 left-1/2 z-4 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-[#404141] bg-[#101112] p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px]"
+  >
+    <div class="flex flex-col flex-col-reverse items-center justify-between sm:flex-row">
+      <h1 class="text-[24px] leading-6 text-white">{{ repoName }} — Security</h1>
+      <button type="button" (click)="closeModal()" class="hover:text-secondary-500 text-neutral-200">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 15 15"
+          fill="none"
+          stroke="currentColor"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path d="M0.595215 14.4052L14.4047 0.595703" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M14.4047 14.4052L0.595215 0.595703" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="gradient-border mx-auto my-6 h-px sm:my-10"></div>
+
+    @if (loading) {
+      <app-spinner />
+    } @else if (detail) {
+      <app-severity-breakdown [counts]="detail" />
+
+      @if (detail.recentScans?.length) {
+        <h4 class="mb-2 text-[13px] text-white">Recently Scanned Versions</h4>
+        <div class="flex flex-col gap-1">
+          @for (scan of detail.recentScans; track scan.artifactName + scan.artifactVersion) {
+            <div
+              role="button"
+              tabindex="0"
+              [ngClass]="{ 'cursor-pointer hover:bg-[#1D1C1C]': isRecentScanClickable(scan) }"
+              (click)="openRecentScan(scan, $event)"
+              (keydown.enter)="openRecentScan(scan, $event)"
+              class="flex items-center justify-between gap-2 rounded-lg p-[10px] text-[13px]"
+            >
+              <span class="flex-1 truncate text-[#9C9C9D]">
+                {{ scan.artifactName }}<span class="text-neutral-400">&#64;</span>{{ scan.artifactVersion }}
+              </span>
+              <span class="flex items-center gap-2 text-[#9C9C9D]">
+                @if (scan.severity) {
+                  <app-severity-badge [severity]="scan.severity" [compact]="true" />
+                } @else {
+                  <span class="text-success-400">Clean</span>
+                }
+                {{ scan.scannedAt | date: 'medium' }}
+              </span>
+            </div>
+          }
+        </div>
+      }
+    }
+  </div>
+}

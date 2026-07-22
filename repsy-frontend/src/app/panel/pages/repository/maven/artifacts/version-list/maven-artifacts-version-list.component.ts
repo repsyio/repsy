@@ -22,7 +22,11 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { ArtifactVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
+import {
+  ArtifactVersionListItem,
+  RepoPermissionInfo,
+  VersionSecuritySummary,
+} from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -34,8 +38,10 @@ import { SearchboxComponent } from '../../../../../shared/components/searchbox/s
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
+import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { SecurityService } from '../../../../security/service/security.service';
 import { MavenConfigComponent } from '../../config/maven-config.component';
 import { MavenService } from '../../service/maven.service';
 
@@ -55,6 +61,7 @@ import { MavenService } from '../../service/maven.service';
     EllipsisPipe,
     NgOptimizedImage,
     SpinnerComponent,
+    VersionSecurityBadgeComponent,
   ],
   templateUrl: './maven-artifacts-version-list.component.html',
 })
@@ -72,6 +79,7 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
   public error: string;
   public groupName: string;
   public artifactName: string;
+  public securitySummary: Record<string, VersionSecuritySummary> = {};
   public sortOption: Sort = { name: 'Newest', column: 'versionName', type: 'DESC' };
   public sortOptions: Sort[] = [
     { name: 'Newest', column: 'versionName', type: 'DESC' },
@@ -87,6 +95,7 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
     private readonly router: Router,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
+    private readonly securityService: SecurityService,
   ) {
     this.baseUrl = environment.apiBaseUrl;
     this.username = this.authService.username;
@@ -98,6 +107,7 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.fetchArtifactVersions();
+        this.fetchSecuritySummary();
       }
     });
   }
@@ -189,5 +199,16 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
 
   public get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
+  }
+
+  private fetchSecuritySummary(): void {
+    this.securityService
+      .getVersionSecuritySummary(this.activeRepo.repoName, `${this.groupName}:${this.artifactName}`)
+      .subscribe({
+        next: (summary) => {
+          this.securitySummary = summary;
+        },
+        error: () => {},
+      });
   }
 }

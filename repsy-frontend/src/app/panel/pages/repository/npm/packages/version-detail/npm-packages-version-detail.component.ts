@@ -24,13 +24,15 @@ import { PackageVersionDetail, RepoPermissionInfo } from '../../../../../../../g
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
 import { NpmService } from '../../service/npm.service';
 
 @Component({
   selector: 'app-npm-packages-version-detail',
   standalone: true,
-  imports: [CommonModule, CopyClipboardComponent, NgOptimizedImage, SpinnerComponent],
+  imports: [CommonModule, CopyClipboardComponent, NgOptimizedImage, SpinnerComponent, SecurityScanSectionComponent],
   templateUrl: './npm-packages-version-detail.component.html',
 })
 export class NpmPackagesVersionDetailComponent implements OnDestroy {
@@ -50,6 +52,7 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
     private readonly router: Router,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
+    private readonly breadcrumbSecurityLinkService: BreadcrumbSecurityLinkService,
   ) {
     this.activeRegistry = {} as RepoPermissionInfo;
 
@@ -59,10 +62,16 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
         this.loadVersion();
       }
     });
+    this.breadcrumbSecurityLinkService.show('NPM');
   }
 
   public ngOnDestroy(): void {
     this.registryChanges$.unsubscribe();
+    this.breadcrumbSecurityLinkService.clear();
+  }
+
+  public get securityArtifactName(): string {
+    return this.scopeName ? `@${this.scopeName}/${this.packageName}` : this.packageName;
   }
 
   public loadVersion(): void {
@@ -89,7 +98,6 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
       )
       .subscribe({
         next: (packageVersionInfo: PackageVersionDetail) => {
-          console.log('VERSION DETAIL RAW:', JSON.stringify(packageVersionInfo));
           this.versionInfo = packageVersionInfo;
           this.versionInfo.versionName = this.versionName;
         },

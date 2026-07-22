@@ -42,25 +42,37 @@
     @if (versions?.length > 0) {
       <div class="text-body1">
         <div
-          class="hidden grid-cols-[5fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[3fr_1.2fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Version</div>
+          <div>Security</div>
           <div>Uploaded</div>
           <div></div>
         </div>
         <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
           @for (version of versions; track version.version; let i = $index) {
-            <div role="button" [routerLink]="['/' + activeRepo.repoName + '/' + packageName + '/' + version.version]">
+            <div
+              role="button"
+              [routerLink]="['/' + activeRepo.repoName + '/' + packageName + '/' + version.version]"
+              fragment="security"
+            >
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === versions.length - 1 }"
-                class="grid grid-cols-[5fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="grid grid-cols-[3fr_1.2fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
                 <div class="flex gap-2 text-[14px] text-white">
                   <img class="mb-1" ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
                   <app-tooltip class="group-hover:underline" [text]="version.version" [textHover]="version.version" />
                 </div>
+                <app-version-security-badge
+                  [repoName]="activeRepo.repoName"
+                  repoType="cargo"
+                  [artifactName]="packageName"
+                  [versionName]="version.version"
+                  [severity]="securitySummary[version.version]?.severity ?? null"
+                />
                 <app-tooltip
                   class="text-secondary-500 group-hover:underline"
                   [text]="timeAgo(version.created_at)"

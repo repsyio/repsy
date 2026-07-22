@@ -44,11 +44,18 @@ public class ScanController {
       @RequestParam(value = "dockerImageReference", required = false)
           final @Nullable String dockerImageReference,
       @RequestParam(value = "registryAuthToken", required = false)
-          final @Nullable String registryAuthToken) {
+          final @Nullable String registryAuthToken,
+      @RequestParam(value = "registryInsecure", required = false, defaultValue = "false")
+          final boolean registryInsecure) {
 
     if (dockerImageReference != null) {
       return this.trivyScanService.scanDockerReference(
-          dockerImageReference, registryAuthToken, repoType, artifactName, artifactVersion);
+          dockerImageReference,
+          registryAuthToken,
+          registryInsecure,
+          repoType,
+          artifactName,
+          artifactVersion);
     }
 
     if (file == null || file.isEmpty()) {

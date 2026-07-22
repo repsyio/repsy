@@ -216,6 +216,14 @@
       </pre>
       </div>
 
+      <app-security-scan-section
+        [repoType]="'MAVEN'"
+        [repoName]="activeRepo.repoName"
+        [artifactName]="securityArtifactName"
+        [artifactVersion]="version.artifactVersionName"
+        [canTriggerScan]="activeRepo.canWrite"
+      />
+
       <!-- Delete Version -->
       @if (activeRepo.canManage) {
         <button (click)="deleteVersion()" [disabled]="loading" class="repsy-btn-danger group ml-auto w-full sm:w-auto">

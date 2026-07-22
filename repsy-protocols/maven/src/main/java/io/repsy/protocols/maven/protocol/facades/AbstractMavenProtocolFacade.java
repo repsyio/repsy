@@ -27,8 +27,10 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.tuple.MutablePair;
+import org.apache.maven.index.artifact.Gav;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
@@ -40,6 +42,15 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
   private static final String USAGES = "usages";
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
+
+  /**
+   * Only these packaging types are archives a vulnerability scanner can actually analyze (compiled
+   * classes / embedded dependency metadata) — {@code pom} (plain XML) and {@code module} (Gradle
+   * Module Metadata, JSON) carry no scannable content. Checksum sidecar files (handled separately
+   * via {@link ArtifactUtils#isChecksumFile}) resolve to the extension of the file they checksum
+   * (e.g. {@code foo.jar.sha1} → {@code jar}), so extension alone cannot tell them apart.
+   */
+  private static final Set<String> SCANNABLE_EXTENSIONS = Set.of("jar", "war", "ear");
 
   private final MavenStorageService<ID> mavenStorageService;
   private final ArtifactService<ID> artifactService;
@@ -96,11 +107,42 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
     final var gav = ArtifactUtils.getGavByFile(storagePath);
 
-    if (gav != null) {
+    if (gav != null && isScannableArtifact(gav, fileName)) {
       context.addProperty(ARTIFACT_NAME, gav.getGroupId() + ":" + gav.getArtifactId());
-      context.addProperty(ARTIFACT_VERSION, gav.getVersion());
+      context.addProperty(ARTIFACT_VERSION, resolveLogicalVersion(gav));
     }
 
     context.addProperty(USAGES, afterUploadUsage);
+  }
+
+  /**
+   * Matches {@code ArtifactServiceImpl#createArtifactVersionByGav}'s own {@code versionName}
+   * formula exactly — {@code gav.getVersion()} alone resolves to the physical, timestamped SNAPSHOT
+   * build string (e.g. {@code 1.0-20260720.130651-1}), which is never the identity persisted to
+   * {@code maven_artifact_version} and never a coordinate any other part of the app (UI, manual
+   * re-scan, storage resolver) looks up by.
+   */
+  private static String resolveLogicalVersion(final Gav gav) {
+    return gav.isSnapshot() ? gav.getBaseVersion() : gav.getVersion();
+  }
+
+  /**
+   * Excludes {@code .pom}/{@code .module} metadata files, checksum sidecar files, and attached
+   * {@code sources}/{@code javadoc} classifier jars from triggering a vulnerability scan — a single
+   * {@code mvn deploy} pushes the pom, the primary jar, and a checksum sidecar for each (up to 6-10
+   * requests), and only the primary jar/war/ear actually has scannable content. {@code
+   * gav.getExtension()} can itself be {@code null} — {@link ArtifactUtils#getGavByFile} routes
+   * artifact-level {@code maven-metadata.xml} PUTs (no version segment, e.g. the "latest version"
+   * pointer update after every deploy) through a path that never sets it — and {@code
+   * Set.of(...).contains(null)} throws rather than returning {@code false}, so that has to be
+   * checked explicitly first.
+   */
+  private static boolean isScannableArtifact(final Gav gav, final String fileName) {
+    final var extension = gav.getExtension();
+
+    return extension != null
+        && !ArtifactUtils.isChecksumFile(fileName)
+        && gav.getClassifier() == null
+        && SCANNABLE_EXTENSIONS.contains(extension);
   }
 }

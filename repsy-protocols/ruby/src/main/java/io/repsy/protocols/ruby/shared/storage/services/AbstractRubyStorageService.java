@@ -105,6 +105,14 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
   }
 
   @Override
+  public String getGemRelativePath(
+      final String gemName, final String version, final String platform) {
+
+    final var filename = buildFilename(gemName, version, platform);
+    return Paths.get(GEMS_PATH, gemName, filename).toString();
+  }
+
+  @Override
   public long deleteRepo(final UUID repoId) {
     final var storagePath = StoragePath.of(repoId);
     final var usage = this.storageStrategy.calculatePathUsage(storagePath);

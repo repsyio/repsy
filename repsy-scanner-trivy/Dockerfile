@@ -49,6 +49,12 @@ WORKDIR /app
 
 COPY --from=builder /app/target/repsy-scanner-trivy.jar app.jar
 
+# Trivy's default cache dir is $HOME/.cache/trivy (verified via `trivy --help`), which resolves to
+# /home/appuser/.cache/trivy for this user — pre-create it with appuser ownership so a mounted
+# named volume (docker-compose.yml's trivy-cache) inherits that ownership on first mount instead of
+# defaulting to root, which would otherwise leave it unwritable by this non-root user.
+RUN mkdir -p /home/appuser/.cache/trivy && chown -R appuser:appgroup /home/appuser/.cache/trivy
+
 USER appuser
 
 EXPOSE 8090

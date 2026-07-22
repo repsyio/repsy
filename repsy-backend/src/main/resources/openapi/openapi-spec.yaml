@@ -2715,6 +2715,368 @@ paths:
         required: true
         schema:
           type: string
+  "/api/repos/{repoName}/artifacts/{artifactName}/versions/{artifactVersion}/scans":
+    get:
+      tags:
+        - vulnerability-scan-controller
+      operationId: listVulnerabilityScans
+      parameters:
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifactVersion
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelVulnerabilityScanInfo"
+      summary: List the vulnerability scan history of an artifact version
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/artifacts/{artifactName}/versions/{artifactVersion}/scan-overview":
+    get:
+      tags:
+        - vulnerability-scan-controller
+      operationId: getScanOverview
+      parameters:
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifactVersion
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseScanOverview"
+      summary: Get the severity breakdown of the latest scan for an artifact version
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/artifacts/{artifactName}/versions/{artifactVersion}/scan":
+    post:
+      tags:
+        - vulnerability-scan-controller
+      operationId: triggerVulnerabilityScan
+      parameters:
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifactVersion
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseVulnerabilityScanInfo"
+      summary: Manually trigger a vulnerability re-scan for an artifact version
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/artifacts/{artifactName}/security-summary":
+    get:
+      tags:
+        - vulnerability-scan-controller
+      operationId: getVersionSecuritySummary
+      parameters:
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseVersionSecuritySummaryMap"
+      summary: Get every version's latest-scan severity and finding count for one artifact, in a single call
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/artifacts/security-summary":
+    get:
+      tags:
+        - vulnerability-scan-controller
+      operationId: getArtifactSecuritySummary
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseVersionSecuritySummaryMap"
+      summary: Get every artifact's aggregated latest-scan severity and finding count for a repo, in a single call
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/scans/{scanId}":
+    get:
+      tags:
+        - vulnerability-scan-controller
+      operationId: getVulnerabilityScan
+      parameters:
+        - name: scanId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseVulnerabilityScanDetail"
+      summary: Get a vulnerability scan's detail (metadata only — findings are paginated separately)
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/scans/{scanId}/findings":
+    get:
+      tags:
+        - vulnerability-scan-controller
+      operationId: getVulnerabilityScanFindings
+      parameters:
+        - name: scanId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelVulnerabilityFindingInfo"
+      summary: Get one page of a vulnerability scan's findings
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/security-detail":
+    get:
+      tags:
+        - vulnerability-scan-controller
+      operationId: getRepoSecurityDetail
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseRepoSecurityDetail"
+      summary: Get a repo-wide severity breakdown (each artifact-version's latest scan) plus its most recently scanned versions
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/artifacts/{artifactName}/security-detail":
+    get:
+      tags:
+        - vulnerability-scan-controller
+      operationId: getArtifactSecurityDetail
+      parameters:
+        - name: artifactName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseRepoSecurityDetail"
+      summary: Get one artifact's severity breakdown (each version's latest scan) plus its most recently scanned versions
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/security-summary":
+    get:
+      tags:
+        - vulnerability-scan-controller
+      operationId: getSecuritySummary
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: repoNames
+          in: query
+          required: false
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseSecuritySummary"
+      summary: Get the worst known severity per repo, across all of that repo's scans (not just the latest scan)
+  "/api/security/scans":
+    get:
+      tags:
+        - security-scan-controller
+      operationId: listSecurityScans
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: severity
+          in: query
+          required: false
+          schema:
+            "$ref": "#/components/schemas/Severity"
+        - name: repoType
+          in: query
+          required: false
+          schema:
+            "$ref": "#/components/schemas/RepoType"
+        - name: repoName
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 10
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelVulnerabilityScanInfo"
+        '401':
+          description: Missing or invalid token, or the authenticated user is not an admin
+      summary: List vulnerability scans across all repositories, filterable by severity/repoType/repoName
+  "/api/security/scans/summary":
+    get:
+      tags:
+        - security-scan-controller
+      operationId: getSecurityScansSummary
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: repoType
+          in: query
+          required: false
+          schema:
+            "$ref": "#/components/schemas/RepoType"
+        - name: repoName
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseSecurityScansSummary"
+        '401':
+          description: Missing or invalid token, or the authenticated user is not an admin
+      summary: Get the system-wide severity distribution (each artifact-version's latest scan), filterable by repoType/repoName, independent of the scans list's severity filter
+  "/api/security/supported-repo-types":
+    get:
+      tags:
+        - security-scan-controller
+      operationId: getSupportedRepoTypes
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseListString"
+      summary: List repo types (e.g. MAVEN, NPM) that have a registered vulnerability scanner, single source of truth for gating scan-related UI/behavior
 components:
   schemas:
     NuGetDependencyInfo:
@@ -2996,6 +3358,9 @@ components:
         searchable:
           type: boolean
           nullable: false
+        securityScanEnabled:
+          type: boolean
+          nullable: false
         type:
           "$ref": "#/components/schemas/RepoType"
     RepoSettingsForm:
@@ -3011,6 +3376,9 @@ components:
           type: boolean
           nullable: false
         snapshots:
+          type: boolean
+          nullable: false
+        securityScanEnabled:
           type: boolean
           nullable: false
     RestResponseVoid:
@@ -3413,10 +3781,14 @@ components:
         searchable:
           type: boolean
           nullable: false
+        securityScanEnabled:
+          type: boolean
+          nullable: false
       required:
         - privateRepo
         - allowOverride
         - searchable
+        - securityScanEnabled
     RestResponseRepoSettingsInfo:
       type: object
       properties:
@@ -4807,6 +5179,377 @@ components:
           "$ref": "#/components/schemas/ResponseType"
         data:
           "$ref": "#/components/schemas/GemVersionInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    ScanStatus:
+      type: string
+      enum:
+        - PENDING
+        - RUNNING
+        - COMPLETED
+        - FAILED
+    Severity:
+      type: string
+      enum:
+        - CRITICAL
+        - HIGH
+        - MEDIUM
+        - LOW
+        - UNKNOWN
+    FixStatus:
+      type: string
+      enum:
+        - FIXED
+        - AFFECTED
+        - NOT_AFFECTED
+        - WILL_NOT_FIX
+        - FIX_DEFERRED
+        - END_OF_LIFE
+        - UNDER_INVESTIGATION
+        - UNKNOWN
+    VulnerabilityScanInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        repoName:
+          type: string
+        repoType:
+          "$ref": "#/components/schemas/RepoType"
+        artifactName:
+          type: string
+        artifactVersion:
+          type: string
+        status:
+          "$ref": "#/components/schemas/ScanStatus"
+        highestSeverity:
+          "$ref": "#/components/schemas/Severity"
+        scannerName:
+          type: string
+          nullable: true
+        scannerVersion:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+    VulnerabilityFindingInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        cveId:
+          type: string
+        severity:
+          "$ref": "#/components/schemas/Severity"
+        packageName:
+          type: string
+        packageVersion:
+          type: string
+        fixedVersion:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        referenceUrl:
+          type: string
+          nullable: true
+        fixStatus:
+          "$ref": "#/components/schemas/FixStatus"
+        cvssScore:
+          type: number
+          format: double
+          nullable: true
+        cvssVector:
+          type: string
+          nullable: true
+    VulnerabilityScanDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        repoName:
+          type: string
+        artifactName:
+          type: string
+        artifactVersion:
+          type: string
+        status:
+          "$ref": "#/components/schemas/ScanStatus"
+        scannerName:
+          type: string
+          nullable: true
+        scannerVersion:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+    ScanOverview:
+      type: object
+      properties:
+        scanId:
+          type: string
+          format: uuid
+        status:
+          "$ref": "#/components/schemas/ScanStatus"
+        scannedAt:
+          type: string
+          format: date-time
+          nullable: true
+        criticalCount:
+          type: integer
+          format: int32
+        highCount:
+          type: integer
+          format: int32
+        mediumCount:
+          type: integer
+          format: int32
+        lowCount:
+          type: integer
+          format: int32
+        unknownCount:
+          type: integer
+          format: int32
+        totalCount:
+          type: integer
+          format: int32
+    SecuritySummary:
+      type: object
+      additionalProperties:
+        "$ref": "#/components/schemas/Severity"
+    RestResponseSecuritySummary:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/SecuritySummary"
+        errorCode:
+          type: string
+        text:
+          type: string
+    VersionSecuritySummary:
+      type: object
+      properties:
+        severity:
+          "$ref": "#/components/schemas/Severity"
+          nullable: true
+        findingCount:
+          type: integer
+          format: int32
+    VersionSecuritySummaryMap:
+      type: object
+      additionalProperties:
+        "$ref": "#/components/schemas/VersionSecuritySummary"
+    RestResponseVersionSecuritySummaryMap:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/VersionSecuritySummaryMap"
+        errorCode:
+          type: string
+        text:
+          type: string
+    PagedModelVulnerabilityScanInfo:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/VulnerabilityScanInfo"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelVulnerabilityScanInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelVulnerabilityScanInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    PagedModelVulnerabilityFindingInfo:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/VulnerabilityFindingInfo"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelVulnerabilityFindingInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelVulnerabilityFindingInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RecentScannedVersion:
+      type: object
+      properties:
+        artifactName:
+          type: string
+        artifactVersion:
+          type: string
+        severity:
+          "$ref": "#/components/schemas/Severity"
+          nullable: true
+        scannedAt:
+          type: string
+          format: date-time
+    RepoSecurityDetail:
+      type: object
+      properties:
+        criticalCount:
+          type: integer
+          format: int32
+        highCount:
+          type: integer
+          format: int32
+        mediumCount:
+          type: integer
+          format: int32
+        lowCount:
+          type: integer
+          format: int32
+        unknownCount:
+          type: integer
+          format: int32
+        totalCount:
+          type: integer
+          format: int32
+        recentScans:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RecentScannedVersion"
+    RestResponseRepoSecurityDetail:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/RepoSecurityDetail"
+        errorCode:
+          type: string
+        text:
+          type: string
+    SecurityScansSummary:
+      type: object
+      properties:
+        criticalCount:
+          type: integer
+          format: int32
+        highCount:
+          type: integer
+          format: int32
+        mediumCount:
+          type: integer
+          format: int32
+        lowCount:
+          type: integer
+          format: int32
+        unknownCount:
+          type: integer
+          format: int32
+        totalCount:
+          type: integer
+          format: int32
+    RestResponseSecurityScansSummary:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/SecurityScansSummary"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RestResponseVulnerabilityScanInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/VulnerabilityScanInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RestResponseVulnerabilityScanDetail:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/VulnerabilityScanDetail"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RestResponseScanOverview:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/ScanOverview"
         errorCode:
           type: string
         text:

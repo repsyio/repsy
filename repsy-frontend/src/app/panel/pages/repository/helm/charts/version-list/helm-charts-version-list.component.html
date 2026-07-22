@@ -43,26 +43,35 @@
       <div class="text-body1">
         <!-- Desktop grid -->
         <div
-          class="hidden grid-cols-[3fr_2fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[2fr_1.2fr_2fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Version</div>
+          <div>Security</div>
           <div>App Version</div>
           <div>Published</div>
           <div></div>
         </div>
         <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
           @for (version of versions; track version.version; let i = $index) {
-            <div role="button" [routerLink]="['/' + activeRepo.repoName + '/' + chartName + '/' + version.version]">
+            <div role="button" [routerLink]="['/' + activeRepo.repoName + '/' + chartName + '/' + version.version]"
+              fragment="security">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === versions.length - 1 }"
-                class="grid grid-cols-[3fr_2fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="grid grid-cols-[2fr_1.2fr_2fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
                 <div class="flex items-center gap-2">
                   <img ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" class="mb-1" height="18" width="18" />
                   <app-tooltip class="group-hover:underline text-[#FDFDFD]" [text]="version.version" [textHover]="version.version" />
                 </div>
+                <app-version-security-badge
+                  [repoName]="activeRepo.repoName"
+                  repoType="helm"
+                  [artifactName]="chartName"
+                  [versionName]="version.version"
+                  [severity]="securitySummary[version.version]?.severity ?? null"
+                />
                 <span class="text-[#9FA0A0]">{{ version.appVersion || '—' }}</span>
                 <app-tooltip
                   class="text-secondary-500"
@@ -97,6 +106,7 @@
               class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
               role="button"
               [routerLink]="['/' + activeRepo.repoName + '/' + chartName + '/' + version.version]"
+              fragment="security"
             >
               @if (activeRepo.canManage) {
                 <app-dropdown class="relative left-4 ml-auto" (click)="$event.stopPropagation()">
@@ -115,6 +125,16 @@
                 <span class="text-right break-all text-[#FDFDFD]">{{ version.version }}</span>
               </div>
               <div class="space-y-2">
+                <div class="flex justify-between gap-2">
+                  <span class="text-sm text-[#9FA0A0]">Security:</span>
+                  <app-version-security-badge
+                    [repoName]="activeRepo.repoName"
+                    repoType="helm"
+                    [artifactName]="chartName"
+                    [versionName]="version.version"
+                    [severity]="securitySummary[version.version]?.severity ?? null"
+                  />
+                </div>
                 <div class="flex justify-between gap-2">
                   <span class="text-sm text-[#9FA0A0]">App Version:</span>
                   <span class="text-right break-all text-[#9FA0A0]">{{ version.appVersion || '—' }}</span>

@@ -71,10 +71,11 @@
         <div>
           <!-- Table Headers -->
           <div
-            class="hidden grid-cols-[4fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+            class="hidden grid-cols-[3fr_1.2fr_1fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
             animate.enter="fade-in-up"
           >
             <div>Version</div>
+            <div>Security</div>
             <div>Signed</div>
             <div>Uploaded</div>
             <div></div>
@@ -95,7 +96,7 @@
                 <div
                   animate.enter="fade-in-down"
                   [ngClass]="{ 'rounded-b-[12px]': i === versions.length - 1 }"
-                  class="grid grid-cols-[4fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                  class="grid grid-cols-[3fr_1.2fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
                 >
                   <div class="flex gap-2 text-[14px] text-white">
                     <img class="mb-1" ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
@@ -105,6 +106,14 @@
                       [textHover]="version.versionName"
                     />
                   </div>
+
+                  <app-version-security-badge
+                    [repoName]="activeRepo.repoName"
+                    repoType="maven"
+                    [artifactName]="groupName + ':' + artifactName"
+                    [versionName]="version.versionName"
+                    [severity]="securitySummary[version.versionName]?.severity ?? null"
+                  />
 
                   <div class="flex gap-2 text-[14px] text-white">
                     @if (version.signed) {
@@ -183,6 +192,16 @@
                 </div>
 
                 <div class="space-y-2">
+                  <div class="flex items-start justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Security: </span>
+                    <app-version-security-badge
+                      [repoName]="activeRepo.repoName"
+                      repoType="maven"
+                      [artifactName]="groupName + ':' + artifactName"
+                      [versionName]="version.versionName"
+                      [severity]="securitySummary[version.versionName]?.severity ?? null"
+                    />
+                  </div>
                   <div class="flex items-start justify-between gap-2">
                     <span class="text-sm text-[#9FA0A0]">Last Updated: </span>
                     <span class="text-secondary-500 text-right break-all">

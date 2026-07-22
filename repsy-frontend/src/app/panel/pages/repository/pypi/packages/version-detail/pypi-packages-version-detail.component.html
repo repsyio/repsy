@@ -87,6 +87,14 @@
         <h3 class="text-neutral-200">{{ packageName }}</h3>
       </div>
 
+      <app-security-scan-section
+        [repoType]="'PYPI'"
+        [repoName]="activeRepo.repoName"
+        [artifactName]="versionInfo.packageName"
+        [artifactVersion]="versionName"
+        [canTriggerScan]="activeRepo.canWrite"
+      />
+
       @if (activeRepo.canManage) {
         <button (click)="deleteVersion()" [disabled]="loading" class="repsy-btn-danger group ml-auto w-full sm:w-auto">
           <svg

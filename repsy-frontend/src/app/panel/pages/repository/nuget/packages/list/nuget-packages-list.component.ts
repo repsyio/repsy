@@ -21,12 +21,14 @@ import moment from 'moment';
 import { Subscription } from 'rxjs';
 
 import { environment } from '../../../../../../../environments/environment';
+import { VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../../../../shared/components/ellipsis/ellipsis.pipe';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { PackageSecurityBadgeComponent } from '../../../../../shared/components/package-security-badge/package-security-badge.component';
 import { PaginationComponent } from '../../../../../shared/components/pagination/pagination.component';
 import { SearchboxComponent } from '../../../../../shared/components/searchbox/searchbox.component';
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
@@ -35,6 +37,7 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
+import { SecurityService } from '../../../../security/service/security.service';
 import { NugetConfigComponent } from '../../config/nuget-config.component';
 import { NugetPackageListItem } from '../../dto/nuget-package-list-item';
 import { NugetService } from '../../service/nuget.service';
@@ -55,6 +58,7 @@ import { NugetService } from '../../service/nuget.service';
     EllipsisPipe,
     EmptyListComponent,
     NgOptimizedImage,
+    PackageSecurityBadgeComponent,
   ],
   templateUrl: './nuget-packages-list.component.html',
 })
@@ -68,6 +72,7 @@ export class NugetPackagesListComponent implements OnDestroy {
   public packages: NugetPackageListItem[] = [];
   public pagedData = new PagedData<NugetPackageListItem>();
   public activeRepo: RepoPermissionInfo;
+  public securitySummary: Record<string, VersionSecuritySummary> = {};
   public readonly baseUrl: string;
   public readonly username: string;
 
@@ -84,6 +89,7 @@ export class NugetPackagesListComponent implements OnDestroy {
     private readonly nugetService: NugetService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
+    private readonly securityService: SecurityService,
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
@@ -92,6 +98,7 @@ export class NugetPackagesListComponent implements OnDestroy {
       if (repo) {
         this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
         this.fetchPackages();
+        this.fetchSecuritySummary();
       }
     });
   }
@@ -164,5 +171,18 @@ export class NugetPackagesListComponent implements OnDestroy {
 
   public timeAgo(date: Date | string): string {
     return moment(date).fromNow();
+  }
+
+  public packageRoute(pkg: NugetPackageListItem): string {
+    return `/${this.activeRepo.repoName}/${pkg.packageId}`;
+  }
+
+  private fetchSecuritySummary(): void {
+    this.securityService.getArtifactSecuritySummary(this.activeRepo.repoName).subscribe({
+      next: (summary) => {
+        this.securitySummary = summary;
+      },
+      error: () => {},
+    });
   }
 }

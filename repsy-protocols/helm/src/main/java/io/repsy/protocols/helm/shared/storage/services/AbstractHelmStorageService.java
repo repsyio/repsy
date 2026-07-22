@@ -106,6 +106,11 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   }
 
   @Override
+  public String getChartRelativePath(final String name, final String version) {
+    return HelmConstants.CHARTS_PATH + "/" + name + "-" + version + HelmConstants.TGZ_EXTENSION;
+  }
+
+  @Override
   public void saveBlobChunk(
       final UUID repoUuid, final UUID uploadId, final InputStream chunk, final String repoName) {
     final var storagePath = StoragePath.of(repoUuid, "oci/blobs/" + uploadId);

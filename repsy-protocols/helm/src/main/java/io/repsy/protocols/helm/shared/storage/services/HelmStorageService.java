@@ -44,6 +44,9 @@ public interface HelmStorageService<ID> {
 
   void clearTrash();
 
+  /** Storage-relative path of a classic (chart-museum) push: {@code charts/{name}-{version}.tgz}. */
+  String getChartRelativePath(String name, String version);
+
   // OCI blob methods
 
   void saveBlobChunk(UUID repoUuid, UUID uploadId, InputStream chunk, String repoName);

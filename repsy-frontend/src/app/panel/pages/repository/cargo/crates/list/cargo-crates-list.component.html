@@ -43,10 +43,11 @@
     @if (crates?.length > 0) {
       <div class="text-body1">
         <div
-          class="hidden grid-cols-[2fr_2fr_2fr_1fr_30px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[2fr_1fr_2fr_2fr_1fr_30px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Crate</div>
+          <div>Security</div>
           <div>Latest</div>
           <div>Last Updated</div>
           <div>Downloads</div>
@@ -58,7 +59,7 @@
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === crates.length - 1 }"
-                class="grid grid-cols-[2fr_2fr_2fr_1fr_30px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="grid grid-cols-[2fr_1fr_2fr_2fr_1fr_30px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
                 <div class="flex items-center gap-2">
                   <img
@@ -74,6 +75,13 @@
                     [textHover]="crate.name"
                   />
                 </div>
+                <app-package-security-badge
+                  repoType="cargo"
+                  [repoName]="activeRepo.repoName"
+                  [artifactName]="crate.name"
+                  [packageRoute]="packageRoute(crate)"
+                  [severity]="securitySummary[crate.name]?.severity ?? null"
+                />
                 <app-tooltip
                   class="text-[#FDFDFD]"
                   [text]="crate.max_version | ellipsis: 20"
@@ -145,6 +153,16 @@
                     </svg>
                     {{ crate.name }}
                   </span>
+                </div>
+                <div class="flex justify-between gap-2">
+                  <span class="text-sm text-[#9FA0A0]">Security:</span>
+                  <app-package-security-badge
+                    repoType="cargo"
+                    [repoName]="activeRepo.repoName"
+                    [artifactName]="crate.name"
+                    [packageRoute]="packageRoute(crate)"
+                    [severity]="securitySummary[crate.name]?.severity ?? null"
+                  />
                 </div>
                 <div class="flex justify-between gap-2">
                   <span class="text-sm text-[#9FA0A0]">Latest:</span>

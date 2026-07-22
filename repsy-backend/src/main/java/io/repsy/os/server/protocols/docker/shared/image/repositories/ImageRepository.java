@@ -47,7 +47,8 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
                 select max(t.createdAt)
                 from Tag t
                 where t.image = i
-              ) as updatedAt
+              ) as updatedAt,
+              i.lastUpdatedAt as lastUpdatedAt
             from Image i
               join i.repo re
             where re.id = :repoId

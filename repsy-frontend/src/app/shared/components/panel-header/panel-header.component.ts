@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { NgOptimizedImage } from '@angular/common';
+import { NgOptimizedImage, ViewportScroller } from '@angular/common';
 import { Component, EventEmitter, HostListener, Output } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
@@ -39,8 +39,17 @@ export class PanelHeaderComponent {
   constructor(
     private readonly authService: AuthService,
     private readonly router: Router,
+    viewportScroller: ViewportScroller,
   ) {
     this.username = this.authService.username;
+
+    // Angular's fragment scrolling (`withInMemoryScrolling({ anchorScrolling: 'enabled' })`) reads
+    // this offset, not CSS `scroll-margin-top` — without it, scrolling to e.g. `#security` lands the
+    // target flush at the viewport top, hidden behind this `fixed` header. A function (not a static
+    // tuple) is required here since the header's own height is responsive (`.header` breakpoints) and
+    // shrinks once scrolled (`.header.smaller`, see onWindowScroll below), so it must be read fresh at
+    // the moment each scroll happens rather than measured once.
+    viewportScroller.setOffset(() => [0, document.querySelector('header')?.getBoundingClientRect().height ?? 0]);
   }
 
   docDropdown = false;

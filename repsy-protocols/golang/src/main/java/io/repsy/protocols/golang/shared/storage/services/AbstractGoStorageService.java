@@ -34,8 +34,14 @@ import org.springframework.core.io.Resource;
 public abstract class AbstractGoStorageService<ID> implements GoStorageService<ID> {
 
   private static final String ERR_ITEM_NOT_FOUND = "itemNotFound";
+  private static final String ZIP_EXTENSION = ".zip";
 
   private final StorageStrategy storageStrategy;
+
+  @Override
+  public String getModuleZipRelativePath(final String modulePath, final String version) {
+    return "/" + modulePath + "/@v/" + version + ZIP_EXTENSION;
+  }
 
   @Override
   public void createRepo(final UUID repoUuid) {

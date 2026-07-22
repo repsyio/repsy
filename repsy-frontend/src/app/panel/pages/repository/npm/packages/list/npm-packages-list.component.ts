@@ -22,13 +22,14 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { NpmPackageListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { NpmPackageListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../../../../shared/components/ellipsis/ellipsis.pipe';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { PackageSecurityBadgeComponent } from '../../../../../shared/components/package-security-badge/package-security-badge.component';
 import { PaginationComponent } from '../../../../../shared/components/pagination/pagination.component';
 import { SearchboxComponent } from '../../../../../shared/components/searchbox/searchbox.component';
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
@@ -36,6 +37,7 @@ import { ToastService } from '../../../../../shared/components/toast/toast.servi
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { SecurityService } from '../../../../security/service/security.service';
 import { NpmConfigComponent } from '../../config/npm-config.component';
 import { NpmService } from '../../service/npm.service';
 
@@ -55,6 +57,7 @@ import { NpmService } from '../../service/npm.service';
     EllipsisPipe,
     NgOptimizedImage,
     SpinnerComponent,
+    PackageSecurityBadgeComponent,
   ],
   templateUrl: './npm-packages-list.component.html',
 })
@@ -69,6 +72,7 @@ export class NpmPackagesListComponent implements OnDestroy {
   public pagedData: PagedData<NpmPackageListItem>;
   public activeRegistry: RepoPermissionInfo;
   public packages: NpmPackageListItem[];
+  public securitySummary: Record<string, VersionSecuritySummary> = {};
 
   public sortOption: Sort = { name: 'Newest', column: 'updatedAt', type: 'DESC' };
   public sortOptions: Sort[] = [
@@ -84,6 +88,7 @@ export class NpmPackagesListComponent implements OnDestroy {
     private readonly authService: AuthService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
+    private readonly securityService: SecurityService,
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.pagedData = new PagedData<NpmPackageListItem>();
@@ -93,6 +98,7 @@ export class NpmPackagesListComponent implements OnDestroy {
       if (registry) {
         this.activeRegistry = Object.assign({}, registry);
         this.fetchPackages();
+        this.fetchSecuritySummary();
       }
     });
   }
@@ -146,7 +152,6 @@ export class NpmPackagesListComponent implements OnDestroy {
         next: (pagedData: PagedData<NpmPackageListItem>) => {
           this.pagedData.page = pagedData.page;
           this.packages = pagedData.content;
-          console.log('Fetched packages:', this.packages);
         },
         error: () => {},
       });
@@ -174,5 +179,22 @@ export class NpmPackagesListComponent implements OnDestroy {
 
   public get canManage(): boolean {
     return this.activeRegistry?.canManage ?? false;
+  }
+
+  public packageSecurityKey(pkg: NpmPackageListItem): string {
+    return pkg.scope ? `@${pkg.scope}/${pkg.name}` : pkg.name;
+  }
+
+  public packageRoute(pkg: NpmPackageListItem): string {
+    return `/${this.activeRegistry.repoName}/${pkg.scope ? pkg.scope : '~'}/${pkg.name}`;
+  }
+
+  private fetchSecuritySummary(): void {
+    this.securityService.getArtifactSecuritySummary(this.activeRegistry.repoName).subscribe({
+      next: (summary) => {
+        this.securitySummary = summary;
+      },
+      error: () => {},
+    });
   }
 }

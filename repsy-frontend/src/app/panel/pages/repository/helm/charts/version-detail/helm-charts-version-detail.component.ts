@@ -26,13 +26,22 @@ import {HelmChartDetail, RepoPermissionInfo} from '../../../../../../../generate
 import {SpinnerComponent} from '../../../../../../shared/components/spinner/spinner.component';
 import {CopyClipboardComponent} from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import {DangerModalService} from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import {SecurityScanSectionComponent} from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import {ToastService} from '../../../../../shared/components/toast/toast.service';
 import {HelmService} from '../../service/helm.service';
 
 @Component({
   selector: 'app-helm-charts-version-detail',
   standalone: true,
-  imports: [CommonModule, SpinnerComponent, CopyClipboardComponent, NgOptimizedImage, HighlightLineNumbers, Highlight],
+  imports: [
+    CommonModule,
+    SpinnerComponent,
+    CopyClipboardComponent,
+    NgOptimizedImage,
+    HighlightLineNumbers,
+    Highlight,
+    SecurityScanSectionComponent,
+  ],
   templateUrl: './helm-charts-version-detail.component.html',
 })
 export class HelmChartsVersionDetailComponent implements OnDestroy {

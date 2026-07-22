@@ -69,6 +69,32 @@
           <span class="text-[14px] font-medium text-[#FDFDFD]">Users</span>
         </a>
       }
+
+      <!-- Security Link (Admin Only) -->
+      @if (isAdmin) {
+        <a
+          routerLink="/security"
+          class="flex h-[44px] items-center gap-2 rounded-lg px-4 hover:bg-[#404141]"
+          routerLinkActive="bg-[#333333]"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M10 1.66667L16.6667 4.16667V9.16667C16.6667 13.2 13.7333 16.9583 10 18.3333C6.26667 16.9583 3.33333 13.2 3.33333 9.16667V4.16667L10 1.66667Z"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span class="text-[14px] font-medium text-[#FDFDFD]">Security</span>
+        </a>
+      }
     </nav>
   </div>
 
@@ -202,6 +228,32 @@
               />
             </svg>
             <span class="text-[14px] font-medium text-[#FDFDFD]">Users</span>
+          </a>
+        }
+
+        <!-- Security Link (Admin Only) -->
+        @if (isAdmin) {
+          <a
+            routerLink="/security"
+            class="flex h-[44px] items-center gap-2 rounded-lg px-4 hover:bg-[#404141]"
+            routerLinkActive="bg-[#333333]"
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M10 1.66667L16.6667 4.16667V9.16667C16.6667 13.2 13.7333 16.9583 10 18.3333C6.26667 16.9583 3.33333 13.2 3.33333 9.16667V4.16667L10 1.66667Z"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span class="text-[14px] font-medium text-[#FDFDFD]">Security</span>
           </a>
         }
       </nav>

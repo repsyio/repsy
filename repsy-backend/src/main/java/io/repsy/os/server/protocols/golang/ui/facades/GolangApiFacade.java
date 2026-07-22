@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.golang.ui.facades;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.generated.model.GoModuleInfo;
@@ -30,6 +31,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -44,6 +46,7 @@ public class GolangApiFacade implements ProtocolApiFacade {
   private final @NonNull GoModuleServiceImpl goModuleService;
   private final @NonNull GoModuleRepository goModuleRepository;
   private final @NonNull GoModuleVersionRepository goModuleVersionRepository;
+  private final @NonNull ApplicationEventPublisher eventPublisher;
 
   @Transactional
   public void createRepo(final @NonNull UUID repoId) {
@@ -115,5 +118,13 @@ public class GolangApiFacade implements ProtocolApiFacade {
     this.golangStorageService.deleteVersionFiles(versionStoragePath, repoInfo.getName());
 
     this.goModuleVersionRepository.delete(moduleVersion);
+
+    this.eventPublisher.publishEvent(
+        new ArtifactVersionDeletedEvent(
+            repoInfo.getStorageKey(),
+            repoInfo.getType().name(),
+            repoInfo.getName(),
+            modulePath,
+            version));
   }
 }

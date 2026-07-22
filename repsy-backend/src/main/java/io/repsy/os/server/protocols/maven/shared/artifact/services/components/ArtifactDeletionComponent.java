@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.maven.shared.artifact.services.components;
 
+import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.DeletedItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
@@ -28,6 +29,7 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Component;
 
@@ -38,6 +40,7 @@ public class ArtifactDeletionComponent {
 
   private final MavenStorageService mavenStorageService;
   private final ArtifactServiceImpl artifactService;
+  private final ApplicationEventPublisher eventPublisher;
 
   public Pair<DeletedItem, BaseUsages> deleteArtifactVersion(
       final RepoInfo repoInfo,
@@ -47,7 +50,17 @@ public class ArtifactDeletionComponent {
       throws IOException, XmlPullParserException {
 
     if (this.artifactService.hasOnlyOneVersion(repoInfo.getStorageKey(), groupName, artifactName)) {
-      return this.deleteArtifact(repoInfo, groupName, artifactName);
+      final var result = this.deleteArtifact(repoInfo, groupName, artifactName);
+
+      this.eventPublisher.publishEvent(
+          new ArtifactVersionDeletedEvent(
+              repoInfo.getStorageKey(),
+              repoInfo.getType().name(),
+              repoInfo.getName(),
+              groupName + ":" + artifactName,
+              versionName));
+
+      return result;
     }
 
     final var artifactUsage =
@@ -63,6 +76,14 @@ public class ArtifactDeletionComponent {
 
     this.artifactService.deleteArtifactVersion(
         repoInfo, groupName, artifactName, versionName, versioningUsagesPair.getFirst());
+
+    this.eventPublisher.publishEvent(
+        new ArtifactVersionDeletedEvent(
+            repoInfo.getStorageKey(),
+            repoInfo.getType().name(),
+            repoInfo.getName(),
+            groupName + ":" + artifactName,
+            versionName));
 
     return Pair.of(DeletedItem.VERSION, usages);
   }
