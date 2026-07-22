@@ -30,8 +30,6 @@ import io.repsy.os.server.protocols.maven.shared.artifact.dtos.VersionDeveloperI
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.VersionLicenseInfo;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
-import io.repsy.os.server.protocols.maven.shared.artifact.entities.VersionDeveloper;
-import io.repsy.os.server.protocols.maven.shared.artifact.entities.VersionLicense;
 import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactConverter;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
@@ -44,15 +42,14 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
-import io.repsy.protocols.maven.shared.artifact.services.VersionComparator;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -69,6 +66,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.Resource;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -88,6 +86,11 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   private static final String SIGNED_POM_SUFFIX = ".asc";
   private static final String ERR_ARTIFACT_VERSION_NOT_FOUND = "artifactVersionNotFound";
   private static final String ERR_ARTIFACT_NOT_FOUND = "artifactNotFound";
+  private static final String UNIQUE_VIOLATION_SQL_STATE = "23505";
+  private static final String ARTIFACT_UNIQUE_CONSTRAINT =
+      "ux_maven_artifact__repo_id_group_artifact";
+  private static final String ARTIFACT_VERSION_UNIQUE_CONSTRAINT =
+      "ux_maven_artifact_version__artifact_id_version_name";
 
   private final RepoRepository repoRepository;
   private final ArtifactRepository artifactRepository;
@@ -97,6 +100,8 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   private final ArtifactConverter artifactConverter;
   private final PGPVerifierService pgpVerifierService;
   private final KeyStoreService keyStoreService;
+  private final ArtifactUpsertHelper artifactUpsertHelper;
+  private final ArtifactVersionWriteService artifactVersionWriteService;
 
   @Qualifier("osStorageStrategyMaven")
   private final StorageStrategy storageStrategy;
@@ -469,11 +474,42 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
 
     this.setVersionProperties(filesInVersionDir, pomModel, version);
 
-    final var savedArtifactVersion = this.artifactVersionRepository.save(version);
+    try {
+      this.artifactUpsertHelper.insertArtifactVersion(version, pomModel, artifact);
+    } catch (final DataIntegrityViolationException e) {
+      this.handleArtifactVersionInsertConflict(
+          repo, artifact, gav, versionPath, pomModel, version, e);
+    }
+  }
 
-    this.createVersionDevelopersByPomModel(pomModel, savedArtifactVersion);
-    this.createVersionLicensesByPomModel(pomModel, savedArtifactVersion);
-    this.updateReleaseAndLatestVersions(artifact);
+  private void handleArtifactVersionInsertConflict(
+      final Repo repo,
+      final Artifact artifact,
+      final Gav gav,
+      final String versionPath,
+      final @Nullable Model pomModel,
+      final ArtifactVersion version,
+      final DataIntegrityViolationException e) {
+
+    if (!this.isUniqueConstraintViolation(e, ARTIFACT_VERSION_UNIQUE_CONSTRAINT)) {
+      throw e;
+    }
+
+    log.warn(
+        "Concurrent maven artifact version insert for {}:{} version {}, updating existing row"
+            + " instead: {}",
+        gav.getGroupId(),
+        gav.getArtifactId(),
+        version.getVersionName(),
+        e.getMessage());
+
+    final var existingVersion = this.getArtifactVersionByGav(artifact.getId(), gav);
+
+    if (existingVersion == null) {
+      throw e;
+    }
+
+    this.updateArtifactVersion(repo, existingVersion, versionPath, pomModel);
   }
 
   private void processSignedFileProcess(
@@ -524,44 +560,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     final var customKeys = this.keyStoreService.findHostsByRepoId(repo.getId());
 
     this.pgpVerifierService.verify(nonSignedFileResource, signedFileResource, customKeys);
-  }
-
-  private void createVersionDevelopersByPomModel(
-      final @Nullable Model pomModel, final ArtifactVersion artifactVersion) {
-
-    if (pomModel == null
-        || pomModel.getDevelopers() == null
-        || pomModel.getDevelopers().isEmpty()) {
-      return;
-    }
-
-    for (final var developer : pomModel.getDevelopers()) {
-      final var versionDeveloper = new VersionDeveloper();
-
-      versionDeveloper.setArtifactVersion(artifactVersion);
-      versionDeveloper.setName(developer.getName());
-      versionDeveloper.setEmail(developer.getEmail());
-
-      this.versionDeveloperRepository.save(versionDeveloper);
-    }
-  }
-
-  private void createVersionLicensesByPomModel(
-      final @Nullable Model pomModel, final ArtifactVersion artifactVersion) {
-
-    if (pomModel == null || pomModel.getLicenses() == null || pomModel.getLicenses().isEmpty()) {
-      return;
-    }
-
-    for (final var license : pomModel.getLicenses()) {
-      final var versionLicense = new VersionLicense();
-
-      versionLicense.setArtifactVersion(artifactVersion);
-      versionLicense.setName(license.getName());
-      versionLicense.setUrl(license.getUrl());
-
-      this.versionLicenseRepository.save(versionLicense);
-    }
   }
 
   /* Return developer info's of given artifact version */
@@ -623,20 +621,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     return artifactVersionOptional.orElse(null);
   }
 
-  private List<String> getArtifactVersionNames(final UUID artifactId) {
-
-    final var versions = this.artifactVersionRepository.findByArtifactId(artifactId);
-
-    final var versionNames = new ArrayList<String>();
-
-    for (final var artifactVersion : versions) {
-      versionNames.add(artifactVersion.getVersionName());
-    }
-
-    versionNames.sort(new VersionComparator());
-    return versionNames;
-  }
-
   private ArtifactDeployType getDeployTypeByGav(final RepoInfo repoInfo, final Gav gav) {
 
     final var artifact =
@@ -688,7 +672,55 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       this.setArtifactProperties(pomModel, artifact);
     }
 
-    return this.artifactRepository.save(artifact);
+    try {
+      return this.artifactUpsertHelper.insertArtifact(artifact);
+    } catch (final DataIntegrityViolationException e) {
+      return this.handleArtifactInsertConflict(repo, gav, pomModel, e);
+    }
+  }
+
+  private Artifact handleArtifactInsertConflict(
+      final Repo repo,
+      final Gav gav,
+      final @Nullable Model pomModel,
+      final DataIntegrityViolationException e) {
+
+    if (!this.isUniqueConstraintViolation(e, ARTIFACT_UNIQUE_CONSTRAINT)) {
+      throw e;
+    }
+
+    log.warn(
+        "Concurrent maven artifact insert for {}:{} in repo {}, updating existing row instead: {}",
+        gav.getGroupId(),
+        gav.getArtifactId(),
+        repo.getId(),
+        e.getMessage());
+
+    final var existing = this.getArtifact(repo.getId(), gav.getArtifactId(), gav.getGroupId());
+
+    if (existing == null) {
+      throw e;
+    }
+
+    return this.updateArtifactProperties(existing, pomModel);
+  }
+
+  private boolean isUniqueConstraintViolation(
+      final DataIntegrityViolationException exception, final String constraintName) {
+
+    final var rootCause = exception.getMostSpecificCause();
+
+    if (!(rootCause instanceof final SQLException sqlException)) {
+      return false;
+    }
+
+    if (!UNIQUE_VIOLATION_SQL_STATE.equals(sqlException.getSQLState())) {
+      return false;
+    }
+
+    final var message = sqlException.getMessage();
+
+    return message != null && message.contains(constraintName);
   }
 
   private boolean versionTypeNotMatched(final Repo repo, final boolean snapshot) {
@@ -705,25 +737,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     }
 
     return groupId;
-  }
-
-  private void updateReleaseAndLatestVersions(final Artifact artifact) {
-
-    final var versionNames = this.getArtifactVersionNames(artifact.getId());
-    final var latest = versionNames.getLast();
-
-    String release = null;
-
-    for (int i = versionNames.size() - 1; i >= 0; i--) {
-      if (!ArtifactUtils.isSnapshot(versionNames.get(i))) {
-        release = versionNames.get(i);
-        break;
-      }
-    }
-
-    artifact.setLatest(latest);
-    artifact.setRelease(release);
-    this.artifactRepository.save(artifact);
   }
 
   private boolean checkExtractedInfos(
@@ -769,51 +782,71 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   private void createOrUpdateArtifactByPomFile(
       final Repo repo, final Gav gav, final String versionPath, final @Nullable Model pomModel) {
 
-    final var artifact = this.getArtifact(repo.getId(), gav.getArtifactId(), gav.getGroupId());
+    final var existingArtifact =
+        this.getArtifact(repo.getId(), gav.getArtifactId(), gav.getGroupId());
+    final var artifact =
+        existingArtifact != null
+            ? this.updateArtifactProperties(existingArtifact, pomModel)
+            : this.createArtifactByGav(repo, gav, pomModel);
 
-    if (artifact != null) {
-      artifact.setLastUpdatedAt(Instant.now());
+    this.createOrUpdateArtifactVersion(repo, artifact, gav, versionPath, pomModel);
+  }
 
-      // update artifact properties
-      if (pomModel != null) {
-        this.setArtifactProperties(pomModel, artifact);
-      }
+  private Artifact updateArtifactProperties(
+      final Artifact artifact, final @Nullable Model pomModel) {
 
-      this.artifactRepository.save(artifact);
+    artifact.setLastUpdatedAt(Instant.now());
 
-      final var artifactVersion = this.getArtifactVersionByGav(artifact.getId(), gav);
-
-      if (artifactVersion == null) {
-        this.createArtifactVersionByGav(versionPath, gav, pomModel, artifact); // version uploaded
-      } else {
-        artifactVersion.setLastUpdatedAt(Instant.now());
-
-        final var versionStoragePath = StoragePath.of(repo.getId(), versionPath);
-
-        final var filesInVersionDir =
-            this.storageStrategy.listStorageItems(versionStoragePath).stream()
-                .map(StorageItemInfo::getPath)
-                .toList();
-
-        // update artifact version properties
-        this.setVersionProperties(filesInVersionDir, pomModel, artifactVersion);
-
-        this.versionDeveloperRepository.deleteAllByArtifactVersionId(artifactVersion.getId());
-        this.versionLicenseRepository.deleteAllByArtifactVersionId(artifactVersion.getId());
-
-        this.createVersionDevelopersByPomModel(pomModel, artifactVersion);
-        this.createVersionLicensesByPomModel(pomModel, artifactVersion);
-
-        this.artifactVersionRepository.save(artifactVersion);
-
-        log.info("Artifact version updated for repo {} ", repo.getId());
-      }
-
-    } else {
-      final var savedArtifact = this.createArtifactByGav(repo, gav, pomModel);
-
-      this.createArtifactVersionByGav(versionPath, gav, pomModel, savedArtifact);
+    if (pomModel != null) {
+      this.setArtifactProperties(pomModel, artifact);
     }
+
+    return this.artifactRepository.save(artifact);
+  }
+
+  private void createOrUpdateArtifactVersion(
+      final Repo repo,
+      final Artifact artifact,
+      final Gav gav,
+      final String versionPath,
+      final @Nullable Model pomModel) {
+
+    final var artifactVersion = this.getArtifactVersionByGav(artifact.getId(), gav);
+
+    if (artifactVersion != null) {
+      this.updateArtifactVersion(repo, artifactVersion, versionPath, pomModel);
+    } else {
+      this.createArtifactVersionByGav(versionPath, gav, pomModel, artifact); // version uploaded
+    }
+  }
+
+  private void updateArtifactVersion(
+      final Repo repo,
+      final ArtifactVersion artifactVersion,
+      final String versionPath,
+      final @Nullable Model pomModel) {
+
+    artifactVersion.setLastUpdatedAt(Instant.now());
+
+    final var versionStoragePath = StoragePath.of(repo.getId(), versionPath);
+
+    final var filesInVersionDir =
+        this.storageStrategy.listStorageItems(versionStoragePath).stream()
+            .map(StorageItemInfo::getPath)
+            .toList();
+
+    // update artifact version properties
+    this.setVersionProperties(filesInVersionDir, pomModel, artifactVersion);
+
+    this.versionDeveloperRepository.deleteAllByArtifactVersionId(artifactVersion.getId());
+    this.versionLicenseRepository.deleteAllByArtifactVersionId(artifactVersion.getId());
+
+    this.artifactVersionWriteService.createVersionDevelopers(pomModel, artifactVersion);
+    this.artifactVersionWriteService.createVersionLicenses(pomModel, artifactVersion);
+
+    this.artifactVersionRepository.save(artifactVersion);
+
+    log.info("Artifact version updated for repo {} ", repo.getId());
   }
 
   private @Nullable Artifact getArtifact(
