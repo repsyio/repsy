@@ -189,9 +189,13 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
    * The expanded panel's status/severity summary always describes {@link selectedScan} — the scan
    * the user actually clicked into (Scan History row, or whatever loaded by default) — never {@link
    * overview}, which is strictly the latest/active scan's own aggregate, used only for the collapsed
-   * header badge and for picking which scan {@link syncPolling} targets. There's no per-scan
-   * aggregate endpoint, so counts come from {@link findings}, already fetched for whichever scan is
-   * selected.
+   * header badge and for picking which scan {@link syncPolling} targets. When the selected scan IS
+   * the overview's scan (the common case: {@link loadOverview} loads it by default, and it's the
+   * only scan a fresh page load ever selects), {@link overview} already carries real, scan-wide
+   * totals from {@code GET .../scan-overview} and is used directly. There is no per-scan aggregate
+   * endpoint for a scan other than the latest, so once the user picks a different (older) scan from
+   * Scan History, this necessarily falls back to counting {@link findings} — only the currently
+   * loaded findings page, not the full set.
    */
   public get selectedScanSeverityCounts(): {
     criticalCount: number;
@@ -200,6 +204,16 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     lowCount: number;
     unknownCount: number;
   } {
+    if (this.overview && this.selectedScan?.id === this.overview.scanId) {
+      return {
+        criticalCount: this.overview.criticalCount ?? 0,
+        highCount: this.overview.highCount ?? 0,
+        mediumCount: this.overview.mediumCount ?? 0,
+        lowCount: this.overview.lowCount ?? 0,
+        unknownCount: this.overview.unknownCount ?? 0,
+      };
+    }
+
     return {
       criticalCount: this.countBySeverity(Severity.Critical),
       highCount: this.countBySeverity(Severity.High),

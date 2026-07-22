@@ -41,7 +41,8 @@ public class CargoArtifactStorageResolver implements ArtifactStorageResolver {
       final @NonNull String artifactName,
       final @NonNull String artifactVersion) {
 
-    return Optional.of(this.cargoStorageService.getCrateRelativePath(artifactName, artifactVersion));
+    return Optional.of(
+        this.cargoStorageService.getCrateRelativePath(artifactName, artifactVersion));
   }
 
   @Override

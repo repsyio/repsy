@@ -41,7 +41,8 @@ public class NuGetArtifactStorageResolver implements ArtifactStorageResolver {
       final @NonNull String artifactName,
       final @NonNull String artifactVersion) {
 
-    return Optional.of(this.nuGetStorageService.getNupkgRelativePath(artifactName, artifactVersion));
+    return Optional.of(
+        this.nuGetStorageService.getNupkgRelativePath(artifactName, artifactVersion));
   }
 
   @Override

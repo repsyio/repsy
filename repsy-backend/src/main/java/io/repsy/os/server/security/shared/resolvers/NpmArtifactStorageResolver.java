@@ -27,9 +27,9 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 /**
- * {@code artifactName} is stored as {@code "@scope/pkg"} (scoped) or {@code "pkg"} (unscoped) —
- * see {@code AbstractNpmProtocolFacade#buildArtifactName} — so it is split back apart here rather
- * than needing a separate scope lookup.
+ * {@code artifactName} is stored as {@code "@scope/pkg"} (scoped) or {@code "pkg"} (unscoped) — see
+ * {@code AbstractNpmProtocolFacade#buildArtifactName} — so it is split back apart here rather than
+ * needing a separate scope lookup.
  */
 @Component
 @NullMarked

@@ -137,7 +137,11 @@ public class HelmApiFacade implements ProtocolApiFacade {
 
     this.eventPublisher.publishEvent(
         new ArtifactVersionDeletedEvent(
-            repoInfo.getStorageKey(), repoInfo.getType().name(), repoInfo.getName(), name, version));
+            repoInfo.getStorageKey(),
+            repoInfo.getType().name(),
+            repoInfo.getName(),
+            name,
+            version));
 
     final var filename = name + "-" + version + HelmConstants.TGZ_EXTENSION;
     final var freed =

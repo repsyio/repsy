@@ -36,6 +36,9 @@ public interface RubyStorageService {
 
   long deleteRepo(UUID repoId);
 
-  /** Storage-relative path of a gem version: {@code gems/{gemName}/{gemName}-{version}[-{platform}].gem}. */
+  /**
+   * Storage-relative path of a gem version: {@code
+   * gems/{gemName}/{gemName}-{version}[-{platform}].gem}.
+   */
   String getGemRelativePath(String gemName, String version, String platform);
 }

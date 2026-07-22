@@ -91,7 +91,8 @@ final class SecurityScanController {
   /**
    * Single source of truth for "which repo types are scannable" — the frontend uses this to gate
    * scan-related UI (toggle, section, badges, filter options) so unsupported protocols never show
-   * dead controls, and {@code ArtifactPushedEventPostProcessor} gates on the same registry directly.
+   * dead controls, and {@code ArtifactPushedEventPostProcessor} gates on the same registry
+   * directly.
    */
   @GetMapping("/supported-repo-types")
   public @NonNull RestResponse<List<String>> getSupportedRepoTypes() {

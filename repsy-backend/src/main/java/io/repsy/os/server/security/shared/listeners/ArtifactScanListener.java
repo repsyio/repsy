@@ -223,10 +223,10 @@ public class ArtifactScanListener {
   /**
    * Returns {@code null} (after logging why) instead of propagating when a scan record cannot be
    * created for this push — covers the rare case of the same artifact version being pushed twice in
-   * quick succession (e.g. a CI retry): the unique partial index on {@code vulnerability_scan}
-   * (see {@code V0009__Init_Vulnerability_Scanning}) rejects the second insert while the first scan
-   * is still PENDING/RUNNING for the identical repo/artifact/version. There is no scanId to record
-   * a failure against in that case (creation itself failed) and nothing distinct to mark failed
+   * quick succession (e.g. a CI retry): the unique partial index on {@code vulnerability_scan} (see
+   * {@code V0009__Init_Vulnerability_Scanning}) rejects the second insert while the first scan is
+   * still PENDING/RUNNING for the identical repo/artifact/version. There is no scanId to record a
+   * failure against in that case (creation itself failed) and nothing distinct to mark failed
    * either — the already in-flight scan already covers this exact artifact content — so the skip is
    * logged at WARN (this app's default {@code logging.level.root} is WARN, and INFO would be
    * silently dropped there) instead of disappearing into the default {@code @Async}

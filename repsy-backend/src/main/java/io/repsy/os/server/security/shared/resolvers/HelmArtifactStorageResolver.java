@@ -29,8 +29,8 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 /**
- * Only covers the classic (chart-museum) push path — {@code charts/{name}-{version}.tgz} — which
- * is fully deterministic. A chart pushed via OCI instead lives at a content-addressed {@code
+ * Only covers the classic (chart-museum) push path — {@code charts/{name}-{version}.tgz} — which is
+ * fully deterministic. A chart pushed via OCI instead lives at a content-addressed {@code
  * oci/blobs/{digest}} path that cannot be derived from name+version at all (same indirection as
  * Docker, deliberately out of scope here). Since both push paths share the single "HELM" repo type,
  * there is no way to tell them apart from the coordinate alone — so, unlike every other resolver in

@@ -35,8 +35,8 @@ import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.index.artifact.M2GavCalculator;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
@@ -50,8 +50,8 @@ import org.springframework.stereotype.Component;
  * extension. {@link M2GavCalculator#gavToPath} (the exact inverse of the parsing this codebase
  * already uses in {@code ArtifactUtils}) then builds the full layout path.
  *
- * <p>For SNAPSHOT versions specifically, {@code artifactVersion} here is always the <em>logical</em>
- * identity (e.g. {@code 1.0-SNAPSHOT}) — the same string persisted as {@code
+ * <p>For SNAPSHOT versions specifically, {@code artifactVersion} here is always the
+ * <em>logical</em> identity (e.g. {@code 1.0-SNAPSHOT}) — the same string persisted as {@code
  * maven_artifact_version.version_name} and shown everywhere in the UI — never the physical,
  * timestamped build filename (e.g. {@code 1.0-20260720.130651-1}) that Maven actually writes to
  * disk. Passing the logical string straight into {@link Gav}/{@code gavToPath} builds a path to a
@@ -122,8 +122,18 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
 
     final var gav =
         new Gav(
-            groupId, artifactId, resolvedVersion, null, extension, null, null, null, false, null,
-            false, null);
+            groupId,
+            artifactId,
+            resolvedVersion,
+            null,
+            extension,
+            null,
+            null,
+            null,
+            false,
+            null,
+            false,
+            null);
 
     return Optional.of(new M2GavCalculator().gavToPath(gav));
   }
@@ -178,7 +188,8 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
         .filter(snapshotVersion -> extension.equals(snapshotVersion.getExtension()))
         .filter(
             snapshotVersion ->
-                snapshotVersion.getClassifier() == null || snapshotVersion.getClassifier().isBlank())
+                snapshotVersion.getClassifier() == null
+                    || snapshotVersion.getClassifier().isBlank())
         .map(SnapshotVersion::getVersion)
         .findFirst();
   }
