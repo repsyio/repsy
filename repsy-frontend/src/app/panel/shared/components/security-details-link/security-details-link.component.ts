@@ -21,13 +21,7 @@ import { Observable } from 'rxjs';
 
 import { SecurityScanSupportService } from '../../service/security-scan-support.service';
 
-/**
- * Jumps to the version-detail page's own {@code #security} section (relies on {@code
- * withInMemoryScrolling({ anchorScrolling: 'enabled' })} in {@code app.config.ts} plus {@code
- * SecurityScanSectionComponent} already auto-expanding on the {@code security} fragment) — never
- * rendered for a repo type the scanner registry doesn't support, matching every other
- * security-scan surface's gating.
- */
+
 @Component({
   selector: 'app-security-details-link',
   templateUrl: './security-details-link.component.html',

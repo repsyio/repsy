@@ -151,7 +151,6 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
       return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body("invalidManifest");
     }
 
-    // If Not Manifest List, rename Layers.
     if (!contentType.equals(OCI_IMAGE_INDEX) && !contentType.equals(DOCKER_MANIFEST_LIST)) {
       final var storagePathMap = this.layerRenamer.findLayersToRename(repoInfo, manifestJson);
       this.layerRenamer.renameLayers(repoInfo, storagePathMap);

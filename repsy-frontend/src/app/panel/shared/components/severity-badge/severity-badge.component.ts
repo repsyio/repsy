@@ -19,11 +19,7 @@ import { Component, Input } from '@angular/core';
 
 import { Severity } from '../../../../../generated/api';
 
-/**
- * Each severity gets its own colour AND its own icon shape (octagon/triangle/diamond/circle) —
- * relying on colour alone (e.g. red vs. green) is not distinguishable for common forms of colour
- * blindness, so the shape carries the meaning independently of hue.
- */
+
 const SEVERITY_CLASSES: Record<string, string> = {
   [Severity.Critical]: 'border-error-600 bg-error-900 text-error-400',
   [Severity.High]: 'border-warning-600 bg-warning-900 text-warning-400',

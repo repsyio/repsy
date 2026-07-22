@@ -28,11 +28,6 @@ import org.mapstruct.Mappings;
 @NullMarked
 public interface ImageConverter {
 
-  /**
-   * {@code updatedAt} reflects the most recent tag push (intentional — that is what "last updated"
-   * means for an image), which is {@code null} when the image has no tags left. Falls back to the
-   * image's own {@code lastUpdatedAt} so a zero-tag image never produces a {@code null} timestamp.
-   */
   default Instant resolveUpdatedAt(
       final io.repsy.os.server.protocols.docker.shared.image.dtos.ImageListItem source) {
     final var lastTagPushedAt = source.getUpdatedAt();

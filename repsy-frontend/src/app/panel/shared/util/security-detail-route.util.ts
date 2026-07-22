@@ -21,13 +21,7 @@ export interface ArtifactDetailRoute {
   queryParams?: Record<string, string>;
 }
 
-/**
- * Builds the version-detail route for an artifact, given its repo type — the same per-protocol
- * coordinate parsing used to link a repo/artifact/version triple (severity-summary rows, recent-scan
- * rows) to the page that actually shows it. Returns {@code null} when the route can't be resolved,
- * e.g. a Docker digest-referenced push ({@code artifactVersion} starting with {@code "sha256:"}) has
- * no corresponding tag-list entry, so it's left non-clickable rather than linking to a 404.
- */
+
 export function buildArtifactDetailRoute(
   repoType: RepoType | undefined,
   repoName: string | undefined,

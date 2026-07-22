@@ -36,7 +36,7 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
   private static final String DEFAULT_PLATFORM = "ruby";
   private static final String GEM_FILE_FMT = "%s-%s.gem";
   private static final String GEM_FILE_PLATFORM_FMT = "%s-%s-%s.gem";
-  // Gem versions always start with a digit; split name from version on first -\d
+
   private static final Pattern VERSION_START = Pattern.compile("-(?=\\d)");
 
   private final StorageStrategy storageStrategy;

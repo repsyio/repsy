@@ -20,12 +20,6 @@ import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 
-/**
- * Recomputes an artifact version's storage-relative path live, from its coordinate alone, instead
- * of relying on a previously-recorded scan row. Implementations must only compute/verify the path
- * (protocol-specific formula, optionally checked against a metadata table) — never download or read
- * the artifact's content.
- */
 public interface ArtifactStorageResolver {
 
   @NonNull Optional<String> resolve(

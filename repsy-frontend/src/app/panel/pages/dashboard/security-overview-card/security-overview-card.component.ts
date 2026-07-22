@@ -43,9 +43,9 @@ export class SecurityOverviewCardComponent implements OnInit {
         next: (summary) => {
           const severities = Object.values(summary);
           this.totalRepoCount = severities.length;
-          // A null value means "no CRITICAL/HIGH/../UNKNOWN finding ever recorded" — indistinguishable
-          // here between "never scanned" and "scanned clean" (see the summary endpoint's contract),
-          // so this card only ever reports repos with an actual finding, never a "scanned" count.
+
+
+
           this.criticalOrHighCount = severities.filter(
             (severity) => severity === Severity.Critical || severity === Severity.High,
           ).length;

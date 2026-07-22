@@ -17,7 +17,6 @@ package io.repsy.scanner.trivy.gate;
 
 import org.jspecify.annotations.NonNull;
 
-/** Thrown by a {@link TrivyExecutionGate} when no permit becomes available within the timeout. */
 public final class GateAcquisitionTimeoutException extends RuntimeException {
 
   public GateAcquisitionTimeoutException(final @NonNull String message) {

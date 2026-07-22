@@ -84,8 +84,7 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
 
   @Override
   public void deleteVersionFiles(final StoragePath atVVersionBasePath, final String repoName) {
-    // atVVersionBasePath points to /{modulePath}/@v/{version} (no extension)
-    // List the parent @v/ directory and delete files matching the version prefix
+
     final var storageKey = atVVersionBasePath.getStorageKey();
     if (storageKey == null) {
       return;
@@ -105,7 +104,7 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
         this.tryDeleteVersionFile(item, versionPrefix, atVDirPath, storageKey);
       }
     } catch (final Exception _) {
-      // directory may not exist
+
     }
   }
 
@@ -121,7 +120,7 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
     try {
       this.storageStrategy.delete(filePath);
     } catch (final Exception _) {
-      // best-effort
+
     }
   }
 

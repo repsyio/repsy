@@ -18,7 +18,6 @@ package io.repsy.scanner.trivy.dtos;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/** Field-for-field mirror of {@code io.repsy.os.server.security.scanner.dtos.ScannerFinding}. */
 public record ScannerFinding(
     @NonNull String cveId,
     @NonNull Severity severity,

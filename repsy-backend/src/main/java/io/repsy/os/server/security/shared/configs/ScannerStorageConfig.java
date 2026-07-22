@@ -22,12 +22,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Bridges each protocol's own {@code osStorageStrategy<Protocol>}-qualified {@link StorageStrategy}
- * bean into a single map keyed by {@code RepoType.name()} (e.g. "MAVEN"), so the scanner package
- * can resolve the right storage backend for an {@link io.repsy.core.events.ArtifactPushedEvent}
- * without depending on {@code RepoType} itself.
- */
 @Configuration
 public class ScannerStorageConfig {
 

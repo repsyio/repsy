@@ -15,11 +15,6 @@
  */
 package io.repsy.os.server.security.scan.dtos;
 
-/**
- * One row per artifact (package), aggregated across all of that artifact's versions' latest scans.
- * {@code severityRank} is {@link Severity}'s ordinal (0=CRITICAL .. 4=UNKNOWN), matching {@link
- * RepoSeverityRank}.
- */
 public interface ArtifactScanSummary {
   String getArtifactName();
 

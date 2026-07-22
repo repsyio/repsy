@@ -41,24 +41,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
-/**
- * The {@code packaging} of a version (jar/war/ear/pom/...) is not derivable from {@code
- * groupId:artifactId} and the version alone — it is read from {@code maven_artifact_version}
- * (already persisted from the POM at push time). Some non-standard packagings map to a different
- * file extension per Maven's own default artifact handlers (e.g. {@code maven-plugin}/{@code
- * bundle}/{@code ejb} all produce a {@code .jar}); everything else is assumed to be its own
- * extension. {@link M2GavCalculator#gavToPath} (the exact inverse of the parsing this codebase
- * already uses in {@code ArtifactUtils}) then builds the full layout path.
- *
- * <p>For SNAPSHOT versions specifically, {@code artifactVersion} here is always the
- * <em>logical</em> identity (e.g. {@code 1.0-SNAPSHOT}) — the same string persisted as {@code
- * maven_artifact_version.version_name} and shown everywhere in the UI — never the physical,
- * timestamped build filename (e.g. {@code 1.0-20260720.130651-1}) that Maven actually writes to
- * disk. Passing the logical string straight into {@link Gav}/{@code gavToPath} builds a path to a
- * file that was never written, so the real timestamped build must first be resolved from the
- * version directory's own {@code maven-metadata.xml} — the same file real Maven clients consult to
- * resolve a snapshot dependency.
- */
 @Slf4j
 @Component
 @NullMarked
@@ -194,11 +176,6 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
         .findFirst();
   }
 
-  /**
-   * Fallback for older repositories whose {@code maven-metadata.xml} predates the {@code
-   * <snapshotVersions>} list (Maven 2 era) and only carries the single, extension-agnostic {@code
-   * <snapshot>} timestamp/build-number pair.
-   */
   private static @NonNull Optional<String> buildFromSnapshotTimestamp(
       final @NonNull Versioning versioning, final @NonNull String artifactVersion) {
 

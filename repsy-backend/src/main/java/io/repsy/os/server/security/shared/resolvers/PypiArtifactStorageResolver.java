@@ -30,17 +30,6 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
-/**
- * Unlike every other protocol, a single PyPI release can have several files (an sdist and one or
- * more platform/interpreter-specific wheels), and the real filenames carry build tags
- * (`-py3-none-any`, `-cp39-cp39-manylinux...`) that cannot be derived from name+version alone —
- * there is also no metadata table recording the exact filename (see {@code Release} entity). So
- * this resolver lists the package's directory and filters by version with the same {@link
- * PackageStorageUtils#isFileBelongsRelease} used elsewhere in this protocol, rather than computing
- * a single path. When more than one file matches, the sdist ({@code .tar.gz}) is preferred — Trivy
- * analyzes source distributions more reliably than wheels — falling back to whichever match was
- * listed first. This is a reasonable default, not a guarantee of scanning the "right" file.
- */
 @Component
 @NullMarked
 public class PypiArtifactStorageResolver implements ArtifactStorageResolver {

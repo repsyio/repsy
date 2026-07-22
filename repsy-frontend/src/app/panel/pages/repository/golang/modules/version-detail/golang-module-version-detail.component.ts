@@ -137,9 +137,9 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
             return;
           }
           this.versionInfo = found;
-          // The backend stores the vulnerability scan's artifactName as this normalized module
-          // path (see AbstractGoProtocolFacade), which is not guaranteed to be byte-identical to
-          // the raw modulePath query param, so prefer the value the server itself returned.
+
+
+
           this.canonicalModulePath = info.modulePath ?? this.modulePath;
         },
         error: () => {},

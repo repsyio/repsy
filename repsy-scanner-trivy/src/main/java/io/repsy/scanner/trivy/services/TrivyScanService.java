@@ -40,16 +40,6 @@ import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Runs Trivy as a subprocess in standalone mode ({@code trivy rootfs --format json}) rather than
- * against a "server mode" REST API — Trivy's client/server protocol is not a documented/stable
- * third-party API; the official remote-scanning consumer is the trivy CLI itself.
- *
- * <p>Subprocess/JSON-parse/DTO-mapping logic is unchanged from the in-process {@code
- * TrivyVulnerabilityScanner} this module supersedes; only the entry point changed from a direct JVM
- * method call to an HTTP handler, and the artifact now arrives as a {@link MultipartFile} that must
- * be materialized to disk before Trivy (a subprocess) can read it.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -101,13 +91,6 @@ public class TrivyScanService {
     }
   }
 
-  /**
-   * Scans an image already sitting in a registry ({@code trivy image <ref>}) instead of a
-   * file-based artifact ({@code trivy rootfs <path>}) — used for Docker, where the pushed content
-   * is blobs+manifest in the registry rather than a single uploadable file. Goes through the same
-   * {@link #runTrivyLocked} gate as the file-based path, since both share the same local trivy
-   * vulnerability DB.
-   */
   public @NonNull ScanOutcome scanDockerReference(
       final @NonNull String imageReference,
       final @Nullable String registryAuthToken,
@@ -152,12 +135,6 @@ public class TrivyScanService {
     }
   }
 
-  /**
-   * Runs the trivy subprocess while holding the single execution-serializing permit. The local
-   * trivy vulnerability DB is not safe for concurrent invocations ({@code rootfs} or {@code image}
-   * alike), so only this call — not extraction, registry auth, or JSON parsing — needs to be
-   * serialized.
-   */
   private @NonNull String runTrivyLocked(final @NonNull List<String> command) {
     try (final var permit = this.acquireGate()) {
       return this.runTrivy(command);
@@ -186,16 +163,6 @@ public class TrivyScanService {
         artifactPath.toString());
   }
 
-  /**
-   * {@code --registry-token} is trivy's native flag for bearer-token registry auth (used for our
-   * own signed JWTs, as well as e.g. ECR/ACR-style token flows) — no custom credential helper
-   * needed. {@code --insecure} is only added when the caller reports the target registry as
-   * plain-HTTP/self-signed ({@code registryInsecure}, derived upstream from the configured registry
-   * base URL's scheme) — without it against such a registry, trivy assumes HTTPS and fails with
-   * "server gave HTTP response to HTTPS client" (confirmed against a real container-to-container
-   * run); against a registry with a valid TLS certificate, the flag must NOT be passed so
-   * certificate verification actually runs.
-   */
   private @NonNull List<String> buildImageCommand(
       final @NonNull String imageReference,
       final @Nullable String registryAuthToken,

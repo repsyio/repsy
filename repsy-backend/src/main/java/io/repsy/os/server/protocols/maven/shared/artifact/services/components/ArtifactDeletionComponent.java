@@ -129,10 +129,6 @@ public class ArtifactDeletionComponent {
     return Pair.of(DeletedItem.GROUP, usages);
   }
 
-  // (io.repsy)  -> Root group
-  // (io.repsy).multi_module_nosnapshot -> Sub group
-  // (io.repsy).multi_module_snapshot -> Sub group
-  // (io.repsy).library_nosnapshot -> Sub group
   private Optional<String> findRootGroup(final List<String> groups) {
 
     if (groups.isEmpty() || groups.size() == 1) {

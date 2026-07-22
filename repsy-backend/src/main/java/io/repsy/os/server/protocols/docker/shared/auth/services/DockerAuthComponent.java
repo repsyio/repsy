@@ -299,11 +299,6 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
     this.authorizeUser(userInfo, permission);
   }
 
-  /**
-   * Authorizes a {@link AuthenticationType#DOCKER_SCAN} token minted for the vulnerability scanner:
-   * valid only for {@link Permission#READ} and only for the exact repo it was minted for (its
-   * subject is the repo id, not a user id) — never a wildcard, never write/manage.
-   */
   private void authorizeScannerToken(
       final String authHeader, final UUID repoId, final Permission permission) {
 

@@ -49,9 +49,5 @@ public interface GoStorageService<ID> {
 
   long deleteRepo(UUID repoUuid);
 
-  /**
-   * Storage-relative path of a module version's zip archive: {@code
-   * /{modulePath}/@v/{version}.zip}.
-   */
   String getModuleZipRelativePath(String modulePath, String version);
 }

@@ -18,26 +18,10 @@ package io.repsy.scanner.trivy.gate;
 import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.NonNull;
 
-/**
- * Bounds how many {@code trivy} subprocesses may run at once. The local trivy vulnerability
- * database (a bbolt file baked into the image) is not safe for concurrent {@code trivy rootfs}
- * invocations, so callers must hold a permit for the duration of the subprocess call.
- *
- * <p>Deliberately provider-agnostic: {@link LocalSemaphoreGate} serializes within a single JVM
- * today; a future Cloud deployment can add a Redis-backed implementation (e.g. {@code
- * RedisDistributedGate}, {@code @Profile("cloud")}) coordinating across multiple instances without
- * any caller-side changes.
- */
 public interface TrivyExecutionGate {
 
-  /**
-   * Blocks up to {@code timeout} waiting for a permit. Throws {@link
-   * GateAcquisitionTimeoutException} if none becomes available in time, so callers never wait
-   * indefinitely for a stuck or oversaturated gate.
-   */
   @NonNull GatePermit acquire(long timeout, @NonNull TimeUnit unit) throws InterruptedException;
 
-  /** A held permit; releasing it is idempotent-safe via try-with-resources. */
   interface GatePermit extends AutoCloseable {
 
     @Override

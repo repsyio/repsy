@@ -27,13 +27,6 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
-/**
- * The gem filename depends on {@code platform} (default {@code "ruby"}, but native-extension gems
- * publish under e.g. {@code "x86_64-linux"}/{@code "java"}) — not derivable from name+version
- * alone, so it is read from {@code ruby_gem_version} (already persisted at push time). If more than
- * one platform was ever published for the same version, any one of them is picked; there is no
- * signal in the coordinate to prefer one over another.
- */
 @Component
 @NullMarked
 @RequiredArgsConstructor

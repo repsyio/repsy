@@ -23,13 +23,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
-/**
- * Maps a repo type (e.g. "MAVEN") to the {@link ArtifactStorageResolver} bean that supports it,
- * built once at startup from every {@link ArtifactStorageResolver} bean Spring can find. Repo types
- * with no registered resolver (Docker's registry-reference mechanism, Helm-OCI's manifest/digest
- * indirection) simply have no entry — callers get an empty {@link Optional} and treat it the same
- * as a resolver-returned {@code Optional.empty()}.
- */
 @Slf4j
 @Component
 public class ArtifactStorageResolverRegistry {

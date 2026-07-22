@@ -55,12 +55,6 @@ public class ArtifactScanListener {
   @Qualifier("storageStrategiesByRepoType")
   private final @NonNull Map<String, StorageStrategy> storageStrategiesByRepoType;
 
-  /**
-   * {@code ArtifactPushedEventPostProcessor} already skips publishing this event entirely when
-   * {@code securityScanEnabled} is off, so no disabled-check is needed here — a later manual "Scan
-   * Now" for a version that was never auto-scanned recomputes its {@code storagePath} live via
-   * {@code ArtifactStorageResolverRegistry} instead of depending on a scan row from this listener.
-   */
   @Async("scanTaskExecutor")
   @EventListener
   public void handleArtifactPushed(final @NonNull ArtifactPushedEvent event) {
@@ -82,25 +76,12 @@ public class ArtifactScanListener {
     this.executeScan(event, scanId);
   }
 
-  /**
-   * Not {@code @Async}: this is a cheap, DB-only cleanup (no external HTTP call like the scan
-   * itself), and running it synchronously means a UI reload immediately after a delete never sees
-   * stale scan rows for the just-deleted version.
-   */
   @EventListener
   public void handleArtifactVersionDeleted(final @NonNull ArtifactVersionDeletedEvent event) {
     this.scanTxService.deleteScansForVersion(
         event.repoId(), event.artifactName(), event.artifactVersion());
   }
 
-  /**
-   * Entry point for a manually-triggered re-scan (see {@code VulnerabilityScanTriggerService}) —
-   * unlike {@link #handleArtifactPushed}, the {@code PENDING} row already exists by the time this
-   * is called (created synchronously so the triggering HTTP request can return its id immediately),
-   * so this only needs to run the scanner/scan-execution half of the flow. Must stay {@code public}
-   * and be invoked through the injected bean (not {@code this}) for the {@code @Async} proxy to
-   * apply.
-   */
   @Async("scanTaskExecutor")
   public void executeManualScan(
       final @NonNull UUID scanId, final @NonNull ArtifactPushedEvent event) {
@@ -177,11 +158,6 @@ public class ArtifactScanListener {
     return new ScanInputs(null, reference, authToken);
   }
 
-  /**
-   * Only mints a token when the repo is private — public repos are pullable without any credential
-   * (matching {@code DockerAuthPreProcessor}'s own skip-auth rule for public READ), so the scanner
-   * never carries a token it doesn't need.
-   */
   private @Nullable String resolveRegistryAuthToken(final @NonNull ArtifactPushedEvent event) {
 
     final var repoInfo = this.repoTxService.getRepo(event.repoId());
@@ -220,18 +196,6 @@ public class ArtifactScanListener {
     return new ResourceArtifactContent(resource.get(), extractFileName(event.storagePath()));
   }
 
-  /**
-   * Returns {@code null} (after logging why) instead of propagating when a scan record cannot be
-   * created for this push — covers the rare case of the same artifact version being pushed twice in
-   * quick succession (e.g. a CI retry): the unique partial index on {@code vulnerability_scan} (see
-   * {@code V0009__Init_Vulnerability_Scanning}) rejects the second insert while the first scan is
-   * still PENDING/RUNNING for the identical repo/artifact/version. There is no scanId to record a
-   * failure against in that case (creation itself failed) and nothing distinct to mark failed
-   * either — the already in-flight scan already covers this exact artifact content — so the skip is
-   * logged at WARN (this app's default {@code logging.level.root} is WARN, and INFO would be
-   * silently dropped there) instead of disappearing into the default {@code @Async}
-   * uncaught-exception handler.
-   */
   private @Nullable UUID createPendingScanOrNull(final @NonNull ArtifactPushedEvent event) {
     final var scannerName =
         this.scannerRegistry
@@ -271,12 +235,6 @@ public class ArtifactScanListener {
     return event.artifactName() == null || event.artifactVersion() == null;
   }
 
-  /**
-   * Builds the path-only registry reference ({@code {repoName}/{imageName}:{tag}} or {@code
-   * {repoName}/{imageName}@{digest}}, no host:port) — {@code artifactVersion} holds either a tag or
-   * a digest depending on how the image was pushed (see {@code
-   * AbstractDockerProtocolTxFacade#verifyTag}), distinguished by the {@code sha256:} prefix.
-   */
   private static @NonNull String buildDockerRegistryReference(
       final @NonNull ArtifactPushedEvent event) {
 

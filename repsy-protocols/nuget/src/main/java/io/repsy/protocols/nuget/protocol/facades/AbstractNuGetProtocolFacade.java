@@ -102,7 +102,6 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
 
       checkVersionAllowance(metadata.version(), repoInfo);
 
-      // Fail fast before writing to storage — avoids orphan disk writes when override is denied
       if (!repoInfo.isAllowOverride()
           && this.packageService.versionExists(
               repoInfo, metadata.packageId(), metadata.version())) {
@@ -149,7 +148,6 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var packageId = extractPackageId(context);
 
-    // Flat container spec: return ALL versions including unlisted
     return this.packageService.getAllVersionInfos(repoInfo, packageId).stream()
         .map(v -> v.version().toLowerCase(Locale.ROOT))
         .toList();
@@ -306,7 +304,6 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   }
 
   private String normalizeVersion(final String rawVersion) {
-    // path segment is "{version}.json" for leaf URLs — strip the extension
 
     return rawVersion.endsWith(FORMAT_JSON)
         ? rawVersion.substring(0, rawVersion.length() - FORMAT_JSON.length())

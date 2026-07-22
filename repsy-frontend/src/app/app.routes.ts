@@ -80,7 +80,7 @@ export const routes: Routes = [
         component: NotFoundComponent,
         title: 'repsy | Not Found',
       },
-      // Dynamic Repository Route (:repoName)
+
       {
         path: ':repoName',
         component: RepositoryWrapperComponent,

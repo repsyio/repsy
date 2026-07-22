@@ -29,11 +29,6 @@ import java.util.Optional;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Maps Trivy's {@code --format json} vulnerability schema to the internal {@link ScannerFinding}
- * DTO. CVSS source priority is nvd -&gt; redhat -&gt; ghsa -&gt; first available, preferring the V3
- * score/vector over V2 within the chosen source.
- */
 final class TrivyFindingMapper {
 
   private static final List<String> CVSS_SOURCE_PRIORITY = List.of("nvd", "redhat", "ghsa");

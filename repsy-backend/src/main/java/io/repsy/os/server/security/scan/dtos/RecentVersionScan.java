@@ -17,9 +17,6 @@ package io.repsy.os.server.security.scan.dtos;
 
 import java.time.Instant;
 
-/**
- * One artifact version's latest scan (not scan history), for a repo-wide "recently scanned" list.
- */
 public interface RecentVersionScan {
   String getArtifactName();
 

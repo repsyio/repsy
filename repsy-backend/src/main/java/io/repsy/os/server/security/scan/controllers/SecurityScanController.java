@@ -69,12 +69,6 @@ final class SecurityScanController {
     return this.resp.success("scansFetched", new PagedModel<>(scans));
   }
 
-  /**
-   * Deliberately ignores {@code severity} — unlike {@link #listScans}'s row filter, this reports
-   * the distribution ACROSS severities, so filtering by one severity first would trivially show
-   * 100% of that severity. {@code repoType}/{@code repoName} are kept since they narrow "which
-   * scans" without collapsing the distribution itself.
-   */
   @GetMapping("/scans/summary")
   public @NonNull RestResponse<SecurityScansSummary> getScansSummary(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
@@ -88,12 +82,6 @@ final class SecurityScanController {
     return this.resp.success("scansSummaryFetched", summary);
   }
 
-  /**
-   * Single source of truth for "which repo types are scannable" — the frontend uses this to gate
-   * scan-related UI (toggle, section, badges, filter options) so unsupported protocols never show
-   * dead controls, and {@code ArtifactPushedEventPostProcessor} gates on the same registry
-   * directly.
-   */
   @GetMapping("/supported-repo-types")
   public @NonNull RestResponse<List<String>> getSupportedRepoTypes() {
     return this.resp.success(

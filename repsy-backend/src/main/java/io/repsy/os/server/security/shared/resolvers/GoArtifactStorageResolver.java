@@ -25,10 +25,6 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
-/**
- * {@code artifactName} is already the lowercase-normalized module path exactly as stored at push
- * time (see {@code AbstractGoProtocolFacade}), so no additional normalization is needed here.
- */
 @Component
 @NullMarked
 @RequiredArgsConstructor

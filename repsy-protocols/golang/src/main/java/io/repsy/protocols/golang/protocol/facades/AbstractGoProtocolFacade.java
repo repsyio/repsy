@@ -86,8 +86,6 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
       return this.handleLatestVersion(repoInfo, path);
     }
 
-    // We no longer return 410 Gone for deleted versions
-
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), path);
     return this.goStorageService.getResource(repoInfo.getName(), storagePath);
   }
@@ -106,10 +104,9 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     }
 
     final var version = GoVersionUtils.extractVersionFromPath(path);
-    // decodedPath preserves original casing for zip-entry lookup (e.g.
-    // "github.com/BurntSushi/toml")
+
     final var decodedPath = GoVersionUtils.decodeModulePath(modulePath);
-    // normalizedPath is lowercased for storage and DB (canonical form)
+
     final var normalizedPath = decodedPath.toLowerCase(Locale.ROOT);
     final var content = inputStream.readAllBytes();
 

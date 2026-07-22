@@ -156,7 +156,7 @@ public class RepoTxService {
   }
 
   public @NonNull List<String> getAllRepoNames() {
-    return this.repoRepository.findAll().stream().map(Repo::getName).toList();
+    return this.repoRepository.findAllRepoNames();
   }
 
   public void updateDiskUsage(final @NonNull UUID repoId, final long diskUsageDiff) {

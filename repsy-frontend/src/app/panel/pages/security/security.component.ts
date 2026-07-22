@@ -122,12 +122,7 @@ export class SecurityComponent implements OnInit, OnDestroy {
     this.fetchScans();
   }
 
-  /**
-   * A full reset, matching {@code UserManagementComponent.refreshPage}: clears every active filter
-   * (not just re-fetching with whatever's currently selected) — the severity-distribution chart is
-   * deliberately left untouched, since it's already filter-independent (see {@link
-   * fetchScansSummary}) and has no reason to change here.
-   */
+
   public refreshPage(): void {
     this.pageNum = 0;
     this.repoNameSearch = '';
@@ -162,9 +157,9 @@ export class SecurityComponent implements OnInit, OnDestroy {
   private fetchScansSummary(): void {
     this.loadingSummary = true;
 
-    // Deliberately called with no repoType/repoName filters — this chart always shows the
-    // system-wide severity distribution, independent of the scans list's active filters, so it
-    // isn't mistaken for a live summary of the (possibly filtered) table below it.
+
+
+
     this.securityService
       .getScansSummary()
       .pipe(finalize(() => (this.loadingSummary = false)))
@@ -232,11 +227,11 @@ export class SecurityComponent implements OnInit, OnDestroy {
           this.pagedData = pagedModel;
           this.scans = pagedModel.content ?? [];
         },
-        // Every other status is already toasted by the global error interceptor — 401 is the one
-        // status that interceptor deliberately skips (see error-handler.interceptor.ts), so without
-        // this the page would just sit there loading forever with no feedback whenever the route
-        // guard doesn't catch a since-revoked admin role (e.g. the role changes while this page is
-        // already open and the user changes a filter, triggering a new request past the guard).
+
+
+
+
+
         error: (err: HttpErrorResponse) => {
           if (err.status === 401) {
             this.toastService.show('You do not have permission to view this page', 'error');

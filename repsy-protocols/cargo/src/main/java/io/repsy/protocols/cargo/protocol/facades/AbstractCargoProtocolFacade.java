@@ -76,8 +76,6 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
     return resource;
   }
 
-  // [ 4 byte JSON len ] [ JSON bytes ] [ 4 byte .crate len ] [ .crate bytes ]
-  // https://doc.rust-lang.org/cargo/reference/registry-web-api.html#publish
   @Override
   public void publish(final ProtocolContext context, final InputStream inputStream)
       throws IOException {

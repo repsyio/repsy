@@ -20,11 +20,6 @@ import java.io.InputStream;
 import org.jspecify.annotations.NonNull;
 import org.springframework.core.io.Resource;
 
-/**
- * Wraps a storage-backed {@link Resource} (e.g. {@code UrlResource} for filesystem storage). {@code
- * Resource.getInputStream()} opens a fresh stream from the backing path on every call rather than
- * holding one open, so no disk copy is needed here.
- */
 public record ResourceArtifactContent(@NonNull Resource resource, @NonNull String fileName)
     implements ArtifactContent {
 

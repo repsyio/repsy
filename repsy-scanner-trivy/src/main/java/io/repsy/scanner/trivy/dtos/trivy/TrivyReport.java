@@ -20,7 +20,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/** Mirrors the top-level object of {@code trivy --format json} output (verified against 0.72.0). */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record TrivyReport(
     @JsonProperty("Trivy") @Nullable TrivyVersion trivy,

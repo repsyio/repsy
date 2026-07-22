@@ -67,7 +67,6 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
 
     this.checkOverridePermission(repoInfo, uploadForm, file);
 
-    // This method calculate on Disk Usages (If override calculate diff)
     final var packageUsage = this.savePackage(repoInfo, uploadForm, file);
 
     context.addProperty(ARTIFACT_NAME, uploadForm.getNormalizedName());

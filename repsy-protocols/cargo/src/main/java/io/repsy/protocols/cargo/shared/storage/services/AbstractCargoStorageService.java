@@ -61,7 +61,6 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
       crateUsages = this.storageStrategy.write(repoName, crateStoragePath, bis);
     }
 
-    // Append Mode for Index file
     final var indexPath = this.getIndexPath(crateName);
     final var indexStoragePath = StoragePath.of(repoId, indexPath.toString());
 

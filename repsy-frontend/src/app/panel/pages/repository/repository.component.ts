@@ -216,9 +216,9 @@ export class RepositoryComponent {
       });
   }
 
-  // Called once per filterRepos()/refreshPage() cycle, after every parallel per-protocol fetch has
-  // settled (tracked via pendingRepoFetches) — batches all visible repo names into a single call
-  // instead of one summary lookup per protocol.
+
+
+
   private fetchSecuritySummary(): void {
     const repoNames = this.repositories.map((repo) => repo.name);
     if (repoNames.length === 0) {

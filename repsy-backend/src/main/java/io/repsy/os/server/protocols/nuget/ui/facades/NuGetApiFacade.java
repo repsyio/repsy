@@ -145,13 +145,12 @@ public class NuGetApiFacade implements ProtocolApiFacade {
 
     try {
       if (deletedItem == NuGetDeletedItem.PACKAGE) {
-        // Keep usage accounting aligned with publish/write operations by freeing only version path
-        // usage.
+
         freed =
             this.nugetStorageService.deletePackageVersion(
                 repoInfo.getId(), packageId.toLowerCase(), version.toLowerCase());
         try {
-          // Remove possibly empty package directory without affecting usage delta.
+
           this.nugetStorageService.deletePackage(repoInfo.getId(), packageId.toLowerCase());
         } catch (final Exception cleanupException) {
           log.debug(

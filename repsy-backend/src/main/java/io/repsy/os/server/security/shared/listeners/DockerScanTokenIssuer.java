@@ -22,13 +22,6 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
-/**
- * Mints short-lived, single-repo, read-only registry pull tokens for the vulnerability scanner to
- * use against a private Docker repo. Deliberately package-private (class and method): the only
- * caller is {@link ArtifactScanListener}'s Docker branch, in this same package — no controller or
- * other externally-reachable code path can reference this type at all, so this scoped-token
- * capability cannot be triggered by anything other than an actual artifact-pushed event.
- */
 @Component
 @RequiredArgsConstructor
 class DockerScanTokenIssuer {

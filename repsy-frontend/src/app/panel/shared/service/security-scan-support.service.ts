@@ -20,12 +20,7 @@ import { catchError, map, shareReplay } from 'rxjs/operators';
 
 import { SecurityScanControllerService } from '../../../../generated/api';
 
-/**
- * Single source of truth for "which repo types are scannable" on the frontend, backed by {@link
- * SecurityScanControllerService#getSupportedRepoTypes}. The backend registry (and therefore this
- * list) only grows/shrinks when scanner beans change, so a single shared, cached request is enough
- * for the whole app session rather than every gated component issuing its own call.
- */
+
 @Injectable({
   providedIn: 'root',
 })

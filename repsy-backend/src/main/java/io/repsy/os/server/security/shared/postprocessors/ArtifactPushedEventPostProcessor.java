@@ -30,12 +30,6 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
-/**
- * Priority is intentionally {@code Integer.MAX_VALUE - 1}: {@code ProtocolProcessor} equality is
- * defined purely by priority, and post-processors are stored in a {@code TreeSet}, so reusing the
- * same priority as another registered post-processor (e.g. {@code UsagePostProcessor}, which uses
- * {@code Integer.MAX_VALUE}) would silently fail to register.
- */
 @Component
 public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
 
@@ -79,17 +73,10 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
 
     final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
 
-    // Safe to skip the event (and therefore any scan row) entirely when scanning is disabled:
-    // a later manual "Scan Now" no longer depends on a prior scan row to know where this artifact
-    // version lives — ArtifactStorageResolverRegistry recomputes storagePath live from its
-    // coordinate instead.
     if (!repoInfo.isSecurityScanEnabled()) {
       return ProcessorResult.next();
     }
 
-    // No scanner registered for this repo type (e.g. a protocol with no VulnerabilityScanner bean
-    // at all) — skip publishing entirely, same silent no-row behavior as the disabled-repo case
-    // above, rather than creating a scan row that can never be picked up.
     if (this.scannerRegistry.findScanner(repoInfo.getType().name()).isEmpty()) {
       return ProcessorResult.next();
     }

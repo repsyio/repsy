@@ -127,8 +127,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
         };
 
     if (usage != null) {
-      // form.getTagName() holds the real tag for tag-referenced pushes, and the digest itself
-      // for digest-referenced pushes (see #verifyTag) — either way it is the right "version".
+
       context.addProperty(ARTIFACT_NAME_PROPERTY, imageInfo.getName());
       context.addProperty(ARTIFACT_VERSION_PROPERTY, form.getTagName());
       context.addProperty(USAGES_PROPERTY, usage);
@@ -462,11 +461,6 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
         this.manifestService.findManifestByRepoIdAndImageNameAndDigest(
             repoInfo.getId(), imageInfo, digest);
 
-    // The stored filename is hashed from the tag used at push time (manifest.getName() — see
-    // ManifestTxService, which always persists the push-time tag there), not from whatever
-    // reference this particular GET happens to use: a standard docker pull does HEAD by tag
-    // followed by GET by digest, so rehashing the raw manifestReference here would recompute the
-    // wrong filename for that (the common) digest-referenced GET.
     final var fileName = generate(repoInfo.getStorageKey(), imageName, manifest.getName());
 
     final var parsedPath = this.parseForManifest(requestPath, fileName);
@@ -477,13 +471,6 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     return new ManifestDetails(manifest.getMediaType(), manifest.getDigest(), manifestStr);
   }
 
-  /**
-   * The GET manifest path (Docker registry {@code manifests/<reference>}) accepts either a tag name
-   * or a content digest as {@code <reference>} — only a literal {@code sha256:} value can be
-   * matched directly against the stored digest column, so a tag must first be resolved to its
-   * current digest, mirroring what the HEAD/manifest-exists path already does via {@link
-   * #findTagByNameAndRepoAndImageName}.
-   */
   private String resolveManifestDigest(
       final BaseRepoInfo<ID> repoInfo, final String imageName, final String reference) {
 

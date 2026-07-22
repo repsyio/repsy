@@ -17,14 +17,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 
-/**
- * {@code app-repository-breadcrumb} is rendered once per protocol, as a sibling of the routed page
- * (see e.g. {@code maven.component.html}: {@code <app-repository-breadcrumb /><router-outlet />}) —
- * not an ancestor of it — so a routed version-detail page can't reach it via content projection to
- * put a "See Security Details" link on the same row. This lets a version-detail page announce its
- * repo type on init and withdraw it on destroy; the breadcrumb renders the link for whatever repo
- * type is currently announced (or nothing, on every other page).
- */
+
 @Injectable({
   providedIn: 'root',
 })

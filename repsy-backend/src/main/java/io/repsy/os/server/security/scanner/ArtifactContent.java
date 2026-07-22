@@ -19,12 +19,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import org.jspecify.annotations.NonNull;
 
-/**
- * A scannable artifact's bytes, decoupled from where they physically live (storage-backed resource,
- * temp file, etc). {@link #openStream()} may be called at most once per scan attempt by a given
- * caller — implementations are not required to support concurrent reads, only repeated sequential
- * opens (e.g. across retries).
- */
 public interface ArtifactContent {
 
   @NonNull String fileName();

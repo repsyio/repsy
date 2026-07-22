@@ -27,13 +27,6 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.jspecify.annotations.NonNull;
 
-/**
- * Extracts {@code .tgz}/{@code .tar.gz} archives to a temp directory so Trivy's {@code rootfs}
- * command can walk the actual package contents (e.g. {@code package.json}, {@code PKG-INFO})
- * instead of treating the compressed tarball as an opaque, unrecognized file. Guards against
- * zip-slip (entries escaping the target directory via {@code ../}) and skips symlink/hardlink
- * entries, since the archive is untrusted user-uploaded content.
- */
 @Slf4j
 final class TarGzExtractor {
 

@@ -17,13 +17,7 @@
 import { Observable, timer } from 'rxjs';
 import { switchMap, takeWhile } from 'rxjs/operators';
 
-/**
- * Repeatedly calls {@code fetchFn} every {@code intervalMs} (first call immediately) and completes
- * the returned observable right after {@code isTerminal} first returns {@code true} for a result —
- * the caller never has to manage its own interval/stop condition, just subscribe and unsubscribe on
- * teardown. {@code switchMap} guarantees at most one in-flight request at a time: if a fetch is still
- * pending when the next tick fires, that tick is dropped rather than piling up a second request.
- */
+
 export function pollUntilTerminal<T>(
   fetchFn: () => Observable<T>,
   isTerminal: (result: T) => boolean,

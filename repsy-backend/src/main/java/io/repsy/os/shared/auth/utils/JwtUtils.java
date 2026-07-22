@@ -107,12 +107,6 @@ public class JwtUtils {
         .sign(Algorithm.HMAC512(this.secret));
   }
 
-  /**
-   * Mints a token whose subject is a repo id rather than a user id, scoped to a single {@code
-   * scope} string (e.g. {@code repository:{repoName}:pull}) and typed {@link
-   * AuthenticationType#DOCKER_SCAN}. Callers authorize it by comparing the subject against the repo
-   * being accessed — it never resolves to a real user or deploy token.
-   */
   public @NonNull String createRepoScopedToken(
       final @NonNull UUID repoId,
       final @NonNull String scope,

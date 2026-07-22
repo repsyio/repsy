@@ -19,6 +19,5 @@ import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/** Field-for-field mirror of {@code io.repsy.os.server.security.scanner.dtos.ScanOutcome}. */
 public record ScanOutcome(
     @NonNull List<@NonNull ScannerFinding> findings, @Nullable String scannerVersion) {}

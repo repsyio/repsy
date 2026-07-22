@@ -15,7 +15,6 @@
  */
 package io.repsy.os.server.security.scan.dtos;
 
-/** {@code severityRank} is {@link Severity}'s ordinal (0=CRITICAL .. 4=UNKNOWN). */
 public interface RepoSeverityRank {
   String getRepoName();
 

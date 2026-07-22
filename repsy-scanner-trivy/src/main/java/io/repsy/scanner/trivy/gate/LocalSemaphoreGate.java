@@ -18,15 +18,10 @@ package io.repsy.scanner.trivy.gate;
 import java.util.Locale;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
-/**
- * In-process {@link TrivyExecutionGate} backed by a single-permit {@link Semaphore}. Serializes
- * {@code trivy rootfs} calls within this JVM only — sufficient for a single-instance deployment,
- * but does not coordinate across multiple instances (see {@link TrivyExecutionGate} for the
- * Redis-backed follow-up).
- */
 @Component
 public class LocalSemaphoreGate implements TrivyExecutionGate {
 
@@ -47,6 +42,12 @@ public class LocalSemaphoreGate implements TrivyExecutionGate {
               + " waiting for a trivy execution slot");
     }
 
-    return this.semaphore::release;
+    final var released = new AtomicBoolean(false);
+
+    return () -> {
+      if (released.compareAndSet(false, true)) {
+        this.semaphore.release();
+      }
+    };
   }
 }

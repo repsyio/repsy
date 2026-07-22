@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.jspecify.annotations.Nullable;
 
-/** One vendor's CVSS entry (e.g. "nvd", "redhat", "ghsa") from Trivy's multi-source CVSS map. */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record TrivyCvss(
     @JsonProperty("V2Vector") @Nullable String v2Vector,

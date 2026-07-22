@@ -25,11 +25,7 @@ Chart.register(...registerables);
 const SEVERITY_CHART_COLORS = ['#ed7688', '#ffec7d', '#7de2ff', '#9eff87', '#9fa0a0'];
 const SEVERITY_CHART_LABELS = ['Critical', 'High', 'Medium', 'Low', 'Unknown'];
 
-/**
- * The set of fields RepoSecurityDetail and ScanOverview both share — a structural type rather than
- * importing either generated model directly, so this component doesn't care which endpoint the
- * counts came from.
- */
+
 export interface SeverityCounts {
   criticalCount?: number;
   highCount?: number;

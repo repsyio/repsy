@@ -44,13 +44,7 @@ const FINDINGS_PAGE_SIZE = 10;
 const SECURITY_FRAGMENT = 'security';
 const POLL_INTERVAL_MS = 3000;
 const TERMINAL_STATUSES: ScanStatus[] = [ScanStatus.Completed, ScanStatus.Failed];
-/**
- * Content above this section (syntax-highlighted manifest/POM blocks, images, etc.) can still be
- * reflowing asynchronously after {@link isSupported$} resolves and this element first renders, which
- * would shift it further down the page than a single immediate scroll attempt accounts for — so
- * {@link scrollToSecurityWithRetries} re-issues the scroll a few more times as that settles, instead
- * of guessing one "safe enough" delay.
- */
+
 const SCROLL_RETRY_DELAYS_MS = [0, 300, 800];
 
 @Component({
@@ -105,9 +99,9 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     private readonly securityScanSupportService: SecurityScanSupportService,
     private readonly viewportScroller: ViewportScroller,
   ) {
-    // Arriving from an external link (Security page, version-list, repo-security modal) always
-    // carries #security — those links exist specifically so a user who already cares about
-    // vulnerabilities lands with the section open, not just scrolled to a collapsed header.
+
+
+
     this.fragmentChanges$ = this.route.fragment.subscribe((fragment) => {
       if (fragment === SECURITY_FRAGMENT) {
         this.expanded = true;
@@ -118,14 +112,14 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
   public ngOnInit(): void {
     this.isSupported$ = this.securityScanSupportService.isSupported(this.repoType);
 
-    // Arriving on a fresh page load (cross-page nav from the Security page, a modal's "recently
-    // scanned" link, etc.) races Angular's own one-shot, native fragment scroll: it fires on
-    // `NavigationEnd`, before `isSupported$` (an HTTP round trip) resolves and this `#security`
-    // element even exists in the DOM — so it silently scrolls nowhere. Once support is confirmed
-    // (this element is about to render), retry the scroll ourselves (see
-    // scrollToSecurityWithRetries). A same-page fragment change (e.g. the "See Security Details"
-    // button) never hits this: the element already exists, so Angular's own native scroll already
-    // succeeds and this never needs to fire again for that navigation.
+
+
+
+
+
+
+
+
     this.isSupportedSub = this.isSupported$.subscribe((isSupported) => {
       if (isSupported && this.route.snapshot.fragment === SECURITY_FRAGMENT) {
         this.scrollToSecurityWithRetries();
@@ -158,11 +152,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     this.expanded = !this.expanded;
   }
 
-  /**
-   * Drives ONLY the collapsed header's quick-glance badge — the latest/active scan's own worst
-   * severity, independent of whichever scan {@link selectedScan} currently points to. The expanded
-   * panel's own severity summary uses {@link selectedScanSeverityCounts} instead.
-   */
+
   public get worstSeverity(): Severity | null {
     if (!this.overview) {
       return null;
@@ -185,18 +175,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     return null;
   }
 
-  /**
-   * The expanded panel's status/severity summary always describes {@link selectedScan} — the scan
-   * the user actually clicked into (Scan History row, or whatever loaded by default) — never {@link
-   * overview}, which is strictly the latest/active scan's own aggregate, used only for the collapsed
-   * header badge and for picking which scan {@link syncPolling} targets. When the selected scan IS
-   * the overview's scan (the common case: {@link loadOverview} loads it by default, and it's the
-   * only scan a fresh page load ever selects), {@link overview} already carries real, scan-wide
-   * totals from {@code GET .../scan-overview} and is used directly. There is no per-scan aggregate
-   * endpoint for a scan other than the latest, so once the user picks a different (older) scan from
-   * Scan History, this necessarily falls back to counting {@link findings} — only the currently
-   * loaded findings page, not the full set.
-   */
+
   public get selectedScanSeverityCounts(): {
     criticalCount: number;
     highCount: number;
@@ -276,14 +255,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     return this.overview?.status !== ScanStatus.Pending && this.overview?.status !== ScanStatus.Running;
   }
 
-  /**
-   * {@code GET .../scan-overview} 404s ({@code artifactVersionNeverScanned}) when this artifact
-   * version has no scan history yet, and the app's global HTTP error interceptor toasts every
-   * caught error unconditionally — there is no per-request opt-out for it. Rather than add one just
-   * for this, {@code listVulnerabilityScans} is checked first: it never 404s (an empty page is a
-   * valid, non-error result), so the overview/detail calls — the only ones that can 404 for this
-   * reason — are simply skipped once we already know there is nothing to show.
-   */
+
   private refresh(): void {
     this.loading = true;
     this.overview = null;
@@ -384,25 +356,12 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
       });
   }
 
-  /**
-   * Per-severity breakdown reflects only the currently loaded findings page (up to {@code
-   * FINDINGS_PAGE_SIZE}), not the selected scan's full finding set — {@link findingsTotalCount}
-   * alone stays exact (taken from the page's own {@code totalElements}).
-   */
+
   private countBySeverity(severity: Severity): number {
     return this.findings.filter((finding) => finding.severity === severity).length;
   }
 
-  /**
-   * Patches whichever pieces of component state reference the scan a poll tick just fetched.
-   * {@link overview} and {@link selectedScan} are independent — a poll tick for the latest/active
-   * scan must never overwrite {@link selectedScan} while the user is looking at a different
-   * (already-terminal) scan from Scan History, and conversely a history click must never redirect
-   * what {@link syncPolling} is polling. Findings/overview-severity are only re-fetched once the
-   * polled scan actually reaches a terminal state (see {@link refreshOnTerminalScan}) — not on every
-   * PENDING/RUNNING tick, which would otherwise re-request the same not-yet-changed data every
-   * {@link POLL_INTERVAL_MS}.
-   */
+
   private applyRefreshedScan(detail: VulnerabilityScanDetail): void {
     this.patchScanInHistory(detail);
 
@@ -444,12 +403,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     }
   }
 
-  /**
-   * Once (not per-tick): re-fetches findings for whichever scan is both selected and just finished
-   * (so the expanded panel's findings table/severity counts pick up real results), and refreshes
-   * {@link overview}'s own aggregate when the just-finished scan is the latest/active one (so the
-   * collapsed header badge stops showing whatever stale counts it had before the scan completed).
-   */
+
   private refreshOnTerminalScan(scanId: string, isSelectedScan: boolean, isOverviewScan: boolean): void {
     if (isSelectedScan) {
       this.findingsPageNum = 0;
@@ -472,13 +426,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
       });
   }
 
-  /**
-   * Only ever polls the single scan currently summarized at the top of the section — history rows
-   * for other PENDING/RUNNING scans simply reflect whatever the last full {@link refresh} loaded,
-   * consistent with this component being the only place in the app that polls (see {@link
-   * pollUntilTerminal}); list/badge surfaces elsewhere never do. Independent of whatever the user has
-   * selected from Scan History — see {@link applyRefreshedScan}.
-   */
+
   private syncPolling(): void {
     const scanId = this.overview?.scanId;
     const isActive = this.overview?.status === ScanStatus.Pending || this.overview?.status === ScanStatus.Running;

@@ -15,7 +15,6 @@
  */
 package io.repsy.os.server.security.scan.dtos;
 
-/** One row per artifact version, from that version's single latest scan (not scan history). */
 public interface VersionScanSummary {
   String getArtifactVersion();
 

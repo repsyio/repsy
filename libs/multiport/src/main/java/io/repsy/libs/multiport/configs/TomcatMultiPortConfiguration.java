@@ -65,7 +65,7 @@ public class TomcatMultiPortConfiguration {
 
     final var connectors = new ArrayList<Connector>();
 
-    // ports without the main port.
+
     final var additionalPorts = this.multiPortProperties.getAdditionalPorts();
 
     for (final var entry : additionalPorts.entrySet()) {
