@@ -94,6 +94,7 @@ RUN mvn -f ./repsy/repsy-os/repsy-protocols/pom.xml install -DskipTests -Dchecks
 FROM node:24-alpine AS frontend-build
 
 WORKDIR /app
+ENV CI=true
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 

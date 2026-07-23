@@ -7,6 +7,7 @@
 - [Features](#features)
 - [Quick Start](#quick-start)
 - [HTTPS / SSL](#https--ssl)
+- [Vulnerability Scanning](#vulnerability-scanning)
 - [Installation](#installation)
     - [Using Docker (H2 - Embedded)](#option-1-docker-with-h2-embedded-database)
     - [Using Docker (PostgreSQL)](#option-2-docker-with-postgresql)
@@ -28,6 +29,7 @@
 - **RESTful API**: Comprehensive REST API
 - **Database Support**: H2 (embedded) and PostgreSQL
 - **Docker Ready**: Complete containerization support
+- **Vulnerability Scanning**: Vulnerability scanning (Maven, npm, PyPI, Docker) via an optional Trivy-based scanner service.
 
 ## Quick Start
 
@@ -120,6 +122,10 @@ docker run \
 > Self-signed certificates will cause `x509: certificate signed by unknown authority` errors
 > in clients unless the certificate is explicitly trusted.
 
+## Vulnerability Scanning
+
+Repsy can scan pushed artifacts (Maven, npm, PyPI, Docker) for known vulnerabilities using a separate `repsy-scanner-trivy` service. This is **disabled by default** (`SECURITY_SCANNER=disabled`) and adds no dependency to a plain install. To enable it, run the `repsy-scanner-trivy` service (see [Option 3](#option-3-docker-compose-with-postgresql) and [`repsy-scanner-trivy/README.md`](./repsy-scanner-trivy/README.md)) and set `SECURITY_SCANNER=enabled` along with the `TRIVY_*`/`DOCKER_INTERNAL_REGISTRY_BASE_URL` variables above.
+
 ## Installation
 
 ### Option 1: Docker with H2 (Embedded Database)
@@ -205,6 +211,61 @@ networks:
     driver: bridge
 ```
 
+#### Adding vulnerability scanning to the stack
+
+To enable vulnerability scanning, add the following service to your docker-compose.yml:
+
+```yaml
+  repsy-scanner-trivy:
+    container_name: repsy-scanner-trivy
+    hostname: repsy-scanner-trivy
+    build:
+      context: ./repsy-scanner-trivy
+      dockerfile: Dockerfile
+    environment:
+      - SCANNER_API_KEY=${TRIVY_SCANNER_API_KEY:-changeme-trivy-api-key}
+      - TRIVY_GATE_ACQUIRE_TIMEOUT_SECONDS=180
+    ports:
+      - "8090:8090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - trivy-cache:/home/appuser/.cache/trivy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8090/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    networks:
+      - repsy-network
+
+volumes:
+  trivy-cache:
+```
+
+This supports two topologies:
+
+- **(a) Full compose** — every service (`postgres`, `repsy`, `repsy-scanner-trivy`) runs
+  in the compose stack. The `repsy` service's environment gets `SECURITY_SCANNER=enabled`,
+  `TRIVY_SCANNER_BASE_URL=http://repsy-scanner-trivy:8090`, and
+  `DOCKER_INTERNAL_REGISTRY_BASE_URL=http://repsy:9090` (service-name-based DNS resolution
+  on `repsy-network`).
+- **(b) Hybrid (backend on host)** — the common day-to-day dev setup: `repsy-backend`
+  runs from the IDE / `mvn spring-boot:run` directly on the host, and only `postgres` +
+  `repsy-scanner-trivy` run in the compose stack. The host-run backend needs its own env
+  vars set directly, pointing at the stack's published ports:
+  `DB_URL=jdbc:postgresql://localhost:5432/repsy`, `SECURITY_SCANNER=enabled`,
+  `TRIVY_SCANNER_BASE_URL=http://localhost:8090`, `TRIVY_SCANNER_API_KEY=<same value as
+  the compose stack's TRIVY_SCANNER_API_KEY>`, and
+  `DOCKER_INTERNAL_REGISTRY_BASE_URL=http://host.docker.internal:9090` (this last one only
+  resolves from inside `repsy-scanner-trivy` because of the `extra_hosts` entry above —
+  without it, Linux Docker does not auto-map `host.docker.internal` the way Docker Desktop
+  does on macOS/Windows).
+
+See [`repsy-scanner-trivy/README.md`](./repsy-scanner-trivy/README.md) for scanner service
+details (standalone build/run instructions, its own environment variables, and API usage).
+
 ### Manual Installation
 
 **Prerequisites:**
@@ -250,6 +311,11 @@ Access at:
 | `API_PORT` | Backend API and Frontend web UI port | `8080` |
 | `H2_TCP_SERVER_ENABLED` | Enable H2 TCP server for external database access (development only) | `false` |
 | `H2_TCP_SERVER_PORT` | H2 TCP server port | `9092` |
+| `SECURITY_SCANNER` | Enables vulnerability scanning of pushed artifacts (`enabled`/`disabled`) | `disabled` |
+| `TRIVY_SCANNER_BASE_URL` | Base URL of the `repsy-scanner-trivy` service | `http://localhost:8090` |
+| `TRIVY_SCANNER_API_KEY` | Shared API key sent to the scanner service (must match its `SCANNER_API_KEY`) | *(empty)* |
+| `DOCKER_INTERNAL_REGISTRY_BASE_URL` | Base URL the scanner uses to pull Docker images from this instance's own registry | `http://localhost:9090` |
+| `TRIVY_GATE_ACQUIRE_TIMEOUT_SECONDS` | Scanner-side: max time a queued scan waits to acquire the single-Trivy-execution gate | `60` |
 
 **Important Notes:**
 
@@ -315,6 +381,12 @@ docker exec repsy env | grep ADMIN
   docker logs repsy | grep "Admin password"
   ```
   The application will automatically generate a new random password on next startup.
+
+**Vulnerability scans failing with 401/500:**
+- Check that `TRIVY_SCANNER_API_KEY` (repsy-backend) and `SCANNER_API_KEY` (`repsy-scanner-trivy`) are set to the exact same value — a mismatch causes the scanner to reject requests.
+
+**Docker scans failing:**
+- Remember that `DOCKER_INTERNAL_REGISTRY_BASE_URL` is resolved from the **scanner container's** point of view, not the backend's — it must never be `localhost`. Use `host.docker.internal` (hybrid topology, backend on host) or the backend's service name (e.g. `http://repsy:9090`, full-compose topology) instead.
 
 ### Logs
 
