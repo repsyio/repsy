@@ -39,6 +39,10 @@ import tools.jackson.databind.ObjectMapper;
 public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFacade {
 
   private static final String USAGES = "usages";
+  private static final String ARTIFACT_NAME = "artifactName";
+  private static final String ARTIFACT_VERSION = "artifactVersion";
+  private static final String STORAGE_PATH = "storagePath";
+  private static final String CRATE_STORAGE_PATH_FMT = "crates/%s/%s-%s.crate";
 
   private final CargoStorageService cargoStorageService;
   private final CargoCrateService<ID> cargoCrateService;
@@ -72,8 +76,6 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
     return resource;
   }
 
-  // [ 4 byte JSON len ] [ JSON bytes ] [ 4 byte .crate len ] [ .crate bytes ]
-  // https://doc.rust-lang.org/cargo/reference/registry-web-api.html#publish
   @Override
   public void publish(final ProtocolContext context, final InputStream inputStream)
       throws IOException {
@@ -104,6 +106,10 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
 
     this.cargoCrateService.publish(repoInfo, requestWithChecksum);
 
+    context.addProperty(ARTIFACT_NAME, crateName);
+    context.addProperty(ARTIFACT_VERSION, request.vers());
+    context.addProperty(
+        STORAGE_PATH, String.format(CRATE_STORAGE_PATH_FMT, crateName, crateName, request.vers()));
     context.addProperty(USAGES, usages);
   }
 

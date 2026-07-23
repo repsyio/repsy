@@ -27,8 +27,10 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.tuple.MutablePair;
+import org.apache.maven.index.artifact.Gav;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
@@ -38,6 +40,10 @@ import org.springframework.core.io.Resource;
 public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFacade<ID> {
 
   private static final String USAGES = "usages";
+  private static final String ARTIFACT_NAME = "artifactName";
+  private static final String ARTIFACT_VERSION = "artifactVersion";
+
+  private static final Set<String> SCANNABLE_EXTENSIONS = Set.of("jar", "war", "ear");
 
   private final MavenStorageService<ID> mavenStorageService;
   private final ArtifactService<ID> artifactService;
@@ -92,6 +98,26 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
     this.artifactService.createOrUpdateArtifact(repoInfo, storagePath, resource);
 
+    final var gav = ArtifactUtils.getGavByFile(storagePath);
+
+    if (gav != null && isScannableArtifact(gav, fileName)) {
+      context.addProperty(ARTIFACT_NAME, gav.getGroupId() + ":" + gav.getArtifactId());
+      context.addProperty(ARTIFACT_VERSION, resolveLogicalVersion(gav));
+    }
+
     context.addProperty(USAGES, afterUploadUsage);
+  }
+
+  private static String resolveLogicalVersion(final Gav gav) {
+    return gav.isSnapshot() ? gav.getBaseVersion() : gav.getVersion();
+  }
+
+  private static boolean isScannableArtifact(final Gav gav, final String fileName) {
+    final var extension = gav.getExtension();
+
+    return extension != null
+        && !ArtifactUtils.isChecksumFile(fileName)
+        && gav.getClassifier() == null
+        && SCANNABLE_EXTENSIONS.contains(extension);
   }
 }

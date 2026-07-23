@@ -47,4 +47,6 @@ public interface CargoStorageService {
       throws IOException;
 
   void createRepo(UUID repoId);
+
+  String getCrateRelativePath(String crateName, String versionName);
 }

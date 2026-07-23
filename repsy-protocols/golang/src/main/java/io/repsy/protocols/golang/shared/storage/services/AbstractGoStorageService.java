@@ -34,8 +34,14 @@ import org.springframework.core.io.Resource;
 public abstract class AbstractGoStorageService<ID> implements GoStorageService<ID> {
 
   private static final String ERR_ITEM_NOT_FOUND = "itemNotFound";
+  private static final String ZIP_EXTENSION = ".zip";
 
   private final StorageStrategy storageStrategy;
+
+  @Override
+  public String getModuleZipRelativePath(final String modulePath, final String version) {
+    return "/" + modulePath + "/@v/" + version + ZIP_EXTENSION;
+  }
 
   @Override
   public void createRepo(final UUID repoUuid) {
@@ -78,8 +84,7 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
 
   @Override
   public void deleteVersionFiles(final StoragePath atVVersionBasePath, final String repoName) {
-    // atVVersionBasePath points to /{modulePath}/@v/{version} (no extension)
-    // List the parent @v/ directory and delete files matching the version prefix
+
     final var storageKey = atVVersionBasePath.getStorageKey();
     if (storageKey == null) {
       return;
@@ -99,7 +104,7 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
         this.tryDeleteVersionFile(item, versionPrefix, atVDirPath, storageKey);
       }
     } catch (final Exception _) {
-      // directory may not exist
+
     }
   }
 
@@ -115,7 +120,7 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
     try {
       this.storageStrategy.delete(filePath);
     } catch (final Exception _) {
-      // best-effort
+
     }
   }
 

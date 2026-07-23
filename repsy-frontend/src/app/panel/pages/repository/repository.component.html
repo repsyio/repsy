@@ -254,6 +254,11 @@
                     [text]="repo.name | ellipsis"
                     [textHover]="repo.name"
                   />
+                  <app-repo-security-badge
+                    [repoName]="repo.name"
+                    [repoType]="repo.repoType"
+                    [severity]="securitySummary[repo.name] ?? null"
+                  />
                 </div>
 
                 <div class="text-[14px] text-[#FDFDFD]">
@@ -549,6 +554,11 @@
                   }
                 }
                 <span class="break-all text-[#FDFDFD]">{{ repo.name }}</span>
+                <app-repo-security-badge
+                    [repoName]="repo.name"
+                    [repoType]="repo.repoType"
+                    [severity]="securitySummary[repo.name] ?? null"
+                  />
               </div>
 
               <div class="space-y-2">

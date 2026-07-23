@@ -1,0 +1,17 @@
+@if (severity && (isSupported$ | async)) {
+  <button type="button" (click)="openModal($event)" class="cursor-pointer">
+    <app-severity-badge
+      [severity]="severity"
+      [compact]="true"
+      [attr.aria-label]="versionName + ' security status'"
+    />
+  </button>
+
+  <app-version-security-modal
+    [repoName]="repoName"
+    [repoType]="repoType"
+    [artifactName]="artifactName"
+    [artifactVersion]="versionName"
+    [(open)]="showModal"
+  />
+}

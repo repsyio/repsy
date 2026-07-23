@@ -67,6 +67,7 @@ export class VersionAllowanceComponent implements OnInit {
     form.allowOverride = this.parentForm.get('allowOverride')!.value;
     form.snapshots = snapshots;
     form.releases = releases;
+    form.securityScanEnabled = this.parentForm.get('securityScanEnabled')!.value;
 
     if (this.repoType === RepoType.NUGET) {
       this.protocolRepoControllerService.updateSettings(this.repoName, form).subscribe({

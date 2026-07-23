@@ -25,7 +25,9 @@ import { ReleaseClassifierInfo, ReleaseDetail, RepoPermissionInfo } from '../../
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
 import { PypiService } from '../../service/pypi.service';
 
 type Classifiers = Record<string, [string]>;
@@ -33,7 +35,7 @@ type Classifiers = Record<string, [string]>;
 @Component({
   selector: 'app-pypi-packages-version-detail',
   standalone: true,
-  imports: [CommonModule, CopyClipboardComponent, NgOptimizedImage, SpinnerComponent],
+  imports: [CommonModule, CopyClipboardComponent, NgOptimizedImage, SpinnerComponent, SecurityScanSectionComponent],
   templateUrl: './pypi-packages-version-detail.component.html',
 })
 export class PypiPackagesVersionDetailComponent implements OnDestroy {
@@ -54,6 +56,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
     private readonly router: Router,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
+    private readonly breadcrumbSecurityLinkService: BreadcrumbSecurityLinkService,
   ) {
     this.classifiers = {};
     this.baseUrl = environment.repoBaseUrl;
@@ -65,10 +68,12 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
         this.loadVersion();
       }
     });
+    this.breadcrumbSecurityLinkService.show('PYPI');
   }
 
   public ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
+    this.breadcrumbSecurityLinkService.clear();
   }
 
   public loadVersion(): void {

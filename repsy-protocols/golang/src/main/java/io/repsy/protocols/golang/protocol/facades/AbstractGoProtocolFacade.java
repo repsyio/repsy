@@ -54,9 +54,10 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
   private static final String LATEST_SUFFIX = "/@latest";
   private static final String INFO_EXTENSION = ".info";
   private static final String MOD_EXTENSION = ".mod";
-  private static final String ZIP_EXTENSION = ".zip";
   private static final String USAGES = "usages";
   private static final String CONTENT_SHA256_KEY = "contentSha256";
+  private static final String ARTIFACT_NAME = "artifactName";
+  private static final String ARTIFACT_VERSION = "artifactVersion";
 
   private static final ObjectMapper OBJECT_MAPPER =
       new ObjectMapper()
@@ -85,8 +86,6 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
       return this.handleLatestVersion(repoInfo, path);
     }
 
-    // We no longer return 410 Gone for deleted versions
-
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), path);
     return this.goStorageService.getResource(repoInfo.getName(), storagePath);
   }
@@ -105,10 +104,9 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     }
 
     final var version = GoVersionUtils.extractVersionFromPath(path);
-    // decodedPath preserves original casing for zip-entry lookup (e.g.
-    // "github.com/BurntSushi/toml")
+
     final var decodedPath = GoVersionUtils.decodeModulePath(modulePath);
-    // normalizedPath is lowercased for storage and DB (canonical form)
+
     final var normalizedPath = decodedPath.toLowerCase(Locale.ROOT);
     final var content = inputStream.readAllBytes();
 
@@ -130,7 +128,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     final var zipStoragePath =
         StoragePath.of(
             repoInfo.getStorageKey(),
-            PATH_SEPARATOR + normalizedPath + "/@v/" + version + ZIP_EXTENSION);
+            this.goStorageService.getModuleZipRelativePath(normalizedPath, version));
     final var zipUsages =
         this.goStorageService.writeInputStreamToPath(
             zipStoragePath, new ByteArrayInputStream(content), repoInfo.getName());
@@ -139,6 +137,8 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
 
     final var totalDiskUsage =
         modUsages.getDiskUsage() + zipUsages.getDiskUsage() + infoUsages.getDiskUsage();
+    context.addProperty(ARTIFACT_NAME, normalizedPath);
+    context.addProperty(ARTIFACT_VERSION, version);
     context.addProperty(USAGES, BaseUsages.ofDisk(totalDiskUsage));
   }
 

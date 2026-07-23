@@ -35,4 +35,6 @@ public interface RubyStorageService {
   void createRepo(UUID repoId);
 
   long deleteRepo(UUID repoId);
+
+  String getGemRelativePath(String gemName, String version, String platform);
 }

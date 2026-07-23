@@ -1,0 +1,25 @@
+@if (hasFindings) {
+  <div class="mb-6 flex flex-wrap gap-2">
+    @if ((counts?.criticalCount ?? 0) > 0) {
+      <app-severity-badge severity="CRITICAL" [count]="counts?.criticalCount ?? 0" />
+    }
+    @if ((counts?.highCount ?? 0) > 0) {
+      <app-severity-badge severity="HIGH" [count]="counts?.highCount ?? 0" />
+    }
+    @if ((counts?.mediumCount ?? 0) > 0) {
+      <app-severity-badge severity="MEDIUM" [count]="counts?.mediumCount ?? 0" />
+    }
+    @if ((counts?.lowCount ?? 0) > 0) {
+      <app-severity-badge severity="LOW" [count]="counts?.lowCount ?? 0" />
+    }
+    @if ((counts?.unknownCount ?? 0) > 0) {
+      <app-severity-badge severity="UNKNOWN" [count]="counts?.unknownCount ?? 0" />
+    }
+  </div>
+
+  <div class="relative mx-auto mb-8 h-[220px] w-full max-w-[280px]">
+    <canvas #chartCanvas></canvas>
+  </div>
+} @else {
+  <p class="mb-6 text-[13px] text-success-400">No known vulnerabilities found.</p>
+}

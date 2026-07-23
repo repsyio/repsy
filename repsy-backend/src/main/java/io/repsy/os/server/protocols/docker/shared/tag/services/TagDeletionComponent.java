@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.docker.shared.tag.services;
 
 import static io.repsy.protocols.docker.shared.utils.ManifestNameGenerator.generate;
 
+import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
@@ -29,6 +30,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -39,6 +41,7 @@ public class TagDeletionComponent {
   private final ImageTxService imageService;
   private final ManifestTxService manifestService;
   private final DockerStorageService dockerStorageService;
+  private final ApplicationEventPublisher eventPublisher;
 
   public BaseUsages deleteTag(
       final RepoInfo repoInfo, final String imageName, final String tagName) {
@@ -50,6 +53,14 @@ public class TagDeletionComponent {
         this.manifestService.findTag(repoInfo.getStorageKey(), imageInfo.getId(), tagName);
 
     this.manifestService.deleteTag(tag);
+
+    this.eventPublisher.publishEvent(
+        new ArtifactVersionDeletedEvent(
+            repoInfo.getStorageKey(),
+            repoInfo.getType().name(),
+            repoInfo.getName(),
+            imageInfo.getName(),
+            tagName));
 
     final var manifestsToDeleteFileNames =
         this.findManifestsToDeleteFileNames(repoInfo, imageInfo.getId(), imageName, List.of(tag));

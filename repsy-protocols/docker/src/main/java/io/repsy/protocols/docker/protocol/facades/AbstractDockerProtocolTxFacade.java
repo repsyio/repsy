@@ -70,6 +70,8 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
   private static final String MULTIPLATFORM = "Multiplatform";
   private static final String USAGES_PROPERTY = "usages";
+  private static final String ARTIFACT_NAME_PROPERTY = "artifactName";
+  private static final String ARTIFACT_VERSION_PROPERTY = "artifactVersion";
 
   protected final DockerStorageService<ID> dockerStorageService;
   protected final LayerService<ID> layerService;
@@ -125,6 +127,9 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
         };
 
     if (usage != null) {
+
+      context.addProperty(ARTIFACT_NAME_PROPERTY, imageInfo.getName());
+      context.addProperty(ARTIFACT_VERSION_PROPERTY, form.getTagName());
       context.addProperty(USAGES_PROPERTY, usage);
     }
 
@@ -440,7 +445,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
   private ManifestDetails performDatabaseLookupForManifest(
       final ProtocolContext context,
-      final String manifestDigest,
+      final String manifestReference,
       final String imageName,
       final String requestPath)
       throws IOException {
@@ -450,9 +455,11 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     final var imageInfo =
         this.imageService.findImageInfoByRepoIdAndName(repoInfo.getId(), imageName);
 
+    final var digest = this.resolveManifestDigest(repoInfo, imageName, manifestReference);
+
     final var manifest =
         this.manifestService.findManifestByRepoIdAndImageNameAndDigest(
-            repoInfo.getId(), imageInfo, manifestDigest);
+            repoInfo.getId(), imageInfo, digest);
 
     final var fileName = generate(repoInfo.getStorageKey(), imageName, manifest.getName());
 
@@ -462,6 +469,19 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     final var manifestStr = manifestResource.getContentAsString(StandardCharsets.UTF_8);
 
     return new ManifestDetails(manifest.getMediaType(), manifest.getDigest(), manifestStr);
+  }
+
+  private String resolveManifestDigest(
+      final BaseRepoInfo<ID> repoInfo, final String imageName, final String reference) {
+
+    if (reference.startsWith(DockerConstants.SHA256_PREFIX)) {
+      return reference;
+    }
+
+    return this.manifestService
+        .findActiveTagByNameAndRepoAndImage(repoInfo.getId(), imageName, reference)
+        .map(BaseTagDetail::getDigest)
+        .orElseThrow(() -> new ItemNotFoundException("tagNotFound"));
   }
 
   private Resource getLayerResource(

@@ -54,6 +54,10 @@ import org.springframework.core.io.Resource;
 @RequiredArgsConstructor
 public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID> {
 
+  private static final String ARTIFACT_NAME = "artifactName";
+  private static final String ARTIFACT_VERSION = "artifactVersion";
+  private static final String STORAGE_PATH = "storagePath";
+
   protected final HelmStorageService<ID> helmStorageService;
   protected final ChartService<ID> chartService;
   protected final OciBlobService<ID> ociBlobService;
@@ -131,9 +135,9 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
             .size(size)
             .build();
 
-    final var filename = name + "-" + version + HelmConstants.TGZ_EXTENSION;
     final var storagePath =
-        StoragePath.of(repoInfo.getStorageKey(), HelmConstants.CHARTS_PATH + "/" + filename);
+        StoragePath.of(
+            repoInfo.getStorageKey(), this.helmStorageService.getChartRelativePath(name, version));
 
     final var existingOpt =
         this.chartService.findOptionalByNameAndVersion(repoInfo.getId(), name, version);
@@ -145,12 +149,18 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
       final var oldSize = existingOpt.get().size();
       final var chartInfo = this.chartService.update(repoInfo.getId(), form);
       this.helmStorageService.saveChart(repoInfo.getName(), storagePath, chartStream);
+      context.addProperty(ARTIFACT_NAME, name);
+      context.addProperty(ARTIFACT_VERSION, version);
+      context.addProperty(STORAGE_PATH, storagePath.getRelativePath().getPath());
       context.addProperty("usages", BaseUsages.ofDisk(size - oldSize));
       return chartInfo;
     }
 
     final var chartInfo = this.chartService.findOrCreate(form, repoInfo.getId());
     this.helmStorageService.saveChart(repoInfo.getName(), storagePath, chartStream);
+    context.addProperty(ARTIFACT_NAME, name);
+    context.addProperty(ARTIFACT_VERSION, version);
+    context.addProperty(STORAGE_PATH, storagePath.getRelativePath().getPath());
     context.addProperty("usages", BaseUsages.ofDisk(size));
     return chartInfo;
   }
@@ -164,9 +174,6 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
 
     final var manifests = this.ociManifestService.findAllByChartId(chartInfo.id());
 
-    // Soft-delete manifests before the chart so the chart FK join still resolves
-    // when @SQLRestriction("DELETED = false") is applied. If the chart were deleted
-    // first, the join in softDeleteByChartUuid would return no rows.
     this.ociManifestService.deleteAllByChartId(chartInfo.id());
 
     this.chartService.delete(repoInfo.getId(), name, version);

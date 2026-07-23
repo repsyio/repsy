@@ -21,6 +21,7 @@ import moment from 'moment';
 import { Subscription } from 'rxjs';
 
 import { environment } from '../../../../../../../environments/environment';
+import { VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -30,9 +31,11 @@ import { PaginationComponent } from '../../../../../shared/components/pagination
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
+import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
+import { SecurityService } from '../../../../security/service/security.service';
 import { NugetConfigComponent } from '../../config/nuget-config.component';
 import { NugetDeletedItem } from '../../dto/nuget-deleted-item';
 import { NugetPackageInfo } from '../../dto/nuget-package-info';
@@ -53,6 +56,7 @@ import { NugetService } from '../../service/nuget.service';
     TooltipComponent,
     NugetConfigComponent,
     NgOptimizedImage,
+    VersionSecurityBadgeComponent,
   ],
   templateUrl: './nuget-packages-version-list.component.html',
 })
@@ -69,6 +73,7 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
   public activeRepo: RepoPermissionInfo;
   public readonly baseUrl: string;
   public readonly username: string;
+  public securitySummary: Record<string, VersionSecuritySummary> = {};
   public sortOption: Sort = { name: 'Newest', column: 'publishedAt', type: 'DESC' };
   public sortOptions: Sort[] = [
     { name: 'Newest', column: 'publishedAt', type: 'DESC' },
@@ -83,6 +88,7 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
+    private readonly securityService: SecurityService,
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
@@ -92,6 +98,7 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
         this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
         this.packageId = this.route.snapshot.paramMap.get('packageId');
         this.fetchVersions();
+        this.fetchSecuritySummary();
       }
     });
   }
@@ -170,5 +177,14 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
 
   public timeAgo(date: Date | string): string {
     return moment(date).fromNow();
+  }
+
+  private fetchSecuritySummary(): void {
+    this.securityService.getVersionSecuritySummary(this.activeRepo.repoName, this.packageId).subscribe({
+      next: (summary) => {
+        this.securitySummary = summary;
+      },
+      error: () => {},
+    });
   }
 }

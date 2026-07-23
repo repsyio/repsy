@@ -22,13 +22,14 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { ImageListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { ImageListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../../../../shared/components/ellipsis/ellipsis.pipe';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { PackageSecurityBadgeComponent } from '../../../../../shared/components/package-security-badge/package-security-badge.component';
 import { PaginationComponent } from '../../../../../shared/components/pagination/pagination.component';
 import { SearchboxComponent } from '../../../../../shared/components/searchbox/searchbox.component';
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
@@ -37,6 +38,7 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { ByteFormatter } from '../../../../../shared/util/byte-formatter';
+import { SecurityService } from '../../../../security/service/security.service';
 import { DockerConfigComponent } from '../../config/docker-config.component';
 import { DockerService } from '../../service/docker.service';
 
@@ -56,6 +58,7 @@ import { DockerService } from '../../service/docker.service';
     EllipsisPipe,
     NgOptimizedImage,
     SpinnerComponent,
+    PackageSecurityBadgeComponent,
   ],
   templateUrl: './docker-images-list.component.html',
 })
@@ -69,6 +72,7 @@ export class DockerImagesListComponent implements OnDestroy {
   public pagedData: PagedData<ImageListItem>;
   public activeRepo: RepoPermissionInfo;
   public images: ImageListItem[];
+  public securitySummary: Record<string, VersionSecuritySummary> = {};
 
   public sortOption: Sort = { name: 'Newest', column: 'lastUpdatedAt', type: 'DESC' };
   public sortOptions: Sort[] = [
@@ -84,6 +88,7 @@ export class DockerImagesListComponent implements OnDestroy {
     private readonly authService: AuthService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
+    private readonly securityService: SecurityService,
   ) {
     this.baseUrl = environment.apiBaseUrl;
     this.pagedData = new PagedData<ImageListItem>();
@@ -93,6 +98,7 @@ export class DockerImagesListComponent implements OnDestroy {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.fetchImages();
+        this.fetchSecuritySummary();
       }
     });
   }
@@ -173,5 +179,18 @@ export class DockerImagesListComponent implements OnDestroy {
 
   public get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
+  }
+
+  public packageRoute(image: ImageListItem): string {
+    return `/${this.activeRepo.repoName}/${image.name}`;
+  }
+
+  private fetchSecuritySummary(): void {
+    this.securityService.getArtifactSecuritySummary(this.activeRepo.repoName).subscribe({
+      next: (summary) => {
+        this.securitySummary = summary;
+      },
+      error: () => {},
+    });
   }
 }

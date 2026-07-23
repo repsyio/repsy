@@ -143,6 +143,24 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
   }
 
   @Override
+  public String getNupkgRelativePath(final String packageId, final String version) {
+
+    final var normalizedId = packageId.toLowerCase(Locale.ROOT);
+    final var normalizedVersion = normalizeNuGetVersion(version);
+
+    return PACKAGES_PATH
+        + "/"
+        + normalizedId
+        + "/"
+        + normalizedVersion
+        + "/"
+        + normalizedId
+        + "."
+        + normalizedVersion
+        + ".nupkg";
+  }
+
+  @Override
   public long deletePackageVersion(final UUID repoId, final String packageId, final String version)
       throws IOException {
 

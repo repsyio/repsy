@@ -20,7 +20,7 @@ import { RouterLink } from '@angular/router';
 import moment from 'moment';
 import { finalize, map } from 'rxjs/operators';
 
-import { ProtocolRepoControllerService, RepoType as ApiRepoType } from '../../../../generated/api';
+import { ProtocolRepoControllerService, RepoType as ApiRepoType, Severity } from '../../../../generated/api';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../shared/components/ellipsis/ellipsis.pipe';
@@ -28,6 +28,7 @@ import { EmptyListComponent } from '../../shared/components/empty-list/empty-lis
 import { DangerModalService } from '../../shared/components/modals/danger-modal/danger-modal.service';
 import { RepositoryCreateModalComponent } from '../../shared/components/modals/repository-create-modal/repository-create-modal.component';
 import { PaginationComponent } from '../../shared/components/pagination/pagination.component';
+import { RepoSecurityBadgeComponent } from '../../shared/components/repo-security-badge/repo-security-badge.component';
 import { SearchboxComponent } from '../../shared/components/searchbox/searchbox.component';
 import { SelectorComponent } from '../../shared/components/selector/selector.component';
 import { ToastService } from '../../shared/components/toast/toast.service';
@@ -36,6 +37,7 @@ import { RepoListItem } from '../../shared/dto/repo/repo-list-item';
 import { RepoType } from '../../shared/dto/repo/repo-type';
 import { ByteFormatter } from '../../shared/util/byte-formatter';
 import { ProfileService } from '../profile/service/profile.service';
+import { SecurityService } from '../security/service/security.service';
 
 @Component({
   selector: 'app-repository',
@@ -53,6 +55,7 @@ import { ProfileService } from '../profile/service/profile.service';
     TooltipComponent,
     EllipsisPipe,
     SpinnerComponent,
+    RepoSecurityBadgeComponent,
   ],
   templateUrl: './repository.component.html',
 })
@@ -81,9 +84,13 @@ export class RepositoryComponent {
   public username: string;
   public error: string;
   public isAdmin = false;
+  public securitySummary: Record<string, Severity | null> = {};
+
+  private pendingRepoFetches = 0;
 
   constructor(
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly securityService: SecurityService,
     private readonly profileFacadeService: ProfileService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
@@ -129,6 +136,7 @@ export class RepositoryComponent {
     this.loading = true;
     this.repositories = [];
     this.filteredRepos = [];
+    this.securitySummary = {};
 
     this.loadAllRepos(option);
   }
@@ -180,11 +188,16 @@ export class RepositoryComponent {
 
   private fetchRepositories(repoType: RepoType): void {
     this.loading = true;
+    this.pendingRepoFetches++;
     this.protocolRepoControllerService
       .getInfo(repoType.toUpperCase() as ApiRepoType)
       .pipe(
         finalize(() => {
           this.loading = false;
+          this.pendingRepoFetches--;
+          if (this.pendingRepoFetches === 0) {
+            this.fetchSecuritySummary();
+          }
         }),
         map((r) => r.data as unknown as RepoListItem[]),
       )
@@ -201,6 +214,23 @@ export class RepositoryComponent {
         },
         error: () => {},
       });
+  }
+
+
+
+
+  private fetchSecuritySummary(): void {
+    const repoNames = this.repositories.map((repo) => repo.name);
+    if (repoNames.length === 0) {
+      return;
+    }
+
+    this.securityService.getSecuritySummary(repoNames).subscribe({
+      next: (summary) => {
+        this.securitySummary = summary;
+      },
+      error: () => {},
+    });
   }
 
   private loadAllRepos(option: string) {

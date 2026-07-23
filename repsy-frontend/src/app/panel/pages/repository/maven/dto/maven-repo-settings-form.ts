@@ -19,4 +19,5 @@ export class MavenRepoSettingsForm {
   public releases: boolean;
   public snapshots: boolean;
   public allowOverride: boolean;
+  public securityScanEnabled = true;
 }

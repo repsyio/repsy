@@ -53,7 +53,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tools.jackson.databind.ObjectMapper;
 
-/** Handles PUT /v2/{repo}/{name}/manifests/{reference} — pushes a manifest. */
 @NullMarked
 public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     implements ProtocolMethodHandler {
@@ -61,6 +60,8 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
   private static final Pattern MANIFEST_PUSH_PATTERN = Pattern.compile("^/([^/]+)/manifests/(.+)$");
   private static final int RETRY_COUNT = 3;
   private static final long WAIT_RETRY = 100;
+  private static final String ARTIFACT_NAME = "artifactName";
+  private static final String ARTIFACT_VERSION = "artifactVersion";
 
   private final PathParser basePathParser;
   private final HelmFacade<ID> helmFacade;
@@ -174,13 +175,12 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
 
     this.helmFacade.pushManifest(context, name, reference, contentBytes);
 
-    // Only count disk usage on version-tagged pushes. Helm also pushes the manifest a second time
-    // addressed by its content digest (sha256:...) — same blob, no additional storage consumed.
     if (!reference.startsWith(HelmConstants.SHA256_PREFIX)) {
+      context.addProperty(ARTIFACT_NAME, metadata.getName());
+      context.addProperty(ARTIFACT_VERSION, metadata.getVersion());
       context.addProperty("usages", BaseUsages.ofDisk(layerSize));
     }
 
-    // Replace the last path segment (reference) with the digest
     final var requestPath = request.getRequestURI();
     final var manifestsBasePath = requestPath.substring(0, requestPath.lastIndexOf('/') + 1);
     final var location =

@@ -4,6 +4,14 @@
   @if (!this.error) {
     @if (chart) {
       <div animate.enter="fade-in-up">
+        <app-security-scan-section
+          [repoType]="'HELM'"
+          [repoName]="activeRepo.repoName"
+          [artifactName]="chartName"
+          [artifactVersion]="versionName"
+          [canTriggerScan]="activeRepo.canWrite"
+        />
+
         <!-- Header -->
         <div class="mb-6 flex flex-wrap items-center gap-3">
           <div class="flex items-center gap-2">

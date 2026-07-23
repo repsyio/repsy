@@ -15,7 +15,7 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Highlight } from 'ngx-highlightjs';
 import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
@@ -26,7 +26,9 @@ import { RepoPermissionInfo, TagDetail } from '../../../../../../../generated/ap
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
 import { getRepoDomain } from '../../docker-repo-util';
 import { DockerService } from '../../service/docker.service';
 
@@ -35,10 +37,18 @@ type Classifiers = Record<string, [string]>;
 @Component({
   selector: 'app-docker-tag-detail',
   standalone: true,
-  imports: [CommonModule, CopyClipboardComponent, NgOptimizedImage, SpinnerComponent, HighlightLineNumbers, Highlight],
+  imports: [
+    CommonModule,
+    CopyClipboardComponent,
+    NgOptimizedImage,
+    SpinnerComponent,
+    HighlightLineNumbers,
+    Highlight,
+    SecurityScanSectionComponent,
+  ],
   templateUrl: './docker-images-tag-detail.component.html',
 })
-export class DockerImagesTagDetailComponent {
+export class DockerImagesTagDetailComponent implements OnDestroy {
   public loading = true;
   public imageName: string;
   public tagName: string;
@@ -58,6 +68,7 @@ export class DockerImagesTagDetailComponent {
     private readonly route: ActivatedRoute,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
+    private readonly breadcrumbSecurityLinkService: BreadcrumbSecurityLinkService,
   ) {
     this.classifiers = {};
     this.activeRepo = {} as RepoPermissionInfo;
@@ -70,6 +81,12 @@ export class DockerImagesTagDetailComponent {
         this.loadTag();
       }
     });
+    this.breadcrumbSecurityLinkService.show('DOCKER');
+  }
+
+  public ngOnDestroy(): void {
+    this.repositoryChanges$.unsubscribe();
+    this.breadcrumbSecurityLinkService.clear();
   }
 
   public loadTag(): void {

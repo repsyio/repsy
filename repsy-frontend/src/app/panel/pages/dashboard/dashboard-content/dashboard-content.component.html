@@ -15,15 +15,20 @@
 
 <!-- Cards Grid -->
 <div animate.enter="fade-in-down" class="space-y-[16px]">
-  <!-- Welcome Card + Total Disk Usage & Repository Card -->
+  <!-- Welcome Card + (Total Disk Usage & Security Overview stacked) & Repository Card -->
   <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
     <!-- Welcome Card -->
     <div class="xl:col-span-2">
       <app-welcome-card />
     </div>
 
-    <!-- Total Disk Usage & Repository Card - Side by Side -->
-    <app-total-disk [usage]="usage" />
+    <!-- Total Disk Usage & Security Overview Card - Stacked -->
+    <div class="flex flex-col gap-[25px]">
+      <app-total-disk [usage]="usage" />
+      <app-security-overview-card />
+    </div>
+
+    <!-- Repository Card -->
     <app-repository-card
       [mavenRepoCount]="mavenRepoCount"
       [npmRegistryCount]="npmRegistryCount"

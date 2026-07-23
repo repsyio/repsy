@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.ruby.ui.facades;
 
+import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.GemListItem;
 import io.repsy.os.generated.model.GemVersionInfo;
@@ -26,6 +27,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -38,6 +40,7 @@ public class RubyApiFacade implements ProtocolApiFacade {
 
   private final RubyGemServiceImpl gemService;
   private final RubyStorageService storageService;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Override
   public BaseUsages deleteRepo(final RepoInfo repoInfo) {
@@ -80,13 +83,32 @@ public class RubyApiFacade implements ProtocolApiFacade {
     final var gemId = this.gemService.getGemId(repoInfo.getStorageKey(), gemName);
 
     if (this.gemService.countNonYankedVersions(gemId) <= 1) {
-      return this.deleteGem(repoInfo, gemName);
+      final var result = this.deleteGem(repoInfo, gemName);
+
+      this.eventPublisher.publishEvent(
+          new ArtifactVersionDeletedEvent(
+              repoInfo.getStorageKey(),
+              repoInfo.getType().name(),
+              repoInfo.getName(),
+              gemName,
+              version));
+
+      return result;
     }
 
     final var freed =
         this.storageService.deleteGem(
             repoInfo.getStorageKey(), repoInfo.getName(), gemName, version, platform);
     this.gemService.deleteVersion(gemId, version, platform);
+
+    this.eventPublisher.publishEvent(
+        new ArtifactVersionDeletedEvent(
+            repoInfo.getStorageKey(),
+            repoInfo.getType().name(),
+            repoInfo.getName(),
+            gemName,
+            version));
+
     return BaseUsages.ofDisk(-1L * freed);
   }
 

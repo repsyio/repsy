@@ -24,6 +24,7 @@ import { environment } from '../../../../../../../environments/environment';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { NugetDeletedItem } from '../../dto/nuget-deleted-item';
@@ -34,7 +35,14 @@ import { NugetService } from '../../service/nuget.service';
 @Component({
   selector: 'app-nuget-packages-version-detail',
   standalone: true,
-  imports: [CommonModule, SpinnerComponent, CopyClipboardComponent, NgOptimizedImage, Highlight],
+  imports: [
+    CommonModule,
+    SpinnerComponent,
+    CopyClipboardComponent,
+    NgOptimizedImage,
+    Highlight,
+    SecurityScanSectionComponent,
+  ],
   templateUrl: './nuget-packages-version-detail.component.html',
 })
 export class NugetPackagesVersionDetailComponent implements OnDestroy {

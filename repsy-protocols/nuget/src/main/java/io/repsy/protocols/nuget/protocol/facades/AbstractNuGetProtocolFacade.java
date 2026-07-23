@@ -23,6 +23,7 @@ import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.checkVersi
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.copyStreamToFile;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.extractPackageId;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.extractPackageIdAndVersion;
+import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.normalizeNuGetVersion;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.readNuspecMetadata;
 import static io.repsy.protocols.nuget.shared.utils.NuGetServiceIndexResources.build;
 
@@ -66,6 +67,10 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
 
   public static final String USAGES = "usages";
   public static final String SUPPORTED_VERSION = "3.0.0";
+  private static final String ARTIFACT_NAME = "artifactName";
+  private static final String ARTIFACT_VERSION = "artifactVersion";
+  private static final String STORAGE_PATH = "storagePath";
+  private static final String NUPKG_STORAGE_PATH_FMT = "packages/%s/%s/%s.%s.nupkg";
   private static final List<String> REGISTRATION_INDEX_TYPES =
       List.of("catalog:CatalogRoot", "PackageRegistration", "catalog:Permalink");
 
@@ -97,7 +102,6 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
 
       checkVersionAllowance(metadata.version(), repoInfo);
 
-      // Fail fast before writing to storage — avoids orphan disk writes when override is denied
       if (!repoInfo.isAllowOverride()
           && this.packageService.versionExists(
               repoInfo, metadata.packageId(), metadata.version())) {
@@ -119,6 +123,19 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
           metadata.packageId(),
           metadata.version());
 
+      final var normalizedId = metadata.packageId().toLowerCase(Locale.ROOT);
+      final var normalizedVersion = normalizeNuGetVersion(metadata.version());
+
+      context.addProperty(ARTIFACT_NAME, metadata.packageId());
+      context.addProperty(ARTIFACT_VERSION, metadata.version());
+      context.addProperty(
+          STORAGE_PATH,
+          String.format(
+              NUPKG_STORAGE_PATH_FMT,
+              normalizedId,
+              normalizedVersion,
+              normalizedId,
+              normalizedVersion));
       context.addProperty(USAGES, usages);
     } finally {
       Files.deleteIfExists(tempFile);
@@ -131,7 +148,6 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var packageId = extractPackageId(context);
 
-    // Flat container spec: return ALL versions including unlisted
     return this.packageService.getAllVersionInfos(repoInfo, packageId).stream()
         .map(v -> v.version().toLowerCase(Locale.ROOT))
         .toList();
@@ -288,7 +304,6 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   }
 
   private String normalizeVersion(final String rawVersion) {
-    // path segment is "{version}.json" for leaf URLs — strip the extension
 
     return rawVersion.endsWith(FORMAT_JSON)
         ? rawVersion.substring(0, rawVersion.length() - FORMAT_JSON.length())

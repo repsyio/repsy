@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.pypi.ui.facades;
 
+import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.ReleaseDetail;
 import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPackageServiceImpl;
@@ -28,6 +29,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -37,6 +39,7 @@ public class PypiApiFacade implements ProtocolApiFacade {
 
   private final @NonNull PypiStorageService pypiStorageService;
   private final @NonNull PypiPackageServiceImpl pypiPackageService;
+  private final @NonNull ApplicationEventPublisher eventPublisher;
 
   public BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
 
@@ -74,6 +77,14 @@ public class PypiApiFacade implements ProtocolApiFacade {
     final var releaseVersion = ReleaseVersion.of(version);
 
     this.pypiPackageService.deleteRelease(packageInfo.getId(), releaseVersion.getVersion());
+
+    this.eventPublisher.publishEvent(
+        new ArtifactVersionDeletedEvent(
+            repoInfo.getStorageKey(),
+            repoInfo.getType().name(),
+            repoInfo.getName(),
+            packageInfo.getNormalizedName(),
+            releaseVersion.getVersion()));
 
     final var isHasNoReleases = this.pypiPackageService.isPackageHasNoReleases(packageInfo.getId());
 

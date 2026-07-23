@@ -18,7 +18,6 @@ package io.repsy.os.server.protocols.docker.shared.image.mappers;
 import io.repsy.os.server.protocols.docker.shared.image.dtos.ImageInfo;
 import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import org.jspecify.annotations.NullMarked;
 import org.mapstruct.Mapper;
@@ -29,8 +28,12 @@ import org.mapstruct.Mappings;
 @NullMarked
 public interface ImageConverter {
 
-  default Instant map(final LocalDateTime localDateTime) {
-    return localDateTime.toInstant(ZoneOffset.UTC);
+  default Instant resolveUpdatedAt(
+      final io.repsy.os.server.protocols.docker.shared.image.dtos.ImageListItem source) {
+    final var lastTagPushedAt = source.getUpdatedAt();
+    return lastTagPushedAt == null
+        ? source.getLastUpdatedAt()
+        : lastTagPushedAt.toInstant(ZoneOffset.UTC);
   }
 
   @Mappings({
@@ -39,7 +42,7 @@ public interface ImageConverter {
   })
   ImageInfo toImageInfo(Image image);
 
-  @Mapping(target = "updatedAt", source = "updatedAt")
+  @Mapping(target = "updatedAt", expression = "java(resolveUpdatedAt(source))")
   io.repsy.os.generated.model.ImageListItem toDto(
       io.repsy.os.server.protocols.docker.shared.image.dtos.ImageListItem source);
 }

@@ -54,16 +54,19 @@ export class VisibilityComponent {
       form = Object.assign(new MavenRepoSettingsForm(), this.parentForm.value);
       (form as MavenRepoSettingsForm).privateRepo = this.parentForm.get('privateRepository').value;
       (form as MavenRepoSettingsForm).allowOverride = this.parentForm.get('allowOverride').value;
+      (form as MavenRepoSettingsForm).securityScanEnabled = this.parentForm.get('securityScanEnabled').value;
     } else if (this.repoType === RepoType.NUGET) {
       form = new RepoSettingsForm();
       form.privateRepo = this.parentForm.get('privateRepository').value;
       form.allowOverride = this.parentForm.get('allowOverride').value;
       form.releases = this.parentForm.get('releases').value;
       form.snapshots = this.parentForm.get('snapshots').value;
+      form.securityScanEnabled = this.parentForm.get('securityScanEnabled').value;
     } else {
       form = new RepoSettingsForm();
       form.privateRepo = this.parentForm.get('privateRepository').value;
       form.allowOverride = this.parentForm.get('allowOverride').value;
+      form.securityScanEnabled = this.parentForm.get('securityScanEnabled').value;
     }
 
     this.protocolRepoControllerService.updateSettings(this.repoName, form).subscribe({

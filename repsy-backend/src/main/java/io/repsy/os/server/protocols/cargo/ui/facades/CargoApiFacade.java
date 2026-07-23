@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.cargo.ui.facades;
 
+import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.CrateListItem;
 import io.repsy.os.generated.model.CrateVersionListItem;
@@ -35,6 +36,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -54,6 +56,7 @@ public class CargoApiFacade implements ProtocolApiFacade {
   private final CargoCrateConverter cargoCrateConverter;
   private final CargoStorageService cargoStorageService;
   private final ObjectMapper objectMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public BaseUsages deleteRepo(final RepoInfo repoInfo) throws IOException {
@@ -128,6 +131,14 @@ public class CargoApiFacade implements ProtocolApiFacade {
     final var normalizedName = CrateUtils.normalizeCrateName(name);
 
     this.cargoCrateService.deleteCrateVersion(repoInfo, normalizedName, vers);
+
+    this.eventPublisher.publishEvent(
+        new ArtifactVersionDeletedEvent(
+            repoInfo.getStorageKey(),
+            repoInfo.getType().name(),
+            repoInfo.getName(),
+            normalizedName,
+            vers));
 
     final var remainingEntries = this.cargoCrateService.getIndexEntries(repoInfo, normalizedName);
 

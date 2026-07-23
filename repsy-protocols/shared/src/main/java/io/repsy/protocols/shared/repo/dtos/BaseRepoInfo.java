@@ -39,5 +39,6 @@ public class BaseRepoInfo<ID> {
   private @Nullable Boolean releases;
   private boolean allowOverride;
   private boolean searchable;
+  private boolean securityScanEnabled;
   private RepoType type;
 }

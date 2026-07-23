@@ -14,18 +14,20 @@
 /// limitations under the License.
 ///
 
-import { NgOptimizedImage } from '@angular/common';
+import { AsyncPipe, NgOptimizedImage } from '@angular/common';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { NavigationEnd, Router, RouterModule } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Observable, Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
+import { SecurityDetailsLinkComponent } from '../../../shared/components/security-details-link/security-details-link.component';
+import { BreadcrumbSecurityLinkService } from '../../../shared/service/breadcrumb-security-link.service';
 import { RepoLookupService } from '../repo-entry/repo-lookup.service';
 
 @Component({
   selector: 'app-repository-breadcrumb',
   standalone: true,
-  imports: [RouterModule, NgOptimizedImage],
+  imports: [RouterModule, NgOptimizedImage, AsyncPipe, SecurityDetailsLinkComponent],
   templateUrl: './repository-breadcrumb.component.html',
 })
 export class RepositoryBreadcrumbComponent implements OnInit, OnDestroy {
@@ -33,12 +35,16 @@ export class RepositoryBreadcrumbComponent implements OnInit, OnDestroy {
   public crumbLinks: string[] = [];
   public crumbQueryParams: (Record<string, string> | null)[] = [];
   public repoIcon = '';
+  public readonly securityLinkRepoType$: Observable<string | null>;
   private routerSubscription: Subscription | null = null;
 
   constructor(
     private readonly router: Router,
     private readonly repoLookupService: RepoLookupService,
-  ) {}
+    breadcrumbSecurityLinkService: BreadcrumbSecurityLinkService,
+  ) {
+    this.securityLinkRepoType$ = breadcrumbSecurityLinkService.repoType$;
+  }
 
   public ngOnInit(): void {
     this.updateBreadcrumbs();

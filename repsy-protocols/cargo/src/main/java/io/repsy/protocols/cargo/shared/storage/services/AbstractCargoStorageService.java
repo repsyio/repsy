@@ -61,7 +61,6 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
       crateUsages = this.storageStrategy.write(repoName, crateStoragePath, bis);
     }
 
-    // Append Mode for Index file
     final var indexPath = this.getIndexPath(crateName);
     final var indexStoragePath = StoragePath.of(repoId, indexPath.toString());
 
@@ -151,6 +150,13 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
   public void createRepo(final UUID repoId) {
 
     this.storageStrategy.createDirectory(repoId.toString());
+  }
+
+  @Override
+  public String getCrateRelativePath(final String crateName, final String versionName) {
+
+    final var crateFileName = String.format(CRATES_FILE_NAME_FMT, crateName, versionName);
+    return Paths.get(CRATES_PATH, crateName, crateFileName).toString();
   }
 
   @Override

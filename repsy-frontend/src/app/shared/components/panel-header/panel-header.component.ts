@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 
-import { NgOptimizedImage } from '@angular/common';
+import { NgOptimizedImage, ViewportScroller } from '@angular/common';
 import { Component, EventEmitter, HostListener, Output } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
@@ -39,8 +39,17 @@ export class PanelHeaderComponent {
   constructor(
     private readonly authService: AuthService,
     private readonly router: Router,
+    viewportScroller: ViewportScroller,
   ) {
     this.username = this.authService.username;
+
+
+
+
+
+
+
+    viewportScroller.setOffset(() => [0, document.querySelector('header')?.getBoundingClientRect().height ?? 0]);
   }
 
   docDropdown = false;

@@ -51,7 +51,6 @@ out/
 **/node_modules/
 
 .env
-docker-compose.yml
 
 # Since we use pnpm by default
 package-lock.json

@@ -36,6 +36,7 @@ import { RepoInfoComponent } from './repo-info/repo-info.component';
 import { RepoStorageComponent } from './repo-storage/repo-storage.component';
 import { SignatureComponent } from './signature/signature.component';
 import { VisibilityComponent } from './visibility/visibility.component';
+import { VulnerabilityScanningComponent } from './vulnerability-scanning/vulnerability-scanning.component';
 
 @Component({
   selector: 'app-repository-settings',
@@ -53,6 +54,7 @@ import { VisibilityComponent } from './visibility/visibility.component';
     VersionAllowanceComponent,
     RepoStorageComponent,
     PackageOverrideComponent,
+    VulnerabilityScanningComponent,
     SignatureComponent,
     DeployTokenComponent,
   ],
@@ -79,6 +81,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
     this.generalSettingsForm = new FormGroup({
       privateRepository: new FormControl(false, [Validators.required]),
       allowOverride: new FormControl(true, [Validators.required]),
+      securityScanEnabled: new FormControl(true, [Validators.required]),
     });
 
     this.mavenSettingsForm = new FormGroup({
@@ -86,6 +89,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
       releases: new FormControl(false, [Validators.required]),
       snapshots: new FormControl(false, [Validators.required]),
       allowOverride: new FormControl(true, [Validators.required]),
+      securityScanEnabled: new FormControl(true, [Validators.required]),
     });
   }
 

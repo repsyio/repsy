@@ -1,5 +1,6 @@
 @if (crumbs.length > 0) {
-  <nav class="mb-4 text-[14px]">
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
+    <nav class="text-[14px]">
     <ol class="flex flex-wrap items-center p-0">
       @for (crumbLink of crumbLinks; track crumbLink; let i = $index; let last = $last) {
         <li class="flex items-center">
@@ -48,5 +49,10 @@
         </li>
       }
     </ol>
-  </nav>
+    </nav>
+
+    @if (securityLinkRepoType$ | async; as securityLinkRepoType) {
+      <app-security-details-link [repoType]="securityLinkRepoType" />
+    }
+  </div>
 }

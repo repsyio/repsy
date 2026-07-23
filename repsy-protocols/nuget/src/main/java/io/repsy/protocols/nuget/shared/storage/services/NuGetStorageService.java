@@ -40,4 +40,6 @@ public interface NuGetStorageService {
   long deletePackage(UUID repoId, String packageId) throws IOException;
 
   long deleteRepo(UUID repoId);
+
+  String getNupkgRelativePath(String packageId, String version);
 }

@@ -50,5 +50,8 @@ public interface RepoRepository extends JpaRepository<Repo, UUID> {
   @Query("select sum(r.diskUsage) from Repo r")
   Long getTotalDiskUsage();
 
+  @Query("select r.name from Repo r")
+  @NonNull List<String> findAllRepoNames();
+
   long countAllByType(@NonNull RepoType type);
 }

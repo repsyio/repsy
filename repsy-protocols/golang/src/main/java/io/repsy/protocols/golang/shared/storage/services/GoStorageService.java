@@ -48,4 +48,6 @@ public interface GoStorageService<ID> {
   void deleteVersionFiles(StoragePath atVVersionBasePath, String repoName);
 
   long deleteRepo(UUID repoUuid);
+
+  String getModuleZipRelativePath(String modulePath, String version);
 }

@@ -44,10 +44,11 @@
       <div class="text-body1">
         <!-- Desktop grid -->
         <div
-          class="hidden grid-cols-[2fr_1fr_2fr_1fr_30px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[2fr_1fr_1fr_2fr_1fr_30px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Name</div>
+          <div>Security</div>
           <div>Latest Version</div>
           <div>Description</div>
           <div>Updated</div>
@@ -59,7 +60,7 @@
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === charts.length - 1 }"
-                class="grid grid-cols-[2fr_1fr_2fr_1fr_30px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="grid grid-cols-[2fr_1fr_1fr_2fr_1fr_30px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
                 <div class="flex items-center gap-2">
                   <img class="h-[18px] w-[18px]" src="/assets/icons/helm/helm.svg" alt="Helm" />
@@ -69,6 +70,13 @@
                     [textHover]="chart.name"
                   />
                 </div>
+                <app-package-security-badge
+                  repoType="helm"
+                  [repoName]="activeRepo.repoName"
+                  [artifactName]="chart.name"
+                  [packageRoute]="packageRoute(chart)"
+                  [severity]="securitySummary[chart.name]?.severity ?? null"
+                />
                 <a
                   class="group text-secondary-500 flex w-max gap-2 text-[14px]"
                   [routerLink]="'/' + activeRepo.repoName + '/' + chart.name + '/' + chart.latestVersion"
@@ -153,6 +161,16 @@
                 @if (chart.description) {
                   <span class="text-sm text-[#9FA0A0] break-all">{{ chart.description | ellipsis: 60 }}</span>
                 }
+                <div class="flex justify-between gap-2">
+                  <span class="text-sm text-[#9FA0A0]">Security:</span>
+                  <app-package-security-badge
+                    repoType="helm"
+                    [repoName]="activeRepo.repoName"
+                    [artifactName]="chart.name"
+                    [packageRoute]="packageRoute(chart)"
+                    [severity]="securitySummary[chart.name]?.severity ?? null"
+                  />
+                </div>
                 <div class="flex justify-between gap-2">
                   <span class="text-sm text-[#9FA0A0]">Latest:</span>
                   <a

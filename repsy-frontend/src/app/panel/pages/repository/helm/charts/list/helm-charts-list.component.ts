@@ -21,13 +21,14 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { HelmChartListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { HelmChartListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../../../../shared/components/ellipsis/ellipsis.pipe';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { PackageSecurityBadgeComponent } from '../../../../../shared/components/package-security-badge/package-security-badge.component';
 import { PaginationComponent } from '../../../../../shared/components/pagination/pagination.component';
 import { SearchboxComponent } from '../../../../../shared/components/searchbox/searchbox.component';
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
@@ -35,6 +36,7 @@ import { ToastService } from '../../../../../shared/components/toast/toast.servi
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
+import { SecurityService } from '../../../../security/service/security.service';
 import { HelmConfigComponent } from '../../config/helm-config.component';
 import { HelmService } from '../../service/helm.service';
 
@@ -54,6 +56,7 @@ import { HelmService } from '../../service/helm.service';
     EllipsisPipe,
     EmptyListComponent,
     NgOptimizedImage,
+    PackageSecurityBadgeComponent,
   ],
   templateUrl: './helm-charts-list.component.html',
 })
@@ -67,6 +70,7 @@ export class HelmChartsListComponent implements OnDestroy {
   public charts: HelmChartListItem[] = [];
   public pagedData = new PagedData<HelmChartListItem>();
   public activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
+  public securitySummary: Record<string, VersionSecuritySummary> = {};
 
   public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
   public sortOptions: Sort[] = [
@@ -85,6 +89,7 @@ export class HelmChartsListComponent implements OnDestroy {
     private readonly helmService: HelmService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
+    private readonly securityService: SecurityService,
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
@@ -92,6 +97,7 @@ export class HelmChartsListComponent implements OnDestroy {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.fetchCharts();
+        this.fetchSecuritySummary();
       }
     });
   }
@@ -164,5 +170,18 @@ export class HelmChartsListComponent implements OnDestroy {
           this.toastService.show(err, 'error');
         },
       });
+  }
+
+  public packageRoute(chart: HelmChartListItem): string {
+    return `/${this.activeRepo.repoName}/${chart.name}`;
+  }
+
+  private fetchSecuritySummary(): void {
+    this.securityService.getArtifactSecuritySummary(this.activeRepo.repoName).subscribe({
+      next: (summary) => {
+        this.securitySummary = summary;
+      },
+      error: () => {},
+    });
   }
 }

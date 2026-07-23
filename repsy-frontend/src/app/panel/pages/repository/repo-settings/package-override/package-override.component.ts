@@ -58,6 +58,7 @@ export class PackageOverrideComponent implements OnInit {
       mavenForm.privateRepo = this.parentForm.get('privateRepository')?.value;
       mavenForm.snapshots = this.parentForm.get('snapshots')?.value;
       mavenForm.releases = this.parentForm.get('releases')?.value;
+      mavenForm.securityScanEnabled = this.parentForm.get('securityScanEnabled')?.value;
       form = mavenForm;
     } else if (this.repoType === RepoType.NUGET) {
       const nugetForm = new RepoSettingsForm();
@@ -65,11 +66,13 @@ export class PackageOverrideComponent implements OnInit {
       nugetForm.privateRepo = this.parentForm.get('privateRepository')?.value;
       nugetForm.releases = this.parentForm.get('releases')?.value;
       nugetForm.snapshots = this.parentForm.get('snapshots')?.value;
+      nugetForm.securityScanEnabled = this.parentForm.get('securityScanEnabled')?.value;
       form = nugetForm;
     } else {
       const generalForm = new RepoSettingsForm();
       generalForm.allowOverride = this.allowOverride;
       generalForm.privateRepo = this.parentForm.get('privateRepository')?.value;
+      generalForm.securityScanEnabled = this.parentForm.get('securityScanEnabled')?.value;
       form = generalForm;
     }
 

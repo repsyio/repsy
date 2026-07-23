@@ -44,7 +44,7 @@ public interface HelmStorageService<ID> {
 
   void clearTrash();
 
-  // OCI blob methods
+  String getChartRelativePath(String name, String version);
 
   void saveBlobChunk(UUID repoUuid, UUID uploadId, InputStream chunk, String repoName);
 
@@ -55,8 +55,6 @@ public interface HelmStorageService<ID> {
   Optional<Resource> getBlob(UUID repoUuid, String digest, String repoName);
 
   boolean blobExists(UUID repoUuid, String digest, String repoName);
-
-  // OCI manifest methods
 
   void saveManifest(UUID repoUuid, String name, String reference, byte[] content, String repoName);
 

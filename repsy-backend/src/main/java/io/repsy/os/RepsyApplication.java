@@ -26,6 +26,8 @@ import io.repsy.os.server.protocols.npm.shared.storage.configs.NpmFileSystemStor
 import io.repsy.os.server.protocols.nuget.shared.storage.configs.NuGetFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.pypi.shared.storage.configs.PypiFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.ruby.shared.storage.configs.RubyFileSystemStorageBackendConfigProps;
+import io.repsy.os.server.security.scanner.trivy.DockerRegistryProperties;
+import io.repsy.os.server.security.scanner.trivy.TrivyScannerProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
@@ -45,6 +47,8 @@ import org.springframework.scheduling.annotation.EnableAsync;
   HelmFileSystemStorageBackendConfigProps.class,
   NuGetFileSystemStorageBackendConfigProps.class,
   RubyFileSystemStorageBackendConfigProps.class,
+  TrivyScannerProperties.class,
+  DockerRegistryProperties.class,
 })
 @EnableAsync
 @SpringBootApplication(

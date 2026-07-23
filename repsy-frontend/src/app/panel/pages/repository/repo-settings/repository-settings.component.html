@@ -26,6 +26,15 @@
       </div>
 
       <div>
+        <app-vulnerability-scanning
+          [parentForm]="repoType === 'maven' || repoType === 'nuget' ? mavenSettingsForm : generalSettingsForm"
+          [repoType]="repoType"
+          [repoName]="activeRepository?.repoName"
+          (fetch)="getRepoSettings()"
+        />
+      </div>
+
+      <div>
         @if (repoType === 'maven' || repoType === 'nuget') {
           <app-maven-version-allowence
             [parentForm]="mavenSettingsForm"

@@ -25,19 +25,21 @@ import { GoModuleVersionListItem, RepoPermissionInfo } from '../../../../../../.
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { GolangService } from '../../service/golang.service';
 
 @Component({
   selector: 'app-golang-module-version-detail',
   standalone: true,
-  imports: [CommonModule, CopyClipboardComponent, NgOptimizedImage, SpinnerComponent],
+  imports: [CommonModule, CopyClipboardComponent, NgOptimizedImage, SpinnerComponent, SecurityScanSectionComponent],
   templateUrl: './golang-module-version-detail.component.html',
 })
 export class GolangModuleVersionDetailComponent implements OnDestroy {
   public loading = true;
   public error: string;
   public modulePath: string;
+  public canonicalModulePath: string;
   public versionName: string;
   public versionInfo: GoModuleVersionListItem;
   public getCommand: string;
@@ -135,6 +137,10 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
             return;
           }
           this.versionInfo = found;
+
+
+
+          this.canonicalModulePath = info.modulePath ?? this.modulePath;
         },
         error: () => {},
       });
@@ -142,5 +148,9 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
 
   public get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
+  }
+
+  public get securityArtifactName(): string {
+    return this.canonicalModulePath ?? this.modulePath;
   }
 }

@@ -64,6 +64,7 @@ public class RepoTxService {
     repo.setAllowOverride(true);
     repo.setSnapshots(true);
     repo.setReleases(true);
+    repo.setSecurityScanEnabled(true);
     repo.setType(repoType);
 
     this.repoRepository.save(repo);
@@ -99,6 +100,7 @@ public class RepoTxService {
     repo.setAllowOverride(Boolean.TRUE.equals(settings.getAllowOverride()));
     repo.setReleases(settings.getReleases());
     repo.setSnapshots(settings.getSnapshots());
+    repo.setSecurityScanEnabled(Boolean.TRUE.equals(settings.getSecurityScanEnabled()));
     this.repoRepository.save(repo);
   }
 
@@ -139,6 +141,7 @@ public class RepoTxService {
         .snapshots(repoInfo.getSnapshots())
         .searchable(repoInfo.isSearchable())
         .allowOverride(repoInfo.isAllowOverride())
+        .securityScanEnabled(repoInfo.isSecurityScanEnabled())
         .build();
   }
 
@@ -150,6 +153,10 @@ public class RepoTxService {
 
   public long getRepoCount(final @NonNull RepoType repoType) {
     return this.repoRepository.countAllByType(repoType);
+  }
+
+  public @NonNull List<String> getAllRepoNames() {
+    return this.repoRepository.findAllRepoNames();
   }
 
   public void updateDiskUsage(final @NonNull UUID repoId, final long diskUsageDiff) {
