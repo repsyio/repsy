@@ -35,9 +35,7 @@ export class UserService {
   }
 
   public listUsers(search?: string, page?: number, size?: number): Observable<PagedModelUserResponse> {
-    return this.userControllerService
-      .listUsers(this.authorizationHeader, search, page, size)
-      .pipe(map((r) => r.data!));
+    return this.userControllerService.listUsers(this.authorizationHeader, search, page, size).pipe(map((r) => r.data!));
   }
 
   public createUser(form: UserCreateForm): Observable<UserResponse> {

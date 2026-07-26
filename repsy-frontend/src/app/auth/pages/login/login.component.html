@@ -11,31 +11,6 @@
       <h3 class="text-body1 text-neutral-200">Sign in to your account</h3>
       <!-- Form -->
       <form [formGroup]="form" class="mt-[72px] w-full" (submit)="form.valid && login()">
-        <!-- Username or Email -->
-        <div>
-          <label class="text-body1 mb-2 inline-block text-neutral-200" for="username">Username</label>
-          <input
-            type="text"
-            id="username"
-            name="username"
-            formControlName="username"
-            placeholder="username"
-            class="input-text-brand w-full"
-          />
-
-          <div class="text-body2 text-error min-h-7 pt-1">
-            @if (form.get('username').errors?.['required'] && form.get('username').touched) {
-              <p animate.enter="fade-in-up">• Should not be empty</p>
-            } @else if (form.get('username').errors?.['pattern'] && form.get('username').touched) {
-              <p animate.enter="fade-in-up">• Should not contain invalid characters</p>
-            } @else if (form.get('username').errors?.['minlength'] && form.get('username').touched) {
-              <p animate.enter="fade-in-up">• Should be minimum 3 characters</p>
-            } @else if (form.get('username').errors?.['maxlength'] && form.get('username').touched) {
-              <p animate.enter="fade-in-up">• Should be maximum 150 characters</p>
-            }
-          </div>
-        </div>
-
         <!-- Password -->
         <div>
           <label class="text-body1 mb-2 inline-block text-neutral-200" for="password">Password</label>

@@ -44,8 +44,6 @@ export class SecurityOverviewCardComponent implements OnInit {
           const severities = Object.values(summary);
           this.totalRepoCount = severities.length;
 
-
-
           this.criticalOrHighCount = severities.filter(
             (severity) => severity === Severity.Critical || severity === Severity.High,
           ).length;

@@ -99,9 +99,6 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     private readonly securityScanSupportService: SecurityScanSupportService,
     private readonly viewportScroller: ViewportScroller,
   ) {
-
-
-
     this.fragmentChanges$ = this.route.fragment.subscribe((fragment) => {
       if (fragment === SECURITY_FRAGMENT) {
         this.expanded = true;
@@ -111,14 +108,6 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
 
   public ngOnInit(): void {
     this.isSupported$ = this.securityScanSupportService.isSupported(this.repoType);
-
-
-
-
-
-
-
-
 
     this.isSupportedSub = this.isSupported$.subscribe((isSupported) => {
       if (isSupported && this.route.snapshot.fragment === SECURITY_FRAGMENT) {
@@ -152,7 +141,6 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     this.expanded = !this.expanded;
   }
 
-
   public get worstSeverity(): Severity | null {
     if (!this.overview) {
       return null;
@@ -174,7 +162,6 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     }
     return null;
   }
-
 
   public get selectedScanSeverityCounts(): {
     criticalCount: number;
@@ -255,7 +242,6 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     return this.overview?.status !== ScanStatus.Pending && this.overview?.status !== ScanStatus.Running;
   }
 
-
   private refresh(): void {
     this.loading = true;
     this.overview = null;
@@ -263,7 +249,12 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     this.stopPolling();
 
     this.vulnerabilityScanControllerService
-      .listVulnerabilityScans(this.artifactName, this.artifactVersion, { page: this.pageNum, size: PAGE_SIZE }, this.repoName)
+      .listVulnerabilityScans(
+        this.artifactName,
+        this.artifactVersion,
+        { page: this.pageNum, size: PAGE_SIZE },
+        this.repoName,
+      )
       .pipe(
         finalize(() => {
           this.loading = false;
@@ -287,7 +278,12 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     this.loading = true;
 
     this.vulnerabilityScanControllerService
-      .listVulnerabilityScans(this.artifactName, this.artifactVersion, { page: this.pageNum, size: PAGE_SIZE }, this.repoName)
+      .listVulnerabilityScans(
+        this.artifactName,
+        this.artifactVersion,
+        { page: this.pageNum, size: PAGE_SIZE },
+        this.repoName,
+      )
       .pipe(
         finalize(() => {
           this.loading = false;
@@ -356,11 +352,9 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
       });
   }
 
-
   private countBySeverity(severity: Severity): number {
     return this.findings.filter((finding) => finding.severity === severity).length;
   }
-
 
   private applyRefreshedScan(detail: VulnerabilityScanDetail): void {
     this.patchScanInHistory(detail);
@@ -403,7 +397,6 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     }
   }
 
-
   private refreshOnTerminalScan(scanId: string, isSelectedScan: boolean, isOverviewScan: boolean): void {
     if (isSelectedScan) {
       this.findingsPageNum = 0;
@@ -426,7 +419,6 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
       });
   }
 
-
   private syncPolling(): void {
     const scanId = this.overview?.scanId;
     const isActive = this.overview?.status === ScanStatus.Pending || this.overview?.status === ScanStatus.Running;
@@ -436,7 +428,10 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     }
 
     this.pollingSub = pollUntilTerminal(
-      () => this.vulnerabilityScanControllerService.getVulnerabilityScan(scanId, this.repoName).pipe(map((response) => response.data!)),
+      () =>
+        this.vulnerabilityScanControllerService
+          .getVulnerabilityScan(scanId, this.repoName)
+          .pipe(map((response) => response.data!)),
       (detail) => TERMINAL_STATUSES.includes(detail.status!),
       POLL_INTERVAL_MS,
     ).subscribe((detail) => this.applyRefreshedScan(detail));

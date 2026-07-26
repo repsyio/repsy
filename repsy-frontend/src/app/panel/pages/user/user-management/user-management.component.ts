@@ -76,12 +76,10 @@ export class UserManagementComponent implements OnInit {
   }
 
   public fetchUsers(): void {
-    this.userService
-      .listUsers(this.searchQuery || undefined, this.pageNum, this.pageSize)
-      .subscribe((pagedModel) => {
-        this.pagedData = pagedModel;
-        this.users = pagedModel.content ?? [];
-      });
+    this.userService.listUsers(this.searchQuery || undefined, this.pageNum, this.pageSize).subscribe((pagedModel) => {
+      this.pagedData = pagedModel;
+      this.users = pagedModel.content ?? [];
+    });
   }
 
   public loadPage(pageNum: number): void {

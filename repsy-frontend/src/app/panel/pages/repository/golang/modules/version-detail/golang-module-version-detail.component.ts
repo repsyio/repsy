@@ -138,8 +138,6 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
           }
           this.versionInfo = found;
 
-
-
           this.canonicalModulePath = info.modulePath ?? this.modulePath;
         },
         error: () => {},

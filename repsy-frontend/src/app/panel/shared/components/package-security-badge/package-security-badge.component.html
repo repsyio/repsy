@@ -1,10 +1,6 @@
 @if (severity && (isSupported$ | async)) {
   <button type="button" (click)="openModal($event)" class="cursor-pointer">
-    <app-severity-badge
-      [severity]="severity"
-      [compact]="true"
-      [attr.aria-label]="artifactName + ' security status'"
-    />
+    <app-severity-badge [severity]="severity" [compact]="true" [attr.aria-label]="artifactName + ' security status'" />
   </button>
 
   <app-package-security-modal

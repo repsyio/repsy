@@ -21,6 +21,7 @@ import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.LoginForm;
 import io.repsy.os.generated.model.LoginInfo;
 import io.repsy.os.generated.model.RefreshTokenForm;
+import io.repsy.os.panel.auth.dtos.AdminLoginForm;
 import io.repsy.os.panel.auth.services.AuthUserService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.utils.MultiPortNames;
@@ -46,6 +47,15 @@ class AuthController {
   public @NonNull RestResponse<LoginInfo> login(@RequestBody @Valid final @NonNull LoginForm form) {
 
     final var loginInfo = this.authUserService.login(form);
+
+    return this.resp.success("loginSucceeded", loginInfo);
+  }
+
+  @PostMapping("/admin/login")
+  public @NonNull RestResponse<LoginInfo> adminLogin(
+      @RequestBody @Valid final @NonNull AdminLoginForm form) {
+
+    final var loginInfo = this.authUserService.adminLogin(form);
 
     return this.resp.success("loginSucceeded", loginInfo);
   }

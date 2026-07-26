@@ -48,6 +48,6 @@ export class ErrorInterceptor implements HttpInterceptor {
     this._error = error;
     console.error('Unauthorized access - redirecting to login');
     localStorage.clear();
-    this.router.navigate(['/login']).then(() => window.location.reload());
+    this.router.navigate(['/admin/login']).then(() => window.location.reload());
   }
 }

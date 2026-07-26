@@ -18,13 +18,13 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { map } from 'rxjs';
 
-import { ProfileService } from '../../panel/pages/profile/service/profile.service';
+import { CurrentUserService } from '../../shared/services/current-user.service';
 
 export const adminGuard: CanActivateFn = () => {
-  const profileFacadeService = inject(ProfileService);
+  const currentUserService = inject(CurrentUserService);
   const router = inject(Router);
 
-  return profileFacadeService.get().pipe(
+  return currentUserService.get().pipe(
     map((profile) => {
       if (profile.role === 'ADMIN') {
         return true;

@@ -18,4 +18,5 @@ export const environment = {
   apiBaseUrl: 'http://localhost:7979',
   repoBaseUrl: 'http://localhost:9090',
   docsBase: 'https://docs.repsy.io',
+  gitnodeUrl: 'http://localhost:4200',
 };

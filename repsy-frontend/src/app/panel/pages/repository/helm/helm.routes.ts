@@ -29,8 +29,7 @@ export const HELM_ROUTES: Routes = [
       {
         path: '',
         pathMatch: 'full',
-        component:
-        HelmChartsListComponent,
+        component: HelmChartsListComponent,
         title: 'repsy | Helm Charts',
       },
       {

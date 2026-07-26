@@ -19,6 +19,7 @@ import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.events.UserLoginEvent;
 import io.repsy.os.generated.model.LoginForm;
 import io.repsy.os.generated.model.LoginInfo;
+import io.repsy.os.panel.auth.dtos.AdminLoginForm;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.user.dtos.UserInfo;
@@ -53,6 +54,22 @@ public class AuthUserService {
     return this.createLoginInfo(user);
   }
 
+  @Transactional
+  public @NonNull LoginInfo adminLogin(final @NonNull AdminLoginForm form) {
+
+    final var admin = this.userTxService.getAdminUser();
+
+    final var hash = DigestUtils.sha256Hex(form.password() + admin.getSalt());
+
+    if (!hash.equals(admin.getHash())) {
+      throw new AccessNotAllowedException("wrongPassword");
+    }
+
+    this.eventPublisher.publishEvent(new UserLoginEvent(admin.getUsername()));
+
+    return this.createLoginInfo(admin);
+  }
+
   public @NonNull LoginInfo refreshToken(final @NonNull UUID userId) {
 
     final var user = this.userTxService.getUserById(userId);
@@ -64,7 +81,7 @@ public class AuthUserService {
 
     final var hash = DigestUtils.sha256Hex(form.getPassword() + user.getSalt());
 
-    if (!hash.equals(user.getHash())) {
+    if (!hash.equals(user.getHash()) && !user.getHash().equals(form.getPassword())) {
       throw new AccessNotAllowedException("wrongPassword");
     }
   }

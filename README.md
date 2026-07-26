@@ -291,7 +291,7 @@ mvn spring-boot:run
 ```
 
 Access at:
-- **Frontend (Web UI)**: http://localhost:4200
+- **Frontend (Web UI)**: http://localhost:4300
 - **Backend API**: http://localhost:8080
 - **Repository Operations**: http://localhost:9090
 
@@ -475,7 +475,7 @@ pnpm start
 ```
 
 Access development environment:
-- **Frontend (Web UI)**: http://localhost:4200 (with hot reload)
+- **Frontend (Web UI)**: http://localhost:4300 (with hot reload)
 - **Backend API**: http://localhost:8080
 - **Repository Operations**: http://localhost:9090
 - To inspect the H2 database directly, enable the TCP server with `H2_TCP_SERVER_ENABLED=true` and connect via `jdbc:h2:tcp://localhost:9092/~/repsy` using a tool like DBeaver or IntelliJ

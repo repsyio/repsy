@@ -35,7 +35,14 @@ import { MavenService } from '../../service/maven.service';
 @Component({
   selector: 'app-maven-artifacts-version-detail',
   standalone: true,
-  imports: [CopyClipboardComponent, NgOptimizedImage, SpinnerComponent, HighlightLineNumbers, Highlight, SecurityScanSectionComponent],
+  imports: [
+    CopyClipboardComponent,
+    NgOptimizedImage,
+    SpinnerComponent,
+    HighlightLineNumbers,
+    Highlight,
+    SecurityScanSectionComponent,
+  ],
   templateUrl: './maven-artifacts-version-detail.component.html',
 })
 export class MavenArtifactsVersionDetailComponent implements OnDestroy {

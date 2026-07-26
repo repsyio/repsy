@@ -15,7 +15,7 @@
 ///
 
 import { Injectable } from '@angular/core';
-import { map,Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 
 import {
   PagedModelVulnerabilityScanInfo,
@@ -71,15 +71,11 @@ export class SecurityService {
   }
 
   public getArtifactSecuritySummary(repoName: string): Observable<Record<string, VersionSecuritySummary>> {
-    return this.vulnerabilityScanControllerService
-      .getArtifactSecuritySummary(repoName)
-      .pipe(map((r) => r.data ?? {}));
+    return this.vulnerabilityScanControllerService.getArtifactSecuritySummary(repoName).pipe(map((r) => r.data ?? {}));
   }
 
   public getRepoSecurityDetail(repoName: string): Observable<RepoSecurityDetail> {
-    return this.vulnerabilityScanControllerService
-      .getRepoSecurityDetail(repoName)
-      .pipe(map((r) => r.data!));
+    return this.vulnerabilityScanControllerService.getRepoSecurityDetail(repoName).pipe(map((r) => r.data!));
   }
 
   public getArtifactSecurityDetail(repoName: string, artifactName: string): Observable<RepoSecurityDetail> {

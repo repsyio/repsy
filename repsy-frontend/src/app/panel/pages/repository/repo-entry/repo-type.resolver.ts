@@ -37,12 +37,10 @@ export const repoTypeResolver: ResolveFn<RepoRouteData | null> = (route) => {
   }
 
   return repoLookupService.getRepoType(repoName).pipe(
-    map(
-      (repoType): RepoRouteData => ({
-        repoName,
-        repoType,
-      }),
-    ),
+    map((repoType): RepoRouteData => ({
+      repoName,
+      repoType,
+    })),
     catchError(() => {
       router.navigate(['/not-found']);
       return of(null);

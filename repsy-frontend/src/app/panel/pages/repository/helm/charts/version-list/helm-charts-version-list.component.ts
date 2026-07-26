@@ -21,11 +21,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import {
-  HelmChartVersionItem,
-  RepoPermissionInfo,
-  VersionSecuritySummary,
-} from '../../../../../../../generated/api';
+import { HelmChartVersionItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -132,7 +128,11 @@ export class HelmChartsVersionListComponent implements OnDestroy {
       this.loading = true;
       this.helmService
         .deleteChart(this.chartName, version.version)
-        .pipe(finalize(() => { this.loading = false; }))
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
         .subscribe({
           next: () => {
             this.toastService.show('Version deleted successfully', 'success');
@@ -155,7 +155,11 @@ export class HelmChartsVersionListComponent implements OnDestroy {
     this.loading = true;
     this.helmService
       .getChartVersions(this.chartName)
-      .pipe(finalize(() => { this.loading = false; }))
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
       .subscribe({
         next: (versions: HelmChartVersionItem[]) => {
           this.allVersions = versions;

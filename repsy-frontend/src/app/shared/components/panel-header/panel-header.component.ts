@@ -16,7 +16,7 @@
 
 import { NgOptimizedImage, ViewportScroller } from '@angular/common';
 import { Component, EventEmitter, HostListener, Output } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../../../auth/pages/service/auth.service';
 import { ProfileAvatarComponent } from '../../../panel/shared/components/avatar/profile.avatar.component';
@@ -38,16 +38,9 @@ export class PanelHeaderComponent {
 
   constructor(
     private readonly authService: AuthService,
-    private readonly router: Router,
     viewportScroller: ViewportScroller,
   ) {
     this.username = this.authService.username;
-
-
-
-
-
-
 
     viewportScroller.setOffset(() => [0, document.querySelector('header')?.getBoundingClientRect().height ?? 0]);
   }
@@ -67,8 +60,7 @@ export class PanelHeaderComponent {
   }
 
   public logOut(): void {
-    this.authService.logOut();
-    this.router.navigateByUrl('login');
+    this.authService.logOutToGitNode();
   }
 
   @HostListener('document:click')

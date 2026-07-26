@@ -66,9 +66,7 @@ export class RubyService {
         this.repoName,
         search || undefined,
       )
-      .pipe(
-        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GemListItem>),
-      );
+      .pipe(map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GemListItem>));
   }
 
   public fetchGemVersions(
@@ -87,8 +85,7 @@ export class RubyService {
       )
       .pipe(
         map(
-          (r) =>
-            ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GemVersionListItem>,
+          (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GemVersionListItem>,
         ),
       );
   }

@@ -135,7 +135,11 @@ export class HelmChartsListComponent implements OnDestroy {
       this.loading = true;
       this.helmService
         .deleteAllVersions(chart.name)
-        .pipe(finalize(() => { this.loading = false; }))
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
         .subscribe({
           next: () => {
             this.refreshPage();
@@ -158,7 +162,11 @@ export class HelmChartsListComponent implements OnDestroy {
     this.loading = true;
     this.helmService
       .searchCharts(this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .pipe(finalize(() => { this.loading = false; }))
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
       .subscribe({
         next: (pagedData: PagedData<HelmChartListItem>) => {
           this.pagedData.page = pagedData.page;

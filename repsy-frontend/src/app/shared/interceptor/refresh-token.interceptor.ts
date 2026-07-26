@@ -60,7 +60,7 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
 
   private _logOut(): void {
     this.authService.logOut();
-    this.router.navigateByUrl('login');
+    this.router.navigateByUrl('/admin/login');
   }
 
   private _refreshToken(): Observable<string> {

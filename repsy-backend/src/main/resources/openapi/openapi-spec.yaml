@@ -3608,9 +3608,9 @@ components:
           pattern: "^[a-zA-Z0-9@_\\-.]+$"
         password:
           type: string
-          maxLength: 50
+          maxLength: 64
           minLength: 6
-          pattern: "^(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?=\\S+$).+$"
+          pattern: "^((?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?=\\S+$).+|[a-f0-9]{64})$"
       required:
         - username
         - password

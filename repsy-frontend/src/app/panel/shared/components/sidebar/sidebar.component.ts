@@ -19,7 +19,7 @@ import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { Router, RouterLink, RouterModule } from '@angular/router';
 
 import { AuthService } from '../../../../auth/pages/service/auth.service';
-import { ProfileService } from '../../../pages/profile/service/profile.service';
+import { CurrentUserService } from '../../../../shared/services/current-user.service';
 import { SearchboxComponent } from '../searchbox/searchbox.component';
 
 @Component({
@@ -37,7 +37,7 @@ export class SidebarComponent implements OnInit {
 
   constructor(
     private readonly authService: AuthService,
-    private readonly profileFacadeService: ProfileService,
+    private readonly currentUserService: CurrentUserService,
     private readonly router: Router,
   ) {}
 
@@ -47,7 +47,7 @@ export class SidebarComponent implements OnInit {
   }
 
   private loadUserRole(): void {
-    this.profileFacadeService.get().subscribe({
+    this.currentUserService.get().subscribe({
       next: (profile) => {
         this.isAdmin = profile.role === 'ADMIN';
       },
@@ -59,8 +59,7 @@ export class SidebarComponent implements OnInit {
   }
 
   public logOut(): void {
-    this.authService.logOut();
-    this.router.navigateByUrl('login');
+    this.authService.logOutToGitNode();
   }
 
   closeMobileMenu(): void {

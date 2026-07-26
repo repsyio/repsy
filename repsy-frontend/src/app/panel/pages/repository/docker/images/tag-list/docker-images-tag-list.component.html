@@ -86,10 +86,7 @@
         <!-- Tag Table (Desktop) -->
         <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
           @for (tag of tags; track tag.name; let i = $index) {
-            <div
-              role="button"
-              [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name + '/detail'"
-            >
+            <div role="button" [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name + '/detail'">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === tags.length - 1 }"

@@ -21,7 +21,6 @@ export interface ArtifactDetailRoute {
   queryParams?: Record<string, string>;
 }
 
-
 export function buildArtifactDetailRoute(
   repoType: RepoType | undefined,
   repoName: string | undefined,

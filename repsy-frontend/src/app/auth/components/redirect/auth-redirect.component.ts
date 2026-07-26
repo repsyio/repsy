@@ -25,7 +25,7 @@ import {
   ViewContainerRef,
 } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 
 import { SplashService } from '../../../shared/components/splash-screen/splasht.service';
 import { AuthService } from '../../pages/service/auth.service';
@@ -46,6 +46,7 @@ export class AuthRedirectComponent implements OnInit {
   constructor(
     private readonly authService: AuthService,
     private readonly splashService: SplashService,
+    private readonly router: Router,
     @Inject(PLATFORM_ID) private platformId: object,
   ) {
     this.isAuthenticated = this.authService.isAuthenticated();
@@ -66,13 +67,7 @@ export class AuthRedirectComponent implements OnInit {
         }
       });
     } else {
-      import('../../../../../src/app/auth/pages/login/login.component').then((m) => {
-        this.container.createComponent(m.LoginComponent);
-        if (isPlatformBrowser(this.platformId)) {
-          document.title = 'repsy | Login';
-          this.splashService.setLoading = false;
-        }
-      });
+      void this.router.navigateByUrl('/admin/login');
     }
   }
 }

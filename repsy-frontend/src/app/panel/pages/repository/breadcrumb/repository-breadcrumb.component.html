@@ -1,54 +1,58 @@
 @if (crumbs.length > 0) {
   <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
     <nav class="text-[14px]">
-    <ol class="flex flex-wrap items-center p-0">
-      @for (crumbLink of crumbLinks; track crumbLink; let i = $index; let last = $last) {
-        <li class="flex items-center">
-          <!-- Last breadcrumb item (No link) -->
-          @if (last) {
-            <div class="text-[#FDFDFD]">
-              @if (repoIcon.includes('cargo')) {
-                <img
-                  width="23"
-                  height="23"
-                  [ngSrc]="repoIcon"
-                  alt="icon"
-                  class="inline-block h-[23px] w-[23px] brightness-0 invert"
-                />
-              } @else {
-                <img
-                  width="25"
-                  height="25"
-                  [ngSrc]="repoIcon"
-                  alt="icon"
-                  class="inline-block h-[25px] w-[25px] brightness-0 invert"
-                />
-              }
-              {{ crumbs[i] }}
-            </div>
-          } @else {
-            <a class="text-[#9FA0A0] hover:text-[#FDFDFD]" [routerLink]="crumbLink" [queryParams]="crumbQueryParams[i]">
-              @if (i === 1) {
-                <img width="20" height="20" [ngSrc]="repoIcon" alt="icon" class="inline-block h-[20px] w-[20px]" />
-              }
+      <ol class="flex flex-wrap items-center p-0">
+        @for (crumbLink of crumbLinks; track crumbLink; let i = $index; let last = $last) {
+          <li class="flex items-center">
+            <!-- Last breadcrumb item (No link) -->
+            @if (last) {
+              <div class="text-[#FDFDFD]">
+                @if (repoIcon.includes('cargo')) {
+                  <img
+                    width="23"
+                    height="23"
+                    [ngSrc]="repoIcon"
+                    alt="icon"
+                    class="inline-block h-[23px] w-[23px] brightness-0 invert"
+                  />
+                } @else {
+                  <img
+                    width="25"
+                    height="25"
+                    [ngSrc]="repoIcon"
+                    alt="icon"
+                    class="inline-block h-[25px] w-[25px] brightness-0 invert"
+                  />
+                }
+                {{ crumbs[i] }}
+              </div>
+            } @else {
+              <a
+                class="text-[#9FA0A0] hover:text-[#FDFDFD]"
+                [routerLink]="crumbLink"
+                [queryParams]="crumbQueryParams[i]"
+              >
+                @if (i === 1) {
+                  <img width="20" height="20" [ngSrc]="repoIcon" alt="icon" class="inline-block h-[20px] w-[20px]" />
+                }
 
-              {{ crumbs[i] }}
-            </a>
-          }
+                {{ crumbs[i] }}
+              </a>
+            }
 
-          @if (i < crumbLinks.length - 1) {
-            <!-- Separator Image -->
-            <img
-              ngSrc="/assets/icons/cursor/breadcrumb-split.svg"
-              height="16"
-              width="16"
-              alt="Breadcrumb Split"
-              class="mx-2"
-            />
-          }
-        </li>
-      }
-    </ol>
+            @if (i < crumbLinks.length - 1) {
+              <!-- Separator Image -->
+              <img
+                ngSrc="/assets/icons/cursor/breadcrumb-split.svg"
+                height="16"
+                width="16"
+                alt="Breadcrumb Split"
+                class="mx-2"
+              />
+            }
+          </li>
+        }
+      </ol>
     </nav>
 
     @if (securityLinkRepoType$ | async; as securityLinkRepoType) {

@@ -17,14 +17,14 @@
 import { Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
 
-import { LoginInfo, ProfileInfo } from '../../../../../generated/api';
-import { ProfileControllerService } from '../../../../../generated/api';
-import { AuthService } from '../../../../auth/pages/service/auth.service';
+import { ProfileInfo } from '../../../generated/api';
+import { ProfileControllerService } from '../../../generated/api';
+import { AuthService } from '../../auth/pages/service/auth.service';
 
 @Injectable({
   providedIn: 'root',
 })
-export class ProfileService {
+export class CurrentUserService {
   constructor(
     private readonly profileControllerService: ProfileControllerService,
     private readonly authService: AuthService,
@@ -36,21 +36,5 @@ export class ProfileService {
 
   public get(): Observable<ProfileInfo> {
     return this.profileControllerService.getProfile(this.authorizationHeader).pipe(map((r) => r.data!));
-  }
-
-  public updatePassword(password: string): Observable<void> {
-    return this.profileControllerService
-      .updatePassword(this.authorizationHeader, { password })
-      .pipe(map(() => undefined));
-  }
-
-  public updateUsername(username: string): Observable<LoginInfo> {
-    return this.profileControllerService
-      .updateUsername(this.authorizationHeader, { username })
-      .pipe(map((r) => r.data!));
-  }
-
-  public deleteAccount(): Observable<void> {
-    return this.profileControllerService.deleteProfile(this.authorizationHeader).pipe(map(() => undefined));
   }
 }

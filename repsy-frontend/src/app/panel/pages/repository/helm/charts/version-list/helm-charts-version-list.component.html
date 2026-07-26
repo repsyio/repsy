@@ -54,8 +54,11 @@
         </div>
         <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
           @for (version of versions; track version.version; let i = $index) {
-            <div role="button" [routerLink]="['/' + activeRepo.repoName + '/' + chartName + '/' + version.version]"
-              fragment="security">
+            <div
+              role="button"
+              [routerLink]="['/' + activeRepo.repoName + '/' + chartName + '/' + version.version]"
+              fragment="security"
+            >
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === versions.length - 1 }"
@@ -63,7 +66,11 @@
               >
                 <div class="flex items-center gap-2">
                   <img ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" class="mb-1" height="18" width="18" />
-                  <app-tooltip class="group-hover:underline text-[#FDFDFD]" [text]="version.version" [textHover]="version.version" />
+                  <app-tooltip
+                    class="text-[#FDFDFD] group-hover:underline"
+                    [text]="version.version"
+                    [textHover]="version.version"
+                  />
                 </div>
                 <app-version-security-badge
                   [repoName]="activeRepo.repoName"

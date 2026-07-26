@@ -90,7 +90,11 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
     this.loading = true;
     this.rubyService
       .fetchGemVersion(gemName, version)
-      .pipe(finalize(() => { this.loading = false; }))
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
       .subscribe({
         next: (gemVersion) => {
           this.gemVersion = gemVersion;
@@ -106,7 +110,11 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
       this.loading = true;
       this.rubyService
         .deleteGemVersion(this.gemName, this.versionName, this.gemVersion?.platform ?? 'ruby')
-        .pipe(finalize(() => { this.loading = false; }))
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
         .subscribe({
           next: () => {
             this.router.navigate(['../..'], { relativeTo: this.route }).then(() => {

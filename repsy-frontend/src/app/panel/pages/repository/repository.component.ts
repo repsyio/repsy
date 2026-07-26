@@ -22,6 +22,7 @@ import { finalize, map } from 'rxjs/operators';
 
 import { ProtocolRepoControllerService, RepoType as ApiRepoType, Severity } from '../../../../generated/api';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
+import { CurrentUserService } from '../../../shared/services/current-user.service';
 import { DropdownComponent } from '../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../shared/components/ellipsis/ellipsis.pipe';
 import { EmptyListComponent } from '../../shared/components/empty-list/empty-list.component';
@@ -36,7 +37,6 @@ import { TooltipComponent } from '../../shared/components/tooltip/tooltip.compon
 import { RepoListItem } from '../../shared/dto/repo/repo-list-item';
 import { RepoType } from '../../shared/dto/repo/repo-type';
 import { ByteFormatter } from '../../shared/util/byte-formatter';
-import { ProfileService } from '../profile/service/profile.service';
 import { SecurityService } from '../security/service/security.service';
 
 @Component({
@@ -91,7 +91,7 @@ export class RepositoryComponent {
   constructor(
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly securityService: SecurityService,
-    private readonly profileFacadeService: ProfileService,
+    private readonly currentUserService: CurrentUserService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
   ) {
@@ -216,9 +216,6 @@ export class RepositoryComponent {
       });
   }
 
-
-
-
   private fetchSecuritySummary(): void {
     const repoNames = this.repositories.map((repo) => repo.name);
     if (repoNames.length === 0) {
@@ -245,7 +242,7 @@ export class RepositoryComponent {
   }
 
   private loadUserRole(): void {
-    this.profileFacadeService.get().subscribe((profile) => {
+    this.currentUserService.get().subscribe((profile) => {
       this.isAdmin = profile.role === 'ADMIN';
     });
   }

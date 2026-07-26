@@ -21,11 +21,7 @@ import { Subscription } from 'rxjs';
 import { finalize, switchMap } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import {
-  CrateVersionListItem,
-  RepoPermissionInfo,
-  VersionSecuritySummary,
-} from '../../../../../../../generated/api';
+import { CrateVersionListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';

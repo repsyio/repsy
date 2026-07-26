@@ -78,6 +78,13 @@ public class UserTxService {
     return this.userConverter.toUserInfo(this.findUserByUsername(username));
   }
 
+  public @NonNull UserInfo getAdminUser() {
+    return this.userConverter.toUserInfo(
+        this.userRepository
+            .findFirstByRole(UserRole.ADMIN)
+            .orElseThrow(() -> new ItemNotFoundException(ERR_USER_NOT_FOUND)));
+  }
+
   public @NonNull UserInfo getUserById(final @NonNull UUID userId) {
     return this.userConverter.toUserInfo(this.findUserById(userId));
   }

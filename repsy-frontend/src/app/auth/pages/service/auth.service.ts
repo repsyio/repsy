@@ -15,11 +15,16 @@
 ///
 
 import { isPlatformBrowser } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { Inject, Injectable, PLATFORM_ID } from '@angular/core';
-import { map, Observable, throwError } from 'rxjs';
+import { firstValueFrom, map, Observable, throwError } from 'rxjs';
 
-import { LoginForm } from '../../../../generated/api';
-import { AuthControllerService } from '../../../../generated/api/api/auth-controller.service';
+import { environment } from '../../../../environments/environment';
+import { AuthControllerService } from '../../../../generated/api';
+
+interface AdminLoginResponse {
+  data: { username: string; token: string; refreshToken: string };
+}
 
 @Injectable({
   providedIn: 'root',
@@ -32,6 +37,7 @@ export class AuthService {
 
   constructor(
     private readonly authControllerService: AuthControllerService,
+    private readonly http: HttpClient,
     @Inject(PLATFORM_ID) platformId: object,
   ) {
     this.isBrowser = isPlatformBrowser(platformId);
@@ -54,12 +60,12 @@ export class AuthService {
     return !!(this._accessToken && this._refreshToken);
   }
 
-  public logIn(form: LoginForm): Observable<void> {
-    return this.authControllerService.login(form).pipe(
-      map((r) => {
-        this._update(r.data!.username!, r.data!.token!, r.data!.refreshToken!);
-      }),
+  public async logInAdmin(password: string): Promise<void> {
+    const response = await firstValueFrom(
+      this.http.post<AdminLoginResponse>(`${environment.apiBaseUrl}/api/auth/admin/login`, { password }),
     );
+
+    this._update(response.data.username, response.data.token, response.data.refreshToken);
   }
 
   public refreshToken(): Observable<string> {
@@ -74,6 +80,10 @@ export class AuthService {
     );
   }
 
+  public applyExternalSession(username: string, token: string, refreshToken: string): void {
+    this._update(username, token, refreshToken);
+  }
+
   public logOut(): void {
     this._username = null;
     this._accessToken = null;
@@ -83,6 +93,14 @@ export class AuthService {
       localStorage.removeItem('username');
       localStorage.removeItem('token');
       localStorage.removeItem('refresh-token');
+    }
+  }
+
+  public logOutToGitNode(): void {
+    this.logOut();
+
+    if (this.isBrowser) {
+      window.location.href = environment.gitnodeUrl;
     }
   }
 

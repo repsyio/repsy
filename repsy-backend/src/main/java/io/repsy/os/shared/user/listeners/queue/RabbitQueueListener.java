@@ -22,8 +22,11 @@ import dev.gitnode.os.events.queue.TenantRegisteredEvent;
 import dev.gitnode.os.events.queue.UsernameUpdatedEvent;
 import dev.gitnode.os.events.queue.visitor.QueueEventVisitor;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
+import io.repsy.os.shared.configs.queue.GitNodeIdempotency;
+import io.repsy.os.shared.configs.queue.GitNodeIdempotencyRepository;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -35,11 +38,25 @@ import org.springframework.stereotype.Service;
 public class RabbitQueueListener implements QueueEventVisitor {
 
   private final UserTxService userTxService;
+  private final GitNodeIdempotencyRepository idempotencyRepository;
 
   @RabbitListener(queues = "user-management")
   public void onEventHandled(final QueueBaseMessage message) {
 
+    final var idempotencyKey = message.getIdempotencyKey();
+
+    if (this.existsIdempotencyKey(idempotencyKey)) {
+      return;
+    }
+
     message.accept(this);
+
+    this.idempotencyRepository.save(new GitNodeIdempotency(idempotencyKey));
+  }
+
+  private boolean existsIdempotencyKey(final UUID idempotencyKey) {
+
+    return this.idempotencyRepository.existsByKey(idempotencyKey);
   }
 
   @Override

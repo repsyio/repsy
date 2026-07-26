@@ -547,7 +547,7 @@
                     <img
                       ngSrc="/assets/icons/ruby/ruby.svg"
                       alt="Ruby"
-                      class="group-hover:opacity-90 h-[20px] w-[20px] shrink-0"
+                      class="h-[20px] w-[20px] shrink-0 group-hover:opacity-90"
                       width="20"
                       height="20"
                     />
@@ -555,10 +555,10 @@
                 }
                 <span class="break-all text-[#FDFDFD]">{{ repo.name }}</span>
                 <app-repo-security-badge
-                    [repoName]="repo.name"
-                    [repoType]="repo.repoType"
-                    [severity]="securitySummary[repo.name] ?? null"
-                  />
+                  [repoName]="repo.name"
+                  [repoType]="repo.repoType"
+                  [severity]="securitySummary[repo.name] ?? null"
+                />
               </div>
 
               <div class="space-y-2">

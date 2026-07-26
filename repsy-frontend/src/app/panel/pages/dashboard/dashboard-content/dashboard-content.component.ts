@@ -67,11 +67,9 @@ export class DashboardContentComponent {
     private readonly usageService: UsageService,
     private readonly cdRef: ChangeDetectorRef,
   ) {
-    this.usageService
-      .getTotalUsage()
-      .subscribe((usage) => {
-        Object.assign(this.usage, usage);
-      });
+    this.usageService.getTotalUsage().subscribe((usage) => {
+      Object.assign(this.usage, usage);
+    });
 
     this.fetchRepoCounts();
     this.fetchRepoInfos();

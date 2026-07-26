@@ -13,22 +13,22 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 ///
-import {CommonModule, NgOptimizedImage} from '@angular/common';
-import {Component, OnDestroy} from '@angular/core';
-import {ActivatedRoute, Router} from '@angular/router';
-import {Highlight} from 'ngx-highlightjs';
-import {HighlightLineNumbers} from 'ngx-highlightjs/line-numbers';
-import {Subscription} from 'rxjs';
-import {finalize} from 'rxjs/operators';
+import { CommonModule, NgOptimizedImage } from '@angular/common';
+import { Component, OnDestroy } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { Highlight } from 'ngx-highlightjs';
+import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
+import { Subscription } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
-import {environment} from '../../../../../../../environments/environment';
-import {HelmChartDetail, RepoPermissionInfo} from '../../../../../../../generated/api';
-import {SpinnerComponent} from '../../../../../../shared/components/spinner/spinner.component';
-import {CopyClipboardComponent} from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
-import {DangerModalService} from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
-import {SecurityScanSectionComponent} from '../../../../../shared/components/security-scan-section/security-scan-section.component';
-import {ToastService} from '../../../../../shared/components/toast/toast.service';
-import {HelmService} from '../../service/helm.service';
+import { environment } from '../../../../../../../environments/environment';
+import { HelmChartDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
+import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
+import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { HelmService } from '../../service/helm.service';
 
 @Component({
   selector: 'app-helm-charts-version-detail',
@@ -78,8 +78,12 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
   }
 
   public formatSize(bytes: number): string {
-    if (bytes < 1024) {return `${bytes} B`;}
-    if (bytes < 1024 * 1024) {return `${(bytes / 1024).toFixed(1)} KB`;}
+    if (bytes < 1024) {
+      return `${bytes} B`;
+    }
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    }
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   }
 
@@ -88,7 +92,11 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
       this.loading = true;
       this.helmService
         .deleteChart(this.chartName, this.versionName)
-        .pipe(finalize(() => { this.loading = false; }))
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
         .subscribe({
           next: () => {
             this.router.navigate(['..'], { relativeTo: this.route }).then(() => {
@@ -119,7 +127,11 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
 
     this.helmService
       .getChartDetail(name, version)
-      .pipe(finalize(() => { this.loading = false; }))
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
       .subscribe({
         next: (detail) => {
           this.chart = detail;
@@ -132,7 +144,9 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
             this.chart.description ? `description: ${this.chart.description}` : null,
             this.chart.appVersion ? `appVersion: "${this.chart.appVersion}"` : null,
             this.chart.type ? `type: ${this.chart.type}` : null,
-          ].filter(Boolean).join('\n');
+          ]
+            .filter(Boolean)
+            .join('\n');
         },
         error: () => {},
       });

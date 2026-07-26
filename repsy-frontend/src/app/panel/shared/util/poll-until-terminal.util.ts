@@ -17,7 +17,6 @@
 import { Observable, timer } from 'rxjs';
 import { switchMap, takeWhile } from 'rxjs/operators';
 
-
 export function pollUntilTerminal<T>(
   fetchFn: () => Observable<T>,
   isTerminal: (result: T) => boolean,

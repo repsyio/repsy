@@ -20,7 +20,6 @@ import { catchError, map, shareReplay } from 'rxjs/operators';
 
 import { SecurityScanControllerService } from '../../../../generated/api';
 
-
 @Injectable({
   providedIn: 'root',
 })

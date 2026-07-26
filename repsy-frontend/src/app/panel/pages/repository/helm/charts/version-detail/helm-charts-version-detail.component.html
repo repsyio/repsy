@@ -57,7 +57,7 @@
             <span class="text-[#9C9C9D]">{{ formattedSize }}</span>
             <span class="text-[#2A2A2A]">|</span>
             <span class="text-white">Digest: </span>
-            <span class="font-mono text-[#9C9C9D] break-all">{{ chart.digest }}</span>
+            <span class="font-mono break-all text-[#9C9C9D]">{{ chart.digest }}</span>
             <app-copy-clipboard [text]="chart.digest" />
           </div>
         </div>
@@ -87,16 +87,14 @@
             <span class="text-[14px] text-[#FDFDFD]">Chart.yaml</span>
             <app-copy-clipboard [text]="chartYaml" />
           </div>
-          <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]"><code [highlight]="chartYaml" language="yaml" lineNumbers></code></pre>
+          <pre
+            class="max-h-[500px] text-[13px] sm:max-h-[800px]"
+          ><code [highlight]="chartYaml" language="yaml" lineNumbers></code></pre>
         </div>
 
         <!-- Delete -->
         @if (activeRepo.canManage) {
-          <button
-            (click)="deleteVersion()"
-            [disabled]="loading"
-            class="repsy-btn-danger ml-auto w-full sm:w-auto"
-          >
+          <button (click)="deleteVersion()" [disabled]="loading" class="repsy-btn-danger ml-auto w-full sm:w-auto">
             <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
             Delete Version
           </button>

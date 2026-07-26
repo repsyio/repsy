@@ -17,7 +17,6 @@ import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChange
 
 import { MarkdownComponent } from '../../../../shared/components/markdown/markdown.component';
 
-
 @Component({
   selector: 'app-helm-config',
   standalone: true,

@@ -18,10 +18,8 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, ViewEncapsulation } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
-import { finalize } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
-import { LoginForm } from '../../../../generated/api';
 import { ToastService } from '../../../panel/shared/components/toast/toast.service';
 import { AuthService } from '../service/auth.service';
 
@@ -55,15 +53,6 @@ export class LoginComponent implements OnInit {
 
     this.setRandomImage();
     this.form = this.fb.group({
-      username: [
-        '',
-        [
-          Validators.required,
-          Validators.minLength(3),
-          Validators.maxLength(150),
-          Validators.pattern(/^[a-zA-Z0-9@_\-.]+$/),
-        ],
-      ],
       password: [
         '',
         [
@@ -76,24 +65,21 @@ export class LoginComponent implements OnInit {
     });
   }
 
-  public login(): void {
+  public async login(): Promise<void> {
     this.loading = true;
     this.form.disable();
 
-    const form = this.form.getRawValue() as LoginForm;
+    const { password } = this.form.getRawValue() as { password: string };
 
-    this.authService
-      .logIn(form)
-      .pipe(
-        finalize(() => {
-          this.loading = false;
-          this.form.enable();
-        }),
-      )
-      .subscribe({
-        next: () => this.router.navigateByUrl('/'),
-        error: () => {},
-      });
+    try {
+      await this.authService.logInAdmin(password);
+      await this.router.navigateByUrl('/');
+    } catch {
+      // wrong password — surfaced via form re-enable below
+    } finally {
+      this.loading = false;
+      this.form.enable();
+    }
   }
 
   public toggleVisibility(): void {

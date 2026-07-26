@@ -31,7 +31,7 @@
       </div>
     </div>
   } @else {
-    <p class="text-[13px] text-success-400">No known vulnerabilities found.</p>
+    <p class="text-success-400 text-[13px]">No known vulnerabilities found.</p>
   }
 </div>
 
@@ -62,7 +62,14 @@
       class="hover:text-secondary-500 flex h-[40px] w-[40px] flex-shrink-0 items-center justify-center text-neutral-200"
       title="Refresh"
     >
-      <svg width="22" height="22" viewBox="0 0 22 22" stroke="currentColor" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 22 22"
+        stroke="currentColor"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <path
           d="M21.0832 3.66645V9.16645M21.0832 9.16645H15.5832M21.0832 9.16645L16.8298 5.16978C15.8447 4.18411 14.6258 3.46406 13.2871 3.07683C11.9484 2.6896 10.5334 2.64781 9.1741 2.95535C7.81485 3.2629 6.55565 3.90977 5.51402 4.83558C4.47238 5.7614 3.68224 6.936 3.21734 8.24978M0.916504 18.3331V12.8331M0.916504 12.8331H6.4165M0.916504 12.8331L5.16984 16.8298C6.15502 17.8155 7.37385 18.5355 8.71258 18.9227C10.0513 19.31 11.4663 19.3518 12.8256 19.0442C14.1848 18.7367 15.444 18.0898 16.4857 17.164C17.5273 16.2382 18.3174 15.0636 18.7823 13.7498"
           stroke-linecap="round"
@@ -111,7 +118,7 @@
             </span>
           } @else if (scan.status === ScanStatus.Completed && !scan.highestSeverity) {
             <span
-              class="inline-flex items-center gap-1.5 rounded-full border border-success-600 bg-success-900 px-2.5 py-1 text-[12px] font-medium text-success-400"
+              class="border-success-600 bg-success-900 text-success-400 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path
@@ -137,6 +144,10 @@
   </div>
 
   @if ((pagedData.page?.totalPages ?? 0) > 1) {
-    <app-pagination [pageNum]="pageNum" [totalPages]="pagedData.page?.totalPages ?? 0" (pageNumChange)="loadPage($event)" />
+    <app-pagination
+      [pageNum]="pageNum"
+      [totalPages]="pagedData.page?.totalPages ?? 0"
+      (pageNumChange)="loadPage($event)"
+    />
   }
 }

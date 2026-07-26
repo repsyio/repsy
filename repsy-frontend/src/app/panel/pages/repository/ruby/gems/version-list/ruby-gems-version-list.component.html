@@ -53,8 +53,11 @@
         </div>
         <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
           @for (version of versions; track version.version; let i = $index) {
-            <div role="button" [routerLink]="['/' + activeRepo.repoName + '/' + gemName + '/' + version.version]"
-              fragment="security">
+            <div
+              role="button"
+              [routerLink]="['/' + activeRepo.repoName + '/' + gemName + '/' + version.version]"
+              fragment="security"
+            >
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === versions.length - 1 }"
