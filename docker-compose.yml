@@ -1,0 +1,11 @@
+services:
+  postgres:
+    container_name: repsy-os-postgres
+    hostname: repsy-os-postgres
+    image: postgres:18
+    environment:
+      - POSTGRES_DB=repsy_os
+      - POSTGRES_USER=repsy_os
+      - POSTGRES_PASSWORD=repsy_os123
+    ports:
+      - "5432:5432"

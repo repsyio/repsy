@@ -15,7 +15,7 @@
 ///
 
 export const environment = {
-  apiBaseUrl: 'http://localhost:8080',
+  apiBaseUrl: 'http://localhost:7979',
   repoBaseUrl: 'http://localhost:9090',
   docsBase: 'https://docs.repsy.io',
 };
