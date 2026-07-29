@@ -34,7 +34,7 @@
     "@eslint/js": "^9.39.4",
     "@ngx-env/builder": "^21.0.1",
     "@stripe/stripe-js": "^8.11.0",
-    "@tailwindcss/postcss": "^4.3.0",
+    "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/typography": "^0.5.19",
     "chart.js": "^4.5.1",
     "dotenv": "^17.4.2",
