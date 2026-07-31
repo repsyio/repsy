@@ -36,6 +36,8 @@ const SEVERITY_LABELS: Record<string, string> = {
   [Severity.Unknown]: 'Unknown',
 };
 
+const CLEAN_CLASSES = 'border-success-600 bg-success-900 text-success-400';
+
 @Component({
   selector: 'app-severity-badge',
   standalone: true,
@@ -43,17 +45,30 @@ const SEVERITY_LABELS: Record<string, string> = {
   templateUrl: './severity-badge.component.html',
 })
 export class SeverityBadgeComponent {
-  @Input({ required: true }) public severity: Severity;
+  @Input() public severity: Severity | null = null;
+  @Input() public scanned = true;
   @Input() public count: number | null = null;
   @Input() public compact = false;
 
   protected readonly Severity = Severity;
 
+  public get isClean(): boolean {
+    return this.scanned && !this.severity;
+  }
+
   public get classes(): string {
-    return SEVERITY_CLASSES[this.severity] ?? SEVERITY_CLASSES[Severity.Unknown];
+    if (this.isClean) {
+      return CLEAN_CLASSES;
+    }
+
+    return this.severity ? (SEVERITY_CLASSES[this.severity] ?? SEVERITY_CLASSES[Severity.Unknown]) : SEVERITY_CLASSES[Severity.Unknown];
   }
 
   public get label(): string {
-    return SEVERITY_LABELS[this.severity] ?? SEVERITY_LABELS[Severity.Unknown];
+    if (this.isClean) {
+      return 'Clean';
+    }
+
+    return this.severity ? (SEVERITY_LABELS[this.severity] ?? SEVERITY_LABELS[Severity.Unknown]) : SEVERITY_LABELS[Severity.Unknown];
   }
 }

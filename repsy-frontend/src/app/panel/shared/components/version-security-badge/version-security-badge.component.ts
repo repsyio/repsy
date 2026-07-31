@@ -35,6 +35,7 @@ export class VersionSecurityBadgeComponent implements OnInit {
   @Input({ required: true }) public artifactName: string;
   @Input({ required: true }) public versionName: string;
   @Input() public severity: Severity | null = null;
+  @Input() public scanned = false;
 
   public isSupported$: Observable<boolean>;
   public showModal = false;

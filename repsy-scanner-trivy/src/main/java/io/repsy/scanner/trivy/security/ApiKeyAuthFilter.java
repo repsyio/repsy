@@ -35,6 +35,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
 
   private static final String API_KEY_HEADER = "X-Scanner-Api-Key";
   private static final String HEALTH_PATH = "/health";
+  private static final String ACTUATOR_PATH_PREFIX = "/actuator";
 
   private final @NonNull ScannerSecurityProperties properties;
 
@@ -45,7 +46,7 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
       final @NonNull FilterChain filterChain)
       throws ServletException, IOException {
 
-    if (HEALTH_PATH.equals(request.getServletPath())) {
+    if (isUnauthenticatedPath(request.getServletPath())) {
       filterChain.doFilter(request, response);
       return;
     }
@@ -58,6 +59,10 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
     }
 
     filterChain.doFilter(request, response);
+  }
+
+  private static boolean isUnauthenticatedPath(final @NonNull String servletPath) {
+    return HEALTH_PATH.equals(servletPath) || servletPath.startsWith(ACTUATOR_PATH_PREFIX);
   }
 
   private boolean isAuthorized(final @NonNull HttpServletRequest request) {

@@ -74,6 +74,7 @@
                   [artifactName]="gem.name"
                   [packageRoute]="packageRoute(gem)"
                   [severity]="securitySummary[gem.name]?.severity ?? null"
+                  [scanned]="securitySummary[gem.name]?.scanned ?? false"
                 />
                 <a
                   class="group text-secondary-500 flex w-max gap-2 text-[14px]"
@@ -165,6 +166,7 @@
                     [artifactName]="gem.name"
                     [packageRoute]="packageRoute(gem)"
                     [severity]="securitySummary[gem.name]?.severity ?? null"
+                    [scanned]="securitySummary[gem.name]?.scanned ?? false"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

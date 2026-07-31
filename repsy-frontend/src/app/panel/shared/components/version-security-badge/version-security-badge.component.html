@@ -1,7 +1,8 @@
-@if (severity && (isSupported$ | async)) {
+@if (scanned && (isSupported$ | async)) {
   <button type="button" (click)="openModal($event)" class="cursor-pointer">
     <app-severity-badge
       [severity]="severity"
+      [scanned]="scanned"
       [compact]="true"
       [attr.aria-label]="versionName + ' security status'"
     />

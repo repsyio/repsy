@@ -1,5 +1,6 @@
 server:
   port: ${SERVER_PORT:8090}
+  shutdown: graceful
 
 spring:
   application:
@@ -8,14 +9,24 @@ spring:
     multipart:
       max-file-size: 500MB
       max-request-size: 500MB
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT_SECONDS:300}s
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
 
 scanner:
+  worker-count: ${SCANNER_WORKER_COUNT:1}
+  job-retention-minutes: ${SCANNER_JOB_RETENTION_MINUTES:60}
+  job-retention-check-interval-ms: ${SCANNER_JOB_RETENTION_CHECK_INTERVAL_MS:600000}
   security:
     api-key: ${SCANNER_API_KEY}
   trivy:
     binary-path: ${TRIVY_BINARY_PATH:trivy}
     timeout-seconds: ${TRIVY_TIMEOUT_SECONDS:300}
-    gate-acquire-timeout-seconds: ${TRIVY_GATE_ACQUIRE_TIMEOUT_SECONDS:60}
 
 logging:
   level:

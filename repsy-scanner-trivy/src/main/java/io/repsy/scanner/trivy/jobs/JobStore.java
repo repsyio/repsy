@@ -13,19 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.scanner.trivy;
+package io.repsy.scanner.trivy.jobs;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
-import org.springframework.scheduling.annotation.EnableScheduling;
+import io.repsy.scanner.trivy.dtos.ScanJob;
+import java.time.Instant;
+import java.util.Optional;
+import org.jspecify.annotations.NonNull;
 
-@SpringBootApplication
-@ConfigurationPropertiesScan
-@EnableScheduling
-public class TrivyScannerApplication {
+public interface JobStore {
 
-  public static void main(final String[] args) {
-    SpringApplication.run(TrivyScannerApplication.class, args);
-  }
+  // No-op if scanId is already present, so a retried submit never re-enqueues duplicate work.
+  void putIfAbsent(@NonNull String scanId, @NonNull ScanJob job);
+
+  @NonNull Optional<ScanJob> get(@NonNull String scanId);
+
+  void update(@NonNull String scanId, @NonNull ScanJob updated);
+
+  void removeCompletedBefore(@NonNull Instant threshold);
 }

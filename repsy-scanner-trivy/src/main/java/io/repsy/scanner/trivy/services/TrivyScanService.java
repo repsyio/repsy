@@ -16,11 +16,11 @@
 package io.repsy.scanner.trivy.services;
 
 import io.repsy.scanner.trivy.config.TrivyScannerProperties;
+import io.repsy.scanner.trivy.dtos.ScanJob;
 import io.repsy.scanner.trivy.dtos.ScanOutcome;
 import io.repsy.scanner.trivy.dtos.trivy.TrivyReport;
 import io.repsy.scanner.trivy.errors.TrivyScanException;
-import io.repsy.scanner.trivy.gate.GateAcquisitionTimeoutException;
-import io.repsy.scanner.trivy.gate.TrivyExecutionGate;
+import io.repsy.scanner.trivy.jobs.JobStore;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -28,13 +28,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.UnaryOperator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.core.JacksonException;
@@ -49,39 +53,80 @@ public class TrivyScanService {
 
   private final @NonNull TrivyScannerProperties properties;
   private final @NonNull ObjectMapper objectMapper;
-  private final @NonNull TrivyExecutionGate gate;
+  private final @NonNull JobStore jobStore;
 
-  public @NonNull ScanOutcome scan(
+  @Qualifier("scanWorkerExecutor")
+  private final @NonNull Executor scanWorkerExecutor;
+
+  public void submitScan(
+      final @NonNull String scanId,
       final @NonNull MultipartFile file,
       final @NonNull String repoType,
       final @NonNull String artifactName,
       final @NonNull String artifactVersion) {
 
     log.info(
-        "Scanning {}@{} (repoType={}, file={})",
+        "Queuing scan {} for {}@{} (repoType={}, file={})",
+        scanId,
         artifactName,
         artifactVersion,
         repoType,
         file.getOriginalFilename());
 
     final var artifactPath = this.writeToTempFile(file);
+    final var fileName = file.getOriginalFilename();
+
+    this.jobStore.putIfAbsent(scanId, ScanJob.queued(scanId));
+    this.scanWorkerExecutor.execute(() -> this.runFileScan(scanId, artifactPath, fileName));
+  }
+
+  public void submitDockerScan(
+      final @NonNull String scanId,
+      final @NonNull String imageReference,
+      final @Nullable String registryAuthToken,
+      final boolean registryInsecure,
+      final @NonNull String repoType,
+      final @NonNull String artifactName,
+      final @NonNull String artifactVersion) {
+
+    log.info(
+        "Queuing docker scan {} for image {} ({}@{}, repoType={}, insecure={})",
+        scanId,
+        imageReference,
+        artifactName,
+        artifactVersion,
+        repoType,
+        registryInsecure);
+
+    this.jobStore.putIfAbsent(scanId, ScanJob.queued(scanId));
+    this.scanWorkerExecutor.execute(
+        () -> this.runDockerScan(scanId, imageReference, registryAuthToken, registryInsecure));
+  }
+
+  public @NonNull Optional<ScanJob> getStatus(final @NonNull String scanId) {
+    return this.jobStore.get(scanId);
+  }
+
+  private void runFileScan(
+      final @NonNull String scanId,
+      final @NonNull Path artifactPath,
+      final @Nullable String fileName) {
+
+    this.updateStatus(scanId, ScanJob::toRunning);
+
     Path extractedDir = null;
-
     try {
-      final var fileName = file.getOriginalFilename();
-
       if (fileName != null && TarGzExtractor.isTarGz(fileName)) {
         extractedDir = this.extractTarGz(artifactPath);
       }
 
       final var scanTarget = extractedDir != null ? extractedDir : artifactPath;
+      final var outcome = this.runAndParse(this.buildRootfsCommand(scanTarget));
 
-      final var stdout = this.runTrivyLocked(this.buildRootfsCommand(scanTarget));
-      final var report = this.parseReport(stdout);
-      final var findings = TrivyFindingMapper.toFindings(report.results());
-      final var scannerVersion = report.trivy() != null ? report.trivy().version() : null;
-
-      return new ScanOutcome(findings, scannerVersion);
+      this.updateStatus(scanId, job -> job.toCompleted(outcome));
+    } catch (final Exception exception) {
+      log.error("Vulnerability scan {} failed", scanId, exception);
+      this.updateStatus(scanId, job -> job.toFailed(resolveFailureMessage(exception)));
     } finally {
       this.deleteQuietly(artifactPath);
 
@@ -91,30 +136,39 @@ public class TrivyScanService {
     }
   }
 
-  public @NonNull ScanOutcome scanDockerReference(
+  private void runDockerScan(
+      final @NonNull String scanId,
       final @NonNull String imageReference,
       final @Nullable String registryAuthToken,
-      final boolean registryInsecure,
-      final @NonNull String repoType,
-      final @NonNull String artifactName,
-      final @NonNull String artifactVersion) {
+      final boolean registryInsecure) {
 
-    log.info(
-        "Scanning docker image {} ({}@{}, repoType={}, insecure={})",
-        imageReference,
-        artifactName,
-        artifactVersion,
-        repoType,
-        registryInsecure);
+    this.updateStatus(scanId, ScanJob::toRunning);
 
-    final var stdout =
-        this.runTrivyLocked(
-            this.buildImageCommand(imageReference, registryAuthToken, registryInsecure));
+    try {
+      final var outcome =
+          this.runAndParse(
+              this.buildImageCommand(imageReference, registryAuthToken, registryInsecure));
+
+      this.updateStatus(scanId, job -> job.toCompleted(outcome));
+    } catch (final Exception exception) {
+      log.error("Docker vulnerability scan {} failed", scanId, exception);
+      this.updateStatus(scanId, job -> job.toFailed(resolveFailureMessage(exception)));
+    }
+  }
+
+  private @NonNull ScanOutcome runAndParse(final @NonNull List<String> command) {
+    final var stdout = this.runTrivy(command);
     final var report = this.parseReport(stdout);
     final var findings = TrivyFindingMapper.toFindings(report.results());
     final var scannerVersion = report.trivy() != null ? report.trivy().version() : null;
 
     return new ScanOutcome(findings, scannerVersion);
+  }
+
+  private void updateStatus(
+      final @NonNull String scanId, final @NonNull UnaryOperator<ScanJob> transition) {
+
+    this.jobStore.get(scanId).ifPresent(job -> this.jobStore.update(scanId, transition.apply(job)));
   }
 
   private @NonNull Path extractTarGz(final @NonNull Path artifactPath) {
@@ -132,24 +186,6 @@ public class TrivyScanService {
       return tempFile;
     } catch (final IOException exception) {
       throw new TrivyScanException("Failed to materialize uploaded artifact", exception);
-    }
-  }
-
-  private @NonNull String runTrivyLocked(final @NonNull List<String> command) {
-    try (final var permit = this.acquireGate()) {
-      return this.runTrivy(command);
-    }
-  }
-
-  private TrivyExecutionGate.@NonNull GatePermit acquireGate() {
-    try {
-      return this.gate.acquire(this.properties.gateAcquireTimeoutSeconds(), TimeUnit.SECONDS);
-    } catch (final GateAcquisitionTimeoutException exception) {
-      throw new TrivyScanException(exception.getMessage(), exception);
-    } catch (final InterruptedException exception) {
-      Thread.currentThread().interrupt();
-      throw new TrivyScanException(
-          "Interrupted while waiting for a trivy execution slot", exception);
     }
   }
 
@@ -268,5 +304,11 @@ public class TrivyScanService {
     final var dotIndex = fileName.lastIndexOf('.');
 
     return dotIndex >= 0 ? fileName.substring(dotIndex + 1) : DEFAULT_EXTENSION;
+  }
+
+  private static @NonNull String resolveFailureMessage(final @NonNull Exception exception) {
+    return exception.getMessage() != null
+        ? exception.getMessage()
+        : exception.getClass().getSimpleName();
   }
 }

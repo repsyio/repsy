@@ -13,19 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.scanner.trivy;
+package io.repsy.scanner.trivy.errors;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
-import org.springframework.scheduling.annotation.EnableScheduling;
+import org.jspecify.annotations.NonNull;
 
-@SpringBootApplication
-@ConfigurationPropertiesScan
-@EnableScheduling
-public class TrivyScannerApplication {
+public final class ScanJobNotFoundException extends RuntimeException {
 
-  public static void main(final String[] args) {
-    SpringApplication.run(TrivyScannerApplication.class, args);
+  public ScanJobNotFoundException(final @NonNull String scanId) {
+    super("No scan job found for scanId: " + scanId);
   }
 }

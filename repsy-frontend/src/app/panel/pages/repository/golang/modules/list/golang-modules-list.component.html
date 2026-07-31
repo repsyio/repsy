@@ -97,6 +97,7 @@
                   [packageRoute]="'/' + activeRepo.repoName + '/modules'"
                   [packageQueryParams]="{ modulePath: mod.modulePath }"
                   [severity]="securitySummary[mod.modulePath]?.severity ?? null"
+                  [scanned]="securitySummary[mod.modulePath]?.scanned ?? false"
                 />
 
                 <app-tooltip
@@ -163,6 +164,7 @@
                     [packageRoute]="'/' + activeRepo.repoName + '/modules'"
                     [packageQueryParams]="{ modulePath: mod.modulePath }"
                     [severity]="securitySummary[mod.modulePath]?.severity ?? null"
+                    [scanned]="securitySummary[mod.modulePath]?.scanned ?? false"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

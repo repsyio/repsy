@@ -15,7 +15,10 @@
  */
 package io.repsy.scanner.trivy.controllers;
 
-import io.repsy.scanner.trivy.dtos.ScanOutcome;
+import io.repsy.scanner.trivy.dtos.ScanJobStatus;
+import io.repsy.scanner.trivy.dtos.ScanJobStatusResponse;
+import io.repsy.scanner.trivy.dtos.ScanSubmissionResponse;
+import io.repsy.scanner.trivy.errors.ScanJobNotFoundException;
 import io.repsy.scanner.trivy.services.TrivyScanService;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +26,8 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,7 +41,8 @@ public class ScanController {
   private final @NonNull TrivyScanService trivyScanService;
 
   @PostMapping(path = "/scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  public @NonNull ScanOutcome scan(
+  public @NonNull ScanSubmissionResponse scan(
+      @RequestParam("scanId") final @NotBlank String scanId,
       @RequestParam(value = "file", required = false) final @Nullable MultipartFile file,
       @RequestParam("repoType") final @NotBlank String repoType,
       @RequestParam("artifactName") final @NotBlank String artifactName,
@@ -49,19 +55,32 @@ public class ScanController {
           final boolean registryInsecure) {
 
     if (dockerImageReference != null) {
-      return this.trivyScanService.scanDockerReference(
+      this.trivyScanService.submitDockerScan(
+          scanId,
           dockerImageReference,
           registryAuthToken,
           registryInsecure,
           repoType,
           artifactName,
           artifactVersion);
+
+      return new ScanSubmissionResponse(scanId, ScanJobStatus.QUEUED);
     }
 
     if (file == null || file.isEmpty()) {
       throw new IllegalArgumentException("file must not be empty");
     }
 
-    return this.trivyScanService.scan(file, repoType, artifactName, artifactVersion);
+    this.trivyScanService.submitScan(scanId, file, repoType, artifactName, artifactVersion);
+
+    return new ScanSubmissionResponse(scanId, ScanJobStatus.QUEUED);
+  }
+
+  @GetMapping("/scan/{scanId}")
+  public @NonNull ScanJobStatusResponse getStatus(@PathVariable final @NonNull String scanId) {
+    return this.trivyScanService
+        .getStatus(scanId)
+        .map(ScanJobStatusResponse::from)
+        .orElseThrow(() -> new ScanJobNotFoundException(scanId));
   }
 }

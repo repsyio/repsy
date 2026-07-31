@@ -50,10 +50,20 @@ export class NpmService {
   }
 
   public getRepository(repoName: string): Observable<RepoPermissionInfo> {
+    this.resetActiveRepoIfChanged(repoName);
+
     return this.protocolRepoControllerService.getPermission(repoName).pipe(
       map((r) => r.data!),
       tap((info) => this.repoSubject.next(info)),
     );
+  }
+
+  private resetActiveRepoIfChanged(repoName: string): void {
+    if (this.repoSubject.getValue()?.repoName === repoName) {
+      return;
+    }
+
+    this.repoSubject.next(null);
   }
 
   public searchPackages(

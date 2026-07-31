@@ -131,6 +131,7 @@
                   [artifactName]="imageName"
                   [versionName]="tag.name"
                   [severity]="securitySummary[tag.name]?.severity ?? null"
+                  [scanned]="securitySummary[tag.name]?.scanned ?? false"
                 />
 
                 <app-tooltip
@@ -221,6 +222,7 @@
                     [artifactName]="imageName"
                     [versionName]="tag.name"
                     [severity]="securitySummary[tag.name]?.severity ?? null"
+                    [scanned]="securitySummary[tag.name]?.scanned ?? false"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

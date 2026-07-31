@@ -5343,10 +5343,18 @@ components:
         totalCount:
           type: integer
           format: int32
+    RepoSecuritySummary:
+      type: object
+      properties:
+        severity:
+          "$ref": "#/components/schemas/Severity"
+          nullable: true
+        scanned:
+          type: boolean
     SecuritySummary:
       type: object
       additionalProperties:
-        "$ref": "#/components/schemas/Severity"
+        "$ref": "#/components/schemas/RepoSecuritySummary"
     RestResponseSecuritySummary:
       type: object
       properties:
@@ -5369,6 +5377,8 @@ components:
         findingCount:
           type: integer
           format: int32
+        scanned:
+          type: boolean
     VersionSecuritySummaryMap:
       type: object
       additionalProperties:
