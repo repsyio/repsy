@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.UnaryOperator;
 import lombok.RequiredArgsConstructor;
@@ -76,8 +77,13 @@ public class TrivyScanService {
     final var artifactPath = this.writeToTempFile(file);
     final var fileName = file.getOriginalFilename();
 
-    this.jobStore.putIfAbsent(scanId, ScanJob.queued(scanId));
-    this.scanWorkerExecutor.execute(() -> this.runFileScan(scanId, artifactPath, fileName));
+    if (!this.jobStore.putIfAbsent(scanId, ScanJob.queued(scanId))) {
+      log.debug("Scan {} already queued/running, skipping duplicate submit", scanId);
+      this.deleteQuietly(artifactPath);
+      return;
+    }
+
+    this.enqueue(scanId, artifactPath, () -> this.runFileScan(scanId, artifactPath, fileName));
   }
 
   public void submitDockerScan(
@@ -98,13 +104,38 @@ public class TrivyScanService {
         repoType,
         registryInsecure);
 
-    this.jobStore.putIfAbsent(scanId, ScanJob.queued(scanId));
-    this.scanWorkerExecutor.execute(
+    if (!this.jobStore.putIfAbsent(scanId, ScanJob.queued(scanId))) {
+      log.debug("Docker scan {} already queued/running, skipping duplicate submit", scanId);
+      return;
+    }
+
+    this.enqueue(
+        scanId,
+        null,
         () -> this.runDockerScan(scanId, imageReference, registryAuthToken, registryInsecure));
   }
 
   public @NonNull Optional<ScanJob> getStatus(final @NonNull String scanId) {
     return this.jobStore.get(scanId);
+  }
+
+  // Rejection here means the task never started, so the worker's own finally-block cleanup
+  // (see runFileScan) never runs — the temp file and the stuck QUEUED job must be handled here.
+  private void enqueue(
+      final @NonNull String scanId,
+      final @Nullable Path artifactPath,
+      final @NonNull Runnable task) {
+
+    try {
+      this.scanWorkerExecutor.execute(task);
+    } catch (final RejectedExecutionException exception) {
+      log.error("Failed to enqueue scan {}: worker queue full", scanId, exception);
+      this.updateStatus(scanId, job -> job.toFailed("Scanner busy, please retry"));
+
+      if (artifactPath != null) {
+        this.deleteQuietly(artifactPath);
+      }
+    }
   }
 
   private void runFileScan(

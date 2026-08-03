@@ -23,7 +23,8 @@ import org.jspecify.annotations.NonNull;
 public interface JobStore {
 
   // No-op if scanId is already present, so a retried submit never re-enqueues duplicate work.
-  void putIfAbsent(@NonNull String scanId, @NonNull ScanJob job);
+  // Returns true if job was newly added, false if scanId was already present.
+  boolean putIfAbsent(@NonNull String scanId, @NonNull ScanJob job);
 
   @NonNull Optional<ScanJob> get(@NonNull String scanId);
 

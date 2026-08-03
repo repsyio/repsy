@@ -33,8 +33,8 @@ public class InMemoryJobStore implements JobStore {
   private final ConcurrentHashMap<String, ScanJob> jobs = new ConcurrentHashMap<>();
 
   @Override
-  public void putIfAbsent(final @NonNull String scanId, final @NonNull ScanJob job) {
-    this.jobs.putIfAbsent(scanId, job);
+  public boolean putIfAbsent(final @NonNull String scanId, final @NonNull ScanJob job) {
+    return this.jobs.putIfAbsent(scanId, job) == null;
   }
 
   @Override

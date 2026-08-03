@@ -40,9 +40,6 @@ public class ScanWorkerExecutorConfig {
     executor.setQueueCapacity(QUEUE_CAPACITY);
     executor.setThreadNamePrefix("scan-worker-");
 
-    // A pod being drained (SIGTERM) should let its currently-running scan finish rather than
-    // killing it mid-way; queued-but-not-started work is intentionally NOT waited for here, since
-    // cloud-server's orphan-detection polling already reclaims jobs the scanner never got to.
     executor.setWaitForTasksToCompleteOnShutdown(true);
     executor.setAwaitTerminationSeconds((int) this.trivyProperties.timeoutSeconds());
 
