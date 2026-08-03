@@ -116,9 +116,7 @@ public class TrivyScanService {
 
     Path extractedDir = null;
     try {
-      if (fileName != null && TarGzExtractor.isTarGz(fileName)) {
-        extractedDir = this.extractTarGz(artifactPath);
-      }
+      extractedDir = this.extractIfArchive(artifactPath, fileName);
 
       final var scanTarget = extractedDir != null ? extractedDir : artifactPath;
       final var outcome = this.runAndParse(this.buildRootfsCommand(scanTarget));
@@ -171,9 +169,35 @@ public class TrivyScanService {
     this.jobStore.get(scanId).ifPresent(job -> this.jobStore.update(scanId, transition.apply(job)));
   }
 
+  private @Nullable Path extractIfArchive(
+      final @NonNull Path artifactPath, final @Nullable String fileName) {
+
+    if (fileName == null) {
+      return null;
+    }
+
+    if (TarGzExtractor.isTarGz(fileName)) {
+      return this.extractTarGz(artifactPath);
+    }
+
+    if (WheelExtractor.isWheel(fileName)) {
+      return this.extractWheel(artifactPath);
+    }
+
+    return null;
+  }
+
   private @NonNull Path extractTarGz(final @NonNull Path artifactPath) {
     try {
       return TarGzExtractor.extract(artifactPath);
+    } catch (final IOException exception) {
+      throw new TrivyScanException("Failed to extract archive for scanning", exception);
+    }
+  }
+
+  private @NonNull Path extractWheel(final @NonNull Path artifactPath) {
+    try {
+      return WheelExtractor.extract(artifactPath);
     } catch (final IOException exception) {
       throw new TrivyScanException("Failed to extract archive for scanning", exception);
     }
