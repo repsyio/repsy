@@ -52,6 +52,9 @@ public class TrivyScanService {
 
   private static final String DEFAULT_EXTENSION = "bin";
 
+  private static final int MAX_ERROR_MESSAGE_LENGTH = 1900;
+  private static final String TRUNCATION_SUFFIX = "... [truncated]";
+
   private final @NonNull TrivyScannerProperties properties;
   private final @NonNull ObjectMapper objectMapper;
   private final @NonNull JobStore jobStore;
@@ -310,7 +313,8 @@ public class TrivyScanService {
     }
 
     if (process.exitValue() != 0) {
-      throw new TrivyScanException("trivy exited with code " + process.exitValue() + ": " + stderr);
+      throw new TrivyScanException(
+          truncateErrorMessage("trivy exited with code " + process.exitValue() + ": " + stderr));
     }
 
     return stdout;
@@ -362,8 +366,17 @@ public class TrivyScanService {
   }
 
   private static @NonNull String resolveFailureMessage(final @NonNull Exception exception) {
-    return exception.getMessage() != null
-        ? exception.getMessage()
-        : exception.getClass().getSimpleName();
+    final var message =
+        exception.getMessage() != null ? exception.getMessage() : exception.getClass().getSimpleName();
+
+    return truncateErrorMessage(message);
+  }
+
+  private static @NonNull String truncateErrorMessage(final @NonNull String message) {
+    if (message.length() <= MAX_ERROR_MESSAGE_LENGTH) {
+      return message;
+    }
+
+    return message.substring(0, MAX_ERROR_MESSAGE_LENGTH) + TRUNCATION_SUFFIX;
   }
 }
