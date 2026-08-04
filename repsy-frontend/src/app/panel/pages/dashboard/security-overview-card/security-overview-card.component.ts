@@ -41,13 +41,11 @@ export class SecurityOverviewCardComponent implements OnInit {
       .pipe(finalize(() => (this.loading = false)))
       .subscribe({
         next: (summary) => {
-          const severities = Object.values(summary);
-          this.totalRepoCount = severities.length;
+          const repoSummaries = Object.values(summary);
+          this.totalRepoCount = repoSummaries.length;
 
-
-
-          this.criticalOrHighCount = severities.filter(
-            (severity) => severity === Severity.Critical || severity === Severity.High,
+          this.criticalOrHighCount = repoSummaries.filter(
+            (repoSummary) => repoSummary.severity === Severity.Critical || repoSummary.severity === Severity.High,
           ).length;
         },
         error: () => {},

@@ -257,7 +257,8 @@
                   <app-repo-security-badge
                     [repoName]="repo.name"
                     [repoType]="repo.repoType"
-                    [severity]="securitySummary[repo.name] ?? null"
+                    [severity]="securitySummary[repo.name]?.severity ?? null"
+                    [scanned]="securitySummary[repo.name]?.scanned ?? false"
                   />
                 </div>
 
@@ -557,7 +558,8 @@
                 <app-repo-security-badge
                     [repoName]="repo.name"
                     [repoType]="repo.repoType"
-                    [severity]="securitySummary[repo.name] ?? null"
+                    [severity]="securitySummary[repo.name]?.severity ?? null"
+                    [scanned]="securitySummary[repo.name]?.scanned ?? false"
                   />
               </div>
 

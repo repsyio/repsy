@@ -117,6 +117,7 @@
                   [artifactName]="pkg.name"
                   [packageRoute]="packageRoute(pkg)"
                   [severity]="securitySummary[pkg.name]?.severity ?? null"
+                  [scanned]="securitySummary[pkg.name]?.scanned ?? false"
                 />
 
                 <a
@@ -250,6 +251,7 @@
                     [artifactName]="pkg.name"
                     [packageRoute]="packageRoute(pkg)"
                     [severity]="securitySummary[pkg.name]?.severity ?? null"
+                    [scanned]="securitySummary[pkg.name]?.scanned ?? false"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

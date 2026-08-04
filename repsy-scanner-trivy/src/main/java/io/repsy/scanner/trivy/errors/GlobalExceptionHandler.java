@@ -37,6 +37,13 @@ public class GlobalExceptionHandler {
         .body(new ErrorResponse(exception.getMessage()));
   }
 
+  @ExceptionHandler(ScanJobNotFoundException.class)
+  public @NonNull ResponseEntity<ErrorResponse> handleScanJobNotFound(
+      final @NonNull ScanJobNotFoundException exception) {
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .body(new ErrorResponse(exception.getMessage()));
+  }
+
   @ExceptionHandler({
     ConstraintViolationException.class,
     IllegalArgumentException.class,

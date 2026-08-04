@@ -98,6 +98,7 @@
                   [artifactName]="image.name"
                   [packageRoute]="packageRoute(image)"
                   [severity]="securitySummary[image.name]?.severity ?? null"
+                  [scanned]="securitySummary[image.name]?.scanned ?? false"
                 />
 
                 <app-tooltip
@@ -176,6 +177,7 @@
                     [artifactName]="image.name"
                     [packageRoute]="packageRoute(image)"
                     [severity]="securitySummary[image.name]?.severity ?? null"
+                    [scanned]="securitySummary[image.name]?.scanned ?? false"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

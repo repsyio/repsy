@@ -13,13 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.scanner.trivy.gate;
+package io.repsy.scanner.trivy.dtos;
 
 import org.jspecify.annotations.NonNull;
 
-public final class GateAcquisitionTimeoutException extends RuntimeException {
-
-  public GateAcquisitionTimeoutException(final @NonNull String message) {
-    super(message);
-  }
-}
+public record ScanSubmissionResponse(@NonNull String scanId, @NonNull ScanJobStatus status) {}

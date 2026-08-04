@@ -13,10 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.scanner.trivy.config;
+package io.repsy.scanner.trivy.jobs;
 
+import io.repsy.scanner.trivy.dtos.ScanJob;
+import java.time.Instant;
+import java.util.Optional;
 import org.jspecify.annotations.NonNull;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 
-@ConfigurationProperties(prefix = "scanner.trivy")
-public record TrivyScannerProperties(@NonNull String binaryPath, long timeoutSeconds) {}
+public interface JobStore {
+
+  // No-op if scanId is already present, so a retried submit never re-enqueues duplicate work.
+  // Returns true if job was newly added, false if scanId was already present.
+  boolean putIfAbsent(@NonNull String scanId, @NonNull ScanJob job);
+
+  @NonNull Optional<ScanJob> get(@NonNull String scanId);
+
+  void update(@NonNull String scanId, @NonNull ScanJob updated);
+
+  void removeCompletedBefore(@NonNull Instant threshold);
+}

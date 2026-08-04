@@ -36,6 +36,7 @@ export class PackageSecurityBadgeComponent implements OnInit {
   @Input({ required: true }) public packageRoute: string;
   @Input() public packageQueryParams?: Record<string, string>;
   @Input() public severity: Severity | null = null;
+  @Input() public scanned = false;
 
   public isSupported$: Observable<boolean>;
   public showModal = false;

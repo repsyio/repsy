@@ -74,6 +74,7 @@
                   [artifactName]="pkg.packageId"
                   [packageRoute]="packageRoute(pkg)"
                   [severity]="securitySummary[pkg.packageId]?.severity ?? null"
+                  [scanned]="securitySummary[pkg.packageId]?.scanned ?? false"
                 />
                 <app-tooltip
                   class="text-[#FDFDFD]"
@@ -141,6 +142,7 @@
                     [artifactName]="pkg.packageId"
                     [packageRoute]="packageRoute(pkg)"
                     [severity]="securitySummary[pkg.packageId]?.severity ?? null"
+                    [scanned]="securitySummary[pkg.packageId]?.scanned ?? false"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

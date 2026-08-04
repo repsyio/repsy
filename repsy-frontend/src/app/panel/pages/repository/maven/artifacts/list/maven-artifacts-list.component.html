@@ -147,6 +147,7 @@
                     [artifactName]="packageSecurityKey(artifact)"
                     [packageRoute]="packageRoute(artifact)"
                     [severity]="securitySummary[packageSecurityKey(artifact)]?.severity ?? null"
+                    [scanned]="securitySummary[packageSecurityKey(artifact)]?.scanned ?? false"
                   />
 
                   <a
@@ -283,6 +284,7 @@
                       [artifactName]="packageSecurityKey(artifact)"
                       [packageRoute]="packageRoute(artifact)"
                       [severity]="securitySummary[packageSecurityKey(artifact)]?.severity ?? null"
+                      [scanned]="securitySummary[packageSecurityKey(artifact)]?.scanned ?? false"
                     />
                   </div>
                   <div class="flex justify-between gap-2">

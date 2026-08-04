@@ -13,19 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.scanner.trivy;
+package io.repsy.scanner.trivy.dtos;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
-import org.springframework.scheduling.annotation.EnableScheduling;
-
-@SpringBootApplication
-@ConfigurationPropertiesScan
-@EnableScheduling
-public class TrivyScannerApplication {
-
-  public static void main(final String[] args) {
-    SpringApplication.run(TrivyScannerApplication.class, args);
-  }
+public enum ScanJobStatus {
+  QUEUED,
+  RUNNING,
+  COMPLETED,
+  FAILED
 }

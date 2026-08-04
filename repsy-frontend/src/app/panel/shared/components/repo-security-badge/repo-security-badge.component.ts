@@ -33,6 +33,7 @@ export class RepoSecurityBadgeComponent implements OnInit {
   @Input({ required: true }) public repoName: string;
   @Input({ required: true }) public repoType: string;
   @Input() public severity: Severity | null = null;
+  @Input() public scanned = false;
 
   public isSupported$: Observable<boolean>;
   public showModal = false;

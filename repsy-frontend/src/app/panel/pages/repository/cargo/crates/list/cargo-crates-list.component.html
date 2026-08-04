@@ -81,6 +81,7 @@
                   [artifactName]="crate.name"
                   [packageRoute]="packageRoute(crate)"
                   [severity]="securitySummary[crate.name]?.severity ?? null"
+                  [scanned]="securitySummary[crate.name]?.scanned ?? false"
                 />
                 <app-tooltip
                   class="text-[#FDFDFD]"
@@ -162,6 +163,7 @@
                     [artifactName]="crate.name"
                     [packageRoute]="packageRoute(crate)"
                     [severity]="securitySummary[crate.name]?.severity ?? null"
+                    [scanned]="securitySummary[crate.name]?.scanned ?? false"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

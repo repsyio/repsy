@@ -20,6 +20,7 @@ import { map,Observable } from 'rxjs';
 import {
   PagedModelVulnerabilityScanInfo,
   RepoSecurityDetail,
+  RepoSecuritySummary,
   RepoType,
   SecurityScanControllerService,
   SecurityScansSummary,
@@ -55,10 +56,10 @@ export class SecurityService {
       .pipe(map((r) => r.data!));
   }
 
-  public getSecuritySummary(repoNames?: string[]): Observable<Record<string, Severity | null>> {
+  public getSecuritySummary(repoNames?: string[]): Observable<Record<string, RepoSecuritySummary>> {
     return this.vulnerabilityScanControllerService
       .getSecuritySummary(this.authorizationHeader, repoNames)
-      .pipe(map((r) => (r.data ?? {}) as Record<string, Severity | null>));
+      .pipe(map((r) => r.data ?? {}));
   }
 
   public getVersionSecuritySummary(
