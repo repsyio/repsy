@@ -21,6 +21,7 @@ import io.repsy.os.server.protocols.cargo.shared.crate.storage.configs.CargoFile
 import io.repsy.os.server.protocols.docker.shared.storage.configs.DockerFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.golang.shared.storage.configs.GolangFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.helm.shared.storage.configs.HelmFileSystemStorageBackendConfigProps;
+import io.repsy.os.server.protocols.maven.shared.keystore.configs.PgpPublicKeyserverFallbackProperties;
 import io.repsy.os.server.protocols.maven.shared.storage.configs.MavenFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.npm.shared.storage.configs.NpmFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.nuget.shared.storage.configs.NuGetFileSystemStorageBackendConfigProps;
@@ -49,6 +50,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
   RubyFileSystemStorageBackendConfigProps.class,
   TrivyScannerProperties.class,
   DockerRegistryProperties.class,
+  PgpPublicKeyserverFallbackProperties.class,
 })
 @EnableAsync
 @SpringBootApplication(
