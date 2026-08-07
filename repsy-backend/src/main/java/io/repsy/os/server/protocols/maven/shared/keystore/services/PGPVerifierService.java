@@ -20,7 +20,6 @@ import static org.bouncycastle.openpgp.PGPUtil.getDecoderStream;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
-import io.repsy.os.server.protocols.maven.shared.keystore.configs.PgpPublicKeyserverFallbackProperties;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,8 +45,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 @Slf4j
 @Service
@@ -56,8 +53,6 @@ public class PGPVerifierService {
 
   private static final String KEY_ID_FORMAT = "%016X";
   private static final int PGP_BUFFER_SIZE = 4_096;
-  private static final @NonNull String PGP_PUBLIC_KEY_MARKER =
-      "-----BEGIN PGP PUBLIC KEY BLOCK-----";
   private static final @NonNull Set<String> KEY_SERVERS =
       Set.of(
           "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x%s",
@@ -65,8 +60,6 @@ public class PGPVerifierService {
 
   @Qualifier("pgpVerifierWebClient")
   private final @NonNull WebClient webClient;
-
-  private final @NonNull PgpPublicKeyserverFallbackProperties pgpPublicKeyserverFallbackProperties;
 
   @SneakyThrows
   public void verify(
@@ -120,20 +113,15 @@ public class PGPVerifierService {
       return customKey;
     }
 
-    if (!this.pgpPublicKeyserverFallbackProperties.enabled()) {
-      return Optional.empty();
+    for (final var serverTemplate : KEY_SERVERS) {
+      final var key = this.fetchKeyFromServer(serverTemplate.formatted(keyIdHex), keyId);
+
+      if (key.isPresent()) {
+        return key;
+      }
     }
 
-    return this.fetchFromPublicKeyServers(keyIdHex, keyId);
-  }
-
-  private @NonNull Optional<PGPPublicKey> fetchFromPublicKeyServers(
-      final @NonNull String keyIdHex, final long keyId) {
-
-    return Flux.fromIterable(KEY_SERVERS)
-        .flatMap(serverTemplate -> this.fetchKeyReactive(serverTemplate.formatted(keyIdHex), keyId))
-        .next()
-        .blockOptional();
+    return Optional.empty();
   }
 
   private @NonNull Optional<PGPPublicKey> findInCustomHosts(
@@ -199,44 +187,11 @@ public class PGPVerifierService {
             .onErrorReturn("")
             .block();
 
-    if (keyData != null && keyData.contains(PGP_PUBLIC_KEY_MARKER)) {
+    if (keyData != null && keyData.contains("-----BEGIN PGP PUBLIC KEY BLOCK-----")) {
       return this.parsePublicKey(keyData, keyId);
     }
 
     return Optional.empty();
-  }
-
-  private @NonNull Mono<PGPPublicKey> fetchKeyReactive(
-      final @NonNull String serverUrl, final long keyId) {
-
-    return this.webClient
-        .get()
-        .uri(serverUrl)
-        .retrieve()
-        .bodyToMono(String.class)
-        .mapNotNull(keyData -> this.tryParseKey(keyData, keyId))
-        .onErrorResume(error -> this.logFetchFailureAndReturnEmpty(serverUrl, error));
-  }
-
-  private @Nullable PGPPublicKey tryParseKey(final @NonNull String keyData, final long keyId) {
-
-    if (!keyData.contains(PGP_PUBLIC_KEY_MARKER)) {
-      return null;
-    }
-
-    try {
-      return this.parsePublicKey(keyData, keyId).orElse(null);
-    } catch (final PGPException | IOException exception) {
-      log.debug("Failed to parse PGP key data: {}", exception.getMessage());
-      return null;
-    }
-  }
-
-  private @NonNull Mono<PGPPublicKey> logFetchFailureAndReturnEmpty(
-      final @NonNull String serverUrl, final @NonNull Throwable error) {
-
-    log.debug("Failed to fetch key from server {}: {}", serverUrl, error.getMessage());
-    return Mono.empty();
   }
 
   private @NonNull Optional<PGPPublicKey> parsePublicKey(

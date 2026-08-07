@@ -91,10 +91,6 @@ os:
   app:
     schema: public
 
-    pgp:
-      public-keyserver-fallback:
-        enabled: ${PGP_PUBLIC_KEYSERVER_FALLBACK_ENABLED:true}
-
     storage:
       file-system:
         maven:
