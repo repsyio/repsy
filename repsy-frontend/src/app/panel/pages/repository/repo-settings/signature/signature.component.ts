@@ -51,7 +51,6 @@ export class SignatureComponent implements OnInit {
 
   public readonly wellKnownServers = [
     { host: 'keyserver.ubuntu.com', displayName: 'Ubuntu Keyserver' },
-    { host: 'pgp.mit.edu', displayName: 'MIT PGP Public Key Server' },
     { host: 'keys.openpgp.org', displayName: 'OpenPGP Keyserver' },
   ];
 
