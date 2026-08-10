@@ -40,7 +40,7 @@ importers:
         version: 9.39.4
       '@ngx-env/builder':
         specifier: ^21.0.1
-        version: 21.0.1(@angular/build@21.2.11(@angular/compiler-cli@21.2.13(@angular/compiler@21.2.13)(typescript@5.9.3))(@angular/compiler@21.2.13)(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(@angular/platform-browser@21.2.13(@angular/animations@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@25.9.1)(chokidar@5.0.0)(jiti@2.7.0)(karma@6.4.4)(lightningcss@1.32.0)(postcss@8.5.15)(tailwindcss@4.3.0)(terser@5.49.2)(tslib@2.8.1)(typescript@5.9.3))(webpack@5.106.2(lightningcss@1.32.0)(postcss@8.5.15))
+        version: 21.0.1(@angular/build@21.2.11(@angular/compiler-cli@21.2.13(@angular/compiler@21.2.13)(typescript@5.9.3))(@angular/compiler@21.2.13)(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(@angular/platform-browser@21.2.13(@angular/animations@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@25.9.1)(chokidar@5.0.0)(jiti@2.7.0)(karma@6.4.4)(lightningcss@1.32.0)(postcss@8.5.26)(tailwindcss@4.3.0)(terser@5.49.2)(tslib@2.8.1)(typescript@5.9.3))(webpack@5.106.2(lightningcss@1.32.0)(postcss@8.5.26))
       '@stripe/stripe-js':
         specifier: ^8.11.0
         version: 8.11.0
@@ -75,8 +75,8 @@ importers:
         specifier: ^21.3.0
         version: 21.3.0(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(@angular/platform-browser@21.2.13(@angular/animations@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(marked@18.0.3)(rxjs@7.8.2)(zone.js@0.16.2)
       postcss:
-        specifier: ^8.5.15
-        version: 8.5.15
+        specifier: ^8.5.26
+        version: 8.5.26
       remixicon:
         specifier: ^4.9.1
         version: 4.9.1
@@ -110,7 +110,7 @@ importers:
         version: 21.4.0(@angular-eslint/template-parser@21.4.0(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(@typescript-eslint/types@8.60.0)(@typescript-eslint/utils@8.59.4(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3)
       '@angular/build':
         specifier: ^21.2.11
-        version: 21.2.11(@angular/compiler-cli@21.2.13(@angular/compiler@21.2.13)(typescript@5.9.3))(@angular/compiler@21.2.13)(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(@angular/platform-browser@21.2.13(@angular/animations@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@25.9.1)(chokidar@5.0.0)(jiti@2.7.0)(karma@6.4.4)(lightningcss@1.32.0)(postcss@8.5.15)(tailwindcss@4.3.0)(terser@5.49.2)(tslib@2.8.1)(typescript@5.9.3)
+        version: 21.2.11(@angular/compiler-cli@21.2.13(@angular/compiler@21.2.13)(typescript@5.9.3))(@angular/compiler@21.2.13)(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(@angular/platform-browser@21.2.13(@angular/animations@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@25.9.1)(chokidar@5.0.0)(jiti@2.7.0)(karma@6.4.4)(lightningcss@1.32.0)(postcss@8.5.26)(tailwindcss@4.3.0)(terser@5.49.2)(tslib@2.8.1)(typescript@5.9.3)
       '@angular/cli':
         specifier: ^21.2.11
         version: 21.2.11(@types/node@25.9.1)(chokidar@5.0.0)
@@ -122,7 +122,7 @@ importers:
         version: 2.40.1
       '@tailwindcss/nesting':
         specifier: 0.0.0-insiders.565cd3e
-        version: 0.0.0-insiders.565cd3e(postcss@8.5.15)
+        version: 0.0.0-insiders.565cd3e(postcss@8.5.26)
       '@types/jasmine':
         specifier: ~5.1.15
         version: 5.1.15
@@ -146,7 +146,7 @@ importers:
         version: 21.4.0(@angular/cli@21.2.11(@types/node@25.9.1)(chokidar@5.0.0))(chokidar@5.0.0)(eslint@9.39.4(jiti@2.7.0))(typescript-eslint@8.59.4(eslint@9.39.4(jiti@2.7.0))(typescript@5.9.3))(typescript@5.9.3)
       autoprefixer:
         specifier: ^10.5.4
-        version: 10.5.4(postcss@8.5.15)
+        version: 10.5.4(postcss@8.5.26)
       daisyui:
         specifier: ^5.5.20
         version: 5.5.20
@@ -3596,13 +3596,8 @@ packages:
     resolution: {integrity: sha512-WWdIxpyjEn+FhQJQQv9aQAYlHoNVdzIzUySNV1gHUPDSdZJ3yZn7pAAbQcV7B56Mvu881q9FZV+0Vx2xC44VWA==}
     engines: {node: ^18.17.0 || >=20.5.0}
 
-  nanoid@3.3.12:
-    resolution: {integrity: sha512-ZB9RH/39qpq5Vu6Y+NmUaFhQR6pp+M2Xt76XBnEwDaGcVAqhlvxrl3B2bKS5D3NH3QR76v3aSrKaF/Kiy7lEtQ==}
-    engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
-    hasBin: true
-
-  nanoid@3.3.16:
-    resolution: {integrity: sha512-bzlKTyNJ7+LdGIIwy8ijFpIqEQIvafahV7eYykJ8Cvh42EdJeODoJ6gUJXpQJvej1BddH8OqTXZNE/KfbWAu8Q==}
+  nanoid@3.3.18:
+    resolution: {integrity: sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
@@ -3896,12 +3891,8 @@ packages:
   postcss-value-parser@4.2.0:
     resolution: {integrity: sha512-1NNCs6uurfkVbeXG4S8JFT9t19m45ICnif8zWLd5oPSZ50QnwMfK+H3jv408d4jw/7Bttv5axS5IiHoLaVNHeQ==}
 
-  postcss@8.5.15:
-    resolution: {integrity: sha512-FfR8sjd4em2T6fb3I2MwAJU7HWVMr9zba+enmQeeWFfCbm+UOC/0X4DS8XtpUTMwWMGbjKYP7xjfNekzyGmB3A==}
-    engines: {node: ^10 || ^12 || >=14}
-
-  postcss@8.5.24:
-    resolution: {integrity: sha512-8RyVklq0owXUTa4xlpzu4l9AaVKIdQvAcOHZWaMh98HgySsUtxRVf/chRe3dsSLqb6i40BzGRzEUddRaI+9TSw==}
+  postcss@8.5.26:
+    resolution: {integrity: sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==}
     engines: {node: ^10 || ^12 || >=14}
 
   prelude-ls@1.2.1:
@@ -4954,7 +4945,7 @@ snapshots:
       '@angular/core': 21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)
       tslib: 2.8.1
 
-  '@angular/build@21.2.11(@angular/compiler-cli@21.2.13(@angular/compiler@21.2.13)(typescript@5.9.3))(@angular/compiler@21.2.13)(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(@angular/platform-browser@21.2.13(@angular/animations@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@25.9.1)(chokidar@5.0.0)(jiti@2.7.0)(karma@6.4.4)(lightningcss@1.32.0)(postcss@8.5.15)(tailwindcss@4.3.0)(terser@5.49.2)(tslib@2.8.1)(typescript@5.9.3)':
+  '@angular/build@21.2.11(@angular/compiler-cli@21.2.13(@angular/compiler@21.2.13)(typescript@5.9.3))(@angular/compiler@21.2.13)(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(@angular/platform-browser@21.2.13(@angular/animations@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@25.9.1)(chokidar@5.0.0)(jiti@2.7.0)(karma@6.4.4)(lightningcss@1.32.0)(postcss@8.5.26)(tailwindcss@4.3.0)(terser@5.49.2)(tslib@2.8.1)(typescript@5.9.3)':
     dependencies:
       '@ampproject/remapping': 2.3.0
       '@angular-devkit/architect': 0.2102.11(chokidar@5.0.0)
@@ -4992,7 +4983,7 @@ snapshots:
       '@angular/platform-browser': 21.2.13(@angular/animations@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))
       karma: 6.4.4
       lmdb: 3.5.1
-      postcss: 8.5.15
+      postcss: 8.5.26
       tailwindcss: 4.3.0
     transitivePeerDependencies:
       - '@emnapi/core'
@@ -5231,10 +5222,10 @@ snapshots:
       find-up: 5.0.0
     optional: true
 
-  '@dotenv-run/webpack@1.5.2(webpack@5.106.2(lightningcss@1.32.0)(postcss@8.5.15))':
+  '@dotenv-run/webpack@1.5.2(webpack@5.106.2(lightningcss@1.32.0)(postcss@8.5.26))':
     dependencies:
       '@dotenv-run/core': 1.3.8
-      webpack: 5.106.2(lightningcss@1.32.0)(postcss@8.5.15)
+      webpack: 5.106.2(lightningcss@1.32.0)(postcss@8.5.26)
     optional: true
 
   '@emnapi/core@1.10.0':
@@ -5777,12 +5768,12 @@ snapshots:
       tslib: 2.8.1
       uid: 2.0.2
 
-  '@ngx-env/builder@21.0.1(@angular/build@21.2.11(@angular/compiler-cli@21.2.13(@angular/compiler@21.2.13)(typescript@5.9.3))(@angular/compiler@21.2.13)(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(@angular/platform-browser@21.2.13(@angular/animations@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@25.9.1)(chokidar@5.0.0)(jiti@2.7.0)(karma@6.4.4)(lightningcss@1.32.0)(postcss@8.5.15)(tailwindcss@4.3.0)(terser@5.49.2)(tslib@2.8.1)(typescript@5.9.3))(webpack@5.106.2(lightningcss@1.32.0)(postcss@8.5.15))':
+  '@ngx-env/builder@21.0.1(@angular/build@21.2.11(@angular/compiler-cli@21.2.13(@angular/compiler@21.2.13)(typescript@5.9.3))(@angular/compiler@21.2.13)(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(@angular/platform-browser@21.2.13(@angular/animations@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@25.9.1)(chokidar@5.0.0)(jiti@2.7.0)(karma@6.4.4)(lightningcss@1.32.0)(postcss@8.5.26)(tailwindcss@4.3.0)(terser@5.49.2)(tslib@2.8.1)(typescript@5.9.3))(webpack@5.106.2(lightningcss@1.32.0)(postcss@8.5.26))':
     dependencies:
-      '@angular/build': 21.2.11(@angular/compiler-cli@21.2.13(@angular/compiler@21.2.13)(typescript@5.9.3))(@angular/compiler@21.2.13)(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(@angular/platform-browser@21.2.13(@angular/animations@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@25.9.1)(chokidar@5.0.0)(jiti@2.7.0)(karma@6.4.4)(lightningcss@1.32.0)(postcss@8.5.15)(tailwindcss@4.3.0)(terser@5.49.2)(tslib@2.8.1)(typescript@5.9.3)
+      '@angular/build': 21.2.11(@angular/compiler-cli@21.2.13(@angular/compiler@21.2.13)(typescript@5.9.3))(@angular/compiler@21.2.13)(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(@angular/platform-browser@21.2.13(@angular/animations@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@angular/common@21.2.13(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2))(rxjs@7.8.2))(@angular/core@21.2.13(@angular/compiler@21.2.13)(rxjs@7.8.2)(zone.js@0.16.2)))(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@25.9.1)(chokidar@5.0.0)(jiti@2.7.0)(karma@6.4.4)(lightningcss@1.32.0)(postcss@8.5.26)(tailwindcss@4.3.0)(terser@5.49.2)(tslib@2.8.1)(typescript@5.9.3)
       glob: 10.5.0
     optionalDependencies:
-      '@dotenv-run/webpack': 1.5.2(webpack@5.106.2(lightningcss@1.32.0)(postcss@8.5.15))
+      '@dotenv-run/webpack': 1.5.2(webpack@5.106.2(lightningcss@1.32.0)(postcss@8.5.26))
     transitivePeerDependencies:
       - webpack
 
@@ -6115,10 +6106,10 @@ snapshots:
 
   '@stripe/stripe-js@8.11.0': {}
 
-  '@tailwindcss/nesting@0.0.0-insiders.565cd3e(postcss@8.5.15)':
+  '@tailwindcss/nesting@0.0.0-insiders.565cd3e(postcss@8.5.26)':
     dependencies:
-      postcss: 8.5.15
-      postcss-nested: 5.0.6(postcss@8.5.15)
+      postcss: 8.5.26
+      postcss-nested: 5.0.6(postcss@8.5.26)
 
   '@tailwindcss/node@4.3.3':
     dependencies:
@@ -6186,7 +6177,7 @@ snapshots:
       '@alloc/quick-lru': 5.2.0
       '@tailwindcss/node': 4.3.3
       '@tailwindcss/oxide': 4.3.3
-      postcss: 8.5.24
+      postcss: 8.5.26
       tailwindcss: 4.3.3
 
   '@tailwindcss/typography@0.5.19(tailwindcss@4.3.0)':
@@ -6458,7 +6449,7 @@ snapshots:
       '@vue/shared': 3.5.34
       estree-walker: 2.0.2
       magic-string: 0.30.21
-      postcss: 8.5.24
+      postcss: 8.5.26
       source-map-js: 1.2.1
 
   '@vue/compiler-ssr@3.5.34':
@@ -6722,13 +6713,13 @@ snapshots:
 
   asynckit@0.4.0: {}
 
-  autoprefixer@10.5.4(postcss@8.5.15):
+  autoprefixer@10.5.4(postcss@8.5.26):
     dependencies:
       browserslist: 4.28.8
       caniuse-lite: 1.0.30001809
       fraction.js: 5.3.4
       picocolors: 1.1.1
-      postcss: 8.5.15
+      postcss: 8.5.26
       postcss-value-parser: 4.2.0
 
   axios@1.19.0:
@@ -6763,9 +6754,9 @@ snapshots:
       domhandler: 5.0.3
       htmlparser2: 10.1.0
       picocolors: 1.1.1
-      postcss: 8.5.24
+      postcss: 8.5.26
       postcss-media-query-parser: 0.2.3
-      postcss-safe-parser: 7.0.1(postcss@8.5.24)
+      postcss-safe-parser: 7.0.1(postcss@8.5.26)
 
   binary-extensions@2.3.0: {}
 
@@ -8326,9 +8317,7 @@ snapshots:
 
   mute-stream@2.0.0: {}
 
-  nanoid@3.3.12: {}
-
-  nanoid@3.3.16: {}
+  nanoid@3.3.18: {}
 
   natural-compare@1.4.0: {}
 
@@ -8610,14 +8599,14 @@ snapshots:
 
   postcss-media-query-parser@0.2.3: {}
 
-  postcss-nested@5.0.6(postcss@8.5.15):
+  postcss-nested@5.0.6(postcss@8.5.26):
     dependencies:
-      postcss: 8.5.15
+      postcss: 8.5.26
       postcss-selector-parser: 6.1.2
 
-  postcss-safe-parser@7.0.1(postcss@8.5.24):
+  postcss-safe-parser@7.0.1(postcss@8.5.26):
     dependencies:
-      postcss: 8.5.24
+      postcss: 8.5.26
 
   postcss-selector-parser@6.0.10:
     dependencies:
@@ -8631,15 +8620,9 @@ snapshots:
 
   postcss-value-parser@4.2.0: {}
 
-  postcss@8.5.15:
+  postcss@8.5.26:
     dependencies:
-      nanoid: 3.3.12
-      picocolors: 1.1.1
-      source-map-js: 1.2.1
-
-  postcss@8.5.24:
-    dependencies:
-      nanoid: 3.3.16
+      nanoid: 3.3.18
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
@@ -9139,16 +9122,16 @@ snapshots:
       minizlib: 3.1.0
       yallist: 5.0.0
 
-  terser-webpack-plugin@5.6.1(lightningcss@1.32.0)(postcss@8.5.15)(webpack@5.106.2(lightningcss@1.32.0)(postcss@8.5.15)):
+  terser-webpack-plugin@5.6.1(lightningcss@1.32.0)(postcss@8.5.26)(webpack@5.106.2(lightningcss@1.32.0)(postcss@8.5.26)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
       schema-utils: 4.3.3
       terser: 5.49.2
-      webpack: 5.106.2(lightningcss@1.32.0)(postcss@8.5.15)
+      webpack: 5.106.2(lightningcss@1.32.0)(postcss@8.5.26)
     optionalDependencies:
       lightningcss: 1.32.0
-      postcss: 8.5.15
+      postcss: 8.5.26
     optional: true
 
   terser@5.49.2:
@@ -9284,7 +9267,7 @@ snapshots:
       esbuild: 0.27.3
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
-      postcss: 8.5.24
+      postcss: 8.5.26
       rollup: 4.60.4
       tinyglobby: 0.2.15
     optionalDependencies:
@@ -9320,7 +9303,7 @@ snapshots:
   webpack-sources@3.5.1:
     optional: true
 
-  webpack@5.106.2(lightningcss@1.32.0)(postcss@8.5.15):
+  webpack@5.106.2(lightningcss@1.32.0)(postcss@8.5.26):
     dependencies:
       '@types/eslint-scope': 3.7.7
       '@types/estree': 1.0.9
@@ -9343,7 +9326,7 @@ snapshots:
       neo-async: 2.6.2
       schema-utils: 4.3.3
       tapable: 2.3.3
-      terser-webpack-plugin: 5.6.1(lightningcss@1.32.0)(postcss@8.5.15)(webpack@5.106.2(lightningcss@1.32.0)(postcss@8.5.15))
+      terser-webpack-plugin: 5.6.1(lightningcss@1.32.0)(postcss@8.5.26)(webpack@5.106.2(lightningcss@1.32.0)(postcss@8.5.26))
       watchpack: 2.5.2
       webpack-sources: 3.5.1
     transitivePeerDependencies:
