@@ -35,10 +35,6 @@
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "css",
             "assets": [
-              {
-                "glob": "**/*",
-                "input": "src/assets"
-              },
               "src/favicon.ico",
               "src/assets"
             ],
@@ -106,10 +102,6 @@
             "tsConfig": "tsconfig.spec.json",
             "inlineStyleLanguage": "css",
             "assets": [
-              {
-                "glob": "**/*",
-                "input": "src/assets"
-              },
               "src/favicon.ico",
               "src/assets"
             ],

@@ -2,6 +2,10 @@ spring:
   application:
     name: repsy-backend
 
+  web:
+    resources:
+      static-locations: file:./static/
+
   datasource:
     url: ${DB_URL:jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
     username: ${DB_USERNAME:repsy}

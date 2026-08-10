@@ -1,3 +1,4 @@
 window.__env = {
-  apiBaseUrl: 'http://localhost:8080'
+  apiBaseUrl: '__API_BASE_URL__',
+  repoBaseUrl: '__REPO_BASE_URL__'
 };

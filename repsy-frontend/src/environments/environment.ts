@@ -14,8 +14,22 @@
 /// limitations under the License.
 ///
 
+declare global {
+  interface Window {
+    __env?: { apiBaseUrl?: string; repoBaseUrl?: string };
+  }
+}
+
+function resolveRuntimeValue(rawValue: string | undefined, devDefault: string): string {
+  // undefined => static-env.js yuklenmedi/alan yok; placeholder => sed hic calismadi (ng serve)
+  if (rawValue === undefined || /^__.*__$/.test(rawValue)) {
+    return devDefault;
+  }
+  return rawValue;
+}
+
 export const environment = {
-  apiBaseUrl: 'http://localhost:8080',
-  repoBaseUrl: 'http://localhost:9090',
+  apiBaseUrl: resolveRuntimeValue(window.__env?.apiBaseUrl, 'http://localhost:8080'),
+  repoBaseUrl: resolveRuntimeValue(window.__env?.repoBaseUrl, 'http://localhost:9090'),
   docsBase: 'https://docs.repsy.io',
 };

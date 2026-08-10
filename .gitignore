@@ -48,6 +48,8 @@ out/
 
 .dockerconfig.json
 
+docker-compose.yml
+
 **/node_modules/
 
 .env

@@ -35,7 +35,7 @@ RUN apk add --no-cache maven
 
 WORKDIR /app
 
-COPY config/ ./config/
+COPY core/config/ ./config/
 COPY core/ ./core/
 
 WORKDIR /app/core
@@ -56,16 +56,16 @@ WORKDIR /app
 
 COPY --from=core-build /root/.m2 /root/.m2
 
-COPY config/ ./config/
+COPY core/config/ ./config/
 COPY core/core-parent/pom.xml ./core/core-parent/pom.xml
-COPY repsy/repsy-os/pom.xml ./repsy/repsy-os/pom.xml
-COPY repsy/repsy-os/libs/pom.xml ./repsy/repsy-os/libs/pom.xml
-COPY repsy/repsy-os/libs/protocol-router/ ./repsy/repsy-os/libs/protocol-router/
-COPY repsy/repsy-os/libs/multiport/ ./repsy/repsy-os/libs/multiport/
-COPY repsy/repsy-os/libs/storage/ ./repsy/repsy-os/libs/storage/
+COPY pom.xml ./pom.xml
+COPY libs/pom.xml ./libs/pom.xml
+COPY libs/protocol-router/ ./libs/protocol-router/
+COPY libs/multiport/ ./libs/multiport/
+COPY libs/storage/ ./libs/storage/
 
-RUN mvn -f ./repsy/repsy-os/pom.xml install -N -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B && \
-    mvn -f ./repsy/repsy-os/libs/pom.xml install -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B
+RUN mvn -f ./pom.xml install -N -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B && \
+    mvn -f ./libs/pom.xml install -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B
 
 # ─────────────────────────────────────────
 # Stage 3: Build repsy-protocols
@@ -81,12 +81,12 @@ WORKDIR /app
 
 COPY --from=libs-build /root/.m2 /root/.m2
 
-COPY config/ ./config/
+COPY core/config/ ./config/
 COPY core/core-parent/pom.xml ./core/core-parent/pom.xml
-COPY repsy/repsy-os/pom.xml ./repsy/repsy-os/pom.xml
-COPY repsy/repsy-os/repsy-protocols/ ./repsy/repsy-os/repsy-protocols/
+COPY pom.xml ./pom.xml
+COPY repsy-protocols/ ./repsy-protocols/
 
-RUN mvn -f ./repsy/repsy-os/repsy-protocols/pom.xml install -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B
+RUN mvn -f ./repsy-protocols/pom.xml install -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B
 
 # ─────────────────────────────────────────
 # Stage 4: Build Angular Frontend
@@ -98,10 +98,10 @@ ENV CI=true
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-COPY repsy/repsy-os/repsy-frontend/package.json repsy/repsy-os/repsy-frontend/pnpm-lock.yaml ./
+COPY repsy-frontend/package.json repsy-frontend/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
-COPY repsy/repsy-os/repsy-frontend/ .
+COPY repsy-frontend/ .
 RUN pnpm run build:prod
 
 # ─────────────────────────────────────────
@@ -119,17 +119,14 @@ WORKDIR /app
 COPY --from=protocols-build /root/.m2 /root/.m2
 
 COPY core/core-parent/pom.xml ./core/core-parent/pom.xml
-COPY repsy/repsy-os/pom.xml ./repsy/repsy-os/pom.xml
-COPY repsy/repsy-os/repsy-backend/pom.xml ./repsy/repsy-os/repsy-backend/pom.xml
+COPY pom.xml ./pom.xml
+COPY repsy-backend/pom.xml ./repsy-backend/pom.xml
 
-RUN mvn -f ./repsy/repsy-os/repsy-backend/pom.xml dependency:go-offline -Dcheckstyle.skip=true -Dfmt.skip=true -B
+RUN mvn -f ./repsy-backend/pom.xml dependency:go-offline -Dcheckstyle.skip=true -Dfmt.skip=true -B
 
-COPY repsy/repsy-os/repsy-backend/src ./repsy/repsy-os/repsy-backend/src
+COPY repsy-backend/src ./repsy-backend/src
 
-COPY --from=frontend-build /app/dist/panel-frontend/browser \
-     ./repsy/repsy-os/repsy-backend/src/main/resources/static
-
-RUN mvn -f ./repsy/repsy-os/repsy-backend/pom.xml package -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B
+RUN mvn -f ./repsy-backend/pom.xml package -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B
 
 # ─────────────────────────────────────────
 # Stage 6: Runtime
@@ -141,16 +138,20 @@ WORKDIR /app
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
     mkdir -p /app/data /app/certs && \
     chown -R appuser:appgroup /app/data /app/certs
+
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 USER appuser
 
 COPY --from=backend-build \
-     /app/repsy/repsy-os/repsy-backend/target/repsy-backend.jar \
+     /app/repsy-backend/target/repsy-backend.jar \
      app.jar
 
-COPY --from=frontend-build /app/dist/panel-frontend/browser ./static/
+COPY --chown=appuser:appgroup --from=frontend-build /app/dist/panel-frontend/browser ./static/
 
 VOLUME /app/data
 
 EXPOSE 8080 8443 9090 9443
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["/app/entrypoint.sh"]
