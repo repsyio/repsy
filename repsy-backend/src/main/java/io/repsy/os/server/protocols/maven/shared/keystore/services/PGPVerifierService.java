@@ -56,7 +56,6 @@ public class PGPVerifierService {
   private static final @NonNull Set<String> KEY_SERVERS =
       Set.of(
           "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x%s",
-          "https://pgp.mit.edu/pks/lookup?op=get&search=0x%s",
           "https://keys.openpgp.org/pks/lookup?op=get&search=0x%s");
 
   @Qualifier("pgpVerifierWebClient")

@@ -13,18 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.scanner.trivy.gate;
+package io.repsy.scanner.trivy.config;
 
-import java.util.concurrent.TimeUnit;
-import org.jspecify.annotations.NonNull;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
-public interface TrivyExecutionGate {
-
-  @NonNull GatePermit acquire(long timeout, @NonNull TimeUnit unit) throws InterruptedException;
-
-  interface GatePermit extends AutoCloseable {
-
-    @Override
-    void close();
-  }
-}
+@ConfigurationProperties(prefix = "scanner")
+public record ScannerJobProperties(
+    int workerCount, long jobRetentionMinutes, long jobRetentionCheckIntervalMs) {}

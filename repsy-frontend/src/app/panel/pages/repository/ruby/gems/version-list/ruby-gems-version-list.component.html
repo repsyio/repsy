@@ -73,6 +73,7 @@
                   [artifactName]="gemName"
                   [versionName]="version.version"
                   [severity]="securitySummary[version.version]?.severity ?? null"
+                  [scanned]="securitySummary[version.version]?.scanned ?? false"
                 />
                 <span class="text-[14px] text-[#9FA0A0]">{{ version.platform }}</span>
                 <app-tooltip
@@ -139,6 +140,7 @@
                     [artifactName]="gemName"
                     [versionName]="version.version"
                     [severity]="securitySummary[version.version]?.severity ?? null"
+                    [scanned]="securitySummary[version.version]?.scanned ?? false"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

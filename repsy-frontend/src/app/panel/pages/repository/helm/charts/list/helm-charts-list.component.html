@@ -76,6 +76,7 @@
                   [artifactName]="chart.name"
                   [packageRoute]="packageRoute(chart)"
                   [severity]="securitySummary[chart.name]?.severity ?? null"
+                  [scanned]="securitySummary[chart.name]?.scanned ?? false"
                 />
                 <a
                   class="group text-secondary-500 flex w-max gap-2 text-[14px]"
@@ -169,6 +170,7 @@
                     [artifactName]="chart.name"
                     [packageRoute]="packageRoute(chart)"
                     [severity]="securitySummary[chart.name]?.severity ?? null"
+                    [scanned]="securitySummary[chart.name]?.scanned ?? false"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

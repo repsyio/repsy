@@ -20,7 +20,11 @@ import { RouterLink } from '@angular/router';
 import moment from 'moment';
 import { finalize, map } from 'rxjs/operators';
 
-import { ProtocolRepoControllerService, RepoType as ApiRepoType, Severity } from '../../../../generated/api';
+import {
+  ProtocolRepoControllerService,
+  RepoSecuritySummary,
+  RepoType as ApiRepoType,
+} from '../../../../generated/api';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../shared/components/ellipsis/ellipsis.pipe';
@@ -84,7 +88,7 @@ export class RepositoryComponent {
   public username: string;
   public error: string;
   public isAdmin = false;
-  public securitySummary: Record<string, Severity | null> = {};
+  public securitySummary: Record<string, RepoSecuritySummary> = {};
 
   private pendingRepoFetches = 0;
 

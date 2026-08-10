@@ -30,6 +30,7 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
+import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { MavenService } from '../../service/maven.service';
 
 @Component({
@@ -67,11 +68,12 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
     private readonly dangerModalService: DangerModalService,
     private readonly toastService: ToastService,
     private readonly breadcrumbSecurityLinkService: BreadcrumbSecurityLinkService,
+    private readonly repoLookupService: RepoLookupService,
   ) {
     this.baseUrl = environment.apiBaseUrl;
     this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.mavenService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
-      if (registry) {
+      if (registry && this.isRegistryForCurrentRoute(registry)) {
         this.activeRepo = Object.assign({}, registry);
         this.loadVersion();
       }
@@ -82,6 +84,17 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
   public ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.breadcrumbSecurityLinkService.clear();
+  }
+
+  private isRegistryForCurrentRoute(registry: RepoPermissionInfo): boolean {
+    const currentRepo = this.repoLookupService.currentRepo;
+    const matches = !!currentRepo && registry.repoName === currentRepo.repoName;
+
+    if (!matches) {
+      console.debug('Ignoring stale repo registry emission for a different repo', registry, currentRepo);
+    }
+
+    return matches;
   }
 
   public get securityArtifactName(): string {

@@ -113,6 +113,7 @@
                     [artifactName]="groupName + ':' + artifactName"
                     [versionName]="version.versionName"
                     [severity]="securitySummary[version.versionName]?.severity ?? null"
+                    [scanned]="securitySummary[version.versionName]?.scanned ?? false"
                   />
 
                   <div class="flex gap-2 text-[14px] text-white">
@@ -200,6 +201,7 @@
                       [artifactName]="groupName + ':' + artifactName"
                       [versionName]="version.versionName"
                       [severity]="securitySummary[version.versionName]?.severity ?? null"
+                      [scanned]="securitySummary[version.versionName]?.scanned ?? false"
                     />
                   </div>
                   <div class="flex items-start justify-between gap-2">

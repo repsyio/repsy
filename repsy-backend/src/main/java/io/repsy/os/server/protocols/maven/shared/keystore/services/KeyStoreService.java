@@ -45,7 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class KeyStoreService {
 
   private static final Set<String> WELL_KNOWN_HOSTS =
-      Set.of("keyserver.ubuntu.com", "pgp.mit.edu", "keys.openpgp.org");
+      Set.of("keyserver.ubuntu.com", "keys.openpgp.org");
 
   private final AllowedKeyserverRepository allowedKeyserverRepository;
   private final KeyStoreRepository keyStoreRepository;

@@ -10,37 +10,48 @@
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
   >
-    @switch (severity) {
-      @case (Severity.Critical) {
-        <path
-          d="M8 2h8l6 6v8l-6 6H8l-6-6V8l6-6z"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linejoin="round"
-        />
-        <path d="M12 7.5v6M12 16.5v.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-      }
-      @case (Severity.High) {
-        <path d="M12 3 2 20h20L12 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
-        <path d="M12 9.5v4M12 16.5v.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-      }
-      @case (Severity.Medium) {
-        <path d="M12 2 22 12 12 22 2 12 12 2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
-        <path d="M12 8v4.5M12 15.5v.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-      }
-      @case (Severity.Low) {
-        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
-        <path d="M12 8v.01M12 11v5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-      }
-      @default {
-        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
-        <path
-          d="M9.5 9.3a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.7M12 16.5v.01"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
+    @if (isClean) {
+      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
+      <path
+        d="M8 12.5l2.5 2.5L16 9.5"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    } @else {
+      @switch (severity) {
+        @case (Severity.Critical) {
+          <path
+            d="M8 2h8l6 6v8l-6 6H8l-6-6V8l6-6z"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linejoin="round"
+          />
+          <path d="M12 7.5v6M12 16.5v.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        }
+        @case (Severity.High) {
+          <path d="M12 3 2 20h20L12 3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+          <path d="M12 9.5v4M12 16.5v.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        }
+        @case (Severity.Medium) {
+          <path d="M12 2 22 12 12 22 2 12 12 2z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+          <path d="M12 8v4.5M12 15.5v.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        }
+        @case (Severity.Low) {
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
+          <path d="M12 8v.01M12 11v5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        }
+        @default {
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
+          <path
+            d="M9.5 9.3a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.7M12 16.5v.01"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        }
       }
     }
   </svg>
