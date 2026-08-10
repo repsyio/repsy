@@ -1,0 +1,44 @@
+name: Release | Repsy OS
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to repo.repsy.io
+        uses: docker/login-action@v4.1.0
+        with:
+          registry: repo.repsy.io
+          username: ${{ secrets.REPSY_REGISTRY_USERNAME }}
+          password: ${{ secrets.REPSY_REGISTRY_TOKEN }}
+
+      - name: Detect Image Tag
+        run: |
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            echo "DOCKER_IMAGE_TAG=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+          else
+            echo "DOCKER_IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+          fi
+
+      - name: Build and push repsy-os
+        uses: docker/build-push-action@v7.1.0
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            repo.repsy.io/repsy/os/repsy:${{ env.DOCKER_IMAGE_TAG }}
+            repo.repsy.io/repsy/os/repsy:latest
