@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@angular/animations": "^21.2.13",
-    "@angular/cdk": "^21.2.11",
+    "@angular/cdk": "^21.2.14",
     "@angular/common": "^21.2.13",
     "@angular/compiler": "^21.2.13",
     "@angular/core": "^21.2.13",
@@ -68,7 +68,7 @@
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.60.0",
     "angular-eslint": "^21.4.0",
-    "autoprefixer": "^10.5.0",
+    "autoprefixer": "^10.5.4",
     "daisyui": "^5.5.20",
     "depcheck": "^1.4.7",
     "eslint": "^9.39.4",
