@@ -15,6 +15,7 @@
     - [Manual Installation](#manual-installation)
 - [Configuration](#configuration)
 - [Usage](#usage)
+- [Reverse Proxy](#reverse-proxy)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
 - [License](#license)
