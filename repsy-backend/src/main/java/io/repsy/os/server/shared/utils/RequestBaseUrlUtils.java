@@ -26,10 +26,21 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @UtilityClass
 public class RequestBaseUrlUtils {
 
+  private static final int PORT_HTTPS = 443;
+  private static final int PORT_HTTP = 80;
+  private static final String PROTO_HTTPS = "https";
+  private static final String PROTO_HTTP = "http";
+
   public static @NonNull String resolveBaseUrl(final @NonNull HttpServletRequest request) {
-    final var host = request.getHeader("Host");
-    final var protocol = request.isSecure() ? "https://" : "http://";
-    return protocol + (host != null ? host : request.getServerName());
+    final var scheme = request.getScheme();
+    final var host = request.getServerName();
+    final var port = request.getServerPort();
+    return scheme + "://" + (isDefaultPort(scheme, port) ? host : host + ":" + port);
+  }
+
+  private static boolean isDefaultPort(final String scheme, final int port) {
+    return (PROTO_HTTP.equals(scheme) && port == PORT_HTTP)
+        || (PROTO_HTTPS.equals(scheme) && port == PORT_HTTPS);
   }
 
   public static @NonNull String resolveBaseUrl() {

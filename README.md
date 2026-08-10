@@ -306,7 +306,7 @@ Access at:
 | `DB_USERNAME` | Database username | `repsy` |
 | `DB_PASSWORD` | Database password | `repsy123` |
 | `STORAGE_BASE_PATH` | Base directory for artifact file storage. Set to a path inside `/app/data` (e.g. `/app/data/storage`) to persist artifacts with a single volume mount. | `~/.repsy` |
-| `JWT_SECRET` | JWT signing secret. If not set, a random 256-bit secret is generated at startup — all sessions are lost on restart. Set a stable value for production. | *(random)* |
+| `OS_APP_JWT_SECRET` | JWT signing secret. If not set, a random 256-bit secret is generated on every startup — every restart/redeploy invalidates all existing sessions, forcing every user to log in again. Set a stable, secure random value for any production/self-host deployment. | *(random, regenerated on every startup)* |
 | `SERVER_PORT` | Repository operations port | `9090` |
 | `API_PORT` | Backend API and Frontend web UI port | `8080` |
 | `H2_TCP_SERVER_ENABLED` | Enable H2 TCP server for external database access (development only) | `false` |
@@ -321,7 +321,22 @@ Access at:
 
 - **Admin Username**: `admin`
 - **Admin Initial Password**: Only applied when no admin user exists in the database. After first run, change your password through the application interface.
-- **JWT_SECRET**: Set a stable value via environment variable to avoid session invalidation on restart.
+- **OS_APP_JWT_SECRET**: If left unset, a new random secret is generated in memory on every container start — since it isn't persisted, this means every restart or redeploy silently invalidates every issued access/refresh token, logging every user out at once. For any production or self-host deployment, set this to a fixed, securely generated value (e.g. `openssl rand -base64 32`) and keep it unchanged across restarts.
+
+### Reverse Proxy
+
+Repsy can run behind a reverse proxy (nginx, Traefik, Caddy, etc.) on a different public URL. The backend enables Spring Boot's `forward-headers-strategy: native`, which reads the `X-Forwarded-Proto`, `X-Forwarded-Host`, and `X-Forwarded-Port` headers to resolve the correct scheme/host/port instead of the internal `localhost:8080`/`:9090`.
+
+For this to work, your proxy **must** forward these headers. Example nginx config:
+
+```nginx
+proxy_set_header Host $host;
+proxy_set_header X-Forwarded-Proto $scheme;
+proxy_set_header X-Forwarded-Host $host;
+proxy_set_header X-Forwarded-Port $server_port;
+```
+
+> **Note:** The web UI's "how to connect" config snippets for repository operations (Maven, npm, pip, etc.) use the `REPO_BASE_URL` environment variable, resolved at container startup — set it to your public repository-operations URL (e.g. `https://repo.example.com`) when running behind a reverse proxy.
 
 ## Usage
 
