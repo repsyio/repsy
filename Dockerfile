@@ -98,10 +98,20 @@ ENV CI=true
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
+# openapi-generator-cli shells out to a JRE to run the generator jar
+RUN apk add --no-cache openjdk21-jre-headless
+
 COPY repsy-frontend/package.json repsy-frontend/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
+COPY repsy-backend/src/main/resources/openapi/openapi-spec.yaml /tmp/openapi-spec.yaml
 COPY repsy-frontend/ .
+RUN pnpm exec openapi-generator-cli generate \
+    -i /tmp/openapi-spec.yaml \
+    -g typescript-angular \
+    -o src/generated/api \
+    --additional-properties=fileNaming=kebab-case,ngVersion=21.0.0,withInterfaces=true
+
 RUN pnpm run build:prod
 
 # ─────────────────────────────────────────
