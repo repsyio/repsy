@@ -1,1 +1,1 @@
-ALTER TABLE go_module_version DROP COLUMN deleted;
+ALTER TABLE "go_module_version" DROP COLUMN "deleted";

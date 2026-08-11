@@ -1,0 +1,81 @@
+name: Release | Repsy OS
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to repo.repsy.io
+        uses: docker/login-action@v4.1.0
+        with:
+          registry: repo.repsy.io
+          username: ${{ secrets.REPSY_REGISTRY_USERNAME }}
+          password: ${{ secrets.REPSY_REGISTRY_TOKEN }}
+
+      - name: Detect Image Tag
+        run: |
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            echo "DOCKER_IMAGE_TAG=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+          else
+            echo "DOCKER_IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+          fi
+
+      - name: Build and push repsy-os
+        uses: docker/build-push-action@v7.1.0
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            repo.repsy.io/repsy/os/repsy:${{ env.DOCKER_IMAGE_TAG }}
+            repo.repsy.io/repsy/os/repsy:latest
+
+  helm-update:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Detect Image Tag
+        run: |
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            echo "DOCKER_IMAGE_TAG=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+          else
+            echo "DOCKER_IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+          fi
+
+      - name: Install yq
+        run: |
+          sudo curl -sL https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64 -o /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Update image tag in repsy-os-helm
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.HELM_DEPLOY_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no"
+          cd ${{ runner.temp }}
+          git clone git@github.com:repsyio/repsy-os-helm.git
+          cd repsy-os-helm
+          git config user.name "Repsy Pipeline Bot"
+          git config user.email "pipeline-bot@repsy.io"
+          yq -i e '.image.tag = "${{ env.DOCKER_IMAGE_TAG }}"' packages.repsy.io.yaml
+          git add packages.repsy.io.yaml
+          git status
+          git commit -m "New Release '${{ env.DOCKER_IMAGE_TAG }}'"
+          git push origin main
