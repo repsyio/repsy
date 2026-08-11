@@ -7,7 +7,7 @@ spring:
       static-locations: file:./static/
 
   datasource:
-    url: ${DB_URL:jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    url: ${DB_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_DATABASE:repsy}}
     username: ${DB_USERNAME:repsy}
     password: ${DB_PASSWORD:repsy123}
 

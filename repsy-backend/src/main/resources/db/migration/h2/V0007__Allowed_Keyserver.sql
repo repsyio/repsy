@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS "allowed_keyserver"
 (
-    "id"           uuid         PRIMARY KEY DEFAULT random_uuid(),
+    "id"           uuid         DEFAULT random_uuid() PRIMARY KEY,
     "host"         varchar(255) NOT NULL,
     "display_name" varchar(255) NOT NULL,
     "is_active"    boolean      NOT NULL DEFAULT TRUE,
@@ -24,7 +24,14 @@ ALTER TABLE "key_store"
     ADD CONSTRAINT "fk_key_store__allowed_keyserver_id"
         FOREIGN KEY ("allowed_keyserver_id") REFERENCES "allowed_keyserver" ("id") ON DELETE CASCADE;
 
+ALTER TABLE "key_store"
+    DROP CONSTRAINT "fk_key_store__repo_id";
+
 DROP INDEX IF EXISTS "ux_key_store__repo_id";
+
+ALTER TABLE "key_store"
+    ADD CONSTRAINT "fk_key_store__repo_id"
+        FOREIGN KEY ("repo_id") REFERENCES "repo" ("id") ON DELETE CASCADE;
 
 CREATE UNIQUE INDEX "ux_key_store__repo_id__allowed_keyserver_id"
     ON "key_store" ("repo_id", "allowed_keyserver_id");
