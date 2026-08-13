@@ -55,6 +55,20 @@ public class TrivyScanService {
   private static final int MAX_ERROR_MESSAGE_LENGTH = 1900;
   private static final String TRUNCATION_SUFFIX = "... [truncated]";
 
+  // Trivy's own mirror.gcr.io -> ghcr.io db-repository fallback only kicks in for 429/5xx; a
+  // transient hiccup on the mirror's internal cache proxy (e.g. a bare 404 on an
+  // artifacts-downloads URL) is not "transient" by that logic and fails the whole process on the
+  // first attempt. Re-running the trivy invocation itself lets a one-off blip clear.
+  private static final int MAX_DB_DOWNLOAD_ATTEMPTS = 3;
+  private static final long DB_DOWNLOAD_RETRY_DELAY_MS = 5_000;
+  private static final List<String> DB_DOWNLOAD_FAILURE_MARKERS =
+      List.of(
+          "failed to download",
+          "Java DB update failed",
+          "OCI artifact error",
+          "unexpected status code",
+          "failed to fetch the layer");
+
   private final @NonNull TrivyScannerProperties properties;
   private final @NonNull ObjectMapper objectMapper;
   private final @NonNull JobStore jobStore;
@@ -248,13 +262,16 @@ public class TrivyScanService {
   }
 
   private @NonNull List<String> buildRootfsCommand(final @NonNull Path artifactPath) {
-    return List.of(
-        this.properties.binaryPath(),
-        "rootfs",
-        "--format",
-        "json",
-        "--quiet",
-        artifactPath.toString());
+    final var command = new ArrayList<String>();
+    command.add(this.properties.binaryPath());
+    command.add("rootfs");
+    command.add("--format");
+    command.add("json");
+    command.add("--quiet");
+    this.addDbRepositoryFlags(command);
+    command.add(artifactPath.toString());
+
+    return command;
   }
 
   private @NonNull List<String> buildImageCommand(
@@ -268,6 +285,7 @@ public class TrivyScanService {
     command.add("--format");
     command.add("json");
     command.add("--quiet");
+    this.addDbRepositoryFlags(command);
 
     if (registryInsecure) {
       command.add("--insecure");
@@ -283,12 +301,49 @@ public class TrivyScanService {
     return command;
   }
 
+  private void addDbRepositoryFlags(final @NonNull List<String> command) {
+    command.add("--db-repository");
+    command.add(this.properties.dbRepository());
+    command.add("--java-db-repository");
+    command.add(this.properties.javaDbRepository());
+  }
+
   private @NonNull String runTrivy(final @NonNull List<String> command) {
+    for (var attempt = 1; ; attempt++) {
+      try {
+        final var process = new ProcessBuilder(command).start();
+        return this.awaitOutput(process);
+      } catch (final IOException exception) {
+        throw new TrivyScanException("Failed to start trivy process", exception);
+      } catch (final TrivyScanException exception) {
+        if (attempt >= MAX_DB_DOWNLOAD_ATTEMPTS || !isDbDownloadFailure(exception.getMessage())) {
+          throw exception;
+        }
+
+        log.warn(
+            "Trivy DB download looked transient (attempt {}/{}), retrying: {}",
+            attempt,
+            MAX_DB_DOWNLOAD_ATTEMPTS,
+            exception.getMessage());
+        sleepQuietly(DB_DOWNLOAD_RETRY_DELAY_MS);
+      }
+    }
+  }
+
+  private static boolean isDbDownloadFailure(final @Nullable String message) {
+    if (message == null) {
+      return false;
+    }
+
+    return DB_DOWNLOAD_FAILURE_MARKERS.stream().anyMatch(message::contains);
+  }
+
+  private static void sleepQuietly(final long delayMs) {
     try {
-      final var process = new ProcessBuilder(command).start();
-      return this.awaitOutput(process);
-    } catch (final IOException exception) {
-      throw new TrivyScanException("Failed to start trivy process", exception);
+      Thread.sleep(delayMs);
+    } catch (final InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      throw new TrivyScanException("Interrupted while waiting to retry trivy", exception);
     }
   }
 
@@ -367,7 +422,9 @@ public class TrivyScanService {
 
   private static @NonNull String resolveFailureMessage(final @NonNull Exception exception) {
     final var message =
-        exception.getMessage() != null ? exception.getMessage() : exception.getClass().getSimpleName();
+        exception.getMessage() != null
+            ? exception.getMessage()
+            : exception.getClass().getSimpleName();
 
     return truncateErrorMessage(message);
   }

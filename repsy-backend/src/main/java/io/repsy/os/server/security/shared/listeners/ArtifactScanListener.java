@@ -96,7 +96,6 @@ public class ArtifactScanListener {
       return;
     }
 
-    this.scanTxService.markRunning(scanId);
     this.runScan(event, scanId, scanner);
   }
 
@@ -112,19 +111,17 @@ public class ArtifactScanListener {
         return;
       }
 
-      final var outcome =
-          scanner.scan(
-              new ScanRequest(
-                  event.repoType(),
-                  event.repoId(),
-                  event.artifactName(),
-                  event.artifactVersion(),
-                  event.storagePath(),
-                  scanInputs.artifactContent(),
-                  scanInputs.dockerRegistryReference(),
-                  scanInputs.registryAuthToken()));
-
-      this.scanTxService.recordScanOutcome(scanId, outcome);
+      scanner.scan(
+          new ScanRequest(
+              scanId,
+              event.repoType(),
+              event.repoId(),
+              event.artifactName(),
+              event.artifactVersion(),
+              event.storagePath(),
+              scanInputs.artifactContent(),
+              scanInputs.dockerRegistryReference(),
+              scanInputs.registryAuthToken()));
     } catch (final Exception exception) {
       log.error(
           "Vulnerability scan failed for {}@{}",

@@ -22,11 +22,13 @@ import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.libs.protocol.router.ProtocolProvider;
 import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.docker.shared.utils.DockerConstants;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
@@ -81,6 +83,12 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
+    final var artifactVersion = context.<String>getProperty(ARTIFACT_VERSION);
+
+    if (isDigestReference(artifactVersion)) {
+      return ProcessorResult.next();
+    }
+
     final var relativePath = ProtocolContextUtils.getRelativePath(context);
     final var storagePathOverride = context.<String>getProperty(STORAGE_PATH);
     final var storagePath =
@@ -93,7 +101,7 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
             repoInfo.getName(),
             storagePath,
             context.<String>getProperty(ARTIFACT_NAME),
-            context.<String>getProperty(ARTIFACT_VERSION)));
+            artifactVersion));
 
     return ProcessorResult.next();
   }
@@ -101,5 +109,9 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
   private boolean isWriteOperation(
       final @NonNull Map<@NonNull String, @NonNull Object> properties) {
     return (boolean) properties.getOrDefault(WRITE_OPERATION, false);
+  }
+
+  private static boolean isDigestReference(final @Nullable String artifactVersion) {
+    return artifactVersion != null && artifactVersion.startsWith(DockerConstants.SHA256_PREFIX);
   }
 }

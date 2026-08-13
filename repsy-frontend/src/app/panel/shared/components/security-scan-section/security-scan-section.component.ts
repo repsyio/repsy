@@ -32,6 +32,7 @@ import {
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { SecurityScanSupportService } from '../../service/security-scan-support.service';
 import { pollUntilTerminal } from '../../util/poll-until-terminal.util';
+import { scanStatusLabel } from '../../util/scan-status-label.util';
 import { EllipsisPipe } from '../ellipsis/ellipsis.pipe';
 import { PaginationComponent } from '../pagination/pagination.component';
 import { SeverityBadgeComponent } from '../severity-badge/severity-badge.component';
@@ -44,6 +45,7 @@ const FINDINGS_PAGE_SIZE = 10;
 const SECURITY_FRAGMENT = 'security';
 const POLL_INTERVAL_MS = 3000;
 const TERMINAL_STATUSES: ScanStatus[] = [ScanStatus.Completed, ScanStatus.Failed];
+const ACTIVE_STATUSES: ScanStatus[] = [ScanStatus.Pending, ScanStatus.Queued, ScanStatus.Running];
 
 const SCROLL_RETRY_DELAYS_MS = [0, 300, 800];
 
@@ -87,6 +89,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
   public findingsSortDirection: 'ASC' | 'DESC' = 'ASC';
 
   protected readonly ScanStatus = ScanStatus;
+  public readonly statusLabel = scanStatusLabel;
 
   private readonly fragmentChanges$: Subscription;
   private isSupportedSub: Subscription | null = null;
@@ -252,7 +255,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
       return false;
     }
 
-    return this.overview?.status !== ScanStatus.Pending && this.overview?.status !== ScanStatus.Running;
+    return !ACTIVE_STATUSES.includes(this.overview?.status ?? ScanStatus.Completed);
   }
 
 
@@ -429,7 +432,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
 
   private syncPolling(): void {
     const scanId = this.overview?.scanId;
-    const isActive = this.overview?.status === ScanStatus.Pending || this.overview?.status === ScanStatus.Running;
+    const isActive = ACTIVE_STATUSES.includes(this.overview?.status ?? ScanStatus.Completed);
 
     if (!scanId || !isActive) {
       return;
