@@ -55,12 +55,13 @@ public class TrivyScanService {
   private static final int MAX_ERROR_MESSAGE_LENGTH = 1900;
   private static final String TRUNCATION_SUFFIX = "... [truncated]";
 
-  // Trivy's own mirror.gcr.io -> ghcr.io db-repository fallback only kicks in for 429/5xx; a
-  // transient hiccup on the mirror's internal cache proxy (e.g. a bare 404 on an
-  // artifacts-downloads URL) is not "transient" by that logic and fails the whole process on the
-  // first attempt. Re-running the trivy invocation itself lets a one-off blip clear.
-  private static final int MAX_DB_DOWNLOAD_ATTEMPTS = 3;
-  private static final long DB_DOWNLOAD_RETRY_DELAY_MS = 5_000;
+  private static final String WARMUP_TARGET = ".";
+  private static final String DOWNLOAD_DB_ONLY_FLAG = "--download-db-only";
+  private static final String DOWNLOAD_JAVA_DB_ONLY_FLAG = "--download-java-db-only";
+
+  private static final int MAX_DB_DOWNLOAD_ATTEMPTS = 5;
+  private static final long DB_DOWNLOAD_INITIAL_RETRY_DELAY_MS = 5_000;
+  private static final int DB_DOWNLOAD_RETRY_BACKOFF_MULTIPLIER = 2;
   private static final List<String> DB_DOWNLOAD_FAILURE_MARKERS =
       List.of(
           "failed to download",
@@ -136,8 +137,11 @@ public class TrivyScanService {
     return this.jobStore.get(scanId);
   }
 
-  // Rejection here means the task never started, so the worker's own finally-block cleanup
-  // (see runFileScan) never runs — the temp file and the stuck QUEUED job must be handled here.
+  public void warmUpDatabases() {
+    this.runTrivy(this.buildDownloadOnlyCommand(DOWNLOAD_DB_ONLY_FLAG));
+    this.runTrivy(this.buildDownloadOnlyCommand(DOWNLOAD_JAVA_DB_ONLY_FLAG));
+  }
+
   private void enqueue(
       final @NonNull String scanId,
       final @Nullable Path artifactPath,
@@ -301,6 +305,17 @@ public class TrivyScanService {
     return command;
   }
 
+  private @NonNull List<String> buildDownloadOnlyCommand(final @NonNull String downloadOnlyFlag) {
+    final var command = new ArrayList<String>();
+    command.add(this.properties.binaryPath());
+    command.add("rootfs");
+    command.add(downloadOnlyFlag);
+    this.addDbRepositoryFlags(command);
+    command.add(WARMUP_TARGET);
+
+    return command;
+  }
+
   private void addDbRepositoryFlags(final @NonNull List<String> command) {
     command.add("--db-repository");
     command.add(this.properties.dbRepository());
@@ -320,12 +335,14 @@ public class TrivyScanService {
           throw exception;
         }
 
+        final var delayMs = dbDownloadRetryDelayMs(attempt);
         log.warn(
-            "Trivy DB download looked transient (attempt {}/{}), retrying: {}",
+            "Trivy DB download looked transient (attempt {}/{}), retrying in {}ms: {}",
             attempt,
             MAX_DB_DOWNLOAD_ATTEMPTS,
+            delayMs,
             exception.getMessage());
-        sleepQuietly(DB_DOWNLOAD_RETRY_DELAY_MS);
+        sleepQuietly(delayMs);
       }
     }
   }
@@ -336,6 +353,11 @@ public class TrivyScanService {
     }
 
     return DB_DOWNLOAD_FAILURE_MARKERS.stream().anyMatch(message::contains);
+  }
+
+  private static long dbDownloadRetryDelayMs(final int failedAttempt) {
+    return DB_DOWNLOAD_INITIAL_RETRY_DELAY_MS
+        * (long) Math.pow(DB_DOWNLOAD_RETRY_BACKOFF_MULTIPLIER, failedAttempt - 1);
   }
 
   private static void sleepQuietly(final long delayMs) {
