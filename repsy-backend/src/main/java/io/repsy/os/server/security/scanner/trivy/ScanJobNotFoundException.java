@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.security.scan.dtos;
+package io.repsy.os.server.security.scanner.trivy;
 
-public enum ScanStatus {
-  PENDING,
-  QUEUED,
-  RUNNING,
-  COMPLETED,
-  FAILED
+import java.util.UUID;
+import org.jspecify.annotations.NonNull;
+
+public final class ScanJobNotFoundException extends RuntimeException {
+
+  public ScanJobNotFoundException(final @NonNull UUID scanId) {
+    super("Scanner has no job for scanId: " + scanId);
+  }
 }

@@ -55,6 +55,21 @@ public class TrivyScanService {
   private static final int MAX_ERROR_MESSAGE_LENGTH = 1900;
   private static final String TRUNCATION_SUFFIX = "... [truncated]";
 
+  private static final String WARMUP_TARGET = ".";
+  private static final String DOWNLOAD_DB_ONLY_FLAG = "--download-db-only";
+  private static final String DOWNLOAD_JAVA_DB_ONLY_FLAG = "--download-java-db-only";
+
+  private static final int MAX_DB_DOWNLOAD_ATTEMPTS = 5;
+  private static final long DB_DOWNLOAD_INITIAL_RETRY_DELAY_MS = 5_000;
+  private static final int DB_DOWNLOAD_RETRY_BACKOFF_MULTIPLIER = 2;
+  private static final List<String> DB_DOWNLOAD_FAILURE_MARKERS =
+      List.of(
+          "failed to download",
+          "Java DB update failed",
+          "OCI artifact error",
+          "unexpected status code",
+          "failed to fetch the layer");
+
   private final @NonNull TrivyScannerProperties properties;
   private final @NonNull ObjectMapper objectMapper;
   private final @NonNull JobStore jobStore;
@@ -122,8 +137,11 @@ public class TrivyScanService {
     return this.jobStore.get(scanId);
   }
 
-  // Rejection here means the task never started, so the worker's own finally-block cleanup
-  // (see runFileScan) never runs — the temp file and the stuck QUEUED job must be handled here.
+  public void warmUpDatabases() {
+    this.runTrivy(this.buildDownloadOnlyCommand(DOWNLOAD_DB_ONLY_FLAG));
+    this.runTrivy(this.buildDownloadOnlyCommand(DOWNLOAD_JAVA_DB_ONLY_FLAG));
+  }
+
   private void enqueue(
       final @NonNull String scanId,
       final @Nullable Path artifactPath,
@@ -248,13 +266,16 @@ public class TrivyScanService {
   }
 
   private @NonNull List<String> buildRootfsCommand(final @NonNull Path artifactPath) {
-    return List.of(
-        this.properties.binaryPath(),
-        "rootfs",
-        "--format",
-        "json",
-        "--quiet",
-        artifactPath.toString());
+    final var command = new ArrayList<String>();
+    command.add(this.properties.binaryPath());
+    command.add("rootfs");
+    command.add("--format");
+    command.add("json");
+    command.add("--quiet");
+    this.addDbRepositoryFlags(command);
+    command.add(artifactPath.toString());
+
+    return command;
   }
 
   private @NonNull List<String> buildImageCommand(
@@ -268,6 +289,7 @@ public class TrivyScanService {
     command.add("--format");
     command.add("json");
     command.add("--quiet");
+    this.addDbRepositoryFlags(command);
 
     if (registryInsecure) {
       command.add("--insecure");
@@ -283,12 +305,67 @@ public class TrivyScanService {
     return command;
   }
 
+  private @NonNull List<String> buildDownloadOnlyCommand(final @NonNull String downloadOnlyFlag) {
+    final var command = new ArrayList<String>();
+    command.add(this.properties.binaryPath());
+    command.add("rootfs");
+    command.add(downloadOnlyFlag);
+    this.addDbRepositoryFlags(command);
+    command.add(WARMUP_TARGET);
+
+    return command;
+  }
+
+  private void addDbRepositoryFlags(final @NonNull List<String> command) {
+    command.add("--db-repository");
+    command.add(this.properties.dbRepository());
+    command.add("--java-db-repository");
+    command.add(this.properties.javaDbRepository());
+  }
+
   private @NonNull String runTrivy(final @NonNull List<String> command) {
+    for (var attempt = 1; ; attempt++) {
+      try {
+        final var process = new ProcessBuilder(command).start();
+        return this.awaitOutput(process);
+      } catch (final IOException exception) {
+        throw new TrivyScanException("Failed to start trivy process", exception);
+      } catch (final TrivyScanException exception) {
+        if (attempt >= MAX_DB_DOWNLOAD_ATTEMPTS || !isDbDownloadFailure(exception.getMessage())) {
+          throw exception;
+        }
+
+        final var delayMs = dbDownloadRetryDelayMs(attempt);
+        log.warn(
+            "Trivy DB download looked transient (attempt {}/{}), retrying in {}ms: {}",
+            attempt,
+            MAX_DB_DOWNLOAD_ATTEMPTS,
+            delayMs,
+            exception.getMessage());
+        sleepQuietly(delayMs);
+      }
+    }
+  }
+
+  private static boolean isDbDownloadFailure(final @Nullable String message) {
+    if (message == null) {
+      return false;
+    }
+
+    return DB_DOWNLOAD_FAILURE_MARKERS.stream().anyMatch(message::contains);
+  }
+
+  private static long dbDownloadRetryDelayMs(final int failedAttempt) {
+    return DB_DOWNLOAD_INITIAL_RETRY_DELAY_MS
+        * (long) Math.pow(DB_DOWNLOAD_RETRY_BACKOFF_MULTIPLIER, failedAttempt - 1);
+  }
+
+  private static void sleepQuietly(final long delayMs) {
     try {
-      final var process = new ProcessBuilder(command).start();
-      return this.awaitOutput(process);
-    } catch (final IOException exception) {
-      throw new TrivyScanException("Failed to start trivy process", exception);
+      Thread.sleep(delayMs);
+    } catch (final InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      throw new TrivyScanException("Interrupted while waiting to retry trivy", exception);
     }
   }
 
@@ -367,7 +444,9 @@ public class TrivyScanService {
 
   private static @NonNull String resolveFailureMessage(final @NonNull Exception exception) {
     final var message =
-        exception.getMessage() != null ? exception.getMessage() : exception.getClass().getSimpleName();
+        exception.getMessage() != null
+            ? exception.getMessage()
+            : exception.getClass().getSimpleName();
 
     return truncateErrorMessage(message);
   }

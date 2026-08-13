@@ -70,7 +70,9 @@ repsy:
     trivy:
       scanner-base-url: ${TRIVY_SCANNER_BASE_URL:http://localhost:8090}
       api-key: ${TRIVY_SCANNER_API_KEY:}
-      timeout-seconds: ${TRIVY_TIMEOUT_SECONDS:300}
+      request-timeout-seconds: ${TRIVY_REQUEST_TIMEOUT_SECONDS:10}
+      poll-interval-ms: ${TRIVY_POLL_INTERVAL_MS:3000}
+      max-scan-duration-seconds: ${TRIVY_MAX_SCAN_DURATION_SECONDS:330}
     docker:
       internal-registry-base-url: ${DOCKER_INTERNAL_REGISTRY_BASE_URL:http://localhost:9090}
 
