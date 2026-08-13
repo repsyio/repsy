@@ -28,6 +28,7 @@ public final class MediaTypes {
   // OCI Media Types
   public static final String OCI_IMAGE_INDEX = "application/vnd.oci.image.index.v1+json";
   public static final String OCI_MANIFEST_SCHEMA1 = "application/vnd.oci.image.manifest.v1+json";
+  public static final String OCI_EMPTY = "application/vnd.oci.empty.v1+json";
   // Docker Media Types
   public static final String DOCKER_CONFIG_JSON = "application/vnd.docker.container.image.v1+json";
   public static final String DOCKER_MANIFEST_SCHEMA1 =
