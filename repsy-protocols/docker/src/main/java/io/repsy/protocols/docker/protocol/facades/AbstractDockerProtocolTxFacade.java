@@ -19,6 +19,7 @@ import static io.repsy.protocols.docker.shared.utils.ManifestNameGenerator.gener
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_LIST;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_SCHEMA1;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_SCHEMA2;
+import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_EMPTY;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_IMAGE_INDEX;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_MANIFEST_SCHEMA1;
 
@@ -203,6 +204,10 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
     final var usages = this.writeManifest(repoInfo, form);
 
+    if (this.isAttestationManifest(manifestInfo)) {
+      return usages;
+    }
+
     final var platform = this.extractPlatform(repoInfo, manifestInfo.getConfig().getDigest());
     final var tagForm = TagForm.of(form, imageInfo.getName(), platform, manifestInfo);
 
@@ -211,6 +216,12 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     }
 
     return usages;
+  }
+
+  private boolean isAttestationManifest(final ManifestInfo manifestInfo) {
+
+    return manifestInfo.getSubject() != null
+        || OCI_EMPTY.equals(manifestInfo.getConfig().getMediaType());
   }
 
   private BaseUsages createManifestList(
