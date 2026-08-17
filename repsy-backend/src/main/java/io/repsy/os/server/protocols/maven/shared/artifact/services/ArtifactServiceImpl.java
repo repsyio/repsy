@@ -375,6 +375,19 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     return this.artifactRepository.findAllByRepoIdAndGroupName(repoId, groupName);
   }
 
+  public List<String> getArtifactVersionNames(
+      final UUID repoId, final String groupName, final String artifactName) {
+
+    final var artifact =
+        this.artifactRepository
+            .findByRepoIdAndGroupNameAndArtifactName(repoId, groupName, artifactName)
+            .orElseThrow(() -> new ItemNotFoundException(ERR_ARTIFACT_NOT_FOUND));
+
+    return this.artifactVersionRepository.findByArtifactId(artifact.getId()).stream()
+        .map(ArtifactVersion::getVersionName)
+        .toList();
+  }
+
   public List<String> getGroupNames(final UUID repoId) {
 
     return this.artifactRepository.findGroupNamesByRepoId(repoId);
