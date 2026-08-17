@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.docker.ui.facades;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -42,6 +43,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -62,6 +64,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
   private final @NonNull ManifestTxService manifestService;
   private final @NonNull DockerStorageService dockerStorageService;
   private final @NonNull OrphanLayerCleanupService orphanLayerCleanupService;
+  private final @NonNull ApplicationEventPublisher eventPublisher;
 
   public @NonNull BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
 
@@ -81,6 +84,12 @@ public class DockerApiFacade implements ProtocolApiFacade {
     return BaseUsages.builder().diskUsage(-1L * free).build();
   }
 
+  // Event is published after the DB image delete but before the storage manifest delete. If
+  // deleteManifests() below fails and the transaction rolls back, the DB image record comes
+  // back, but the VulnerabilityScan cleanup triggered by this event has already committed
+  // (ArtifactScanListener.handleArtifactVersionDeleted runs synchronously, in its own
+  // transaction) and will not be undone — a known limitation inherited from the equivalent
+  // repsy-cloud code path, out of scope for this change.
   public @NonNull BaseUsages deleteImage(
       final @NonNull RepoInfo repoInfo, final @NonNull String imageName) {
 
@@ -94,10 +103,28 @@ public class DockerApiFacade implements ProtocolApiFacade {
 
     this.imageTxService.deleteImage(repoInfo.getStorageKey(), imageInfo.getName());
 
+    this.publishVersionsDeleted(repoInfo, imageInfo.getName(), tags);
+
     final var usage =
         this.dockerStorageService.deleteManifests(repoInfo, manifestsToDeleteFileNames);
 
     return BaseUsages.builder().diskUsage(-1L * usage).build();
+  }
+
+  private void publishVersionsDeleted(
+      final @NonNull RepoInfo repoInfo,
+      final @NonNull String imageName,
+      final @NonNull List<Tag> tags) {
+
+    for (final var tag : tags) {
+      this.eventPublisher.publishEvent(
+          new ArtifactVersionDeletedEvent(
+              repoInfo.getStorageKey(),
+              repoInfo.getType().name(),
+              repoInfo.getName(),
+              imageName,
+              tag.getName()));
+    }
   }
 
   @Transactional(readOnly = true)
