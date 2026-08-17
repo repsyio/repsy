@@ -112,7 +112,9 @@ public class DockerApiFacade implements ProtocolApiFacade {
   }
 
   private void publishVersionsDeleted(
-      final @NonNull RepoInfo repoInfo, final @NonNull String imageName, final @NonNull List<Tag> tags) {
+      final @NonNull RepoInfo repoInfo,
+      final @NonNull String imageName,
+      final @NonNull List<Tag> tags) {
 
     for (final var tag : tags) {
       this.eventPublisher.publishEvent(
