@@ -100,9 +100,10 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
             repoInfo.getType().name(),
             repoInfo.getName(),
             storagePath,
-            context.<String>getProperty(ARTIFACT_NAME),
+            context.getProperty(ARTIFACT_NAME),
             artifactVersion,
-            true));
+            true,
+            false));
 
     return ProcessorResult.next();
   }
