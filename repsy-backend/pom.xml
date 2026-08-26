@@ -283,7 +283,7 @@
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
-            <version>20260719</version>
+            <version>20260814</version>
         </dependency>
 
         <!-- Test ############################################################## -->
@@ -314,7 +314,7 @@
         <dependency>
             <groupId>com.tngtech.archunit</groupId>
             <artifactId>archunit-junit5</artifactId>
-            <version>1.4.2</version>
+            <version>1.5.0</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

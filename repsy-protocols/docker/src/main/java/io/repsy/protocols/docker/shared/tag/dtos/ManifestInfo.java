@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.docker.shared.tag.dtos;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.Data;
@@ -28,6 +29,9 @@ public class ManifestInfo {
   private String mediaType;
   private Config config;
   private List<ManifestLayer> layers;
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private Config subject;
 
   public @NonNull List<String> getLayerDigests() {
 

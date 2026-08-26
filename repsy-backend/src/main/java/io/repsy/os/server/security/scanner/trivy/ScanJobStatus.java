@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.security.scan.dtos;
+package io.repsy.os.server.security.scanner.trivy;
 
-public enum ScanStatus {
-  PENDING,
+public enum ScanJobStatus {
   QUEUED,
   RUNNING,
   COMPLETED,

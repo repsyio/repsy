@@ -24,7 +24,9 @@ import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageSe
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import java.io.IOException;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
@@ -50,17 +52,10 @@ public class ArtifactDeletionComponent {
       throws IOException, XmlPullParserException {
 
     if (this.artifactService.hasOnlyOneVersion(repoInfo.getStorageKey(), groupName, artifactName)) {
-      final var result = this.deleteArtifact(repoInfo, groupName, artifactName);
-
-      this.eventPublisher.publishEvent(
-          new ArtifactVersionDeletedEvent(
-              repoInfo.getStorageKey(),
-              repoInfo.getType().name(),
-              repoInfo.getName(),
-              groupName + ":" + artifactName,
-              versionName));
-
-      return result;
+      // deleteArtifact() (and whatever it delegates to, e.g. deleteGroup()) publishes
+      // ArtifactVersionDeletedEvent for every version it removes, which at this point is only
+      // this one — no separate publish needed here.
+      return this.deleteArtifact(repoInfo, groupName, artifactName);
     }
 
     final var artifactUsage =
@@ -77,13 +72,7 @@ public class ArtifactDeletionComponent {
     this.artifactService.deleteArtifactVersion(
         repoInfo, groupName, artifactName, versionName, versioningUsagesPair.getFirst());
 
-    this.eventPublisher.publishEvent(
-        new ArtifactVersionDeletedEvent(
-            repoInfo.getStorageKey(),
-            repoInfo.getType().name(),
-            repoInfo.getName(),
-            groupName + ":" + artifactName,
-            versionName));
+    this.publishVersionDeleted(repoInfo, groupName, artifactName, versionName);
 
     return Pair.of(DeletedItem.VERSION, usages);
   }
@@ -95,12 +84,18 @@ public class ArtifactDeletionComponent {
       return this.deleteGroup(repoInfo, groupName);
     }
 
+    final var versionNames =
+        this.artifactService.getArtifactVersionNames(
+            repoInfo.getStorageKey(), groupName, artifactName);
+
     final var usage =
         this.mavenStorageService.deleteArtifact(repoInfo.getStorageKey(), groupName, artifactName);
 
     final var usages = BaseUsages.builder().diskUsage(usage * -1L).build();
 
     this.artifactService.deleteArtifact(repoInfo.getStorageKey(), groupName, artifactName);
+
+    this.publishVersionsDeleted(repoInfo, groupName, artifactName, versionNames);
 
     return Pair.of(DeletedItem.ARTIFACT, usages);
   }
@@ -120,13 +115,36 @@ public class ArtifactDeletionComponent {
       return this.deleteArtifacts(repoInfo, rootGroup, artifacts);
     }
 
+    final var artifacts = this.artifactService.getArtifacts(repoInfo.getStorageKey(), groupName);
+    final var versionNamesByArtifact =
+        this.collectVersionNamesByArtifact(repoInfo, groupName, artifacts);
+
     final long usage = this.mavenStorageService.deleteGroup(repoInfo.getStorageKey(), groupName);
 
     final BaseUsages usages = BaseUsages.builder().diskUsage(usage * -1L).build();
 
     this.artifactService.deleteGroup(repoInfo.getStorageKey(), groupName);
 
+    versionNamesByArtifact.forEach(
+        (artifactName, versionNames) ->
+            this.publishVersionsDeleted(repoInfo, groupName, artifactName, versionNames));
+
     return Pair.of(DeletedItem.GROUP, usages);
+  }
+
+  private Map<String, List<String>> collectVersionNamesByArtifact(
+      final RepoInfo repoInfo, final String groupName, final List<Artifact> artifacts) {
+
+    final var versionNamesByArtifact = new LinkedHashMap<String, List<String>>();
+
+    for (final var artifact : artifacts) {
+      versionNamesByArtifact.put(
+          artifact.getArtifactName(),
+          this.artifactService.getArtifactVersionNames(
+              repoInfo.getStorageKey(), groupName, artifact.getArtifactName()));
+    }
+
+    return versionNamesByArtifact;
   }
 
   private Optional<String> findRootGroup(final List<String> groups) {
@@ -149,16 +167,48 @@ public class ArtifactDeletionComponent {
     var totalUsage = 0L;
 
     for (final var artifact : artifacts) {
+      final var versionNames =
+          this.artifactService.getArtifactVersionNames(
+              repoInfo.getStorageKey(), rootGroup, artifact.getArtifactName());
+
       totalUsage +=
           this.mavenStorageService.deleteArtifact(
               repoInfo.getStorageKey(), rootGroup, artifact.getArtifactName());
 
       this.artifactService.deleteArtifact(
           repoInfo.getStorageKey(), rootGroup, artifact.getArtifactName());
+
+      this.publishVersionsDeleted(repoInfo, rootGroup, artifact.getArtifactName(), versionNames);
     }
 
     final var usages = BaseUsages.builder().diskUsage(totalUsage * -1L).build();
 
     return Pair.of(DeletedItem.GROUP, usages);
+  }
+
+  private void publishVersionDeleted(
+      final RepoInfo repoInfo,
+      final String groupName,
+      final String artifactName,
+      final String versionName) {
+
+    this.eventPublisher.publishEvent(
+        new ArtifactVersionDeletedEvent(
+            repoInfo.getStorageKey(),
+            repoInfo.getType().name(),
+            repoInfo.getName(),
+            groupName + ":" + artifactName,
+            versionName));
+  }
+
+  private void publishVersionsDeleted(
+      final RepoInfo repoInfo,
+      final String groupName,
+      final String artifactName,
+      final List<String> versionNames) {
+
+    for (final var versionName : versionNames) {
+      this.publishVersionDeleted(repoInfo, groupName, artifactName, versionName);
+    }
   }
 }
