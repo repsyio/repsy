@@ -21,6 +21,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public record ScanRequest(
+    @NonNull UUID scanId,
     @NonNull String repoType,
     @NonNull UUID repoId,
     @NonNull String artifactName,

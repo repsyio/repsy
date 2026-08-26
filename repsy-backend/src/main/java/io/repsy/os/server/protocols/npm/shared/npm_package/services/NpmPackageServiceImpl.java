@@ -140,6 +140,13 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
     this.npmPackageRepository.delete(npmPackage);
   }
 
+  public List<String> getVersionNames(final UUID packageId) {
+
+    return this.packageVersionRepository.findByNpmPackageId(packageId).stream()
+        .map(PackageVersion::getVersion)
+        .toList();
+  }
+
   @Transactional
   @Override
   public void addVersionToPackage(final UUID packageId, final Map<String, Object> payload) {

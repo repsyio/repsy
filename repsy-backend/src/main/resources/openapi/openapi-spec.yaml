@@ -5187,6 +5187,7 @@ components:
       type: string
       enum:
         - PENDING
+        - QUEUED
         - RUNNING
         - COMPLETED
         - FAILED

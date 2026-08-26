@@ -68,14 +68,15 @@
         <span
           [class.text-success-400]="selectedScan?.status === ScanStatus.Completed"
           [class.text-info-400]="selectedScan?.status === ScanStatus.Running"
+          [class.text-warning-400]="selectedScan?.status === ScanStatus.Queued"
           [class.text-neutral-200]="selectedScan?.status === ScanStatus.Pending"
           [class.text-error-400]="selectedScan?.status === ScanStatus.Failed"
           class="font-medium"
         >
-          {{ selectedScan?.status }}
+          {{ statusLabel(selectedScan?.status) }}
         </span>
-        @if (selectedScan?.status === ScanStatus.Pending || selectedScan?.status === ScanStatus.Running) {
-          <app-status-polling-indicator label="Scanning..." />
+        @if (selectedScan?.status === ScanStatus.Pending || selectedScan?.status === ScanStatus.Queued || selectedScan?.status === ScanStatus.Running) {
+          <app-status-polling-indicator [label]="statusLabel(selectedScan?.status)" />
         }
       </span>
 
@@ -271,9 +272,10 @@
               <span
                 [class.text-success-400]="scan.status === ScanStatus.Completed"
                 [class.text-info-400]="scan.status === ScanStatus.Running"
+                [class.text-warning-400]="scan.status === ScanStatus.Queued"
                 [class.text-neutral-200]="scan.status === ScanStatus.Pending"
                 [class.text-error-400]="scan.status === ScanStatus.Failed"
-                >{{ scan.status }}</span
+                >{{ statusLabel(scan.status) }}</span
               >
             </span>
           </div>
