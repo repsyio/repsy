@@ -22,8 +22,10 @@ import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPack
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.protocols.pypi.shared.python_package.dtos.ReleaseVersionRequiresPython;
 import io.repsy.protocols.pypi.shared.utils.PackageUtils;
 import io.repsy.protocols.pypi.shared.utils.ReleaseVersion;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,12 +57,17 @@ public class PypiApiFacade implements ProtocolApiFacade {
         this.pypiPackageService.getPackage(
             repoInfo.getStorageKey(), PackageUtils.normalizePackageName(packageName));
 
+    final var releaseVersions =
+        this.pypiPackageService.getReleaseIndexListItemInfos(packageInfo.getId());
+
     this.pypiPackageService.deletePackage(
         repoInfo.getStorageKey(), packageInfo.getNormalizedName());
 
     final var usage =
         this.pypiStorageService.deletePackage(
             repoInfo.getStorageKey(), packageInfo.getNormalizedName());
+
+    this.publishVersionsDeleted(repoInfo, packageInfo.getNormalizedName(), releaseVersions);
 
     return BaseUsages.builder().diskUsage(-1L * usage).build();
   }
@@ -78,13 +85,8 @@ public class PypiApiFacade implements ProtocolApiFacade {
 
     this.pypiPackageService.deleteRelease(packageInfo.getId(), releaseVersion.getVersion());
 
-    this.eventPublisher.publishEvent(
-        new ArtifactVersionDeletedEvent(
-            repoInfo.getStorageKey(),
-            repoInfo.getType().name(),
-            repoInfo.getName(),
-            packageInfo.getNormalizedName(),
-            releaseVersion.getVersion()));
+    this.publishVersionDeleted(
+        repoInfo, packageInfo.getNormalizedName(), releaseVersion.getVersion());
 
     final var isHasNoReleases = this.pypiPackageService.isPackageHasNoReleases(packageInfo.getId());
 
@@ -112,6 +114,30 @@ public class PypiApiFacade implements ProtocolApiFacade {
     }
 
     return usage;
+  }
+
+  private void publishVersionDeleted(
+      final @NonNull RepoInfo repoInfo,
+      final @NonNull String normalizedPackageName,
+      final @NonNull String version) {
+
+    this.eventPublisher.publishEvent(
+        new ArtifactVersionDeletedEvent(
+            repoInfo.getStorageKey(),
+            repoInfo.getType().name(),
+            repoInfo.getName(),
+            normalizedPackageName,
+            version));
+  }
+
+  private void publishVersionsDeleted(
+      final @NonNull RepoInfo repoInfo,
+      final @NonNull String normalizedPackageName,
+      final @NonNull List<ReleaseVersionRequiresPython> releaseVersions) {
+
+    for (final var releaseVersion : releaseVersions) {
+      this.publishVersionDeleted(repoInfo, normalizedPackageName, releaseVersion.getVersion());
+    }
   }
 
   public @NonNull ReleaseDetail getReleaseDetail(

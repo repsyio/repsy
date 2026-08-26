@@ -24,6 +24,7 @@ import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageServic
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -98,6 +99,8 @@ public class NpmApiFacade implements ProtocolApiFacade {
     final var packageInfo =
         this.npmPackageService.getPackage(repoInfo.getStorageKey(), scopeName, packageName);
 
+    final var versionNames = this.npmPackageService.getVersionNames(packageInfo.getId());
+
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
 
     final var usage =
@@ -106,6 +109,8 @@ public class NpmApiFacade implements ProtocolApiFacade {
     final var usages = BaseUsages.builder().diskUsage(-1L * usage).build();
 
     this.npmPackageService.deletePackage(packageInfo.getId());
+
+    this.publishVersionsDeleted(repoInfo, scopeName, packageName, versionNames);
 
     return usages;
   }
@@ -118,17 +123,9 @@ public class NpmApiFacade implements ProtocolApiFacade {
       throws IOException {
 
     if (this.npmPackageService.isLastVersion(repoInfo.getStorageKey(), scopeName, packageName)) {
-      final var result = this.deletePackage(repoInfo, scopeName, packageName);
-
-      this.eventPublisher.publishEvent(
-          new ArtifactVersionDeletedEvent(
-              repoInfo.getStorageKey(),
-              repoInfo.getType().name(),
-              repoInfo.getName(),
-              buildArtifactName(scopeName, packageName),
-              versionName));
-
-      return result;
+      // deletePackage() publishes ArtifactVersionDeletedEvent for every version it removes,
+      // which at this point is only this one — no separate publish needed here.
+      return this.deletePackage(repoInfo, scopeName, packageName);
     }
 
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
@@ -144,13 +141,7 @@ public class NpmApiFacade implements ProtocolApiFacade {
     this.npmPackageService.deletePackageVersion(
         repoInfo, scopeName, packageName, versionName, pair.getFirst());
 
-    this.eventPublisher.publishEvent(
-        new ArtifactVersionDeletedEvent(
-            repoInfo.getStorageKey(),
-            repoInfo.getType().name(),
-            repoInfo.getName(),
-            buildArtifactName(scopeName, packageName),
-            versionName));
+    this.publishVersionDeleted(repoInfo, scopeName, packageName, versionName);
 
     return BaseUsages.builder().diskUsage(pair.getSecond() * -1L).build();
   }
@@ -158,6 +149,32 @@ public class NpmApiFacade implements ProtocolApiFacade {
   public void createRepo(final @NonNull UUID repoId) {
 
     this.npmStorageService.createRepo(repoId);
+  }
+
+  private void publishVersionDeleted(
+      final @NonNull RepoInfo repoInfo,
+      final @Nullable String scopeName,
+      final @NonNull String packageName,
+      final @NonNull String versionName) {
+
+    this.eventPublisher.publishEvent(
+        new ArtifactVersionDeletedEvent(
+            repoInfo.getStorageKey(),
+            repoInfo.getType().name(),
+            repoInfo.getName(),
+            buildArtifactName(scopeName, packageName),
+            versionName));
+  }
+
+  private void publishVersionsDeleted(
+      final @NonNull RepoInfo repoInfo,
+      final @Nullable String scopeName,
+      final @NonNull String packageName,
+      final @NonNull List<String> versionNames) {
+
+    for (final var versionName : versionNames) {
+      this.publishVersionDeleted(repoInfo, scopeName, packageName, versionName);
+    }
   }
 
   private static @NonNull String buildArtifactName(

@@ -19,4 +19,8 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "scanner.trivy")
-public record TrivyScannerProperties(@NonNull String binaryPath, long timeoutSeconds) {}
+public record TrivyScannerProperties(
+    @NonNull String binaryPath,
+    long timeoutSeconds,
+    @NonNull String dbRepository,
+    @NonNull String javaDbRepository) {}

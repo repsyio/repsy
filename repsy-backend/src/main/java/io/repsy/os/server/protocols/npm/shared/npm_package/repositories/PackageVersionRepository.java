@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.npm.shared.npm_package.repositories;
 
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageVersion;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
@@ -35,6 +36,8 @@ public interface PackageVersionRepository extends JpaRepository<PackageVersion, 
       UUID repoId, @Nullable String scopeName, String packageName);
 
   Optional<PackageVersion> findByNpmPackageIdAndVersion(UUID packageId, String version);
+
+  List<PackageVersion> findByNpmPackageId(UUID packageId);
 
   @Query(
       """

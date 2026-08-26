@@ -225,7 +225,6 @@ To enable vulnerability scanning, add the following service to your docker-compo
       dockerfile: Dockerfile
     environment:
       - SCANNER_API_KEY=${TRIVY_SCANNER_API_KEY:-changeme-trivy-api-key}
-      - TRIVY_GATE_ACQUIRE_TIMEOUT_SECONDS=180
     ports:
       - "8090:8090"
     extra_hosts:

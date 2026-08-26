@@ -20,4 +20,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "repsy.security.trivy")
 public record TrivyScannerProperties(
-    @NonNull String scannerBaseUrl, @NonNull String apiKey, long timeoutSeconds) {}
+    @NonNull String scannerBaseUrl,
+    @NonNull String apiKey,
+    long requestTimeoutSeconds,
+    long pollIntervalMs,
+    long maxScanDurationSeconds) {}

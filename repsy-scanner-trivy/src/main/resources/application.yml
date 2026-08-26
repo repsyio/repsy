@@ -27,6 +27,8 @@ scanner:
   trivy:
     binary-path: ${TRIVY_BINARY_PATH:trivy}
     timeout-seconds: ${TRIVY_TIMEOUT_SECONDS:300}
+    db-repository: ${TRIVY_DB_REPOSITORY:ghcr.io/aquasecurity/trivy-db:2,mirror.gcr.io/aquasec/trivy-db:2}
+    java-db-repository: ${TRIVY_JAVA_DB_REPOSITORY:ghcr.io/aquasecurity/trivy-java-db:1,mirror.gcr.io/aquasec/trivy-java-db:1}
 
 logging:
   level:
