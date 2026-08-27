@@ -300,6 +300,7 @@ public class TrivyScanService {
       command.add(registryAuthToken);
     }
 
+    command.add("--");
     command.add(imageReference);
 
     return command;

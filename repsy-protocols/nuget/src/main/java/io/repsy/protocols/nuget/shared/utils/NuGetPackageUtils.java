@@ -40,6 +40,7 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
@@ -166,6 +167,12 @@ public final class NuGetPackageUtils {
     try {
       final var factory = DocumentBuilderFactory.newInstance();
       factory.setNamespaceAware(false);
+      factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+      factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+      factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+      factory.setXIncludeAware(false);
+      factory.setExpandEntityReferences(false);
 
       final var builder = factory.newDocumentBuilder();
       final var doc =

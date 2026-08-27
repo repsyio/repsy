@@ -156,7 +156,7 @@ public class ErrorHandler {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Access not allowed", ex);
+      log.warn("Access not allowed", ex);
 
       return null;
     }
@@ -164,7 +164,7 @@ public class ErrorHandler {
     final var exceptionMessage = ex.getMessage();
     final var messageText = exceptionMessage != null ? exceptionMessage : ERR_ACCESS_NOT_ALLOWED;
 
-    log.info(exceptionToString(ex, request));
+    log.warn(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.FORBIDDEN)
         .contentType(MediaType.APPLICATION_JSON)

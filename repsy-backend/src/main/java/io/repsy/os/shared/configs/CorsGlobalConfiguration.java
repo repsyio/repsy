@@ -15,22 +15,36 @@
  */
 package io.repsy.os.shared.configs;
 
+import java.util.Arrays;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 @RequiredArgsConstructor
 public class CorsGlobalConfiguration implements WebMvcConfigurer {
+  private final @NonNull AppProperties appProperties;
+  private final @NonNull Environment environment;
+
   @Override
   public void addCorsMappings(final @NonNull CorsRegistry registry) {
-    registry
-        .addMapping("/**")
-        .allowedOriginPatterns("*")
-        .allowedMethods("*")
-        .allowedHeaders("*")
-        .allowCredentials(true);
+    if (Arrays.asList(this.environment.getActiveProfiles()).contains("local")) {
+      registry
+          .addMapping("/**")
+          .allowedOriginPatterns("*")
+          .allowedMethods("*")
+          .allowedHeaders("*")
+          .allowCredentials(true);
+    } else {
+      registry
+          .addMapping("/**")
+          .allowedOrigins(this.appProperties.getAllowedOrigins().toArray(new String[0]))
+          .allowedMethods("*")
+          .allowedHeaders("*")
+          .allowCredentials(true);
+    }
   }
 }
