@@ -30,6 +30,9 @@ spring:
     schemas: public
     default-schema: public
 
+app:
+  allowed-origins: ${APP_ALLOWED_ORIGINS:}
+
 server:
   port: ${SERVER_PORT:9090}
   tomcat:

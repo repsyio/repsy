@@ -3474,7 +3474,7 @@ components:
           type: string
           maxLength: 25
           minLength: 0
-          pattern: "^[a-zA-Z0-9_\\-]+$"
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_\\-]*$"
         description:
           type: string
         privateRepo:
@@ -3621,7 +3621,7 @@ components:
           type: string
           maxLength: 25
           minLength: 0
-          pattern: "^[a-zA-Z0-9_\\-]+$"
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_\\-]*$"
       required:
         - name
     RepoDescriptionForm:
