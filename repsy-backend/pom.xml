@@ -290,7 +290,7 @@
 
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>postgresql</artifactId>
+            <artifactId>testcontainers-postgresql</artifactId>
             <optional>true</optional>
             <scope>test</scope>
         </dependency>
