@@ -453,7 +453,7 @@ repsy/
 ├── repsy-backend/          # Spring Boot backend
 │   ├── src/main/java/         # Java source code
 │   ├── src/main/resources/    # Configuration files
-│   └── src/test/              # Unit tests
+│   └── src/test/              # Unit (*Test) and integration (*IT) tests
 ├── repsy-frontend/         # Angular frontend
 │   ├── src/app/               # Angular components
 │   └── src/assets/            # Static assets
@@ -501,6 +501,24 @@ Access development environment:
 ```bash
 # Build Docker image (run from repo root)
 docker build -f Dockerfile -t repsy:latest .
+```
+
+### Running Tests
+
+```bash
+# Unit tests only (*Test.java) - no Docker needed
+mvn test
+
+# Unit + integration tests (*IT.java) - requires a running Docker daemon
+mvn verify
+```
+
+Unit tests are named `*Test` and run in Surefire; integration tests are named `*IT` and run in Failsafe. Integration tests use [Testcontainers](https://testcontainers.com/) to start a real PostgreSQL 18 container.
+
+To run a single integration test class:
+
+```bash
+mvn verify -pl repsy-backend -am -Dit.test=ProfileControllerIT
 ```
 
 ### Code Style

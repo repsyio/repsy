@@ -64,6 +64,28 @@
           </execution>
         </executions>
       </plugin>
+
+      <!--
+        Integration tests (*IT.java, e.g. Testcontainers-backed) run here, not in Surefire, so
+        "mvn test" stays fast and Docker-free; "mvn verify" runs both. Same argLine as Surefire in
+        core-parent, so the JaCoCo agent (and thus the coverage report) covers them too.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <version>3.2.5</version>
+        <configuration>
+          <argLine>${argLine} -Duser.timezone=UTC</argLine>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 </project>
