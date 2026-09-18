@@ -223,6 +223,7 @@ paths:
             type: integer
             format: int32
             default: 0
+            minimum: 0
         - name: size
           in: query
           required: false
@@ -230,6 +231,8 @@ paths:
             type: integer
             format: int32
             default: 10
+            minimum: 1
+            maximum: 100
       responses:
         '200':
           description: OK
@@ -237,6 +240,8 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelUserResponse"
+        '400':
+          description: Invalid paging parameter (page below 0, size outside 1-100, or not a number)
         '401':
           description: Missing or invalid token
         '403':
@@ -3016,6 +3021,7 @@ paths:
             type: integer
             format: int32
             default: 0
+            minimum: 0
         - name: size
           in: query
           required: false
@@ -3023,6 +3029,8 @@ paths:
             type: integer
             format: int32
             default: 10
+            minimum: 1
+            maximum: 100
       responses:
         '200':
           description: OK
@@ -3030,6 +3038,8 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelVulnerabilityScanInfo"
+        '400':
+          description: Invalid paging parameter (page below 0, size outside 1-100, or not a number)
         '401':
           description: Missing or invalid token, or the authenticated user is not an admin
       summary: List vulnerability scans across all repositories, filterable by severity/repoType/repoName
