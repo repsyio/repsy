@@ -27,6 +27,8 @@ import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -50,6 +52,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 final class UserController {
 
+  private static final int MAX_PAGE_SIZE = 100;
+
   private final @NonNull PanelAuthHelper panelAuthHelper;
   private final @NonNull UserTxService userTxService;
   private final @NonNull RestResponseFactory resp;
@@ -58,8 +62,8 @@ final class UserController {
   public @NonNull RestResponse<PagedModel<UserResponse>> list(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestParam(required = false, defaultValue = "") final @NonNull String search,
-      @RequestParam(defaultValue = "0") final int page,
-      @RequestParam(defaultValue = "10") final int size) {
+      @RequestParam(defaultValue = "0") @Min(0) final int page,
+      @RequestParam(defaultValue = "10") @Min(1) @Max(MAX_PAGE_SIZE) final int size) {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
