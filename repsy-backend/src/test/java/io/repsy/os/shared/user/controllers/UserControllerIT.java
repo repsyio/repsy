@@ -696,11 +696,6 @@ class UserControllerIT {
           .containsEntry("role", role.name())
           .containsEntry("lastLoginAt", null);
       assertThat((String) data.get("id")).matches(UUID_PATTERN);
-      // UserTxService.createUserWithRole() maps the entity right after save(), before the INSERT
-      // is flushed, so the @CreationTimestamp value is not set yet: createdAt serializes as null
-      // even though the OpenAPI schema marks it required. Real gap, asserted deliberately (the
-      // persisted row below does have it).
-      assertThat(data).containsEntry("createdAt", null);
 
       final var persisted =
           UserControllerIT.this.reload(
@@ -709,6 +704,9 @@ class UserControllerIT {
       assertThat(persisted.getRole()).isEqualTo(role);
       assertThat(persisted.getLastLoginAt()).isNull();
       assertThat(persisted.getCreatedAt()).isNotNull();
+      // The response must carry the same createdAt that was persisted (RPS-846).
+      assertThat(data.get("createdAt")).isNotNull();
+      assertThat(instantOrNull(data.get("createdAt"))).isEqualTo(persisted.getCreatedAt());
       // The password is stored salted+hashed, never verbatim, and must verify against the input.
       assertThat(persisted.getHash()).isNotEqualTo(password);
       assertThat(AuthUtils.checkPassword(persisted.getHash(), persisted.getSalt(), password))

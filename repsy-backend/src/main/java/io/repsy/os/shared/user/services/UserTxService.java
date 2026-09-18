@@ -130,7 +130,9 @@ public class UserTxService {
     user.setSalt(salt);
     user.setRole(UserRole.valueOf(dto.getRole().name()));
 
-    final var savedUser = this.userRepository.save(user);
+    // The id is application-generated, so save() defers the INSERT; flush it so the
+    // @CreationTimestamp value is populated before the entity is mapped to the response.
+    final var savedUser = this.userRepository.saveAndFlush(user);
     return this.userConverter.toUserResponseDto(savedUser);
   }
 
