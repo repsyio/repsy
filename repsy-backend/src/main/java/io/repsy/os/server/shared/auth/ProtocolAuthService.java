@@ -100,7 +100,7 @@ public class ProtocolAuthService {
       final @Nullable UserInfo userInfo, final @NonNull Permission permission) {
 
     if (userInfo == null) {
-      return PermissionInfo.builder().canRead(true).canWrite(false).canManage(false).build();
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
     this.checkPermission(userInfo, permission);
