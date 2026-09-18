@@ -45,6 +45,7 @@ out/
 
 ### VS Code ###
 .vscode/
+.claude/
 
 .dockerconfig.json
 
