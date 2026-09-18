@@ -45,6 +45,7 @@ import java.nio.file.Files;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.UUID;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -366,11 +367,19 @@ class NpmPackageApiControllerIT {
         throws Exception {
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/missing-repo"))
-          .andExpect(status().isOneOf(200, 404));
+          .andExpect(
+              result ->
+                  Assertions.assertTrue(
+                      result.getResponse().getStatus() == 200
+                          || result.getResponse().getStatus() == 404));
 
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/{repo}/missing", NpmPackageApiControllerIT.this.repoName))
-          .andExpect(status().isOneOf(200, 404));
+          .andExpect(
+              result ->
+                  Assertions.assertTrue(
+                      result.getResponse().getStatus() == 200
+                          || result.getResponse().getStatus() == 404));
 
       NpmPackageApiControllerIT.this
           .perform(
