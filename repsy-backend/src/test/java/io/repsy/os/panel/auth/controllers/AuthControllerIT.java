@@ -1024,17 +1024,20 @@ class AuthControllerIT {
     /**
      * The port-based handler mapping does not raise {@code HttpRequestMethodNotSupportedException}
      * for a verb the path does not map, so the request falls through to the static-resource handler
-     * and fails with the servlet {@code NoResourceFoundException}. {@code ErrorHandler} only
-     * handles the <em>reactive</em> class of the same name, so the generic {@code Throwable}
-     * handler answers 500 instead of a 404/405 (RPS-849). Pinned here as current behavior; update
-     * this assertion when that is fixed.
+     * and fails with the servlet {@code NoResourceFoundException}, which {@code ErrorHandler}
+     * answers with 404 {@code itemNotFound} (RPS-849).
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("unsupportedMethods")
-    @DisplayName("currently answers 500 errorOccurred for a verb the path does not map")
+    @DisplayName("answers 404 itemNotFound for a verb the path does not map")
     void unsupportedMethod(final String name, final MockHttpServletRequestBuilder request)
         throws Exception {
-      expectInternalError(AuthControllerIT.this.perform(request));
+      expectError(
+          AuthControllerIT.this.perform(request),
+          HttpStatus.NOT_FOUND,
+          "itemNotFound",
+          null,
+          "The requested item is not found.");
     }
 
     static Stream<Arguments> unsupportedMethods() {
