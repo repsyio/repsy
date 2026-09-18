@@ -50,6 +50,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -84,6 +85,7 @@ class MavenArtifactControllerIT {
       "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   private static final String GROUP = "com.example.app";
   private static final String ARTIFACT = "demo";
+  private static final String STORAGE_BASE_PATH = createTempStoragePath();
 
   @Container @ServiceConnection
   static final PostgreSQLContainer<?> POSTGRES =
@@ -94,10 +96,10 @@ class MavenArtifactControllerIT {
 
   @DynamicPropertySource
   static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", MavenArtifactControllerIT::tempStoragePath);
+    registry.add("storage-gateway.fs.base-path", () -> STORAGE_BASE_PATH);
   }
 
-  private static String tempStoragePath() {
+  private static String createTempStoragePath() {
     try {
       return Files.createTempDirectory("repsy-maven-artifacts-it").toString();
     } catch (final IOException exception) {
@@ -167,8 +169,12 @@ class MavenArtifactControllerIT {
     if (!snapshot) {
       artifact.setRelease(versionName);
     }
+    artifact.setLastUpdatedAt(Instant.now());
+    this.artifactRepository.saveAndFlush(artifact);
     final var version = new ArtifactVersion();
     version.setArtifact(artifact);
+    version.setCreatedAt(Instant.now());
+    version.setLastUpdatedAt(Instant.now());
     version.setType(snapshot ? ArtifactVersionType.SNAPSHOT : ArtifactVersionType.RELEASE);
     version.setVersionName(versionName);
     version.setName(ARTIFACT);
@@ -176,7 +182,7 @@ class MavenArtifactControllerIT {
     version.setHasSources(!snapshot);
     version.setHasDocuments(!snapshot);
     version.setHasModules(false);
-    this.artifactVersionRepository.save(version);
+    this.artifactVersionRepository.saveAndFlush(version);
     final Path pom =
         Path.of(
             this.storageBasePath,
@@ -188,6 +194,20 @@ class MavenArtifactControllerIT {
             ARTIFACT + "-" + versionName + ".pom");
     Files.createDirectories(pom.getParent());
     Files.writeString(pom, pomXml(versionName), StandardCharsets.UTF_8);
+    Files.writeString(
+        pom.getParent().getParent().resolve("maven-metadata.xml"),
+        metadataXml(),
+        StandardCharsets.UTF_8);
+    if (snapshot) {
+      Files.writeString(
+          pom.getParent().resolve("maven-metadata.xml"),
+          snapshotMetadataXml(),
+          StandardCharsets.UTF_8);
+      Files.writeString(
+          pom.getParent().resolve(ARTIFACT + "-1.1.0-20260918.000000-1.pom"),
+          pomXml(versionName),
+          StandardCharsets.UTF_8);
+    }
   }
 
   private static String pomXml(final String version) {
@@ -198,6 +218,28 @@ class MavenArtifactControllerIT {
         + "</artifactId><version>"
         + version
         + "</version><packaging>jar</packaging><name>Demo</name></project>";
+  }
+
+  private static String metadataXml() {
+    return "<metadata><groupId>"
+        + GROUP
+        + "</groupId><artifactId>"
+        + ARTIFACT
+        + "</artifactId><versioning><latest>1.1.0-SNAPSHOT</latest><release>1.0.0</release>"
+        + "<versions><version>1.0.0</version><version>1.1.0-SNAPSHOT</version></versions>"
+        + "</versioning></metadata>";
+  }
+
+  private static String snapshotMetadataXml() {
+    return "<metadata><groupId>"
+        + GROUP
+        + "</groupId><artifactId>"
+        + ARTIFACT
+        + "</artifactId><version>1.1.0-SNAPSHOT</version><versioning>"
+        + "<snapshot><timestamp>20260918.000000</timestamp><buildNumber>1</buildNumber></snapshot>"
+        + "<snapshotVersions><snapshotVersion><extension>pom</extension><value>"
+        + "1.1.0-20260918.000000-1</value><updated>20260918000000</updated></snapshotVersion>"
+        + "</snapshotVersions></versioning></metadata>";
   }
 
   private static RequestPostProcessor apiPort() {
@@ -231,11 +273,11 @@ class MavenArtifactControllerIT {
           .andExpect(jsonPath("$.type").value("SUCCESS"))
           .andExpect(jsonPath("$.errorCode").value(nullValue()))
           .andExpect(jsonPath("$.text").value("Artifacts have been fetched."))
-          .andExpect(jsonPath("$.data.*", hasSize(4)))
+          .andExpect(jsonPath("$.data.page.*", hasSize(4)))
           .andExpect(jsonPath("$.data.content", hasSize(1)))
           .andExpect(jsonPath("$.data.content[0].groupName").value(GROUP))
           .andExpect(jsonPath("$.data.content[0].artifactName").value(ARTIFACT))
-          .andExpect(jsonPath("$.data.page.size").value(20))
+          .andExpect(jsonPath("$.data.page.size").value(10))
           .andExpect(jsonPath("$.data.page.number").value(0))
           .andExpect(jsonPath("$.data.page.totalElements").value(1))
           .andExpect(jsonPath("$.data.page.totalPages").value(1));
@@ -284,15 +326,15 @@ class MavenArtifactControllerIT {
                       MavenArtifactControllerIT.this.repoName,
                       GROUP,
                       ARTIFACT)
-                  .param("version", "1.0")
                   .param("size", "1")
                   .with(apiPort()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.msgId").value("artifactVersionsFetched"))
           .andExpect(jsonPath("$.data.content", hasSize(1)))
-          .andExpect(jsonPath("$.data.content[0].versionName").value("1.0.0"))
+          .andExpect(jsonPath("$.data.content[0].versionName").value("1.1.0-SNAPSHOT"))
           .andExpect(jsonPath("$.data.page.size").value(1))
-          .andExpect(jsonPath("$.data.page.totalElements").value(1));
+          .andExpect(jsonPath("$.data.page.totalElements").value(2))
+          .andExpect(jsonPath("$.data.page.totalPages").value(2));
     }
   }
 
@@ -318,7 +360,7 @@ class MavenArtifactControllerIT {
           .andExpect(jsonPath("$.msgId").value("artifactVersionDeleted"))
           .andExpect(jsonPath("$.type").value("SUCCESS"))
           .andExpect(jsonPath("$.errorCode").value(nullValue()))
-          .andExpect(jsonPath("$.text").value("artifactVersionDeleted"))
+          .andExpect(jsonPath("$.text").value("Artifact version has been deleted."))
           .andExpect(jsonPath("$.data", notNullValue()));
 
       MavenArtifactControllerIT.this
@@ -348,7 +390,8 @@ class MavenArtifactControllerIT {
           .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.*", hasSize(5)))
           .andExpect(jsonPath("$.type").value("ERROR"))
-          .andExpect(jsonPath("$.data").value(nullValue()))
+          .andExpect(jsonPath("$.msgId").value("unAuthorized"))
+          .andExpect(jsonPath("$.data").value("unAuthorized"))
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)))
           .andExpect(jsonPath("$.text").value(notNullValue()));
     }
@@ -371,11 +414,11 @@ class MavenArtifactControllerIT {
                   .with(apiPort()))
           .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("Missing Request Header"))
+          .andExpect(jsonPath("$.msgId").value("unAuthorized"))
           .andExpect(jsonPath("$.type").value("ERROR"))
-          .andExpect(jsonPath("$.data").value(nullValue()))
+          .andExpect(jsonPath("$.data").value("unAuthorized"))
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)))
-          .andExpect(jsonPath("$.text").value("Missing Request Header"));
+          .andExpect(jsonPath("$.text").value("The user has logged in but has no permissions."));
     }
 
     @Test
