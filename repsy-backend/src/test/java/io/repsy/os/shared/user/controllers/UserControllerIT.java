@@ -1002,25 +1002,50 @@ class UserControllerIT {
 
     @Test
     @DisplayName(
-        "currently allows demoting the last remaining ADMIN (unlike DELETE, PUT has no"
-            + " last-admin guard), leaving the system without any administrator")
-    void demotingTheLastAdminIsAllowed() throws Exception {
+        "returns 400 cannotDemoteLastAdminUser for the last remaining ADMIN and changes nothing")
+    void cannotDemoteLastAdmin() throws Exception {
+      // AdminUserInitializer seeds exactly one ADMIN at startup; no test here leaves another one
+      // behind, because every test is rolled back.
       final var lastAdmin = UserControllerIT.this.seededAdmin();
       assertThat(UserControllerIT.this.userRepository.countByRole(UserRole.ADMIN)).isEqualTo(1L);
       final var token = UserControllerIT.this.bearerTokenFor(lastAdmin);
 
-      final var body =
-          expectSuccess(
-              UserControllerIT.this.perform(
-                  put("/api/users/" + lastAdmin.getId())
-                      .header(AUTHORIZATION, token)
-                      .contentType(MediaType.APPLICATION_JSON)
-                      .content(updateBody(SEEDED_ADMIN_USERNAME, "USER"))),
-              "userUpdated");
+      // The body also renames the user, to prove a rejected request applies no part of the update.
+      expectError(
+          UserControllerIT.this.perform(
+              put("/api/users/" + lastAdmin.getId())
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(updateBody(uniqueUsername("renamed"), "USER"))),
+          HttpStatus.BAD_REQUEST,
+          "cannotDemoteLastAdminUser",
+          "cannotDemoteLastAdminUser",
+          "You cannot remove the admin role from the last admin user.");
 
-      assertThat((String) JsonPath.read(body, "$.data.role")).isEqualTo("USER");
-      UserControllerIT.this.entityManager.flush();
-      assertThat(UserControllerIT.this.userRepository.countByRole(UserRole.ADMIN)).isZero();
+      final var after = UserControllerIT.this.reload(lastAdmin.getId());
+      assertThat(after.getUsername()).isEqualTo(SEEDED_ADMIN_USERNAME);
+      assertThat(after.getRole()).isEqualTo(UserRole.ADMIN);
+      assertThat(UserControllerIT.this.userRepository.countByRole(UserRole.ADMIN)).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("lets an admin demote themselves while another admin remains")
+    void demotingSelfWithAnotherAdminIsAllowed() throws Exception {
+      final var self =
+          UserControllerIT.this.createUser(uniqueUsername("selfdemote"), UserRole.ADMIN);
+      final var token = UserControllerIT.this.bearerTokenFor(self);
+      assertThat(UserControllerIT.this.userRepository.countByRole(UserRole.ADMIN))
+          .isGreaterThanOrEqualTo(2L);
+
+      expectSuccess(
+          UserControllerIT.this.perform(
+              put("/api/users/" + self.getId())
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(updateBody(self.getUsername(), "USER"))),
+          "userUpdated");
+
+      assertThat(UserControllerIT.this.reload(self.getId()).getRole()).isEqualTo(UserRole.USER);
     }
   }
 

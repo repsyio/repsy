@@ -48,6 +48,7 @@ public class UserTxService {
   private static final @NonNull String ERR_USER_NOT_FOUND = "userNotFound";
   private static final @NonNull String ERR_USERNAME_IN_USE = "usernameInUse";
   private static final @NonNull String ERR_CANNOT_DELETE_LAST_ADMIN = "cannotDeleteLastAdminUser";
+  private static final @NonNull String ERR_CANNOT_DEMOTE_LAST_ADMIN = "cannotDemoteLastAdminUser";
 
   private final @NonNull UserRepository userRepository;
   private final @NonNull UserConverter userConverter;
@@ -141,6 +142,14 @@ public class UserTxService {
       final @NonNull UUID userId, final @NonNull UserUpdateForm dto) {
 
     final var user = this.findUserById(userId);
+    final var newRole = UserRole.valueOf(dto.getRole().name());
+
+    // Checked before any field is touched so a rejected request leaves the user unmodified.
+    if (user.getRole() == UserRole.ADMIN
+        && newRole != UserRole.ADMIN
+        && this.userRepository.countByRole(UserRole.ADMIN) <= 1) {
+      throw new BadRequestException(ERR_CANNOT_DEMOTE_LAST_ADMIN);
+    }
 
     if (!user.getUsername().equals(dto.getUsername())) {
       if (this.userRepository.existsByUsername(dto.getUsername())) {
@@ -149,7 +158,7 @@ public class UserTxService {
       user.setUsername(dto.getUsername());
     }
 
-    user.setRole(UserRole.valueOf(dto.getRole().name()));
+    user.setRole(newRole);
 
     return this.userConverter.toUserResponseDto(this.userRepository.save(user));
   }
