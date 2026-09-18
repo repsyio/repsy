@@ -51,7 +51,7 @@ public interface PackageDistTagRepository extends JpaRepository<PackageDistTag, 
             join pv.npmPackage p
             join p.repo r
             where r.id = :repoId
-            and p.scope = :scopeName
+            and ((:scopeName is null and p.scope is null) or p.scope = :scopeName)
             and p.name = :packageName""")
   List<PackageDistributionTagMapListItem> findAllByRepoIdAndScopeAndPackageName(
       UUID repoId, @Nullable String scopeName, String packageName);
