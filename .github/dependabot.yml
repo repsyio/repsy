@@ -5,18 +5,41 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
 
   - package-ecosystem: "maven"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      maven-dependencies:
+        patterns:
+          - "*"
 
   - package-ecosystem: "npm"
     directory: "/repsy-frontend"
     schedule:
       interval: "weekly"
 
-  - package-ecosystem: "gitsubmodule"
+  - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # Stay on the Java 25 LTS line; only patch/minor tag bumps are proposed.
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]
+      # Stay on the Node 24 LTS line; only patch/minor tag bumps are proposed.
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "docker"
+    directory: "/repsy-scanner-trivy"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types: ["version-update:semver-major"]

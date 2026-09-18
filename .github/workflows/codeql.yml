@@ -1,0 +1,71 @@
+name: CodeQL
+
+permissions:
+  contents: read
+  security-events: write
+
+on:
+  pull_request:
+    branches:
+      - main
+  schedule:
+    - cron: "30 2 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze-java:
+    name: Analyze Java
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: java-kotlin
+          build-mode: manual
+          config-file: ./.github/codeql-config.yml
+
+      - name: Setup Maven Action
+        uses: s4u/setup-maven-action@v1.20.0
+        with:
+          checkout-enabled: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          java-version: "25"
+          distribution: "temurin"
+          cache: maven
+
+      - name: Install core modules
+        run: mvn -B -ntp install -f core/pom.xml -DskipTests -Drat.skip=true -Dcheckstyle.skip=true
+
+      - name: Build
+        run: mvn -B -ntp -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -Drat.skip=true package
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+
+  analyze-javascript:
+    name: Analyze JavaScript/TypeScript
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          config-file: ./.github/codeql-config.yml
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4

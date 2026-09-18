@@ -1,43 +1,20 @@
-name: MR Checks
+name: SonarCloud Analysis
 
 permissions:
   contents: read
 
 on:
-  pull_request:
+  push:
     branches:
       - main
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  pre-checks:
-    name: Editorconfig check - All
+  analyze:
+    name: Analyze main branch
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v7
-
-      - name: There must be only one .editorconfig file
-        run: |
-          if [ "$(find . -name '.editorconfig' | wc -l)" != "1" ]
-          then
-            exit 1
-          fi
-
-      - name: Install editorconfig-checker
-        uses: editorconfig-checker/action-editorconfig-checker@v2
-        with:
-          version: v3.0.3
-
-      - run: editorconfig-checker
-
-  java-checks:
-    name: Repsy check
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v7
+      - name: Checkout
+        uses: actions/checkout@v7
         with:
           submodules: recursive
           fetch-depth: 0
@@ -72,26 +49,3 @@ jobs:
           -Dsonar.projectKey=repsyio_repsy
           -Dsonar.organization=repsy
           -Dsonar.exclusions=core/**
-
-  repsy-frontend:
-    name: Repsy frontend
-    runs-on: self-hosted
-    defaults:
-      run:
-        working-directory: ./repsy-frontend
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: "24"
-
-      - name: Install pnpm
-        run: npm install -g pnpm
-
-      - name: Install dependencies
-        run: pnpm install --ignore-scripts
-
-      - name: Check
-        run: pnpm run lint

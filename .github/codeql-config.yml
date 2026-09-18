@@ -1,0 +1,7 @@
+name: "CodeQL config"
+
+# The core/ submodule is repsy-core, which already runs its own CodeQL
+# analysis in its own repository (repsyio/repsy-core). Excluding it here
+# avoids duplicate/conflicting alerts on the same source.
+paths-ignore:
+  - core/**
