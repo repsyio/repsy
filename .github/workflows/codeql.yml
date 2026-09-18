@@ -60,6 +60,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # The self-hosted runner's default `node` on PATH is too old for
+      # CodeQL's bundled TypeScript parser (it needs Node >= 14 for ES2020
+      # syntax like `??`, which the extractor's own compiler uses).
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:

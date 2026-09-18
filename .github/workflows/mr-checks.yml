@@ -21,7 +21,9 @@ jobs:
 
       - name: There must be only one .editorconfig file
         run: |
-          if [ "$(find . -name '.editorconfig' | wc -l)" != "1" ]
+          # core/ is a git submodule with its own .editorconfig; it's a
+          # separate repo, not part of this repo's file count.
+          if [ "$(find . -path './core' -prune -o -name '.editorconfig' -print | wc -l)" != "1" ]
           then
             exit 1
           fi
