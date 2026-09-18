@@ -49,8 +49,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -63,27 +63,28 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Full-stack integration tests for {@code /api/profile/*}, exercising the real Spring context,
- * MVC dispatch and a containerized PostgreSQL database (Flyway-migrated) end to end.
+ * Full-stack integration tests for {@code /api/profile/*}, exercising the real Spring context, MVC
+ * dispatch and a containerized PostgreSQL database (Flyway-migrated) end to end.
  *
- * <p>Requests are made through {@link MockMvc}, but {@code ProfileController} is only registered
- * on the "api" multiport connector, and the custom {@code PortBasedRequestMappingHandlerMapping}
+ * <p>Requests are made through {@link MockMvc}, but {@code ProfileController} is only registered on
+ * the "api" multiport connector, and the custom {@code PortBasedRequestMappingHandlerMapping}
  * buckets handlers by {@link jakarta.servlet.ServletRequest#getLocalPort()}. {@link
- * MockMvc#perform} defaults local port to 80, which matches nothing, so every request goes
- * through {@link #apiPort()} to fake the local port onto {@code multiport.ports.api} (8080).
+ * MockMvc#perform} defaults local port to 80, which matches nothing, so every request goes through
+ * {@link #apiPort()} to fake the local port onto {@code multiport.ports.api} (8080).
  */
 @Testcontainers
 @AutoConfigureMockMvc
 @Transactional
-@SpringBootTest(classes = RepsyApplication.class, webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+@SpringBootTest(
+    classes = RepsyApplication.class,
+    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("ProfileController /api/profile/*")
 class ProfileControllerIntegrationTest {
 
   private static final int API_PORT = 8080;
   private static final String VALID_PASSWORD = "Password1!";
 
-  @Container
-  @ServiceConnection
+  @Container @ServiceConnection
   static final PostgreSQLContainer<?> POSTGRES =
       new PostgreSQLContainer<>("postgres:17-alpine")
           .withDatabaseName("repsy")
@@ -121,11 +122,11 @@ class ProfileControllerIntegrationTest {
   }
 
   /**
-   * Creates and returns a user with its {@code createdAt} populated. The whole test method runs
-   * in one transaction (see class Javadoc), so the newly persisted entity sits unflushed in
+   * Creates and returns a user with its {@code createdAt} populated. The whole test method runs in
+   * one transaction (see class Javadoc), so the newly persisted entity sits unflushed in
    * Hibernate's first-level cache; {@code createdAt} is a before-execution generator that only
-   * assigns a value once the INSERT is actually flushed, and {@link UserRepository#findById}
-   * would otherwise just hand back the same managed, still-null instance.
+   * assigns a value once the INSERT is actually flushed, and {@link UserRepository#findById} would
+   * otherwise just hand back the same managed, still-null instance.
    */
   private User createUser(final String username, final UserRole role) {
     final var salt = PasswordGeneratorUtil.generateSalt();
@@ -152,8 +153,10 @@ class ProfileControllerIntegrationTest {
     @Test
     @DisplayName("returns the full profile of the authenticated user, including the diskUsage gap")
     void returnsProfileForAuthenticatedUser() throws Exception {
-      final var user = ProfileControllerIntegrationTest.this.createUser(uniqueUsername("getme"), UserRole.USER);
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+      final var user =
+          ProfileControllerIntegrationTest.this.createUser(uniqueUsername("getme"), UserRole.USER);
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
 
       final var body =
           ProfileControllerIntegrationTest.this
@@ -164,14 +167,16 @@ class ProfileControllerIntegrationTest {
               .andExpect(jsonPath("$.msgId").value("profileFetched"))
               .andExpect(jsonPath("$.type").value("SUCCESS"))
               .andExpect(jsonPath("$.errorCode").value(nullValue()))
-              // "profileFetched" has no entry in messages.properties, so text falls back to the msgId itself.
+              // "profileFetched" has no entry in messages.properties, so text falls back to the
+              // msgId itself.
               .andExpect(jsonPath("$.text").value("profileFetched"))
               .andExpect(jsonPath("$.data.*", hasSize(6)))
               .andExpect(jsonPath("$.data.id").value(user.getId().toString()))
               .andExpect(jsonPath("$.data.username").value(user.getUsername()))
               .andExpect(jsonPath("$.data.role").value("USER"))
               // ProfileService.getProfile() never populates diskUsage, even though the OpenAPI
-              // schema marks it required -- it always serializes as null. Real gap, asserted deliberately.
+              // schema marks it required -- it always serializes as null. Real gap, asserted
+              // deliberately.
               .andExpect(jsonPath("$.data.diskUsage").value(nullValue()))
               // Freshly created user has never logged in.
               .andExpect(jsonPath("$.data.lastLoginAt").value(nullValue()))
@@ -181,17 +186,21 @@ class ProfileControllerIntegrationTest {
               .getContentAsString();
 
       final String createdAt = JsonPath.read(body, "$.data.createdAt");
-      assertThat(Instant.parse(createdAt)).isCloseTo(user.getCreatedAt(), within(2, ChronoUnit.SECONDS));
+      assertThat(Instant.parse(createdAt))
+          .isCloseTo(user.getCreatedAt(), within(2, ChronoUnit.SECONDS));
     }
 
     @Test
     @DisplayName("returns lastLoginAt when the user has logged in before")
     void returnsLastLoginAtWhenPresent() throws Exception {
-      final var user = ProfileControllerIntegrationTest.this.createUser(uniqueUsername("hasLogin"), UserRole.USER);
+      final var user =
+          ProfileControllerIntegrationTest.this.createUser(
+              uniqueUsername("hasLogin"), UserRole.USER);
       ProfileControllerIntegrationTest.this.userTxService.updateLastLoginAt(user.getUsername());
       final var refreshed =
           ProfileControllerIntegrationTest.this.userRepository.findById(user.getId()).orElseThrow();
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
 
       final var body =
           ProfileControllerIntegrationTest.this
@@ -219,9 +228,13 @@ class ProfileControllerIntegrationTest {
           .andExpect(jsonPath("$.msgId").value("Missing Request Header"))
           .andExpect(jsonPath("$.type").value("ERROR"))
           .andExpect(jsonPath("$.data").value(nullValue()))
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(
-              "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")))
-          // No "Missing Request Header" entry in messages.properties, so text falls back to the msgId itself.
+          .andExpect(
+              jsonPath("$.errorCode")
+                  .value(
+                      matchesPattern(
+                          "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")))
+          // No "Missing Request Header" entry in messages.properties, so text falls back to the
+          // msgId itself.
           .andExpect(jsonPath("$.text").value("Missing Request Header"));
     }
 
@@ -235,8 +248,11 @@ class ProfileControllerIntegrationTest {
           .andExpect(jsonPath("$.msgId").value("accessNotAllowed"))
           .andExpect(jsonPath("$.data").value("accessNotAllowed"))
           .andExpect(jsonPath("$.text").value("Access isn't allowed."))
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(
-              "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")));
+          .andExpect(
+              jsonPath("$.errorCode")
+                  .value(
+                      matchesPattern(
+                          "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")));
     }
 
     @Test
@@ -253,9 +269,12 @@ class ProfileControllerIntegrationTest {
     @Test
     @DisplayName("returns 403 for an expired token")
     void expiredToken() throws Exception {
-      final var user = ProfileControllerIntegrationTest.this.createUser(uniqueUsername("expired"), UserRole.USER);
+      final var user =
+          ProfileControllerIntegrationTest.this.createUser(
+              uniqueUsername("expired"), UserRole.USER);
       final var token =
-          ProfileControllerIntegrationTest.this.expiredBearerToken(user.getId(), user.getUsername());
+          ProfileControllerIntegrationTest.this.expiredBearerToken(
+              user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -294,8 +313,10 @@ class ProfileControllerIntegrationTest {
     @DisplayName("updates the username and returns freshly minted tokens")
     void updatesUsername() throws Exception {
       final var user =
-          ProfileControllerIntegrationTest.this.createUser(uniqueUsername("oldname"), UserRole.USER);
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+          ProfileControllerIntegrationTest.this.createUser(
+              uniqueUsername("oldname"), UserRole.USER);
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
       final var newUsername = uniqueUsername("newname");
 
       final var responseBody =
@@ -345,7 +366,8 @@ class ProfileControllerIntegrationTest {
     void reservedUsername() throws Exception {
       final var user =
           ProfileControllerIntegrationTest.this.createUser(uniqueUsername("resv"), UserRole.USER);
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -369,7 +391,8 @@ class ProfileControllerIntegrationTest {
           ProfileControllerIntegrationTest.this.createUser(uniqueUsername("taken"), UserRole.USER);
       final var user =
           ProfileControllerIntegrationTest.this.createUser(uniqueUsername("wants"), UserRole.USER);
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -389,8 +412,10 @@ class ProfileControllerIntegrationTest {
             + " (existsByUsername matches the caller's own row -- a real quirk, not a desired 200)")
     void reSubmittingOwnCurrentUsernameIsRejected() throws Exception {
       final var user =
-          ProfileControllerIntegrationTest.this.createUser(uniqueUsername("samesame"), UserRole.USER);
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+          ProfileControllerIntegrationTest.this.createUser(
+              uniqueUsername("samesame"), UserRole.USER);
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -409,7 +434,8 @@ class ProfileControllerIntegrationTest {
     void tooShortUsername() throws Exception {
       final var user =
           ProfileControllerIntegrationTest.this.createUser(uniqueUsername("short"), UserRole.USER);
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -430,7 +456,8 @@ class ProfileControllerIntegrationTest {
     void tooLongUsername() throws Exception {
       final var user =
           ProfileControllerIntegrationTest.this.createUser(uniqueUsername("long"), UserRole.USER);
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -448,8 +475,10 @@ class ProfileControllerIntegrationTest {
     @DisplayName("returns 400 validationError for an uppercase/invalid-pattern username")
     void invalidPatternUsername() throws Exception {
       final var user =
-          ProfileControllerIntegrationTest.this.createUser(uniqueUsername("pattern"), UserRole.USER);
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+          ProfileControllerIntegrationTest.this.createUser(
+              uniqueUsername("pattern"), UserRole.USER);
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -467,8 +496,10 @@ class ProfileControllerIntegrationTest {
     @DisplayName("returns 400 validationError for malformed request JSON")
     void malformedJsonBody() throws Exception {
       final var user =
-          ProfileControllerIntegrationTest.this.createUser(uniqueUsername("badjson"), UserRole.USER);
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+          ProfileControllerIntegrationTest.this.createUser(
+              uniqueUsername("badjson"), UserRole.USER);
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -498,12 +529,14 @@ class ProfileControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 403 for an expired token (extractUserId verifies internally, same as GET)")
+    @DisplayName(
+        "returns 403 for an expired token (extractUserId verifies internally, same as GET)")
     void expiredToken() throws Exception {
       final var user =
           ProfileControllerIntegrationTest.this.createUser(uniqueUsername("expusr"), UserRole.USER);
       final var token =
-          ProfileControllerIntegrationTest.this.expiredBearerToken(user.getId(), user.getUsername());
+          ProfileControllerIntegrationTest.this.expiredBearerToken(
+              user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -520,7 +553,8 @@ class ProfileControllerIntegrationTest {
     @Test
     @DisplayName("returns 404 when the user from the token no longer exists")
     void userNotFound() throws Exception {
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(UUID.randomUUID(), "ghost");
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(UUID.randomUUID(), "ghost");
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -549,7 +583,8 @@ class ProfileControllerIntegrationTest {
       final var user =
           ProfileControllerIntegrationTest.this.createUser(uniqueUsername("pwuser"), UserRole.USER);
       final var originalHash = user.getHash();
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
       final var newPassword = "NewPassword2@";
 
       ProfileControllerIntegrationTest.this
@@ -571,15 +606,18 @@ class ProfileControllerIntegrationTest {
       final var persisted =
           ProfileControllerIntegrationTest.this.userRepository.findById(user.getId()).orElseThrow();
       assertThat(persisted.getHash()).isNotEqualTo(originalHash);
-      assertThat(AuthUtils.checkPassword(persisted.getHash(), persisted.getSalt(), newPassword)).isTrue();
+      assertThat(AuthUtils.checkPassword(persisted.getHash(), persisted.getSalt(), newPassword))
+          .isTrue();
     }
 
     @Test
     @DisplayName("returns 400 validationError for a too-short password")
     void tooShortPassword() throws Exception {
       final var user =
-          ProfileControllerIntegrationTest.this.createUser(uniqueUsername("shortpw"), UserRole.USER);
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+          ProfileControllerIntegrationTest.this.createUser(
+              uniqueUsername("shortpw"), UserRole.USER);
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -599,7 +637,8 @@ class ProfileControllerIntegrationTest {
     void tooLongPassword() throws Exception {
       final var user =
           ProfileControllerIntegrationTest.this.createUser(uniqueUsername("longpw"), UserRole.USER);
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -618,7 +657,8 @@ class ProfileControllerIntegrationTest {
     void missingUppercase() throws Exception {
       final var user =
           ProfileControllerIntegrationTest.this.createUser(uniqueUsername("nouppr"), UserRole.USER);
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -636,8 +676,10 @@ class ProfileControllerIntegrationTest {
     @DisplayName("returns 400 validationError when missing a digit")
     void missingDigit() throws Exception {
       final var user =
-          ProfileControllerIntegrationTest.this.createUser(uniqueUsername("nodigit"), UserRole.USER);
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+          ProfileControllerIntegrationTest.this.createUser(
+              uniqueUsername("nodigit"), UserRole.USER);
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -656,7 +698,8 @@ class ProfileControllerIntegrationTest {
     void containsWhitespace() throws Exception {
       final var user =
           ProfileControllerIntegrationTest.this.createUser(uniqueUsername("wspw"), UserRole.USER);
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -688,7 +731,8 @@ class ProfileControllerIntegrationTest {
     @Test
     @DisplayName("returns 404 when the user from the token no longer exists")
     void userNotFound() throws Exception {
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(UUID.randomUUID(), "ghost");
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(UUID.randomUUID(), "ghost");
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -712,7 +756,8 @@ class ProfileControllerIntegrationTest {
     void deletesRegularUser() throws Exception {
       final var user =
           ProfileControllerIntegrationTest.this.createUser(uniqueUsername("delme"), UserRole.USER);
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -725,16 +770,19 @@ class ProfileControllerIntegrationTest {
           .andExpect(jsonPath("$.errorCode").value(nullValue()))
           .andExpect(jsonPath("$.text").value("Profile account deleted."));
 
-      assertThat(ProfileControllerIntegrationTest.this.userRepository.findById(user.getId())).isEmpty();
+      assertThat(ProfileControllerIntegrationTest.this.userRepository.findById(user.getId()))
+          .isEmpty();
     }
 
     @Test
     @DisplayName("deletes an ADMIN account when it is not the last one")
     void deletesNonLastAdmin() throws Exception {
       final var secondAdmin =
-          ProfileControllerIntegrationTest.this.createUser(uniqueUsername("admin2"), UserRole.ADMIN);
+          ProfileControllerIntegrationTest.this.createUser(
+              uniqueUsername("admin2"), UserRole.ADMIN);
       final var token =
-          ProfileControllerIntegrationTest.this.bearerTokenFor(secondAdmin.getId(), secondAdmin.getUsername());
+          ProfileControllerIntegrationTest.this.bearerTokenFor(
+              secondAdmin.getId(), secondAdmin.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -742,7 +790,8 @@ class ProfileControllerIntegrationTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.msgId").value("profileDeleted"));
 
-      assertThat(ProfileControllerIntegrationTest.this.userRepository.findById(secondAdmin.getId())).isEmpty();
+      assertThat(ProfileControllerIntegrationTest.this.userRepository.findById(secondAdmin.getId()))
+          .isEmpty();
     }
 
     @Test
@@ -751,9 +800,13 @@ class ProfileControllerIntegrationTest {
       // AdminUserInitializer seeds exactly one "admin" ADMIN user at application startup;
       // no other admin exists unless a test creates one (and @Transactional rolls that back).
       final var lastAdmin =
-          ProfileControllerIntegrationTest.this.userRepository.findByUsername("admin").orElseThrow();
+          ProfileControllerIntegrationTest.this
+              .userRepository
+              .findByUsername("admin")
+              .orElseThrow();
       final var token =
-          ProfileControllerIntegrationTest.this.bearerTokenFor(lastAdmin.getId(), lastAdmin.getUsername());
+          ProfileControllerIntegrationTest.this.bearerTokenFor(
+              lastAdmin.getId(), lastAdmin.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -763,7 +816,8 @@ class ProfileControllerIntegrationTest {
           .andExpect(jsonPath("$.data").value("cannotDeleteLastAdminUser"))
           .andExpect(jsonPath("$.text").value("You cannot delete the last admin user."));
 
-      assertThat(ProfileControllerIntegrationTest.this.userRepository.findById(lastAdmin.getId())).isPresent();
+      assertThat(ProfileControllerIntegrationTest.this.userRepository.findById(lastAdmin.getId()))
+          .isPresent();
     }
 
     @Test
@@ -783,7 +837,8 @@ class ProfileControllerIntegrationTest {
       final var user =
           ProfileControllerIntegrationTest.this.createUser(uniqueUsername("delexp"), UserRole.USER);
       final var token =
-          ProfileControllerIntegrationTest.this.expiredBearerToken(user.getId(), user.getUsername());
+          ProfileControllerIntegrationTest.this.expiredBearerToken(
+              user.getId(), user.getUsername());
 
       ProfileControllerIntegrationTest.this
           .mockMvc
@@ -791,13 +846,15 @@ class ProfileControllerIntegrationTest {
           .andExpect(status().isForbidden())
           .andExpect(jsonPath("$.msgId").value("sessionExpired"));
 
-      assertThat(ProfileControllerIntegrationTest.this.userRepository.findById(user.getId())).isPresent();
+      assertThat(ProfileControllerIntegrationTest.this.userRepository.findById(user.getId()))
+          .isPresent();
     }
 
     @Test
     @DisplayName("returns 404 when the user from the token no longer exists")
     void userNotFound() throws Exception {
-      final var token = ProfileControllerIntegrationTest.this.bearerTokenFor(UUID.randomUUID(), "ghost");
+      final var token =
+          ProfileControllerIntegrationTest.this.bearerTokenFor(UUID.randomUUID(), "ghost");
 
       ProfileControllerIntegrationTest.this
           .mockMvc
