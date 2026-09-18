@@ -11,7 +11,7 @@ permissions:
 jobs:
   enable-automerge:
     if: github.event.pull_request.user.login == 'dependabot[bot]'
-    runs-on: self-hosted
+    runs-on: warp-ubuntu-latest-x64-2x
 
     steps:
       - name: Verify pull request author

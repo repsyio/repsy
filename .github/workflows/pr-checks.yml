@@ -1,4 +1,4 @@
-name: MR Checks
+name: PR Checks
 
 permissions:
   contents: read
@@ -15,9 +15,9 @@ concurrency:
 jobs:
   pre-checks:
     name: Editorconfig check - All
-    runs-on: self-hosted
+    runs-on: warp-ubuntu-latest-x64-2x
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: There must be only one .editorconfig file
         run: |
@@ -29,7 +29,7 @@ jobs:
           fi
 
       - name: Install editorconfig-checker
-        uses: editorconfig-checker/action-editorconfig-checker@v2
+        uses: editorconfig-checker/action-editorconfig-checker@51f63319f592f97930c73d9c46184d20bd206393 # v3.0.0
         with:
           version: v3.0.3
 
@@ -37,22 +37,22 @@ jobs:
 
   java-checks:
     name: Repsy check
-    runs-on: self-hosted
+    runs-on: warp-ubuntu-latest-x64-2x
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
           fetch-depth: 0
 
       - name: Setup Maven Action
-        uses: s4u/setup-maven-action@v1.21.0
+        uses: s4u/setup-maven-action@4a02cbd99769e46198135c31d5097c94618ba3f5 # v1.21.0
         with:
           # Checkout already ran above with fetch-depth: 0 for SonarCloud blame data;
           # setup-maven-action's own default checkout would re-shallow the repo.
           checkout-enabled: false
 
       - name: Set up JDK
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           java-version: "25"
           distribution: "temurin"
@@ -68,6 +68,8 @@ jobs:
       # threshold one by one (see jacoco.check.phase in the root pom.xml). Remove
       # continue-on-error once the coverage follow-up PRs land.
       - name: Analyze with SonarCloud
+        # Dependabot-triggered runs don't receive regular repo secrets, so SONAR_TOKEN is empty.
+        if: github.actor != 'dependabot[bot]'
         continue-on-error: true
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -78,18 +80,27 @@ jobs:
           -Dsonar.projectKey=repsyio_repsy
           -Dsonar.organization=repsy
           -Dsonar.exclusions=core/**
+          -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
+
+      - name: Upload JaCoCo reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: jacoco-reports
+          path: '**/target/site/jacoco/**'
+          if-no-files-found: error
 
   repsy-frontend:
     name: Repsy frontend
-    runs-on: self-hosted
+    runs-on: warp-ubuntu-latest-x64-2x
     defaults:
       run:
         working-directory: ./repsy-frontend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "24"
 
