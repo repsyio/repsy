@@ -412,7 +412,7 @@ class NuGetPackageControllerIT {
           .mockMvc
           .perform(post("/api/nuget/packages/{repo}", repo.getName()).with(apiPort()))
           // RPS-849 owns the unsupported-verb behavior; pin today's error-handler response.
-          .andExpect(status().isInternalServerError());
+          .andExpect(status().isNotFound());
     }
   }
 }
