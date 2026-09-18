@@ -14,6 +14,10 @@
 
   <artifactId>cargo</artifactId>
 
+  <properties>
+    <jacoco.check.phase>verify</jacoco.check.phase>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>io.repsy.protocols</groupId>
