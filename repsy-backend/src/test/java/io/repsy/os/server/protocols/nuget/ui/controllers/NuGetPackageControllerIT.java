@@ -161,8 +161,8 @@ class NuGetPackageControllerIT {
         """
         insert into "public"."nuget_package_version"
           ("id", "package_id", "version", "is_prerelease", "is_listed", "published_at",
-           "download_count", "title", "description", "authors", "tags", "license_url",
-           "project_url", "dependencies", "created_at")
+          "download_count", "title", "description", "authors", "tags", "license_url",
+          "project_url", "dependencies", "created_at")
         values (?, ?, ?, ?, true, current_timestamp, 0, ?, ?, ?, ?, ?, ?, cast(? as jsonb), current_timestamp)
         """,
         UUID.randomUUID(),
