@@ -18,9 +18,19 @@ updates:
       maven-dependencies:
         patterns:
           - "*"
+    ignore:
+      # io.repsy.core:* (the core-* artifacts) is the core submodule's own
+      # groupId — it's built from the core/ directory and already has its
+      # own Dependabot maven updates in the repsyio/repsy-core repository.
+      - dependency-name: "io.repsy.core:*"
 
   - package-ecosystem: "npm"
     directory: "/repsy-frontend"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "gitsubmodule"
+    directory: "/"
     schedule:
       interval: "weekly"
 
