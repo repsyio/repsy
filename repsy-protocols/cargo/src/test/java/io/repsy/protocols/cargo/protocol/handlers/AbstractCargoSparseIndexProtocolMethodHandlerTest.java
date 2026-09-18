@@ -17,6 +17,7 @@ package io.repsy.protocols.cargo.protocol.handlers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.libs.protocol.router.PathParser;
@@ -24,8 +25,12 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.facades.contract.CargoProtocolFacade;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
+import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +41,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletResponse;
 import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -75,6 +84,17 @@ class AbstractCargoSparseIndexProtocolMethodHandlerTest {
   @DisplayName("supports only GET")
   void supportsOnlyGet() {
     assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.GET);
+  }
+
+  @Test
+  @DisplayName("registers itself with the provider and exposes READ metadata")
+  void metadata() {
+    verify(provider).registerMethodHandler(handler);
+    assertThat(handler.getProperties())
+        .containsEntry("permission", Permission.READ)
+        .containsEntry("writeOperation", false)
+        .containsEntry("skipPreProcessor", false)
+        .containsEntry("skipHeaderPreProcessor", true);
   }
 
   // ── Path pattern matching ─────────────────────────────────────────────────
@@ -162,6 +182,73 @@ class AbstractCargoSparseIndexProtocolMethodHandlerTest {
       final var ctx = new ProtocolContext();
       ctx.addProperty("urlProperties", urlProps);
       return ctx;
+    }
+  }
+
+  // ── handle() ─────────────────────────────────────────────────────────────
+
+  @Nested
+  @DisplayName("handle()")
+  class HandleTests {
+
+    private final ProtocolContext ctx = new ProtocolContext();
+
+    private CrateIndexEntry entry(final String version) {
+      return new CrateIndexEntry(
+          "serde", version, List.of(), "abc", Map.of(), false, null, 2, null, null);
+    }
+
+    @Test
+    @DisplayName("returns one JSON line per index entry as text/plain")
+    void returnsNewlineDelimitedEntries() {
+      final var e1 = entry("1.0.0");
+      final var e2 = entry("1.1.0");
+      when(facade.getIndexEntries(ctx)).thenReturn(List.of(e1, e2));
+      when(objectMapper.writeValueAsString(e1)).thenReturn("{\"vers\":\"1.0.0\"}");
+      when(objectMapper.writeValueAsString(e2)).thenReturn("{\"vers\":\"1.1.0\"}");
+
+      final var result = handler.handle(ctx, request, new MockHttpServletResponse());
+
+      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(result.getHeaders().getFirst(HttpHeaders.CONTENT_TYPE))
+          .isEqualTo(MediaType.TEXT_PLAIN_VALUE);
+      assertThat(result.getBody()).isEqualTo("{\"vers\":\"1.0.0\"}\n{\"vers\":\"1.1.0\"}\n");
+    }
+
+    @Test
+    @DisplayName("skips entries that fail to serialize")
+    void skipsUnserializableEntries() {
+      final var e1 = entry("1.0.0");
+      final var e2 = entry("1.1.0");
+      when(facade.getIndexEntries(ctx)).thenReturn(List.of(e1, e2));
+      when(objectMapper.writeValueAsString(e1)).thenThrow(new IllegalStateException("boom"));
+      when(objectMapper.writeValueAsString(e2)).thenReturn("{\"vers\":\"1.1.0\"}");
+
+      final var result = handler.handle(ctx, request, new MockHttpServletResponse());
+
+      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(result.getBody()).isEqualTo("{\"vers\":\"1.1.0\"}\n");
+    }
+
+    @Test
+    @DisplayName("returns 404 when the crate has no index entries")
+    void returnsNotFoundWhenEmpty() {
+      when(facade.getIndexEntries(ctx)).thenReturn(List.of());
+
+      final var result = handler.handle(ctx, request, new MockHttpServletResponse());
+
+      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("returns 404 when the facade fails")
+    void returnsNotFoundOnError() {
+      when(facade.getIndexEntries(ctx)).thenThrow(new IllegalStateException("boom"));
+      when(request.getServletPath()).thenReturn("/se/rd/serde");
+
+      final var result = handler.handle(ctx, request, new MockHttpServletResponse());
+
+      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
   }
 }
