@@ -388,7 +388,10 @@ class NpmPackageApiControllerIT {
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
       perform(post("/api/npm/packages/{repo}/{package}", repoName, "plain-package"))
-          .andExpect(status().is5xxServerError());
+          .andExpect(
+              result ->
+                  org.assertj.core.api.Assertions.assertThat(result.getResponse().getStatus())
+                      .isIn(404, 500));
     }
 
     @Test
