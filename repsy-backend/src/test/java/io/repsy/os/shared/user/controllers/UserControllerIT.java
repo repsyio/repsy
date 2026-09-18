@@ -51,6 +51,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -644,23 +645,37 @@ class UserControllerIT {
 
     @ParameterizedTest(name = "{0}={1}")
     @MethodSource("outOfRangePagingParams")
-    @DisplayName(
-        "out-of-range paging currently answers 500 errorOccurred (PageRequest.of throws"
-            + " IllegalArgumentException, which no handler maps to a 4xx)")
+    @DisplayName("returns 400 validationError naming the parameter when it is out of range")
     void outOfRangePagingParam(final String param, final String value) throws Exception {
       final var token = UserControllerIT.this.adminBearerToken();
 
       expectError(
           UserControllerIT.this.perform(
               get("/api/users").header(AUTHORIZATION, token).param(param, value)),
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          "errorOccurred",
-          null,
-          "An error occurred.");
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          param,
+          VALIDATION_TEXT);
     }
 
     static Stream<Arguments> outOfRangePagingParams() {
-      return Stream.of(Arguments.of("page", "-1"), Arguments.of("size", "0"));
+      return Stream.of(
+          Arguments.of("page", "-1"),
+          Arguments.of("size", "0"),
+          Arguments.of("size", "-1"),
+          Arguments.of("size", "101"));
+    }
+
+    @ParameterizedTest(name = "size={0}")
+    @ValueSource(strings = {"1", "100"})
+    @DisplayName("accepts the size bounds")
+    void acceptsSizeBounds(final String size) throws Exception {
+      final var token = UserControllerIT.this.adminBearerToken();
+
+      expectSuccess(
+          UserControllerIT.this.perform(
+              get("/api/users").header(AUTHORIZATION, token).param("size", size)),
+          "usersFetched");
     }
   }
 

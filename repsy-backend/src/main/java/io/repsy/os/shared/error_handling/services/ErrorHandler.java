@@ -34,6 +34,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ValidationException;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -52,6 +53,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.reactive.resource.NoResourceFoundException;
@@ -270,6 +272,37 @@ public class ErrorHandler {
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(ERR_VALIDATION, ex.getName()));
+  }
+
+  /**
+   * Handles constraint violations on controller method parameters (for example a {@code Min}
+   * constraint on a request parameter), answering with the names of the offending parameters.
+   *
+   * @param ex Thrown method validation exception
+   * @return REST response
+   */
+  @ExceptionHandler(HandlerMethodValidationException.class)
+  @Nullable ResponseEntity<RestResponse<String>> handleException(
+      final @NonNull HandlerMethodValidationException ex,
+      final @NonNull HttpServletRequest request,
+      final @Nullable HttpServletResponse response) {
+
+    if (response == null) {
+      log.debug("Method validation failed", ex);
+
+      return null;
+    }
+
+    log.info(exceptionToString(ex, request));
+
+    final var invalidParameters =
+        ex.getParameterValidationResults().stream()
+            .map(result -> result.getMethodParameter().getParameterName())
+            .collect(Collectors.joining(","));
+
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(this.resp.error(ERR_VALIDATION, invalidParameters));
   }
 
   @ExceptionHandler(ErrorOccurredException.class)

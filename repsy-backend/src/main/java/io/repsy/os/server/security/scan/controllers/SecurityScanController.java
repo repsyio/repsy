@@ -28,6 +28,8 @@ import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -47,6 +49,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 final class SecurityScanController {
 
+  private static final int MAX_PAGE_SIZE = 100;
+
   private final @NonNull PanelAuthHelper panelAuthHelper;
   private final @NonNull VulnerabilityScanTxService scanTxService;
   private final @NonNull VulnerabilityScannerRegistry scannerRegistry;
@@ -58,8 +62,8 @@ final class SecurityScanController {
       @RequestParam(required = false) final @Nullable Severity severity,
       @RequestParam(required = false) final @Nullable RepoType repoType,
       @RequestParam(required = false) final @Nullable String repoName,
-      @RequestParam(defaultValue = "0") final int page,
-      @RequestParam(defaultValue = "10") final int size) {
+      @RequestParam(defaultValue = "0") @Min(0) final int page,
+      @RequestParam(defaultValue = "10") @Min(1) @Max(MAX_PAGE_SIZE) final int size) {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
