@@ -18,44 +18,44 @@ concurrency:
 jobs:
   analyze-actions:
     name: Analyze GitHub Actions
-    runs-on: self-hosted
+    runs-on: warp-ubuntu-latest-x64-2x
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4
         with:
           languages: actions
           build-mode: none
           config-file: ./.github/codeql-config.yml
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4
 
   analyze-java:
     name: Analyze Java
-    runs-on: self-hosted
+    runs-on: warp-ubuntu-latest-x64-2x
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4
         with:
           languages: java-kotlin
           build-mode: manual
           config-file: ./.github/codeql-config.yml
 
       - name: Setup Maven Action
-        uses: s4u/setup-maven-action@v1.21.0
+        uses: s4u/setup-maven-action@4a02cbd99769e46198135c31d5097c94618ba3f5 # v1.21.0
         with:
           checkout-enabled: false
 
       - name: Set up JDK
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           java-version: "25"
           distribution: "temurin"
@@ -68,29 +68,28 @@ jobs:
         run: mvn -B -ntp -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -Drat.skip=true package
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4
 
   analyze-javascript:
     name: Analyze JavaScript/TypeScript
-    runs-on: self-hosted
+    runs-on: warp-ubuntu-latest-x64-2x
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # The self-hosted runner's default `node` on PATH is too old for
-      # CodeQL's bundled TypeScript parser (it needs Node >= 14 for ES2020
-      # syntax like `??`, which the extractor's own compiler uses).
+      # Pin Node explicitly: CodeQL's bundled TypeScript parser needs Node >= 14
+      # (ES2020 syntax like `??`), so don't depend on the runner image's default.
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "24"
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4
         with:
           languages: javascript-typescript
           build-mode: none
           config-file: ./.github/codeql-config.yml
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4
