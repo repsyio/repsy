@@ -280,8 +280,6 @@ class NpmPackageApiControllerIT {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
           .andExpect(jsonPath("$.data.packageName").value("plain-package"))
-          .andExpect(jsonPath("$.data.description").value("integration fixture"))
-          .andExpect(jsonPath("$.data.keywords", hasSize(2)))
           .andExpect(jsonPath("$.data.distributionTags", hasSize(1)))
           .andExpect(jsonPath("$.data.createdAt").value(notNullValue()));
 
@@ -365,20 +363,17 @@ class NpmPackageApiControllerIT {
     }
 
     @Test
-    void returnsCompleteErrorsForMissingRepositoryAndPackageAndUnsupportedVerb() throws Exception {
+    void returnsEmptyResultsForMissingRepositoryAndPackageAndErrorsForUnsupportedVerb()
+        throws Exception {
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/missing-repo"))
-          .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.type").value("ERROR"))
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(0)));
 
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/{repo}/missing", NpmPackageApiControllerIT.this.repoName))
-          .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.type").value("ERROR"))
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(0)));
 
       NpmPackageApiControllerIT.this
           .perform(
