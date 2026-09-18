@@ -51,6 +51,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -644,23 +645,37 @@ class UserControllerIT {
 
     @ParameterizedTest(name = "{0}={1}")
     @MethodSource("outOfRangePagingParams")
-    @DisplayName(
-        "out-of-range paging currently answers 500 errorOccurred (PageRequest.of throws"
-            + " IllegalArgumentException, which no handler maps to a 4xx)")
+    @DisplayName("returns 400 validationError naming the parameter when it is out of range")
     void outOfRangePagingParam(final String param, final String value) throws Exception {
       final var token = UserControllerIT.this.adminBearerToken();
 
       expectError(
           UserControllerIT.this.perform(
               get("/api/users").header(AUTHORIZATION, token).param(param, value)),
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          "errorOccurred",
-          null,
-          "An error occurred.");
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          param,
+          VALIDATION_TEXT);
     }
 
     static Stream<Arguments> outOfRangePagingParams() {
-      return Stream.of(Arguments.of("page", "-1"), Arguments.of("size", "0"));
+      return Stream.of(
+          Arguments.of("page", "-1"),
+          Arguments.of("size", "0"),
+          Arguments.of("size", "-1"),
+          Arguments.of("size", "101"));
+    }
+
+    @ParameterizedTest(name = "size={0}")
+    @ValueSource(strings = {"1", "100"})
+    @DisplayName("accepts the size bounds")
+    void acceptsSizeBounds(final String size) throws Exception {
+      final var token = UserControllerIT.this.adminBearerToken();
+
+      expectSuccess(
+          UserControllerIT.this.perform(
+              get("/api/users").header(AUTHORIZATION, token).param("size", size)),
+          "usersFetched");
     }
   }
 
@@ -1002,25 +1017,50 @@ class UserControllerIT {
 
     @Test
     @DisplayName(
-        "currently allows demoting the last remaining ADMIN (unlike DELETE, PUT has no"
-            + " last-admin guard), leaving the system without any administrator")
-    void demotingTheLastAdminIsAllowed() throws Exception {
+        "returns 400 cannotDemoteLastAdminUser for the last remaining ADMIN and changes nothing")
+    void cannotDemoteLastAdmin() throws Exception {
+      // AdminUserInitializer seeds exactly one ADMIN at startup; no test here leaves another one
+      // behind, because every test is rolled back.
       final var lastAdmin = UserControllerIT.this.seededAdmin();
       assertThat(UserControllerIT.this.userRepository.countByRole(UserRole.ADMIN)).isEqualTo(1L);
       final var token = UserControllerIT.this.bearerTokenFor(lastAdmin);
 
-      final var body =
-          expectSuccess(
-              UserControllerIT.this.perform(
-                  put("/api/users/" + lastAdmin.getId())
-                      .header(AUTHORIZATION, token)
-                      .contentType(MediaType.APPLICATION_JSON)
-                      .content(updateBody(SEEDED_ADMIN_USERNAME, "USER"))),
-              "userUpdated");
+      // The body also renames the user, to prove a rejected request applies no part of the update.
+      expectError(
+          UserControllerIT.this.perform(
+              put("/api/users/" + lastAdmin.getId())
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(updateBody(uniqueUsername("renamed"), "USER"))),
+          HttpStatus.BAD_REQUEST,
+          "cannotDemoteLastAdminUser",
+          "cannotDemoteLastAdminUser",
+          "You cannot remove the admin role from the last admin user.");
 
-      assertThat((String) JsonPath.read(body, "$.data.role")).isEqualTo("USER");
-      UserControllerIT.this.entityManager.flush();
-      assertThat(UserControllerIT.this.userRepository.countByRole(UserRole.ADMIN)).isZero();
+      final var after = UserControllerIT.this.reload(lastAdmin.getId());
+      assertThat(after.getUsername()).isEqualTo(SEEDED_ADMIN_USERNAME);
+      assertThat(after.getRole()).isEqualTo(UserRole.ADMIN);
+      assertThat(UserControllerIT.this.userRepository.countByRole(UserRole.ADMIN)).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("lets an admin demote themselves while another admin remains")
+    void demotingSelfWithAnotherAdminIsAllowed() throws Exception {
+      final var self =
+          UserControllerIT.this.createUser(uniqueUsername("selfdemote"), UserRole.ADMIN);
+      final var token = UserControllerIT.this.bearerTokenFor(self);
+      assertThat(UserControllerIT.this.userRepository.countByRole(UserRole.ADMIN))
+          .isGreaterThanOrEqualTo(2L);
+
+      expectSuccess(
+          UserControllerIT.this.perform(
+              put("/api/users/" + self.getId())
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(updateBody(self.getUsername(), "USER"))),
+          "userUpdated");
+
+      assertThat(UserControllerIT.this.reload(self.getId()).getRole()).isEqualTo(UserRole.USER);
     }
   }
 
@@ -1236,24 +1276,22 @@ class UserControllerIT {
     /**
      * The port-based handler mapping does not raise {@code HttpRequestMethodNotSupportedException}
      * for a verb the path does not map, so the request falls through to the static-resource handler
-     * and fails with the servlet {@code NoResourceFoundException}. {@code ErrorHandler} only
-     * handles the <em>reactive</em> class of the same name, so the generic {@code Throwable}
-     * handler answers 500 instead of a 404/405. Pinned here as current behavior; update this
-     * assertion when the import in {@code ErrorHandler} is fixed.
+     * and fails with the servlet {@code NoResourceFoundException}, which {@code ErrorHandler}
+     * answers with 404 {@code itemNotFound}.
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("unsupportedMethods")
-    @DisplayName("currently answers 500 errorOccurred for a verb the path does not map")
+    @DisplayName("answers 404 itemNotFound for a route or verb nothing maps")
     void unsupportedMethod(final String name, final MockHttpServletRequestBuilder request)
         throws Exception {
       final var token = UserControllerIT.this.adminBearerToken();
 
       expectError(
           UserControllerIT.this.perform(request.header(AUTHORIZATION, token)),
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          "errorOccurred",
+          HttpStatus.NOT_FOUND,
+          "itemNotFound",
           null,
-          "An error occurred.");
+          "The requested item is not found.");
     }
 
     static Stream<Arguments> unsupportedMethods() {
@@ -1262,7 +1300,8 @@ class UserControllerIT {
           Arguments.of("GET /api/users/{userId}", get("/api/users/" + id)),
           Arguments.of("PATCH /api/users/{userId}", patch("/api/users/" + id)),
           Arguments.of("DELETE /api/users", delete("/api/users")),
-          Arguments.of("PUT /api/users", put("/api/users")));
+          Arguments.of("PUT /api/users", put("/api/users")),
+          Arguments.of("GET /api/no-such-route", get("/api/no-such-route")));
     }
   }
 }

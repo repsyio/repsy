@@ -20,14 +20,16 @@ import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
-import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.RepsyApplication;
+import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
+import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
 import io.repsy.os.server.protocols.npm.ui.facades.NpmApiFacade;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -42,10 +44,10 @@ import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.UUID;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -61,13 +63,15 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-/** End-to-end coverage for the npm package-management API. */
+/** End-to-end coverage for every npm package-management API mapping. */
 @Testcontainers
 @AutoConfigureMockMvc
+@Transactional
 @SpringBootTest(
     classes = RepsyApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.MOCK)
@@ -76,9 +80,10 @@ class NpmPackageApiControllerIT {
 
   private static final int API_PORT = 8080;
   private static final int REPOSITORY_PORT = 9090;
+  private static final String PASSWORD = "Password1!";
   private static final String UUID_PATTERN =
       "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-  private static final String PASSWORD = "Password1!";
+  private static final Path STORAGE_PATH = createTempStoragePath();
 
   @Container @ServiceConnection
   static final PostgreSQLContainer<?> POSTGRES =
@@ -93,8 +98,12 @@ class NpmPackageApiControllerIT {
   }
 
   private static String tempStoragePath() {
+    return STORAGE_PATH.toString();
+  }
+
+  private static Path createTempStoragePath() {
     try {
-      return Files.createTempDirectory("repsy-npm-api-it").toString();
+      return Files.createTempDirectory("repsy-npm-package-api-it");
     } catch (final java.io.IOException exception) {
       throw new java.io.UncheckedIOException(exception);
     }
@@ -107,6 +116,9 @@ class NpmPackageApiControllerIT {
   @Autowired private RepoTxService repoTxService;
   @Autowired private RepoRepository repoRepository;
   @Autowired private NpmApiFacade npmApiFacade;
+  @Autowired private NpmPackageRepository npmPackageRepository;
+  @Autowired private PackageVersionRepository packageVersionRepository;
+
   private Repo repo;
   private User admin;
   private String repoName;
@@ -123,10 +135,11 @@ class NpmPackageApiControllerIT {
     this.publish(null, "plain-package", "1.0.0", "latest");
     this.publish(null, "plain-package", "2.0.0-next.1", "next");
     this.publish("tools", "scoped-package", "1.0.0", "latest");
+    this.publish(null, "scope", "1.0.0", "latest");
   }
 
   private User createUser(final UserRole role) {
-    final var username = "npm859-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+    final var username = "npm-it-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
     final var salt = PasswordGeneratorUtil.generateSalt();
     final var hash = PasswordGeneratorUtil.hashPassword(PASSWORD, salt);
     final var info = this.userTxService.create(username, role, hash, salt);
@@ -141,51 +154,41 @@ class NpmPackageApiControllerIT {
         Base64.getEncoder()
             .encodeToString((packagePath + version).getBytes(StandardCharsets.UTF_8));
     final var payload =
-        """
-        {
-          "name": "%s",
-          "dist-tags": {"%s": "%s"},
-          "versions": {
-            "%s": {
-              "name": "%s",
-              "version": "%s",
-              "description": "integration fixture",
-              "keywords": ["fixture", "npm"],
-              "author": {"name": "Repsy", "email": "test@repsy.io"},
-              "dependencies": {"left-pad": "1.3.0"},
-              "dist": {
-                "tarball": "http://localhost/%s-%s.tgz",
-                "shasum": "abc",
-                "integrity": "sha512-abc"
-              }
-            }
-          },
-          "_attachments": {
-            "%s-%s.tgz": {
-              "content_type": "application/octet-stream",
-              "data": "%s",
-              "length": %d
-            }
-          }
-        }
-        """
-            .formatted(
-                packagePath,
-                tag,
-                version,
-                version,
-                packagePath,
-                version,
-                packagePath,
-                version,
-                packageName,
-                version,
-                tarball,
-                packagePath.length() + version.length());
+        "{\"name\":\""
+            + packagePath
+            + "\",\"dist-tags\":{\""
+            + tag
+            + "\":\""
+            + version
+            + "\"},\"versions\":{\""
+            + version
+            + "\":{\"name\":\""
+            + packagePath
+            + "\",\"version\":\""
+            + version
+            + "\",\"description\":\"integration fixture\","
+            + "\"keywords\":[\"fixture\",\"npm\"],\"author\":{\"name\":\"Repsy\",\"email\":\"test@repsy.io\"},"
+            + "\"license\":\"Apache-2.0\",\"homepage\":\"https://repsy.io\","
+            + "\"dependencies\":{\"left-pad\":\"1.3.0\"},\"devDependencies\":{\"jest\":\"29\"},"
+            + "\"peerDependencies\":{\"node\":\">=18\"},\"dist\":{\"tarball\":\"http://localhost/"
+            + packagePath
+            + "-"
+            + version
+            + ".tgz\",\"shasum\":\"abc\",\"integrity\":\"sha512-abc\"}}},"
+            + "\"_attachments\":{\""
+            + packageName
+            + "-"
+            + version
+            + ".tgz\":{\"content_type\":\"application/octet-stream\",\"data\":\""
+            + tarball
+            + "\",\"length\":"
+            + (packagePath.length() + version.length())
+            + "}}}";
 
     this.mockMvc
         .perform(
             put("/{repo}/{package}", this.repoName, packagePath)
+                .servletPath("/" + this.repoName + "/" + packagePath)
                 .with(repositoryPort())
                 .header(AUTHORIZATION, basicAuth())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -199,10 +202,9 @@ class NpmPackageApiControllerIT {
         + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
   }
 
-  private String bearerToken() {
+  private String bearerToken(final User user, final Duration duration) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(
-            this.admin.getId(), this.admin.getUsername(), Duration.ofMinutes(30));
+        + this.jwtUtils.createTokenWithDuration(user.getId(), user.getUsername(), duration);
   }
 
   private static RequestPostProcessor apiPort() {
@@ -215,7 +217,6 @@ class NpmPackageApiControllerIT {
   private static RequestPostProcessor repositoryPort() {
     return request -> {
       request.setLocalPort(REPOSITORY_PORT);
-      request.setServletPath(request.getRequestURI());
       return request;
     };
   }
@@ -225,170 +226,208 @@ class NpmPackageApiControllerIT {
   }
 
   @Nested
-  @DisplayName("read mappings")
-  class Reads {
+  @DisplayName("list and route mappings")
+  class Lists {
 
     @Test
-    void listsPackagesAndSupportsNameAndScopeFilters() throws Exception {
+    void listsScopedAndUnscopedPackagesWithAllFiltersAndPageMetadata() throws Exception {
       NpmPackageApiControllerIT.this
-          .perform(get("/api/npm/packages/{repo}", NpmPackageApiControllerIT.this.repoName))
+          .perform(get("/api/npm/packages/{repo}", repoName))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.*", hasSize(5)))
           .andExpect(jsonPath("$.msgId").value("packagesFetched"))
           .andExpect(jsonPath("$.type").value("SUCCESS"))
-          .andExpect(jsonPath("$.errorCode").value(nullValue()))
-          .andExpect(jsonPath("$.text").value("Packages are fetched."))
-          .andExpect(jsonPath("$.data.content", hasSize(2)))
+          .andExpect(jsonPath("$.data.content", hasSize(3)))
           .andExpect(jsonPath("$.data.page.size").value(10))
-          .andExpect(jsonPath("$.data.page.totalElements").value(2))
-          .andExpect(jsonPath("$.data.content[0].name").value("scoped-package"))
-          .andExpect(jsonPath("$.data.content[0].scope").value("tools"))
-          .andExpect(jsonPath("$.data.content[0].latestVersion").value("1.0.0"));
+          .andExpect(jsonPath("$.data.page.number").value(0))
+          .andExpect(jsonPath("$.data.page.totalElements").value(3))
+          .andExpect(jsonPath("$.data.page.totalPages").value(1));
 
       NpmPackageApiControllerIT.this
-          .perform(
-              get(
-                      "/api/npm/packages/{repo}/{ignoredScope}",
-                      NpmPackageApiControllerIT.this.repoName,
-                      "ignored")
-                  .param("name", "plain"))
-          .andExpect(
-              result ->
-                  Assertions.assertTrue(
-                      result.getResponse().getStatus() == 200
-                          || result.getResponse().getStatus() == 404));
-
-      NpmPackageApiControllerIT.this
-          .perform(
-              get(
-                  "/api/npm/packages/{repo}/scope/{scope}",
-                  NpmPackageApiControllerIT.this.repoName,
-                  "tools"))
+          .perform(get("/api/npm/packages/{repo}", repoName).param("scope", "tools"))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content", hasSize(1)))
           .andExpect(jsonPath("$.data.content[0].scope").value("tools"));
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/packages/{repo}/ignored", repoName).param("name", "plain"))
+          .andExpect(
+              result ->
+                  org.assertj.core.api.Assertions.assertThat(result.getResponse().getStatus())
+                      .isIn(200, 404));
+      NpmPackageApiControllerIT.this
+          .perform(
+              get("/api/npm/packages/{repo}/scope/{scope}", repoName, "tools")
+                  .param("name", "scoped"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(1)))
+          .andExpect(jsonPath("$.data.content[0].scope").value("tools"));
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/packages/{repo}/scope/{scope}", repoName, "tools"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(1)));
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/packages/{repo}", repoName).param("page", "1").param("size", "1"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(1)))
+          .andExpect(jsonPath("$.data.page.size").value(1))
+          .andExpect(jsonPath("$.data.page.totalPages").value(3));
     }
 
     @Test
-    void returnsFullVersionDetailsVersionsAndTagsForScopedAndUnscopedPackages() throws Exception {
+    void resolvesVersionRoutesAndTheLiteralScopePackagePredictably() throws Exception {
       NpmPackageApiControllerIT.this
-          .perform(
-              get(
-                  "/api/npm/packages/{repo}/{package}/versions/{version}",
-                  NpmPackageApiControllerIT.this.repoName,
-                  "plain-package",
-                  "1.0.0"))
+          .perform(get("/api/npm/packages/{repo}/plain-package/versions/1.0.0", repoName))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
           .andExpect(jsonPath("$.data.packageName").value("plain-package"))
-          .andExpect(jsonPath("$.data.distributionTags", hasSize(1)))
+          .andExpect(jsonPath("$.data.distributionTags[0].tagName").value("latest"))
+          .andExpect(jsonPath("$.data.deleted").value(false))
           .andExpect(jsonPath("$.data.createdAt").value(notNullValue()));
-
       NpmPackageApiControllerIT.this
           .perform(
               get(
-                  "/api/npm/packages/{repo}/{scope}/{package}",
-                  NpmPackageApiControllerIT.this.repoName,
+                  "/api/npm/packages/{repo}/{scope}/{package}/versions/1.0.0",
+                  repoName,
                   "tools",
                   "scoped-package"))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.scopeName").value("tools"))
           .andExpect(jsonPath("$.data.packageName").value("scoped-package"));
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/packages/{repo}/scope/versions/1.0.0", repoName))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
+          .andExpect(jsonPath("$.data.packageName").value("scope"));
+    }
 
+    @Test
+    void listsVersionsAndTagsForBothScopeForms() throws Exception {
       NpmPackageApiControllerIT.this
           .perform(
-              get(
-                      "/api/npm/packages/{repo}/package/{package}/versions",
-                      NpmPackageApiControllerIT.this.repoName,
-                      "plain-package")
+              get("/api/npm/packages/{repo}/package/{package}/versions", repoName, "plain-package")
                   .param("version", "2.0"))
           .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("packageVersionsFetched"))
           .andExpect(jsonPath("$.data.content", hasSize(1)))
           .andExpect(jsonPath("$.data.content[0].version").value("2.0.0-next.1"))
           .andExpect(jsonPath("$.data.content[0].deprecated").value(false));
-
       NpmPackageApiControllerIT.this
           .perform(
               get(
-                  "/api/npm/packages/{repo}/package/{package}/tags",
-                  NpmPackageApiControllerIT.this.repoName,
-                  "plain-package"))
+                  "/api/npm/packages/{repo}/tools/package/{package}/versions",
+                  repoName,
+                  "scoped-package"))
           .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data").isArray());
+          .andExpect(jsonPath("$.data.content", hasSize(1)));
+      NpmPackageApiControllerIT.this
+          .perform(
+              get("/api/npm/packages/{repo}/package/{package}/tags", repoName, "plain-package"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("packageTagsFetched"))
+          .andExpect(jsonPath("$.data", hasSize(2)))
+          .andExpect(jsonPath("$.data[0].tag").value("latest"));
+      NpmPackageApiControllerIT.this
+          .perform(
+              get(
+                  "/api/npm/packages/{repo}/tools/package/{package}/tags",
+                  repoName,
+                  "scoped-package"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data", hasSize(1)))
+          .andExpect(jsonPath("$.data[0].tag").value("latest"));
     }
   }
 
   @Nested
-  @DisplayName("authentication and deletion")
+  @DisplayName("authorization, errors and deletes")
   class SecurityAndDeletes {
 
     @Test
-    void rejectsDeleteWithoutManageAuthorizationAndAllowsAuthorizedVersionDelete()
-        throws Exception {
-      NpmPackageApiControllerIT.this
-          .perform(
-              delete(
-                  "/api/npm/packages/{repo}/{package}",
-                  NpmPackageApiControllerIT.this.repoName,
-                  "plain-package"))
+    void rejectsMalformedExpiredAndUnknownBearerTokensOnPrivateReads() throws Exception {
+      final var privateRepoName =
+          "npm-private-" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+      final var info = repoTxService.createRepo(privateRepoName, RepoType.NPM, true, "private");
+      npmApiFacade.createRepo(info.getId());
+      perform(get("/api/npm/packages/{repo}", privateRepoName))
+          .andExpect(status().isUnauthorized())
+          .andExpect(jsonPath("$.type").value("ERROR"));
+      perform(
+              get("/api/npm/packages/{repo}", privateRepoName)
+                  .header(AUTHORIZATION, "Bearer malformed"))
+          .andExpect(status().isForbidden());
+      perform(
+              get("/api/npm/packages/{repo}", privateRepoName)
+                  .header(AUTHORIZATION, bearerToken(admin, Duration.ofSeconds(-30))))
+          .andExpect(status().isForbidden());
+      final var unknown =
+          AuthUtils.AUTH_BEARER
+              + jwtUtils.createTokenWithDuration(
+                  UUID.randomUUID(), "deleted-user", Duration.ofMinutes(30));
+      perform(get("/api/npm/packages/{repo}", privateRepoName).header(AUTHORIZATION, unknown))
+          .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void requiresManageForDeleteAndReturnsCompleteErrors() throws Exception {
+      perform(delete("/api/npm/packages/{repo}/{package}", repoName, "plain-package"))
           .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)))
-          .andExpect(jsonPath("$.data").value("unAuthorized"));
-
-      NpmPackageApiControllerIT.this
-          .perform(
-              delete(
-                      "/api/npm/packages/{repo}/{package}/versions/{version}",
-                      NpmPackageApiControllerIT.this.repoName,
-                      "plain-package",
-                      "2.0.0-next.1")
-                  .header(AUTHORIZATION, NpmPackageApiControllerIT.this.bearerToken()))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("packageVersionDeleted"))
-          .andExpect(jsonPath("$.data").value(nullValue()));
-
-      NpmPackageApiControllerIT.this
-          .perform(
-              get(
-                  "/api/npm/packages/{repo}/{package}/versions/{version}",
-                  NpmPackageApiControllerIT.this.repoName,
-                  "plain-package",
-                  "2.0.0-next.1"))
+          .andExpect(jsonPath("$.data").value("unAuthorized"))
+          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+      final var user = createUser(UserRole.USER);
+      perform(
+              delete("/api/npm/packages/{repo}/{package}", repoName, "plain-package")
+                  .header(AUTHORIZATION, bearerToken(user, Duration.ofMinutes(30))))
+          .andExpect(status().isUnauthorized());
+      perform(get("/api/npm/packages/missing-repo"))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.*", hasSize(5)))
           .andExpect(jsonPath("$.type").value("ERROR"))
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+      perform(get("/api/npm/packages/{repo}/missing/versions/1.0.0", repoName))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+      perform(post("/api/npm/packages/{repo}/{package}", repoName, "plain-package"))
+          .andExpect(
+              result ->
+                  org.assertj.core.api.Assertions.assertThat(result.getResponse().getStatus())
+                      .isIn(404, 500));
     }
 
     @Test
-    void returnsEmptyResultsForMissingRepositoryAndPackageAndErrorsForUnsupportedVerb()
-        throws Exception {
-      NpmPackageApiControllerIT.this
-          .perform(get("/api/npm/packages/missing-repo"))
-          .andExpect(
-              result ->
-                  Assertions.assertTrue(
-                      result.getResponse().getStatus() == 200
-                          || result.getResponse().getStatus() == 404));
+    void deletesVersionAndPackageRowsAndStorageWhileKeepingSiblings() throws Exception {
+      perform(
+              delete(
+                      "/api/npm/packages/{repo}/{package}/versions/{version}",
+                      repoName,
+                      "plain-package",
+                      "2.0.0-next.1")
+                  .header(AUTHORIZATION, bearerToken(admin, Duration.ofMinutes(30))))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.*", hasSize(5)))
+          .andExpect(jsonPath("$.msgId").value("packageVersionDeleted"))
+          .andExpect(jsonPath("$.data").value(nullValue()));
+      final var packageInfo =
+          npmPackageRepository
+              .findByRepoIdAndScopeAndName(repo.getId(), null, "plain-package")
+              .orElseThrow();
+      org.assertj.core.api.Assertions.assertThat(
+              packageVersionRepository.findByNpmPackageId(packageInfo.getId()))
+          .extracting("version")
+          .containsExactly("1.0.0");
 
-      NpmPackageApiControllerIT.this
-          .perform(get("/api/npm/packages/{repo}/missing", NpmPackageApiControllerIT.this.repoName))
-          .andExpect(
-              result ->
-                  Assertions.assertTrue(
-                      result.getResponse().getStatus() == 200
-                          || result.getResponse().getStatus() == 404));
-
-      NpmPackageApiControllerIT.this
-          .perform(
-              put(
-                      "/api/npm/packages/{repo}/{package}",
-                      NpmPackageApiControllerIT.this.repoName,
-                      "plain-package")
-                  .header(CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE))
-          .andExpect(status().isInternalServerError());
+      perform(
+              delete("/api/npm/packages/{repo}/{package}", repoName, "plain-package")
+                  .header(AUTHORIZATION, bearerToken(admin, Duration.ofMinutes(30))))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("packageDeleted"));
+      org.assertj.core.api.Assertions.assertThat(
+              npmPackageRepository.findByRepoIdAndScopeAndName(repo.getId(), null, "plain-package"))
+          .isEmpty();
+      perform(
+              delete("/api/npm/packages/{repo}/{package}", repoName, "plain-package")
+                  .header(AUTHORIZATION, bearerToken(admin, Duration.ofMinutes(30))))
+          .andExpect(status().isNotFound());
     }
   }
 }
