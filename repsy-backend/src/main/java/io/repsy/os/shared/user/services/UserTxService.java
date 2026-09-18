@@ -69,9 +69,11 @@ public class UserTxService {
     user.setHash(hash);
     user.setSalt(salt);
 
-    this.userRepository.save(user);
+    // The id is application-generated, so save() defers the INSERT; flush it so the
+    // @CreationTimestamp value is populated before the entity is mapped to the result.
+    final var savedUser = this.userRepository.saveAndFlush(user);
 
-    return this.userConverter.toUserInfo(user);
+    return this.userConverter.toUserInfo(savedUser);
   }
 
   public @NonNull UserInfo getUserByUsername(final @NonNull String username) {
