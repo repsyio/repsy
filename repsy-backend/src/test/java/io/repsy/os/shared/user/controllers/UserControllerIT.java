@@ -1236,24 +1236,22 @@ class UserControllerIT {
     /**
      * The port-based handler mapping does not raise {@code HttpRequestMethodNotSupportedException}
      * for a verb the path does not map, so the request falls through to the static-resource handler
-     * and fails with the servlet {@code NoResourceFoundException}. {@code ErrorHandler} only
-     * handles the <em>reactive</em> class of the same name, so the generic {@code Throwable}
-     * handler answers 500 instead of a 404/405. Pinned here as current behavior; update this
-     * assertion when the import in {@code ErrorHandler} is fixed.
+     * and fails with the servlet {@code NoResourceFoundException}, which {@code ErrorHandler}
+     * answers with 404 {@code itemNotFound}.
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("unsupportedMethods")
-    @DisplayName("currently answers 500 errorOccurred for a verb the path does not map")
+    @DisplayName("answers 404 itemNotFound for a route or verb nothing maps")
     void unsupportedMethod(final String name, final MockHttpServletRequestBuilder request)
         throws Exception {
       final var token = UserControllerIT.this.adminBearerToken();
 
       expectError(
           UserControllerIT.this.perform(request.header(AUTHORIZATION, token)),
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          "errorOccurred",
+          HttpStatus.NOT_FOUND,
+          "itemNotFound",
           null,
-          "An error occurred.");
+          "The requested item is not found.");
     }
 
     static Stream<Arguments> unsupportedMethods() {
@@ -1262,7 +1260,8 @@ class UserControllerIT {
           Arguments.of("GET /api/users/{userId}", get("/api/users/" + id)),
           Arguments.of("PATCH /api/users/{userId}", patch("/api/users/" + id)),
           Arguments.of("DELETE /api/users", delete("/api/users")),
-          Arguments.of("PUT /api/users", put("/api/users")));
+          Arguments.of("PUT /api/users", put("/api/users")),
+          Arguments.of("GET /api/no-such-route", get("/api/no-such-route")));
     }
   }
 }

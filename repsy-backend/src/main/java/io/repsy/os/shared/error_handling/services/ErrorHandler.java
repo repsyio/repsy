@@ -54,9 +54,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
-import org.springframework.web.reactive.resource.NoResourceFoundException;
 import org.springframework.web.server.MethodNotAllowedException;
 import org.springframework.web.server.MissingRequestValueException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import reactor.core.publisher.Mono;
 
 @Slf4j
@@ -407,14 +407,11 @@ public class ErrorHandler {
       return null;
     }
 
-    final var exceptionMessage = ex.getMessage();
-    final var messageText = exceptionMessage != null ? exceptionMessage : ERR_ITEM_NOT_FOUND;
-
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(messageText, ex.getMessage()));
+        .body(this.resp.error(ERR_ITEM_NOT_FOUND));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
