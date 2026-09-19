@@ -29,10 +29,12 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -54,6 +56,11 @@ import org.springframework.web.bind.annotation.RestController;
 @NullMarked
 @SuppressWarnings("java:S6856")
 public class NpmPackageApiController {
+
+  private static final Set<String> PACKAGE_SORT_PROPERTIES =
+      Set.of("id", "name", "scope", "updatedAt");
+
+  private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("id", "version", "createdAt");
 
   private static final String PACKAGES_FETCHED = "packagesFetched";
 
@@ -106,6 +113,8 @@ public class NpmPackageApiController {
       @RequestParam(required = false) final @Nullable String scope,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
+    SortValidator.requireSortableBy(pageable, PACKAGE_SORT_PROPERTIES);
+
     final var packages =
         this.npmPackageService.getPackagesContainsScope(repoInfo.getStorageKey(), scope, pageable);
 
@@ -122,6 +131,8 @@ public class NpmPackageApiController {
       @PathVariable(required = false) final @Nullable String scope,
       @RequestParam(required = false, defaultValue = "") final String name,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, PACKAGE_SORT_PROPERTIES);
 
     final var packages =
         this.npmPackageService.getPackagesByScopeContainsName(
@@ -160,6 +171,8 @@ public class NpmPackageApiController {
       @PathVariable final String packageName,
       @RequestParam(required = false, defaultValue = "") final String version,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
 
     final var versions =
         this.npmPackageService.getVersionsContainsVersion(

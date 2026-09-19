@@ -26,10 +26,12 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -50,6 +52,11 @@ import org.springframework.web.bind.annotation.RestController;
 @SuppressWarnings("java:S6856")
 public class CargoCrateController {
 
+  private static final Set<String> CRATE_SORT_PROPERTIES =
+      Set.of("id", "name", "maxVersion", "lastUpdatedAt");
+
+  private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("version", "createdAt");
+
   private final CargoApiFacade cargoApiFacade;
   private final RestResponseFactory responseFactory;
   private final UsageUpdateService usageUpdateService;
@@ -60,6 +67,8 @@ public class CargoCrateController {
       final RepoInfo repoInfo,
       @RequestParam(defaultValue = "") final String query,
       final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, CRATE_SORT_PROPERTIES);
 
     final var crates = this.cargoApiFacade.search(repoInfo, query, pageable);
 
@@ -95,6 +104,8 @@ public class CargoCrateController {
       @PathVariable final String crateName,
       @RequestParam(defaultValue = "") final String query,
       final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
 
     final var versions = this.cargoApiFacade.getCrateVersions(repoInfo, crateName, query, pageable);
 
