@@ -113,6 +113,7 @@ class ProtocolDeployTokenControllerIT {
   private static final String DEPLOY_TOKEN_PATTERN = "rdt-[A-Za-z0-9_-]{43}";
   private static final String DEPLOY_USERNAME_PATTERN = "repsy-deploy-token-[a-z0-9]{7}";
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
+  private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String TOKEN_NOT_FOUND_TEXT = "Deploy token not found.";
   private static final String REPO_NOT_FOUND_TEXT = "Repository not found";
   private static final String UNAUTHORIZED_TEXT = "The user has logged in but has no permissions.";
@@ -374,6 +375,15 @@ class ProtocolDeployTokenControllerIT {
     assertThat((String) envelope.get("errorCode")).matches(UUID_PATTERN);
   }
 
+  private static void expectUnsupportedMediaType(final ResultActions result) throws Exception {
+    expectError(
+        result,
+        HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+        "unsupportedMediaType",
+        null,
+        UNSUPPORTED_MEDIA_TYPE_TEXT);
+  }
+
   private static void expectValidationError(final ResultActions result, final String data)
       throws Exception {
     expectError(result, HttpStatus.BAD_REQUEST, "validationError", data, VALIDATION_TEXT);
@@ -492,7 +502,7 @@ class ProtocolDeployTokenControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 403 for a malformed/garbage bearer token")
+    @DisplayName("returns 401 for a malformed/garbage bearer token")
     void malformedBearerToken(final Endpoint endpoint) throws Exception {
       final var repo = ProtocolDeployTokenControllerIT.this.createRepo(RepoType.MAVEN);
 
@@ -503,7 +513,7 @@ class ProtocolDeployTokenControllerIT {
                   .apply(repo.getName())
                   .apply(UUID.randomUUID())
                   .header(AUTHORIZATION, "Bearer not-a-jwt")),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "accessNotAllowed",
           "accessNotAllowed",
           "Access isn't allowed.");
@@ -511,7 +521,7 @@ class ProtocolDeployTokenControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 403 for an expired token")
+    @DisplayName("returns 401 for an expired token")
     void expiredToken(final Endpoint endpoint) throws Exception {
       final var repo = ProtocolDeployTokenControllerIT.this.createRepo(RepoType.MAVEN);
       final var admin =
@@ -526,7 +536,7 @@ class ProtocolDeployTokenControllerIT {
                   .header(
                       AUTHORIZATION,
                       ProtocolDeployTokenControllerIT.this.expiredBearerTokenFor(admin))),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "sessionExpired",
           "sessionExpired",
           "Session expired.");
@@ -665,7 +675,7 @@ class ProtocolDeployTokenControllerIT {
                   .apply(uniqueName("missing"))
                   .apply(UUID.randomUUID())
                   .header(AUTHORIZATION, "Bearer not-a-jwt")),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "accessNotAllowed",
           "accessNotAllowed",
           "Access isn't allowed.");
@@ -970,18 +980,17 @@ class ProtocolDeployTokenControllerIT {
     }
 
     @Test
-    @DisplayName("returns 400 validationError for an unsupported content type")
+    @DisplayName("returns 415 unsupportedMediaType for an unsupported content type")
     void unsupportedContentType() throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var repo = it.createRepo(RepoType.MAVEN);
 
-      expectValidationError(
+      expectUnsupportedMediaType(
           it.perform(
               post(tokensUrl(repo))
                   .header(AUTHORIZATION, it.adminBearerToken())
                   .contentType(MediaType.TEXT_PLAIN)
-                  .content(form("plain"))),
-          null);
+                  .content(form("plain"))));
     }
   }
 

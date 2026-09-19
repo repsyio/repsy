@@ -315,7 +315,7 @@ class UsageControllerIT {
   private static void expectAccessNotAllowed(final ResultActions result) throws Exception {
     expectError(
         result,
-        HttpStatus.FORBIDDEN,
+        HttpStatus.UNAUTHORIZED,
         "accessNotAllowed",
         "accessNotAllowed",
         "Access isn't allowed.");
@@ -334,36 +334,36 @@ class UsageControllerIT {
   class Security {
 
     @Test
-    @DisplayName("returns 403 when the Authorization header is missing")
+    @DisplayName("returns 401 when the Authorization header is missing")
     void missingAuthorizationHeader() throws Exception {
       expectError(
           UsageControllerIT.this.perform(get(USAGES_PATH)),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "missingRequestHeader",
           "Authorization",
           "A required request header is missing.");
     }
 
     @Test
-    @DisplayName("returns 403 for a header without a Bearer prefix")
+    @DisplayName("returns 401 for a header without a Bearer prefix")
     void nonBearerAuthorizationHeader() throws Exception {
       expectAccessNotAllowed(UsageControllerIT.this.getUsages("Basic dXNlcjpw"));
     }
 
     @Test
-    @DisplayName("returns 403 for a malformed/garbage bearer token")
+    @DisplayName("returns 401 for a malformed/garbage bearer token")
     void malformedBearerToken() throws Exception {
       expectAccessNotAllowed(UsageControllerIT.this.getUsages("Bearer not-a-jwt"));
     }
 
     @Test
-    @DisplayName("returns 403 for an expired token")
+    @DisplayName("returns 401 for an expired token")
     void expiredToken() throws Exception {
       final var token = UsageControllerIT.this.expiredBearerTokenFor(SEEDED_ADMIN_USERNAME);
 
       expectError(
           UsageControllerIT.this.getUsages(token),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "sessionExpired",
           "sessionExpired",
           "Session expired.");
@@ -407,7 +407,7 @@ class UsageControllerIT {
      * requireAdmin}, so any signed-in user sees the instance-wide totals. The dashboard, which
      * every signed-in user lands on, renders them in its Total Disk card, so restricting the
      * endpoint would break the non-admin dashboard. Unlike {@code /api/users}, which answers a
-     * non-admin with 401 {@code accessDenied}, this endpoint is meant to stay open.
+     * non-admin with 403 {@code accessDenied}, this endpoint is meant to stay open.
      */
     @Test
     @DisplayName("lets a non-admin user read the totals (open to any authenticated user)")

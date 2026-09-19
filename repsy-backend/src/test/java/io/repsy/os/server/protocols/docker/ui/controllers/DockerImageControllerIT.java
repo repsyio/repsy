@@ -357,7 +357,7 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           DockerImageControllerIT.this.perform(
               get("/api/docker/images/%s".formatted(repo.getName()))
                   .header(AUTHORIZATION, "Bearer not-a-jwt")),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "accessNotAllowed",
           "accessNotAllowed",
           "Access isn't allowed.");
@@ -367,7 +367,7 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           DockerImageControllerIT.this.perform(
               get("/api/docker/images/%s".formatted(repo.getName()))
                   .header(AUTHORIZATION, DockerImageControllerIT.this.expiredBearerTokenFor(user))),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "sessionExpired",
           "sessionExpired",
           "Session expired.");

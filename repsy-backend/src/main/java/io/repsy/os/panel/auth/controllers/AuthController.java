@@ -54,9 +54,9 @@ class AuthController {
   public @NonNull RestResponse<LoginInfo> refreshToken(
       @RequestBody @Valid final @NonNull RefreshTokenForm form) {
 
-    final var userId = this.jwtUtils.verifyRefreshToken(form.getRefreshToken());
+    final var claims = this.jwtUtils.verifyRefreshToken(form.getRefreshToken());
 
-    final var loginInfo = this.authUserService.refreshToken(userId);
+    final var loginInfo = this.authUserService.refreshToken(claims);
 
     return this.resp.success("tokenRefreshed", loginInfo);
   }

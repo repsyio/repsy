@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.helm.ui.controllers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -267,6 +268,20 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     }
   }
 
+  /** Archive whose {@code Chart.yaml} is exactly {@code chartYaml}. */
+  private static byte[] archiveOf(final String chartName, final String chartYaml) {
+    try {
+      final var bytes = new ByteArrayOutputStream();
+      try (final var gzip = new GZIPOutputStream(bytes);
+          final var tar = new TarArchiveOutputStream(gzip)) {
+        addEntry(tar, chartName + "/Chart.yaml", chartYaml);
+      }
+      return bytes.toByteArray();
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
   /** Uploads a chart through {@code POST /{repo}/api/charts} (ChartMuseum-style). */
   private Pushed upload(final Repo repo, final ChartSpec spec, final String token)
       throws Exception {
@@ -294,6 +309,18 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       final String token)
       throws Exception {
     final var bytes = archive(spec);
+    requireStatus(this.putOciChart(repo, ociName, tag, bytes, token), 201, "OCI manifest push");
+    return new Pushed(spec, bytes);
+  }
+
+  /** Pushes {@code bytes} as the chart layer and answers the manifest {@code PUT}. */
+  private MockHttpServletResponse putOciChart(
+      final Repo repo,
+      final String ociName,
+      final String tag,
+      final byte[] bytes,
+      final String token)
+      throws Exception {
     final var layerDigest = sha256(bytes);
     final var configBytes = "{}".getBytes(StandardCharsets.UTF_8);
 
@@ -311,16 +338,13 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
                 OCI_LAYER_TYPE,
                 layerDigest,
                 bytes.length);
-    final var push =
-        this.protocol(
-                put("/v2/{repo}/{name}/manifests/{tag}", repo.getName(), ociName, tag)
-                    .contentType(OCI_MANIFEST_TYPE)
-                    .content(manifest)
-                    .header(AUTHORIZATION, token))
-            .andReturn()
-            .getResponse();
-    requireStatus(push, 201, "OCI manifest push");
-    return new Pushed(spec, bytes);
+    return this.protocol(
+            put("/v2/{repo}/{name}/manifests/{tag}", repo.getName(), ociName, tag)
+                .contentType(OCI_MANIFEST_TYPE)
+                .content(manifest)
+                .header(AUTHORIZATION, token))
+        .andReturn()
+        .getResponse();
   }
 
   private void uploadOciBlob(
@@ -490,13 +514,15 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
         "chartsFetched");
   }
 
+  private ResultActions versionsRequest(final Repo repo, final String name, final String token)
+      throws Exception {
+    return this.perform(
+        get("/api/helm/charts/{repo}/{name}", repo.getName(), name).header(AUTHORIZATION, token));
+  }
+
   private String versions(final Repo repo, final String name, final String token) throws Exception {
     return expectSuccess(
-        this.perform(
-            get("/api/helm/charts/{repo}/{name}", repo.getName(), name)
-                .header(AUTHORIZATION, token)),
-        "chartVersionsFetched",
-        "chartVersionsFetched");
+        this.versionsRequest(repo, name, token), "chartVersionsFetched", "chartVersionsFetched");
   }
 
   private ResultActions detailRequest(
@@ -514,13 +540,16 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
         this.detailRequest(repo, name, version, token), "chartDetailFetched", "chartDetailFetched");
   }
 
+  private ResultActions tagsRequest(final Repo repo, final String name, final String token)
+      throws Exception {
+    return this.perform(
+        get("/api/helm/charts/{repo}/{name}/tags", repo.getName(), name)
+            .header(AUTHORIZATION, token));
+  }
+
   private String tags(final Repo repo, final String name, final String token) throws Exception {
     return expectSuccess(
-        this.perform(
-            get("/api/helm/charts/{repo}/{name}/tags", repo.getName(), name)
-                .header(AUTHORIZATION, token)),
-        "chartTagsFetched",
-        "chartTagsFetched");
+        this.tagsRequest(repo, name, token), "chartTagsFetched", "chartTagsFetched");
   }
 
   private ResultActions deleteVersionRequest(
@@ -728,31 +757,113 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
           .containsExactly("bravo", "alpha", "charlie");
       assertThat(namesOf(it.searchWith(repo, token, "sort", "lastUpdatedAt,asc")))
           .containsExactly("charlie", "alpha", "bravo");
-      assertThat(namesOf(it.searchWith(repo, token, "sort", "chart.name,asc")))
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "name,asc")))
           .containsExactly("alpha", "bravo", "charlie");
-      assertThat(namesOf(it.searchWith(repo, token, "sort", "chart.name,desc")))
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "name,desc")))
           .containsExactly("charlie", "bravo", "alpha");
     }
 
+    @Test
+    @DisplayName("sorts by the list item's own keys: updatedAt and latestVersion")
+    void sortsByListItemKeys() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("charlie", "1.0.0"), token);
+      it.upload(repo, ChartSpec.of("alpha", "3.0.0"), token);
+      it.upload(repo, ChartSpec.of("bravo", "2.0.0"), token);
+
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "updatedAt,desc")))
+          .containsExactly("bravo", "alpha", "charlie");
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "updatedAt,asc")))
+          .containsExactly("charlie", "alpha", "bravo");
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "latestVersion,asc")))
+          .containsExactly("charlie", "bravo", "alpha");
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "latestVersion,desc")))
+          .containsExactly("alpha", "bravo", "charlie");
+    }
+
+    @Test
+    @DisplayName("keeps the createdAt key the panel sends")
+    void sortsByCreatedAt() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      for (final var name : List.of("charlie", "alpha", "bravo")) {
+        it.upload(repo, ChartSpec.of(name, "1.0.0"), token);
+      }
+
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "createdAt,desc")))
+          .containsExactly("bravo", "alpha", "charlie");
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "createdAt,asc")))
+          .containsExactly("charlie", "alpha", "bravo");
+    }
+
     /**
-     * Sorting is applied to the {@code HelmChartVersion} entity, not to the list item, so the
-     * item's own {@code name} is not a sort key: it is a property path error that surfaces as a
-     * generic 500. Pinned as-is; see the follow-up story linked from the PR.
+     * The entity paths the query sorts by ({@code chart.name}, {@code version}) are not part of the
+     * API, so they are rejected like any other unknown key.
      */
     @ParameterizedTest(name = "sort={0}")
-    @ValueSource(strings = {"name,asc", "bogus,asc"})
-    @DisplayName("an unknown sort property is a 500 today")
-    void unknownSortPropertyIs500(final String sort) throws Exception {
+    @ValueSource(strings = {"bogus,asc", "chart.name,asc", "version,asc", "Name,asc"})
+    @DisplayName("returns 400 validationError naming sort for an unsupported sort property")
+    void unknownSortPropertyIs400(final String sort) throws Exception {
       final var it = HelmChartControllerIT.this;
       final var token = it.adminBearerToken();
       final var repo = it.helmRepo();
       it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
 
-      expectInternalError(
+      expectError(
           it.perform(
               get("/api/helm/charts/{repo}", repo.getName())
                   .param("sort", sort)
-                  .header(AUTHORIZATION, token)));
+                  .header(AUTHORIZATION, token)),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          "sort",
+          "Incoming data couldn't be validated.");
+    }
+
+    @Test
+    @DisplayName("rejects the request when only one of several sort properties is unsupported")
+    void oneUnknownAmongSeveralSortProperties() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+
+      expectError(
+          it.perform(
+              get("/api/helm/charts/{repo}", repo.getName())
+                  .param("sort", "name,asc")
+                  .param("sort", "bogus,desc")
+                  .header(AUTHORIZATION, token)),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          "sort",
+          "Incoming data couldn't be validated.");
+    }
+
+    @Test
+    @DisplayName("applies several supported sort keys in order")
+    void sortsByMultipleKeys() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("charlie", "1.0.0"), token);
+      it.upload(repo, ChartSpec.of("alpha", "1.0.0"), token);
+      it.upload(repo, ChartSpec.of("bravo", "2.0.0"), token);
+
+      final var body =
+          expectSuccess(
+              it.perform(
+                  get("/api/helm/charts/{repo}", repo.getName())
+                      .param("sort", "latestVersion,desc")
+                      .param("sort", "name,asc")
+                      .header(AUTHORIZATION, token)),
+              "chartsFetched",
+              "chartsFetched");
+
+      assertThat(namesOf(body)).containsExactly("bravo", "alpha", "charlie");
     }
 
     @ParameterizedTest(name = "{0}={1}")
@@ -814,13 +925,14 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
       final var body = it.versions(repo, "payments", token);
 
-      // The list is a plain, unpaged array; the service does not sort it, so compare as a set.
+      // The list is a plain, unpaged array, newest upload first.
       final var items = dataList(body);
-      assertThat(items).hasSize(3);
+      assertThat(items)
+          .extracting(item -> item.get("version"))
+          .containsExactly("1.2.0+build.5", "1.1.0-rc.1", "1.0.0");
       items.forEach(item -> assertInstantBetween(item.get("createdAt"), from, to));
 
       final var versions = byVersion(items);
-      assertThat(versions).containsOnlyKeys("1.0.0", "1.1.0-rc.1", "1.2.0+build.5");
 
       final var stableItem = versions.get("1.0.0");
       assertKeys(stableItem, VERSION_ITEM_KEYS);
@@ -883,19 +995,42 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     }
 
     /**
-     * The story expected an unknown chart to answer 404. It answers 200 with an empty list: {@code
-     * HelmChartService.findAllVersionsByName} maps a missing chart to an empty list, unlike the
-     * detail and delete endpoints, which answer 404 {@code chartNotFound}. Pinned as-is.
+     * The order is by upload time (newest first), the same notion of "latest" the chart list uses;
+     * it does not follow the semantic version, so an older release uploaded last comes first.
      */
     @Test
-    @DisplayName("an unknown chart is an empty list, not a 404")
-    void unknownChartIsEmptyList() throws Exception {
+    @DisplayName("lists the most recently uploaded version first, whatever its version number")
+    void newestUploadFirst() throws Exception {
       final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
       final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "2.0.0"), token);
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+      it.upload(repo, ChartSpec.of("payments", "1.5.0"), token);
 
-      final var body = it.versions(repo, "does-not-exist", it.userBearerToken());
+      final var items = dataList(it.versions(repo, "payments", token));
 
-      assertThat(dataList(body)).isEmpty();
+      assertThat(items)
+          .extracting(item -> item.get("version"))
+          .containsExactly("1.5.0", "1.0.0", "2.0.0");
+    }
+
+    @Test
+    @DisplayName("an unknown chart is 404 chartNotFound, like detail and delete")
+    void unknownChartIsNotFound() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      final var other = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+      it.upload(other, ChartSpec.of("elsewhere", "1.0.0"), token);
+
+      expectChartNotFound(it.versionsRequest(repo, "does-not-exist", it.userBearerToken()));
+      // A chart that exists only in another repo is not visible here.
+      expectChartNotFound(it.versionsRequest(repo, "elsewhere", token));
+      // The chart name is matched exactly: no prefix, no case folding.
+      expectChartNotFound(it.versionsRequest(repo, "pay", token));
+      expectChartNotFound(it.versionsRequest(repo, "PAYMENTS", token));
     }
   }
 
@@ -1048,12 +1183,9 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       assertThat(stringList(it.tags(other, "payments", token))).containsExactly("9.0.0");
     }
 
-    /**
-     * The story asks to pin "empty list vs 404" for a chart that was only uploaded the classic way
-     * and for an unknown chart: both are 200 with an empty list.
-     */
+    /** A chart that exists but was only uploaded the classic way has no tags: that is not a 404. */
     @Test
-    @DisplayName("a classic-only or unknown chart has an empty tag list, not a 404")
+    @DisplayName("a chart without OCI tags has an empty tag list")
     void noTagsIsEmptyList() throws Exception {
       final var it = HelmChartControllerIT.this;
       final var token = it.adminBearerToken();
@@ -1062,8 +1194,38 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       it.pushOci(repo, "oci", "1.0.0", ChartSpec.of("oci", "1.0.0"), token);
 
       assertThat(stringList(it.tags(repo, "classic", token))).isEmpty();
-      assertThat(stringList(it.tags(repo, "does-not-exist", token))).isEmpty();
       assertThat(stringList(it.tags(repo, "oci", token))).containsExactly("1.0.0");
+    }
+
+    @Test
+    @DisplayName("an unknown chart is 404 chartNotFound, unlike a chart without tags")
+    void unknownChartIsNotFound() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      final var other = it.helmRepo();
+      it.pushOci(repo, "payments", "1.0.0", ChartSpec.of("payments", "1.0.0"), token);
+      it.pushOci(other, "elsewhere", "1.0.0", ChartSpec.of("elsewhere", "1.0.0"), token);
+
+      expectChartNotFound(it.tagsRequest(repo, "does-not-exist", it.userBearerToken()));
+      // A chart that exists only in another repo is not visible here.
+      expectChartNotFound(it.tagsRequest(repo, "elsewhere", token));
+      expectChartNotFound(it.tagsRequest(repo, "PAYMENTS", token));
+    }
+
+    /**
+     * The OCI name comes from the push path and is not checked against {@code Chart.yaml}, so tags
+     * can exist under a name no chart carries. They are still listed rather than answered 404.
+     */
+    @Test
+    @DisplayName("tags pushed under a name that differs from the chart name are listed")
+    void listsTagsOfNameDifferingFromChartName() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.pushOci(repo, "alias", "1.0.0", ChartSpec.of("real-name", "1.0.0"), token);
+
+      assertThat(stringList(it.tags(repo, "alias", token))).containsExactly("1.0.0");
     }
 
     /**
@@ -1152,7 +1314,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       assertThat(it.storedVersions(repo, "payments")).isEmpty();
       assertThat(it.chartRowExists(repo, "orders")).isTrue();
       assertThat(namesOf(it.search(repo, token))).containsExactly("orders");
-      assertThat(dataList(it.versions(repo, "payments", token))).isEmpty();
+      expectChartNotFound(it.versionsRequest(repo, "payments", token));
       assertThat(it.indexYaml(repo)).doesNotContain("payments-1.0.0.tgz");
     }
 
@@ -1253,7 +1415,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       assertThat(it.chartRowExists(repo, "orders")).isTrue();
       assertThat(Files.exists(it.chartFile(repo, "orders", "0.1.0"))).isTrue();
       assertThat(namesOf(it.search(repo, token))).containsExactly("orders");
-      assertThat(dataList(it.versions(repo, "payments", token))).isEmpty();
+      expectChartNotFound(it.versionsRequest(repo, "payments", token));
     }
 
     @Test
@@ -1268,7 +1430,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
       expectDeleted(it.deleteAllRequest(repo, "payments", token));
 
-      assertThat(stringList(it.tags(repo, "payments", token))).isEmpty();
+      expectChartNotFound(it.tagsRequest(repo, "payments", token));
       assertThat(Files.exists(it.ociManifestFile(repo, "payments", "1.0.0"))).isFalse();
       assertThat(Files.exists(it.ociManifestFile(repo, "payments", "latest"))).isFalse();
       assertThat(stringList(it.tags(repo, "orders", token))).containsExactly("0.1.0");
@@ -1317,7 +1479,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     VERSIONS(
         false,
         "chartVersionsFetched",
-        200,
+        404,
         name -> get("/api/helm/charts/{repo}/{name}", name, "payments")),
     DETAIL(
         false,
@@ -1327,7 +1489,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     TAGS(
         false,
         "chartTagsFetched",
-        200,
+        404,
         name -> get("/api/helm/charts/{repo}/{name}/tags", name, "payments")),
     DELETE_ALL(
         true,
@@ -1433,16 +1595,16 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
           endpoint.successMsgId);
     }
 
-    /** A JWT that does not verify is 403 accessNotAllowed, even for a public repo. */
+    /** A JWT that does not verify is 401 accessNotAllowed, even for a public repo. */
     @ParameterizedTest(name = "{0}")
     @EnumSource(Endpoint.class)
-    @DisplayName("a malformed bearer token is 403 accessNotAllowed")
+    @DisplayName("a malformed bearer token is 401 accessNotAllowed")
     void malformedBearerToken(final Endpoint endpoint) throws Exception {
       final var repo = this.repoWithChart(false);
 
       expectError(
           this.send(endpoint, repo.getName(), "Bearer not-a-jwt"),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "accessNotAllowed",
           "accessNotAllowed",
           "Access isn't allowed.");
@@ -1457,21 +1619,19 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       expectUnauthorized(this.send(endpoint, repo.getName(), "Token abc"));
     }
 
-    /**
-     * A Basic header that is not valid base64 is not rejected as 401: decoding it throws and the
-     * error handler answers 500. Pinned as-is; see the follow-up story linked from the PR.
-     */
-    @Test
-    @DisplayName("a Basic header that is not base64 is a 500 today")
-    void undecodableBasicHeader() throws Exception {
+    /** RPS-927: an undecodable Basic credential is a plain 401, not a 500. */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"Basic !!!", "Basic dXNlcg=="})
+    @DisplayName("a Basic header that is not base64 or has no colon is 401 unAuthorized")
+    void undecodableBasicHeader(final String authHeader) throws Exception {
       final var repo = this.repoWithChart(false);
 
-      expectInternalError(this.send(Endpoint.SEARCH, repo.getName(), "Basic !!!"));
+      expectUnauthorized(this.send(Endpoint.SEARCH, repo.getName(), authHeader));
     }
 
     @ParameterizedTest(name = "{0}")
     @EnumSource(Endpoint.class)
-    @DisplayName("an expired token is 403 sessionExpired, even for a public repo")
+    @DisplayName("an expired token is 401 sessionExpired, even for a public repo")
     void expiredToken(final Endpoint endpoint) throws Exception {
       final var it = HelmChartControllerIT.this;
       final var repo = this.repoWithChart(false);
@@ -1480,7 +1640,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
       expectError(
           this.send(endpoint, repo.getName(), expired),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "sessionExpired",
           "sessionExpired",
           "Session expired.");
@@ -1514,8 +1674,8 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
     /**
      * The endpoints do not check the repo type ({@code @RepoOperation} defaults to every scope), so
-     * a repo of another type answers as an empty Helm repo: lists are empty, lookups and deletes
-     * are 404 chartNotFound. Pinned as-is.
+     * a repo of another type answers as an empty Helm repo: the chart list is empty, every
+     * per-chart endpoint is 404 chartNotFound. Pinned as-is.
      */
     @ParameterizedTest(name = "{0}")
     @EnumSource(Endpoint.class)
@@ -1578,6 +1738,146 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
           Arguments.of(HttpMethod.PUT, "/api/helm/charts/%s/payments/tags"),
           Arguments.of(HttpMethod.GET, "/api/helm/charts/%s/payments/1.0.0/extra"),
           Arguments.of(HttpMethod.DELETE, "/api/helm/charts/%s/payments/1.0.0/extra"));
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // POST /{repo}/api/charts and OCI push: Chart.yaml scalars that are not strings (RPS-928)
+  // ---------------------------------------------------------------------------------------------
+
+  @Nested
+  @DisplayName("Chart.yaml scalar types on upload")
+  class ChartYamlScalars {
+
+    private static final String BASE = "name: payments\nversion: 1.0.0\n";
+
+    private static Arguments rejected(
+        final String label, final String chartYaml, final String msgId, final String text) {
+      return Arguments.of(label, chartYaml, msgId, text);
+    }
+
+    static Stream<Arguments> rejectedChartYamls() {
+      final var appVersionText =
+          "Invalid chart appVersion: it must be a string, quote it (for example" + " \"2\").";
+      final var descriptionText = "Invalid chart description: it must be a string, quote it.";
+      final var yamlText = "Chart.yaml is not a valid YAML mapping.";
+      return Stream.of(
+          rejected(
+              "integer appVersion",
+              BASE + "appVersion: 2\n",
+              "chartAppVersionInvalid",
+              appVersionText),
+          rejected(
+              "float appVersion",
+              BASE + "appVersion: 1.10\n",
+              "chartAppVersionInvalid",
+              appVersionText),
+          rejected(
+              "boolean appVersion",
+              BASE + "appVersion: true\n",
+              "chartAppVersionInvalid",
+              appVersionText),
+          rejected(
+              "list appVersion",
+              BASE + "appVersion: [1, 2]\n",
+              "chartAppVersionInvalid",
+              appVersionText),
+          rejected(
+              "integer description",
+              BASE + "description: 42\n",
+              "chartDescriptionInvalid",
+              descriptionText),
+          rejected(
+              "integer type",
+              BASE + "type: 3\n",
+              "chartTypeInvalid",
+              "Invalid chart type: it must be a string."),
+          rejected(
+              "integer name",
+              "name: 5\nversion: 1.0.0\n",
+              "chartNameInvalid",
+              "Invalid chart name."),
+          rejected(
+              "integer version",
+              "name: payments\nversion: 2\n",
+              "chartVersionInvalid",
+              "Invalid chart version."),
+          rejected(
+              "float version",
+              "name: payments\nversion: 1.0\n",
+              "chartVersionInvalid",
+              "Invalid chart version."),
+          rejected("empty document", "", "chartYamlInvalid", yamlText),
+          rejected("list document", "- a\n- b\n", "chartYamlInvalid", yamlText),
+          rejected(
+              "malformed YAML", "name: [unclosed\nversion: 1.0.0\n", "chartYamlInvalid", yamlText));
+    }
+
+    private ResultActions postChartYaml(final Repo repo, final String chartYaml) throws Exception {
+      final var it = HelmChartControllerIT.this;
+      return it.protocol(
+          multipart("/{repo}/api/charts", repo.getName())
+              .part(new MockPart("chart", "payments-1.0.0.tgz", archiveOf("payments", chartYaml)))
+              .header(AUTHORIZATION, it.adminBearerToken()));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("rejectedChartYamls")
+    @DisplayName("POST /{repo}/api/charts answers 400 with a specific message, not 500")
+    void uploadIsRejected(
+        final String label, final String chartYaml, final String msgId, final String text)
+        throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var repo = it.helmRepo();
+      clearInvocations(it.usageUpdateService);
+
+      expectError(this.postChartYaml(repo, chartYaml), HttpStatus.BAD_REQUEST, msgId, msgId, text);
+
+      assertThat(it.chartRowExists(repo, "payments")).isFalse();
+      verifyNoInteractions(it.usageUpdateService);
+    }
+
+    @Test
+    @DisplayName("quoted scalars are strings and keep their exact value")
+    void quotedScalarsAreAccepted() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var repo = it.helmRepo();
+      final var chartYaml = BASE + "appVersion: \"2\"\ndescription: \"42\"\ntype: application\n";
+
+      final var response = this.postChartYaml(repo, chartYaml).andReturn().getResponse();
+
+      requireStatus(response, 201, "chart upload");
+      final var detail = dataMap(it.detail(repo, "payments", "1.0.0", it.userBearerToken()));
+      assertThat(detail)
+          .containsEntry("appVersion", "2")
+          .containsEntry("description", "42")
+          .containsEntry("type", "application");
+    }
+
+    @Test
+    @DisplayName("omitted optional scalars are still accepted")
+    void omittedOptionalScalars() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var repo = it.helmRepo();
+
+      requireStatus(this.postChartYaml(repo, BASE).andReturn().getResponse(), 201, "chart upload");
+
+      assertThat(it.storedVersions(repo, "payments")).containsExactly("1.0.0");
+    }
+
+    @Test
+    @DisplayName("an OCI push with a non-string appVersion is rejected the same way")
+    void ociPushIsRejected() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var repo = it.helmRepo();
+      final var bytes = archiveOf("payments", BASE + "appVersion: 2\n");
+
+      final var push = it.putOciChart(repo, "payments", "1.0.0", bytes, it.adminBearerToken());
+
+      requireStatus(push, 400, "OCI manifest push");
+      assertThat(push.getContentAsString(StandardCharsets.UTF_8))
+          .contains("\"msgId\":\"chartAppVersionInvalid\"");
+      assertThat(it.chartRowExists(repo, "payments")).isFalse();
     }
   }
 

@@ -44,6 +44,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -259,7 +260,7 @@ class KeyStoreControllerIT {
       final var path = "/api/mvn/key-stores/allowed-servers";
       final var missing =
           KeyStoreControllerIT.this.mockMvc.perform(get(path).with(apiPort())).andReturn();
-      assertThat(missing.getResponse().getStatus()).isEqualTo(403);
+      assertThat(missing.getResponse().getStatus()).isEqualTo(401);
       assertError(missing.getResponse().getContentAsString(), "missingRequestHeader");
 
       final var malformed =
@@ -267,7 +268,7 @@ class KeyStoreControllerIT {
               .mockMvc
               .perform(get(path).with(apiPort()).header(AUTHORIZATION, "Bearer invalid"))
               .andReturn();
-      assertThat(malformed.getResponse().getStatus()).isEqualTo(403);
+      assertThat(malformed.getResponse().getStatus()).isEqualTo(401);
       assertError(malformed.getResponse().getContentAsString(), "accessNotAllowed");
 
       final var expired =
@@ -279,19 +280,19 @@ class KeyStoreControllerIT {
               .mockMvc
               .perform(get(path).with(apiPort()).header(AUTHORIZATION, expired))
               .andReturn();
-      assertThat(expiredResponse.getResponse().getStatus()).isEqualTo(403);
+      assertThat(expiredResponse.getResponse().getStatus()).isEqualTo(401);
       assertError(expiredResponse.getResponse().getContentAsString(), "sessionExpired");
 
       final var refreshToken =
           AuthUtils.AUTH_BEARER
               + KeyStoreControllerIT.this.jwtUtils.createRefreshToken(
-                  user.getId(), user.getUsername(), Duration.ofMinutes(30));
+                  user.getId(), user.getUsername(), Duration.ofMinutes(30), Instant.now(), 0);
       final var refreshTokenResponse =
           KeyStoreControllerIT.this
               .mockMvc
               .perform(get(path).with(apiPort()).header(AUTHORIZATION, refreshToken))
               .andReturn();
-      assertThat(refreshTokenResponse.getResponse().getStatus()).isEqualTo(403);
+      assertThat(refreshTokenResponse.getResponse().getStatus()).isEqualTo(401);
       assertError(refreshTokenResponse.getResponse().getContentAsString(), "accessNotAllowed");
     }
   }

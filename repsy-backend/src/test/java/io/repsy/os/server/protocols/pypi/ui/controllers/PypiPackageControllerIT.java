@@ -406,7 +406,7 @@ class PypiPackageControllerIT {
             .perform(
                 api(get("/api/pypi/packages/" + privateRepo.getName()))
                     .header(AUTHORIZATION, "Bearer not-a-jwt"))
-            .andExpect(status().isForbidden())
+            .andExpect(status().isUnauthorized())
             .andReturn()
             .getResponse()
             .getContentAsString();

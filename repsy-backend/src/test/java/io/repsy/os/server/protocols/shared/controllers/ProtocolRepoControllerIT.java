@@ -90,6 +90,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
+  private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String REPO_NOT_FOUND_TEXT = "Repository not found";
   private static final String REPO_EXISTS_TEXT = "The repository exists. Please try another name.";
   private static final String USER_NOT_FOUND_TEXT = "User not found.";
@@ -396,14 +397,14 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 403 for a malformed/garbage bearer token")
+    @DisplayName("returns 401 for a malformed/garbage bearer token")
     void malformedBearerToken(final Endpoint endpoint) throws Exception {
       final var target = this.target();
 
       expectError(
           ProtocolRepoControllerIT.this.perform(
               endpoint.request().apply(target).header(AUTHORIZATION, "Bearer not-a-jwt")),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "accessNotAllowed",
           "accessNotAllowed",
           ACCESS_NOT_ALLOWED_TEXT);
@@ -411,7 +412,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 403 sessionExpired for an expired token")
+    @DisplayName("returns 401 sessionExpired for an expired token")
     void expiredToken(final Endpoint endpoint) throws Exception {
       final var target = this.target();
       final var admin =
@@ -424,7 +425,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
                   .apply(target)
                   .header(
                       AUTHORIZATION, ProtocolRepoControllerIT.this.expiredBearerTokenFor(admin))),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "sessionExpired",
           "sessionExpired",
           SESSION_EXPIRED_TEXT);
@@ -856,13 +857,17 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 400 validationError when the body is not JSON")
+    @DisplayName("returns 415 unsupportedMediaType when the body has no JSON content type")
     void unsupportedMediaType() throws Exception {
-      expectValidationError(
+      expectError(
           ProtocolRepoControllerIT.this.perform(
               post("/api/repos/MAVEN")
                   .content("{\"name\":\"" + uniqueRepoName("nomedia") + "\"}")
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
+          HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+          "unsupportedMediaType",
+          null,
+          UNSUPPORTED_MEDIA_TYPE_TEXT);
     }
 
     @Test

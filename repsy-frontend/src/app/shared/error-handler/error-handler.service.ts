@@ -30,7 +30,7 @@ export class ErrorHandlerService {
     }
 
     if (
-      res.status === 403 &&
+      res.status === 401 &&
       'msgId' in res.error &&
       (res.error.msgId === 'sessionExpired' || res.error.msgId === 'refreshTokenExpired')
     ) {
