@@ -27,7 +27,9 @@ import lombok.experimental.UtilityClass;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.error.YAMLException;
 
 /** Parses Chart.yaml from a .tgz stream without extracting to disk. */
@@ -78,7 +80,8 @@ public class HelmChartParser {
   private static Map<?, ?> loadYaml(final byte[] bytes) {
     final Object parsed;
     try {
-      parsed = new Yaml().load(new ByteArrayInputStream(bytes));
+      parsed =
+          new Yaml(new SafeConstructor(new LoaderOptions())).load(new ByteArrayInputStream(bytes));
     } catch (final YAMLException e) {
       throw new BadRequestException("chartYamlInvalid");
     }
