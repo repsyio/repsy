@@ -100,6 +100,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   private static final String ACCESS_NOT_ALLOWED_TEXT = "Access isn't allowed.";
   private static final String SESSION_EXPIRED_TEXT = "Session expired.";
   private static final String ITEM_NOT_FOUND_TEXT = "The requested item is not found.";
+  private static final String REPO_SCOPE_NOT_MATCHED_TEXT = "Repository scope does not match.";
   private static final String ERROR_OCCURRED_TEXT = "An error occurred.";
 
   private static final String[] REPO_LIST_KEYS = {
@@ -1342,23 +1343,21 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
         value = RepoType.class,
         mode = EnumSource.Mode.EXCLUDE,
         names = {"MAVEN"})
-    @DisplayName("KNOWN DEFECT: a non-Maven repo is a 500, not a clean repoScopeNotMatched error")
+    @DisplayName("returns 400 repoScopeNotMatched for a non-Maven repo")
     void nonMavenRepo(final RepoType type) throws Exception {
       final var repo =
           ProtocolRepoControllerIT.this.seedRepo(
               type, uniqueRepoName(type.name().toLowerCase(Locale.ROOT)));
 
-      // The interceptor throws IllegalArgumentException("repoScopeNotMatched"), which no handler
-      // maps, so the generic handler answers errorOccurred and hides the message.
       expectError(
           ProtocolRepoControllerIT.this.perform(
               get(repoUrl(repo, "/contents"))
                   .param("path", "/")
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          "errorOccurred",
-          null,
-          ERROR_OCCURRED_TEXT);
+          HttpStatus.BAD_REQUEST,
+          "repoScopeNotMatched",
+          "repoScopeNotMatched",
+          REPO_SCOPE_NOT_MATCHED_TEXT);
     }
 
     @Test

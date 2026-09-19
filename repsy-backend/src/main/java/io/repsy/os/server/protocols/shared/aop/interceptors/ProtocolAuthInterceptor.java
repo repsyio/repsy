@@ -19,6 +19,7 @@ import static io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils.REPO_I
 import static io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils.REPO_PERMISSION_INFO;
 import static org.springframework.web.servlet.HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils;
@@ -153,7 +154,7 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
       return;
     }
 
-    throw new IllegalArgumentException("repoScopeNotMatched");
+    throw new BadRequestException("repoScopeNotMatched");
   }
 
   private RepoScope getRepoScope(final HandlerMethod methodHandler) {
