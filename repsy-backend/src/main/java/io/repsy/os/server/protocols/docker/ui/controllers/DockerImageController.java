@@ -171,7 +171,7 @@ public class DockerImageController {
       throws IOException {
 
     final var tag =
-        this.manifestService.findActiveTagByRepoAndDigest(
+        this.manifestService.findActiveTagByRepoAndReference(
             repoInfo.getStorageKey(), imageName, reference);
 
     final var fileName =
