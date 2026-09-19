@@ -35,6 +35,7 @@ import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestListManifestInfo;
 import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
+import io.repsy.protocols.docker.shared.utils.DockerConstants;
 import io.repsy.protocols.docker.shared.utils.MediaTypes;
 import jakarta.persistence.OptimisticLockException;
 import java.time.Instant;
@@ -224,13 +225,17 @@ public class ManifestTxService implements ManifestService<UUID> {
     }
   }
 
-  public Tag findActiveTagByRepoAndDigest(
-      final UUID repoId, final String imageName, final String digest) {
+  public Tag findActiveTagByRepoAndReference(
+      final UUID repoId, final String imageName, final String reference) {
 
-    return this.tagRepository
-        .findDistinctFirstByImageRepoIdAndImageNameAndDigestOrderByCreatedAtDesc(
-            repoId, imageName, digest)
-        .orElseThrow(() -> new ItemNotFoundException("tagNotFound"));
+    final var tag =
+        reference.startsWith(DockerConstants.SHA256_PREFIX)
+            ? this.tagRepository
+                .findDistinctFirstByImageRepoIdAndImageNameAndDigestOrderByCreatedAtDesc(
+                    repoId, imageName, reference)
+            : this.tagRepository.findByImageRepoIdAndImageNameAndName(repoId, imageName, reference);
+
+    return tag.orElseThrow(() -> new ItemNotFoundException("tagNotFound"));
   }
 
   public Page<io.repsy.os.generated.model.ManifestListItem> findManifestsByTagIdContainsName(

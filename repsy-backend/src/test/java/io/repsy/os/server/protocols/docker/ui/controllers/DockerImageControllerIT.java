@@ -213,6 +213,23 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("returns the manifest when the reference is a tag name")
+    void readsManifestByTagReference() throws Exception {
+      final var repo = DockerImageControllerIT.this.dockerRepo();
+      final var image = DockerImageControllerIT.this.seedImage(repo, "app", "latest");
+
+      final var manifest =
+          DockerImageControllerIT.this.expectSuccess(
+              DockerImageControllerIT.this.perform(
+                  get("/api/docker/images/%s/%s/manifests/%s"
+                          .formatted(repo.getName(), image.imageName, image.tag))
+                      .header(AUTHORIZATION, DockerImageControllerIT.this.userBearerToken())),
+              "manifestFetched",
+              "Manifest fetched.");
+      assertThat(JsonPath.<String>read(manifest, "$.data")).isEqualTo(image.manifestJson);
+    }
+
+    @Test
     @DisplayName("lists tags and manifests with filters, paging metadata and DTO fields")
     void listsTagsAndManifests() throws Exception {
       final var repo = DockerImageControllerIT.this.dockerRepo();
@@ -288,6 +305,14 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           DockerImageControllerIT.this.perform(
               get("/api/docker/images/%s/app/manifests/sha256:%s"
                       .formatted(repo.getName(), "f".repeat(64)))
+                  .header(AUTHORIZATION, token)),
+          HttpStatus.NOT_FOUND,
+          "tagNotFound",
+          "tagNotFound",
+          "Tag not found.");
+      DockerImageControllerIT.this.expectError(
+          DockerImageControllerIT.this.perform(
+              get("/api/docker/images/%s/app/manifests/missing-tag".formatted(repo.getName()))
                   .header(AUTHORIZATION, token)),
           HttpStatus.NOT_FOUND,
           "tagNotFound",
