@@ -74,17 +74,30 @@ public class Layer {
   @UpdateTimestamp
   private Instant lastUpdatedAt;
 
+  /**
+   * Identifier-based equality: two layers are equal when they are the same instance or carry the
+   * same non-null id. A layer that has not been persisted yet has no id and equals only itself.
+   * {@code getId()} is used on the other side so a Hibernate proxy is compared by its real id.
+   */
   @Override
   public boolean equals(final Object o) {
+    if (this == o) {
+      return true;
+    }
+
     if (!(o instanceof final Layer layer)) {
       return false;
     }
 
-    return this.id == layer.id && Objects.equals(this.digest, layer.digest);
+    return this.id != null && Objects.equals(this.id, layer.getId());
   }
 
+  /**
+   * Constant on purpose: the id is assigned on persist, so a hash derived from it would move a
+   * layer added to a {@code HashSet} before it was saved into the wrong bucket.
+   */
   @Override
   public int hashCode() {
-    return Objects.hash(this.id, this.digest);
+    return Layer.class.hashCode();
   }
 }
