@@ -67,15 +67,14 @@ jobs:
       - name: Build and Verify
         run: mvn -B -ntp verify
 
-      # TEMPORARY: non-blocking while repsy modules are brought up to the 80% coverage
-      # threshold one by one (see jacoco.check.phase in the root pom.xml). Remove
-      # continue-on-error once the coverage follow-up PRs land.
       - name: Analyze with SonarCloud
-        # Dependabot-triggered runs don't receive regular repo secrets, so SONAR_TOKEN is empty.
-        # Merge queue runs would analyse a gh-readonly-queue/* branch that no PR owns, and
-        # sonarcloud.yml analyses main right after the merge anyway.
-        if: github.actor != 'dependabot[bot]' && github.event_name != 'merge_group'
-        continue-on-error: true
+        # Dependabot-triggered and fork runs don't receive regular repo secrets, so SONAR_TOKEN is
+        # empty and the scanner is rejected. Merge queue runs would analyse a gh-readonly-queue/*
+        # branch that no PR owns, and sonarcloud.yml analyses main right after the merge anyway.
+        if: >-
+          github.actor != 'dependabot[bot]'
+          && github.event_name != 'merge_group'
+          && github.event.pull_request.head.repo.full_name == github.repository
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
