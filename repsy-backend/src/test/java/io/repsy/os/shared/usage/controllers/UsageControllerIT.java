@@ -339,9 +339,9 @@ class UsageControllerIT {
       expectError(
           UsageControllerIT.this.perform(get(USAGES_PATH)),
           HttpStatus.FORBIDDEN,
-          "Missing Request Header",
-          null,
-          "Missing Request Header");
+          "missingRequestHeader",
+          "Authorization",
+          "A required request header is missing.");
     }
 
     @Test

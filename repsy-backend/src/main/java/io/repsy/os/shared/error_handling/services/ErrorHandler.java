@@ -48,6 +48,8 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingMatrixVariableException;
+import org.springframework.web.bind.MissingRequestCookieException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -55,11 +57,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
-import org.springframework.web.server.MethodNotAllowedException;
-import org.springframework.web.server.MissingRequestValueException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-import reactor.core.publisher.Mono;
 
 @Slf4j
 @ControllerAdvice
@@ -73,13 +72,13 @@ public class ErrorHandler {
   private static final @NonNull String ERR_ITEM_NOT_FOUND = "itemNotFound";
   private static final @NonNull String ERR_ERROR_OCCURRED = "errorOccurred";
   private static final @NonNull String ERR_METHOD_NOT_SUPPORTED = "methodNotSupported";
-  private static final @NonNull String ERR_FORM_NOT_VALID = "formNotValid";
   private static final @NonNull String ERR_ACCESS_NOT_ALLOWED = "accessNotAllowed";
   private static final @NonNull String ERR_UNAUTHORIZED = "unauthorizedRequest";
   private static final @NonNull String ERR_ITEM_ALREADY_EXISTS = "itemAlreadyExists";
   private static final @NonNull String ERR_MOVED_TO_PATH = "movedToPath";
   private static final @NonNull String ERR_MFA_EXCEPTION = "mfaException";
   private static final @NonNull String ERR_SIGNATURE_NOT_VERIFIED = "artifactSignatureNotVerified";
+  private static final @NonNull String ERR_MISSING_REQUEST_HEADER = "missingRequestHeader";
   private static final @NonNull String ERR_ILLEGAL_ARGUMENT = "Invalid method argument";
 
   private final @NonNull RestResponseFactory resp;
@@ -90,33 +89,35 @@ public class ErrorHandler {
           "java.nio.channels.ClosedChannelException",
           "org.springframework.web.context.request.async.AsyncRequestNotUsableException");
 
-  @ExceptionHandler(MissingRequestValueException.class)
-  @NonNull ResponseEntity<RestResponse<String>> handleException(
-      final @NonNull MissingRequestValueException ex, final @NonNull HttpServletRequest request) {
+  /**
+   * Handles required request values the client left out (cookie, matrix variable, multipart part).
+   * Path variables are deliberately not listed: a missing one means the handler mapping is wrong,
+   * which is a server error and stays a 500. Headers and request parameters have their own
+   * handlers.
+   *
+   * @param ex Thrown exception
+   * @return REST response
+   */
+  @ExceptionHandler({
+    MissingRequestCookieException.class,
+    MissingMatrixVariableException.class,
+    MissingServletRequestPartException.class
+  })
+  @Nullable ResponseEntity<RestResponse<String>> handleMissingRequestValue(
+      final @NonNull Exception ex,
+      final @NonNull HttpServletRequest request,
+      final @Nullable HttpServletResponse response) {
+
+    if (response == null) {
+      log.debug("Missing request value", ex);
+      return null;
+    }
 
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(ERR_BAD_REQUEST, ex.getMessage()));
-  }
-
-  @ExceptionHandler(WebClientResponseException.class)
-  @NonNull Mono<ResponseEntity<RestResponse<String>>> handleException(
-      final @NonNull WebClientResponseException ex) {
-
-    final var status = ex.getStatusCode();
-    final var body = ex.getResponseBodyAsString();
-
-    if (status == HttpStatus.BAD_REQUEST || status.value() == UNPROCESSABLE_ENTITY) {
-      log.info("{}, WebClient response body: {}", status, body);
-      return Mono.just(
-          ResponseEntity.status(status).body(this.resp.error(ERR_FORM_NOT_VALID, body)));
-    }
-
-    log.error("{}, WebClient response body: {}", status, body);
-
-    return Mono.just(ResponseEntity.status(status).body(this.resp.error(ERR_ERROR_OCCURRED, body)));
   }
 
   @ExceptionHandler(Throwable.class)
@@ -466,25 +467,6 @@ public class ErrorHandler {
         .body(this.resp.error(ERR_VALIDATION));
   }
 
-  @ExceptionHandler(MethodNotAllowedException.class)
-  @Nullable ResponseEntity<RestResponse<Void>> handleException(
-      final @NonNull MethodNotAllowedException ex,
-      final @NonNull HttpServletRequest request,
-      final @Nullable HttpServletResponse response) {
-
-    if (response == null) {
-      log.debug(ERR_ILLEGAL_ARGUMENT, ex);
-
-      return null;
-    }
-
-    log.info(exceptionToString(ex, request));
-
-    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_VALIDATION));
-  }
-
   @ExceptionHandler(MissingServletRequestParameterException.class)
   @Nullable ResponseEntity<RestResponse<String>> handleException(
       final @NonNull MissingServletRequestParameterException ex,
@@ -616,9 +598,18 @@ public class ErrorHandler {
         .body(this.resp.error(messageText, ex.getMessage()));
   }
 
+  /**
+   * Handles a missing required request header. A missing {@code Authorization} header stays a 403
+   * like every other failed authentication on the panel (malformed, non-Bearer and expired tokens),
+   * which is what the frontend interceptors expect; any other missing header is a plain 400.
+   *
+   * @param ex Thrown exception
+   * @return REST response carrying the header name
+   */
   @ExceptionHandler(MissingRequestHeaderException.class)
   @Nullable ResponseEntity<RestResponse<String>> handleException(
       final @NonNull MissingRequestHeaderException ex,
+      final @NonNull HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -626,8 +617,15 @@ public class ErrorHandler {
       return null;
     }
 
-    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+    log.info(exceptionToString(ex, request));
+
+    final var status =
+        HttpHeaders.AUTHORIZATION.equalsIgnoreCase(ex.getHeaderName())
+            ? HttpStatus.FORBIDDEN
+            : HttpStatus.BAD_REQUEST;
+
+    return ResponseEntity.status(status)
         .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error("Missing Request Header"));
+        .body(this.resp.error(ERR_MISSING_REQUEST_HEADER, ex.getHeaderName()));
   }
 }

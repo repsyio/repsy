@@ -221,17 +221,15 @@ class ProfileControllerIT {
           .perform(get("/api/profile").with(apiPort()))
           .andExpect(status().isForbidden())
           .andExpect(jsonPath("$.*", hasSize(5)))
-          .andExpect(jsonPath("$.msgId").value("Missing Request Header"))
+          .andExpect(jsonPath("$.msgId").value("missingRequestHeader"))
           .andExpect(jsonPath("$.type").value("ERROR"))
-          .andExpect(jsonPath("$.data").value(nullValue()))
+          .andExpect(jsonPath("$.data").value("Authorization"))
           .andExpect(
               jsonPath("$.errorCode")
                   .value(
                       matchesPattern(
                           "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")))
-          // No "Missing Request Header" entry in messages.properties, so text falls back to the
-          // msgId itself.
-          .andExpect(jsonPath("$.text").value("Missing Request Header"));
+          .andExpect(jsonPath("$.text").value("A required request header is missing."));
     }
 
     @Test
@@ -500,8 +498,8 @@ class ProfileControllerIT {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body(uniqueUsername("nobody"))))
           .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.msgId").value("Missing Request Header"))
-          .andExpect(jsonPath("$.text").value("Missing Request Header"));
+          .andExpect(jsonPath("$.msgId").value("missingRequestHeader"))
+          .andExpect(jsonPath("$.text").value("A required request header is missing."));
     }
 
     @Test
@@ -685,8 +683,8 @@ class ProfileControllerIT {
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("NewPassword2@")))
           .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.msgId").value("Missing Request Header"))
-          .andExpect(jsonPath("$.text").value("Missing Request Header"));
+          .andExpect(jsonPath("$.msgId").value("missingRequestHeader"))
+          .andExpect(jsonPath("$.text").value("A required request header is missing."));
     }
 
     @Test
@@ -776,8 +774,8 @@ class ProfileControllerIT {
           .mockMvc
           .perform(delete("/api/profile").with(apiPort()))
           .andExpect(status().isForbidden())
-          .andExpect(jsonPath("$.msgId").value("Missing Request Header"))
-          .andExpect(jsonPath("$.text").value("Missing Request Header"));
+          .andExpect(jsonPath("$.msgId").value("missingRequestHeader"))
+          .andExpect(jsonPath("$.text").value("A required request header is missing."));
     }
 
     @Test

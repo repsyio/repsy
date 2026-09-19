@@ -582,9 +582,9 @@ class SecurityScanControllerIT {
       expectError(
           SecurityScanControllerIT.this.perform(get(path)),
           HttpStatus.FORBIDDEN,
-          "Missing Request Header",
-          null,
-          "Missing Request Header");
+          "missingRequestHeader",
+          "Authorization",
+          "A required request header is missing.");
     }
 
     @ParameterizedTest(name = "{0}")

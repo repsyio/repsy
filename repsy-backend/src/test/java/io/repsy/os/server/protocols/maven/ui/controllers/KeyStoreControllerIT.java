@@ -260,7 +260,7 @@ class KeyStoreControllerIT {
       final var missing =
           KeyStoreControllerIT.this.mockMvc.perform(get(path).with(apiPort())).andReturn();
       assertThat(missing.getResponse().getStatus()).isEqualTo(403);
-      assertError(missing.getResponse().getContentAsString(), "Missing Request Header");
+      assertError(missing.getResponse().getContentAsString(), "missingRequestHeader");
 
       final var malformed =
           KeyStoreControllerIT.this

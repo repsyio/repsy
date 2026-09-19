@@ -348,9 +348,9 @@ class UserControllerIT {
       expectError(
           UserControllerIT.this.perform(endpoint.request().apply(UUID.randomUUID())),
           HttpStatus.FORBIDDEN,
-          "Missing Request Header",
-          null,
-          "Missing Request Header");
+          "missingRequestHeader",
+          "Authorization",
+          "A required request header is missing.");
     }
 
     @ParameterizedTest(name = "{0}")
