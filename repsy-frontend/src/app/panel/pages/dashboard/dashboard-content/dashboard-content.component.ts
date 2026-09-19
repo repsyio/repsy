@@ -20,8 +20,8 @@ import { forkJoin, map, of, switchMap } from 'rxjs';
 
 import { RepoListInfo, RepoType, TotalUsageInfo } from '../../../../../generated/api';
 import { ProtocolRepoControllerService } from '../../../../../generated/api';
-import { ProfileService } from '../../profile/service/profile.service';
 import { RepositoryCreateModalComponent } from '../../../shared/components/modals/repository-create-modal/repository-create-modal.component';
+import { ProfileService } from '../../profile/service/profile.service';
 import { RecentActivityComponent } from '../recent-activity/recent-activity.component';
 import { RepositoryCardComponent } from '../repository-card/repository-card.component';
 import { SecurityOverviewCardComponent } from '../security-overview-card/security-overview-card.component';
