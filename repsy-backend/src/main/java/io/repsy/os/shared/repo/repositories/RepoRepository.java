@@ -33,7 +33,7 @@ public interface RepoRepository extends JpaRepository<Repo, UUID> {
 
   boolean existsByName(@NonNull String name);
 
-  @NonNull List<Repo> findAllByType(@NonNull RepoType type);
+  @NonNull List<Repo> findAllByTypeOrderByCreatedAtDescNameAsc(@NonNull RepoType type);
 
   @Modifying
   @Query(
