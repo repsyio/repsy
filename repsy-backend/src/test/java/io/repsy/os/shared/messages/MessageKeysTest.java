@@ -127,6 +127,9 @@ class MessageKeysTest {
           "sha256Mismatch",
           "unknownPath");
 
+  /** Deliberately reserved bundle keys that are not currently emitted by the application. */
+  private static final Set<String> RESERVED_KEYS = Set.of();
+
   private static Properties messages;
   private static Map<String, Set<String>> usedMsgIds;
   private static Set<String> unresolvedConstants;
@@ -166,6 +169,20 @@ class MessageKeysTest {
         .as(
             "msgIds used in code but missing from messages.properties (the API would return the"
                 + " raw key as `text`); add an entry for each")
+        .isEmpty();
+  }
+
+  @Test
+  @DisplayName("every message bundle key is used or deliberately reserved")
+  void bundleKeysAreUsed() {
+    final var unused = new TreeSet<>(messages.stringPropertyNames());
+    unused.removeAll(usedMsgIds.keySet());
+    unused.removeAll(RESERVED_KEYS);
+
+    assertThat(unused)
+        .as(
+            "message keys not referenced by a recognised response or exception path; remove them"
+                + " or add them to RESERVED_KEYS with a comment explaining why they are kept")
         .isEmpty();
   }
 
