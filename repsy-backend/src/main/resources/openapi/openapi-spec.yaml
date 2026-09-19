@@ -3158,6 +3158,10 @@ components:
           type: string
         projectUrl:
           type: string
+        repositoryUrl:
+          type: string
+        readme:
+          type: string
         listed:
           type: boolean
           nullable: false

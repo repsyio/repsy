@@ -83,7 +83,7 @@ class NuGetPackageVersionPersistenceIT extends AbstractIntegrationTest {
     final var pkgId = this.createPackage(repoInfo.getId(), packageId);
 
     this.nugetPackageService.publishVersion(
-        repoInfo, pkgId, "1.0.0", NUSPEC_WITH_DEPENDENCIES.formatted(packageId, "1.0.0"));
+        repoInfo, pkgId, "1.0.0", NUSPEC_WITH_DEPENDENCIES.formatted(packageId, "1.0.0"), null);
     this.entityManager.flush();
     this.entityManager.clear();
 
@@ -113,7 +113,7 @@ class NuGetPackageVersionPersistenceIT extends AbstractIntegrationTest {
     final var pkgId = this.createPackage(repoInfo.getId(), packageId);
 
     this.nugetPackageService.publishVersion(
-        repoInfo, pkgId, "1.0.0", NUSPEC_WITHOUT_DEPENDENCIES.formatted(packageId, "1.0.0"));
+        repoInfo, pkgId, "1.0.0", NUSPEC_WITHOUT_DEPENDENCIES.formatted(packageId, "1.0.0"), null);
     this.entityManager.flush();
     this.entityManager.clear();
 

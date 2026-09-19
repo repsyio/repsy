@@ -162,8 +162,8 @@ class NuGetPackageControllerIT {
         insert into "public"."nuget_package_version"
           ("id", "package_id", "version", "is_prerelease", "is_listed", "published_at",
           "download_count", "title", "description", "authors", "tags", "license_url",
-          "project_url", "dependencies", "created_at")
-        values (?, ?, ?, ?, true, current_timestamp, 0, ?, ?, ?, ?, ?, ?, cast(? as jsonb), current_timestamp)
+          "project_url", "repository_url", "readme", "dependencies", "created_at")
+        values (?, ?, ?, ?, true, current_timestamp, 0, ?, ?, ?, ?, ?, ?, ?, ?, cast(? as jsonb), current_timestamp)
         """,
         UUID.randomUUID(),
         packageId,
@@ -175,6 +175,8 @@ class NuGetPackageControllerIT {
         "searchable fixture",
         "https://example.test/license",
         "https://example.test/project",
+        "https://example.test/repository.git",
+        "# NuGet fixture",
         "[]");
   }
 
@@ -268,6 +270,8 @@ class NuGetPackageControllerIT {
           .andExpect(jsonPath("$.msgId").value("nugetVersionFetched"))
           .andExpect(jsonPath("$.data.packageId").value("fixture.package"))
           .andExpect(jsonPath("$.data.version").value("1.0.0"))
+          .andExpect(jsonPath("$.data.repositoryUrl").value("https://example.test/repository.git"))
+          .andExpect(jsonPath("$.data.readme").value("# NuGet fixture"))
           .andExpect(jsonPath("$.data.dependencies", hasSize(0)));
     }
 

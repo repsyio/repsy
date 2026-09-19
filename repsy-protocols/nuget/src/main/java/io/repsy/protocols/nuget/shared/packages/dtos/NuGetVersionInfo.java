@@ -31,7 +31,9 @@ public record NuGetVersionInfo(
     @Nullable String iconUrl,
     @Nullable String licenseUrl,
     @Nullable String projectUrl,
+    @Nullable String repositoryUrl,
     boolean listed,
     long downloadCount,
     Instant publishedAt,
-    @Nullable List<NuGetDependencyInfo> dependencies) {}
+    @Nullable List<NuGetDependencyInfo> dependencies,
+    @Nullable String readme) {}

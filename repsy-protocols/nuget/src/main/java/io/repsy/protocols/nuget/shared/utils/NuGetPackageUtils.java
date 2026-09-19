@@ -28,6 +28,7 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,6 +41,7 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +50,7 @@ import org.jspecify.annotations.Nullable;
 import org.semver4j.Semver;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import tools.jackson.core.type.TypeReference;
@@ -66,6 +69,8 @@ public final class NuGetPackageUtils {
   private static final int THREE = 3;
   private static final int FOUR = 4;
   private static final int REGISTRATION_PAGE_SIZE = 64;
+  private static final int MAX_README_BYTES = 256 * 1024;
+  private static final int MAX_REPOSITORY_URL_LENGTH = 512;
   private static final Pattern NUGET_ID_PATTERN =
       Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$");
   private static final Pattern NUGET_VERSION_PATTERN =
@@ -130,6 +135,121 @@ public final class NuGetPackageUtils {
       log.debug("Failed to extract {} from nuspec", tagName, e);
     }
     return null;
+  }
+
+  /**
+   * Reads the repository URL from the nuspec {@code <repository>} element. The standard form
+   * carries it in the {@code url} attribute ({@code <repository type="git" url="..." />}); the
+   * element text is used as a fallback for the plain-text form. A URL longer than the {@code
+   * repository_url} column is dropped rather than failing the publish.
+   */
+  public static @Nullable String extractRepositoryUrl(final String nuspecXml) {
+    final var url = readRepositoryUrl(nuspecXml);
+    if (url != null && url.length() > MAX_REPOSITORY_URL_LENGTH) {
+      log.warn("Skipping repository URL: longer than {} characters", MAX_REPOSITORY_URL_LENGTH);
+      return null;
+    }
+    return url;
+  }
+
+  private static @Nullable String readRepositoryUrl(final String nuspecXml) {
+    try {
+      final var repositories = parseNuspec(nuspecXml).getElementsByTagName("repository");
+      if (repositories.getLength() == 0) {
+        return null;
+      }
+
+      final var repository = (Element) repositories.item(0);
+      final var urlAttribute = repository.getAttribute("url").strip();
+      if (!urlAttribute.isEmpty()) {
+        return urlAttribute;
+      }
+
+      final var text = repository.getTextContent().strip();
+      return text.isEmpty() ? null : text;
+    } catch (final Exception e) {
+      log.debug("Failed to parse nuspec, falling back to the plain-text repository form", e);
+      return extractXmlTag(nuspecXml, "repository");
+    }
+  }
+
+  /**
+   * Reads the README the nuspec {@code <readme>} element points at from the package, or returns
+   * {@code null} when there is none, it is missing from the archive, too large or not text.
+   */
+  public static @Nullable String extractReadme(final Path nupkg, final String nuspecXml) {
+    final var readmePath = extractXmlTag(nuspecXml, "readme");
+    if (readmePath == null) {
+      return null;
+    }
+
+    final var wanted = normalizeEntryName(readmePath);
+
+    try (final var zipIn = new ZipInputStream(Files.newInputStream(nupkg))) {
+      ZipEntry entry;
+      while ((entry = zipIn.getNextEntry()) != null) {
+        if (!entry.isDirectory() && matchesEntry(entry.getName(), wanted)) {
+          return readReadmeContent(zipIn, readmePath);
+        }
+      }
+    } catch (final IOException e) {
+      log.debug("Failed to read the README '{}' from the package", readmePath, e);
+      return null;
+    }
+
+    log.debug("README '{}' declared in the nuspec is not in the package", readmePath);
+    return null;
+  }
+
+  private static @Nullable String readReadmeContent(final InputStream in, final String readmePath)
+      throws IOException {
+
+    final var bytes = in.readNBytes(MAX_README_BYTES + 1);
+    if (bytes.length > MAX_README_BYTES) {
+      log.warn("Skipping README '{}': larger than {} bytes", readmePath, MAX_README_BYTES);
+      return null;
+    }
+
+    final var content = new String(bytes, StandardCharsets.UTF_8);
+    // PostgreSQL text columns reject NUL, so a binary file must not be stored as a README.
+    if (content.indexOf('\0') >= 0) {
+      log.warn("Skipping README '{}': not a text file", readmePath);
+      return null;
+    }
+    return content.startsWith("﻿") ? content.substring(1) : content;
+  }
+
+  private static boolean matchesEntry(final String entryName, final String wanted) {
+    final var normalized = normalizeEntryName(entryName);
+    if (normalized.equalsIgnoreCase(wanted)) {
+      return true;
+    }
+    // OPC part names percent-encode characters such as spaces (docs/My%20Readme.md).
+    try {
+      final var decoded = URLDecoder.decode(normalized.replace("+", "%2B"), StandardCharsets.UTF_8);
+      return decoded.equalsIgnoreCase(wanted);
+    } catch (final IllegalArgumentException e) {
+      return false;
+    }
+  }
+
+  private static String normalizeEntryName(final String name) {
+    var normalized = name.strip().replace('\\', '/');
+    while (normalized.startsWith("/") || normalized.startsWith("./")) {
+      normalized = normalized.substring(normalized.startsWith("/") ? 1 : 2);
+    }
+    return normalized;
+  }
+
+  private static Document parseNuspec(final String nuspecXml) throws Exception {
+    final var factory = DocumentBuilderFactory.newInstance();
+    factory.setNamespaceAware(false);
+    factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+    factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+
+    return factory
+        .newDocumentBuilder()
+        .parse(new ByteArrayInputStream(nuspecXml.getBytes(StandardCharsets.UTF_8)));
   }
 
   public static String extractNuspec(final InputStream inputStream) throws IOException {
@@ -310,7 +430,8 @@ public final class NuGetPackageUtils {
     validatePackageId(packageId);
     validatePackageVersion(version);
 
-    return new NuspecMetadata(packageId, normalizeNuGetVersion(version), nuspecXml);
+    return new NuspecMetadata(
+        packageId, normalizeNuGetVersion(version), nuspecXml, extractReadme(tempFile, nuspecXml));
   }
 
   private static void validatePackageId(final String id) {
