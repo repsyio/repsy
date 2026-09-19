@@ -16,6 +16,7 @@
 package io.repsy.os.server.security.shared.listeners;
 
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
+import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.core.events.ArtifactPushedEvent;
 import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -30,13 +31,14 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.docker.shared.utils.DockerConstants;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -52,10 +54,12 @@ public class ArtifactScanListener {
   private final @NonNull RepoTxService repoTxService;
   private final @NonNull DockerScanTokenIssuer dockerScanTokenIssuer;
 
+  @Qualifier("scanTaskExecutor")
+  private final @NonNull Executor scanTaskExecutor;
+
   @Qualifier("storageStrategiesByRepoType")
   private final @NonNull Map<String, StorageStrategy> storageStrategiesByRepoType;
 
-  @Async("scanTaskExecutor")
   @EventListener
   public void handleArtifactPushed(final @NonNull ArtifactPushedEvent event) {
 
@@ -73,7 +77,17 @@ public class ArtifactScanListener {
       return;
     }
 
-    this.executeScan(event, scanId);
+    this.submitScan(
+        event,
+        scanId,
+        () -> {
+          this.scanTxService.recordScanFailure(scanId, "Scan executor is saturated; retry later");
+          log.warn(
+              "Skipping vulnerability scan for {}@{} (repo={}): scan executor is saturated",
+              event.artifactName(),
+              event.artifactVersion(),
+              event.repoName());
+        });
   }
 
   @EventListener
@@ -82,10 +96,26 @@ public class ArtifactScanListener {
         event.repoId(), event.artifactName(), event.artifactVersion());
   }
 
-  @Async("scanTaskExecutor")
   public void executeManualScan(
       final @NonNull UUID scanId, final @NonNull ArtifactPushedEvent event) {
-    this.executeScan(event, scanId);
+    this.submitScan(
+        event,
+        scanId,
+        () -> {
+          this.scanTxService.recordScanFailure(scanId, "Scan executor is saturated; retry later");
+          throw new RetryableException("scanExecutorSaturated");
+        });
+  }
+
+  private void submitScan(
+      final @NonNull ArtifactPushedEvent event,
+      final @NonNull UUID scanId,
+      final @NonNull Runnable rejectionAction) {
+    try {
+      this.scanTaskExecutor.execute(() -> this.executeScan(event, scanId));
+    } catch (final RejectedExecutionException exception) {
+      rejectionAction.run();
+    }
   }
 
   private void executeScan(final @NonNull ArtifactPushedEvent event, final @NonNull UUID scanId) {
