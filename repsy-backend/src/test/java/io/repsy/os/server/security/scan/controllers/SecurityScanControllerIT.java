@@ -409,6 +409,16 @@ class SecurityScanControllerIT {
     return scanId;
   }
 
+  private UUID queuedScan(
+      final TestRepo repo, final String artifact, final String version, final Instant createdAt) {
+
+    final var scanId =
+        this.scanTxService.createPendingScan(repo.id(), artifact, version, SCANNER_NAME);
+    this.scanTxService.markQueued(scanId);
+    this.pinCreatedAt(scanId, createdAt);
+    return scanId;
+  }
+
   private static Instant at(final int minutesAfterBase) {
     return BASE_TIME.plus(minutesAfterBase, ChronoUnit.MINUTES);
   }
@@ -1431,15 +1441,15 @@ class SecurityScanControllerIT {
     }
 
     @Test
-    @DisplayName("counts only the latest scan of each artifact version")
+    @DisplayName("counts only the latest completed scan of each artifact version")
     void supersededScansAreIgnored() throws Exception {
       final var t = SecurityScanControllerIT.this;
       final var repo = t.createRepo(RepoType.MAVEN);
       // 1.0 was rescanned: only the newer result counts.
       t.completedScan(repo, "a", "1.0", at(1), t.findings(Severity.CRITICAL, Severity.CRITICAL));
       t.completedScan(repo, "a", "1.0", at(2), t.findings(Severity.LOW));
-      // 2.0 was rescanned and the newer scan failed: it has no findings, so none count. Pinned as
-      // current behavior; RPS-896 questions it (the earlier findings arguably still apply).
+      // 2.0 was rescanned and the newer scan failed: the earlier completed scan's findings still
+      // apply.
       t.completedScan(repo, "a", "2.0", at(3), t.findings(Severity.HIGH));
       t.failedScan(repo, "a", "2.0", at(4));
       // 3.0 has a single scan.
@@ -1447,7 +1457,44 @@ class SecurityScanControllerIT {
 
       final var body = expectSummary(t.getSummary(t.adminBearerToken()));
 
-      assertSummary(body, 0, 0, 1, 1, 0);
+      assertSummary(body, 0, 1, 1, 1, 0);
+    }
+
+    @Test
+    @DisplayName("keeps the last completed findings while a rescan is not completed")
+    void unfinishedRescansKeepTheLastKnownFindings() throws Exception {
+      final var t = SecurityScanControllerIT.this;
+      final var repo = t.createRepo(RepoType.MAVEN);
+      final var artifact = "a";
+
+      // Pending rescan: earlier completed scan's findings still count.
+      t.completedScan(repo, artifact, "pending", at(1), t.findings(Severity.HIGH));
+      t.pendingScan(repo, artifact, "pending", at(2));
+
+      // Queued rescan: earlier completed scan's findings still count.
+      t.completedScan(repo, artifact, "queued", at(1), t.findings(Severity.HIGH));
+      t.queuedScan(repo, artifact, "queued", at(2));
+
+      // Running rescan: earlier completed scan's findings still count.
+      t.completedScan(repo, artifact, "running", at(1), t.findings(Severity.HIGH));
+      t.runningScan(repo, artifact, "running", at(2));
+
+      // Failed rescan: earlier completed scan's findings still count.
+      t.completedScan(repo, artifact, "failed", at(1), t.findings(Severity.HIGH));
+      t.failedScan(repo, artifact, "failed", at(2));
+
+      // Only failed scans, no completed: contributes nothing.
+      t.failedScan(repo, artifact, "never-completed", at(3));
+
+      // Multiple completed scans: only the latest one counts.
+      t.completedScan(
+          repo, artifact, "completed-after-failure", at(1), t.findings(Severity.CRITICAL));
+      t.failedScan(repo, artifact, "completed-after-failure", at(2));
+      t.completedScan(repo, artifact, "completed-after-failure", at(3), t.findings(Severity.LOW));
+
+      final var body = expectSummary(t.getSummary(t.adminBearerToken()));
+
+      assertSummary(body, 0, 4, 0, 1, 0);
     }
 
     @Test
