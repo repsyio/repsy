@@ -19,18 +19,25 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.services.RestResponseFactory;
+import io.repsy.os.generated.model.UpdateUsernameForm;
 import io.repsy.os.panel.profile.services.ProfileService;
 import io.repsy.os.shared.auth.PanelAuthHelper;
+import io.repsy.os.shared.auth.dtos.PanelTokenClaims;
 import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.os.shared.user.dtos.UserInfo;
+import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.mappers.UserConverter;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -42,8 +49,10 @@ class ProfileControllerTest {
 
   private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
   private final UserRepository userRepository = Mockito.mock(UserRepository.class);
+  private final UserConverter userConverter = Mockito.mock(UserConverter.class);
+  private final ProfileService profileService = Mockito.mock(ProfileService.class);
   private final UserTxService userTxService =
-      new UserTxService(this.userRepository, Mockito.mock(UserConverter.class));
+      new UserTxService(this.userRepository, this.userConverter);
   private final PanelAuthHelper panelAuthHelper =
       new PanelAuthHelper(this.jwtUtils, this.userTxService);
 
@@ -52,15 +61,37 @@ class ProfileControllerTest {
       new ProfileController(
           this.jwtUtils,
           this.panelAuthHelper,
-          Mockito.mock(ProfileService.class),
+          this.profileService,
           this.userTxService,
           Mockito.mock(RestResponseFactory.class));
+
+  /** RPS-990: the token is decoded once, and its session start is handed to the new tokens. */
+  @Test
+  @DisplayName("updateUsername decodes the bearer token once and keeps the session start")
+  void updateUsernameDecodesTheTokenOnce() {
+    final var sessionStart = Instant.parse("2026-09-01T10:00:00Z");
+    final var userId = UUID.randomUUID();
+    final var user = new User();
+    final var userInfo = UserInfo.builder().id(userId).username("alice").build();
+    final var form = new UpdateUsernameForm().username("alice2");
+    when(this.jwtUtils.extractPanelClaims(AUTH_HEADER))
+        .thenReturn(new PanelTokenClaims("alice", 0, sessionStart));
+    when(this.userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+    when(this.userConverter.toUserInfo(user)).thenReturn(userInfo);
+
+    this.controller.updateUsername(AUTH_HEADER, form);
+
+    verify(this.profileService).updateUsername(userId, "alice2", sessionStart);
+    verify(this.jwtUtils).extractPanelClaims(AUTH_HEADER);
+    verifyNoMoreInteractions(this.jwtUtils);
+  }
 
   /** RPS-962: a valid token whose user is gone is an authentication failure, not a 404. */
   @Test
   @DisplayName("deleteProfile answers unAuthorized when the token's user no longer exists")
   void deleteProfileTokenUserNoLongerExists() {
-    when(this.jwtUtils.verifyAndExtractUsername(AUTH_HEADER, TokenRealm.PANEL)).thenReturn("ghost");
+    when(this.jwtUtils.extractPanelClaims(AUTH_HEADER))
+        .thenReturn(new PanelTokenClaims("ghost", 0, Instant.now()));
 
     assertThatThrownBy(() -> this.controller.deleteProfile(AUTH_HEADER))
         .isExactlyInstanceOf(UnAuthorizedException.class)

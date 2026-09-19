@@ -69,11 +69,11 @@ class ProfileController {
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestBody @Valid final @NonNull UpdateUsernameForm form) {
 
-    final var userId = this.panelAuthHelper.authenticate(authHeader).getId();
+    final var session = this.panelAuthHelper.authenticateSession(authHeader);
 
     final var loginInfo =
         this.profileService.updateUsername(
-            userId, form.getUsername(), this.jwtUtils.extractSessionStart(authHeader));
+            session.user().getId(), form.getUsername(), session.sessionStart());
 
     return this.resp.success("usernameUpdated", loginInfo);
   }
