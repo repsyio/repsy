@@ -63,7 +63,8 @@ class ProfileServiceTest {
   @Test
   @DisplayName("updatePassword answers unAuthorized when the token's user no longer exists")
   void updatePassword() {
-    assertUnauthorized(() -> this.service.updatePassword(this.ghostId, new PasswordForm()));
+    assertUnauthorized(
+        () -> this.service.updatePassword(this.ghostId, new PasswordForm(), Instant.now()));
   }
 
   private static void assertUnauthorized(final ThrowingCallable call) {
