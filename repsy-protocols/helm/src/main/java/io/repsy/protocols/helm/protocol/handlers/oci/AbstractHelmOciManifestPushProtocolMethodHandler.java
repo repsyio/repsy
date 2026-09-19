@@ -23,7 +23,6 @@ import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
-import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmFacade;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
@@ -178,7 +177,6 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     if (!reference.startsWith(HelmConstants.SHA256_PREFIX)) {
       context.addProperty(ARTIFACT_NAME, metadata.getName());
       context.addProperty(ARTIFACT_VERSION, metadata.getVersion());
-      context.addProperty("usages", BaseUsages.ofDisk(layerSize));
     }
 
     final var requestPath = request.getRequestURI();

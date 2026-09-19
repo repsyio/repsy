@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.helm.shared.storage.services;
 
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.helm.shared.utils.HelmConstants;
@@ -109,10 +110,10 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   }
 
   @Override
-  public void saveBlobChunk(
+  public BaseUsages saveBlobChunk(
       final UUID repoUuid, final UUID uploadId, final InputStream chunk, final String repoName) {
     final var storagePath = StoragePath.of(repoUuid, "oci/blobs/" + uploadId);
-    this.storageStrategy.write(repoName, storagePath, chunk);
+    return this.storageStrategy.write(repoName, storagePath, chunk);
   }
 
   @Override
@@ -123,9 +124,9 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   }
 
   @Override
-  public void finalizeBlob(final UUID repoUuid, final UUID uploadId, final String digest) {
+  public BaseUsages finalizeBlob(final UUID repoUuid, final UUID uploadId, final String digest) {
     final var storagePath = StoragePath.of(repoUuid, "oci/blobs/" + uploadId);
-    this.storageStrategy.renameObject(storagePath, digest);
+    return this.storageStrategy.renameObject(storagePath, digest);
   }
 
   @Override

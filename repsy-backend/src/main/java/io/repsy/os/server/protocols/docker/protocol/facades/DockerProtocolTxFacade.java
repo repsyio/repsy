@@ -27,7 +27,7 @@ import io.repsy.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
 import io.repsy.protocols.docker.shared.utils.BaseParsedPath;
-import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
@@ -80,13 +80,20 @@ public class DockerProtocolTxFacade extends AbstractDockerProtocolTxFacade<UUID>
   @Override
   @Transactional
   public void finalizeLayerUpload(
-      final BaseRepoInfo<UUID> repoInfo, final RelativePath relativePath, final LayerInfo layerInfo)
+      final ProtocolContext context, final RelativePath relativePath, final LayerInfo layerInfo)
       throws IOException {
 
-    super.finalizeLayerUpload(repoInfo, relativePath, layerInfo);
+    super.finalizeLayerUpload(context, relativePath, layerInfo);
 
-    super.dockerStorageService.rename(
-        repoInfo.getStorageKey(), relativePath, layerInfo.getDigest());
+    final var repoInfo = ProtocolContextUtils.<UUID>getRepoInfo(context);
+
+    // A layer whose digest is already stored is dropped here: its upload was charged as it was
+    // written, so the bytes it freed are refunded.
+    final var usages =
+        super.dockerStorageService.rename(
+            repoInfo.getStorageKey(), relativePath, layerInfo.getDigest());
+
+    ProtocolContextUtils.addUsages(context, usages);
   }
 
   @Override

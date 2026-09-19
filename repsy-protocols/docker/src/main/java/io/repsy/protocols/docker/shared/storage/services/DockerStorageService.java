@@ -53,7 +53,7 @@ public interface DockerStorageService<ID> {
 
   void deleteBlob(UUID repoUuid, String digest);
 
-  void rename(UUID repoUuid, RelativePath relativePath, String digest);
+  BaseUsages rename(UUID repoUuid, RelativePath relativePath, String digest);
 
   void clearTrash();
 }

@@ -98,9 +98,10 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
   @Override
   public void finalizeLayerUpload(
-      final BaseRepoInfo<ID> repoInfo, final RelativePath relativePath, final LayerInfo layerInfo)
+      final ProtocolContext context, final RelativePath relativePath, final LayerInfo layerInfo)
       throws IOException {
 
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var resource = this.getResource(repoInfo, relativePath);
     layerInfo.setSize(resource.contentLength());
 

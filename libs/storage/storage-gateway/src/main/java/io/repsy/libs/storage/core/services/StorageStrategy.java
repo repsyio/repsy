@@ -40,7 +40,12 @@ public interface StorageStrategy {
 
   long getFileUsage(@NonNull StoragePath storagePath, @NonNull String repoName) throws IOException;
 
-  void renameObject(@NonNull StoragePath storagePath, @NonNull String digest);
+  /**
+   * Renames the object to {@code digest}. Answers the disk usage the rename changed: zero when the
+   * object was moved, and minus its size when the digest already existed and the object was dropped
+   * as a redundant copy.
+   */
+  @NonNull BaseUsages renameObject(@NonNull StoragePath storagePath, @NonNull String digest);
 
   @NonNull BaseUsages write(
       @NonNull String repoName, @NonNull StoragePath storagePath, @NonNull InputStream inputStream);

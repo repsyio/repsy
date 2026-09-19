@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.helm.ui.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -23,6 +24,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
@@ -67,6 +69,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -385,6 +388,44 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     requireStatus(finalize, 201, "OCI blob finalize");
   }
 
+  /** Uploads a blob the way {@code helm push} streams it: start, one chunk, empty finalize. */
+  private void uploadOciBlobChunked(
+      final Repo repo,
+      final String ociName,
+      final byte[] bytes,
+      final String digest,
+      final String token)
+      throws Exception {
+    final var start =
+        this.protocol(
+                post("/v2/{repo}/{name}/blobs/uploads/", repo.getName(), ociName)
+                    .header(AUTHORIZATION, token))
+            .andReturn()
+            .getResponse();
+    requireStatus(start, 202, "OCI blob upload start");
+    final var location = start.getHeader("Location");
+    final var uploadId = location.substring(location.lastIndexOf('/') + 1);
+
+    final var chunk =
+        this.protocol(
+                patch("/v2/{repo}/{name}/blobs/uploads/{id}", repo.getName(), ociName, uploadId)
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .content(bytes)
+                    .header(AUTHORIZATION, token))
+            .andReturn()
+            .getResponse();
+    requireStatus(chunk, 202, "OCI blob chunk upload");
+
+    final var finalize =
+        this.protocol(
+                put("/v2/{repo}/{name}/blobs/uploads/{id}", repo.getName(), ociName, uploadId)
+                    .param("digest", digest)
+                    .header(AUTHORIZATION, token))
+            .andReturn()
+            .getResponse();
+    requireStatus(finalize, 201, "OCI blob finalize");
+  }
+
   /**
    * Inserts a chart version literally named {@code tags} (the chart parser would refuse it, since
    * it is not semver) together with its package file, to exercise the {@code /{name}/tags} vs
@@ -439,6 +480,17 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     this.entityManager.flush();
     this.entityManager.clear();
     return this.helmChartRepository.findByRepoIdAndName(repo.getId(), chartName).isPresent();
+  }
+
+  /** The sum of every disk-usage delta requested for the repo since the last reset. */
+  private long netUsage(final Repo repo) {
+    final var captor = ArgumentCaptor.forClass(UsageChangedInfo.class);
+    verify(this.usageUpdateService, atLeast(0)).updateUsage(captor.capture());
+
+    return captor.getAllValues().stream()
+        .filter(info -> info.repoId().equals(repo.getId()))
+        .mapToLong(info -> info.usages().getDiskUsage())
+        .sum();
   }
 
   private void verifyUsageDelta(final Repo repo, final long diskUsage) {
@@ -1527,6 +1579,69 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
     MockHttpServletRequestBuilder to(final String repoName) {
       return this.request.apply(repoName);
+    }
+  }
+
+  @Nested
+  @DisplayName("OCI blob upload usage")
+  class OciBlobUsage {
+
+    @Test
+    @DisplayName("a blob is charged when it is uploaded, in one request or in chunks")
+    void blobIsChargedOnUpload() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.asProtocolBearer(it.adminBearerToken());
+      final var repo = it.helmRepo();
+      final var whole = "one request ".repeat(40).getBytes(StandardCharsets.UTF_8);
+      final var chunked = "in chunks ".repeat(70).getBytes(StandardCharsets.UTF_8);
+
+      it.uploadOciBlob(repo, "payments", whole, sha256(whole), token);
+      assertThat(it.netUsage(repo)).isEqualTo(whole.length);
+
+      it.uploadOciBlobChunked(repo, "payments", chunked, sha256(chunked), token);
+      assertThat(it.netUsage(repo)).isEqualTo((long) whole.length + chunked.length);
+    }
+
+    @Test
+    @DisplayName("uploading a digest that is already stored charges nothing more")
+    void duplicateBlobIsNotChargedTwice() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.asProtocolBearer(it.adminBearerToken());
+      final var repo = it.helmRepo();
+      final var blob = "shared blob ".repeat(50).getBytes(StandardCharsets.UTF_8);
+      it.uploadOciBlob(repo, "payments", blob, sha256(blob), token);
+      clearInvocations(it.usageUpdateService);
+
+      // Sent whole, the copy is charged and refunded inside one request, so nothing is reported.
+      it.uploadOciBlob(repo, "payments", blob, sha256(blob), token);
+      verifyNoInteractions(it.usageUpdateService);
+
+      // Chunked, the chunk is charged by its own request and handed back by the finalize.
+      it.uploadOciBlobChunked(repo, "payments", blob, sha256(blob), token);
+      assertThat(it.netUsage(repo)).isZero();
+      try (final var blobs = Files.list(storageDirOf(repo).resolve("oci").resolve("blobs"))) {
+        assertThat(blobs.count()).isEqualTo(1);
+      }
+    }
+
+    @Test
+    @DisplayName("one chart pushed under several tags is charged once, and deleting it releases it")
+    void chartUnderSeveralTagsIsChargedOnce() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var panelToken = it.adminBearerToken();
+      final var token = it.asProtocolBearer(panelToken);
+      final var repo = it.helmRepo();
+      final var chart = archive(ChartSpec.of("payments", "1.0.0"));
+
+      for (final var tag : List.of("1.0.0", "stable", "latest")) {
+        requireStatus(it.putOciChart(repo, "payments", tag, chart, token), 201, "manifest " + tag);
+      }
+
+      assertThat(it.netUsage(repo)).isEqualTo(chart.length);
+
+      expectDeleted(it.deleteAllRequest(repo, "payments", panelToken));
+
+      assertThat(it.netUsage(repo)).isZero();
     }
   }
 

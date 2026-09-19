@@ -133,11 +133,12 @@ public abstract class AbstractDockerStorageService<ID> implements DockerStorageS
   }
 
   @Override
-  public void rename(final UUID repoUuid, final RelativePath relativePath, final String digest) {
+  public BaseUsages rename(
+      final UUID repoUuid, final RelativePath relativePath, final String digest) {
 
     final var storagePath = StoragePath.of(repoUuid, relativePath.getPath());
 
-    this.storageStrategy.renameObject(storagePath, digest);
+    return this.storageStrategy.renameObject(storagePath, digest);
   }
 
   @Override

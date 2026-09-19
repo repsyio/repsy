@@ -16,16 +16,19 @@
 package io.repsy.protocols.shared.utils;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 @UtilityClass
 @NullMarked
 public class ProtocolContextUtils {
 
   private static final String URL_PROPERTIES = "urlProperties";
+  private static final String USAGES = "usages";
 
   @SuppressWarnings("unchecked")
   public static <ID> BaseRepoInfo<ID> getRepoInfo(final ProtocolContext context) {
@@ -35,6 +38,18 @@ public class ProtocolContextUtils {
 
   public static RelativePath getRelativePath(final ProtocolContext context) {
     return context.<BaseUrlParserProperties<?, ?>>getProperty(URL_PROPERTIES).getRelativePath();
+  }
+
+  /**
+   * Adds {@code usages} to what the request has already put on the context, so a request that
+   * changes disk usage twice (a chunk written, then a duplicate dropped) reports the net change to
+   * the usage post-processor instead of the last one.
+   */
+  public static void addUsages(final ProtocolContext context, final BaseUsages usages) {
+    final @Nullable BaseUsages existing = context.getProperty(USAGES);
+    final var diskUsage = (existing == null ? 0L : existing.getDiskUsage()) + usages.getDiskUsage();
+
+    context.addProperty(USAGES, BaseUsages.ofDisk(diskUsage));
   }
 
   @SuppressWarnings("unchecked")

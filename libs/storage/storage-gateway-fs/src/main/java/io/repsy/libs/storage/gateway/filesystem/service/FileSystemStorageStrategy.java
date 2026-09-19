@@ -324,12 +324,14 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   /**
    * Renames the object to its digest. The target is content-addressed, so when it already exists
    * (the same layer pushed twice, or concurrently) it holds the same bytes: the redundant source is
-   * dropped and the call succeeds. The digest comes from the client, so it has to be a plain file
-   * name: anything that could leave the source's directory is refused.
+   * dropped and the call succeeds, answering the bytes it freed as negative disk usage. The digest
+   * comes from the client, so it has to be a plain file name: anything that could leave the
+   * source's directory is refused.
    */
   @SneakyThrows
   @Override
-  public void renameObject(final @NonNull StoragePath storagePath, final @NonNull String digest) {
+  public @NonNull BaseUsages renameObject(
+      final @NonNull StoragePath storagePath, final @NonNull String digest) {
     if (digest.isEmpty()
         || digest.equals(".")
         || digest.contains("..")
@@ -338,14 +340,17 @@ public class FileSystemStorageStrategy implements StorageStrategy {
       throw new InvalidStoragePathException("invalidStoragePath");
     }
     final Path basePathObj = this.toPhysicalPath(storagePath);
-    this.moveOrDropDuplicate(basePathObj, basePathObj.resolveSibling(digest));
+    return this.moveOrDropDuplicate(basePathObj, basePathObj.resolveSibling(digest));
   }
 
-  private void moveOrDropDuplicate(final Path source, final Path target) throws IOException {
+  private BaseUsages moveOrDropDuplicate(final Path source, final Path target) throws IOException {
     try {
       Files.move(source, target);
+      return BaseUsages.ofDisk(0);
     } catch (final FileAlreadyExistsException e) {
+      final var size = Files.size(source);
       Files.deleteIfExists(source);
+      return BaseUsages.ofDisk(-size);
     }
   }
 
