@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.auth0.jwt.JWT;
+import com.auth0.jwt.algorithms.Algorithm;
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.auth.utils.AuthUtils;
@@ -40,6 +41,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Full-stack integration tests for {@code /api/profile/*}, exercising the real Spring context, MVC
@@ -51,6 +53,22 @@ import org.springframework.http.MediaType;
  */
 @DisplayName("ProfileController /api/profile/*")
 class ProfileControllerIT extends AbstractIntegrationTest {
+
+  /**
+   * A bearer token signed with the running application's secret, so it passes signature
+   * verification. A {@code null} subject omits the claim altogether.
+   */
+  private String serverSignedBearerToken(final String subject) {
+    final var secret = (String) ReflectionTestUtils.getField(this.jwtUtils, "secret");
+    var builder =
+        JWT.create()
+            .withClaim("username", "someuser")
+            .withExpiresAt(Instant.now().plus(1, ChronoUnit.HOURS));
+    if (subject != null) {
+      builder = builder.withSubject(subject);
+    }
+    return AuthUtils.AUTH_BEARER + builder.sign(Algorithm.HMAC512(secret));
+  }
 
   @Nested
   @DisplayName("GET /api/profile")
@@ -180,6 +198,34 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           .andExpect(jsonPath("$.msgId").value("sessionExpired"))
           .andExpect(jsonPath("$.data").value("sessionExpired"))
           .andExpect(jsonPath("$.text").value("Session expired."));
+    }
+
+    @Test
+    @DisplayName("returns 403 accessNotAllowed for a validly signed token whose subject is no UUID")
+    void nonUuidSubject() throws Exception {
+      final var token = ProfileControllerIT.this.serverSignedBearerToken("not-a-uuid");
+
+      ProfileControllerIT.this
+          .mockMvc
+          .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"))
+          .andExpect(jsonPath("$.data").value("accessNotAllowed"))
+          .andExpect(jsonPath("$.text").value("Access isn't allowed."));
+    }
+
+    @Test
+    @DisplayName("returns 403 accessNotAllowed for a validly signed token without a subject")
+    void missingSubject() throws Exception {
+      final var token = ProfileControllerIT.this.serverSignedBearerToken(null);
+
+      ProfileControllerIT.this
+          .mockMvc
+          .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"))
+          .andExpect(jsonPath("$.data").value("accessNotAllowed"))
+          .andExpect(jsonPath("$.text").value("Access isn't allowed."));
     }
 
     @Test
