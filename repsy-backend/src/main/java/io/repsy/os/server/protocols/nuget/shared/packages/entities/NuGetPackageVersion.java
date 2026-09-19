@@ -29,8 +29,10 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
+import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 @Data
@@ -103,7 +105,8 @@ public class NuGetPackageVersion {
   private String readme;
 
   @Nullable
-  @Column(name = "dependencies", columnDefinition = "clob")
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "dependencies", columnDefinition = "jsonb")
   private String dependencies;
 
   @Column(name = "created_at", nullable = false)
