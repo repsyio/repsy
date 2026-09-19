@@ -556,7 +556,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               get("/api/repos/MAVEN/count")
                   .header(AUTHORIZATION, basicAuth(username, VALID_PASSWORD))),
           "repoCountFetched",
-          "repoCountFetched");
+          "Repo count fetched.");
     }
 
     @Test
@@ -624,7 +624,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
                 HttpStatus.NOT_FOUND,
                 "repoTypeNotFound",
                 "repoTypeNotFound",
-                "repoTypeNotFound"));
+                "Repository type not found."));
         result.add(
             Arguments.of(
                 "short go alias",
@@ -633,7 +633,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
                 HttpStatus.NOT_FOUND,
                 "repoTypeNotFound",
                 "repoTypeNotFound",
-                "repoTypeNotFound"));
+                "Repository type not found."));
         // The interceptor accepts these, but the enum conversion of @PathVariable is case
         // sensitive, so they fail there instead.
         result.add(
@@ -1197,7 +1197,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               json(patch(repoUrl(repo, "/description")), descriptionBody(""))
                   .header(AUTHORIZATION, token)),
           "repoDescriptionEdited",
-          "repoDescriptionEdited");
+          "Repo description updated.");
 
       final var body =
           expectSuccess(
@@ -1738,7 +1738,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           ProtocolRepoControllerIT.this.perform(
               json(patch(repoUrl(keep, "/name")), nameBody(renamed)).header(AUTHORIZATION, token)),
           "repoRenamed",
-          "repoRenamed");
+          "Repo renamed.");
       expectSuccess(
           ProtocolRepoControllerIT.this.perform(
               delete(repoUrl(gone, "")).header(AUTHORIZATION, token)),
@@ -1778,7 +1778,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               ProtocolRepoControllerIT.this.perform(
                   get("/api/repos/" + type + "/count").header(AUTHORIZATION, token)),
               "repoCountFetched",
-              "repoCountFetched");
+              "Repo count fetched.");
       return ((Number) JsonPath.read(body, "$.data")).longValue();
     }
 
@@ -1857,7 +1857,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               json(patch(repoUrl(repo, "/name")), nameBody(newName))
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
           "repoRenamed",
-          "repoRenamed");
+          "Repo renamed.");
     }
 
     @Test
@@ -1894,7 +1894,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           ProtocolRepoControllerIT.this.perform(
               get("/api/repos/" + newName + "/format").header(AUTHORIZATION, token)),
           "repoTypeFetched",
-          "repoTypeFetched");
+          "Repo type fetched.");
       expectRepoNotFound(
           ProtocolRepoControllerIT.this.perform(
               get(repoUrl(repo, "/format")).header(AUTHORIZATION, token)));
@@ -2010,7 +2010,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               json(patch(repoUrl(repo, "/description")), body)
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
           "repoDescriptionEdited",
-          "repoDescriptionEdited");
+          "Repo description updated.");
     }
 
     @Test
@@ -2146,7 +2146,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
                   get(repoUrl(repo, "/format"))
                       .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())),
               "repoTypeFetched",
-              "repoTypeFetched");
+              "Repo type fetched.");
 
       assertThat(JsonPath.<String>read(body, "$.data"))
           .isEqualTo(type.name().toLowerCase(Locale.ROOT));
@@ -2161,7 +2161,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
                   get("/api/repos/go/format")
                       .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())),
               "repoTypeFetched",
-              "repoTypeFetched");
+              "Repo type fetched.");
 
       assertThat(JsonPath.<String>read(body, "$.data")).isEqualTo("golang");
     }
@@ -2175,7 +2175,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           expectSuccess(
               ProtocolRepoControllerIT.this.perform(get(repoUrl(repo, "/format"))),
               "repoTypeFetched",
-              "repoTypeFetched");
+              "Repo type fetched.");
 
       assertThat(JsonPath.<String>read(body, "$.data")).isEqualTo("helm");
     }
