@@ -19,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -410,12 +412,12 @@ class ProtocolAuthServiceTest {
     private static final String PATH = "/com/example/lib.jar";
 
     private final UUID repoId = UUID.randomUUID();
-    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+    private final JwtUtils jwtUtils = mock(JwtUtils.class);
     private final ProtocolAuthService downloadAuthService =
         new ProtocolAuthService(
             ProtocolAuthServiceTest.this.userTxService,
             this.jwtUtils,
-            Mockito.mock(DeployTokenService.class));
+            mock(DeployTokenService.class));
 
     @Test
     @DisplayName("a read is checked against the repo and path of the token")
@@ -428,7 +430,7 @@ class ProtocolAuthServiceTest {
     @Test
     @DisplayName("a token that fails verification fails the request")
     void failedVerificationFailsTheRequest() {
-      Mockito.doThrow(new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED))
+      doThrow(new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED))
           .when(this.jwtUtils)
           .verifyDownloadToken(TOKEN, this.repoId, PATH);
 

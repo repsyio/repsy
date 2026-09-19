@@ -590,9 +590,9 @@ class JwtUtilsTest {
   void downloadTokenIsRejectedForAnotherRepo() {
     final var token =
         this.jwtUtils.createDownloadToken(UUID.randomUUID(), "/lib.jar", Duration.ofMinutes(1));
+    final var otherRepoId = UUID.randomUUID();
 
-    assertThatThrownBy(
-            () -> this.jwtUtils.verifyDownloadToken(token, UUID.randomUUID(), "/lib.jar"))
+    assertThatThrownBy(() -> this.jwtUtils.verifyDownloadToken(token, otherRepoId, "/lib.jar"))
         .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
