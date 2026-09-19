@@ -31,8 +31,10 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
@@ -55,6 +57,12 @@ import org.springframework.web.bind.annotation.RestController;
 @NullMarked
 @SuppressWarnings("java:S6856")
 public class MavenArtifactController {
+
+  private static final Set<String> ARTIFACT_SORT_PROPERTIES =
+      Set.of("id", "groupName", "artifactName", "lastUpdatedAt");
+
+  private static final Set<String> VERSION_SORT_PROPERTIES =
+      Set.of("id", "versionName", "lastUpdatedAt");
 
   private final UsageUpdateService usageUpdateService;
   private final ArtifactServiceImpl artifactService;
@@ -133,6 +141,8 @@ public class MavenArtifactController {
       @PathVariable final String artifactName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
+    SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
+
     final var artifactVersions =
         this.artifactService.getArtifactVersions(
             repoInfo.getStorageKey(), groupName, artifactName, pageable);
@@ -150,6 +160,8 @@ public class MavenArtifactController {
       @RequestParam(required = false, defaultValue = "") final String version,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
+    SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
+
     final var artifactVersions =
         this.artifactService.getArtifactVersionsContainsVersion(
             repoInfo.getStorageKey(), groupName, artifactName, version, pageable);
@@ -165,6 +177,8 @@ public class MavenArtifactController {
       @RequestParam(required = false, defaultValue = "") final String groupName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
+    SortValidator.requireSortableBy(pageable, ARTIFACT_SORT_PROPERTIES);
+
     final var artifacts =
         this.artifactService.getArtifactsContainsGroupName(
             repoInfo.getStorageKey(), groupName, pageable);
@@ -179,6 +193,8 @@ public class MavenArtifactController {
       @PathVariable final String groupName,
       @RequestParam(required = false, defaultValue = "") final String artifactName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, ARTIFACT_SORT_PROPERTIES);
 
     final var artifacts =
         this.artifactService.getArtifactsContainsArtifactName(

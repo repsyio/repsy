@@ -3468,6 +3468,7 @@ components:
           pattern: "^[a-zA-Z0-9_\\-]+$"
         description:
           type: string
+          maxLength: 500
         privateRepo:
           type: boolean
           nullable: false
