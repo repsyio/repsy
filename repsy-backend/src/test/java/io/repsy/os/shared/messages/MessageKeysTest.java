@@ -97,10 +97,7 @@ class MessageKeysTest {
       Pattern.compile(
           "static\\s+final\\s+(?:@\\w+\\s+)?String\\s+([A-Z][A-Z0-9_]*)\\s*=\\s*\"([^\"\\\\]*)\"");
 
-  /**
-   * Success msgIds with no bundle entry yet. RPS-940 adds the entries; delete each id here in that
-   * change. {@link #allowlistsHoldOnlyIdsThatAreStillMissing()} fails if one is left behind.
-   */
+  /** Success msgIds that are still missing from the bundle. */
   private static final Set<String> PENDING_RPS_940 = Set.of("movedToPath");
 
   /**

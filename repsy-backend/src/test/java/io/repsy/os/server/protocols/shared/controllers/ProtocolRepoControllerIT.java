@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.shared.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -32,7 +31,6 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import jakarta.persistence.PersistenceException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.time.Instant;
@@ -75,10 +73,10 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * <ul>
  *   <li>authorization is only {@code READ}/{@code WRITE} for any authenticated user and {@code
  *       MANAGE} for {@code ADMIN}; there is no repo owner concept;
- *   <li>the two {@code {repoType}}-only routes ({@code /info}, {@code /count}) and {@code POST}
- *       create carry no repo name, so the interceptor only authenticates the caller for them and
- *       {@code count}'s {@code MANAGE} annotation is not enforced;
- *   <li>a request without an {@code Authorization} header on those routes ends in a 500;
+ *   <li>the {@code {repoType}}-only routes carry no repo name, so the interceptor authenticates the
+ *       caller and applies the handler's declared permission; {@code /info} is readable by all
+ *       authenticated users while creation and {@code /count} require {@code MANAGE};
+ *   <li>a request without an {@code Authorization} header on those routes returns 401;
  * </ul>
  *
  * <p>{@code UsageUpdateService.updateUsage} is {@code @Async}, so it runs on another thread and can
@@ -98,6 +96,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   private static final String ACCESS_NOT_ALLOWED_TEXT = "Access isn't allowed.";
   private static final String SESSION_EXPIRED_TEXT = "Session expired.";
   private static final String ITEM_NOT_FOUND_TEXT = "The requested item is not found.";
+  private static final String REPO_SCOPE_NOT_MATCHED_TEXT = "Repository scope does not match.";
   private static final String ERROR_OCCURRED_TEXT = "An error occurred.";
 
   private static final String[] REPO_LIST_KEYS = {
@@ -259,8 +258,10 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     REPO_READ,
     /** Route with a repo name and {@code MANAGE}: only an ADMIN gets in. */
     REPO_MANAGE,
-    /** Route with only a repo type: the interceptor merely authenticates the caller. */
-    TYPE_ONLY
+    /** Route with only a repo type and a READ annotation. */
+    TYPE_ONLY_READ,
+    /** Route with only a repo type and a MANAGE annotation. */
+    TYPE_ONLY_MANAGE
   }
 
   /** What a request targets: an existing repo and the {@code {repoType}} spelling to use. */
@@ -279,7 +280,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     return List.of(
         new Endpoint(
             "POST /api/repos/{repoType}",
-            Kind.TYPE_ONLY,
+            Kind.TYPE_ONLY_MANAGE,
             t -> json(post("/api/repos/" + t.repoType()), createBody("probe-" + randomTag()))),
         new Endpoint(
             "DELETE /api/repos/{repoName}",
@@ -303,11 +304,11 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
             t -> get("/api/repos/" + t.repoName() + "/usage")),
         new Endpoint(
             "GET /api/repos/{repoType}/info",
-            Kind.TYPE_ONLY,
+            Kind.TYPE_ONLY_READ,
             t -> get("/api/repos/" + t.repoType() + "/info")),
         new Endpoint(
             "GET /api/repos/{repoType}/count",
-            Kind.TYPE_ONLY,
+            Kind.TYPE_ONLY_MANAGE,
             t -> get("/api/repos/" + t.repoType() + "/count")),
         new Endpoint(
             "PATCH /api/repos/{repoName}/name",
@@ -352,7 +353,15 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   }
 
   private static Stream<Endpoint> typeOnlyEndpoints() {
-    return endpointsOfKind(Kind.TYPE_ONLY);
+    return Stream.concat(typeOnlyReadEndpoints(), typeOnlyManageEndpoints());
+  }
+
+  private static Stream<Endpoint> typeOnlyReadEndpoints() {
+    return endpointsOfKind(Kind.TYPE_ONLY_READ);
+  }
+
+  private static Stream<Endpoint> typeOnlyManageEndpoints() {
+    return endpointsOfKind(Kind.TYPE_ONLY_MANAGE);
   }
 
   @Nested
@@ -377,6 +386,10 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     static Stream<Endpoint> typeOnlyEndpoints() {
       return ProtocolRepoControllerIT.typeOnlyEndpoints();
+    }
+
+    static Stream<Endpoint> typeOnlyManageEndpoints() {
+      return ProtocolRepoControllerIT.typeOnlyManageEndpoints();
     }
 
     private Target target() {
@@ -515,6 +528,18 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
 
     @ParameterizedTest(name = "{0}")
+    @MethodSource("typeOnlyManageEndpoints")
+    @DisplayName("returns 401 unAuthorized for a plain USER on a type-only MANAGE route")
+    void typeOnlyManageRouteAsPlainUser(final Endpoint endpoint) throws Exception {
+      expectUnauthorized(
+          ProtocolRepoControllerIT.this.perform(
+              endpoint
+                  .request()
+                  .apply(new Target("unused", "MAVEN"))
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())));
+    }
+
+    @ParameterizedTest(name = "{0}")
     @MethodSource("repoManageEndpoints")
     @DisplayName(
         "returns 401 unAuthorized for a non-admin caller on a MANAGE route, changing nothing")
@@ -539,7 +564,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     @DisplayName("accepts HTTP Basic credentials of an existing user")
     void basicCredentials() throws Exception {
       final var username = uniqueUsername("basic");
-      ProtocolRepoControllerIT.this.createUser(username, UserRole.USER);
+      ProtocolRepoControllerIT.this.createUser(username, UserRole.ADMIN);
 
       expectSuccess(
           ProtocolRepoControllerIT.this.perform(
@@ -807,19 +832,16 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName(
-        "lets a plain USER create a repo: create only authenticates, it never checks MANAGE")
-    void plainUserCanCreate() throws Exception {
+    @DisplayName("rejects a plain USER because repository creation requires MANAGE")
+    void plainUserCannotCreate() throws Exception {
       final var name = uniqueRepoName("byuser");
 
-      expectSuccess(
+      expectUnauthorized(
           ProtocolRepoControllerIT.this.perform(
               json(post("/api/repos/MAVEN"), createBody(name))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())),
-          "repoCreated",
-          "Repo created.");
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())));
 
-      assertThat(ProtocolRepoControllerIT.this.reloadRepo(name).getName()).isEqualTo(name);
+      assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(name)).isEmpty();
     }
 
     @ParameterizedTest(name = "{0}")
@@ -921,7 +943,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("KNOWN DEFECT: a 500-character description is fine but 501 is not validated")
+    @DisplayName("returns 400 validationError for a 501-character description")
     void descriptionOverColumnLength() throws Exception {
       final var ok = uniqueRepoName("d500");
       expectSuccess(
@@ -934,24 +956,17 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           "Repo created.");
       assertThat(ProtocolRepoControllerIT.this.reloadRepo(ok).getDescription()).hasSize(500);
 
-      // RepoCreateForm.description has no maxLength (RepoDescriptionForm does), so the form passes
-      // validation and the INSERT is what fails. Hibernate defers it until flush; in production
-      // RepoTxService.createRepo commits on return, so the caller gets a 500 errorOccurred. Here
-      // the test-managed transaction hides that, so pin the failing flush instead.
       final var tooLong = uniqueRepoName("d501");
-      expectSuccess(
+      final var dirsBefore = directoryCount(RepoType.NPM);
+      expectValidationError(
           ProtocolRepoControllerIT.this.perform(
               json(
                       post("/api/repos/NPM"),
                       "{\"name\":\"%s\",\"description\":\"%s\"}"
                           .formatted(tooLong, "d".repeat(501)))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          "repoCreated",
-          "Repo created.");
-
-      assertThatThrownBy(() -> ProtocolRepoControllerIT.this.entityManager.flush())
-          .isInstanceOf(PersistenceException.class)
-          .hasStackTraceContaining("value too long for type character varying(500)");
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
+      assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(tooLong)).isEmpty();
+      assertThat(directoryCount(RepoType.NPM)).isEqualTo(dirsBefore);
     }
   }
 
@@ -1181,10 +1196,10 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("gives the creator no owner privileges: there is no repo owner")
+    @DisplayName("does not grant owner privileges: repository access is role-based")
     void creatorIsNotAnOwner() throws Exception {
       final var creator =
-          ProtocolRepoControllerIT.this.createUser(uniqueUsername("creator"), UserRole.USER);
+          ProtocolRepoControllerIT.this.createUser(uniqueUsername("creator"), UserRole.ADMIN);
       final var token = ProtocolRepoControllerIT.this.bearerTokenFor(creator);
       final var name = uniqueRepoName("mine");
 
@@ -1201,7 +1216,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               "repoPermissionsFetched",
               "Repo permissions of the user have fetched.");
 
-      assertPermissions(dataObject(body), name, null, true, true, false, false);
+      assertPermissions(dataObject(body), name, null, true, true, true, false);
     }
 
     @Test
@@ -1367,23 +1382,21 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
         value = RepoType.class,
         mode = EnumSource.Mode.EXCLUDE,
         names = {"MAVEN"})
-    @DisplayName("KNOWN DEFECT: a non-Maven repo is a 500, not a clean repoScopeNotMatched error")
+    @DisplayName("returns 400 repoScopeNotMatched for a non-Maven repo")
     void nonMavenRepo(final RepoType type) throws Exception {
       final var repo =
           ProtocolRepoControllerIT.this.seedRepo(
               type, uniqueRepoName(type.name().toLowerCase(Locale.ROOT)));
 
-      // The interceptor throws IllegalArgumentException("repoScopeNotMatched"), which no handler
-      // maps, so the generic handler answers errorOccurred and hides the message.
       expectError(
           ProtocolRepoControllerIT.this.perform(
               get(repoUrl(repo, "/contents"))
                   .param("path", "/")
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          "errorOccurred",
-          null,
-          ERROR_OCCURRED_TEXT);
+          HttpStatus.BAD_REQUEST,
+          "repoScopeNotMatched",
+          "repoScopeNotMatched",
+          REPO_SCOPE_NOT_MATCHED_TEXT);
     }
 
     @Test
@@ -1851,12 +1864,15 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns the count to a plain USER: MANAGE is declared but never enforced here")
-    void plainUserIsAllowed() throws Exception {
+    @DisplayName("returns 401 unAuthorized for a plain USER because count requires MANAGE")
+    void plainUserIsRejected() throws Exception {
       ProtocolRepoControllerIT.this.deleteDefaultRepos();
       ProtocolRepoControllerIT.this.seedRepo(RepoType.PYPI, uniqueRepoName("p"));
 
-      assertThat(this.count("PYPI", ProtocolRepoControllerIT.this.userBearerToken())).isEqualTo(1);
+      expectUnauthorized(
+          ProtocolRepoControllerIT.this.perform(
+              get("/api/repos/PYPI/count")
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())));
     }
   }
 
