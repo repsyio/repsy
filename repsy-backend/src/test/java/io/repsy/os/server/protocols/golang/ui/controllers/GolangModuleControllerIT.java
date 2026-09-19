@@ -23,6 +23,8 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -77,6 +79,8 @@ class GolangModuleControllerIT {
   private static final int PROTOCOL_PORT = 9090;
   private static final String VALID_PASSWORD = "Password1!";
   private static final String MODULE = "io.repsy/hello-world";
+  private static final String V2_MODULE = "example.com/mod/v2";
+  private static final String UPPERCASE_MODULE = "example.com/Upper/Module";
   private static final String UUID_PATTERN =
       "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
@@ -160,22 +164,32 @@ class GolangModuleControllerIT {
 
   private void upload(final String repoName, final String version, final String token)
       throws Exception {
+    this.upload(repoName, MODULE, version, token);
+  }
+
+  private void upload(
+      final String repoName, final String module, final String version, final String token)
+      throws Exception {
     this.mockMvc
         .perform(
-            put("/{repo}/{module}/@v/{version}", repoName, MODULE, version)
+            put("/{repo}/{module}/@v/{version}", repoName, module, version)
                 .with(protocolPort())
                 .header(AUTHORIZATION, token)
                 .contentType("application/zip")
-                .content(moduleZip(version)))
+                .content(moduleZip(module, version)))
         .andExpect(status().isOk());
   }
 
   private static byte[] moduleZip(final String version) {
+    return moduleZip(MODULE, version);
+  }
+
+  private static byte[] moduleZip(final String module, final String version) {
     try {
       final var output = new ByteArrayOutputStream();
       try (var zip = new ZipOutputStream(output)) {
-        final var prefix = MODULE + "@" + version + "/";
-        putEntry(zip, prefix + "go.mod", "module " + MODULE + "\n\ngo 1.23\n");
+        final var prefix = module + "@" + version + "/";
+        putEntry(zip, prefix + "go.mod", "module " + module + "\n\ngo 1.23\n");
         putEntry(zip, prefix + "hello.go", "package hello\n");
       }
       return output.toByteArray();
@@ -254,6 +268,196 @@ class GolangModuleControllerIT {
         .andExpect(jsonPath("$.data.createdAt", notNullValue()))
         .andExpect(jsonPath("$.data.versions", hasSize(2)))
         .andExpect(jsonPath("$.text").value("moduleInfoFetched"));
+  }
+
+  @Test
+  @DisplayName("supports Go module paths and semver variants while preserving DTO shapes")
+  void supportsModulePathAndVersionVariants() throws Exception {
+    final var user = this.createUser();
+    final var token = this.bearerToken(user);
+    final var repo = this.createRepo(unique("variants"), false);
+    this.upload(repo, V2_MODULE, "v2.0.0", token);
+    this.upload(repo, UPPERCASE_MODULE, "v1.0.0-20240101120000-0123456789ab", token);
+    this.upload(repo, MODULE, "v1.2.3+incompatible", token);
+
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}", repo)
+                .param("page", "0")
+                .param("size", "2")
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.*", hasSize(5)))
+        .andExpect(jsonPath("$.msgId").value("modulesFetched"))
+        .andExpect(jsonPath("$.type").value("SUCCESS"))
+        .andExpect(jsonPath("$.data.content", hasSize(2)))
+        .andExpect(jsonPath("$.data.content[*].id", hasSize(2)))
+        .andExpect(jsonPath("$.data.content[*].createdAt", hasSize(2)))
+        .andExpect(jsonPath("$.data.page.size").value(2))
+        .andExpect(jsonPath("$.data.page.totalElements").value(3))
+        .andExpect(jsonPath("$.data.page.totalPages").value(2))
+        .andExpect(jsonPath("$.errorCode").value(nullValue()))
+        .andExpect(jsonPath("$.text").value("modulesFetched"));
+
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}/search", repo)
+                .param("search", "upper")
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.content", hasSize(1)))
+        .andExpect(jsonPath("$.data.content[0].modulePath").value(UPPERCASE_MODULE.toLowerCase()));
+
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}/versions", repo)
+                .param("modulePath", MODULE)
+                .param("search", "incompatible")
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.*", hasSize(5)))
+        .andExpect(jsonPath("$.data.content", hasSize(1)))
+        .andExpect(jsonPath("$.data.content[0].version").value("v1.2.3+incompatible"))
+        .andExpect(jsonPath("$.data.content[0].goVersion").value("1.23"));
+  }
+
+  @Test
+  @DisplayName("returns complete validation and not-found envelopes for module queries")
+  void validatesQueriesAndNotFoundModules() throws Exception {
+    final var user = this.createUser();
+    final var token = this.bearerToken(user);
+    final var repo = this.createRepo(unique("validation"), true);
+
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}", repo)
+                .param("search", "missing")
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.*", hasSize(5)))
+        .andExpect(jsonPath("$.data.content", hasSize(0)))
+        .andExpect(jsonPath("$.data.page.totalElements").value(0))
+        .andExpect(jsonPath("$.errorCode").value(nullValue()));
+
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}/versions", repo)
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.*", hasSize(5)))
+        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(jsonPath("$.data").value("modulePath"))
+        .andExpect(jsonPath("$.errorCode", matchesPattern(UUID_PATTERN)))
+        .andExpect(jsonPath("$.text").value("Incoming data couldn't be validated."));
+
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}/info", repo)
+                .param("modulePath", MODULE)
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.*", hasSize(5)))
+        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(jsonPath("$.data").value("moduleNotFound"))
+        .andExpect(jsonPath("$.errorCode", matchesPattern(UUID_PATTERN)));
+
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}", "does-not-exist")
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(jsonPath("$.data").value("repoNotFound"));
+  }
+
+  @Test
+  @DisplayName("enforces authentication, visibility, repository type, and management permissions")
+  void enforcesAuthorizationAndRepositoryBoundaries() throws Exception {
+    final var owner = this.createUser();
+    final var token = this.bearerToken(owner);
+    final var repo = this.createRepo(unique("private"), true);
+    final var publicRepo = this.createRepo(unique("public"), false);
+    this.upload(publicRepo, "v1.0.0", token);
+
+    this.mockMvc
+        .perform(get("/api/go/modules/{repo}", repo).with(apiPort()))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(jsonPath("$.data").value("unAuthorized"))
+        .andExpect(jsonPath("$.errorCode", matchesPattern(UUID_PATTERN)));
+
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}", repo)
+                .with(apiPort())
+                .header(AUTHORIZATION, "Bearer malformed"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.type").value("ERROR"));
+
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}", publicRepo).with(apiPort()).header(AUTHORIZATION, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.content[0].modulePath").value(MODULE));
+
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}", repo)
+                .with(apiPort())
+                .header(AUTHORIZATION, this.bearerToken(this.createUser())))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.type").value("SUCCESS"))
+        .andExpect(jsonPath("$.data.content", hasSize(0)));
+
+    final var mavenRepo =
+        this.repoTxService.createRepo(
+            unique("maven"), io.repsy.protocols.shared.repo.dtos.RepoType.MAVEN, false, null);
+    this.entityManager.flush();
+    this.mockMvc
+        .perform(
+            get("/api/go/modules/{repo}", mavenRepo.getName())
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.type").value("SUCCESS"))
+        .andExpect(jsonPath("$.data.content", hasSize(0)));
+
+    this.mockMvc
+        .perform(
+            delete("/api/go/modules/{repo}", repo)
+                .param("modulePath", MODULE)
+                .with(apiPort())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.type").value("ERROR"));
+  }
+
+  @Test
+  @DisplayName("rejects unsupported verbs and keeps sumdb as a deliberate 404")
+  void rejectsUnsupportedVerbsAndSumdbVariants() throws Exception {
+    final var user = this.createUser();
+    final var token = this.bearerToken(user);
+    final var repo = this.createRepo(unique("verbs"), true);
+
+    this.mockMvc
+        .perform(post("/api/go/modules/{repo}", repo).with(apiPort()).header(AUTHORIZATION, token))
+        .andExpect(status().isNotFound());
+    this.mockMvc
+        .perform(patch("/api/go/modules/{repo}", repo).with(apiPort()).header(AUTHORIZATION, token))
+        .andExpect(status().isNotFound());
+    this.mockMvc
+        .perform(get("/api/go/modules/{repo}/sumdb/supported", repo).with(apiPort()))
+        .andExpect(status().isNotFound());
+    this.mockMvc
+        .perform(get("/api/go/modules/{repo}/sumdb/supported", "unknown").with(apiPort()))
+        .andExpect(status().isNotFound());
   }
 
   @Test
