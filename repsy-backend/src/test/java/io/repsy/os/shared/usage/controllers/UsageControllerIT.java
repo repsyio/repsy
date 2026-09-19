@@ -535,8 +535,8 @@ class UsageControllerIT {
           Arguments.of(1024L, "1.00 KB"),
           Arguments.of(1025L, "1.01 KB"),
           Arguments.of(1536L, "1.50 KB"),
-          // Rounding up at two decimals pushes the value to the next whole KB, not to "1.00 MB".
-          Arguments.of(1_048_575L, "1024.00 KB"),
+          // Rounding up at two decimals reaches 1024.00 KB, so the text rolls over to "1.00 MB".
+          Arguments.of(1_048_575L, "1.00 MB"),
           Arguments.of(1_048_576L, "1.00 MB"),
           Arguments.of(1_073_741_824L, "1.00 GB"),
           Arguments.of(1_099_511_627_776L, "1.00 TB"),

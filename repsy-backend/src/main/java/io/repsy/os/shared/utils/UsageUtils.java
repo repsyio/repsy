@@ -24,26 +24,37 @@ public final class UsageUtils {
   private static final long MEGABYTE = 1048576L;
   private static final long GIGABYTE = 1073741824L;
   private static final long TERABYTE = 1099511627776L;
+  private static final long[] UNIT_SIZES = {KILOBYTE, MEGABYTE, GIGABYTE, TERABYTE};
+  private static final String[] UNIT_NAMES = {"KB", "MB", "GB", "TB"};
+  private static final BigDecimal NEXT_UNIT_THRESHOLD = BigDecimal.valueOf(KILOBYTE);
 
   private UsageUtils() {
     throw new UnsupportedOperationException("Utility class");
   }
 
   public static @NonNull String humanReadable(final long usage) {
-    if (usage >= TERABYTE) {
-      return BigDecimal.valueOf(usage).divide(BigDecimal.valueOf(TERABYTE), 2, RoundingMode.CEILING)
-          + " TB";
-    } else if (usage >= GIGABYTE) {
-      return BigDecimal.valueOf(usage).divide(BigDecimal.valueOf(GIGABYTE), 2, RoundingMode.CEILING)
-          + " GB";
-    } else if (usage >= MEGABYTE) {
-      return BigDecimal.valueOf(usage).divide(BigDecimal.valueOf(MEGABYTE), 2, RoundingMode.CEILING)
-          + " MB";
-    } else if (usage >= KILOBYTE) {
-      return BigDecimal.valueOf(usage).divide(BigDecimal.valueOf(KILOBYTE), 2, RoundingMode.CEILING)
-          + " KB";
+    if (usage < KILOBYTE) {
+      return usage + " B";
     }
 
-    return usage + " B";
+    int unit = UNIT_SIZES.length - 1;
+    while (usage < UNIT_SIZES[unit]) {
+      unit--;
+    }
+
+    BigDecimal scaled = scale(usage, unit);
+
+    // Rounding up can push a value just below the next unit to 1024.00; show it in that unit.
+    if (unit < UNIT_SIZES.length - 1 && scaled.compareTo(NEXT_UNIT_THRESHOLD) >= 0) {
+      unit++;
+      scaled = scale(usage, unit);
+    }
+
+    return scaled + " " + UNIT_NAMES[unit];
+  }
+
+  private static BigDecimal scale(final long usage, final int unit) {
+    return BigDecimal.valueOf(usage)
+        .divide(BigDecimal.valueOf(UNIT_SIZES[unit]), 2, RoundingMode.CEILING);
   }
 }
