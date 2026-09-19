@@ -27,6 +27,7 @@ import io.repsy.os.server.protocols.docker.shared.layer.services.LayerTxService;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
+import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerForm;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestInfo;
@@ -76,7 +77,8 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
       throws Exception {
     final String configDigest = "sha256:" + "1".repeat(64);
     final String layerDigest = "sha256:" + "2".repeat(64);
-    final String manifestDigest = "sha256:" + "3".repeat(64);
+    final String manifestDigest =
+        "sha256:" + "%064x".formatted((long) tag.hashCode() & 0xffffffffL);
     final String configJson = "{\"architecture\":\"amd64\",\"os\":\"linux\"}";
     final String manifestJson =
         "{\"schemaVersion\":2,\"mediaType\":\"%s\",\"config\":{\"mediaType\":\"%s\",\"size\":%d,\"digest\":\"%s\"},\"layers\":[{\"mediaType\":\"%s\",\"size\":3,\"digest\":\"%s\"}]}"
@@ -211,6 +213,65 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("lists tags and manifests with filters, paging metadata and DTO fields")
+    void listsTagsAndManifests() throws Exception {
+      final var repo = DockerImageControllerIT.this.dockerRepo();
+      DockerImageControllerIT.this.seedImage(repo, "app", "latest");
+      DockerImageControllerIT.this.seedImage(repo, "app", "stable");
+      final var token = DockerImageControllerIT.this.userBearerToken();
+
+      final var tags =
+          DockerImageControllerIT.this.expectSuccess(
+              DockerImageControllerIT.this.perform(
+                  get("/api/docker/images/%s/app/tags".formatted(repo.getName()))
+                      .param("name", "latest")
+                      .param("page", "0")
+                      .param("size", "1")
+                      .header(AUTHORIZATION, token)),
+              "imageTagsFetched",
+              "Image tags fetched.");
+      final var tagPage = data(tags);
+      assertThat(tagPage).containsKeys("content", "page");
+      assertThat((java.util.List<?>) tagPage.get("content")).hasSize(1);
+      assertThat((Map<String, Object>) ((java.util.List<?>) tagPage.get("content")).getFirst())
+          .containsKeys("name", "platform", "lastUpdatedAt")
+          .containsEntry("name", "latest");
+      assertThat((Map<String, Object>) tagPage.get("page"))
+          .containsEntry("size", 1)
+          .containsEntry("totalElements", 1);
+
+      final var manifests =
+          DockerImageControllerIT.this.expectSuccess(
+              DockerImageControllerIT.this.perform(
+                  get("/api/docker/images/%s/app/tags/latest/manifests".formatted(repo.getName()))
+                      .param("page", "0")
+                      .param("size", "10")
+                      .header(AUTHORIZATION, token)),
+              "tagLayersFetched",
+              "Tag layers fetched.");
+      final var manifestPage = data(manifests);
+      assertThat((java.util.List<?>) manifestPage.get("content")).hasSize(1);
+      assertThat((Map<String, Object>) ((java.util.List<?>) manifestPage.get("content")).getFirst())
+          .containsKeys("name", "digest", "createdAt", "platform", "configDigest");
+    }
+
+    @Test
+    @DisplayName("resolves the default tag through the image route")
+    void resolvesDefaultTag() throws Exception {
+      final var repo = DockerImageControllerIT.this.dockerRepo();
+      DockerImageControllerIT.this.seedImage(repo, "app", "latest");
+
+      final var body =
+          DockerImageControllerIT.this.expectSuccess(
+              DockerImageControllerIT.this.perform(
+                  get("/api/docker/images/%s/app".formatted(repo.getName()))
+                      .header(AUTHORIZATION, DockerImageControllerIT.this.userBearerToken())),
+              "tagDetailFetched",
+              "Tag detail fetched");
+      assertThat(data(body)).containsEntry("name", "latest").containsEntry("imageName", "app");
+    }
+
+    @Test
     @DisplayName("returns 404 for unknown image and malformed references")
     void unknownItems() throws Exception {
       final var repo = DockerImageControllerIT.this.dockerRepo();
@@ -223,6 +284,48 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           "imageNotFound",
           "imageNotFound",
           "Image not found.");
+      DockerImageControllerIT.this.expectError(
+          DockerImageControllerIT.this.perform(
+              get("/api/docker/images/%s/app/manifests/sha256:%s"
+                      .formatted(repo.getName(), "f".repeat(64)))
+                  .header(AUTHORIZATION, token)),
+          HttpStatus.NOT_FOUND,
+          "tagNotFound",
+          "tagNotFound",
+          "Tag not found.");
+      DockerImageControllerIT.this.expectError(
+          DockerImageControllerIT.this.perform(
+              get("/api/docker/images/%s/app/configs/sha256:%s"
+                      .formatted(repo.getName(), "f".repeat(64)))
+                  .header(AUTHORIZATION, token)),
+          HttpStatus.NOT_FOUND,
+          "layerNotFound",
+          "layerNotFound",
+          "Layer not found.");
+    }
+
+    @Test
+    @DisplayName("rejects expired and malformed authorization tokens")
+    void rejectsInvalidTokens() throws Exception {
+      final var repo = DockerImageControllerIT.this.dockerRepo();
+      DockerImageControllerIT.this.expectError(
+          DockerImageControllerIT.this.perform(
+              get("/api/docker/images/%s".formatted(repo.getName()))
+                  .header(AUTHORIZATION, "Bearer not-a-jwt")),
+          HttpStatus.FORBIDDEN,
+          "accessNotAllowed",
+          "accessNotAllowed",
+          "Access isn't allowed.");
+      final var user =
+          DockerImageControllerIT.this.createUser("expired" + randomTag(), UserRole.USER);
+      DockerImageControllerIT.this.expectError(
+          DockerImageControllerIT.this.perform(
+              get("/api/docker/images/%s".formatted(repo.getName()))
+                  .header(AUTHORIZATION, DockerImageControllerIT.this.expiredBearerTokenFor(user))),
+          HttpStatus.FORBIDDEN,
+          "sessionExpired",
+          "sessionExpired",
+          "Session expired.");
     }
   }
 
@@ -265,6 +368,14 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
               "tagDeleted",
               "Tag deleted.");
       assertThat((Object) JsonPath.read(body, "$.data")).isNull();
+      DockerImageControllerIT.this.expectError(
+          DockerImageControllerIT.this.perform(
+              delete("/api/docker/images/%s/app/tags/latest".formatted(repo.getName()))
+                  .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())),
+          HttpStatus.NOT_FOUND,
+          "tagNotFound",
+          "tagNotFound",
+          "Tag not found.");
     }
 
     @Test
@@ -293,6 +404,22 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           "imageNotFound",
           "imageNotFound",
           "Image not found.");
+    }
+
+    @Test
+    @DisplayName("returns forbidden for an authenticated user without manage permission")
+    void deniesManageOperationsForReadOnlyUser() throws Exception {
+      final var repo = DockerImageControllerIT.this.privateDockerRepo();
+      DockerImageControllerIT.this.seedImage(repo, "app", "latest");
+      final var token = DockerImageControllerIT.this.userBearerToken();
+      DockerImageControllerIT.this.expectError(
+          DockerImageControllerIT.this.perform(
+              delete("/api/docker/images/blobs/%s/orphan-layers".formatted(repo.getName()))
+                  .header(AUTHORIZATION, token)),
+          HttpStatus.UNAUTHORIZED,
+          "unAuthorized",
+          "unAuthorized",
+          "The user has logged in but has no permissions.");
     }
   }
 }

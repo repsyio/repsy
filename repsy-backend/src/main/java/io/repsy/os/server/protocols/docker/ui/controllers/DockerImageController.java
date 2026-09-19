@@ -55,6 +55,8 @@ import org.springframework.web.bind.annotation.RestController;
 @SuppressWarnings("java:S6856")
 public class DockerImageController {
 
+  private static final String DEFAULT_TAG = "latest";
+
   private final @NonNull ImageTxService imageService;
   private final @NonNull ManifestTxService manifestService;
   private final @NonNull DockerApiFacade dockerApiFacade;
@@ -110,7 +112,15 @@ public class DockerImageController {
     return this.restResponseFactory.success("imageDeleted");
   }
 
-  @GetMapping({"/{repoName}/{imageName}", "/{repoName}/{imageName}/tags/{tagName}"})
+  @GetMapping("/{repoName}/{imageName}")
+  @RepoOperation
+  public RestResponse<TagDetail> getDefaultTagDetail(
+      final RepoInfo repoInfo, @PathVariable final String imageName) {
+
+    return this.getTagDetail(repoInfo, imageName, DEFAULT_TAG);
+  }
+
+  @GetMapping("/{repoName}/{imageName}/tags/{tagName}")
   @RepoOperation
   public RestResponse<TagDetail> getTagDetail(
       final RepoInfo repoInfo,
