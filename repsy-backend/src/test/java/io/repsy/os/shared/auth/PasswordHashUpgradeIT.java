@@ -122,7 +122,7 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
 
     this.panelLogin(user.getUsername(), VALID_PASSWORD, 200);
     this.panelLogin(user.getUsername(), VALID_PASSWORD, 200);
-    this.panelLogin(user.getUsername(), "Other1234!", 403);
+    this.panelLogin(user.getUsername(), "Other1234!", 401);
   }
 
   @Test
@@ -158,7 +158,7 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
   void wrongPasswordDoesNotUpgrade() throws Exception {
     final var user = this.createLegacyUser(VALID_PASSWORD);
 
-    this.panelLogin(user.getUsername(), "Other1234!", 403);
+    this.panelLogin(user.getUsername(), "Other1234!", 401);
     this.basicRequest(user.getUsername(), "Other1234!", 401);
 
     assertThat(this.reload(user.getId()).getHash()).isEqualTo(user.getHash());
@@ -207,7 +207,7 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
   @Test
   @DisplayName("an unknown username is rejected like a wrong password")
   void unknownUsernameIsRejected() throws Exception {
-    this.panelLogin(uniqueUsername("ghost"), VALID_PASSWORD, 403);
+    this.panelLogin(uniqueUsername("ghost"), VALID_PASSWORD, 401);
     this.basicRequest(uniqueUsername("ghost"), VALID_PASSWORD, 401);
   }
 }
