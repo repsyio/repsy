@@ -242,7 +242,7 @@ public class ArtifactScanListener {
           event.artifactVersion(),
           event.repoName());
       return null;
-    } catch (final ItemNotFoundException exception) {
+    } catch (final ItemNotFoundException _) {
       log.info(
           "Skipping vulnerability scan for {}@{} (repo={}): the repo no longer exists",
           event.artifactName(),
