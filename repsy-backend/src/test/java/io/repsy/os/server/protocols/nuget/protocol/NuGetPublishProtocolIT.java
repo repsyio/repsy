@@ -16,7 +16,9 @@
 package io.repsy.os.server.protocols.nuget.protocol;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
@@ -55,12 +57,16 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -97,7 +103,10 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
 
   @Autowired private NuGetPackageRepository nugetPackageRepository;
   @Autowired private NuGetPackageVersionRepository nugetPackageVersionRepository;
-  @Autowired private NuGetStorageService nugetStorageService;
+
+  /** A spy that calls through, so only the test that stubs it changes the storage behaviour. */
+  @MockitoSpyBean private NuGetStorageService nugetStorageService;
+
   @Autowired private RepoTxService repoTxService;
   @Autowired private PlatformTransactionManager transactionManager;
 
@@ -822,6 +831,33 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
                   .value("Release packages are not allowed in this repository."));
 
       NuGetPublishProtocolIT.this.assertNothingStored(repo, pkg.id());
+    }
+  }
+
+  @Nested
+  @DisplayName("an unexpected failure")
+  @ExtendWith(OutputCaptureExtension.class)
+  class UnexpectedFailure {
+
+    @Test
+    @DisplayName("answers 500 'Publish failed' and logs the exception with its stack trace")
+    void logsTheException(final CapturedOutput output) throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var pkg = new Pkg(uniquePackageId(), "1.0.0");
+      doThrow(new IllegalStateException("storage backend down"))
+          .when(NuGetPublishProtocolIT.this.nugetStorageService)
+          .writePackage(any(), any(), any(), any(), any());
+
+      NuGetPublishProtocolIT.this
+          .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
+          .andExpect(status().isInternalServerError())
+          .andExpect(jsonPath("$.errors[0].message").value("Publish failed"));
+
+      assertThat(output.getAll())
+          .contains("ERROR")
+          .contains("NuGet publish failed")
+          .contains("java.lang.IllegalStateException: storage backend down");
+      verifyNoInteractions(NuGetPublishProtocolIT.this.usageUpdateService);
     }
   }
 
