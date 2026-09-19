@@ -7,6 +7,9 @@ on:
   pull_request:
     branches:
       - main
+  # The merge queue on main builds every queued PR on top of the ones ahead of it and reports
+  # these same checks. Without this trigger, queued entries never get a result and time out.
+  merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -64,13 +67,14 @@ jobs:
       - name: Build and Verify
         run: mvn -B -ntp verify
 
-      # TEMPORARY: non-blocking while repsy modules are brought up to the 80% coverage
-      # threshold one by one (see jacoco.check.phase in the root pom.xml). Remove
-      # continue-on-error once the coverage follow-up PRs land.
       - name: Analyze with SonarCloud
-        # Dependabot-triggered runs don't receive regular repo secrets, so SONAR_TOKEN is empty.
-        if: github.actor != 'dependabot[bot]'
-        continue-on-error: true
+        # Dependabot-triggered and fork runs don't receive regular repo secrets, so SONAR_TOKEN is
+        # empty and the scanner is rejected. Merge queue runs would analyse a gh-readonly-queue/*
+        # branch that no PR owns, and sonarcloud.yml analyses main right after the merge anyway.
+        if: >-
+          github.actor != 'dependabot[bot]'
+          && github.event_name != 'merge_group'
+          && github.event.pull_request.head.repo.full_name == github.repository
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
@@ -112,3 +116,21 @@ jobs:
 
       - name: Check
         run: pnpm run lint
+
+      # The specs import the generated API client (src/generated/api, git-ignored), and the
+      # generator is a Java tool that openapi-generator-cli downloads on first use.
+      - name: Set up JDK
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          java-version: "25"
+          distribution: "temurin"
+
+      - name: Generate API client
+        run: pnpm run gen:api
+
+      # Karma needs a Chrome binary; the runner image ships google-chrome. The CI launcher in
+      # karma.conf.cjs adds --no-sandbox. A failing spec makes ng test exit non-zero.
+      - name: Unit tests
+        run: |
+          google-chrome --version
+          pnpm test --watch=false --browsers=ChromeHeadlessCI
