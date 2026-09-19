@@ -312,6 +312,12 @@ public class ProtocolAuthService {
     return this.userTxService.getUserByUsername(username);
   }
 
+  /**
+   * Repos have no owner or per-user access list, so an authenticated user holds READ and WRITE on
+   * every repo, private ones included; "private" only means "login required". Only MANAGE needs the
+   * ADMIN role. The README documents this model (RPS-939), and {@code ProtocolAuthServiceTest} pins
+   * it.
+   */
   private void checkPermission(
       final @NonNull UserInfo userInfo, final @NonNull Permission permission) {
 
