@@ -633,15 +633,11 @@ public class ErrorHandler {
       return null;
     }
 
-    final var exceptionMessage = ex.getMessage();
-    final var messageText =
-        exceptionMessage != null ? exceptionMessage : ERR_SCAN_EXECUTOR_SATURATED;
-
     log.info(exceptionToString(ex, request));
 
     return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
         .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(messageText, ex.getMessage()));
+        .body(this.resp.error(ERR_SCAN_EXECUTOR_SATURATED, ex.getMessage()));
   }
 
   @ExceptionHandler(MfaException.class)
