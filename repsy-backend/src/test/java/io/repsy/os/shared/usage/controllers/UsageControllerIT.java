@@ -403,12 +403,14 @@ class UsageControllerIT {
     }
 
     /**
-     * The controller only calls {@code authenticate}, never {@code requireAdmin}, so any signed-in
-     * user sees the instance-wide totals. Pinned as current behavior; if the endpoint is ever
-     * restricted to admins, this becomes a 401 {@code accessDenied} like {@code /api/users}.
+     * Intended policy (RPS-876): the controller only calls {@code authenticate}, never {@code
+     * requireAdmin}, so any signed-in user sees the instance-wide totals. The dashboard, which
+     * every signed-in user lands on, renders them in its Total Disk card, so restricting the
+     * endpoint would break the non-admin dashboard. Unlike {@code /api/users}, which answers a
+     * non-admin with 401 {@code accessDenied}, this endpoint is meant to stay open.
      */
     @Test
-    @DisplayName("currently lets a non-admin user read the totals (only authenticate is required)")
+    @DisplayName("lets a non-admin user read the totals (open to any authenticated user)")
     void nonAdminCaller() throws Exception {
       final var repoId = UsageControllerIT.this.createRepo(RepoType.MAVEN);
       UsageControllerIT.this.recordUsage(repoId, 2048);
