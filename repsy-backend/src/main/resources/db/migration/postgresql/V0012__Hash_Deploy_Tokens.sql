@@ -2,4 +2,5 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 UPDATE "repo_deploy_token"
-SET "token" = encode(digest("token", 'sha256'), 'hex');
+SET "token" = encode(digest("token", 'sha256'), 'hex')
+WHERE "token" LIKE 'rdt-%';
