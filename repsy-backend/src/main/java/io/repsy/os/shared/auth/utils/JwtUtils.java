@@ -163,7 +163,11 @@ public class JwtUtils {
       throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
 
-    return UUID.fromString(decodedJWT.getSubject());
+    try {
+      return UUID.fromString(decodedJWT.getSubject());
+    } catch (final IllegalArgumentException | NullPointerException _) {
+      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
   }
 
   public void verify(final @NonNull String authHeader) {
