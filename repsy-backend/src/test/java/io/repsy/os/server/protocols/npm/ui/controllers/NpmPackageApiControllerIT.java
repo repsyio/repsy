@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.npm.ui.controllers;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
@@ -63,6 +64,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.server.PathContainer;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -70,6 +72,8 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -116,6 +120,7 @@ class NpmPackageApiControllerIT {
   }
 
   @Autowired private MockMvc mockMvc;
+  @Autowired private RequestMappingHandlerMapping handlerMapping;
   @Autowired private JwtUtils jwtUtils;
   @Autowired private UserTxService userTxService;
   @Autowired private UserRepository userRepository;
@@ -254,12 +259,6 @@ class NpmPackageApiControllerIT {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content", hasSize(1)))
           .andExpect(jsonPath("$.data.content[0].scope").value("tools"));
-      NpmPackageApiControllerIT.this
-          .perform(get("/api/npm/packages/{repo}/ignored", repoName).param("name", "plain"))
-          .andExpect(
-              result ->
-                  org.assertj.core.api.Assertions.assertThat(result.getResponse().getStatus())
-                      .isIn(200, 404));
       NpmPackageApiControllerIT.this
           .perform(
               get("/api/npm/packages/{repo}/scope/{scope}", repoName, "tools")
@@ -442,6 +441,38 @@ class NpmPackageApiControllerIT {
       perform(get("/api/npm/packages/{repo}/missing/versions/1.0.0", repoName))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+    }
+
+    @Test
+    void answersNotFoundWithTheErrorEnvelopeForAMissingPackage() throws Exception {
+      perform(get("/api/npm/packages/{repo}/{package}", repoName, "missing"))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.*", hasSize(5)))
+          .andExpect(jsonPath("$.msgId").value("packageNotFound"))
+          .andExpect(jsonPath("$.type").value("ERROR"))
+          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+    }
+
+    @Test
+    void routesTwoSegmentGetPathsOnlyToTheVersionHandler() {
+      // Two handlers once matched /api/npm/packages/{repo}/{x}, so which one answered depended on
+      // registration order: a listing of every package, a 404, or an ambiguous-handler 500.
+      final var matching =
+          handlerMapping.getHandlerMethods().entrySet().stream()
+              .filter(
+                  entry ->
+                      entry.getKey().getMethodsCondition().getMethods().contains(RequestMethod.GET))
+              .filter(
+                  entry ->
+                      entry.getKey().getPathPatternsCondition().getPatterns().stream()
+                          .anyMatch(
+                              pattern ->
+                                  pattern.matches(
+                                      PathContainer.parsePath("/api/npm/packages/repo/missing"))))
+              .map(entry -> entry.getValue().getMethod().getName())
+              .toList();
+
+      assertThat(matching).containsExactly("getVersion");
     }
 
     @Test
