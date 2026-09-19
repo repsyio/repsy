@@ -324,13 +324,17 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   /**
    * Renames the object to its digest. The target is content-addressed, so when it already exists
    * (the same layer pushed twice, or concurrently) it holds the same bytes: the redundant source is
-   * dropped and the call succeeds.
+   * dropped and the call succeeds. The digest comes from the client, so it has to name a sibling of
+   * the source and not escape the storage root.
    */
   @SneakyThrows
   @Override
   public void renameObject(final @NonNull StoragePath storagePath, final @NonNull String digest) {
     final Path basePathObj = this.toPhysicalPath(storagePath);
-    final Path renamedPath = basePathObj.resolveSibling(digest);
+    final Path renamedPath = this.requireInsideBase(basePathObj.resolveSibling(digest).normalize());
+    if (!renamedPath.getParent().equals(basePathObj.getParent())) {
+      throw new InvalidStoragePathException("invalidStoragePath");
+    }
     try {
       Files.move(basePathObj, renamedPath);
     } catch (final FileAlreadyExistsException e) {
@@ -339,12 +343,15 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   }
 
   private @NonNull Path toPhysicalPath(final @NonNull StoragePath storagePath) {
-    final var normalized = this.basePath.normalize();
-    final var resolved = normalized.resolve(storagePath.getPath()).normalize();
-    if (!resolved.startsWith(normalized)) {
+    final var resolved = this.basePath.normalize().resolve(storagePath.getPath()).normalize();
+    return this.requireInsideBase(resolved);
+  }
+
+  private @NonNull Path requireInsideBase(final @NonNull Path normalizedPath) {
+    if (!normalizedPath.startsWith(this.basePath.normalize())) {
       throw new InvalidStoragePathException("invalidStoragePath");
     }
-    return resolved;
+    return normalizedPath;
   }
 
   private void addItems(
