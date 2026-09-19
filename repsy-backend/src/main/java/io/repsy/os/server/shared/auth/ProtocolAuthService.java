@@ -93,8 +93,10 @@ public class ProtocolAuthService {
       return;
     }
 
-    // A scanner token is repo-scoped and has no user; only Docker knows how to authorize it.
-    if (authenticationType == AuthenticationType.DOCKER_SCAN) {
+    // A scanner token is repo-scoped and has no user; only Docker knows how to authorize it. An
+    // anonymous token has no user either, so its username claim must not be looked up (RPS-986).
+    if (authenticationType == AuthenticationType.DOCKER_SCAN
+        || authenticationType == AuthenticationType.ANONYMOUS) {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 

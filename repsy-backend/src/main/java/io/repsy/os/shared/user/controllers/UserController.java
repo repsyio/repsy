@@ -24,6 +24,7 @@ import io.repsy.os.generated.model.UserCreateForm;
 import io.repsy.os.generated.model.UserResponse;
 import io.repsy.os.generated.model.UserUpdateForm;
 import io.repsy.os.shared.auth.PanelAuthHelper;
+import io.repsy.os.shared.user.services.ReservedUsernameService;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import jakarta.validation.Valid;
@@ -56,6 +57,7 @@ final class UserController {
 
   private final @NonNull PanelAuthHelper panelAuthHelper;
   private final @NonNull UserTxService userTxService;
+  private final @NonNull ReservedUsernameService reservedUsernameService;
   private final @NonNull RestResponseFactory resp;
 
   @GetMapping
@@ -80,6 +82,8 @@ final class UserController {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
+    this.reservedUsernameService.requireNotReserved(dto.getUsername());
+
     final var createdUser = this.userTxService.createUserWithRole(dto);
 
     return this.resp.success("userCreated", createdUser);
@@ -92,6 +96,11 @@ final class UserController {
       @Valid @RequestBody final @NonNull UserUpdateForm dto) {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
+
+    // A user who already holds a now-reserved name may keep it; only a rename is checked.
+    if (!this.userTxService.getUserById(userId).getUsername().equals(dto.getUsername())) {
+      this.reservedUsernameService.requireNotReserved(dto.getUsername());
+    }
 
     final var updatedUser = this.userTxService.updateUserDetails(userId, dto);
 
