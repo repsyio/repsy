@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.shared.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -29,6 +28,7 @@ import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
+import io.repsy.os.server.shared.token.utils.DeployTokenHash;
 import io.repsy.os.server.shared.token.utils.TokenUsernameGenerator;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -94,7 +94,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  *
  * <p>Several assertions pin behavior that is surprising rather than desirable; each is called out
  * in the test's display name or comment so a future fix shows up as a deliberate test change:
- * deploy tokens are persisted in clear text, {@code DeployTokenForm} has no name pattern or
+ * deploy tokens are persisted as SHA-256 hashes, {@code DeployTokenForm} has no name pattern or
  * permission field, token names are not unique per repo, and the list endpoint answers a page past
  * the end (and an empty repo) with a synthetic empty page.
  */
@@ -233,7 +233,8 @@ class ProtocolDeployTokenControllerIT {
 
   /**
    * Inserts a deploy token row directly and returns it re-read from the database. The secret is
-   * generated exactly as the application does, so it satisfies the unique index on {@code token}.
+   * generated and hashed exactly as the application does, so it satisfies the unique index on
+   * {@code token}.
    */
   private RepoDeployToken seedToken(
       final RepoInfo repo,
@@ -245,7 +246,7 @@ class ProtocolDeployTokenControllerIT {
     entity.setName(name);
     entity.setDescription("seeded " + name);
     entity.setUsername(TokenUsernameGenerator.deployTokenUsername());
-    entity.setToken(TokenFactory.deployToken());
+    entity.setToken(DeployTokenHash.hash(TokenFactory.deployToken()));
     entity.setReadOnly(readOnly);
     entity.setExpirationDate(expirationDate);
     entity.setTokenDurationDay(30);
@@ -648,14 +649,9 @@ class ProtocolDeployTokenControllerIT {
       assertThat(row.getId()).isNotNull();
     }
 
-    /**
-     * The story asks to assert that only a hash is persisted. It is not: the secret is stored
-     * verbatim (protocol auth looks tokens up by equality via {@code findByRepoIdAndToken}), so
-     * this pins the current behavior. Switching to hashed storage must update this test.
-     */
     @Test
-    @DisplayName("returns the secret once; it is persisted in clear text and never listed again")
-    void secretIsReturnedOnceAndStoredVerbatim() throws Exception {
+    @DisplayName("returns the secret once; only its hash is persisted and never listed again")
+    void secretIsReturnedOnceAndStoredHashed() throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var repo = it.createRepo(RepoType.MAVEN);
       final var token = it.adminBearerToken();
@@ -671,9 +667,10 @@ class ProtocolDeployTokenControllerIT {
       final String secret = JsonPath.read(created, "$.data.token");
 
       final var row = it.tokensOf(repo).getFirst();
-      assertThat(row.getToken()).isEqualTo(secret);
+      assertThat(row.getToken()).isEqualTo(DeployTokenHash.hash(secret));
+      assertThat(row.getToken()).isNotEqualTo(secret);
       assertThat(it.deployTokenRepository.findByRepoIdAndToken(repo.getStorageKey(), secret))
-          .isPresent();
+          .isEmpty();
 
       final var listed =
           expectSuccess(
@@ -776,36 +773,6 @@ class ProtocolDeployTokenControllerIT {
           Arguments.of(
               "500-char description",
               "{\"name\":\"d\",\"description\":\"%s\"}".formatted("d".repeat(500))));
-    }
-
-    /**
-     * {@code DeployTokenForm} allows a username of up to 150 characters but the {@code username}
-     * column is {@code varchar(80)}, so 81..150 characters pass request validation and are only
-     * rejected by the database. The INSERT is deferred to the flush, which is why the failure is
-     * observed there rather than in the response: the test's outer transaction keeps the handler's
-     * own commit-time flush from running. In production that flush runs when the service method
-     * returns. Widening the column or lowering the form limit to 80 should replace this test with
-     * one of the boundary cases above.
-     */
-    @Test
-    @DisplayName("passes validation for an 81-character username that the database then rejects")
-    void usernameLongerThanColumnIsRejectedByTheDatabase() {
-      final var it = ProtocolDeployTokenControllerIT.this;
-      final var repo = it.createRepo(RepoType.MAVEN);
-      final var token = it.adminBearerToken();
-
-      assertThatThrownBy(
-              () -> {
-                it.perform(
-                    post(tokensUrl(repo))
-                        .header(AUTHORIZATION, token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                            "{\"name\":\"long-user\",\"username\":\"%s\"}"
-                                .formatted("u".repeat(81))));
-                it.entityManager.flush();
-              })
-          .hasStackTraceContaining("value too long for type character varying(80)");
     }
 
     /**
@@ -915,8 +882,8 @@ class ProtocolDeployTokenControllerIT {
           Arguments.of("null name", "{\"name\":null}"),
           Arguments.of("name too long", "{\"name\":\"%s\"}".formatted("n".repeat(81))),
           Arguments.of(
-              "username too long",
-              "{\"name\":\"n\",\"username\":\"%s\"}".formatted("u".repeat(151))),
+              "username longer than the column",
+              "{\"name\":\"n\",\"username\":\"%s\"}".formatted("u".repeat(81))),
           Arguments.of(
               "description too long",
               "{\"name\":\"n\",\"description\":\"%s\"}".formatted("d".repeat(501))),
@@ -1213,11 +1180,11 @@ class ProtocolDeployTokenControllerIT {
       // Only the secret changes; id, name, username, description, read_only, expiry, duration and
       // created_at all stay as they were before the request.
       final var after = it.stateOf(before.id());
-      assertThat(after).isEqualTo(before.withToken(newSecret));
+      assertThat(after).isEqualTo(before.withToken(DeployTokenHash.hash(newSecret)));
       assertThat(it.deployTokenRepository.findByRepoIdAndToken(repo.getStorageKey(), oldSecret))
           .isEmpty();
       assertThat(it.deployTokenRepository.findByRepoIdAndToken(repo.getStorageKey(), newSecret))
-          .isPresent();
+          .isEmpty();
       assertThat(it.tokensOf(repo)).hasSize(1);
     }
 
