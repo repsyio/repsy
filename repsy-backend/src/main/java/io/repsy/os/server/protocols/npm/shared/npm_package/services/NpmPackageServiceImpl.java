@@ -356,14 +356,6 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
         .map(this.npmPackageConverter::toPackageListItemDto);
   }
 
-  public Page<io.repsy.os.generated.model.NpmPackageListItem> getPackagesContainsName(
-      final UUID repoId, final String name, final Pageable pageable) {
-
-    return this.npmPackageRepository
-        .findAllByRepoIdAndLatestVersionContainsName(repoId, name, pageable)
-        .map(this.npmPackageConverter::toPackageListItemDto);
-  }
-
   public Page<io.repsy.os.generated.model.NpmPackageListItem> getPackagesByScopeContainsName(
       final UUID repoId, final @Nullable String scope, final String name, final Pageable pageable) {
 
