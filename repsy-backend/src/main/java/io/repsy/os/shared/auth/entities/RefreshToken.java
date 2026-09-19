@@ -15,7 +15,6 @@
  */
 package io.repsy.os.shared.auth.entities;
 
-import io.repsy.core.uuidv7.UuidV7;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -31,7 +30,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RefreshToken {
   @Id
-  @UuidV7
   @Column(name = "id", columnDefinition = "uuid", nullable = false)
   private UUID id;
 

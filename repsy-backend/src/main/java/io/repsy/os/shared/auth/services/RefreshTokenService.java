@@ -19,6 +19,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.auth.entities.RefreshToken;
 import io.repsy.os.shared.auth.repositories.RefreshTokenRepository;
+import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class RefreshTokenService {
   private static final @NonNull String REFRESH_TOKEN_EXPIRED = "refreshTokenExpired";
 
   private final @NonNull RefreshTokenRepository repository;
+  private final @NonNull EntityManager entityManager;
 
   @Transactional
   public void register(
@@ -46,7 +48,9 @@ public class RefreshTokenService {
     token.setUserId(userId);
     token.setFamilyId(familyId);
     token.setExpiresAt(expiresAt);
-    this.repository.save(token);
+    // The JTI is assigned before persistence so it can be embedded in the JWT. Persist explicitly;
+    // repository.save would choose merge for a non-null assigned id and fail for a new row.
+    this.entityManager.persist(token);
   }
 
   @Transactional

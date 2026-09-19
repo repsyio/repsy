@@ -39,6 +39,14 @@ public class LoginInfoFactory {
    */
   public @NonNull LoginInfo create(
       final @NonNull UserInfo user, final @NonNull Instant sessionStart) {
+    return this.create(user, sessionStart, UUID.randomUUID());
+  }
+
+  /** Issues a token pair in an existing refresh-token family. */
+  public @NonNull LoginInfo create(
+      final @NonNull UserInfo user,
+      final @NonNull Instant sessionStart,
+      final @NonNull UUID refreshTokenFamilyId) {
 
     final var accessToken =
         this.jwtUtils.createSessionAccessToken(
@@ -48,7 +56,6 @@ public class LoginInfoFactory {
             sessionStart);
 
     final var refreshTokenId = UUID.randomUUID();
-    final var refreshTokenFamilyId = UUID.randomUUID();
     final var refreshTimeout =
         AuthUtils.boundBySession(AuthUtils.TIMEOUT_REFRESH_TOKEN, sessionStart);
     final var refreshToken =

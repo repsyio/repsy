@@ -91,7 +91,7 @@ public class AuthUserService {
       throw new UnAuthorizedException(REFRESH_TOKEN_EXPIRED);
     }
 
-    return this.loginInfoFactory.create(user, claims.sessionStart());
+    return this.loginInfoFactory.create(user, claims.sessionStart(), claims.familyId());
   }
 
   private void checkPassword(final @NonNull UserInfo user, final @NonNull LoginForm form) {

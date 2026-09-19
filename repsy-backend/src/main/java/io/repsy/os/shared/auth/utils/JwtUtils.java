@@ -263,6 +263,10 @@ public class JwtUtils {
       throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
 
+    return this.refreshTokenClaims(decodedJWT);
+  }
+
+  private @NonNull RefreshTokenClaims refreshTokenClaims(final @NonNull DecodedJWT decodedJWT) {
     final var sessionStart = decodedJWT.getClaim(CLAIM_SESSION_START).asInstant();
     final var tokenVersion = decodedJWT.getClaim(CLAIM_TOKEN_VERSION).asInt();
     final var tokenId = decodedJWT.getId();
