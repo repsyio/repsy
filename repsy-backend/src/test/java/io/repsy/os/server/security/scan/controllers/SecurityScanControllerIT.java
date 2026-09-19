@@ -40,12 +40,14 @@ import io.repsy.os.server.security.scanner.dtos.ScannerFinding;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
+import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import jakarta.persistence.EntityManagerFactory;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -63,6 +65,8 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -179,6 +183,8 @@ class SecurityScanControllerIT {
   @DynamicPropertySource
   static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
     registry.add("storage-gateway.fs.base-path", SecurityScanControllerIT::tempStoragePath);
+    // Lets the query-count tests read the number of statements a request ran.
+    registry.add("spring.jpa.properties.hibernate.generate_statistics", () -> "true");
   }
 
   private static String tempStoragePath() {
@@ -226,6 +232,7 @@ class SecurityScanControllerIT {
   @Autowired private RepoRepository repoRepository;
   @Autowired private VulnerabilityScanRepository scanRepository;
   @Autowired private VulnerabilityScanTxService scanTxService;
+  @Autowired private EntityManagerFactory entityManagerFactory;
   @MockitoSpyBean private VulnerabilityScannerRegistry scannerRegistry;
 
   private final List<UUID> createdUserIds = new ArrayList<>();
@@ -417,6 +424,10 @@ class SecurityScanControllerIT {
     this.scanTxService.markQueued(scanId);
     this.pinCreatedAt(scanId, createdAt);
     return scanId;
+  }
+
+  private Statistics hibernateStatistics() {
+    return this.entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
   }
 
   private static Instant at(final int minutesAfterBase) {
@@ -1379,6 +1390,83 @@ class SecurityScanControllerIT {
       assertPage(maxSize, 100, 0, 3, 1);
       assertThat(artifactVersions(minSize)).containsExactly("v3");
       assertPage(minSize, 1, 0, 3, 3);
+    }
+
+    // -------------------------------------------------------------------------------------------
+    // Query count (RPS-909)
+    // -------------------------------------------------------------------------------------------
+
+    /** Seeds one scan in each of {@code repos}, newest last, and returns the repos. */
+    private List<TestRepo> seedScansAcross(final List<TestRepo> repos) {
+      IntStream.range(0, repos.size())
+          .forEach(
+              i -> SecurityScanControllerIT.this.completedScan(repos.get(i), "a", "v" + i, at(i)));
+      return repos;
+    }
+
+    private List<TestRepo> createRepos(final int count, final RepoType type) {
+      return IntStream.range(0, count)
+          .mapToObj(i -> SecurityScanControllerIT.this.createRepo(type))
+          .toList();
+    }
+
+    /** Runs the request and returns how many JDBC statements Hibernate prepared for it. */
+    private long statementsFor(final String token, final Map<String, String> params)
+        throws Exception {
+      final var statistics = SecurityScanControllerIT.this.hibernateStatistics();
+      statistics.clear();
+      expectScans(SecurityScanControllerIT.this.getScans(token, params));
+      assertThat(statistics.getEntityStatistics(Repo.class.getName()).getFetchCount())
+          .as("repositories loaded lazily, one query each")
+          .isZero();
+      return statistics.getPrepareStatementCount();
+    }
+
+    @Test
+    @DisplayName("loads a page of scans from many repositories in a constant number of queries")
+    void constantQueryCountAcrossRepositories() throws Exception {
+      final var token = SecurityScanControllerIT.this.adminBearerToken();
+      final var params = Map.of("size", "10");
+
+      final var oneRepo = SecurityScanControllerIT.this.createRepo(RepoType.MAVEN);
+      IntStream.range(0, 10)
+          .forEach(i -> SecurityScanControllerIT.this.completedScan(oneRepo, "a", "v" + i, at(i)));
+      final var singleRepoStatements = this.statementsFor(token, params);
+
+      SecurityScanControllerIT.this.scanRepository.deleteAll();
+      final var repos = this.seedScansAcross(this.createRepos(10, RepoType.MAVEN));
+      final var manyReposStatements = this.statementsFor(token, params);
+
+      final var body = expectScans(SecurityScanControllerIT.this.getScans(token, params));
+      assertThat(content(body))
+          .extracting(scan -> scan.get("repoName"), scan -> scan.get("repoType"))
+          .containsExactlyElementsOf(
+              repos.reversed().stream().map(r -> tuple(r.name(), r.type().name())).toList());
+
+      // The caller lookup, the page query and the count query, whatever the repositories.
+      assertThat(manyReposStatements).isEqualTo(singleRepoStatements).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("keeps the query count constant when a repository filter applies")
+    void constantQueryCountWithFilter() throws Exception {
+      final var token = SecurityScanControllerIT.this.adminBearerToken();
+      this.seedScansAcross(this.createRepos(10, RepoType.NPM));
+      SecurityScanControllerIT.this.completedScan(
+          SecurityScanControllerIT.this.createRepo(RepoType.MAVEN), "a", "other", at(100));
+
+      final var statements =
+          this.statementsFor(token, Map.of("size", "5", "repoType", RepoType.NPM.name()));
+
+      final var body =
+          expectScans(
+              SecurityScanControllerIT.this.getScans(
+                  token, Map.of("size", "5", "repoType", RepoType.NPM.name())));
+      assertThat(content(body))
+          .hasSize(5)
+          .allSatisfy(s -> assertThat(s).containsEntry("repoType", "NPM"));
+      assertPage(body, 5, 0, 10, 2);
+      assertThat(statements).isEqualTo(3);
     }
   }
 
