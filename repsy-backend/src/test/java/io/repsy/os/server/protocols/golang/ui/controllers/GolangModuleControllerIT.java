@@ -29,25 +29,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.PagingAssertions;
-import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.protocols.golang.ui.facades.GolangApiFacade;
-import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import io.repsy.os.shared.user.services.UserTxService;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.time.Duration;
 import java.util.UUID;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -59,72 +50,20 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** Full-stack integration tests for the Go module-management API. */
-@Testcontainers
-@AutoConfigureMockMvc
-@Transactional
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("GolangModuleController /api/go/modules/*")
-class GolangModuleControllerIT {
+class GolangModuleControllerIT extends AbstractIntegrationTest {
 
-  private static final int API_PORT = 8080;
   private static final int PROTOCOL_PORT = 9090;
-  private static final String VALID_PASSWORD = "Password1!";
   private static final String MODULE = "io.repsy/hello-world";
   private static final String V2_MODULE = "example.com/mod/v2";
   private static final String UPPERCASE_MODULE = "example.com/Upper/Module";
-  private static final String UUID_PATTERN =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", GolangModuleControllerIT::tempStoragePath);
-  }
-
-  private static String tempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-go-modules-it").toString();
-    } catch (final IOException e) {
-      throw new UncheckedIOException(e);
-    }
-  }
-
-  @Autowired private MockMvc mockMvc;
-  @Autowired private JwtUtils jwtUtils;
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
   @Autowired private RepoTxService repoTxService;
   @Autowired private GolangApiFacade golangApiFacade;
-  @PersistenceContext private EntityManager entityManager;
-
-  private static RequestPostProcessor apiPort() {
-    return request -> {
-      request.setLocalPort(API_PORT);
-      return request;
-    };
-  }
 
   private static RequestPostProcessor protocolPort() {
     return request -> {
@@ -136,31 +75,6 @@ class GolangModuleControllerIT {
 
   private static String unique(final String prefix) {
     return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
-  }
-
-  private User createUser() {
-    return this.createUser(UserRole.USER);
-  }
-
-  private User createUser(final UserRole role) {
-    final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword(VALID_PASSWORD, salt);
-    final var userInfo = this.userTxService.create(unique("gomod"), role, hash, salt);
-    this.entityManager.flush();
-    return this.userRepository.findById(userInfo.getId()).orElseThrow();
-  }
-
-  private String bearerToken(final User user) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createPanelAccessToken(
-            user.getId(), user.getUsername(), Duration.ofMinutes(30));
-  }
-
-  /** The upload goes to the protocol endpoint, which takes protocol tokens, not panel ones. */
-  private String protocolToken(final User user) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createProtocolToken(
-            user.getId(), user.getUsername(), Duration.ofMinutes(30));
   }
 
   private String createRepo(final String name, final boolean privateRepo) {
@@ -222,11 +136,11 @@ class GolangModuleControllerIT {
   @Test
   @DisplayName("lists, searches, versions, and details expose complete response shapes")
   void returnsModuleManagementData() throws Exception {
-    final var user = this.createUser();
-    final var token = this.bearerToken(user);
+    final var user = this.createUser(uniqueUsername("gomod"), UserRole.USER);
+    final var token = this.bearerTokenFor(user);
     final var repo = this.createRepo(unique("go"), true);
-    this.upload(repo, "v1.0.0", this.protocolToken(user));
-    this.upload(repo, "v1.2.0", this.protocolToken(user));
+    this.upload(repo, "v1.0.0", this.protocolBearerTokenFor(user));
+    this.upload(repo, "v1.2.0", this.protocolBearerTokenFor(user));
 
     this.mockMvc
         .perform(get("/api/go/modules/{repo}", repo).with(apiPort()).header(AUTHORIZATION, token))
@@ -287,13 +201,16 @@ class GolangModuleControllerIT {
   @Test
   @DisplayName("supports Go module paths and semver variants while preserving DTO shapes")
   void supportsModulePathAndVersionVariants() throws Exception {
-    final var user = this.createUser();
-    final var token = this.bearerToken(user);
+    final var user = this.createUser(uniqueUsername("gomod"), UserRole.USER);
+    final var token = this.bearerTokenFor(user);
     final var repo = this.createRepo(unique("variants"), false);
-    this.upload(repo, V2_MODULE, "v2.0.0", this.protocolToken(user));
+    this.upload(repo, V2_MODULE, "v2.0.0", this.protocolBearerTokenFor(user));
     this.upload(
-        repo, UPPERCASE_MODULE, "v1.0.0-20240101120000-0123456789ab", this.protocolToken(user));
-    this.upload(repo, MODULE, "v1.2.3+incompatible", this.protocolToken(user));
+        repo,
+        UPPERCASE_MODULE,
+        "v1.0.0-20240101120000-0123456789ab",
+        this.protocolBearerTokenFor(user));
+    this.upload(repo, MODULE, "v1.2.3+incompatible", this.protocolBearerTokenFor(user));
 
     this.mockMvc
         .perform(
@@ -342,8 +259,8 @@ class GolangModuleControllerIT {
   @Test
   @DisplayName("returns complete validation and not-found envelopes for module queries")
   void validatesQueriesAndNotFoundModules() throws Exception {
-    final var user = this.createUser();
-    final var token = this.bearerToken(user);
+    final var user = this.createUser(uniqueUsername("gomod"), UserRole.USER);
+    final var token = this.bearerTokenFor(user);
     final var repo = this.createRepo(unique("validation"), true);
 
     this.mockMvc
@@ -395,11 +312,11 @@ class GolangModuleControllerIT {
   @Test
   @DisplayName("enforces authentication, visibility, repository type, and management permissions")
   void enforcesAuthorizationAndRepositoryBoundaries() throws Exception {
-    final var owner = this.createUser();
-    final var token = this.bearerToken(owner);
+    final var owner = this.createUser(uniqueUsername("gomod"), UserRole.USER);
+    final var token = this.bearerTokenFor(owner);
     final var repo = this.createRepo(unique("private"), true);
     final var publicRepo = this.createRepo(unique("public"), false);
-    this.upload(publicRepo, "v1.0.0", this.protocolToken(owner));
+    this.upload(publicRepo, "v1.0.0", this.protocolBearerTokenFor(owner));
 
     this.mockMvc
         .perform(get("/api/go/modules/{repo}", repo).with(apiPort()))
@@ -426,7 +343,9 @@ class GolangModuleControllerIT {
         .perform(
             get("/api/go/modules/{repo}", repo)
                 .with(apiPort())
-                .header(AUTHORIZATION, this.bearerToken(this.createUser())))
+                .header(
+                    AUTHORIZATION,
+                    this.bearerTokenFor(this.createUser(uniqueUsername("gomod"), UserRole.USER))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.type").value("SUCCESS"))
         .andExpect(jsonPath("$.data.content", hasSize(0)));
@@ -457,8 +376,8 @@ class GolangModuleControllerIT {
   @Test
   @DisplayName("rejects unsupported verbs and keeps sumdb as a deliberate 404")
   void rejectsUnsupportedVerbsAndSumdbVariants() throws Exception {
-    final var user = this.createUser();
-    final var token = this.bearerToken(user);
+    final var user = this.createUser(uniqueUsername("gomod"), UserRole.USER);
+    final var token = this.bearerTokenFor(user);
     final var repo = this.createRepo(unique("verbs"), true);
 
     this.mockMvc
@@ -478,8 +397,8 @@ class GolangModuleControllerIT {
   @Test
   @DisplayName("pins checksum support and authorization behavior")
   void handlesAuthAndSumdb() throws Exception {
-    final var user = this.createUser();
-    final var token = this.bearerToken(user);
+    final var user = this.createUser(uniqueUsername("gomod"), UserRole.USER);
+    final var token = this.bearerTokenFor(user);
     final var repo = this.createRepo(unique("go"), true);
 
     this.mockMvc
@@ -506,11 +425,11 @@ class GolangModuleControllerIT {
   @Test
   @DisplayName("deletes a version and module through the management endpoints")
   void deletesVersionsAndModules() throws Exception {
-    final var user = this.createUser(UserRole.ADMIN);
-    final var token = this.bearerToken(user);
+    final var user = this.createUser(uniqueUsername("gomod"), UserRole.ADMIN);
+    final var token = this.bearerTokenFor(user);
     final var repo = this.createRepo(unique("go"), true);
-    this.upload(repo, "v1.0.0", this.protocolToken(user));
-    this.upload(repo, "v1.2.0", this.protocolToken(user));
+    this.upload(repo, "v1.0.0", this.protocolBearerTokenFor(user));
+    this.upload(repo, "v1.2.0", this.protocolBearerTokenFor(user));
 
     this.mockMvc
         .perform(
@@ -601,8 +520,8 @@ class GolangModuleControllerIT {
     private String seededRepo(final User user) throws Exception {
       final var it = GolangModuleControllerIT.this;
       final var repo = it.createRepo(unique("paging"), false);
-      it.upload(repo, "v1.0.0", it.protocolToken(user));
-      it.upload(repo, "v1.2.0", it.protocolToken(user));
+      it.upload(repo, "v1.0.0", it.protocolBearerTokenFor(user));
+      it.upload(repo, "v1.2.0", it.protocolBearerTokenFor(user));
       return repo;
     }
 
@@ -611,8 +530,8 @@ class GolangModuleControllerIT {
     @DisplayName("accepts every documented sort property in both directions")
     void acceptsSort(final String path, final String property) throws Exception {
       final var it = GolangModuleControllerIT.this;
-      final var user = it.createUser();
-      final var token = it.bearerToken(user);
+      final var user = it.createUser(uniqueUsername("gomod"), UserRole.USER);
+      final var token = it.bearerTokenFor(user);
       final var repo = this.seededRepo(user);
 
       this.list(path, repo, token, "sort", property + ",asc").andExpect(status().isOk());
@@ -623,8 +542,8 @@ class GolangModuleControllerIT {
     @DisplayName("orders the versions by the requested sort property")
     void ordersVersions() throws Exception {
       final var it = GolangModuleControllerIT.this;
-      final var user = it.createUser();
-      final var token = it.bearerToken(user);
+      final var user = it.createUser(uniqueUsername("gomod"), UserRole.USER);
+      final var token = it.bearerTokenFor(user);
       final var repo = this.seededRepo(user);
 
       this.list(VERSIONS, repo, token, "sort", "version,asc")
@@ -640,8 +559,8 @@ class GolangModuleControllerIT {
     @DisplayName("returns 400 validationError naming sort for an unknown sort property")
     void unknownSortIs400(final String path) throws Exception {
       final var it = GolangModuleControllerIT.this;
-      final var user = it.createUser();
-      final var token = it.bearerToken(user);
+      final var user = it.createUser(uniqueUsername("gomod"), UserRole.USER);
+      final var token = it.bearerTokenFor(user);
       final var repo = this.seededRepo(user);
 
       PagingAssertions.expectInvalidParameter(
@@ -654,8 +573,8 @@ class GolangModuleControllerIT {
     void invalidPagingParam(final String path, final String param, final String value)
         throws Exception {
       final var it = GolangModuleControllerIT.this;
-      final var user = it.createUser();
-      final var token = it.bearerToken(user);
+      final var user = it.createUser(uniqueUsername("gomod"), UserRole.USER);
+      final var token = it.bearerTokenFor(user);
       final var repo = this.seededRepo(user);
 
       PagingAssertions.expectInvalidParameter(this.list(path, repo, token, param, value), param);

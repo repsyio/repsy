@@ -25,28 +25,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.RepsyApplication;
+import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
 import io.repsy.os.server.shared.token.utils.TokenUsernameGenerator;
-import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.token.utils.TokenFactory;
-import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
@@ -63,21 +51,11 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Full-stack integration tests for {@code /api/repos/{repoName}/deploy-tokens/*}, exercising the
@@ -97,19 +75,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * deploy tokens are persisted as SHA-256 hashes, {@code DeployTokenForm} has no name pattern or
  * permission field, and token names are not unique per repo.
  */
-@Testcontainers
-@AutoConfigureMockMvc
-@Transactional
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("ProtocolDeployTokenController /api/repos/{repoName}/deploy-tokens/*")
-class ProtocolDeployTokenControllerIT {
+class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
 
-  private static final int API_PORT = 8080;
-  private static final String VALID_PASSWORD = "Password1!";
-  private static final String UUID_PATTERN =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   private static final String DEPLOY_TOKEN_PATTERN = "rdt-[A-Za-z0-9_-]{43}";
   private static final String DEPLOY_USERNAME_PATTERN = "repsy-deploy-token-[a-z0-9]{7}";
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
@@ -125,51 +93,18 @@ class ProtocolDeployTokenControllerIT {
           "TokenFetched", "Token fetched.");
   private static final Instant BASE_TIME = Instant.parse("2026-01-01T00:00:00Z");
 
-  private static final String[] ENVELOPE_KEYS = {"msgId", "type", "data", "errorCode", "text"};
   private static final String[] TOKEN_INFO_KEYS = {"token", "username"};
   private static final String[] LIST_ITEM_KEYS = {
     "id", "name", "username", "description", "read_only", "expiration_date", "created_at"
   };
   private static final String[] PAGE_KEYS = {"size", "number", "totalElements", "totalPages"};
 
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", ProtocolDeployTokenControllerIT::tempStoragePath);
-  }
-
-  private static String tempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-deploy-tokens-it").toString();
-    } catch (final IOException e) {
-      throw new UncheckedIOException(e);
-    }
-  }
-
-  @Autowired private MockMvc mockMvc;
-  @Autowired private JwtUtils jwtUtils;
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
   @Autowired private RepoTxService repoTxService;
   @Autowired private RepoDeployTokenRepository deployTokenRepository;
-  @PersistenceContext private EntityManager entityManager;
 
   // ---------------------------------------------------------------------------------------------
   // Request / fixture helpers
   // ---------------------------------------------------------------------------------------------
-
-  private static RequestPostProcessor apiPort() {
-    return request -> {
-      request.setLocalPort(API_PORT);
-      return request;
-    };
-  }
 
   private static String uniqueName(final String prefix) {
     return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
@@ -177,10 +112,6 @@ class ProtocolDeployTokenControllerIT {
 
   private static String form(final String name) {
     return "{\"name\":\"%s\"}".formatted(name);
-  }
-
-  private ResultActions perform(final MockHttpServletRequestBuilder request) throws Exception {
-    return this.mockMvc.perform(request.with(apiPort()));
   }
 
   private static String tokensUrl(final String repoName) {
@@ -201,34 +132,6 @@ class ProtocolDeployTokenControllerIT {
 
   private RepoInfo createRepo(final RepoType type) {
     return this.repoTxService.createRepo(uniqueName("repo"), type, false, null);
-  }
-
-  private User createUser(final String username, final UserRole role) {
-    final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword(VALID_PASSWORD, salt);
-    final var userInfo = this.userTxService.create(username, role, hash, salt);
-    this.entityManager.flush();
-    return this.userRepository.findById(userInfo.getId()).orElseThrow();
-  }
-
-  private String bearerTokenFor(final User user) {
-    return this.bearerTokenFor(user.getId(), user.getUsername());
-  }
-
-  private String bearerTokenFor(final UUID userId, final String username) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofMinutes(30));
-  }
-
-  private String expiredBearerTokenFor(final User user) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createPanelAccessToken(
-            user.getId(), user.getUsername(), Duration.ofSeconds(-30));
-  }
-
-  /** Creates a fresh, non-seeded ADMIN (the only role holding MANAGE) and returns its token. */
-  private String adminBearerToken() {
-    return this.bearerTokenFor(this.createUser(uniqueName("admin"), UserRole.ADMIN));
   }
 
   /**
@@ -337,42 +240,7 @@ class ProtocolDeployTokenControllerIT {
    */
   private static String expectSuccess(final ResultActions result, final String msgId)
       throws Exception {
-    final var body =
-        result.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-
-    final Map<String, Object> envelope = JsonPath.read(body, "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "SUCCESS")
-        .containsEntry("errorCode", null)
-        .containsEntry("text", SUCCESS_TEXTS.get(msgId));
-    return body;
-  }
-
-  /** Asserts a complete ERROR envelope, including the generated {@code errorCode} UUID. */
-  private static void expectError(
-      final ResultActions result,
-      final HttpStatus expectedStatus,
-      final String msgId,
-      final String data,
-      final String text)
-      throws Exception {
-    final var body =
-        result
-            .andExpect(status().is(expectedStatus.value()))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-
-    final Map<String, Object> envelope = JsonPath.read(body, "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "ERROR")
-        .containsEntry("data", data)
-        .containsEntry("text", text);
-    assertThat((String) envelope.get("errorCode")).matches(UUID_PATTERN);
+    return expectSuccess(result, msgId, SUCCESS_TEXTS.get(msgId));
   }
 
   private static void expectUnsupportedMediaType(final ResultActions result) throws Exception {

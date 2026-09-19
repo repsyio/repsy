@@ -27,33 +27,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.PagingAssertions;
-import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateIndexRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateMetaRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.services.CargoCrateServiceImpl;
-import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
-import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.time.Duration;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -66,111 +52,30 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpStatus;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** Full-stack integration coverage for the Cargo crate-management API. */
-@Testcontainers
-@AutoConfigureMockMvc
-@Transactional
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("CargoCrateController /api/cargo/crates/*")
-class CargoCrateControllerIT {
+class CargoCrateControllerIT extends AbstractIntegrationTest {
 
-  private static final int API_PORT = 8080;
-  private static final String VALID_PASSWORD = "Password1!";
-  private static final String[] ENVELOPE_KEYS = {"msgId", "type", "data", "errorCode", "text"};
-  private static final String UUID_PATTERN =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", CargoCrateControllerIT::tempStoragePath);
-  }
-
-  private static String tempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-cargo-it").toString();
-    } catch (final IOException e) {
-      throw new java.io.UncheckedIOException(e);
-    }
-  }
-
-  @Autowired private MockMvc mockMvc;
-  @Autowired private JwtUtils jwtUtils;
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
-  @Autowired private RepoRepository repoRepository;
   @Autowired private CargoCrateServiceImpl crateService;
   @Autowired private CargoCrateIndexRepository crateIndexRepository;
   @Autowired private CargoCrateMetaRepository crateMetaRepository;
   @Autowired private CargoStorageService cargoStorageService;
-  @PersistenceContext private EntityManager entityManager;
-
-  private static RequestPostProcessor apiPort() {
-    return request -> {
-      request.setLocalPort(API_PORT);
-      return request;
-    };
-  }
 
   private static String unique(final String prefix) {
     return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
   }
 
-  private User createUser(final String prefix, final UserRole role) {
-    final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword(VALID_PASSWORD, salt);
-    final var info = this.userTxService.create(unique(prefix), role, hash, salt);
-    this.entityManager.flush();
-    return this.userRepository.findById(info.getId()).orElseThrow();
-  }
-
-  private static String basicAuth(final String username, final String password) {
-    final var raw = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
-    return "Basic " + Base64.getEncoder().encodeToString(raw);
-  }
-
-  private String token(final User user) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createPanelAccessToken(
-            user.getId(), user.getUsername(), Duration.ofMinutes(30));
-  }
-
-  private String expiredToken(final User user) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createPanelAccessToken(
-            user.getId(), user.getUsername(), Duration.ofSeconds(-30));
-  }
-
   private Repo seedRepo(final RepoType type, final boolean privateRepo) throws Exception {
-    final var admin = this.createUser("admin", UserRole.ADMIN);
+    final var admin = this.createUser(unique("admin"), UserRole.ADMIN);
     final var name = unique("cargo");
     this.mockMvc
         .perform(
             post("/api/repos/" + type.name())
                 .with(apiPort())
-                .header(AUTHORIZATION, this.token(admin))
+                .header(AUTHORIZATION, this.bearerTokenFor(admin))
                 .contentType("application/json")
                 .content("{\"name\":\"%s\",\"privateRepo\":%s}".formatted(name, privateRepo)))
         .andExpect(status().isOk());
@@ -305,17 +210,6 @@ class CargoCrateControllerIT {
 
   private static Map<String, Object> data(final String body) {
     return JsonPath.read(body, "$.data");
-  }
-
-  private static void expectSuccess(
-      final ResultActions result, final String msgId, final String text) throws Exception {
-    final var envelope = (Map<String, Object>) JsonPath.read(body(result), "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "SUCCESS")
-        .containsEntry("errorCode", null)
-        .containsEntry("text", text);
   }
 
   private static void expectError(
@@ -516,12 +410,12 @@ class CargoCrateControllerIT {
     @Test
     void reportsNotFoundForMissingRepoCrateAndVersion() throws Exception {
       final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, false);
-      final var user = CargoCrateControllerIT.this.createUser("reader", UserRole.USER);
+      final var user = CargoCrateControllerIT.this.createUser(unique("reader"), UserRole.USER);
       // A missing repo is only revealed to an authenticated caller; anonymous callers get the
       // same 401 as for a private repo (RPS-887).
       expectError(
           CargoCrateControllerIT.this.request(
-              "GET", "/api/cargo/crates/missing", CargoCrateControllerIT.this.token(user)),
+              "GET", "/api/cargo/crates/missing", CargoCrateControllerIT.this.bearerTokenFor(user)),
           HttpStatus.NOT_FOUND,
           "repoNotFound",
           "Repository not found");
@@ -552,7 +446,7 @@ class CargoCrateControllerIT {
     @DisplayName("answers an unknown Basic username exactly like a wrong password (RPS-906)")
     void basicCredentialsDoNotRevealUsernames() throws Exception {
       final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, true);
-      final var user = CargoCrateControllerIT.this.createUser("basic", UserRole.USER);
+      final var user = CargoCrateControllerIT.this.createUser(unique("basic"), UserRole.USER);
       final var path = "/api/cargo/crates/" + repo.getName();
 
       for (final var auth :
@@ -584,7 +478,7 @@ class CargoCrateControllerIT {
     @Test
     void rejectsMissingMalformedExpiredAndDeletedUserTokens() throws Exception {
       final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, true);
-      final var user = CargoCrateControllerIT.this.createUser("reader", UserRole.USER);
+      final var user = CargoCrateControllerIT.this.createUser(unique("reader"), UserRole.USER);
       final var path = "/api/cargo/crates/" + repo.getName();
       expectError(
           CargoCrateControllerIT.this.request("GET", path, null),
@@ -598,14 +492,15 @@ class CargoCrateControllerIT {
           "Access isn't allowed.");
       expectError(
           CargoCrateControllerIT.this.request(
-              "GET", path, CargoCrateControllerIT.this.expiredToken(user)),
+              "GET", path, CargoCrateControllerIT.this.expiredBearerTokenFor(user)),
           HttpStatus.UNAUTHORIZED,
           "sessionExpired",
           "Session expired.");
       CargoCrateControllerIT.this.userRepository.deleteById(user.getId());
       CargoCrateControllerIT.this.entityManager.flush();
       expectError(
-          CargoCrateControllerIT.this.request("GET", path, CargoCrateControllerIT.this.token(user)),
+          CargoCrateControllerIT.this.request(
+              "GET", path, CargoCrateControllerIT.this.bearerTokenFor(user)),
           HttpStatus.NOT_FOUND,
           "userNotFound",
           "User not found.");
@@ -631,10 +526,12 @@ class CargoCrateControllerIT {
     @Test
     void allowsAnAuthenticatedUserToReadAPrivateRepo() throws Exception {
       final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, true);
-      final var user = CargoCrateControllerIT.this.createUser("noaccess", UserRole.USER);
+      final var user = CargoCrateControllerIT.this.createUser(unique("noaccess"), UserRole.USER);
       CargoCrateControllerIT.this
           .request(
-              "GET", "/api/cargo/crates/" + repo.getName(), CargoCrateControllerIT.this.token(user))
+              "GET",
+              "/api/cargo/crates/" + repo.getName(),
+              CargoCrateControllerIT.this.bearerTokenFor(user))
           .andExpect(status().isOk());
     }
 
@@ -657,7 +554,7 @@ class CargoCrateControllerIT {
     @Test
     void deletesOneVersionUpdatesIndexAndThenDeletesTheCrateFiles() throws Exception {
       final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, false);
-      final var user = CargoCrateControllerIT.this.createUser("manager", UserRole.ADMIN);
+      final var user = CargoCrateControllerIT.this.createUser(unique("manager"), UserRole.ADMIN);
       CargoCrateControllerIT.this.publish(repo, "delete-me", "1.0.0");
       CargoCrateControllerIT.this.publish(repo, "delete-me", "2.0.0");
 
@@ -665,7 +562,7 @@ class CargoCrateControllerIT {
           CargoCrateControllerIT.this.request(
               "DELETE",
               "/api/cargo/crates/" + repo.getName() + "/delete-me/1.0.0",
-              CargoCrateControllerIT.this.token(user)),
+              CargoCrateControllerIT.this.bearerTokenFor(user)),
           "crateVersionDeleted",
           "Crate version deleted.");
       CargoCrateControllerIT.this.entityManager.flush();
@@ -688,7 +585,7 @@ class CargoCrateControllerIT {
           CargoCrateControllerIT.this.request(
               "DELETE",
               "/api/cargo/crates/" + repo.getName() + "/delete-me",
-              CargoCrateControllerIT.this.token(user)),
+              CargoCrateControllerIT.this.bearerTokenFor(user)),
           "crateDeleted",
           "Crate deleted.");
       CargoCrateControllerIT.this.entityManager.flush();
@@ -703,7 +600,7 @@ class CargoCrateControllerIT {
           CargoCrateControllerIT.this.request(
               "DELETE",
               "/api/cargo/crates/" + repo.getName() + "/delete-me",
-              CargoCrateControllerIT.this.token(user)),
+              CargoCrateControllerIT.this.bearerTokenFor(user)),
           HttpStatus.NOT_FOUND,
           "crateNotFound",
           "crateNotFound");
@@ -712,13 +609,13 @@ class CargoCrateControllerIT {
     @Test
     void deniesDeleteToReadOnlyCaller() throws Exception {
       final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, false);
-      final var user = CargoCrateControllerIT.this.createUser("reader", UserRole.USER);
+      final var user = CargoCrateControllerIT.this.createUser(unique("reader"), UserRole.USER);
       CargoCrateControllerIT.this.publish(repo, "protected", "1.0.0");
       expectError(
           CargoCrateControllerIT.this.request(
               "DELETE",
               "/api/cargo/crates/" + repo.getName() + "/protected",
-              CargoCrateControllerIT.this.token(user)),
+              CargoCrateControllerIT.this.bearerTokenFor(user)),
           HttpStatus.UNAUTHORIZED,
           "unAuthorized",
           "The user has logged in but has no permissions.");

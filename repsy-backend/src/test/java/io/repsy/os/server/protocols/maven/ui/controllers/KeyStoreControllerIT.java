@@ -23,27 +23,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.PagingAssertions;
-import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.AllowedKeyserver;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.AllowedKeyserverRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.KeyStoreRepository;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.repo.services.RepoTxService;
-import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -56,93 +45,24 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** Full-stack integration tests for the Maven key-store API. */
-@Testcontainers
-@AutoConfigureMockMvc
-@Transactional
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("KeyStoreController /api/mvn/key-stores/*")
-class KeyStoreControllerIT {
+class KeyStoreControllerIT extends AbstractIntegrationTest {
 
-  private static final int API_PORT = 8080;
-  private static final String PASSWORD = "Password1!";
-  private static final String UUID_PATTERN =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-  private static final String[] ENVELOPE_KEYS = {"msgId", "type", "data", "errorCode", "text"};
   private static final String[] KEY_STORE_KEYS = {
     "id", "allowedKeyserverId", "host", "displayName"
   };
   private static final String[] PAGE_KEYS = {"content", "page"};
 
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", KeyStoreControllerIT::tempStoragePath);
-  }
-
-  private static String tempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-keystore-it").toString();
-    } catch (final IOException exception) {
-      throw new UncheckedIOException(exception);
-    }
-  }
-
-  @Autowired private MockMvc mockMvc;
-  @Autowired private JwtUtils jwtUtils;
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
   @Autowired private RepoTxService repoTxService;
-  @Autowired private RepoRepository repoRepository;
   @Autowired private AllowedKeyserverRepository allowedKeyserverRepository;
   @Autowired private KeyStoreRepository keyStoreRepository;
-  @PersistenceContext private EntityManager entityManager;
-
-  private static RequestPostProcessor apiPort() {
-    return request -> {
-      request.setLocalPort(API_PORT);
-      return request;
-    };
-  }
 
   private static String unique(final String prefix) {
     return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
-  }
-
-  private User createUser(final UserRole role) {
-    final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword(PASSWORD, salt);
-    final var info = this.userTxService.create(unique("user"), role, hash, salt);
-    this.entityManager.flush();
-    return this.userRepository.findById(info.getId()).orElseThrow();
-  }
-
-  private String tokenFor(final User user) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createPanelAccessToken(
-            user.getId(), user.getUsername(), Duration.ofMinutes(30));
   }
 
   private Repo createRepo(final RepoType type) {
@@ -207,14 +127,14 @@ class KeyStoreControllerIT {
 
     @Test
     void returnsActiveServersWithTheCompleteShape() throws Exception {
-      final var user = KeyStoreControllerIT.this.createUser(UserRole.USER);
+      final var user = KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.USER);
       final var response =
           KeyStoreControllerIT.this
               .mockMvc
               .perform(
                   get("/api/mvn/key-stores/allowed-servers")
                       .with(apiPort())
-                      .header(AUTHORIZATION, KeyStoreControllerIT.this.tokenFor(user)))
+                      .header(AUTHORIZATION, KeyStoreControllerIT.this.bearerTokenFor(user)))
               .andExpect(status().isOk())
               .andReturn()
               .getResponse()
@@ -241,7 +161,7 @@ class KeyStoreControllerIT {
       final var server = KeyStoreControllerIT.this.keyserver("pgp.circl.lu");
       server.setActive(false);
       KeyStoreControllerIT.this.allowedKeyserverRepository.saveAndFlush(server);
-      final var user = KeyStoreControllerIT.this.createUser(UserRole.USER);
+      final var user = KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.USER);
 
       final var response =
           KeyStoreControllerIT.this
@@ -249,7 +169,7 @@ class KeyStoreControllerIT {
               .perform(
                   get("/api/mvn/key-stores/allowed-servers")
                       .with(apiPort())
-                      .header(AUTHORIZATION, KeyStoreControllerIT.this.tokenFor(user)))
+                      .header(AUTHORIZATION, KeyStoreControllerIT.this.bearerTokenFor(user)))
               .andExpect(status().isOk())
               .andReturn()
               .getResponse()
@@ -261,7 +181,7 @@ class KeyStoreControllerIT {
 
     @Test
     void rejectsMissingMalformedExpiredAndDeletedUserTokens() throws Exception {
-      final var user = KeyStoreControllerIT.this.createUser(UserRole.USER);
+      final var user = KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.USER);
       final var path = "/api/mvn/key-stores/allowed-servers";
       final var missing =
           KeyStoreControllerIT.this.mockMvc.perform(get(path).with(apiPort())).andReturn();
@@ -309,9 +229,10 @@ class KeyStoreControllerIT {
     @Test
     void createsListsAndDeletesKeyStoresWithCompleteJson() throws Exception {
       final var repo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
-      final var admin = KeyStoreControllerIT.this.createUser(UserRole.ADMIN);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
       final var server = KeyStoreControllerIT.this.keyserver("keyserver.pgp.com");
-      final var token = KeyStoreControllerIT.this.tokenFor(admin);
+      final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
 
       final var created =
           KeyStoreControllerIT.this.performCreate(
@@ -370,8 +291,9 @@ class KeyStoreControllerIT {
     void isolatesRepositoriesAndRejectsDuplicatesAndInvalidKeyservers() throws Exception {
       final var repo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
       final var otherRepo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
-      final var admin = KeyStoreControllerIT.this.createUser(UserRole.ADMIN);
-      final var token = KeyStoreControllerIT.this.tokenFor(admin);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
+      final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
       final var server = KeyStoreControllerIT.this.keyserver("pgpkeys.eu");
 
       assertSuccess(
@@ -404,11 +326,12 @@ class KeyStoreControllerIT {
     void enforcesMavenScopePermissionsAndRepositoryOwnership() throws Exception {
       final var maven = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
       final var npm = KeyStoreControllerIT.this.createRepo(RepoType.NPM);
-      final var user = KeyStoreControllerIT.this.createUser(UserRole.USER);
-      final var admin = KeyStoreControllerIT.this.createUser(UserRole.ADMIN);
+      final var user = KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.USER);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
       final var server = KeyStoreControllerIT.this.keyserver("keyserver.pgp.com");
-      final var userToken = KeyStoreControllerIT.this.tokenFor(user);
-      final var adminToken = KeyStoreControllerIT.this.tokenFor(admin);
+      final var userToken = KeyStoreControllerIT.this.bearerTokenFor(user);
+      final var adminToken = KeyStoreControllerIT.this.bearerTokenFor(admin);
 
       final var readOnlyList =
           KeyStoreControllerIT.this
@@ -469,8 +392,9 @@ class KeyStoreControllerIT {
     @Test
     void validatesRequestBodyAndPathVariables() throws Exception {
       final var repo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
-      final var admin = KeyStoreControllerIT.this.createUser(UserRole.ADMIN);
-      final var token = KeyStoreControllerIT.this.tokenFor(admin);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
+      final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
       final var noBody =
           KeyStoreControllerIT.this
               .mockMvc
@@ -523,7 +447,7 @@ class KeyStoreControllerIT {
     @DisplayName("accepts every documented sort property in both directions")
     void acceptsSort(final String property) throws Exception {
       final var it = KeyStoreControllerIT.this;
-      final var token = it.tokenFor(it.createUser(UserRole.ADMIN));
+      final var token = it.bearerTokenFor(it.createUser(uniqueUsername("user"), UserRole.ADMIN));
       final var repo = this.seededRepo(token);
 
       this.list(repo, token, "sort", property + ",asc").andExpect(status().isOk());
@@ -534,7 +458,7 @@ class KeyStoreControllerIT {
     @DisplayName("returns 400 validationError naming sort for an unknown sort property")
     void unknownSortIs400() throws Exception {
       final var it = KeyStoreControllerIT.this;
-      final var token = it.tokenFor(it.createUser(UserRole.ADMIN));
+      final var token = it.bearerTokenFor(it.createUser(uniqueUsername("user"), UserRole.ADMIN));
       final var repo = this.seededRepo(token);
 
       PagingAssertions.expectInvalidParameter(
@@ -546,7 +470,7 @@ class KeyStoreControllerIT {
     @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
     void invalidPagingParam(final String param, final String value) throws Exception {
       final var it = KeyStoreControllerIT.this;
-      final var token = it.tokenFor(it.createUser(UserRole.ADMIN));
+      final var token = it.bearerTokenFor(it.createUser(uniqueUsername("user"), UserRole.ADMIN));
       final var repo = this.seededRepo(token);
 
       PagingAssertions.expectInvalidParameter(this.list(repo, token, param, value), param);

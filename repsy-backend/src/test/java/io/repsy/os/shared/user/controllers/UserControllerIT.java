@@ -902,9 +902,8 @@ class UserControllerIT extends AbstractIntegrationTest {
     @DisplayName(
         "returns 400 cannotDemoteLastAdminUser for the last remaining ADMIN and changes nothing")
     void cannotDemoteLastAdmin() throws Exception {
-      // AdminUserInitializer seeds exactly one ADMIN at startup; no test here leaves another one
-      // behind, because every test is rolled back.
-      final var lastAdmin = UserControllerIT.this.seededAdmin();
+      // The database is shared with other IT classes, so drop any other committed ADMIN first.
+      final var lastAdmin = UserControllerIT.this.seededAdminAsLastAdmin();
       assertThat(UserControllerIT.this.userRepository.countByRole(UserRole.ADMIN)).isEqualTo(1L);
       final var token = UserControllerIT.this.bearerTokenFor(lastAdmin);
 
@@ -1011,9 +1010,8 @@ class UserControllerIT extends AbstractIntegrationTest {
     @Test
     @DisplayName("returns 400 cannotDeleteLastAdminUser for the last remaining ADMIN")
     void cannotDeleteLastAdmin() throws Exception {
-      // AdminUserInitializer seeds exactly one ADMIN at startup; no test here leaves another one
-      // behind, because every test is rolled back.
-      final var lastAdmin = UserControllerIT.this.seededAdmin();
+      // The database is shared with other IT classes, so drop any other committed ADMIN first.
+      final var lastAdmin = UserControllerIT.this.seededAdminAsLastAdmin();
       assertThat(UserControllerIT.this.userRepository.countByRole(UserRole.ADMIN)).isEqualTo(1L);
       final var token = UserControllerIT.this.bearerTokenFor(lastAdmin);
 

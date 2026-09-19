@@ -29,25 +29,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.PagingAssertions;
-import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
 import io.repsy.os.server.protocols.npm.ui.facades.NpmApiFacade;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.UUID;
@@ -60,73 +53,22 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.PathContainer;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** End-to-end coverage for every npm package-management API mapping. */
-@Testcontainers
-@AutoConfigureMockMvc
-@Transactional
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("NpmPackageApiController /api/npm/packages/*")
-class NpmPackageApiControllerIT {
+class NpmPackageApiControllerIT extends AbstractIntegrationTest {
 
-  private static final int API_PORT = 8080;
   private static final int REPOSITORY_PORT = 9090;
-  private static final String PASSWORD = "Password1!";
-  private static final String UUID_PATTERN =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-  private static final Path STORAGE_PATH = createTempStoragePath();
 
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", NpmPackageApiControllerIT::tempStoragePath);
-  }
-
-  private static String tempStoragePath() {
-    return STORAGE_PATH.toString();
-  }
-
-  private static Path createTempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-npm-package-api-it");
-    } catch (final java.io.IOException exception) {
-      throw new java.io.UncheckedIOException(exception);
-    }
-  }
-
-  @Autowired private MockMvc mockMvc;
   @Autowired private RequestMappingHandlerMapping handlerMapping;
-  @Autowired private JwtUtils jwtUtils;
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
   @Autowired private RepoTxService repoTxService;
-  @Autowired private RepoRepository repoRepository;
   @Autowired private NpmApiFacade npmApiFacade;
   @Autowired private NpmPackageRepository npmPackageRepository;
   @Autowired private PackageVersionRepository packageVersionRepository;
@@ -137,7 +79,7 @@ class NpmPackageApiControllerIT {
 
   @BeforeEach
   void setUp() throws Exception {
-    this.admin = this.createUser(UserRole.ADMIN);
+    this.admin = this.createUser(uniqueUsername("npm-it-"), UserRole.ADMIN);
     this.repoName = "npm-it-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
     final var repoInfo =
         this.repoTxService.createRepo(this.repoName, RepoType.NPM, false, "Npm IT");
@@ -148,14 +90,6 @@ class NpmPackageApiControllerIT {
     this.publish(null, "plain-package", "2.0.0-next.1", "next");
     this.publish("tools", "scoped-package", "1.0.0", "latest");
     this.publish(null, "scope", "1.0.0", "latest");
-  }
-
-  private User createUser(final UserRole role) {
-    final var username = "npm-it-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-    final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword(PASSWORD, salt);
-    final var info = this.userTxService.create(username, role, hash, salt);
-    return this.userRepository.findById(info.getId()).orElseThrow();
   }
 
   private void publish(
@@ -209,7 +143,7 @@ class NpmPackageApiControllerIT {
   }
 
   private String basicAuth() {
-    final var credentials = this.admin.getUsername() + ":" + PASSWORD;
+    final var credentials = this.admin.getUsername() + ":" + VALID_PASSWORD;
     return AuthUtils.AUTH_BASIC
         + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
   }
@@ -219,22 +153,11 @@ class NpmPackageApiControllerIT {
         + this.jwtUtils.createPanelAccessToken(user.getId(), user.getUsername(), duration);
   }
 
-  private static RequestPostProcessor apiPort() {
-    return request -> {
-      request.setLocalPort(API_PORT);
-      return request;
-    };
-  }
-
   private static RequestPostProcessor repositoryPort() {
     return request -> {
       request.setLocalPort(REPOSITORY_PORT);
       return request;
     };
-  }
-
-  private ResultActions perform(final MockHttpServletRequestBuilder request) throws Exception {
-    return this.mockMvc.perform(request.with(apiPort()));
   }
 
   @Nested
@@ -442,7 +365,7 @@ class NpmPackageApiControllerIT {
           .andExpect(jsonPath("$.*", hasSize(5)))
           .andExpect(jsonPath("$.data").value("unAuthorized"))
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
-      final var user = createUser(UserRole.USER);
+      final var user = createUser(uniqueUsername("npm-it-"), UserRole.USER);
       perform(
               delete("/api/npm/packages/{repo}/{package}", repoName, "plain-package")
                   .header(AUTHORIZATION, bearerToken(user, Duration.ofMinutes(30))))
