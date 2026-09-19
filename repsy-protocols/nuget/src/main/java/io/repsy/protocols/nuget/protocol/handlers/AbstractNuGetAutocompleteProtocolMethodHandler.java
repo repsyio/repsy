@@ -99,7 +99,7 @@ public abstract class AbstractNuGetAutocompleteProtocolMethodHandler
 
       return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(results);
     } catch (final Exception e) {
-      log.debug("NuGet autocomplete failed: {}", e.getMessage());
+      log.error("NuGet autocomplete failed", e);
       return ResponseEntity.internalServerError().build();
     }
   }

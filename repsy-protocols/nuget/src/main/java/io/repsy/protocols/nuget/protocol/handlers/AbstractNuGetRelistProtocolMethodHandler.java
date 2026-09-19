@@ -97,7 +97,7 @@ public abstract class AbstractNuGetRelistProtocolMethodHandler implements Protoc
     } catch (final ItemNotFoundException e) {
       return ResponseEntity.status(NOT_FOUND).body(of(e.getMessage()));
     } catch (final Exception e) {
-      log.debug("NuGet relist failed: ", e);
+      log.error("NuGet relist failed", e);
       return ResponseEntity.status(INTERNAL_SERVER_ERROR).body(of("Relist failed"));
     }
   }

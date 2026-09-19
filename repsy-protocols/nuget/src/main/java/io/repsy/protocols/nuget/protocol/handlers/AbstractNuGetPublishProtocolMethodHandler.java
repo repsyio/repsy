@@ -104,6 +104,7 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler implements Proto
     } catch (final ResponseStatusException e) {
       return this.handleConflict(e);
     } catch (final Exception e) {
+      log.error("NuGet publish failed", e);
       return this.createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Publish failed");
     }
   }

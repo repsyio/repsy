@@ -98,6 +98,7 @@ public abstract class AbstractNuGetUnlistProtocolMethodHandler implements Protoc
     } catch (final ItemNotFoundException e) {
       return ResponseEntity.status(NOT_FOUND).body(of(e.getMessage()));
     } catch (final Exception e) {
+      log.error("NuGet unlist failed", e);
       return ResponseEntity.status(INTERNAL_SERVER_ERROR).body(of("Unlist failed"));
     }
   }
