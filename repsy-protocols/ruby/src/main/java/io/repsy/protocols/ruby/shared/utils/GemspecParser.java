@@ -30,7 +30,10 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.Constructor;
+import org.yaml.snakeyaml.constructor.Construct;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.nodes.MappingNode;
+import org.yaml.snakeyaml.nodes.Node;
 import org.yaml.snakeyaml.nodes.Tag;
 
 /**
@@ -45,6 +48,7 @@ public class GemspecParser {
   private static final String METADATA_ENTRY = "metadata.gz";
   private static final String RUNTIME_DEP = "runtime";
   private static final String DEFAULT_PLATFORM = "ruby";
+  private static final String RUBY_TAG_PREFIX = "!ruby/";
 
   public static GemMetadata parse(final byte[] gemBytes) {
     try (final var tar = new TarArchiveInputStream(new ByteArrayInputStream(gemBytes))) {
@@ -65,14 +69,7 @@ public class GemspecParser {
   private static GemMetadata parseMetadataGz(final byte[] gzBytes) {
     final Map<String, Object> spec;
     try (final var gzip = new GZIPInputStream(new ByteArrayInputStream(gzBytes))) {
-      final var opts = new LoaderOptions();
-      final var constructor =
-          new Constructor(opts) {
-            {
-              this.yamlConstructors.put(null, this.yamlConstructors.get(Tag.MAP));
-            }
-          };
-      spec = new Yaml(constructor).load(gzip);
+      spec = new Yaml(new GemspecConstructor()).load(gzip);
     } catch (final IOException | RuntimeException e) {
       throw new BadRequestException("invalidGemFile");
     }
@@ -213,5 +210,30 @@ public class GemspecParser {
     final var ver = pair.get(1);
     final var verStr = ver instanceof final Map<?, ?> m ? m.get("version") : ver;
     return op + " " + verStr;
+  }
+
+  /**
+   * A {@link SafeConstructor} that also accepts the Ruby-specific local tags of a gemspec (<code>
+   * !ruby/object:Gem::Specification</code>, <code>!ruby/object:Gem::Version</code>, ...) by reading
+   * their mappings as plain maps. Global tags (<code>!!java.lang.Foo</code>, <code>
+   * !&lt;tag:yaml.org,2002:...&gt;</code>) that SafeConstructor does not know are still rejected.
+   */
+  private static final class GemspecConstructor extends SafeConstructor {
+
+    GemspecConstructor() {
+      super(new LoaderOptions());
+    }
+
+    @Override
+    protected Construct getConstructor(final Node node) {
+      if (node instanceof MappingNode && isRubyLocalTag(node.getTag())) {
+        return this.yamlConstructors.get(Tag.MAP);
+      }
+      return super.getConstructor(node);
+    }
+
+    private static boolean isRubyLocalTag(final Tag tag) {
+      return tag.getValue().startsWith(RUBY_TAG_PREFIX);
+    }
   }
 }
