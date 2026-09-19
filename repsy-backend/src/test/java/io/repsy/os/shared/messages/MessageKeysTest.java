@@ -98,56 +98,10 @@ class MessageKeysTest {
           "static\\s+final\\s+(?:@\\w+\\s+)?String\\s+([A-Z][A-Z0-9_]*)\\s*=\\s*\"([^\"\\\\]*)\"");
 
   /**
-   * Success msgIds with no bundle entry yet. RPS-940 adds the entries; delete each id here in that
-   * change. {@link #allowlistsHoldOnlyIdsThatAreStillMissing()} fails if one is left behind.
+   * ErrorHandler msgIds with no bundle entry yet. RPS-991 adds the entry; delete the id here in
+   * that change. {@link #allowlistsHoldOnlyIdsThatAreStillMissing()} fails if one is left behind.
    */
-  private static final Set<String> PENDING_RPS_940 =
-      Set.of(
-          "artifactSecurityDetailFetched",
-          "artifactSecuritySummaryFetched",
-          "chartDeleted",
-          "chartDetailFetched",
-          "chartTagsFetched",
-          "chartVersionsFetched",
-          "chartsFetched",
-          "crateDeleted",
-          "crateFetched",
-          "crateVersionDeleted",
-          "crateVersionFetched",
-          "crateVersionsFetched",
-          "cratesFetched",
-          "gemDeleted",
-          "gemVersionDeleted",
-          "gemVersionFetched",
-          "gemVersionsFetched",
-          "gemsFetched",
-          "keyStoresFetched",
-          "moduleDeleted",
-          "moduleInfoFetched",
-          "moduleVersionDeleted",
-          "moduleVersionsFetched",
-          "modulesFetched",
-          "movedToPath",
-          "nugetPackageDeleted",
-          "nugetPackageFetched",
-          "nugetPackagesFetched",
-          "nugetVersionDeleted",
-          "nugetVersionFetched",
-          "nugetVersionsFetched",
-          "passwordReset",
-          "profileFetched",
-          "releaseDetailFetched",
-          "releasesFetched",
-          "repoSecurityDetailFetched",
-          "scanFindingsFetched",
-          "securitySummaryFetched",
-          "tokenRefreshed",
-          "userCreated",
-          "userDeleted",
-          "userUpdated",
-          "usersFetched",
-          "versionGone",
-          "versionSecuritySummaryFetched");
+  private static final Set<String> PENDING_RPS_991 = Set.of("movedToPath");
 
   /**
    * Error msgIds thrown from exceptions with no bundle entry yet. RPS-958 adds the entries or drops
@@ -217,7 +171,7 @@ class MessageKeysTest {
     final var missing = new TreeMap<>(usedMsgIds);
 
     missing.keySet().removeAll(messages.stringPropertyNames());
-    missing.keySet().removeAll(PENDING_RPS_940);
+    missing.keySet().removeAll(PENDING_RPS_991);
     missing.keySet().removeAll(PENDING_RPS_958);
 
     assertThat(missing)
@@ -242,7 +196,7 @@ class MessageKeysTest {
   void allowlistsHoldOnlyIdsThatAreStillMissing() {
     final var pending = new TreeSet<String>();
 
-    pending.addAll(PENDING_RPS_940);
+    pending.addAll(PENDING_RPS_991);
     pending.addAll(PENDING_RPS_958);
 
     final var nowHaveEntries =
