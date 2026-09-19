@@ -2133,6 +2133,92 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   }
 
   // ---------------------------------------------------------------------------------------------
+  // OCI manifest push: malformed manifest (RPS-987)
+  // ---------------------------------------------------------------------------------------------
+
+  @Nested
+  @DisplayName("OCI manifest push manifest validation")
+  class OciPushManifestValidation {
+
+    private static final String DIGEST = "sha256:" + "a".repeat(64);
+
+    private static String layer(final String digest, final String size) {
+      return "{\"layers\":[{\"digest\":%s,\"size\":%s}]}".formatted(digest, size);
+    }
+
+    private MockHttpServletResponse putManifest(final Repo repo, final String manifest)
+        throws Exception {
+      final var it = HelmChartControllerIT.this;
+      return it.protocol(
+              put("/v2/{repo}/{name}/manifests/{tag}", repo.getName(), "payments", "1.0.0")
+                  .contentType(OCI_MANIFEST_TYPE)
+                  .content(manifest)
+                  .header(AUTHORIZATION, it.adminProtocolBearerToken()))
+          .andReturn()
+          .getResponse();
+    }
+
+    static Stream<Arguments> malformedManifests() {
+      return Stream.of(
+          Arguments.of(
+              "not json", "manifestInvalidJson", "The manifest is not a valid JSON object."),
+          Arguments.of("[]", "manifestInvalidJson", "The manifest is not a valid JSON object."),
+          Arguments.of(
+              "{}", "manifestLayersMissing", "The manifest must have a non-empty layers array."),
+          Arguments.of(
+              "{\"layers\":[]}",
+              "manifestLayersMissing",
+              "The manifest must have a non-empty layers array."),
+          Arguments.of(
+              "{\"layers\":[{\"size\":10}]}",
+              "manifestLayerInvalid",
+              "The first layer of the manifest needs a sha256 digest and a numeric size."),
+          Arguments.of(
+              "{\"layers\":[{\"digest\":\"" + DIGEST + "\"}]}",
+              "manifestLayerInvalid",
+              "The first layer of the manifest needs a sha256 digest and a numeric size."),
+          Arguments.of(
+              layer("\"" + DIGEST + "\"", "\"10\""),
+              "manifestLayerInvalid",
+              "The first layer of the manifest needs a sha256 digest and a numeric size."),
+          Arguments.of(
+              layer("\"../../etc/passwd\"", "10"),
+              "manifestLayerInvalid",
+              "The first layer of the manifest needs a sha256 digest and a numeric size."));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("malformedManifests")
+    @DisplayName("a malformed manifest is 400 with a specific msgId and stores nothing")
+    void malformedManifestIsRejected(final String manifest, final String msgId, final String text)
+        throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var repo = it.helmRepo();
+
+      final var push = this.putManifest(repo, manifest);
+
+      requireStatus(push, 400, "OCI manifest push");
+      final var body = push.getContentAsString(StandardCharsets.UTF_8);
+      assertThat((String) JsonPath.read(body, "$.msgId")).isEqualTo(msgId);
+      assertThat((String) JsonPath.read(body, "$.text")).isEqualTo(text);
+      assertThat(it.chartRowExists(repo, "payments")).isFalse();
+      assertThat(it.ociManifestFile(repo, "payments", "1.0.0")).doesNotExist();
+    }
+
+    @Test
+    @DisplayName("a layer whose blob was never uploaded is still 404 blobNotFound")
+    void missingBlobIsStillNotFound() throws Exception {
+      final var repo = HelmChartControllerIT.this.helmRepo();
+
+      final var push = this.putManifest(repo, layer("\"" + DIGEST + "\"", "10"));
+
+      requireStatus(push, 404, "OCI manifest push");
+      assertThat((String) JsonPath.read(push.getContentAsString(StandardCharsets.UTF_8), "$.msgId"))
+          .isEqualTo("blobNotFound");
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------
   // OCI blob finalize (RPS-929)
   // ---------------------------------------------------------------------------------------------
 
