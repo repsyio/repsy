@@ -435,7 +435,7 @@ class FileSystemStorageStrategyIT {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"../escaped", "../../escaped", "nested/digest", "", ".", ".."})
+    @ValueSource(strings = {"../escaped", "../../escaped", "nested/digest", "a\\b", "", ".", ".."})
     @DisplayName("rejects a digest that is not a plain sibling name and leaves the source alone")
     void rejectDigestThatIsNotASibling(final String digest) throws Exception {
       final var key = UUID.randomUUID();

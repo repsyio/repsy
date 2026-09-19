@@ -324,34 +324,38 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   /**
    * Renames the object to its digest. The target is content-addressed, so when it already exists
    * (the same layer pushed twice, or concurrently) it holds the same bytes: the redundant source is
-   * dropped and the call succeeds. The digest comes from the client, so it has to name a sibling of
-   * the source and not escape the storage root.
+   * dropped and the call succeeds. The digest comes from the client, so it has to be a plain file
+   * name: anything that could leave the source's directory is refused.
    */
   @SneakyThrows
   @Override
   public void renameObject(final @NonNull StoragePath storagePath, final @NonNull String digest) {
-    final Path basePathObj = this.toPhysicalPath(storagePath);
-    final Path renamedPath = this.requireInsideBase(basePathObj.resolveSibling(digest).normalize());
-    if (!renamedPath.getParent().equals(basePathObj.getParent())) {
+    if (digest.isEmpty()
+        || digest.equals(".")
+        || digest.contains("..")
+        || digest.contains("/")
+        || digest.contains("\\")) {
       throw new InvalidStoragePathException("invalidStoragePath");
     }
+    final Path basePathObj = this.toPhysicalPath(storagePath);
+    this.moveOrDropDuplicate(basePathObj, basePathObj.resolveSibling(digest));
+  }
+
+  private void moveOrDropDuplicate(final Path source, final Path target) throws IOException {
     try {
-      Files.move(basePathObj, renamedPath);
+      Files.move(source, target);
     } catch (final FileAlreadyExistsException e) {
-      Files.deleteIfExists(basePathObj);
+      Files.deleteIfExists(source);
     }
   }
 
   private @NonNull Path toPhysicalPath(final @NonNull StoragePath storagePath) {
-    final var resolved = this.basePath.normalize().resolve(storagePath.getPath()).normalize();
-    return this.requireInsideBase(resolved);
-  }
-
-  private @NonNull Path requireInsideBase(final @NonNull Path normalizedPath) {
-    if (!normalizedPath.startsWith(this.basePath.normalize())) {
+    final var normalized = this.basePath.normalize();
+    final var resolved = normalized.resolve(storagePath.getPath()).normalize();
+    if (!resolved.startsWith(normalized)) {
       throw new InvalidStoragePathException("invalidStoragePath");
     }
-    return normalizedPath;
+    return resolved;
   }
 
   private void addItems(
