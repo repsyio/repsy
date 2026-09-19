@@ -770,38 +770,34 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
                   .header(AUTHORIZATION, token)));
     }
 
-    /**
-     * The story expected out-of-range paging to answer 500 (RPS-848). It does not: RPS-848
-     * validated only the explicit {@code page}/{@code size} params of other endpoints, while this
-     * one takes a Spring Data {@code Pageable} whose resolver silently falls back to page 0 / size
-     * 10 for non-numeric values, clamps a negative page to 0, replaces a size below 1 with the
-     * default and does not cap the size. Pinned as-is.
-     */
     @ParameterizedTest(name = "{0}={1}")
-    @MethodSource("lenientPagingParams")
-    @DisplayName("falls back to defaults instead of failing for non-numeric or out-of-range paging")
-    void lenientPagingParam(
-        final String param, final String value, final int expectedSize, final int expectedNumber)
-        throws Exception {
+    @MethodSource("invalidPagingParams")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String param, final String value) throws Exception {
       final var it = HelmChartControllerIT.this;
       final var token = it.adminBearerToken();
       final var repo = it.helmRepo();
       it.upload(repo, ChartSpec.of("only", "1.0.0"), token);
 
-      final var body = it.searchWith(repo, token, param, value);
-
-      assertThat(namesOf(body)).containsExactly("only");
-      assertPage(body, expectedSize, expectedNumber, 1, 1);
+      expectError(
+          it.perform(
+              get("/api/helm/charts/{repo}", repo.getName())
+                  .param(param, value)
+                  .header(AUTHORIZATION, token)),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          param,
+          "Incoming data couldn't be validated.");
     }
 
-    static Stream<Arguments> lenientPagingParams() {
+    static Stream<Arguments> invalidPagingParams() {
       return Stream.of(
-          Arguments.of("page", "abc", 10, 0),
-          Arguments.of("size", "abc", 10, 0),
-          Arguments.of("page", "-1", 10, 0),
-          Arguments.of("size", "0", 10, 0),
-          Arguments.of("size", "-1", 10, 0),
-          Arguments.of("size", "101", 101, 0));
+          Arguments.of("page", "abc"),
+          Arguments.of("size", "abc"),
+          Arguments.of("page", "-1"),
+          Arguments.of("size", "0"),
+          Arguments.of("size", "-1"),
+          Arguments.of("size", "101"));
     }
   }
 

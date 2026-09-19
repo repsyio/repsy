@@ -1136,21 +1136,35 @@ class ProtocolDeployTokenControllerIT {
       assertThat(namesOf(descending)).containsExactly("charlie", "bravo", "alpha");
     }
 
-    /**
-     * The story expected out-of-range paging to answer 500 (RPS-848) and asked to pin it. That is
-     * not what happens here: RPS-848 validated only the explicit {@code page}/{@code size} params
-     * of {@code GET /api/users} and {@code GET /api/security/scans}. This endpoint takes a Spring
-     * Data {@code Pageable}, whose argument resolver silently falls back to the defaults (page 0,
-     * size 10) for non-numeric values, clamps a negative page to 0, and replaces a size below 1
-     * with the default. Nothing caps the size at 100 either. Pinned as-is; tightening it belongs
-     * with RPS-848 follow-up work and should turn this into a 400 {@code validationError} test.
-     */
     @ParameterizedTest(name = "{0}={1}")
-    @MethodSource("lenientPagingParams")
-    @DisplayName("falls back to defaults instead of failing for non-numeric or out-of-range paging")
-    void lenientPagingParam(
-        final String param, final String value, final long expectedSize, final long expectedNumber)
-        throws Exception {
+    @MethodSource("invalidPagingParams")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String param, final String value) throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var repo = it.createRepo(RepoType.MAVEN);
+      it.seedToken(repo, "only");
+
+      expectValidationError(
+          it.perform(
+              get(tokensUrl(repo))
+                  .header(AUTHORIZATION, it.adminBearerToken())
+                  .param(param, value)),
+          param);
+    }
+
+    static Stream<Arguments> invalidPagingParams() {
+      return Stream.of(
+          Arguments.of("page", "abc"),
+          Arguments.of("size", "abc"),
+          Arguments.of("page", "-1"),
+          Arguments.of("size", "0"),
+          Arguments.of("size", "-1"),
+          Arguments.of("size", "101"));
+    }
+
+    @Test
+    @DisplayName("accepts the largest allowed size")
+    void acceptsMaxPageSize() throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var repo = it.createRepo(RepoType.MAVEN);
       it.seedToken(repo, "only");
@@ -1160,21 +1174,20 @@ class ProtocolDeployTokenControllerIT {
               it.perform(
                   get(tokensUrl(repo))
                       .header(AUTHORIZATION, it.adminBearerToken())
-                      .param(param, value)),
+                      .param("size", "100")),
               "TokenFetched");
 
       assertThat(namesOf(body)).containsExactly("only");
-      assertPage(body, expectedSize, expectedNumber, 1, 1);
+      assertPage(body, 100, 0, 1, 1);
     }
 
-    static Stream<Arguments> lenientPagingParams() {
-      return Stream.of(
-          Arguments.of("page", "abc", 10, 0),
-          Arguments.of("size", "abc", 10, 0),
-          Arguments.of("page", "-1", 10, 0),
-          Arguments.of("size", "0", 10, 0),
-          Arguments.of("size", "-1", 10, 0),
-          Arguments.of("size", "101", 101, 0));
+    @Test
+    @DisplayName("answers 401 unAuthorized, not 400, when a bad size comes without credentials")
+    void authenticationComesBeforePagingValidation() throws Exception {
+      final var repo = ProtocolDeployTokenControllerIT.this.createRepo(RepoType.MAVEN);
+
+      expectUnauthorized(
+          ProtocolDeployTokenControllerIT.this.perform(get(tokensUrl(repo)).param("size", "0")));
     }
   }
 
