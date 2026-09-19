@@ -19,6 +19,7 @@ import static io.repsy.protocols.helm.shared.utils.HelmOciHttpValues.DOCKER_CONT
 import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 import static org.springframework.http.HttpHeaders.LOCATION;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -150,6 +151,8 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     final var blobResource = this.helmFacade.getBlob(context, layerDigest);
     final var metadata = HelmChartParser.parseChartYaml(blobResource.getInputStream());
 
+    this.requireMatchingChartName(name, metadata.getName());
+
     final var chartForm =
         HelmChartForm.builder()
             .name(metadata.getName())
@@ -194,6 +197,16 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
         .header(DOCKER_CONTENT_DIGEST, manifestInfo.digest())
         .header(CONTENT_TYPE, mediaType)
         .build();
+  }
+
+  /**
+   * The chart and its version are stored under the {@code Chart.yaml} name and the manifest and its
+   * tags under the path name; letting the two differ leaves the chart unreachable by its own tags.
+   */
+  private void requireMatchingChartName(final String pathName, final String chartName) {
+    if (!pathName.equals(chartName)) {
+      throw new BadRequestException("chartNameMismatch");
+    }
   }
 
   @SneakyThrows(NoSuchAlgorithmException.class)
