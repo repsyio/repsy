@@ -85,6 +85,15 @@ public class CargoAuthComponent extends ProtocolAuthService {
     }
 
     if (isBearerToken(authHeader)) {
+      // Only a token issued to a user is renewed. A deploy-token JWT names whatever username the
+      // client sent, so exchanging it would hand out a token for that user.
+      final var authenticationType =
+          this.jwtUtils.extractAuthenticationType(authHeader, TokenRealm.PROTOCOL);
+
+      if (authenticationType != AuthenticationType.USERNAME_PASSWORD) {
+        throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      }
+
       final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
       final var userInfo = this.userTxService.getAuthenticatedUserByUsername(username);
       return this.jwtUtils.createProtocolToken(
@@ -103,15 +112,12 @@ public class CargoAuthComponent extends ProtocolAuthService {
             ? authHeader
             : "Bearer " + authHeader;
 
-    final UserInfo userInfo;
-
     if (isBasicToken(normalized)) {
-      userInfo = this.resolveBasicAuthUser(normalized);
-    } else {
-      userInfo = this.resolveBearerAuthUser(repoInfo, normalized);
+      this.authorizeUser(this.resolveBasicAuthUser(normalized), permission);
+      return;
     }
 
-    this.authorizeUser(userInfo, permission);
+    this.handleBearerAuth(normalized, repoInfo.getStorageKey(), permission);
   }
 
   private UserInfo resolveBasicAuthUser(final String authHeader) {
@@ -123,19 +129,6 @@ public class CargoAuthComponent extends ProtocolAuthService {
     }
 
     return this.authenticateWithPassword(credentials);
-  }
-
-  private @Nullable UserInfo resolveBearerAuthUser(
-      final BaseRepoInfo<UUID> repoInfo, final String authHeader) {
-
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
-    final var userInfoOpt = this.userTxService.getUserByUsernameOptional(username);
-
-    if (userInfoOpt.isEmpty() && repoInfo.isPrivateRepo()) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    return userInfoOpt.orElse(null);
   }
 
   private String authenticateBasicAndCreateToken(final String authHeader) {

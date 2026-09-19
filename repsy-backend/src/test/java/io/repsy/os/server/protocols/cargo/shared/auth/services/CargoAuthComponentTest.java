@@ -15,15 +15,18 @@
  */
 package io.repsy.os.server.protocols.cargo.shared.auth.services;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
+import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
@@ -35,6 +38,7 @@ import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.nio.charset.StandardCharsets;
+import java.time.temporal.TemporalAmount;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
@@ -121,6 +125,8 @@ class CargoAuthComponentTest {
       "authenticateAndCreateToken answers unAuthorized for a bearer token whose user is gone")
   void authenticateAndCreateTokenUserNoLongerExists() {
     final var jwtUtils = Mockito.mock(JwtUtils.class);
+    when(jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+        .thenReturn(AuthenticationType.USERNAME_PASSWORD);
     when(jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class))).thenReturn("ghost");
     // A real UserTxService over an empty repository: the lookup itself is under test.
     final var component =
@@ -131,5 +137,47 @@ class CargoAuthComponentTest {
             Mockito.mock(DeployTokenService.class));
 
     assertUnauthorized(() -> component.authenticateAndCreateToken("Bearer signed.jwt.token"));
+  }
+
+  /**
+   * RPS-979: a deploy-token JWT names whatever username the client sent, so /me must not exchange
+   * it for a token of that user.
+   */
+  @Test
+  @DisplayName("authenticateAndCreateToken refuses to exchange a deploy-token bearer token")
+  void authenticateAndCreateTokenRefusesDeployTokenJwt() {
+    final var jwtUtils = Mockito.mock(JwtUtils.class);
+    when(jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+        .thenReturn(AuthenticationType.DEPLOY_TOKEN);
+    when(jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
+        .thenReturn(USERNAME);
+    final var component =
+        new CargoAuthComponent(
+            this.userTxService, jwtUtils, Mockito.mock(DeployTokenService.class));
+
+    assertUnauthorized(() -> component.authenticateAndCreateToken("Bearer signed.jwt.token"));
+    verify(this.userTxService, never()).getAuthenticatedUserByUsername(anyString());
+    verify(jwtUtils, never())
+        .createProtocolToken(any(UUID.class), anyString(), any(TemporalAmount.class));
+  }
+
+  @Test
+  @DisplayName("authenticateAndCreateToken renews the token of a user")
+  void authenticateAndCreateTokenRenewsUserToken() {
+    final var alice = this.userTxService.getUserByUsernameOptional(USERNAME).orElseThrow();
+    final var jwtUtils = Mockito.mock(JwtUtils.class);
+    when(jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+        .thenReturn(AuthenticationType.USERNAME_PASSWORD);
+    when(jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
+        .thenReturn(USERNAME);
+    when(this.userTxService.getAuthenticatedUserByUsername(USERNAME)).thenReturn(alice);
+    when(jwtUtils.createProtocolToken(eq(alice.getId()), eq(USERNAME), any(TemporalAmount.class)))
+        .thenReturn("renewed");
+    final var component =
+        new CargoAuthComponent(
+            this.userTxService, jwtUtils, Mockito.mock(DeployTokenService.class));
+
+    assertThat(component.authenticateAndCreateToken("Bearer signed.jwt.token"))
+        .isEqualTo("renewed");
   }
 }

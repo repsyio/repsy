@@ -26,6 +26,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.generated.model.RepoPermissionInfo;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
+import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.dtos.PermissionInfo;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
@@ -89,7 +90,7 @@ public class ProtocolAuthService {
       return;
     }
 
-    this.authorizeJWTRequest(authHeader, permission, realm);
+    this.authorizeJWTRequest(authHeader, repoId, permission, realm);
   }
 
   public void handleBasicAuth(
@@ -233,10 +234,29 @@ public class ProtocolAuthService {
     }
   }
 
+  /**
+   * Authorizes a signed JWT by what it was issued for. A deploy-token JWT carries the deploy token
+   * id as its subject and whatever username the client sent as its {@code username} claim, so it is
+   * authorized as that token (bound to the repo, read-only and expiry honored) and its username is
+   * never resolved to a user. Only a token issued to a user is resolved through its username.
+   */
   private void authorizeJWTRequest(
       final @NonNull String authHeader,
+      final @NonNull UUID repoId,
       final @NonNull Permission permission,
       final @NonNull TokenRealm realm) {
+
+    final var authenticationType = this.jwtUtils.extractAuthenticationType(authHeader, realm);
+
+    if (authenticationType == AuthenticationType.DEPLOY_TOKEN) {
+      this.authorizeTokenRequestTokenId(
+          repoId, this.jwtUtils.extractUserId(authHeader, realm), permission);
+      return;
+    }
+
+    if (authenticationType == AuthenticationType.DOCKER_SCAN) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
 
     final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, realm);
     final var userInfo = this.userTxService.getAuthenticatedUserByUsername(username);
