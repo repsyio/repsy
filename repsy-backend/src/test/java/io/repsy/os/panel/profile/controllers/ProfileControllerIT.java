@@ -644,8 +644,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
       ProfileControllerIT.this.expectRefreshRejected(oldRefreshToken);
 
-      final String currentRefreshToken =
-          JsonPath.read(passwordChangeBody, "$.data.refreshToken");
+      final String currentRefreshToken = JsonPath.read(passwordChangeBody, "$.data.refreshToken");
       ProfileControllerIT.this
           .mockMvc
           .perform(
