@@ -21,6 +21,7 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -137,8 +138,11 @@ class RubyGemApiControllerIT {
   }
 
   private RepoInfo createRepo(final boolean privateRepo) {
-    final var repo =
-        this.repoTxService.createRepo(unique("rubyrepo"), RepoType.RUBY, privateRepo, null);
+    return this.createRepo(RepoType.RUBY, privateRepo);
+  }
+
+  private RepoInfo createRepo(final RepoType type, final boolean privateRepo) {
+    final var repo = this.repoTxService.createRepo(unique("rubyrepo"), type, privateRepo, null);
     this.rubyStorageService.createRepo(repo.getId());
     return repo;
   }
@@ -365,6 +369,113 @@ class RubyGemApiControllerIT {
     }
 
     @Test
+    @DisplayName("allows authenticated private reads and returns unknown repositories")
+    void privateReadAndUnknownItems() throws Exception {
+      final var repo = RubyGemApiControllerIT.this.createRepo(true);
+      final var user = RubyGemApiControllerIT.this.createUser(UserRole.USER);
+
+      RubyGemApiControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/ruby/gems/{repo}", repo.getName())
+                  .with(apiPort())
+                  .header(AUTHORIZATION, RubyGemApiControllerIT.this.bearer(user)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("gemsFetched"));
+
+      RubyGemApiControllerIT.this
+          .mockMvc
+          .perform(get("/api/ruby/gems/{repo}", "missing-ruby-repo").with(apiPort()))
+          .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("supports filtering, pagination, and empty results")
+    void filtersAndPaginatesGemList() throws Exception {
+      final var user = RubyGemApiControllerIT.this.createUser(UserRole.USER);
+      final var repo = RubyGemApiControllerIT.this.createRepo(true);
+      final var token = RubyGemApiControllerIT.this.bearer(user);
+      RubyGemApiControllerIT.this.publish(repo.getName(), "alpha-gem", "1.0.0", "ruby", "alpha");
+      RubyGemApiControllerIT.this.publish(repo.getName(), "beta-gem", "1.0.0", "ruby", "beta");
+      RubyGemApiControllerIT.this.publish(repo.getName(), "gamma-gem", "1.0.0", "ruby", "gamma");
+
+      RubyGemApiControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/ruby/gems/{repo}", repo.getName())
+                  .param("name", "beta")
+                  .param("page", "0")
+                  .param("size", "1")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(1)))
+          .andExpect(jsonPath("$.data.content[0].name").value("beta-gem"))
+          .andExpect(jsonPath("$.data.page.number").value(0))
+          .andExpect(jsonPath("$.data.page.size").value(1))
+          .andExpect(jsonPath("$.data.page.totalElements").value(1));
+
+      RubyGemApiControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/ruby/gems/{repo}", repo.getName())
+                  .param("page", "1")
+                  .param("size", "2")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(1)))
+          .andExpect(jsonPath("$.data.page.totalElements").value(3))
+          .andExpect(jsonPath("$.data.page.totalPages").value(2));
+
+      RubyGemApiControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/ruby/gems/{repo}", repo.getName())
+                  .param("name", "does-not-match")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(0)))
+          .andExpect(jsonPath("$.data.page.totalElements").value(0));
+    }
+
+    @Test
+    @DisplayName("returns not found for unknown gems, versions, and platforms")
+    void unknownGemVersionAndPlatformAreNotFound() throws Exception {
+      final var repo = RubyGemApiControllerIT.this.createRepo(false);
+      RubyGemApiControllerIT.this.publish(repo.getName(), "known", "1.0.0", "ruby", "known");
+
+      RubyGemApiControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/ruby/gems/{repo}/{gem}/versions", repo.getName(), "missing")
+                  .with(apiPort()))
+          .andExpect(status().isNotFound());
+      RubyGemApiControllerIT.this
+          .mockMvc
+          .perform(
+              get(
+                      "/api/ruby/gems/{repo}/{gem}/versions/{version}",
+                      repo.getName(),
+                      "known",
+                      "9.9.9")
+                  .with(apiPort()))
+          .andExpect(status().isNotFound());
+      RubyGemApiControllerIT.this
+          .mockMvc
+          .perform(
+              get(
+                      "/api/ruby/gems/{repo}/{gem}/versions/{version}",
+                      repo.getName(),
+                      "known",
+                      "1.0.0")
+                  .param("platform", "missing-platform")
+                  .with(apiPort()))
+          .andExpect(status().isNotFound());
+    }
+
+    @Test
     @DisplayName("rejects missing, malformed, expired, and unknown-user authorization")
     void rejectsInvalidAuthorization() throws Exception {
       final var repo = RubyGemApiControllerIT.this.createRepo(true);
@@ -483,6 +594,38 @@ class RubyGemApiControllerIT {
     }
 
     @Test
+    @DisplayName("deleting the last version also removes its gem")
+    void deletingLastVersionRemovesGem() throws Exception {
+      final var admin = RubyGemApiControllerIT.this.createUser(UserRole.ADMIN);
+      final var repo = RubyGemApiControllerIT.this.createRepo(true);
+      final var token = RubyGemApiControllerIT.this.bearer(admin);
+      RubyGemApiControllerIT.this.publish(repo.getName(), "last-version", "1.0.0", "ruby", "only");
+
+      RubyGemApiControllerIT.this
+          .mockMvc
+          .perform(
+              delete(
+                      "/api/ruby/gems/{repo}/{gem}/versions/{version}",
+                      repo.getName(),
+                      "last-version",
+                      "1.0.0")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("gemVersionDeleted"))
+          .andExpect(jsonPath("$.data").value(nullValue()));
+
+      RubyGemApiControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/ruby/gems/{repo}", repo.getName())
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(0)));
+    }
+
+    @Test
     @DisplayName("does not allow a read-only caller to delete")
     void readOnlyCallerCannotDelete() throws Exception {
       final var repo = RubyGemApiControllerIT.this.createRepo(true);
@@ -497,6 +640,21 @@ class RubyGemApiControllerIT {
                   .header(AUTHORIZATION, RubyGemApiControllerIT.this.bearer(user)))
           .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+    }
+
+    @Test
+    @DisplayName("rejects unsupported methods on the Ruby gem API")
+    void unsupportedMethodsAreRejected() throws Exception {
+      final var repo = RubyGemApiControllerIT.this.createRepo(false);
+
+      RubyGemApiControllerIT.this
+          .mockMvc
+          .perform(post("/api/ruby/gems/{repo}", repo.getName()).with(apiPort()))
+          .andExpect(status().isNotFound());
+      RubyGemApiControllerIT.this
+          .mockMvc
+          .perform(post("/api/ruby/gems/{repo}/{gem}", repo.getName(), "missing").with(apiPort()))
+          .andExpect(status().isNotFound());
     }
   }
 }
