@@ -54,7 +54,7 @@ public interface MavenStorageService<ID> {
 
   long deleteGroup(UUID repoUuid, String groupId);
 
-  long deleteRepo(UUID repoUuid);
+  void deleteRepo(UUID repoUuid);
 
   Pair<Versioning, BaseUsages> deleteVersionFromMetadata(
       BaseRepoInfo<ID> repoInfo, String groupId, String artifactId, String versionName)

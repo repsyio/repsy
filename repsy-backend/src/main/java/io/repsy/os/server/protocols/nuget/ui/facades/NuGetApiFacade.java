@@ -57,9 +57,8 @@ public class NuGetApiFacade implements ProtocolApiFacade {
 
   @Override
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public BaseUsages deleteRepo(final RepoInfo repoInfo) throws IOException {
-    final long freed = this.nugetStorageService.deleteRepo(repoInfo.getId());
-    return BaseUsages.builder().diskUsage(-1L * freed).build();
+  public void deleteRepo(final RepoInfo repoInfo) throws IOException {
+    this.nugetStorageService.deleteRepo(repoInfo.getId());
   }
 
   @Transactional(readOnly = true)

@@ -30,7 +30,7 @@ import tools.jackson.core.JacksonException;
 
 @NullMarked
 public interface NpmStorageService {
-  long deleteRepo(UUID repoId);
+  void deleteRepo(UUID repoId);
 
   void createRepo(UUID repoId);
 

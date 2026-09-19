@@ -41,7 +41,7 @@ public interface PypiStorageService<ID> {
       Map<String, String> versionAndRequiresPythonMap)
       throws IOException, TemplateException;
 
-  long deleteRepo(UUID repoUuid);
+  void deleteRepo(UUID repoUuid);
 
   void createRepo(UUID repoUuid);
 

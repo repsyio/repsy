@@ -190,13 +190,8 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
   }
 
   @Override
-  public long deleteRepo(final UUID repoId) {
-
+  public void deleteRepo(final UUID repoId) {
     final var storagePath = StoragePath.of(repoId);
-    final var usage = this.storageStrategy.calculatePathUsage(storagePath);
-
     this.storageStrategy.deleteDirectory(storagePath);
-
-    return usage;
   }
 }
