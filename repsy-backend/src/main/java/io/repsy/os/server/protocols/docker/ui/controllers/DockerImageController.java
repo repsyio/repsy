@@ -182,15 +182,16 @@ public class DockerImageController {
     return this.restResponseFactory.success("manifestFetched", manifest);
   }
 
-  @GetMapping("/{repoName}/{ignoredImageName}/configs/{digest}")
+  @GetMapping("/{repoName}/{imageName}/configs/{digest}")
   @RepoOperation
   public RestResponse<String> getConfig(
       final RepoInfo repoInfo,
-      @PathVariable final String ignoredImageName,
+      @PathVariable final String imageName,
       @PathVariable final String digest)
       throws IOException {
 
-    final var layer = this.dockerApiFacade.findLayerByDigestAndRepoAndImageName(repoInfo, digest);
+    final var layer =
+        this.dockerApiFacade.findConfigLayerByImageAndDigest(repoInfo, imageName, digest);
 
     final var config = this.dockerApiFacade.getConfig(repoInfo, layer.getDigest());
 

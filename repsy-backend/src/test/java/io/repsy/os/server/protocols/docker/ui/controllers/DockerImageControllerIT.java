@@ -76,7 +76,12 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
 
   private ImageFixture seedImage(final Repo repo, final String imageName, final String tag)
       throws Exception {
-    final String configDigest = "sha256:" + "1".repeat(64);
+    return this.seedImage(repo, imageName, tag, "sha256:" + "1".repeat(64));
+  }
+
+  private ImageFixture seedImage(
+      final Repo repo, final String imageName, final String tag, final String configDigest)
+      throws Exception {
     final String layerDigest = "sha256:" + "2".repeat(64);
     final String manifestDigest =
         "sha256:" + "%064x".formatted((long) tag.hashCode() & 0xffffffffL);
@@ -321,8 +326,66 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           "Tag not found.");
       DockerImageControllerIT.this.expectError(
           DockerImageControllerIT.this.perform(
-              get("/api/docker/images/%s/app/configs/sha256:%s"
+              get("/api/docker/images/%s/missing/configs/sha256:%s"
                       .formatted(repo.getName(), "f".repeat(64)))
+                  .header(AUTHORIZATION, token)),
+          HttpStatus.NOT_FOUND,
+          "imageNotFound",
+          "imageNotFound",
+          "Image not found.");
+    }
+
+    @Test
+    @DisplayName("returns layerNotFound for a config digest the image does not reference")
+    void configDigestUnknownToImage() throws Exception {
+      final var repo = DockerImageControllerIT.this.dockerRepo();
+      final var image = DockerImageControllerIT.this.seedImage(repo, "app", "latest");
+      DockerImageControllerIT.this.expectError(
+          DockerImageControllerIT.this.perform(
+              get("/api/docker/images/%s/%s/configs/sha256:%s"
+                      .formatted(repo.getName(), image.imageName, "f".repeat(64)))
+                  .header(AUTHORIZATION, DockerImageControllerIT.this.userBearerToken())),
+          HttpStatus.NOT_FOUND,
+          "layerNotFound",
+          "layerNotFound",
+          "Layer not found.");
+    }
+
+    @Test
+    @DisplayName("scopes the config endpoint to the requested image within a repository")
+    void configIsScopedToImage() throws Exception {
+      final var repo = DockerImageControllerIT.this.dockerRepo();
+      final var app = DockerImageControllerIT.this.seedImage(repo, "app", "latest");
+      final var other =
+          DockerImageControllerIT.this.seedImage(
+              repo, "other", "latest", "sha256:" + "3".repeat(64));
+      final var token = DockerImageControllerIT.this.userBearerToken();
+
+      for (final var image : List.of(app, other)) {
+        final var config =
+            DockerImageControllerIT.this.expectSuccess(
+                DockerImageControllerIT.this.perform(
+                    get("/api/docker/images/%s/%s/configs/%s"
+                            .formatted(repo.getName(), image.imageName, image.configDigest))
+                        .header(AUTHORIZATION, token)),
+                "configFetched",
+                "Config fetched.");
+        assertThat(JsonPath.<String>read(config, "$.data")).contains("architecture");
+      }
+
+      DockerImageControllerIT.this.expectError(
+          DockerImageControllerIT.this.perform(
+              get("/api/docker/images/%s/%s/configs/%s"
+                      .formatted(repo.getName(), app.imageName, other.configDigest))
+                  .header(AUTHORIZATION, token)),
+          HttpStatus.NOT_FOUND,
+          "layerNotFound",
+          "layerNotFound",
+          "Layer not found.");
+      DockerImageControllerIT.this.expectError(
+          DockerImageControllerIT.this.perform(
+              get("/api/docker/images/%s/%s/configs/%s"
+                      .formatted(repo.getName(), other.imageName, app.configDigest))
                   .header(AUTHORIZATION, token)),
           HttpStatus.NOT_FOUND,
           "layerNotFound",

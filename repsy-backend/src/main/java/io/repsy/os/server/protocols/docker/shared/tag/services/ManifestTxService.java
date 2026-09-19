@@ -195,6 +195,12 @@ public class ManifestTxService implements ManifestService<UUID> {
     return this.tagRepository.findAllByImageRepoIdAndImageId(repoId, imageId);
   }
 
+  public boolean existsByImageIdAndConfigDigest(final UUID imageId, final String configDigest) {
+
+    return this.manifestRepository.existsByTagPlatformTagImageIdAndConfigDigest(
+        imageId, configDigest);
+  }
+
   private void deleteOldManifests(
       final UUID repoId, final UUID imageId, final Tag tag, final List<Manifest> newManifests) {
 
