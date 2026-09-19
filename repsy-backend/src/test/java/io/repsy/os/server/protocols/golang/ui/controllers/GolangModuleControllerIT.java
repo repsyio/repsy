@@ -30,19 +30,27 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.golang.ui.facades.GolangApiFacade;
 import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /** Full-stack integration tests for the Go module-management API. */
@@ -461,5 +469,115 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .header(AUTHORIZATION, token))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.type").value("ERROR"));
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the list endpoints")
+  class PagingAndSorting {
+
+    private static final String MODULES = "/api/go/modules/{repo}";
+    private static final String SEARCH = "/api/go/modules/{repo}/search";
+    private static final String VERSIONS = "/api/go/modules/{repo}/versions";
+
+    static Stream<String> endpoints() {
+      return Stream.of(MODULES, SEARCH, VERSIONS);
+    }
+
+    static Stream<Arguments> acceptedSorts() {
+      return Stream.of(
+          Arguments.of(MODULES, "id"),
+          Arguments.of(MODULES, "modulePath"),
+          Arguments.of(MODULES, "createdAt"),
+          Arguments.of(SEARCH, "id"),
+          Arguments.of(SEARCH, "modulePath"),
+          Arguments.of(SEARCH, "createdAt"),
+          Arguments.of(VERSIONS, "id"),
+          Arguments.of(VERSIONS, "version"),
+          Arguments.of(VERSIONS, "createdAt"));
+    }
+
+    static Stream<Arguments> invalidPagingOnEveryEndpoint() {
+      return endpoints()
+          .flatMap(
+              path ->
+                  PagingAssertions.invalidPagingParams()
+                      .map(args -> Arguments.of(path, args.get()[0], args.get()[1])));
+    }
+
+    private ResultActions list(
+        final String path, final String repo, final String token, final String... params)
+        throws Exception {
+      final var request =
+          get(path, repo).param("modulePath", MODULE).with(apiPort()).header(AUTHORIZATION, token);
+
+      for (int i = 0; i < params.length; i += 2) {
+        request.param(params[i], params[i + 1]);
+      }
+
+      return GolangModuleControllerIT.this.mockMvc.perform(request);
+    }
+
+    private String seededRepo(final User user) throws Exception {
+      final var it = GolangModuleControllerIT.this;
+      final var repo = it.createRepo(unique("paging"), false);
+      it.upload(repo, "v1.0.0", it.protocolBearerTokenFor(user));
+      it.upload(repo, "v1.2.0", it.protocolBearerTokenFor(user));
+      return repo;
+    }
+
+    @ParameterizedTest(name = "{0} sort={1}")
+    @MethodSource("acceptedSorts")
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String path, final String property) throws Exception {
+      final var it = GolangModuleControllerIT.this;
+      final var user = it.createUser(uniqueUsername("gomod"), UserRole.USER);
+      final var token = it.bearerTokenFor(user);
+      final var repo = this.seededRepo(user);
+
+      this.list(path, repo, token, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(path, repo, token, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("orders the versions by the requested sort property")
+    void ordersVersions() throws Exception {
+      final var it = GolangModuleControllerIT.this;
+      final var user = it.createUser(uniqueUsername("gomod"), UserRole.USER);
+      final var token = it.bearerTokenFor(user);
+      final var repo = this.seededRepo(user);
+
+      this.list(VERSIONS, repo, token, "sort", "version,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("v1.0.0"));
+      this.list(VERSIONS, repo, token, "sort", "version,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("v1.2.0"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400(final String path) throws Exception {
+      final var it = GolangModuleControllerIT.this;
+      final var user = it.createUser(uniqueUsername("gomod"), UserRole.USER);
+      final var token = it.bearerTokenFor(user);
+      final var repo = this.seededRepo(user);
+
+      PagingAssertions.expectInvalidParameter(
+          this.list(path, repo, token, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0} {1}={2}")
+    @MethodSource("invalidPagingOnEveryEndpoint")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String path, final String param, final String value)
+        throws Exception {
+      final var it = GolangModuleControllerIT.this;
+      final var user = it.createUser(uniqueUsername("gomod"), UserRole.USER);
+      final var token = it.bearerTokenFor(user);
+      final var repo = this.seededRepo(user);
+
+      PagingAssertions.expectInvalidParameter(this.list(path, repo, token, param, value), param);
+    }
   }
 }

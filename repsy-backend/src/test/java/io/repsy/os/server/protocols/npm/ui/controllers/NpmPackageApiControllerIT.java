@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
 import io.repsy.os.server.protocols.npm.ui.facades.NpmApiFacade;
@@ -55,6 +56,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.PathContainer;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
@@ -493,6 +495,89 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
               path ->
                   Stream.of(HttpMethod.PUT, HttpMethod.POST, HttpMethod.PATCH)
                       .map(method -> Arguments.of(method, path)));
+    }
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the list endpoints")
+  class PagingAndSorting {
+
+    private static final String PACKAGES = "/api/npm/packages/{repo}";
+    private static final String UNSCOPED = "/api/npm/packages/{repo}/scope";
+    private static final String SCOPED = "/api/npm/packages/{repo}/scope/tools";
+    private static final String VERSIONS =
+        "/api/npm/packages/{repo}/package/plain-package/versions";
+    private static final String SCOPED_VERSIONS =
+        "/api/npm/packages/{repo}/tools/package/scoped-package/versions";
+
+    static Stream<String> endpoints() {
+      return Stream.of(PACKAGES, UNSCOPED, SCOPED, VERSIONS, SCOPED_VERSIONS);
+    }
+
+    static Stream<Arguments> acceptedSorts() {
+      final var packageSorts =
+          Stream.of(PACKAGES, UNSCOPED, SCOPED)
+              .flatMap(
+                  path ->
+                      Stream.of("id", "name", "scope", "updatedAt")
+                          .map(property -> Arguments.of(path, property)));
+      final var versionSorts =
+          Stream.of(VERSIONS, SCOPED_VERSIONS)
+              .flatMap(
+                  path ->
+                      Stream.of("id", "version", "createdAt")
+                          .map(property -> Arguments.of(path, property)));
+
+      return Stream.concat(packageSorts, versionSorts);
+    }
+
+    static Stream<Arguments> invalidPagingOnEveryEndpoint() {
+      return endpoints()
+          .flatMap(
+              path ->
+                  PagingAssertions.invalidPagingParams()
+                      .map(args -> Arguments.of(path, args.get()[0], args.get()[1])));
+    }
+
+    private ResultActions list(final String path, final String param, final String value)
+        throws Exception {
+      return NpmPackageApiControllerIT.this.perform(
+          get(path, NpmPackageApiControllerIT.this.repoName).param(param, value));
+    }
+
+    @ParameterizedTest(name = "{0} sort={1}")
+    @MethodSource("acceptedSorts")
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String path, final String property) throws Exception {
+      this.list(path, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(path, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("orders the versions by the requested sort property")
+    void ordersVersions() throws Exception {
+      this.list(VERSIONS, "sort", "version,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("1.0.0"));
+      this.list(VERSIONS, "sort", "version,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("2.0.0-next.1"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400(final String path) throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(path, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0} {1}={2}")
+    @MethodSource("invalidPagingOnEveryEndpoint")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String path, final String param, final String value)
+        throws Exception {
+      PagingAssertions.expectInvalidParameter(this.list(path, param, value), param);
     }
   }
 }

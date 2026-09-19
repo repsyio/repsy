@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.services.RubyGemServiceImpl;
 import io.repsy.os.server.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.os.shared.auth.utils.AuthUtils;
@@ -41,13 +42,18 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.web.servlet.ResultActions;
 
 /** Full-stack integration coverage for the Ruby gem-management API. */
 @DisplayName("RubyGemApiController /api/ruby/gems/*")
@@ -596,6 +602,102 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(post("/api/ruby/gems/{repo}/{gem}", repo.getName(), "missing").with(apiPort()))
           .andExpect(status().isNotFound());
+    }
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the list endpoints")
+  class PagingAndSorting {
+
+    private static final String GEMS = "/api/ruby/gems/{repo}";
+    private static final String VERSIONS = "/api/ruby/gems/{repo}/fixture-gem/versions";
+
+    static Stream<String> endpoints() {
+      return Stream.of(GEMS, VERSIONS);
+    }
+
+    static Stream<Arguments> acceptedSorts() {
+      return Stream.concat(
+          Stream.of("id", "name", "updatedAt").map(property -> Arguments.of(GEMS, property)),
+          Stream.of("id", "version", "createdAt")
+              .map(property -> Arguments.of(VERSIONS, property)));
+    }
+
+    static Stream<Arguments> invalidPagingOnEveryEndpoint() {
+      return endpoints()
+          .flatMap(
+              path ->
+                  PagingAssertions.invalidPagingParams()
+                      .map(args -> Arguments.of(path, args.get()[0], args.get()[1])));
+    }
+
+    private record Seed(RepoInfo repo, String token) {}
+
+    private Seed seed() throws Exception {
+      final var it = RubyGemApiControllerIT.this;
+      final var user = it.createUser(uniqueUsername("ruby"), UserRole.USER);
+      final var repo = it.createRepo(true);
+
+      it.publish(repo.getName(), "fixture-gem", "1.0.0", "ruby", "stable fixture");
+      it.publish(repo.getName(), "fixture-gem", "1.1.0", "ruby", "latest fixture");
+      it.publish(repo.getName(), "other-gem", "0.1.0", "ruby", "other fixture");
+
+      return new Seed(repo, it.bearerTokenFor(user));
+    }
+
+    private ResultActions list(
+        final Seed seed, final String path, final String param, final String value)
+        throws Exception {
+      return RubyGemApiControllerIT.this.mockMvc.perform(
+          get(path, seed.repo().getName())
+              .param(param, value)
+              .with(apiPort())
+              .header(AUTHORIZATION, seed.token()));
+    }
+
+    @ParameterizedTest(name = "{0} sort={1}")
+    @MethodSource("acceptedSorts")
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String path, final String property) throws Exception {
+      final var seed = this.seed();
+
+      this.list(seed, path, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(seed, path, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("orders the gems and versions by the requested sort property")
+    void ordersByRequestedProperty() throws Exception {
+      final var seed = this.seed();
+
+      this.list(seed, GEMS, "sort", "name,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("fixture-gem"));
+      this.list(seed, GEMS, "sort", "name,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("other-gem"));
+      this.list(seed, VERSIONS, "sort", "version,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("1.0.0"));
+      this.list(seed, VERSIONS, "sort", "version,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("1.1.0"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400(final String path) throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(this.seed(), path, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0} {1}={2}")
+    @MethodSource("invalidPagingOnEveryEndpoint")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String path, final String param, final String value)
+        throws Exception {
+      PagingAssertions.expectInvalidParameter(this.list(this.seed(), path, param, value), param);
     }
   }
 }
