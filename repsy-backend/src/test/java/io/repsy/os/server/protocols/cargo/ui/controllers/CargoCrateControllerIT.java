@@ -427,14 +427,14 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
               "GET", "/api/cargo/crates/" + repo.getName() + "/missing", null),
           HttpStatus.NOT_FOUND,
           "crateNotFound",
-          "crateNotFound");
+          "Crate not found.");
       CargoCrateControllerIT.this.publish(repo, "exists", "1.0.0");
       expectError(
           CargoCrateControllerIT.this.request(
               "GET", "/api/cargo/crates/" + repo.getName() + "/exists/9.9.9", null),
           HttpStatus.NOT_FOUND,
           "crateVersionNotFound",
-          "crateVersionNotFound");
+          "Crate version not found.");
     }
   }
 
@@ -603,7 +603,7 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
               CargoCrateControllerIT.this.bearerTokenFor(user)),
           HttpStatus.NOT_FOUND,
           "crateNotFound",
-          "crateNotFound");
+          "Crate not found.");
     }
 
     @Test

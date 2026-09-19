@@ -254,7 +254,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
         HttpStatus.UNAUTHORIZED,
         "refreshTokenExpired",
         "refreshTokenExpired",
-        "refreshTokenExpired");
+        "Refresh token expired.");
   }
 
   private static void expectInternalError(final ResultActions result) throws Exception {

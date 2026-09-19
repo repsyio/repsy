@@ -586,7 +586,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   }
 
   private static void expectChartNotFound(final ResultActions result) throws Exception {
-    expectError(result, HttpStatus.NOT_FOUND, "chartNotFound", "chartNotFound", "chartNotFound");
+    expectError(result, HttpStatus.NOT_FOUND, "chartNotFound", "chartNotFound", "Chart not found.");
   }
 
   private static void expectRepoNotFound(final ResultActions result) throws Exception {
