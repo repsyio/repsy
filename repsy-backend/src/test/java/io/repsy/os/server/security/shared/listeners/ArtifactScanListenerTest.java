@@ -65,11 +65,14 @@ class ArtifactScanListenerTest {
 
   private ArtifactScanListener listener;
   private Logger listenerLogger;
+  private Level originalLogLevel;
   private ListAppender<ILoggingEvent> logAppender;
 
   @BeforeEach
   void setUp() {
     this.listenerLogger = (Logger) LoggerFactory.getLogger(ArtifactScanListener.class);
+    this.originalLogLevel = this.listenerLogger.getLevel();
+    this.listenerLogger.setLevel(Level.DEBUG);
     this.logAppender = new ListAppender<>();
     this.logAppender.start();
     this.listenerLogger.addAppender(this.logAppender);
@@ -87,6 +90,7 @@ class ArtifactScanListenerTest {
   @AfterEach
   void tearDown() {
     this.listenerLogger.detachAppender(this.logAppender);
+    this.listenerLogger.setLevel(this.originalLogLevel);
   }
 
   @Test
