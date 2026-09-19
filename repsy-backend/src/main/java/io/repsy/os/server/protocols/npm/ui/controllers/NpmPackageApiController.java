@@ -112,20 +112,6 @@ public class NpmPackageApiController {
     return this.restResponseFactory.success(PACKAGES_FETCHED, new PagedModel<>(packages));
   }
 
-  @GetMapping("/{repoName}/{ignoredScope}")
-  @RepoOperation
-  public RestResponse<PagedModel<NpmPackageListItem>> list(
-      final RepoInfo repoInfo,
-      @PathVariable final String ignoredScope,
-      @RequestParam(required = false, defaultValue = "") final String name,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
-
-    final var packages =
-        this.npmPackageService.getPackagesContainsName(repoInfo.getStorageKey(), name, pageable);
-
-    return this.restResponseFactory.success(PACKAGES_FETCHED, new PagedModel<>(packages));
-  }
-
   @GetMapping({
     "/{repoName}/scope",
     "/{repoName}/scope/{scope}",
