@@ -308,8 +308,8 @@ public class ErrorHandler {
   }
 
   /**
-   * Handles an unacceptable {@code page} or {@code size} on a paged endpoint, answering like a
-   * constraint violation on an explicit request parameter does.
+   * Handles an unacceptable {@code page}, {@code size} or {@code sort} on a paged endpoint,
+   * answering like a constraint violation on an explicit request parameter does.
    *
    * @param ex Thrown paging exception
    * @return REST response
