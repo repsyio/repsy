@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.shared.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -32,7 +31,6 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import jakarta.persistence.PersistenceException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.time.Instant;
@@ -922,7 +920,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("KNOWN DEFECT: a 500-character description is fine but 501 is not validated")
+    @DisplayName("returns 400 validationError for a 501-character description")
     void descriptionOverColumnLength() throws Exception {
       final var ok = uniqueRepoName("d500");
       expectSuccess(
@@ -935,24 +933,17 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           "Repo created.");
       assertThat(ProtocolRepoControllerIT.this.reloadRepo(ok).getDescription()).hasSize(500);
 
-      // RepoCreateForm.description has no maxLength (RepoDescriptionForm does), so the form passes
-      // validation and the INSERT is what fails. Hibernate defers it until flush; in production
-      // RepoTxService.createRepo commits on return, so the caller gets a 500 errorOccurred. Here
-      // the test-managed transaction hides that, so pin the failing flush instead.
       final var tooLong = uniqueRepoName("d501");
-      expectSuccess(
+      final var dirsBefore = directoryCount(RepoType.NPM);
+      expectValidationError(
           ProtocolRepoControllerIT.this.perform(
               json(
                       post("/api/repos/NPM"),
                       "{\"name\":\"%s\",\"description\":\"%s\"}"
                           .formatted(tooLong, "d".repeat(501)))
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          "repoCreated",
-          "Repo created.");
-
-      assertThatThrownBy(() -> ProtocolRepoControllerIT.this.entityManager.flush())
-          .isInstanceOf(PersistenceException.class)
-          .hasStackTraceContaining("value too long for type character varying(500)");
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
+      assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(tooLong)).isEmpty();
+      assertThat(directoryCount(RepoType.NPM)).isEqualTo(dirsBefore);
     }
   }
 
