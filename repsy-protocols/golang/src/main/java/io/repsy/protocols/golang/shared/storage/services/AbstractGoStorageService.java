@@ -105,7 +105,7 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
       for (final var item : items) {
         this.tryDeleteVersionFile(item, versionPrefix, atVDirPath, storageKey);
       }
-    } catch (final ItemNotFoundException e) {
+    } catch (final ItemNotFoundException _) {
       // No @v directory means there are no files left to remove.
       log.debug("Nothing to delete under {}", atVStoragePath);
     } catch (final Exception e) {
