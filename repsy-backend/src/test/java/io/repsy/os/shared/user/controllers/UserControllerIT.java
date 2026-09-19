@@ -62,6 +62,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 class UserControllerIT extends AbstractIntegrationTest {
 
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
+  private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String USERNAME_IN_USE_TEXT = "Username is in use. Please try another one.";
   private static final String USER_NOT_FOUND_TEXT = "User not found.";
   private static final Instant BASE_TIME = Instant.parse("2026-01-01T00:00:00Z");
@@ -121,6 +122,15 @@ class UserControllerIT extends AbstractIntegrationTest {
 
   private static void expectValidationError(final ResultActions result) throws Exception {
     expectError(result, HttpStatus.BAD_REQUEST, "validationError", null, VALIDATION_TEXT);
+  }
+
+  private static void expectUnsupportedMediaType(final ResultActions result) throws Exception {
+    expectError(
+        result,
+        HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+        "unsupportedMediaType",
+        null,
+        UNSUPPORTED_MEDIA_TYPE_TEXT);
   }
 
   /** Asserts the complete {@code UserResponse} shape against the row as stored in the database. */
@@ -712,11 +722,11 @@ class UserControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 400 validationError for an unsupported content type")
+    @DisplayName("returns 415 unsupportedMediaType for an unsupported content type")
     void unsupportedContentType() throws Exception {
       final var token = UserControllerIT.this.adminBearerToken();
 
-      expectValidationError(
+      expectUnsupportedMediaType(
           UserControllerIT.this.perform(
               post("/api/users")
                   .header(AUTHORIZATION, token)

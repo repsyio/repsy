@@ -16,23 +16,28 @@
 package io.repsy.os.shared.error_handling.services;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.core.response.services.RestResponseFactory;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
@@ -111,12 +116,42 @@ class ErrorHandlerTest {
   }
 
   @Test
-  @DisplayName("answers 400 methodNotSupported for an unsupported HTTP method")
+  @DisplayName("answers 405 methodNotSupported with an Allow header for an unsupported HTTP method")
   void methodNotSupported() throws Exception {
+    final var result =
+        this.mockMvc
+            .perform(multipart("/cookie"))
+            .andExpect(status().isMethodNotAllowed())
+            .andExpect(jsonPath("$.msgId").value("methodNotSupported"))
+            .andReturn();
+
+    assertThat(result.getResponse().getHeader(HttpHeaders.ALLOW)).contains("GET");
+  }
+
+  @Test
+  @DisplayName(
+      "answers 415 unsupportedMediaType with an Accept header for an unsupported body type")
+  void mediaTypeNotSupported() throws Exception {
+    final var result =
+        this.mockMvc
+            .perform(post("/json").contentType(MediaType.TEXT_PLAIN).content("{}"))
+            .andExpect(status().isUnsupportedMediaType())
+            .andExpect(jsonPath("$.msgId").value("unsupportedMediaType"))
+            .andExpect(jsonPath("$.type").value("ERROR"))
+            .andExpect(jsonPath("$.text").value("Unsupported media type."))
+            .andReturn();
+
+    assertThat(result.getResponse().getHeader(HttpHeaders.ACCEPT))
+        .contains(MediaType.APPLICATION_JSON_VALUE);
+  }
+
+  @Test
+  @DisplayName("keeps 400 validationError for a body that cannot be read")
+  void malformedBody() throws Exception {
     this.mockMvc
-        .perform(multipart("/cookie"))
+        .perform(post("/json").contentType(MediaType.APPLICATION_JSON).content("{not json"))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.msgId").value("methodNotSupported"));
+        .andExpect(jsonPath("$.msgId").value("validationError"));
   }
 
   @Test
@@ -151,6 +186,11 @@ class ErrorHandlerTest {
     @GetMapping("/cookie")
     String cookie(@CookieValue("sid") final String sid) {
       return sid;
+    }
+
+    @PostMapping(value = "/json", consumes = MediaType.APPLICATION_JSON_VALUE)
+    String json(@RequestBody final Map<String, String> body) {
+      return body.toString();
     }
 
     @PostMapping("/part")

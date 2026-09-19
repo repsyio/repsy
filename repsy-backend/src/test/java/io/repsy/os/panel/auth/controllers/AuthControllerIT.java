@@ -115,6 +115,7 @@ class AuthControllerIT {
   private static final String UUID_PATTERN =
       "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
+  private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String USER_NOT_FOUND_TEXT = "User not found.";
   private static final String INVALID_CREDENTIALS_TEXT = "Username or password is incorrect.";
   private static final String ACCESS_NOT_ALLOWED_TEXT = "Access isn't allowed.";
@@ -325,6 +326,15 @@ class AuthControllerIT {
 
   private static void expectValidationError(final ResultActions result) throws Exception {
     expectError(result, HttpStatus.BAD_REQUEST, "validationError", null, VALIDATION_TEXT);
+  }
+
+  private static void expectUnsupportedMediaType(final ResultActions result) throws Exception {
+    expectError(
+        result,
+        HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+        "unsupportedMediaType",
+        null,
+        UNSUPPORTED_MEDIA_TYPE_TEXT);
   }
 
   private static void expectUserNotFound(final ResultActions result) throws Exception {
@@ -630,11 +640,11 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 400 validationError for an unsupported content type")
+    @DisplayName("returns 415 unsupportedMediaType for an unsupported content type")
     void unsupportedContentType() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("plain"), UserRole.USER);
 
-      expectValidationError(
+      expectUnsupportedMediaType(
           AuthControllerIT.this.perform(
               post("/api/auth/login")
                   .contentType(MediaType.TEXT_PLAIN)
@@ -642,11 +652,11 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 400 validationError when no content type is sent")
+    @DisplayName("returns 415 unsupportedMediaType when no content type is sent")
     void missingContentType() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("notype"), UserRole.USER);
 
-      expectValidationError(
+      expectUnsupportedMediaType(
           AuthControllerIT.this.perform(
               post("/api/auth/login").content(loginBody(user.getUsername(), VALID_PASSWORD))));
     }
@@ -1039,9 +1049,9 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 400 validationError for an unsupported content type")
+    @DisplayName("returns 415 unsupportedMediaType for an unsupported content type")
     void unsupportedContentType() throws Exception {
-      expectValidationError(
+      expectUnsupportedMediaType(
           AuthControllerIT.this.perform(
               post("/api/auth/tokens/refresh")
                   .contentType(MediaType.TEXT_PLAIN)
