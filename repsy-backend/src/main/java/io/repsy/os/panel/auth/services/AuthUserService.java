@@ -16,6 +16,7 @@
 package io.repsy.os.panel.auth.services;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.events.UserLoginEvent;
 import io.repsy.os.generated.model.LoginForm;
 import io.repsy.os.generated.model.LoginInfo;
@@ -36,6 +37,13 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuthUserService {
 
+  private static final @NonNull String INVALID_CREDENTIALS = "invalidCredentials";
+  private static final @NonNull UserInfo DUMMY_USER =
+      UserInfo.builder()
+          .salt("repsy-login-dummy")
+          .hash("0000000000000000000000000000000000000000000000000000000000000000")
+          .build();
+
   private final @NonNull UserTxService userTxService;
   private final @NonNull JwtUtils jwtUtils;
   private final @NonNull ApplicationEventPublisher eventPublisher;
@@ -43,7 +51,14 @@ public class AuthUserService {
   @Transactional
   public @NonNull LoginInfo login(final @NonNull LoginForm form) {
 
-    final var user = this.userTxService.getUserByUsername(form.getUsername());
+    final UserInfo user;
+    try {
+      user = this.userTxService.getUserByUsername(form.getUsername());
+    } catch (final ItemNotFoundException exception) {
+      // Perform the same hash work for unknown usernames to avoid leaking account existence.
+      this.checkPassword(DUMMY_USER, form);
+      throw new AccessNotAllowedException(INVALID_CREDENTIALS);
+    }
 
     this.checkPassword(user, form);
 
@@ -65,7 +80,7 @@ public class AuthUserService {
     final var hash = DigestUtils.sha256Hex(form.getPassword() + user.getSalt());
 
     if (!hash.equals(user.getHash())) {
-      throw new AccessNotAllowedException("wrongPassword");
+      throw new AccessNotAllowedException(INVALID_CREDENTIALS);
     }
   }
 

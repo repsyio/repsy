@@ -116,8 +116,7 @@ class AuthControllerIT {
       "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
   private static final String USER_NOT_FOUND_TEXT = "User not found.";
-  private static final String WRONG_PASSWORD_TEXT =
-      "Password is wrong, try another one or reset your password.";
+  private static final String INVALID_CREDENTIALS_TEXT = "Username or password is incorrect.";
   private static final String ACCESS_NOT_ALLOWED_TEXT = "Access isn't allowed.";
   private static final String INTERNAL_ERROR_TEXT = "An error occurred.";
 
@@ -319,6 +318,15 @@ class AuthControllerIT {
     expectError(result, HttpStatus.NOT_FOUND, "userNotFound", "userNotFound", USER_NOT_FOUND_TEXT);
   }
 
+  private static void expectInvalidCredentials(final ResultActions result) throws Exception {
+    expectError(
+        result,
+        HttpStatus.FORBIDDEN,
+        "invalidCredentials",
+        "invalidCredentials",
+        INVALID_CREDENTIALS_TEXT);
+  }
+
   private static void expectAccessNotAllowed(final ResultActions result) throws Exception {
     expectError(
         result,
@@ -478,9 +486,9 @@ class AuthControllerIT {
         expectError(
             AuthControllerIT.this.login(username, OTHER_VALID_PASSWORD),
             HttpStatus.FORBIDDEN,
-            "wrongPassword",
-            "wrongPassword",
-            WRONG_PASSWORD_TEXT);
+            "invalidCredentials",
+            "invalidCredentials",
+            INVALID_CREDENTIALS_TEXT);
         assertThat(AuthControllerIT.this.userRepository.findById(userId).orElseThrow())
             .extracting(User::getLastLoginAt)
             .isNull();
@@ -506,44 +514,37 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 404 userNotFound for an unknown username")
+    @DisplayName("returns 403 invalidCredentials for an unknown username")
     void unknownUsername() throws Exception {
-      expectUserNotFound(AuthControllerIT.this.login(uniqueUsername("ghost"), VALID_PASSWORD));
+      expectInvalidCredentials(
+          AuthControllerIT.this.login(uniqueUsername("ghost"), VALID_PASSWORD));
     }
 
     @Test
-    @DisplayName("returns 403 wrongPassword for a wrong (but well-formed) password")
+    @DisplayName("returns 403 invalidCredentials for a wrong (but well-formed) password")
     void wrongPassword() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("wrongpw"), UserRole.USER);
 
-      expectError(
-          AuthControllerIT.this.login(user.getUsername(), OTHER_VALID_PASSWORD),
-          HttpStatus.FORBIDDEN,
-          "wrongPassword",
-          "wrongPassword",
-          WRONG_PASSWORD_TEXT);
+      expectInvalidCredentials(
+          AuthControllerIT.this.login(user.getUsername(), OTHER_VALID_PASSWORD));
     }
 
     @Test
-    @DisplayName("returns 403 wrongPassword for the seeded admin, so the admin row is resolvable")
+    @DisplayName(
+        "returns 403 invalidCredentials for the seeded admin, so the admin row is resolvable")
     void wrongPasswordForSeededAdmin() throws Exception {
-      expectError(
-          AuthControllerIT.this.login(SEEDED_ADMIN_USERNAME, VALID_PASSWORD),
-          HttpStatus.FORBIDDEN,
-          "wrongPassword",
-          "wrongPassword",
-          WRONG_PASSWORD_TEXT);
+      expectInvalidCredentials(AuthControllerIT.this.login(SEEDED_ADMIN_USERNAME, VALID_PASSWORD));
     }
 
     @Test
-    @DisplayName("looks the username up case-sensitively: another casing is 404 userNotFound")
+    @DisplayName("looks the username up case-sensitively: another casing is invalidCredentials")
     void usernameLookupIsCaseSensitive() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("MixedCase"), UserRole.USER);
       assertThat(user.getUsername()).isNotEqualTo(user.getUsername().toLowerCase());
 
-      expectUserNotFound(
+      expectInvalidCredentials(
           AuthControllerIT.this.login(user.getUsername().toLowerCase(), VALID_PASSWORD));
-      expectUserNotFound(
+      expectInvalidCredentials(
           AuthControllerIT.this.login(user.getUsername().toUpperCase(), VALID_PASSWORD));
     }
 
@@ -600,9 +601,9 @@ class AuthControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("boundaryUsernames")
-    @DisplayName("accepts usernames at the form's length limits (then 404 userNotFound)")
+    @DisplayName("accepts usernames at the form's length limits (then invalidCredentials)")
     void boundaryUsernames(final String name, final String username) throws Exception {
-      expectUserNotFound(AuthControllerIT.this.login(username, VALID_PASSWORD));
+      expectInvalidCredentials(AuthControllerIT.this.login(username, VALID_PASSWORD));
     }
 
     static Stream<Arguments> boundaryUsernames() {
@@ -670,9 +671,9 @@ class AuthControllerIT {
       expectError(
           AuthControllerIT.this.login(username, VALID_PASSWORD),
           HttpStatus.FORBIDDEN,
-          "wrongPassword",
-          "wrongPassword",
-          WRONG_PASSWORD_TEXT);
+          "invalidCredentials",
+          "invalidCredentials",
+          INVALID_CREDENTIALS_TEXT);
     }
 
     @Test
@@ -694,9 +695,9 @@ class AuthControllerIT {
       expectError(
           AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD),
           HttpStatus.FORBIDDEN,
-          "wrongPassword",
-          "wrongPassword",
-          WRONG_PASSWORD_TEXT);
+          "invalidCredentials",
+          "invalidCredentials",
+          INVALID_CREDENTIALS_TEXT);
       final var before = Instant.now();
       final var body =
           expectSuccess(
@@ -721,7 +722,7 @@ class AuthControllerIT {
           "usernameUpdated");
       AuthControllerIT.this.entityManager.flush();
 
-      expectUserNotFound(AuthControllerIT.this.login(oldUsername, VALID_PASSWORD));
+      expectInvalidCredentials(AuthControllerIT.this.login(oldUsername, VALID_PASSWORD));
       final var before = Instant.now();
       final var body =
           expectSuccess(AuthControllerIT.this.login(newUsername, VALID_PASSWORD), "loginSucceeded");
@@ -742,7 +743,7 @@ class AuthControllerIT {
           "userDeleted");
       AuthControllerIT.this.entityManager.flush();
 
-      expectUserNotFound(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
+      expectInvalidCredentials(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
     }
 
     @Test
@@ -757,7 +758,7 @@ class AuthControllerIT {
           "profileDeleted");
       AuthControllerIT.this.entityManager.flush();
 
-      expectUserNotFound(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
+      expectInvalidCredentials(AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD));
     }
   }
 
