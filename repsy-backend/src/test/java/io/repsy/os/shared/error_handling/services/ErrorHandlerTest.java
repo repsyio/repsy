@@ -29,6 +29,7 @@ import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +40,8 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.bind.UnsatisfiedServletRequestParameterException;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -192,14 +195,25 @@ class ErrorHandlerTest {
   }
 
   @Test
-  @DisplayName("does not render a size-limit failure when no servlet response is available")
-  void uploadTooLargeWithoutResponse() {
+  @DisplayName("does not render 4xx failures of the request when no servlet response is available")
+  void clientFailuresWithoutResponse() {
     final var handler =
         new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var request = new MockHttpServletRequest();
 
+    assertThat(handler.handleException(new MaxUploadSizeExceededException(1024), request, null))
+        .isNull();
     assertThat(
             handler.handleException(
-                new MaxUploadSizeExceededException(1024), new MockHttpServletRequest(), null))
+                new HttpMediaTypeNotAcceptableException(List.of(MediaType.APPLICATION_JSON)),
+                request,
+                null))
+        .isNull();
+    assertThat(
+            handler.handleException(
+                new UnsatisfiedServletRequestParameterException(new String[] {"name"}, Map.of()),
+                request,
+                null))
         .isNull();
   }
 
