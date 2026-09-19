@@ -635,7 +635,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       final var result = new ArrayList<Arguments>();
 
       for (final var route : routes) {
-        // The interceptor matches case-insensitively but does not know "go"; it only knows GOLANG.
+        // The interceptor accepts only the exact RepoType names.
         result.add(
             Arguments.of(
                 "unknown type",
@@ -664,7 +664,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
                 HttpStatus.NOT_FOUND,
                 "repoTypeNotFound",
                 "repoTypeNotFound",
-                "repoTypeNotFound"));
+                "Repository type not found."));
         result.add(
             Arguments.of(
                 "mixed case",
@@ -673,7 +673,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
                 HttpStatus.NOT_FOUND,
                 "repoTypeNotFound",
                 "repoTypeNotFound",
-                "repoTypeNotFound"));
+                "Repository type not found."));
         result.add(
             Arguments.of(
                 "lower case golang",
@@ -682,7 +682,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
                 HttpStatus.NOT_FOUND,
                 "repoTypeNotFound",
                 "repoTypeNotFound",
-                "repoTypeNotFound"));
+                "Repository type not found."));
       }
 
       return result.stream();
@@ -700,7 +700,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           HttpStatus.NOT_FOUND,
           "repoTypeNotFound",
           "repoTypeNotFound",
-          "repoTypeNotFound");
+          "Repository type not found.");
 
       assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(name)).isEmpty();
     }
