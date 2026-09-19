@@ -27,6 +27,7 @@ import io.repsy.os.generated.model.UpdateUsernameForm;
 import io.repsy.os.panel.profile.services.ProfileService;
 import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import jakarta.validation.Valid;
@@ -78,13 +79,17 @@ class ProfileController {
   }
 
   @PutMapping("/password")
-  public @NonNull RestResponse<Void> updatePassword(
+  public @NonNull RestResponse<LoginInfo> updatePassword(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestBody @Valid final @NonNull PasswordForm form) {
 
-    this.profileService.updatePassword(this.panelAuthHelper.authenticate(authHeader).getId(), form);
+    final var loginInfo =
+        this.profileService.updatePassword(
+            this.jwtUtils.extractUserId(authHeader, TokenRealm.PANEL),
+            form,
+            this.jwtUtils.extractSessionStart(authHeader));
 
-    return this.resp.success("passwordChanged");
+    return this.resp.success("passwordChanged", loginInfo);
   }
 
   @DeleteMapping

@@ -18,7 +18,7 @@ import { isPlatformBrowser } from '@angular/common';
 import { Inject, Injectable, PLATFORM_ID } from '@angular/core';
 import { map, Observable, throwError } from 'rxjs';
 
-import { LoginForm } from '../../../../generated/api';
+import { LoginForm, LoginInfo } from '../../../../generated/api';
 import { AuthControllerService } from '../../../../generated/api/api/auth-controller.service';
 
 @Injectable({
@@ -72,6 +72,10 @@ export class AuthService {
         return r.data!.token!;
       }),
     );
+  }
+
+  public updateLoginInfo(loginInfo: LoginInfo): void {
+    this._update(loginInfo.username!, loginInfo.token!, loginInfo.refreshToken!);
   }
 
   public logOut(): void {

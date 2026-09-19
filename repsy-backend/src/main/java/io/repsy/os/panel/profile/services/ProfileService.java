@@ -71,7 +71,10 @@ public class ProfileService {
   }
 
   @Transactional
-  public void updatePassword(final @NonNull UUID userId, final @NonNull PasswordForm form) {
+  public @NonNull LoginInfo updatePassword(
+      final @NonNull UUID userId,
+      final @NonNull PasswordForm form,
+      final @NonNull Instant sessionStart) {
 
     final var user = this.userTxService.getAuthenticatedUserById(userId);
 
@@ -80,6 +83,9 @@ public class ProfileService {
     user.setSalt(salt);
     user.setHash(PasswordHasher.hash(form.getPassword()));
     this.userTxService.updatePassword(user.getId(), user.getHash(), salt);
+
+    // Re-read so the returned tokens carry the incremented token version.
+    return this.loginInfoFactory.create(this.userTxService.getUserById(userId), sessionStart);
   }
 
   private boolean isUsernameReserved(final @NonNull String username) {
