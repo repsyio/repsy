@@ -45,6 +45,7 @@ public class JwtUtils {
   private static final @NonNull String CLAIM_TOKEN_TYPE = "token_type";
   private static final @NonNull String CLAIM_SESSION_START = "session_start";
   private static final @NonNull String CLAIM_TOKEN_VERSION = "token_version";
+  private static final @NonNull String CLAIM_TOKEN_FAMILY = "token_family";
   private static final @NonNull String TOKEN_TYPE_REFRESH = "refresh";
   private static final int SECRET_BYTE_LENGTH = 32;
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -208,12 +209,32 @@ public class JwtUtils {
       final @NonNull TemporalAmount timeoutDuration,
       final @NonNull Instant sessionStart,
       final int tokenVersion) {
+    return this.createRefreshToken(
+        userId,
+        username,
+        timeoutDuration,
+        sessionStart,
+        tokenVersion,
+        UUID.randomUUID(),
+        UUID.randomUUID());
+  }
+
+  public @NonNull String createRefreshToken(
+      final @NonNull UUID userId,
+      final @NonNull String username,
+      final @NonNull TemporalAmount timeoutDuration,
+      final @NonNull Instant sessionStart,
+      final int tokenVersion,
+      final @NonNull UUID tokenId,
+      final @NonNull UUID familyId) {
     return JWT.create()
+        .withJWTId(tokenId.toString())
         .withSubject(userId.toString())
         .withClaim(CLAIM_USERNAME, username)
         .withClaim(CLAIM_TOKEN_TYPE, TOKEN_TYPE_REFRESH)
         .withClaim(CLAIM_SESSION_START, sessionStart)
         .withClaim(CLAIM_TOKEN_VERSION, tokenVersion)
+        .withClaim(CLAIM_TOKEN_FAMILY, familyId.toString())
         .withExpiresAt(Instant.now().plus(timeoutDuration))
         .sign(Algorithm.HMAC512(this.secret));
   }
@@ -270,15 +291,30 @@ public class JwtUtils {
       throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
 
+    return this.refreshTokenClaims(decodedJWT);
+  }
+
+  private @NonNull RefreshTokenClaims refreshTokenClaims(final @NonNull DecodedJWT decodedJWT) {
     final var sessionStart = decodedJWT.getClaim(CLAIM_SESSION_START).asInstant();
     final var tokenVersion = decodedJWT.getClaim(CLAIM_TOKEN_VERSION).asInt();
+    final var tokenId = decodedJWT.getId();
+    final var familyId = decodedJWT.getClaim(CLAIM_TOKEN_FAMILY).asString();
 
-    // A refresh token without these claims predates bounded sessions and cannot be exchanged.
-    if (sessionStart == null || tokenVersion == null) {
+    // A refresh token without these claims predates refresh-token rotation and cannot be exchanged.
+    if (sessionStart == null || tokenVersion == null || tokenId == null || familyId == null) {
       throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
 
-    return new RefreshTokenClaims(subjectAsUuid(decodedJWT), sessionStart, tokenVersion);
+    try {
+      return new RefreshTokenClaims(
+          subjectAsUuid(decodedJWT),
+          UUID.fromString(tokenId),
+          UUID.fromString(familyId),
+          sessionStart,
+          tokenVersion);
+    } catch (final IllegalArgumentException _) {
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
   }
 
   private static @NonNull UUID subjectAsUuid(final @NonNull DecodedJWT decodedJWT) {

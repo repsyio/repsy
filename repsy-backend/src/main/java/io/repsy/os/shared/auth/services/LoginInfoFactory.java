@@ -20,6 +20,7 @@ import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import java.time.Instant;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
@@ -30,6 +31,7 @@ import org.springframework.stereotype.Component;
 public class LoginInfoFactory {
 
   private final @NonNull JwtUtils jwtUtils;
+  private final @NonNull RefreshTokenService refreshTokenService;
 
   /**
    * Issues a token pair for {@code user}. Neither token outlives {@link AuthUtils#TIMEOUT_SESSION}
@@ -37,6 +39,14 @@ public class LoginInfoFactory {
    */
   public @NonNull LoginInfo create(
       final @NonNull UserInfo user, final @NonNull Instant sessionStart) {
+    return this.create(user, sessionStart, UUID.randomUUID());
+  }
+
+  /** Issues a token pair in an existing refresh-token family. */
+  public @NonNull LoginInfo create(
+      final @NonNull UserInfo user,
+      final @NonNull Instant sessionStart,
+      final @NonNull UUID refreshTokenFamilyId) {
 
     final var accessToken =
         this.jwtUtils.createSessionAccessToken(
@@ -46,13 +56,20 @@ public class LoginInfoFactory {
             sessionStart,
             user.getTokenVersion());
 
+    final var refreshTokenId = UUID.randomUUID();
+    final var refreshTimeout =
+        AuthUtils.boundBySession(AuthUtils.TIMEOUT_REFRESH_TOKEN, sessionStart);
     final var refreshToken =
         this.jwtUtils.createRefreshToken(
             user.getId(),
             user.getUsername(),
-            AuthUtils.boundBySession(AuthUtils.TIMEOUT_REFRESH_TOKEN, sessionStart),
+            refreshTimeout,
             sessionStart,
-            user.getTokenVersion());
+            user.getTokenVersion(),
+            refreshTokenId,
+            refreshTokenFamilyId);
+    this.refreshTokenService.register(
+        refreshTokenId, user.getId(), refreshTokenFamilyId, Instant.now().plus(refreshTimeout));
 
     return LoginInfo.builder()
         .username(user.getUsername())

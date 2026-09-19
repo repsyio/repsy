@@ -23,6 +23,7 @@ import io.repsy.os.generated.model.LoginForm;
 import io.repsy.os.generated.model.LoginInfo;
 import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.auth.services.LoginInfoFactory;
+import io.repsy.os.shared.auth.services.RefreshTokenService;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.dtos.UserInfo;
@@ -45,6 +46,7 @@ public class AuthUserService {
 
   private final @NonNull UserTxService userTxService;
   private final @NonNull LoginInfoFactory loginInfoFactory;
+  private final @NonNull RefreshTokenService refreshTokenService;
   private final @NonNull ApplicationEventPublisher eventPublisher;
 
   @Transactional
@@ -74,7 +76,10 @@ public class AuthUserService {
     return this.loginInfoFactory.create(user, Instant.now().truncatedTo(ChronoUnit.SECONDS));
   }
 
+  @Transactional
   public @NonNull LoginInfo refreshToken(final @NonNull RefreshTokenClaims claims) {
+
+    this.refreshTokenService.consume(claims);
 
     final var user = this.userTxService.getAuthenticatedUserById(claims.userId());
 
@@ -88,6 +93,6 @@ public class AuthUserService {
       throw new UnAuthorizedException(REFRESH_TOKEN_EXPIRED);
     }
 
-    return this.loginInfoFactory.create(user, claims.sessionStart());
+    return this.loginInfoFactory.create(user, claims.sessionStart(), claims.familyId());
   }
 }

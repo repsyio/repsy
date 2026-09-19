@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.auth.services.LoginInfoFactory;
+import io.repsy.os.shared.auth.services.RefreshTokenService;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.mappers.UserConverter;
 import io.repsy.os.shared.user.repositories.UserRepository;
@@ -39,13 +40,16 @@ class AuthUserServiceTest {
       new AuthUserService(
           new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)),
           Mockito.mock(LoginInfoFactory.class),
+          Mockito.mock(RefreshTokenService.class),
           Mockito.mock(ApplicationEventPublisher.class));
 
   /** RPS-962: a refresh token of a deleted user is an authentication failure, not a 404. */
   @Test
   @DisplayName("refreshToken answers unAuthorized for a valid token whose user no longer exists")
   void refreshTokenUserNoLongerExists() {
-    final var claims = new RefreshTokenClaims(UUID.randomUUID(), Instant.now(), 0);
+    final var claims =
+        new RefreshTokenClaims(
+            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), Instant.now(), 0);
 
     assertThatThrownBy(() -> this.service.refreshToken(claims))
         .isExactlyInstanceOf(UnAuthorizedException.class)

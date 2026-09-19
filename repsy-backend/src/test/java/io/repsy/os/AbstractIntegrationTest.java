@@ -22,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.jayway.jsonpath.JsonPath;
+import io.repsy.os.shared.auth.services.RefreshTokenService;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
@@ -147,10 +148,20 @@ public abstract class AbstractIntegrationTest {
 
   @Autowired protected MockMvc mockMvc;
   @Autowired protected JwtUtils jwtUtils;
+  @Autowired protected RefreshTokenService refreshTokenService;
   @Autowired protected UserTxService userTxService;
   @Autowired protected UserRepository userRepository;
   @Autowired protected RepoRepository repoRepository;
   @PersistenceContext protected EntityManager entityManager;
+
+  protected void registerRefreshToken(final String token) {
+    final var claims = this.jwtUtils.verifyRefreshToken(token);
+    this.refreshTokenService.register(
+        claims.tokenId(),
+        claims.userId(),
+        claims.familyId(),
+        JWT.decode(token).getExpiresAtAsInstant());
+  }
 
   /**
    * Blocks until the application's asynchronous startup seeding has committed its default repos.
