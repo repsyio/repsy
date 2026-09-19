@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.security.shared.resolvers;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
@@ -54,7 +55,14 @@ public class PypiArtifactStorageResolver implements ArtifactStorageResolver {
 
     final var packagePath = artifactName.endsWith("/") ? artifactName : artifactName + "/";
     final var storagePath = StoragePath.of(repoId, packagePath);
-    final var items = this.pypiStorageStrategy.listDirectoryContents(storagePath);
+    final List<StorageItemInfo> items;
+
+    try {
+      items = this.pypiStorageStrategy.listDirectoryContents(storagePath);
+    } catch (final ItemNotFoundException exception) {
+      // A package that was never uploaded has no directory at all.
+      return Optional.empty();
+    }
 
     final var candidates = filterMatchingFilenames(items, artifactVersion);
     final var chosen = pickPreferredFilename(candidates);
