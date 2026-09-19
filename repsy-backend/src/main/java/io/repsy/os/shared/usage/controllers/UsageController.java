@@ -41,6 +41,10 @@ public class UsageController {
   private final @NonNull RestResponseFactory responseFactory;
   private final @NonNull UsageService usageService;
 
+  /**
+   * Instance-wide totals, deliberately open to any authenticated user (no {@code requireAdmin}):
+   * the panel dashboard, which every signed-in user lands on, shows them in its Total Disk card.
+   */
   @GetMapping
   public @NonNull RestResponse<TotalUsageInfo> getTotalUsage(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
