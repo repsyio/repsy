@@ -66,7 +66,7 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
     final var repoName = ResolverUtils.extractRepoInfo(this.getUriVariables(request));
 
     if (repoName == null) {
-      this.authenticateUser(request);
+      this.authenticateUser(request, this.getPermission(methodHandler));
       return true;
     }
 
@@ -124,7 +124,7 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
     return this.authComponents.get(scopeType.orElse(RepoType.MAVEN));
   }
 
-  private void authenticateUser(final HttpServletRequest request) {
+  private void authenticateUser(final HttpServletRequest request, final Permission permission) {
 
     final var uriVariables = this.getUriVariables(request);
     final var repoTypeOpt = ResolverUtils.extractRepoType(uriVariables);
@@ -136,7 +136,13 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
     final var authComponent = this.authComponents.get(repoTypeOpt.get());
     final var authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
-    authComponent.authenticateUser(authHeader);
+    if (authHeader == null) {
+      authComponent.authorizeUser(null, permission);
+      return;
+    }
+
+    final var userInfo = authComponent.authenticateUser(authHeader);
+    authComponent.authorizeUser(userInfo, permission);
   }
 
   @SuppressWarnings("unchecked")
