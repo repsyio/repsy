@@ -15,6 +15,10 @@
  */
 package io.repsy.os.server.protocols.ruby.protocol;
 
+import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.PROTOCOL_PORT;
+import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.PUBLISH_PATH;
+import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.gem;
+import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.protocolPort;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -24,41 +28,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.zip.GZIPOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
  * Full-stack coverage of the RubyGems wire protocol served by the protocol router on the main port
  * (9090): {@code gem push}, download, index and {@code gem yank}.
  *
  * <p>The protocol path parser resolves the repo from {@code request.getServletPath()}. MockMvc
- * leaves that empty unless the test sets it, so a request that skips {@link #protocolPort()} never
+ * leaves that empty unless the test sets it, so a request that skips {@code protocolPort()} never
  * matches any handler and ends in {@code 404 unknownPath} even though the route is registered.
  */
 @DisplayName("Ruby protocol /{repo}/api/v1/gems")
 class RubyGemProtocolIT extends AbstractIntegrationTest {
-
-  private static final int PROTOCOL_PORT = 9090;
-  private static final String PUBLISH_PATH = "/{repo}/api/v1/gems";
-
-  /** Serves the request the way the protocol port does: main port, servlet path = request URI. */
-  private static RequestPostProcessor protocolPort() {
-    return request -> {
-      request.setLocalPort(PROTOCOL_PORT);
-      request.setServletPath(request.getRequestURI());
-      return request;
-    };
-  }
 
   private ResultActions protocol(final AbstractMockHttpServletRequestBuilder<?> request)
       throws Exception {
@@ -167,42 +152,5 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .content(gem("pushed-gem", "1.2.3")))
         .andExpect(status().isNotFound());
-  }
-
-  /**
-   * The minimal outer tar {@code GemspecParser} needs: {@code metadata.gz} + {@code data.tar.gz}.
-   */
-  private static byte[] gem(final String name, final String version) throws IOException {
-    final var metadata =
-        "name: %s\nversion:\n  version: %s\nplatform: ruby\ndescription: fixture\nauthors:\n- Alice\n"
-            .formatted(name, version);
-    final var output = new ByteArrayOutputStream();
-
-    try (var tar = new TarArchiveOutputStream(output)) {
-      add(tar, "metadata.gz", gzip(metadata.getBytes(StandardCharsets.UTF_8)));
-      add(tar, "data.tar.gz", gzip(new byte[0]));
-      tar.finish();
-    }
-
-    return output.toByteArray();
-  }
-
-  private static byte[] gzip(final byte[] bytes) throws IOException {
-    final var output = new ByteArrayOutputStream();
-
-    try (var gzip = new GZIPOutputStream(output)) {
-      gzip.write(bytes);
-    }
-
-    return output.toByteArray();
-  }
-
-  private static void add(final TarArchiveOutputStream tar, final String name, final byte[] bytes)
-      throws IOException {
-    final var entry = new TarArchiveEntry(name);
-    entry.setSize(bytes.length);
-    tar.putArchiveEntry(entry);
-    tar.write(bytes);
-    tar.closeArchiveEntry();
   }
 }
