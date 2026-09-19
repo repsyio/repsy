@@ -16,7 +16,6 @@
 package io.repsy.os.server.shared.auth;
 
 import static io.repsy.os.shared.auth.utils.AuthUtils.AUTH_BEARER;
-import static io.repsy.os.shared.auth.utils.AuthUtils.checkPassword;
 import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromAuthHeader;
 import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBasicToken;
@@ -29,6 +28,7 @@ import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.PermissionInfo;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -264,13 +264,23 @@ public class ProtocolAuthService {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
-    final var userInfo =
-        this.userTxService
-            .getUserByUsernameOptional(username)
-            .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
+    final var userInfoOpt = this.userTxService.getUserByUsernameOptional(username);
 
-    if (!checkPassword(userInfo.getHash(), userInfo.getSalt(), password)) {
+    if (userInfoOpt.isEmpty()) {
+      // Spend the time of a real check, so an unknown username is as slow as a wrong password.
+      PasswordHasher.verifyDummy(password);
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    final var userInfo = userInfoOpt.get();
+
+    if (!PasswordHasher.matches(password, userInfo.getHash(), userInfo.getSalt())) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    // Hashes from an older algorithm or work factor are replaced now that the password is known.
+    if (PasswordHasher.needsUpgrade(userInfo.getHash(), password)) {
+      this.userTxService.upgradePasswordHash(userInfo, password);
     }
 
     return userInfo;

@@ -34,6 +34,7 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.auth.utils.AuthUtils;
+import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import java.time.Duration;
@@ -638,7 +639,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var persisted =
           ProfileControllerIT.this.userRepository.findById(user.getId()).orElseThrow();
       assertThat(persisted.getHash()).isNotEqualTo(originalHash);
-      assertThat(AuthUtils.checkPassword(persisted.getHash(), persisted.getSalt(), newPassword))
+      assertThat(PasswordHasher.matches(newPassword, persisted.getHash(), persisted.getSalt()))
           .isTrue();
     }
 

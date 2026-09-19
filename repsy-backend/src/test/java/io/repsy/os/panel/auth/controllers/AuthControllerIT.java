@@ -33,6 +33,7 @@ import io.repsy.core.events.UserLoginEvent;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
+import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -400,7 +401,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
     void updatesLastLoginAt() throws Exception {
       // Committed for real: the async listener runs on another thread and must be able to see it.
       final var salt = PasswordGeneratorUtil.generateSalt();
-      final var hash = PasswordGeneratorUtil.hashPassword(VALID_PASSWORD, salt);
+      final var hash = PasswordHasher.hash(VALID_PASSWORD);
       final var userId =
           AuthControllerIT.this
               .userTxService

@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -200,6 +201,84 @@ class ProtocolAuthServiceTest {
           () -> ProtocolAuthServiceTest.this.authService.authenticateUser(basicAuth("ghost", "x")));
 
       verify(ProtocolAuthServiceTest.this.userTxService, never()).getUserByUsername(anyString());
+    }
+  }
+
+  /** RPS-961: a legacy SHA-256 hash is replaced by BCrypt once its owner authenticates. */
+  @Nested
+  @DisplayName("password hash upgrade")
+  class HashUpgrade {
+
+    private final UserInfo bcryptUser =
+        UserInfo.builder()
+            .id(UUID.randomUUID())
+            .username("carol")
+            .salt(SALT)
+            .hash(PasswordHasher.hash(PASSWORD))
+            .role(UserRole.USER)
+            .build();
+
+    @Test
+    @DisplayName("authenticateWithPassword upgrades a legacy hash after a correct password")
+    void upgradesLegacyHash() {
+      ProtocolAuthServiceTest.this.authService.authenticateWithPassword(
+          credentials(USERNAME, PASSWORD));
+
+      verify(ProtocolAuthServiceTest.this.userTxService).upgradePasswordHash(ALICE, PASSWORD);
+    }
+
+    @Test
+    @DisplayName("authenticateWithPassword leaves a current BCrypt hash alone")
+    void keepsCurrentHash() {
+      when(ProtocolAuthServiceTest.this.userTxService.getUserByUsernameOptional("carol"))
+          .thenReturn(Optional.of(this.bcryptUser));
+
+      final var user =
+          ProtocolAuthServiceTest.this.authService.authenticateWithPassword(
+              credentials("carol", PASSWORD));
+
+      assertThat(user).isSameAs(this.bcryptUser);
+      verify(ProtocolAuthServiceTest.this.userTxService, never())
+          .upgradePasswordHash(any(), anyString());
+    }
+
+    @Test
+    @DisplayName("authenticateWithPassword does not upgrade after a wrong password")
+    void doesNotUpgradeOnWrongPassword() {
+      assertUnauthorized(
+          () ->
+              ProtocolAuthServiceTest.this.authService.authenticateWithPassword(
+                  credentials(USERNAME, "wrong")));
+
+      verify(ProtocolAuthServiceTest.this.userTxService, never())
+          .upgradePasswordHash(any(), anyString());
+    }
+
+    @Test
+    @DisplayName("an unknown username still pays for one hash check, like a wrong password")
+    void unknownUsernameCostsAHashCheck() {
+      final var wrongPassword = averageNanos(USERNAME);
+      final var unknownUser = averageNanos("ghost");
+
+      // A generous bound: the point is the order of magnitude. Without the dummy check the unknown
+      // username returns in microseconds while a BCrypt check takes tens of milliseconds.
+      assertThat(unknownUser).isGreaterThan(wrongPassword / 4);
+    }
+
+    private long averageNanos(final String username) {
+      final var rounds = 3;
+      final var start = System.nanoTime();
+
+      for (var i = 0; i < rounds; i++) {
+        try {
+          ProtocolAuthServiceTest.this.authService.authenticateWithPassword(
+              credentials(username, "wrong"));
+        } catch (final UnAuthorizedException _) {
+          // The outcome is asserted elsewhere; only the elapsed time matters here.
+        }
+      }
+
+      return (System.nanoTime() - start) / rounds;
     }
   }
 

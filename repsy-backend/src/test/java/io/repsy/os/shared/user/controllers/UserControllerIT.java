@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
-import io.repsy.os.shared.auth.utils.AuthUtils;
+import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import java.time.Instant;
@@ -582,7 +582,7 @@ class UserControllerIT extends AbstractIntegrationTest {
       assertThat(instantOrNull(data.get("createdAt"))).isEqualTo(persisted.getCreatedAt());
       // The password is stored salted+hashed, never verbatim, and must verify against the input.
       assertThat(persisted.getHash()).isNotEqualTo(password);
-      assertThat(AuthUtils.checkPassword(persisted.getHash(), persisted.getSalt(), password))
+      assertThat(PasswordHasher.matches(password, persisted.getHash(), persisted.getSalt()))
           .isTrue();
     }
 
@@ -1111,8 +1111,8 @@ class UserControllerIT extends AbstractIntegrationTest {
       assertThat(after.getSalt()).isNotEqualTo(oldSalt);
       assertThat(after.getUsername()).isEqualTo(target.getUsername());
       assertThat(after.getRole()).isEqualTo(UserRole.USER);
-      assertThat(AuthUtils.checkPassword(after.getHash(), after.getSalt(), newPassword)).isTrue();
-      assertThat(AuthUtils.checkPassword(after.getHash(), after.getSalt(), VALID_PASSWORD))
+      assertThat(PasswordHasher.matches(newPassword, after.getHash(), after.getSalt())).isTrue();
+      assertThat(PasswordHasher.matches(VALID_PASSWORD, after.getHash(), after.getSalt()))
           .as("the previous password must no longer work")
           .isFalse();
     }

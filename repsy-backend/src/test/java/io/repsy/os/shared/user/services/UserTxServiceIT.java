@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
+import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.UserRole;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -41,7 +42,7 @@ class UserTxServiceIT extends AbstractIntegrationTest {
     // users.username is varchar(25), so keep the unique suffix short.
     final var username = "txs-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
     final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword("Password1!", salt);
+    final var hash = PasswordHasher.hash("Password1!");
 
     // Deliberately no flush before reading the result: the value has to be there on return.
     final var userInfo = this.userTxService.create(username, UserRole.USER, hash, salt);

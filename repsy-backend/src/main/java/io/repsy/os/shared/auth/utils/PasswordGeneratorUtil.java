@@ -17,7 +17,6 @@ package io.repsy.os.shared.auth.utils;
 
 import java.util.List;
 import lombok.experimental.UtilityClass;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.jspecify.annotations.NonNull;
 import org.passay.data.CharacterData;
@@ -58,11 +57,11 @@ public class PasswordGeneratorUtil {
     return PASSWORD_GENERATOR.generate().toString();
   }
 
+  /**
+   * Generates a salt for the user row. BCrypt puts its own salt inside the hash, so only legacy
+   * SHA-256 hashes read this value; it is still stored because {@code users.salt} is not nullable.
+   */
   public @NonNull String generateSalt() {
     return RandomStringUtils.secure().nextAlphanumeric(SALT_LENGTH);
-  }
-
-  public @NonNull String hashPassword(final @NonNull String password, final @NonNull String salt) {
-    return DigestUtils.sha256Hex(password + salt);
   }
 }

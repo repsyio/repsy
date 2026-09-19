@@ -17,6 +17,7 @@ package io.repsy.os.shared.user;
 
 import io.repsy.core.events.UserCreatedEvent;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
+import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.repositories.UserRepository;
@@ -73,7 +74,7 @@ public class AdminUserInitializer implements ApplicationRunner {
 
     final var newPassword = PasswordGeneratorUtil.generatePassword();
     final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword(newPassword, salt);
+    final var hash = PasswordHasher.hash(newPassword);
 
     adminUser.setHash(hash);
     adminUser.setSalt(salt);
@@ -96,7 +97,7 @@ public class AdminUserInitializer implements ApplicationRunner {
     }
 
     final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword(password, salt);
+    final var hash = PasswordHasher.hash(password);
 
     final var userInfo = this.userTxService.create(ADMIN_USERNAME, UserRole.ADMIN, hash, salt);
 

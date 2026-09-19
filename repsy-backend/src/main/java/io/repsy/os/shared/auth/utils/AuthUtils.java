@@ -23,7 +23,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import lombok.experimental.UtilityClass;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -79,13 +78,6 @@ public class AuthUtils {
         };
 
     return Credentials.builder().username(username).password(credentials[1]).build();
-  }
-
-  /** Check if the given password is correct */
-  public static boolean checkPassword(
-      final @NonNull String hash, final @NonNull String salt, final @NonNull String password) {
-
-    return DigestUtils.sha256Hex(password + salt).equals(hash);
   }
 
   public static @NonNull String removeBasicPrefix(final @NonNull String authHeader) {
