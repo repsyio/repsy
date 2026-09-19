@@ -44,6 +44,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * 42804, so publishing any package that declares a dependency failed. These tests publish through
  * {@link NuGetPackageService#publishVersion} - the path the protocol handlers use - and check both
  * what lands in the column and what the read side returns.
+ *
+ * <p>This is the only class that covers NuGet dependency persistence; it replaces the overlapping
+ * RPS-901 and RPS-904 regression tests (RPS-967).
  */
 @DisplayName("NuGetPackageServiceImpl publish/read on PostgreSQL")
 class NuGetPackageServiceIT extends AbstractIntegrationTest {
@@ -215,6 +218,26 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
     assertThat(this.dependenciesColumn(packageId, "3.0.0")).containsEntry("json_type", null);
 
     final var info = this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, "3.0.0");
+
+    assertThat(info).isPresent();
+    assertThat(info.get().dependencies()).isNull();
+  }
+
+  @Test
+  @DisplayName("stores SQL NULL for a bare nuspec that declares only an id and a version")
+  void storesNullForBareNuspec() {
+    final var repoInfo = this.seedNuGetRepo();
+    final var packageId = this.createPackage(repoInfo);
+
+    this.publish(
+        repoInfo,
+        packageId,
+        "3.1.0",
+        "<package><metadata><id>Fixture.Package</id><version>3.1.0</version></metadata></package>");
+
+    assertThat(this.dependenciesColumn(packageId, "3.1.0")).containsEntry("json_type", null);
+
+    final var info = this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, "3.1.0");
 
     assertThat(info).isPresent();
     assertThat(info.get().dependencies()).isNull();
