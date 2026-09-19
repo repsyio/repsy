@@ -23,9 +23,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateIndexRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateMetaRepository;
@@ -55,10 +57,13 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -730,5 +735,88 @@ class CargoCrateControllerIT {
     this.mockMvc
         .perform(patch("/api/cargo/crates/" + repo.getName()).with(apiPort()))
         .andExpect(status().isNotFound());
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the list endpoints")
+  class PagingAndSorting {
+
+    private static final String CRATES = "/api/cargo/crates/{repo}";
+    private static final String VERSIONS = "/api/cargo/crates/{repo}/paged/versions";
+
+    static Stream<String> endpoints() {
+      return Stream.of(CRATES, VERSIONS);
+    }
+
+    static Stream<Arguments> acceptedSorts() {
+      return Stream.concat(
+          Stream.of("id", "name", "maxVersion", "lastUpdatedAt")
+              .map(property -> Arguments.of(CRATES, property)),
+          Stream.of("version", "createdAt").map(property -> Arguments.of(VERSIONS, property)));
+    }
+
+    static Stream<Arguments> invalidPagingOnEveryEndpoint() {
+      return endpoints()
+          .flatMap(
+              path ->
+                  PagingAssertions.invalidPagingParams()
+                      .map(args -> Arguments.of(path, args.get()[0], args.get()[1])));
+    }
+
+    private Repo seededRepo() throws Exception {
+      final var it = CargoCrateControllerIT.this;
+      final var repo = it.seedRepo(RepoType.CARGO, false);
+      it.publish(repo, "paged", "1.0.0");
+      it.publish(repo, "paged", "1.1.0");
+      it.publish(repo, "other", "0.1.0");
+      return repo;
+    }
+
+    private ResultActions list(
+        final Repo repo, final String path, final String param, final String value)
+        throws Exception {
+      return CargoCrateControllerIT.this.request(
+          "GET", path.replace("{repo}", repo.getName()) + "?" + param + "=" + value, null);
+    }
+
+    @ParameterizedTest(name = "{0} sort={1}")
+    @MethodSource("acceptedSorts")
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String path, final String property) throws Exception {
+      final var repo = this.seededRepo();
+
+      this.list(repo, path, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(repo, path, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("orders the versions by the requested sort property")
+    void ordersVersions() throws Exception {
+      final var repo = this.seededRepo();
+
+      this.list(repo, VERSIONS, "sort", "version,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("1.0.0"));
+      this.list(repo, VERSIONS, "sort", "version,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("1.1.0"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400(final String path) throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(this.seededRepo(), path, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0} {1}={2}")
+    @MethodSource("invalidPagingOnEveryEndpoint")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String path, final String param, final String value)
+        throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(this.seededRepo(), path, param, value), param);
+    }
   }
 }
