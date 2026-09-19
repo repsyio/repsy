@@ -194,6 +194,7 @@ class AbstractCargoStorageServiceTest {
 
       assertThatThrownBy(() -> service.deletePackage(REPO_ID, REPO_NAME, "serde"))
           .isInstanceOf(ErrorOccurredException.class)
+          .hasMessage("errorOccurred")
           .hasCauseInstanceOf(IOException.class);
       verify(storageStrategy, never()).deleteDirectory(any());
     }

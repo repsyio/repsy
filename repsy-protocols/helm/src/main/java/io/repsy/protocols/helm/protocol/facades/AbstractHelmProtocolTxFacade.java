@@ -46,10 +46,12 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
+@Slf4j
 @NullMarked
 @RequiredArgsConstructor
 public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID> {
@@ -144,7 +146,8 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
 
     if (existingOpt.isPresent()) {
       if (!repoInfo.isAllowOverride()) {
-        throw new ItemAlreadyExistException("chartAlreadyExists: " + name + ":" + version);
+        log.info("Chart {}:{} already exists in repo {}", name, version, repoInfo.getName());
+        throw new ItemAlreadyExistException("chartAlreadyExists");
       }
       final var oldSize = existingOpt.get().size();
       final var chartInfo = this.chartService.update(repoInfo.getId(), form);

@@ -52,8 +52,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p>What it recognises: an identifier-like string literal or an {@code UPPER_SNAKE} constant that
  * is the first argument of {@code success}/{@code warning}/{@code error} on the response factory,
- * or of a msgId-carrying exception constructor. Ids held in variables, built by concatenation, or
- * free text with spaces are not seen.
+ * or of a msgId-carrying exception constructor. Ids held in variables are not seen. A string
+ * literal that starts an exception's msgId but is free text or continued by a concatenation cannot
+ * have a bundle entry, so {@link #msgIdsAreFixedIdentifiers()} fails on it (RPS-992).
  *
  * <p>Bundle keys that no code uses are not flagged: most of them are leftovers tracked by RPS-959.
  */
@@ -78,11 +79,20 @@ class MessageKeysTest {
               + LITERAL_OR_CONSTANT);
 
   /** Exceptions {@code ErrorHandler} renders with the exception message as the msgId. */
+  private static final String MSG_ID_EXCEPTION =
+      "\\bnew\\s+(?:ItemNotFound|BadRequest|ItemAlreadyExist|AccessNotAllowed|UnAuthorized"
+          + "|ErrorOccurred|SignatureNotVerified|Mfa)Exception\\(\\s*";
+
   private static final Pattern EXCEPTION_MSG_ID =
-      Pattern.compile(
-          "\\bnew\\s+(?:ItemNotFound|BadRequest|ItemAlreadyExist|AccessNotAllowed|UnAuthorized"
-              + "|ErrorOccurred|SignatureNotVerified|Mfa)Exception\\(\\s*"
-              + LITERAL_OR_CONSTANT);
+      Pattern.compile(MSG_ID_EXCEPTION + LITERAL_OR_CONSTANT);
+
+  /**
+   * A string literal that starts an exception's msgId argument but is not a bare identifier, or is
+   * continued by a concatenation. {@code ErrorHandler} returns it as both {@code msgId} and {@code
+   * text}, because no bundle entry can exist for it (RPS-992).
+   */
+  private static final Pattern NON_IDENTIFIER_MSG_ID =
+      Pattern.compile(MSG_ID_EXCEPTION + "\"(?<text>[^\"\\\\]*)\"\\s*(?<next>[,)+])");
 
   /**
    * Helpers that pass their last argument on as the msgId of an exception, so the literal never
@@ -133,6 +143,7 @@ class MessageKeysTest {
   private static Properties messages;
   private static Map<String, Set<String>> usedMsgIds;
   private static Set<String> unresolvedConstants;
+  private static Map<String, Set<String>> nonIdentifierMsgIds;
 
   @BeforeAll
   static void scanSources() throws IOException {
@@ -147,12 +158,14 @@ class MessageKeysTest {
 
     usedMsgIds = new TreeMap<>();
     unresolvedConstants = new TreeSet<>();
+    nonIdentifierMsgIds = new TreeMap<>();
 
     sources.forEach(
         (file, source) -> {
           collect(RESPONSE_MSG_ID, source, file, constants);
           collect(EXCEPTION_MSG_ID, source, file, constants);
           collect(FORWARDED_MSG_ID, source, file, constants);
+          collectNonIdentifiers(source, file);
         });
   }
 
@@ -169,6 +182,17 @@ class MessageKeysTest {
         .as(
             "msgIds used in code but missing from messages.properties (the API would return the"
                 + " raw key as `text`); add an entry for each")
+        .isEmpty();
+  }
+
+  @Test
+  @DisplayName("no exception msgId is free text or built by concatenation")
+  void msgIdsAreFixedIdentifiers() {
+    assertThat(nonIdentifierMsgIds)
+        .as(
+            "exception msgIds that are free text or concatenated; they never have a bundle entry,"
+                + " so the API returns them as both `msgId` and `text`. Throw a fixed id, add an"
+                + " entry for it, and log the variable parts instead")
         .isEmpty();
   }
 
@@ -259,6 +283,18 @@ class MessageKeysTest {
         } else {
           values.forEach(value -> addUsage(value, file));
         }
+      }
+    }
+  }
+
+  private static void collectNonIdentifiers(final String source, final String file) {
+    final Matcher matcher = NON_IDENTIFIER_MSG_ID.matcher(source);
+
+    while (matcher.find()) {
+      final var text = matcher.group("text");
+
+      if ("+".equals(matcher.group("next")) || !text.matches("\\w+")) {
+        nonIdentifierMsgIds.computeIfAbsent(text, key -> new TreeSet<>()).add(file);
       }
     }
   }
