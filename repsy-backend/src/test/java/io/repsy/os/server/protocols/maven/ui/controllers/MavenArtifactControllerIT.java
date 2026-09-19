@@ -251,7 +251,7 @@ class MavenArtifactControllerIT {
 
   private String bearerToken() {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(
+        + this.jwtUtils.createPanelAccessToken(
             this.admin.getId(), this.admin.getUsername(), Duration.ofMinutes(30));
   }
 

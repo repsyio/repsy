@@ -145,7 +145,14 @@ class GolangModuleControllerIT {
 
   private String bearerToken(final User user) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(
+        + this.jwtUtils.createPanelAccessToken(
+            user.getId(), user.getUsername(), Duration.ofMinutes(30));
+  }
+
+  /** The upload goes to the protocol endpoint, which takes protocol tokens, not panel ones. */
+  private String protocolToken(final User user) {
+    return AuthUtils.AUTH_BEARER
+        + this.jwtUtils.createProtocolToken(
             user.getId(), user.getUsername(), Duration.ofMinutes(30));
   }
 
@@ -211,8 +218,8 @@ class GolangModuleControllerIT {
     final var user = this.createUser();
     final var token = this.bearerToken(user);
     final var repo = this.createRepo(unique("go"), true);
-    this.upload(repo, "v1.0.0", token);
-    this.upload(repo, "v1.2.0", token);
+    this.upload(repo, "v1.0.0", this.protocolToken(user));
+    this.upload(repo, "v1.2.0", this.protocolToken(user));
 
     this.mockMvc
         .perform(get("/api/go/modules/{repo}", repo).with(apiPort()).header(AUTHORIZATION, token))
@@ -276,9 +283,10 @@ class GolangModuleControllerIT {
     final var user = this.createUser();
     final var token = this.bearerToken(user);
     final var repo = this.createRepo(unique("variants"), false);
-    this.upload(repo, V2_MODULE, "v2.0.0", token);
-    this.upload(repo, UPPERCASE_MODULE, "v1.0.0-20240101120000-0123456789ab", token);
-    this.upload(repo, MODULE, "v1.2.3+incompatible", token);
+    this.upload(repo, V2_MODULE, "v2.0.0", this.protocolToken(user));
+    this.upload(
+        repo, UPPERCASE_MODULE, "v1.0.0-20240101120000-0123456789ab", this.protocolToken(user));
+    this.upload(repo, MODULE, "v1.2.3+incompatible", this.protocolToken(user));
 
     this.mockMvc
         .perform(
@@ -384,7 +392,7 @@ class GolangModuleControllerIT {
     final var token = this.bearerToken(owner);
     final var repo = this.createRepo(unique("private"), true);
     final var publicRepo = this.createRepo(unique("public"), false);
-    this.upload(publicRepo, "v1.0.0", token);
+    this.upload(publicRepo, "v1.0.0", this.protocolToken(owner));
 
     this.mockMvc
         .perform(get("/api/go/modules/{repo}", repo).with(apiPort()))
@@ -494,8 +502,8 @@ class GolangModuleControllerIT {
     final var user = this.createUser(UserRole.ADMIN);
     final var token = this.bearerToken(user);
     final var repo = this.createRepo(unique("go"), true);
-    this.upload(repo, "v1.0.0", token);
-    this.upload(repo, "v1.2.0", token);
+    this.upload(repo, "v1.0.0", this.protocolToken(user));
+    this.upload(repo, "v1.2.0", this.protocolToken(user));
 
     this.mockMvc
         .perform(

@@ -325,7 +325,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
 
       final var response =
           NuGetPublishProtocolIT.this.pushAs(
-              repo, nupkg, NuGetPublishProtocolIT.this.adminBearerToken());
+              repo, nupkg, NuGetPublishProtocolIT.this.adminProtocolBearerToken());
 
       assertStatus(response, 201);
 
@@ -366,7 +366,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
 
       assertStatus(
           NuGetPublishProtocolIT.this.pushAs(
-              repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminBearerToken()),
+              repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
           201);
 
       assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, pkg.id()))
@@ -387,7 +387,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
 
       assertStatus(
           NuGetPublishProtocolIT.this.pushAs(
-              repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminBearerToken()),
+              repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
           201);
 
       final var versions = NuGetPublishProtocolIT.this.storedVersions(repo, pkg.id());
@@ -402,7 +402,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
 
       assertStatus(
           NuGetPublishProtocolIT.this.pushAs(
-              repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminBearerToken()),
+              repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
           201);
 
       assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, pkg.id()))
@@ -423,7 +423,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
 
       assertStatus(
           NuGetPublishProtocolIT.this.pushAs(
-              repo, nupkg, NuGetPublishProtocolIT.this.adminBearerToken()),
+              repo, nupkg, NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
           201);
 
       NuGetPublishProtocolIT.this
@@ -451,7 +451,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
     void severalVersions() throws Exception {
       final var repo = NuGetPublishProtocolIT.this.nugetRepo();
       final var id = uniquePackageId();
-      final var token = NuGetPublishProtocolIT.this.adminBearerToken();
+      final var token = NuGetPublishProtocolIT.this.adminProtocolBearerToken();
 
       assertStatus(
           NuGetPublishProtocolIT.this.pushAs(repo, new Pkg(id, "1.0.0").nupkg(), token), 201);
@@ -480,7 +480,8 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
                   multipart(HttpMethod.PUT, PUSH_PATH, repo.getName())
                       .part(new MockPart("symbols", "symbols.snupkg", new byte[] {1, 2, 3}))
                       .part(new MockPart(PACKAGE_PART, "package.nupkg", pkg.nupkg()))
-                      .header(AUTHORIZATION, NuGetPublishProtocolIT.this.adminBearerToken()))
+                      .header(
+                          AUTHORIZATION, NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
               .andReturn()
               .getResponse();
 
@@ -500,7 +501,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
                   push(
                       repo,
                       new MockPart("file", "package.nupkg", pkg.nupkg()),
-                      NuGetPublishProtocolIT.this.adminBearerToken()))
+                      NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
               .andReturn()
               .getResponse();
 
@@ -519,7 +520,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
               put(PUSH_PATH, repo.getName())
                   .contentType("application/octet-stream")
                   .content(pkg.nupkg())
-                  .header(AUTHORIZATION, NuGetPublishProtocolIT.this.adminBearerToken()))
+                  .header(AUTHORIZATION, NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
           .andExpect(status().isBadRequest())
           .andExpect(
               jsonPath("$.errors[0].message").value("Content-Type must be multipart/form-data"));
@@ -535,7 +536,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       NuGetPublishProtocolIT.this
           .protocol(
               multipart(HttpMethod.PUT, PUSH_PATH, repo.getName())
-                  .header(AUTHORIZATION, NuGetPublishProtocolIT.this.adminBearerToken()))
+                  .header(AUTHORIZATION, NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errors[0].message").value("Missing package content."));
 
@@ -548,7 +549,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       final var repo = NuGetPublishProtocolIT.this.nugetRepo();
 
       NuGetPublishProtocolIT.this
-          .protocol(push(repo, new byte[0], NuGetPublishProtocolIT.this.adminBearerToken()))
+          .protocol(push(repo, new byte[0], NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errors[0].message").value("NuGet package stream is empty."));
 
@@ -570,7 +571,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
               push(
                   repo,
                   "definitely not a nupkg".getBytes(StandardCharsets.UTF_8),
-                  NuGetPublishProtocolIT.this.adminBearerToken()))
+                  NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
           .andExpect(status().isBadRequest())
           .andExpect(
               jsonPath("$.errors[0].message")
@@ -586,7 +587,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       final var noNuspec = zip(entry("lib/net8.0/x.dll", "MZ"));
 
       NuGetPublishProtocolIT.this
-          .protocol(push(repo, noNuspec, NuGetPublishProtocolIT.this.adminBearerToken()))
+          .protocol(push(repo, noNuspec, NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
           .andExpect(status().isBadRequest())
           .andExpect(
               jsonPath("$.errors[0].message")
@@ -603,7 +604,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
           zip(entry("x.nuspec", "<package><metadata><id>Only.Id</id></metadata></package>"));
 
       NuGetPublishProtocolIT.this
-          .protocol(push(repo, incomplete, NuGetPublishProtocolIT.this.adminBearerToken()))
+          .protocol(push(repo, incomplete, NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errors[0].message").value("Missing 'id' or 'version' in nuspec."));
 
@@ -617,7 +618,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       final var pkg = new Pkg("bad id!", "1.0.0");
 
       NuGetPublishProtocolIT.this
-          .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminBearerToken()))
+          .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errors[0].message").value("Invalid NuGet package id."));
 
@@ -636,7 +637,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       final var pkg = new Pkg(uniquePackageId(), "1.0");
 
       NuGetPublishProtocolIT.this
-          .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminBearerToken()))
+          .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errors[0].message").value("Invalid NuGet version format."));
 
@@ -650,7 +651,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       final var pkg = new Pkg(uniquePackageId(), "one.two");
 
       NuGetPublishProtocolIT.this
-          .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminBearerToken()))
+          .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.errors[0].message").value("Invalid NuGet version format."));
 
@@ -669,7 +670,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       final var created = NuGetPublishProtocolIT.this.nugetRepo();
       final var repo = NuGetPublishProtocolIT.this.withRepoSettings(created, false, null, null);
       final var pkg = new Pkg(uniquePackageId(), "1.0.0");
-      final var token = NuGetPublishProtocolIT.this.adminBearerToken();
+      final var token = NuGetPublishProtocolIT.this.adminProtocolBearerToken();
       final var original = pkg.nupkg();
 
       assertStatus(NuGetPublishProtocolIT.this.pushAs(repo, original, token), 201);
@@ -709,7 +710,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       final var created = NuGetPublishProtocolIT.this.nugetRepo();
       final var repo = NuGetPublishProtocolIT.this.withRepoSettings(created, true, null, null);
       final var pkg = new Pkg(uniquePackageId(), "1.0.0");
-      final var token = NuGetPublishProtocolIT.this.adminBearerToken();
+      final var token = NuGetPublishProtocolIT.this.adminProtocolBearerToken();
 
       assertStatus(NuGetPublishProtocolIT.this.pushAs(repo, pkg.nupkg(), token), 201);
 
@@ -736,7 +737,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       final var pkg = new Pkg(uniquePackageId(), "1.0.0-rc.1");
 
       NuGetPublishProtocolIT.this
-          .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminBearerToken()))
+          .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
           .andExpect(status().isUnprocessableContent())
           .andExpect(
               jsonPath("$.errors[0].message")
@@ -753,7 +754,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       final var pkg = new Pkg(uniquePackageId(), "1.0.0");
 
       NuGetPublishProtocolIT.this
-          .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminBearerToken()))
+          .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
           .andExpect(status().isUnprocessableContent())
           .andExpect(
               jsonPath("$.errors[0].message")
@@ -862,7 +863,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       final var pkg = new Pkg(uniquePackageId(), "1.0.0");
       final var token =
           NuGetPublishProtocolIT.this
-              .adminBearerToken()
+              .adminProtocolBearerToken()
               .substring(io.repsy.os.shared.auth.utils.AuthUtils.AUTH_BEARER.length());
 
       final var response =

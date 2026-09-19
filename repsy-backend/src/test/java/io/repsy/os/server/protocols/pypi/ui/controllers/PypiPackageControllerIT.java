@@ -151,7 +151,7 @@ class PypiPackageControllerIT {
 
   private String bearerToken(final UserInfo user) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(
+        + this.jwtUtils.createPanelAccessToken(
             user.getId(), user.getUsername(), Duration.ofMinutes(30));
   }
 

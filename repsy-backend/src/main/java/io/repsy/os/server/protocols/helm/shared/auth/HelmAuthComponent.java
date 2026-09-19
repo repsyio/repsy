@@ -20,6 +20,7 @@ import io.repsy.os.server.shared.auth.ProtocolAuthService;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -42,15 +43,15 @@ public class HelmAuthComponent extends ProtocolAuthService {
   public void handleBearerAuth(
       final String authHeader, final UUID repoId, final Permission permission) {
 
-    final var authType = this.jwtUtils.extractAuthenticationType(authHeader);
+    final var authType = this.jwtUtils.extractAuthenticationType(authHeader, TokenRealm.PROTOCOL);
 
     if (authType == AuthenticationType.DEPLOY_TOKEN) {
       this.authorizeTokenRequestTokenId(
-          repoId, this.jwtUtils.extractUserId(authHeader), permission);
+          repoId, this.jwtUtils.extractUserId(authHeader, TokenRealm.PROTOCOL), permission);
       return;
     }
 
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader);
+    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
     final var userInfo = this.userTxService.getUserByUsernameOptional(username).orElse(null);
 
     if (userInfo == null) {

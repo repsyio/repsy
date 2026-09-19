@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
+import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.constants.ErrorConstants;
 import java.time.Duration;
@@ -66,7 +67,7 @@ class JwtUtilsTest {
     final var userId = UUID.randomUUID();
     final var username = "testuser";
     final var accessToken =
-        this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofMinutes(15));
+        this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofMinutes(15));
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(accessToken))
         .isInstanceOf(UnAuthorizedException.class)
@@ -79,7 +80,7 @@ class JwtUtilsTest {
     final var userId = UUID.randomUUID();
     final var username = "testuser";
     final var legacyToken =
-        this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofMinutes(30));
+        this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofMinutes(30));
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(legacyToken))
         .isInstanceOf(UnAuthorizedException.class)
@@ -95,7 +96,8 @@ class JwtUtilsTest {
         this.jwtUtils.createRefreshToken(
             userId, username, Duration.ofMinutes(30), SESSION_START, TOKEN_VERSION);
 
-    assertThatThrownBy(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + refreshToken))
+    assertThatThrownBy(
+            () -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + refreshToken, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
@@ -106,9 +108,9 @@ class JwtUtilsTest {
     final var userId = UUID.randomUUID();
     final var username = "testuser";
     final var accessToken =
-        this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofMinutes(15));
+        this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofMinutes(15));
 
-    this.jwtUtils.verify(AuthUtils.AUTH_BEARER + accessToken);
+    this.jwtUtils.verify(AuthUtils.AUTH_BEARER + accessToken, TokenRealm.PANEL);
     // No exception means success
   }
 
@@ -122,7 +124,9 @@ class JwtUtilsTest {
             userId, username, Duration.ofMinutes(30), SESSION_START, TOKEN_VERSION);
 
     assertThatThrownBy(
-            () -> this.jwtUtils.verifyAndExtractUsername(AuthUtils.AUTH_BEARER + refreshToken))
+            () ->
+                this.jwtUtils.verifyAndExtractUsername(
+                    AuthUtils.AUTH_BEARER + refreshToken, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
@@ -133,9 +137,11 @@ class JwtUtilsTest {
     final var userId = UUID.randomUUID();
     final var username = "testuser";
     final var accessToken =
-        this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofMinutes(15));
+        this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofMinutes(15));
 
-    final var result = this.jwtUtils.verifyAndExtractUsername(AuthUtils.AUTH_BEARER + accessToken);
+    final var result =
+        this.jwtUtils.verifyAndExtractUsername(
+            AuthUtils.AUTH_BEARER + accessToken, TokenRealm.PANEL);
 
     assertThat(result).isEqualTo(username);
   }
@@ -149,7 +155,9 @@ class JwtUtilsTest {
         this.jwtUtils.createRefreshToken(
             userId, username, Duration.ofMinutes(30), SESSION_START, TOKEN_VERSION);
 
-    assertThatThrownBy(() -> this.jwtUtils.extractUserId(AuthUtils.AUTH_BEARER + refreshToken))
+    assertThatThrownBy(
+            () ->
+                this.jwtUtils.extractUserId(AuthUtils.AUTH_BEARER + refreshToken, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
@@ -160,9 +168,10 @@ class JwtUtilsTest {
     final var userId = UUID.randomUUID();
     final var username = "testuser";
     final var accessToken =
-        this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofMinutes(15));
+        this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofMinutes(15));
 
-    final var result = this.jwtUtils.extractUserId(AuthUtils.AUTH_BEARER + accessToken);
+    final var result =
+        this.jwtUtils.extractUserId(AuthUtils.AUTH_BEARER + accessToken, TokenRealm.PANEL);
 
     assertThat(result).isEqualTo(userId);
   }
@@ -177,7 +186,9 @@ class JwtUtilsTest {
             userId, username, Duration.ofMinutes(30), SESSION_START, TOKEN_VERSION);
 
     assertThatThrownBy(
-            () -> this.jwtUtils.extractAuthenticationType(AuthUtils.AUTH_BEARER + refreshToken))
+            () ->
+                this.jwtUtils.extractAuthenticationType(
+                    AuthUtils.AUTH_BEARER + refreshToken, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
@@ -188,9 +199,11 @@ class JwtUtilsTest {
     final var userId = UUID.randomUUID();
     final var username = "testuser";
     final var accessToken =
-        this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofMinutes(15));
+        this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofMinutes(15));
 
-    final var result = this.jwtUtils.extractAuthenticationType(AuthUtils.AUTH_BEARER + accessToken);
+    final var result =
+        this.jwtUtils.extractAuthenticationType(
+            AuthUtils.AUTH_BEARER + accessToken, TokenRealm.PANEL);
 
     assertThat(result).isNotNull();
   }
@@ -198,7 +211,7 @@ class JwtUtilsTest {
   @Test
   @DisplayName("refresh token with a non-UUID subject is rejected by verifyRefreshToken")
   void verifyRefreshTokenRejectsNonUuidSubject() {
-    final var token = this.signedToken("not-a-uuid", "refresh");
+    final var token = this.signedToken("not-a-uuid", "refresh", null);
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
         .isInstanceOf(UnAuthorizedException.class)
@@ -208,7 +221,7 @@ class JwtUtilsTest {
   @Test
   @DisplayName("refresh token without a subject is rejected by verifyRefreshToken")
   void verifyRefreshTokenRejectsMissingSubject() {
-    final var token = this.signedToken(null, "refresh");
+    final var token = this.signedToken(null, "refresh", null);
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
         .isInstanceOf(UnAuthorizedException.class)
@@ -218,9 +231,9 @@ class JwtUtilsTest {
   @Test
   @DisplayName("access token with a non-UUID subject is rejected by getUserId")
   void getUserIdRejectsNonUuidSubject() {
-    final var token = this.signedToken("not-a-uuid", null);
+    final var token = this.signedToken("not-a-uuid", null, "panel");
 
-    assertThatThrownBy(() -> this.jwtUtils.getUserId(token))
+    assertThatThrownBy(() -> this.jwtUtils.getUserId(token, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
@@ -228,16 +241,17 @@ class JwtUtilsTest {
   @Test
   @DisplayName("access token without a subject is rejected by getUserId")
   void getUserIdRejectsMissingSubject() {
-    final var token = this.signedToken(null, null);
+    final var token = this.signedToken(null, null, "panel");
 
-    assertThatThrownBy(() -> this.jwtUtils.getUserId(token))
+    assertThatThrownBy(() -> this.jwtUtils.getUserId(token, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 
-  private String signedToken(final String subject, final String tokenType) {
+  private String signedToken(final String subject, final String tokenType, final String audience) {
     return JWT.create()
         .withSubject(subject)
+        .withAudience(audience == null ? new String[0] : new String[] {audience})
         .withClaim("username", "testuser")
         .withClaim("token_type", tokenType)
         .withClaim("session_start", SESSION_START)
@@ -266,9 +280,10 @@ class JwtUtilsTest {
     final var userId = UUID.randomUUID();
     final var username = "testuser";
     final var expiredToken =
-        this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofSeconds(-1));
+        this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofSeconds(-1));
 
-    assertThatThrownBy(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + expiredToken))
+    assertThatThrownBy(
+            () -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + expiredToken, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining("sessionExpired");
   }
@@ -281,7 +296,8 @@ class JwtUtilsTest {
         this.jwtUtils.createRefreshToken(
             UUID.randomUUID(), "testuser", Duration.ofSeconds(-1), SESSION_START, TOKEN_VERSION);
 
-    assertThatThrownBy(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + expiredToken))
+    assertThatThrownBy(
+            () -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + expiredToken, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining("sessionExpired");
   }
@@ -318,7 +334,7 @@ class JwtUtilsTest {
             .withExpiresAt(Instant.now().plus(Duration.ofMinutes(15)))
             .sign(Algorithm.HMAC512(otherSecret));
 
-    assertThatThrownBy(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + token))
+    assertThatThrownBy(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + token, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
@@ -371,8 +387,12 @@ class JwtUtilsTest {
   @DisplayName("access token without a session start begins a new session in extractSessionStart")
   void extractSessionStartFallsBackToNow() {
     final var accessToken =
-        this.jwtUtils.createTokenWithDuration(
-            UUID.randomUUID(), "testuser", Duration.ofMinutes(15));
+        JWT.create()
+            .withSubject(UUID.randomUUID().toString())
+            .withAudience("panel")
+            .withClaim("username", "testuser")
+            .withExpiresAt(Instant.now().plus(Duration.ofMinutes(15)))
+            .sign(Algorithm.HMAC512(TEST_SECRET));
 
     final var before = Instant.now().minusSeconds(1);
     final var result = this.jwtUtils.extractSessionStart(AuthUtils.AUTH_BEARER + accessToken);
@@ -391,5 +411,152 @@ class JwtUtilsTest {
             () -> this.jwtUtils.extractSessionStart(AuthUtils.AUTH_BEARER + refreshToken))
         .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("panel access token is accepted on the panel side and rejected on the protocol side")
+  void panelAccessTokenIsScopedToThePanel() {
+    final var userId = UUID.randomUUID();
+    final var header =
+        AuthUtils.AUTH_BEARER
+            + this.jwtUtils.createPanelAccessToken(userId, "testuser", Duration.ofMinutes(15));
+
+    assertThat(this.jwtUtils.verifyAndExtractUsername(header, TokenRealm.PANEL))
+        .isEqualTo("testuser");
+    assertThat(this.jwtUtils.extractUserId(header, TokenRealm.PANEL)).isEqualTo(userId);
+    assertThatThrownBy(() -> this.jwtUtils.verifyAndExtractUsername(header, TokenRealm.PROTOCOL))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+    assertThatThrownBy(() -> this.jwtUtils.verify(header, TokenRealm.PROTOCOL))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("session access token is scoped to the panel, including its session start")
+  void sessionAccessTokenIsScopedToThePanel() {
+    final var header =
+        AuthUtils.AUTH_BEARER
+            + this.jwtUtils.createSessionAccessToken(
+                UUID.randomUUID(), "testuser", Duration.ofMinutes(15), SESSION_START);
+
+    assertThat(this.jwtUtils.extractSessionStart(header)).isEqualTo(SESSION_START);
+    assertThatThrownBy(() -> this.jwtUtils.verify(header, TokenRealm.PROTOCOL))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("protocol token is accepted on the protocol side and rejected on the panel side")
+  void protocolTokenIsScopedToProtocolEndpoints() {
+    final var userId = UUID.randomUUID();
+    final var header =
+        AuthUtils.AUTH_BEARER
+            + this.jwtUtils.createProtocolToken(userId, "testuser", Duration.ofMinutes(15));
+
+    assertThat(this.jwtUtils.verifyAndExtractUsername(header, TokenRealm.PROTOCOL))
+        .isEqualTo("testuser");
+    assertThat(this.jwtUtils.extractUserId(header, TokenRealm.PROTOCOL)).isEqualTo(userId);
+    assertThatThrownBy(() -> this.jwtUtils.verifyAndExtractUsername(header, TokenRealm.PANEL))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+    assertThatThrownBy(() -> this.jwtUtils.extractUserId(header, TokenRealm.PANEL))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+    assertThatThrownBy(() -> this.jwtUtils.extractSessionStart(header))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("protocol token carrying an authentication type is scoped to the protocol side")
+  void authenticatedProtocolTokenIsScopedToProtocolEndpoints() {
+    final var header =
+        AuthUtils.AUTH_BEARER
+            + this.jwtUtils.createProtocolToken(
+                UUID.randomUUID(),
+                "testuser",
+                Duration.ofMinutes(15),
+                AuthenticationType.DEPLOY_TOKEN);
+
+    assertThat(this.jwtUtils.extractAuthenticationType(header, TokenRealm.PROTOCOL))
+        .isEqualTo(AuthenticationType.DEPLOY_TOKEN);
+    assertThatThrownBy(() -> this.jwtUtils.extractAuthenticationType(header, TokenRealm.PANEL))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("repo scoped scanner token is scoped to the protocol side")
+  void repoScopedTokenIsScopedToProtocolEndpoints() {
+    final var repoId = UUID.randomUUID();
+    final var header =
+        AuthUtils.AUTH_BEARER
+            + this.jwtUtils.createRepoScopedToken(repoId, "repo:pull", Duration.ofMinutes(15));
+
+    assertThat(this.jwtUtils.extractUserId(header, TokenRealm.PROTOCOL)).isEqualTo(repoId);
+    assertThatThrownBy(() -> this.jwtUtils.extractUserId(header, TokenRealm.PANEL))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("claim-less legacy token is still accepted on the protocol side")
+  void claimlessLegacyTokenIsAcceptedOnTheProtocolSide() {
+    final var userId = UUID.randomUUID();
+    final var header = AuthUtils.AUTH_BEARER + this.signedToken(userId.toString(), null, null);
+
+    assertThat(this.jwtUtils.verifyAndExtractUsername(header, TokenRealm.PROTOCOL))
+        .isEqualTo("testuser");
+    assertThat(this.jwtUtils.extractUserId(header, TokenRealm.PROTOCOL)).isEqualTo(userId);
+  }
+
+  @Test
+  @DisplayName("claim-less legacy token is answered sessionExpired on the panel side")
+  void claimlessLegacyTokenIsRejectedOnThePanelSide() {
+    final var header =
+        AuthUtils.AUTH_BEARER + this.signedToken(UUID.randomUUID().toString(), null, null);
+
+    assertThatThrownBy(() -> this.jwtUtils.verifyAndExtractUsername(header, TokenRealm.PANEL))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining("sessionExpired");
+    assertThatThrownBy(() -> this.jwtUtils.verify(header, TokenRealm.PANEL))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining("sessionExpired");
+    assertThatThrownBy(() -> this.jwtUtils.extractSessionStart(header))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining("sessionExpired");
+  }
+
+  @Test
+  @DisplayName("refresh token is rejected on both sides")
+  void refreshTokenIsRejectedOnBothSides() {
+    final var header =
+        AuthUtils.AUTH_BEARER
+            + this.jwtUtils.createRefreshToken(
+                UUID.randomUUID(),
+                "testuser",
+                Duration.ofMinutes(30),
+                SESSION_START,
+                TOKEN_VERSION);
+
+    for (final var realm : TokenRealm.values()) {
+      assertThatThrownBy(() -> this.jwtUtils.verify(header, realm))
+          .isInstanceOf(UnAuthorizedException.class)
+          .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+  }
+
+  @Test
+  @DisplayName("token for an unknown audience is rejected on both sides")
+  void unknownAudienceIsRejectedOnBothSides() {
+    final var header =
+        AuthUtils.AUTH_BEARER + this.signedToken(UUID.randomUUID().toString(), null, "other");
+
+    for (final var realm : TokenRealm.values()) {
+      assertThatThrownBy(() -> this.jwtUtils.verify(header, realm))
+          .isInstanceOf(UnAuthorizedException.class)
+          .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
   }
 }

@@ -215,7 +215,7 @@ class NpmPackageApiControllerIT {
 
   private String bearerToken(final User user, final Duration duration) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(user.getId(), user.getUsername(), duration);
+        + this.jwtUtils.createPanelAccessToken(user.getId(), user.getUsername(), duration);
   }
 
   private static RequestPostProcessor apiPort() {
@@ -411,7 +411,7 @@ class NpmPackageApiControllerIT {
           .andExpect(status().isUnauthorized());
       final var unknown =
           AuthUtils.AUTH_BEARER
-              + jwtUtils.createTokenWithDuration(
+              + jwtUtils.createPanelAccessToken(
                   UUID.randomUUID(), "deleted-user", Duration.ofMinutes(30));
       perform(get("/api/npm/packages/{repo}", privateRepoName).header(AUTHORIZATION, unknown))
           .andExpect(status().isNotFound());

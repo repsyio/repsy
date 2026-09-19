@@ -80,7 +80,7 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
     final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
 
     final var body =
-        this.push(repo.getName(), gem("pushed-gem", "1.2.3"), this.adminBearerToken())
+        this.push(repo.getName(), gem("pushed-gem", "1.2.3"), this.adminProtocolBearerToken())
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -94,12 +94,12 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
   void downloadsPushedGem() throws Exception {
     final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
     final var gem = gem("pushed-gem", "1.2.3");
-    this.push(repo.getName(), gem, this.adminBearerToken()).andExpect(status().isOk());
+    this.push(repo.getName(), gem, this.adminProtocolBearerToken()).andExpect(status().isOk());
 
     final var downloaded =
         this.protocol(
                 get("/{repo}/gems/pushed-gem-1.2.3.gem", repo.getName())
-                    .header(AUTHORIZATION, this.adminBearerToken()))
+                    .header(AUTHORIZATION, this.adminProtocolBearerToken()))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -112,12 +112,13 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
   @DisplayName("a pushed gem is listed in the compact index")
   void listsPushedGemInCompactIndex() throws Exception {
     final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
-    this.push(repo.getName(), gem("pushed-gem", "1.2.3"), this.adminBearerToken())
+    this.push(repo.getName(), gem("pushed-gem", "1.2.3"), this.adminProtocolBearerToken())
         .andExpect(status().isOk());
 
     final var names =
         this.protocol(
-                get("/{repo}/names", repo.getName()).header(AUTHORIZATION, this.adminBearerToken()))
+                get("/{repo}/names", repo.getName())
+                    .header(AUTHORIZATION, this.adminProtocolBearerToken()))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -130,7 +131,7 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
   @DisplayName("DELETE /{repo}/api/v1/gems/yank yanks a pushed gem")
   void yanksPushedGem() throws Exception {
     final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
-    final var token = this.adminBearerToken();
+    final var token = this.adminProtocolBearerToken();
     this.push(repo.getName(), gem("pushed-gem", "1.2.3"), token).andExpect(status().isOk());
 
     final var body =
@@ -162,7 +163,7 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
                       request.setLocalPort(PROTOCOL_PORT);
                       return request;
                     })
-                .header(AUTHORIZATION, this.adminBearerToken())
+                .header(AUTHORIZATION, this.adminProtocolBearerToken())
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .content(gem("pushed-gem", "1.2.3")))
         .andExpect(status().isNotFound());

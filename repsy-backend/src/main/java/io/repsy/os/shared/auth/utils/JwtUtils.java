@@ -62,8 +62,11 @@ public class JwtUtils {
     }
   }
 
-  public @NonNull String verifyAndExtractUsername(final @NonNull String authHeader) {
-    return this.verifyAndDecode(this.getToken(authHeader)).getClaim(CLAIM_USERNAME).asString();
+  public @NonNull String verifyAndExtractUsername(
+      final @NonNull String authHeader, final @NonNull TokenRealm realm) {
+    return this.verifyAndDecode(this.getToken(authHeader), realm)
+        .getClaim(CLAIM_USERNAME)
+        .asString();
   }
 
   private @NonNull DecodedJWT decode(
@@ -77,14 +80,43 @@ public class JwtUtils {
     }
   }
 
-  private @NonNull DecodedJWT verifyAndDecode(final @NonNull String token) {
+  private @NonNull DecodedJWT verifyAndDecode(
+      final @NonNull String token, final @NonNull TokenRealm realm) {
     final var decodedJWT = this.decode(token, "sessionExpired");
 
     if (isRefreshToken(decodedJWT)) {
       throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
 
+    checkRealm(decodedJWT, realm);
+
     return decodedJWT;
+  }
+
+  private static void checkRealm(
+      final @NonNull DecodedJWT decodedJWT, final @NonNull TokenRealm realm) {
+    final var audience = decodedJWT.getAudience();
+
+    if (audience == null || audience.isEmpty()) {
+      acceptClaimlessToken(realm);
+      return;
+    }
+
+    if (!audience.contains(realm.getAudience())) {
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+  }
+
+  /**
+   * Tokens issued before they carried a realm have no audience and cannot be attributed to one
+   * entry point. Protocol tokens outlive a deployment by days (npm: 90), so the protocol side keeps
+   * accepting them. The panel side does not: its access tokens live for minutes, and answering
+   * {@code sessionExpired} makes the frontend swap the token through its refresh token once.
+   */
+  private static void acceptClaimlessToken(final @NonNull TokenRealm realm) {
+    if (realm != TokenRealm.PROTOCOL) {
+      throw new UnAuthorizedException("sessionExpired");
+    }
   }
 
   private static boolean isRefreshToken(final @NonNull DecodedJWT decodedJWT) {
@@ -99,24 +131,34 @@ public class JwtUtils {
     return authHeader.replaceFirst("^Bearer ", "");
   }
 
-  public @NonNull String createTokenWithDuration(
+  /** Creates the access token of a panel session that starts now. */
+  public @NonNull String createPanelAccessToken(
+      final @NonNull UUID userId,
+      final @NonNull String username,
+      final @NonNull TemporalAmount timeoutDuration) {
+    return this.createSessionAccessToken(userId, username, timeoutDuration, Instant.now());
+  }
+
+  public @NonNull String createProtocolToken(
       final @NonNull UUID userId,
       final @NonNull String username,
       final @NonNull TemporalAmount timeoutDuration) {
     return JWT.create()
         .withSubject(userId.toString())
+        .withAudience(TokenRealm.PROTOCOL.getAudience())
         .withClaim(CLAIM_USERNAME, username)
         .withExpiresAt(Instant.now().plus(timeoutDuration))
         .sign(Algorithm.HMAC512(this.secret));
   }
 
-  public @NonNull String createTokenWithDuration(
+  public @NonNull String createProtocolToken(
       final @NonNull UUID userId,
       final @NonNull String username,
       final @NonNull TemporalAmount timeoutDuration,
       final @NonNull AuthenticationType authenticationType) {
     return JWT.create()
         .withSubject(userId.toString())
+        .withAudience(TokenRealm.PROTOCOL.getAudience())
         .withClaim(CLAIM_USERNAME, username)
         .withClaim(AUTH_TYPE, authenticationType.getValue())
         .withExpiresAt(Instant.now().plus(timeoutDuration))
@@ -134,6 +176,7 @@ public class JwtUtils {
       final @NonNull Instant sessionStart) {
     return JWT.create()
         .withSubject(userId.toString())
+        .withAudience(TokenRealm.PANEL.getAudience())
         .withClaim(CLAIM_USERNAME, username)
         .withClaim(CLAIM_SESSION_START, sessionStart)
         .withExpiresAt(Instant.now().plus(timeoutDuration))
@@ -162,18 +205,20 @@ public class JwtUtils {
       final @NonNull TemporalAmount timeoutDuration) {
     return JWT.create()
         .withSubject(repoId.toString())
+        .withAudience(TokenRealm.PROTOCOL.getAudience())
         .withClaim(AUTH_TYPE, AuthenticationType.DOCKER_SCAN.getValue())
         .withClaim(CLAIM_SCOPE, scope)
         .withExpiresAt(Instant.now().plus(timeoutDuration))
         .sign(Algorithm.HMAC512(this.secret));
   }
 
-  public @NonNull UUID extractUserId(final @NonNull String authHeader) {
-    return this.getUserId(this.getToken(authHeader));
+  public @NonNull UUID extractUserId(
+      final @NonNull String authHeader, final @NonNull TokenRealm realm) {
+    return this.getUserId(this.getToken(authHeader), realm);
   }
 
-  public @NonNull UUID getUserId(final @NonNull String token) {
-    return subjectAsUuid(this.verifyAndDecode(token));
+  public @NonNull UUID getUserId(final @NonNull String token, final @NonNull TokenRealm realm) {
+    return subjectAsUuid(this.verifyAndDecode(token, realm));
   }
 
   /**
@@ -183,7 +228,9 @@ public class JwtUtils {
    */
   public @NonNull Instant extractSessionStart(final @NonNull String authHeader) {
     final var sessionStart =
-        this.verifyAndDecode(this.getToken(authHeader)).getClaim(CLAIM_SESSION_START).asInstant();
+        this.verifyAndDecode(this.getToken(authHeader), TokenRealm.PANEL)
+            .getClaim(CLAIM_SESSION_START)
+            .asInstant();
 
     return sessionStart != null ? sessionStart : Instant.now();
   }
@@ -214,16 +261,18 @@ public class JwtUtils {
     }
   }
 
-  public void verify(final @NonNull String authHeader) {
-    this.verifyAndDecode(this.getToken(authHeader));
+  public void verify(final @NonNull String authHeader, final @NonNull TokenRealm realm) {
+    this.verifyAndDecode(this.getToken(authHeader), realm);
   }
 
-  public @NonNull AuthenticationType extractAuthenticationType(final @NonNull String authHeader) {
-    return this.getAuthenticationType(this.getToken(authHeader));
+  public @NonNull AuthenticationType extractAuthenticationType(
+      final @NonNull String authHeader, final @NonNull TokenRealm realm) {
+    return this.getAuthenticationType(this.getToken(authHeader), realm);
   }
 
-  public @NonNull AuthenticationType getAuthenticationType(final @NonNull String token) {
-    final var decodedJWT = this.verifyAndDecode(token);
+  public @NonNull AuthenticationType getAuthenticationType(
+      final @NonNull String token, final @NonNull TokenRealm realm) {
+    final var decodedJWT = this.verifyAndDecode(token, realm);
     final var authTypeClaim = decodedJWT.getClaim(AUTH_TYPE);
 
     if (authTypeClaim.isNull() || authTypeClaim.asString() == null) {

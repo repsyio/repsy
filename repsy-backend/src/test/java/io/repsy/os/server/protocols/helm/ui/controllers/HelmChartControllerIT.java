@@ -283,8 +283,9 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   }
 
   /** Uploads a chart through {@code POST /{repo}/api/charts} (ChartMuseum-style). */
-  private Pushed upload(final Repo repo, final ChartSpec spec, final String token)
+  private Pushed upload(final Repo repo, final ChartSpec spec, final String panelToken)
       throws Exception {
+    final var token = this.asProtocolBearer(panelToken);
     final var bytes = archive(spec);
     final var response =
         this.protocol(
@@ -306,8 +307,9 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       final String ociName,
       final String tag,
       final ChartSpec spec,
-      final String token)
+      final String panelToken)
       throws Exception {
+    final var token = this.asProtocolBearer(panelToken);
     final var bytes = archive(spec);
     requireStatus(this.putOciChart(repo, ociName, tag, bytes, token), 201, "OCI manifest push");
     return new Pushed(spec, bytes);
@@ -1818,7 +1820,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       return it.protocol(
           multipart("/{repo}/api/charts", repo.getName())
               .part(new MockPart("chart", "payments-1.0.0.tgz", archiveOf("payments", chartYaml)))
-              .header(AUTHORIZATION, it.adminBearerToken()));
+              .header(AUTHORIZATION, it.adminProtocolBearerToken()));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -1872,7 +1874,8 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       final var repo = it.helmRepo();
       final var bytes = archiveOf("payments", BASE + "appVersion: 2\n");
 
-      final var push = it.putOciChart(repo, "payments", "1.0.0", bytes, it.adminBearerToken());
+      final var push =
+          it.putOciChart(repo, "payments", "1.0.0", bytes, it.adminProtocolBearerToken());
 
       requireStatus(push, 400, "OCI manifest push");
       assertThat(push.getContentAsString(StandardCharsets.UTF_8))
@@ -1897,7 +1900,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     @DisplayName("accepts a blob whose digest already exists and keeps a single copy")
     void acceptsExistingDigest() throws Exception {
       final var it = HelmChartControllerIT.this;
-      final var token = it.adminBearerToken();
+      final var token = it.adminProtocolBearerToken();
       final var repo = it.helmRepo();
       final var bytes = archive(ChartSpec.of("payments", "1.0.0"));
       final var digest = sha256(bytes);

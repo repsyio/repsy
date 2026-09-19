@@ -136,7 +136,7 @@ class KeyStoreControllerIT {
 
   private String tokenFor(final User user) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(
+        + this.jwtUtils.createPanelAccessToken(
             user.getId(), user.getUsername(), Duration.ofMinutes(30));
   }
 
@@ -273,7 +273,7 @@ class KeyStoreControllerIT {
 
       final var expired =
           AuthUtils.AUTH_BEARER
-              + KeyStoreControllerIT.this.jwtUtils.createTokenWithDuration(
+              + KeyStoreControllerIT.this.jwtUtils.createPanelAccessToken(
                   user.getId(), user.getUsername(), Duration.ofSeconds(-1));
       final var expiredResponse =
           KeyStoreControllerIT.this

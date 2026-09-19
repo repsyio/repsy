@@ -133,7 +133,7 @@ class RubyGemApiControllerIT {
 
   private String bearer(final User user) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(
+        + this.jwtUtils.createPanelAccessToken(
             user.getId(), user.getUsername(), Duration.ofMinutes(30));
   }
 
@@ -491,11 +491,11 @@ class RubyGemApiControllerIT {
       final var user = RubyGemApiControllerIT.this.createUser(UserRole.USER);
       final var expired =
           AuthUtils.AUTH_BEARER
-              + RubyGemApiControllerIT.this.jwtUtils.createTokenWithDuration(
+              + RubyGemApiControllerIT.this.jwtUtils.createPanelAccessToken(
                   user.getId(), user.getUsername(), Duration.ofSeconds(-30));
       final var unknown =
           AuthUtils.AUTH_BEARER
-              + RubyGemApiControllerIT.this.jwtUtils.createTokenWithDuration(
+              + RubyGemApiControllerIT.this.jwtUtils.createPanelAccessToken(
                   UUID.randomUUID(), "unknown-user", Duration.ofMinutes(30));
 
       RubyGemApiControllerIT.this
