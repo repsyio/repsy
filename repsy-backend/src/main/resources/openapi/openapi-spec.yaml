@@ -2928,7 +2928,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoSecurityDetail"
-      summary: Get a repo-wide severity breakdown (each artifact-version's latest scan) plus its most recently scanned versions
+      summary: Get a repo-wide severity breakdown (each artifact-version's latest completed scan) plus its most recently scanned versions
     parameters:
       - name: repoName
         in: path
@@ -2953,7 +2953,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoSecurityDetail"
-      summary: Get one artifact's severity breakdown (each version's latest scan) plus its most recently scanned versions
+      summary: Get one artifact's severity breakdown (each version's latest completed scan) plus its most recently scanned versions
     parameters:
       - name: repoName
         in: path
@@ -2987,7 +2987,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseSecuritySummary"
-      summary: Get the worst known severity per repo, across all of that repo's scans (not just the latest scan)
+      summary: Get the worst known severity per repo, across each artifact version's latest completed scan
   "/api/security/scans":
     get:
       tags:
@@ -3073,7 +3073,7 @@ paths:
                 "$ref": "#/components/schemas/RestResponseSecurityScansSummary"
         '401':
           description: Missing or invalid token, or the authenticated user is not an admin
-      summary: Get the system-wide severity distribution (each artifact-version's latest scan), filterable by repoType/repoName, independent of the scans list's severity filter
+      summary: Get the system-wide severity distribution (each artifact-version's latest completed scan), filterable by repoType/repoName, independent of the scans list's severity filter
   "/api/security/supported-repo-types":
     get:
       tags:
