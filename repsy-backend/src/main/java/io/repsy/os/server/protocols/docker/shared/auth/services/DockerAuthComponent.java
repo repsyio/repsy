@@ -64,9 +64,9 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
   }
 
   @Override
-  public UserInfo authenticateUser(final String authHeader) {
+  public UserInfo authenticateUser(final @Nullable String authHeader) {
 
-    if (!isBearerToken(authHeader)) {
+    if (authHeader == null || !isBearerToken(authHeader)) {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 

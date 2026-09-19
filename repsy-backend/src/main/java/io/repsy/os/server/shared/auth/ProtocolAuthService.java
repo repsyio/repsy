@@ -134,7 +134,11 @@ public class ProtocolAuthService {
     throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
   }
 
-  public @NonNull UserInfo authenticateUser(final @NonNull String authHeader) {
+  public @NonNull UserInfo authenticateUser(final @Nullable String authHeader) {
+
+    if (authHeader == null) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
 
     return switch (authHeader) {
       case final String header when isBasicToken(header) -> this.authenticateWithBasic(header);

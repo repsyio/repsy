@@ -503,17 +503,11 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("typeOnlyEndpoints")
-    @DisplayName("KNOWN DEFECT: a missing Authorization header on a repoType route is a 500")
+    @DisplayName("returns 401 unAuthorized for a missing Authorization header on a repoType route")
     void typeOnlyRouteWithoutHeader(final Endpoint endpoint) throws Exception {
-      // ProtocolAuthService.authenticateUser(null) throws a NullPointerException, which the
-      // generic handler turns into errorOccurred instead of an authentication error.
-      expectError(
+      expectUnauthorized(
           ProtocolRepoControllerIT.this.perform(
-              endpoint.request().apply(new Target("unused", "MAVEN"))),
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          "errorOccurred",
-          null,
-          ERROR_OCCURRED_TEXT);
+              endpoint.request().apply(new Target("unused", "MAVEN"))));
     }
 
     @ParameterizedTest(name = "{0}")
