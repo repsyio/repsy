@@ -297,6 +297,7 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
         .andExpect(jsonPath("$.*", hasSize(5)))
         .andExpect(jsonPath("$.type").value("ERROR"))
         .andExpect(jsonPath("$.data").value("moduleNotFound"))
+        .andExpect(jsonPath("$.text").value("Module not found."))
         .andExpect(jsonPath("$.errorCode", matchesPattern(UUID_PATTERN)));
 
     this.mockMvc

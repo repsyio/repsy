@@ -110,34 +110,22 @@ class MessageKeysTest {
   private static final Set<String> PENDING_RPS_958 =
       Set.of(
           "blobNotFound",
-          "chartNotFound",
-          "crateNotFound",
-          "crateVersionNotFound",
           "digestMismatch",
           "fileAlreadyExists",
           "gemNameMissing",
-          "gemNotFound",
-          "gemVersionAlreadyExists",
-          "gemVersionAlreadyYanked",
           "gemVersionMissing",
-          "gemVersionNotFound",
           "goModFileEmpty",
           "goModInvalidModulePath",
           "goModMissingModuleDirective",
           "goModNotFoundInZip",
           "goModuleVersionAlreadyExists",
-          "invalidAuthType",
           "invalidModulePath",
           "invalidPackageVersion",
-          "moduleNotFound",
           "nupkgNotFound",
           "nuspecNotFound",
           "packageVersionAlreadyExists",
-          "refreshTokenExpired",
           "sha256Mismatch",
-          "unknownPath",
-          "urlVariablesNotFound",
-          "versionNotFound");
+          "unknownPath");
 
   private static Properties messages;
   private static Map<String, Set<String>> usedMsgIds;
