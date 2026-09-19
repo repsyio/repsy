@@ -58,7 +58,6 @@
         RPS-964: promote the Error Prone checks this repo has cleaned to errors so they stay at zero.
         Error Prone reads its flags only from the -Xplugin argument, so this restates core-parent's
         compilerArgs (keep the other args in sync with it) with the extra -Xep:<Check>:ERROR flags.
-        Checks with a known open finding (ReferenceEquality, RPS-963) are deliberately not listed.
       -->
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -66,7 +65,7 @@
           <compilerArgs combine.self="override">
             <arg>-parameters</arg>
             <arg>-XDcompilePolicy=simple</arg>
-            <arg>-Xplugin:ErrorProne -Xep:UnicodeInCode:OFF -Xep:MissingOverride:ERROR -Xep:StringCaseLocaleUsage:ERROR -Xep:InlineFormatString:ERROR -Xep:StringSplitter:ERROR -Xep:BadImport:ERROR -Xep:EmptyCatch:ERROR -Xep:UnusedMethod:ERROR -Xep:DefaultCharset:ERROR -Xep:EnumOrdinal:ERROR -Xep:TypeParameterUnusedInFormals:ERROR -Xep:NonApiType:ERROR -Xep:PatternMatchingInstanceof:ERROR -Xep:LoopOverCharArray:ERROR -XepExcludedPaths:(.*/src/test/.*|.*/target/.*)</arg>
+            <arg>-Xplugin:ErrorProne -Xep:UnicodeInCode:OFF -Xep:MissingOverride:ERROR -Xep:StringCaseLocaleUsage:ERROR -Xep:InlineFormatString:ERROR -Xep:StringSplitter:ERROR -Xep:BadImport:ERROR -Xep:EmptyCatch:ERROR -Xep:UnusedMethod:ERROR -Xep:DefaultCharset:ERROR -Xep:EnumOrdinal:ERROR -Xep:TypeParameterUnusedInFormals:ERROR -Xep:NonApiType:ERROR -Xep:PatternMatchingInstanceof:ERROR -Xep:LoopOverCharArray:ERROR -Xep:ReferenceEquality:ERROR -XepExcludedPaths:(.*/src/test/.*|.*/target/.*)</arg>
             <arg>--should-stop=ifError=FLOW</arg>
           </compilerArgs>
         </configuration>
