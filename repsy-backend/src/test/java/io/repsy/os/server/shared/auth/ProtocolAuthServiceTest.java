@@ -22,11 +22,14 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
+import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
+import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.auth.utils.TokenRealm;
@@ -41,6 +44,7 @@ import io.repsy.protocols.shared.repo.dtos.Credentials;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
@@ -320,6 +324,129 @@ class ProtocolAuthServiceTest {
     void handleBearerAuth() {
       assertUnauthorized(
           () -> this.ghostAuthService.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
+    }
+  }
+
+  /**
+   * RPS-979: a JWT minted from a deploy token carries the username the client put in the Basic
+   * credentials, so it has to be authorized as the deploy token and never resolved to the user of
+   * that name.
+   */
+  @Nested
+  @DisplayName("a deploy-token bearer JWT is authorized as the deploy token, not as a user")
+  class DeployTokenJwt {
+
+    private static final String BEARER = "Bearer signed.jwt.token";
+
+    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+    private final DeployTokenService deployTokenService = Mockito.mock(DeployTokenService.class);
+    private final UUID repoId = UUID.randomUUID();
+    private final UUID tokenId = UUID.randomUUID();
+
+    private final ProtocolAuthService jwtAuthService =
+        new ProtocolAuthService(
+            ProtocolAuthServiceTest.this.userTxService, this.jwtUtils, this.deployTokenService);
+
+    DeployTokenJwt() {
+      when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenReturn(AuthenticationType.DEPLOY_TOKEN);
+      when(this.jwtUtils.extractUserId(anyString(), any(TokenRealm.class)))
+          .thenReturn(this.tokenId);
+      // The claim names a real user; it must not be looked at.
+      when(this.jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
+          .thenReturn(USERNAME);
+    }
+
+    private void storeToken(final boolean readOnly, final Instant expirationDate) {
+      final var info = new DeployTokenInfo();
+      info.setId(this.tokenId);
+      info.setReadOnly(readOnly);
+      info.setExpirationDate(expirationDate);
+      when(this.deployTokenService.findByRepoIdAndTokenId(this.repoId, this.tokenId))
+          .thenReturn(Optional.of(info));
+    }
+
+    @Test
+    @DisplayName("a read-write token is authorized for its repo without looking up the user")
+    void authorizesTheDeployToken() {
+      this.storeToken(false, null);
+
+      this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.READ);
+      this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.WRITE);
+
+      verify(ProtocolAuthServiceTest.this.userTxService, never())
+          .getUserByUsernameOptional(anyString());
+      verify(ProtocolAuthServiceTest.this.userTxService, never())
+          .getAuthenticatedUserByUsername(anyString());
+      verify(this.deployTokenService, times(2)).updateLastUsedTime(this.tokenId);
+    }
+
+    @Test
+    @DisplayName("a read-only token can read but not write")
+    void readOnlyTokenCannotWrite() {
+      this.storeToken(true, null);
+
+      this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.READ);
+      assertUnauthorized(
+          () -> this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.WRITE));
+    }
+
+    @Test
+    @DisplayName("a token of another repo is unAuthorized, however the username claim reads")
+    void tokenOfAnotherRepo() {
+      this.storeToken(false, null);
+
+      assertUnauthorized(
+          () -> this.jwtAuthService.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
+      verify(ProtocolAuthServiceTest.this.userTxService, never())
+          .getUserByUsernameOptional(anyString());
+    }
+
+    @Test
+    @DisplayName("an expired token is refused")
+    void expiredToken() {
+      this.storeToken(false, Instant.now().minusSeconds(60));
+
+      assertThatThrownBy(
+              () -> this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.READ))
+          .isExactlyInstanceOf(UnAuthorizedException.class)
+          .hasMessage("deployTokenExpired");
+    }
+
+    @Test
+    @DisplayName("a token that was revoked is refused")
+    void revokedToken() {
+      when(this.deployTokenService.findByRepoIdAndTokenId(this.repoId, this.tokenId))
+          .thenReturn(Optional.empty());
+
+      assertUnauthorized(
+          () -> this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.READ));
+    }
+
+    @Test
+    @DisplayName("a scanner token is refused outside Docker")
+    void scannerTokenIsRefused() {
+      when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenReturn(AuthenticationType.DOCKER_SCAN);
+
+      assertUnauthorized(
+          () -> this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.READ));
+      verify(ProtocolAuthServiceTest.this.userTxService, never())
+          .getAuthenticatedUserByUsername(anyString());
+    }
+
+    @Test
+    @DisplayName("a user token still resolves the user, and MANAGE still needs an admin")
+    void userTokenIsUnchanged() {
+      when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenReturn(AuthenticationType.USERNAME_PASSWORD);
+      when(ProtocolAuthServiceTest.this.userTxService.getAuthenticatedUserByUsername(USERNAME))
+          .thenReturn(ALICE);
+
+      this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.WRITE);
+      assertUnauthorized(
+          () -> this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.MANAGE));
+      verify(this.deployTokenService, never()).findByRepoIdAndTokenId(any(), any());
     }
   }
 

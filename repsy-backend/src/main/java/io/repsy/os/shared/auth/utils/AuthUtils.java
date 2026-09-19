@@ -60,13 +60,16 @@ public class AuthUtils {
    * the base64 alphabet, so a token that is not base64 at all decodes to an empty value and is
    * treated the same way.
    *
+   * <p>Only the first colon separates the two parts (RFC 7617): a username cannot contain a colon,
+   * so every colon after it belongs to the password.
+   *
    * @param authHeader Authorization HTTP header from request
    * @return request Credentials, or null if the token is invalid
    */
   public static @Nullable Credentials extractCredentialsFromBasicToken(
       final @NonNull String authHeader) {
 
-    final var credentials = new String(decodeBase64(authHeader), UTF_8).split(":", -1);
+    final var credentials = new String(decodeBase64(authHeader), UTF_8).split(":", 2);
 
     if (credentials.length < 2) {
       return null;
