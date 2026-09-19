@@ -163,8 +163,17 @@ public class RepoTxService {
     return this.repoRepository.findAllRepoNames();
   }
 
-  public void updateDiskUsage(final @NonNull UUID repoId, final long diskUsageDiff) {
-    this.repoRepository.updateDiskUsage(repoId, diskUsageDiff);
+  /**
+   * Adds {@code diskUsageDiff} to the repo's disk usage.
+   *
+   * @return whether the repo still existed, {@code false} when nothing was updated
+   */
+  public boolean updateDiskUsage(final @NonNull UUID repoId, final long diskUsageDiff) {
+    return this.repoRepository.updateDiskUsage(repoId, diskUsageDiff) > 0;
+  }
+
+  public @NonNull Optional<Long> findDiskUsage(final @NonNull UUID repoId) {
+    return this.repoRepository.findDiskUsageById(repoId);
   }
 
   private @NonNull Repo findRepoOrThrowException(final @NonNull Optional<Repo> repoOptional) {

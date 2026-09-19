@@ -17,7 +17,6 @@ package io.repsy.os.server.protocols.golang.ui.facades;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.events.ArtifactVersionDeletedEvent;
-import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.generated.model.GoModuleInfo;
 import io.repsy.os.generated.model.GoModuleListItem;
@@ -54,11 +53,9 @@ public class GolangApiFacade implements ProtocolApiFacade {
   }
 
   @Transactional
-  public BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
+  public void deleteRepo(final @NonNull RepoInfo repoInfo) {
 
-    final var free = this.golangStorageService.deleteRepo(repoInfo.getStorageKey());
-
-    return BaseUsages.ofDisk(-1 * free);
+    this.golangStorageService.deleteRepo(repoInfo.getStorageKey());
   }
 
   public @NonNull Page<GoModuleListItem> getModules(

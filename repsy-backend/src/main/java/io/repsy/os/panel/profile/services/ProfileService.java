@@ -47,18 +47,19 @@ public class ProfileService {
       final @NonNull String newUsername,
       final @NonNull Instant sessionStart) {
 
-    this.userTxService.getUserById(userId);
+    this.userTxService.getAuthenticatedUserById(userId);
 
     this.validateUsernameAvailability(newUsername);
 
     this.userTxService.updateUsername(userId, newUsername);
 
     // Re-read so the tokens carry the username and the token version after the change.
-    return this.loginInfoFactory.create(this.userTxService.getUserById(userId), sessionStart);
+    return this.loginInfoFactory.create(
+        this.userTxService.getAuthenticatedUserById(userId), sessionStart);
   }
 
   public ProfileInfo getProfile(final @NonNull UUID userId) {
-    final var user = this.userTxService.getUserById(userId);
+    final var user = this.userTxService.getAuthenticatedUserById(userId);
 
     return ProfileInfo.builder()
         .id(user.getId())
@@ -75,7 +76,7 @@ public class ProfileService {
       final @NonNull PasswordForm form,
       final @NonNull Instant sessionStart) {
 
-    final var user = this.userTxService.getUserById(userId);
+    final var user = this.userTxService.getAuthenticatedUserById(userId);
 
     final var salt = PasswordGeneratorUtil.generateSalt();
 

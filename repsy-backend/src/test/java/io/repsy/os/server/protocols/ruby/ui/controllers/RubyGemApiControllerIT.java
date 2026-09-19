@@ -347,7 +347,7 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
               get("/api/ruby/gems/{repo}", repo.getName())
                   .with(apiPort())
                   .header(AUTHORIZATION, unknown))
-          .andExpect(status().isNotFound());
+          .andExpect(status().isUnauthorized());
     }
   }
 

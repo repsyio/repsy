@@ -74,7 +74,7 @@ public class AuthUserService {
 
   public @NonNull LoginInfo refreshToken(final @NonNull RefreshTokenClaims claims) {
 
-    final var user = this.userTxService.getUserById(claims.userId());
+    final var user = this.userTxService.getAuthenticatedUserById(claims.userId());
 
     // A password or username change bumps the version, which revokes the older refresh tokens.
     if (claims.tokenVersion() != user.getTokenVersion()) {

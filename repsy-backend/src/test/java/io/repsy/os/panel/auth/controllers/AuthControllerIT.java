@@ -91,7 +91,6 @@ class AuthControllerIT extends AbstractIntegrationTest {
   private static final String OTHER_VALID_PASSWORD = "NewPassword2@";
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
   private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
-  private static final String USER_NOT_FOUND_TEXT = "User not found.";
   private static final String INVALID_CREDENTIALS_TEXT = "Username or password is incorrect.";
   private static final String ACCESS_NOT_ALLOWED_TEXT = "Access isn't allowed.";
   private static final String INTERNAL_ERROR_TEXT = "An error occurred.";
@@ -226,8 +225,13 @@ class AuthControllerIT extends AbstractIntegrationTest {
         UNSUPPORTED_MEDIA_TYPE_TEXT);
   }
 
-  private static void expectUserNotFound(final ResultActions result) throws Exception {
-    expectError(result, HttpStatus.NOT_FOUND, "userNotFound", "userNotFound", USER_NOT_FOUND_TEXT);
+  private static void expectUnauthorized(final ResultActions result) throws Exception {
+    expectError(
+        result,
+        HttpStatus.UNAUTHORIZED,
+        "unAuthorized",
+        "unAuthorized",
+        "The user has logged in but has no permissions.");
   }
 
   private static void expectInvalidCredentials(final ResultActions result) throws Exception {
@@ -996,7 +1000,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 404 userNotFound when the token's user does not exist")
+    @DisplayName("returns 401 unAuthorized when the token's user does not exist")
     void unknownUser() throws Exception {
       final var token =
           AuthControllerIT.this.jwtUtils.createRefreshToken(
@@ -1006,11 +1010,11 @@ class AuthControllerIT extends AbstractIntegrationTest {
               Instant.now(),
               0);
 
-      expectUserNotFound(AuthControllerIT.this.refreshWith(token));
+      expectUnauthorized(AuthControllerIT.this.refreshWith(token));
     }
 
     @Test
-    @DisplayName("returns 404 userNotFound once the token's user has been deleted")
+    @DisplayName("returns 401 unAuthorized once the token's user has been deleted")
     void deletedUser() throws Exception {
       final var adminToken = AuthControllerIT.this.adminBearerToken();
       final var user = AuthControllerIT.this.createUser(uniqueUsername("deleted"), UserRole.USER);
@@ -1024,7 +1028,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
           "userDeleted");
       AuthControllerIT.this.entityManager.flush();
 
-      expectUserNotFound(AuthControllerIT.this.refreshWith(refreshToken));
+      expectUnauthorized(AuthControllerIT.this.refreshWith(refreshToken));
     }
 
     @Test

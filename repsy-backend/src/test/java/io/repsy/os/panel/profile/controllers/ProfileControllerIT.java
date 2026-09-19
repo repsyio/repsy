@@ -223,7 +223,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 401 accessNotAllowed for a validly signed token whose subject is no UUID")
+    @DisplayName("returns 401 unAuthorized for a validly signed token whose subject is no UUID")
     void nonUuidSubject() throws Exception {
       final var token = ProfileControllerIT.this.serverSignedBearerToken("not-a-uuid");
 
@@ -231,13 +231,13 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"))
-          .andExpect(jsonPath("$.data").value("accessNotAllowed"))
-          .andExpect(jsonPath("$.text").value("Access isn't allowed."));
+          .andExpect(jsonPath("$.msgId").value("unAuthorized"))
+          .andExpect(jsonPath("$.data").value("unAuthorized"))
+          .andExpect(jsonPath("$.text").value("The user has logged in but has no permissions."));
     }
 
     @Test
-    @DisplayName("returns 401 accessNotAllowed for a validly signed token without a subject")
+    @DisplayName("returns 401 unAuthorized for a validly signed token without a subject")
     void missingSubject() throws Exception {
       final var token = ProfileControllerIT.this.serverSignedBearerToken(null);
 
@@ -245,23 +245,23 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
           .andExpect(status().isUnauthorized())
-          .andExpect(jsonPath("$.msgId").value("accessNotAllowed"))
-          .andExpect(jsonPath("$.data").value("accessNotAllowed"))
-          .andExpect(jsonPath("$.text").value("Access isn't allowed."));
+          .andExpect(jsonPath("$.msgId").value("unAuthorized"))
+          .andExpect(jsonPath("$.data").value("unAuthorized"))
+          .andExpect(jsonPath("$.text").value("The user has logged in but has no permissions."));
     }
 
     @Test
-    @DisplayName("returns 404 when the user from the token no longer exists")
-    void userNotFound() throws Exception {
+    @DisplayName("returns 401 when the user from the token no longer exists")
+    void userNoLongerExists() throws Exception {
       final var token = ProfileControllerIT.this.bearerTokenFor(UUID.randomUUID(), "ghost");
 
       ProfileControllerIT.this
           .mockMvc
           .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.msgId").value("userNotFound"))
-          .andExpect(jsonPath("$.data").value("userNotFound"))
-          .andExpect(jsonPath("$.text").value("User not found."));
+          .andExpect(status().isUnauthorized())
+          .andExpect(jsonPath("$.msgId").value("unAuthorized"))
+          .andExpect(jsonPath("$.data").value("unAuthorized"))
+          .andExpect(jsonPath("$.text").value("The user has logged in but has no permissions."));
     }
   }
 
@@ -562,8 +562,8 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 404 when the user from the token no longer exists")
-    void userNotFound() throws Exception {
+    @DisplayName("returns 401 when the user from the token no longer exists")
+    void userNoLongerExists() throws Exception {
       final var token = ProfileControllerIT.this.bearerTokenFor(UUID.randomUUID(), "ghost");
 
       ProfileControllerIT.this
@@ -574,8 +574,8 @@ class ProfileControllerIT extends AbstractIntegrationTest {
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body(uniqueUsername("newone"))))
-          .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.msgId").value("userNotFound"));
+          .andExpect(status().isUnauthorized())
+          .andExpect(jsonPath("$.msgId").value("unAuthorized"));
     }
   }
 
@@ -585,6 +585,30 @@ class ProfileControllerIT extends AbstractIntegrationTest {
 
     private static String body(final String password) {
       return "{\"password\":\"%s\"}".formatted(password);
+    }
+
+    @Test
+    @DisplayName("rejects an access token issued before the password change")
+    void revokesAccessTokensIssuedBefore() throws Exception {
+      final var user =
+          ProfileControllerIT.this.createUser(uniqueUsername("pwaccess"), UserRole.USER);
+      final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
+
+      ProfileControllerIT.this
+          .mockMvc
+          .perform(
+              put("/api/profile/password")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body("NewPassword2@")))
+          .andExpect(status().isOk());
+
+      ProfileControllerIT.this
+          .mockMvc
+          .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
+          .andExpect(status().isUnauthorized())
+          .andExpect(jsonPath("$.msgId").value("sessionExpired"));
     }
 
     @Test
@@ -791,8 +815,8 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 404 when the user from the token no longer exists")
-    void userNotFound() throws Exception {
+    @DisplayName("returns 401 when the user from the token no longer exists")
+    void userNoLongerExists() throws Exception {
       final var token = ProfileControllerIT.this.bearerTokenFor(UUID.randomUUID(), "ghost");
 
       ProfileControllerIT.this
@@ -803,8 +827,8 @@ class ProfileControllerIT extends AbstractIntegrationTest {
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("NewPassword2@")))
-          .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.msgId").value("userNotFound"));
+          .andExpect(status().isUnauthorized())
+          .andExpect(jsonPath("$.msgId").value("unAuthorized"));
     }
   }
 
@@ -895,15 +919,15 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 404 when the user from the token no longer exists")
-    void userNotFound() throws Exception {
+    @DisplayName("returns 401 when the user from the token no longer exists")
+    void userNoLongerExists() throws Exception {
       final var token = ProfileControllerIT.this.bearerTokenFor(UUID.randomUUID(), "ghost");
 
       ProfileControllerIT.this
           .mockMvc
           .perform(delete("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isNotFound())
-          .andExpect(jsonPath("$.msgId").value("userNotFound"));
+          .andExpect(status().isUnauthorized())
+          .andExpect(jsonPath("$.msgId").value("unAuthorized"));
     }
   }
 }

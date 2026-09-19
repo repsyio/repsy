@@ -25,8 +25,8 @@ import io.repsy.os.generated.model.PasswordForm;
 import io.repsy.os.generated.model.ProfileInfo;
 import io.repsy.os.generated.model.UpdateUsernameForm;
 import io.repsy.os.panel.profile.services.ProfileService;
+import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import jakarta.validation.Valid;
@@ -47,6 +47,7 @@ import org.springframework.web.bind.annotation.RestController;
 class ProfileController {
 
   private final @NonNull JwtUtils jwtUtils;
+  private final @NonNull PanelAuthHelper panelAuthHelper;
   private final @NonNull ProfileService profileService;
   private final @NonNull UserTxService userTxService;
   private final @NonNull RestResponseFactory resp;
@@ -55,7 +56,7 @@ class ProfileController {
   public @NonNull RestResponse<ProfileInfo> get(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
-    final var userId = this.jwtUtils.extractUserId(authHeader, TokenRealm.PANEL);
+    final var userId = this.panelAuthHelper.authenticate(authHeader).getId();
 
     final var profileInfo = this.profileService.getProfile(userId);
 
@@ -67,7 +68,7 @@ class ProfileController {
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestBody @Valid final @NonNull UpdateUsernameForm form) {
 
-    final var userId = this.jwtUtils.extractUserId(authHeader, TokenRealm.PANEL);
+    final var userId = this.panelAuthHelper.authenticate(authHeader).getId();
 
     final var loginInfo =
         this.profileService.updateUsername(
@@ -94,8 +95,10 @@ class ProfileController {
   public @NonNull RestResponse<Void> deleteProfile(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
-    final var userId = this.jwtUtils.extractUserId(authHeader, TokenRealm.PANEL);
+    final var userId = this.panelAuthHelper.authenticate(authHeader).getId();
 
+    // A token whose user is already gone is an authentication failure, not a missing resource.
+    this.userTxService.getAuthenticatedUserById(userId);
     this.userTxService.deleteUserById(userId);
 
     return this.resp.success("profileDeleted");
