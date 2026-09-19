@@ -68,7 +68,7 @@ public class ProtocolRepoController {
   private final RestResponseFactory responseFactory;
 
   @PostMapping("/{repoType}")
-  @RepoOperation
+  @RepoOperation(permission = MANAGE)
   public RestResponse<Void> create(
       final ProtocolApiFacade facade,
       @PathVariable final RepoType repoType,
