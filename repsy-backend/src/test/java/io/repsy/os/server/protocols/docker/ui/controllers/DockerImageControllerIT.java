@@ -19,9 +19,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.layer.services.LayerTxService;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
@@ -44,12 +47,17 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.ObjectMapper;
 
 /** Full-stack Testcontainers coverage for the Docker image-management API. */
@@ -651,6 +659,106 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           "unAuthorized",
           "unAuthorized",
           "The user has logged in but has no permissions.");
+    }
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the list endpoints")
+  class PagingAndSorting {
+
+    private static final String IMAGES = "/api/docker/images/%s";
+    private static final String TAGS = "/api/docker/images/%s/app/tags";
+    private static final String MANIFESTS = "/api/docker/images/%s/app/tags/latest/manifests";
+
+    static Stream<String> endpoints() {
+      return Stream.of(IMAGES, TAGS, MANIFESTS);
+    }
+
+    static Stream<Arguments> acceptedSorts() {
+      return Stream.of(
+              Arguments.of(IMAGES, List.of("id", "name", "updatedAt", "lastUpdatedAt")),
+              Arguments.of(TAGS, List.of("id", "name", "createdAt")),
+              Arguments.of(MANIFESTS, List.of("id", "name", "createdAt")))
+          .flatMap(
+              args ->
+                  ((List<?>) args.get()[1])
+                      .stream().map(property -> Arguments.of(args.get()[0], property)));
+    }
+
+    static Stream<Arguments> invalidPagingOnEveryEndpoint() {
+      return endpoints()
+          .flatMap(
+              path ->
+                  PagingAssertions.invalidPagingParams()
+                      .map(args -> Arguments.of(path, args.get()[0], args.get()[1])));
+    }
+
+    private Repo seededRepo() throws Exception {
+      final var it = DockerImageControllerIT.this;
+      final var repo = it.dockerRepo();
+
+      it.seedImage(repo, "app", "latest");
+      it.seedImage(repo, "app", "stable");
+      it.seedImage(repo, "other", "latest");
+
+      return repo;
+    }
+
+    private ResultActions list(
+        final Repo repo, final String path, final String param, final String value)
+        throws Exception {
+      final var it = DockerImageControllerIT.this;
+
+      return it.perform(
+          get(path.formatted(repo.getName()))
+              .param(param, value)
+              .header(AUTHORIZATION, it.userBearerToken()));
+    }
+
+    @ParameterizedTest(name = "{0} sort={1}")
+    @MethodSource("acceptedSorts")
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String path, final String property) throws Exception {
+      final var repo = this.seededRepo();
+
+      this.list(repo, path, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(repo, path, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("orders the images and tags by the requested sort property")
+    void ordersByRequestedProperty() throws Exception {
+      final var repo = this.seededRepo();
+
+      this.list(repo, IMAGES, "sort", "name,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("app"));
+      this.list(repo, IMAGES, "sort", "name,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("other"));
+      this.list(repo, TAGS, "sort", "name,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("latest"));
+      this.list(repo, TAGS, "sort", "name,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("stable"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400(final String path) throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(this.seededRepo(), path, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0} {1}={2}")
+    @MethodSource("invalidPagingOnEveryEndpoint")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String path, final String param, final String value)
+        throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(this.seededRepo(), path, param, value), param);
     }
   }
 }
