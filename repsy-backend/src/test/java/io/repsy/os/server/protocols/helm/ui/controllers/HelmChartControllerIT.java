@@ -297,22 +297,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     final var layerDigest = sha256(bytes);
     final var configBytes = "{}".getBytes(StandardCharsets.UTF_8);
 
-    // Real clients (helm, oras) HEAD the blob first and skip the upload when the registry already
-    // has it. They have to: finalizing a blob whose digest already exists answers 500.
-    final var head =
-        this.protocol(
-                request(
-                        HttpMethod.HEAD,
-                        "/v2/{repo}/{name}/blobs/{digest}",
-                        repo.getName(),
-                        ociName,
-                        layerDigest)
-                    .header(AUTHORIZATION, token))
-            .andReturn()
-            .getResponse();
-    if (head.getStatus() != 200) {
-      this.uploadOciBlob(repo, ociName, bytes, layerDigest, token);
-    }
+    this.uploadOciBlob(repo, ociName, bytes, layerDigest, token);
 
     final var manifest =
         ("{\"schemaVersion\":2,\"mediaType\":\"%s\",\"config\":{\"mediaType\":\"%s\","
@@ -1593,6 +1578,38 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
           Arguments.of(HttpMethod.PUT, "/api/helm/charts/%s/payments/tags"),
           Arguments.of(HttpMethod.GET, "/api/helm/charts/%s/payments/1.0.0/extra"),
           Arguments.of(HttpMethod.DELETE, "/api/helm/charts/%s/payments/1.0.0/extra"));
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // OCI blob finalize (RPS-929)
+  // ---------------------------------------------------------------------------------------------
+
+  @Nested
+  @DisplayName("OCI blob finalize")
+  class OciBlobFinalize {
+
+    /**
+     * Clients that do not HEAD first, and concurrent pushes of the same layer, finalize a digest
+     * that is already stored. The registry has to accept it (RPS-929).
+     */
+    @Test
+    @DisplayName("accepts a blob whose digest already exists and keeps a single copy")
+    void acceptsExistingDigest() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      final var bytes = archive(ChartSpec.of("payments", "1.0.0"));
+      final var digest = sha256(bytes);
+
+      it.uploadOciBlob(repo, "payments", bytes, digest, token);
+      it.uploadOciBlob(repo, "payments", bytes, digest, token);
+
+      final var blobs = storageDirOf(repo).resolve("oci").resolve("blobs");
+      try (final var stored = Files.list(blobs)) {
+        assertThat(stored.map(path -> path.getFileName().toString())).containsExactly(digest);
+      }
+      assertThat(blobs.resolve(digest)).hasBinaryContent(bytes);
     }
   }
 }

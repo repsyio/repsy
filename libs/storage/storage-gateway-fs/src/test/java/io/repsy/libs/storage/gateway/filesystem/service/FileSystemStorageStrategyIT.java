@@ -16,6 +16,7 @@
 package io.repsy.libs.storage.gateway.filesystem.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
@@ -410,6 +411,24 @@ class FileSystemStorageStrategyIT {
       assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/original.bin"))
           .doesNotExist();
       assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/sha256digest")).exists();
+    }
+
+    @Test
+    @DisplayName("drops the source and keeps the existing file when the digest already exists")
+    void dropSourceWhenDigestAlreadyExists() throws Exception {
+      final var key = UUID.randomUUID();
+      FileSystemStorageStrategyIT.this.seedFile(key + "/sha256digest", "stored");
+      FileSystemStorageStrategyIT.this.seedFile(key + "/upload.bin", "duplicate upload");
+      final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "upload.bin");
+
+      assertThatCode(
+              () -> FileSystemStorageStrategyIT.this.strategy.renameObject(sp, "sha256digest"))
+          .doesNotThrowAnyException();
+
+      assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/upload.bin"))
+          .doesNotExist();
+      assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/sha256digest"))
+          .hasContent("stored");
     }
   }
 
