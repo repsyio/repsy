@@ -24,27 +24,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.core.events.UserLoginEvent;
-import io.repsy.os.RepsyApplication;
+import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import io.repsy.os.shared.user.services.UserTxService;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -60,26 +51,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Full-stack integration tests for {@code /api/auth/*}, exercising the real Spring context, MVC
@@ -96,29 +77,18 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  *
  * <p>Every test method runs in one transaction that is rolled back afterwards, so the only data
  * that survives between tests is what the application seeds at startup: the {@code admin} user,
- * whose password is pinned through {@code admin.initial-password}. The one exception is {@code
- * updatesLastLoginAt}: {@code UserLoginListener} is {@code @Async} and runs on another thread,
- * which cannot see rows that are still uncommitted inside a test transaction, so that test runs
- * without one and cleans up after itself. In every other test the listener still fires but finds no
- * such user and logs the failure on its own thread; that is expected noise, not a test failure.
+ * whose password {@link #SEEDED_ADMIN_PASSWORD} is pinned through {@code admin.initial-password} in
+ * {@link AbstractIntegrationTest}. The one exception is {@code updatesLastLoginAt}: {@code
+ * UserLoginListener} is {@code @Async} and runs on another thread, which cannot see rows that are
+ * still uncommitted inside a test transaction, so that test runs without one and cleans up after
+ * itself. In every other test the listener still fires but finds no such user and logs the failure
+ * on its own thread; that is expected noise, not a test failure.
  */
-@Testcontainers
-@AutoConfigureMockMvc
 @RecordApplicationEvents
-@Transactional
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("AuthController /api/auth/*")
-class AuthControllerIT {
+class AuthControllerIT extends AbstractIntegrationTest {
 
-  private static final int API_PORT = 8080;
-  private static final String VALID_PASSWORD = "Password1!";
   private static final String OTHER_VALID_PASSWORD = "NewPassword2@";
-  private static final String SEEDED_ADMIN_USERNAME = "admin";
-  private static final String SEEDED_ADMIN_PASSWORD = "SeededAdmin1!";
-  private static final String UUID_PATTERN =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
   private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String USER_NOT_FOUND_TEXT = "User not found.";
@@ -140,51 +110,11 @@ class AuthControllerIT {
           "userUpdated", "User updated.",
           "userDeleted", "User deleted.");
 
-  private static final String[] ENVELOPE_KEYS = {"msgId", "type", "data", "errorCode", "text"};
   private static final String[] LOGIN_INFO_KEYS = {"username", "token", "refreshToken"};
-
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", AuthControllerIT::tempStoragePath);
-    // Without this the seeded admin gets a random password that is only ever logged.
-    registry.add("admin.initial-password", () -> SEEDED_ADMIN_PASSWORD);
-  }
-
-  private static String tempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-auth-it").toString();
-    } catch (final IOException e) {
-      throw new UncheckedIOException(e);
-    }
-  }
-
-  @Autowired private MockMvc mockMvc;
-  @Autowired private JwtUtils jwtUtils;
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
-  @PersistenceContext private EntityManager entityManager;
 
   // ---------------------------------------------------------------------------------------------
   // Request / fixture helpers
   // ---------------------------------------------------------------------------------------------
-
-  private static RequestPostProcessor apiPort() {
-    return request -> {
-      request.setLocalPort(API_PORT);
-      return request;
-    };
-  }
-
-  private static String uniqueUsername(final String prefix) {
-    return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
-  }
 
   private static String loginBody(final String username, final String password) {
     return "{\"username\":\"%s\",\"password\":\"%s\"}".formatted(username, password);
@@ -192,10 +122,6 @@ class AuthControllerIT {
 
   private static String refreshBody(final String refreshToken) {
     return "{\"refreshToken\":\"%s\"}".formatted(refreshToken);
-  }
-
-  private ResultActions perform(final MockHttpServletRequestBuilder request) throws Exception {
-    return this.mockMvc.perform(request.with(apiPort()));
   }
 
   private ResultActions login(final String body) throws Exception {
@@ -216,38 +142,6 @@ class AuthControllerIT {
     return this.refresh(refreshBody(refreshToken));
   }
 
-  /**
-   * Creates a user with {@link #VALID_PASSWORD} and flushes it, so {@code createdAt} is populated
-   * and the row is visible to the queries the controller runs.
-   */
-  private User createUser(final String username, final UserRole role) {
-    final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword(VALID_PASSWORD, salt);
-    final var userInfo = this.userTxService.create(username, role, hash, salt);
-    this.entityManager.flush();
-    return this.userRepository.findById(userInfo.getId()).orElseThrow();
-  }
-
-  private User seededAdmin() {
-    return this.userRepository.findByUsername(SEEDED_ADMIN_USERNAME).orElseThrow();
-  }
-
-  /** A signed token without an {@code aud} claim, like those issued before tokens had a realm. */
-  private String claimlessToken(
-      final UUID userId, final String username, final TemporalAmount timeout) {
-    return JWT.create()
-        .withSubject(userId.toString())
-        .withClaim("username", username)
-        .withExpiresAt(Instant.now().plus(timeout))
-        .sign(Algorithm.HMAC512(this.serverSecret()));
-  }
-
-  private String bearerTokenFor(final User user) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createPanelAccessToken(
-            user.getId(), user.getUsername(), Duration.ofMinutes(30));
-  }
-
   /** A refresh token of a session the user logged into just now, at the user's current version. */
   private String refreshTokenFor(final User user) {
     return this.refreshTokenFor(user, Instant.now(), user.getTokenVersion());
@@ -261,10 +155,6 @@ class AuthControllerIT {
         AuthUtils.TIMEOUT_REFRESH_TOKEN,
         sessionStart,
         tokenVersion);
-  }
-
-  private String adminBearerToken() {
-    return this.bearerTokenFor(this.createUser(uniqueUsername("caller"), UserRole.ADMIN));
   }
 
   /** The signing secret of the running application (random per context unless configured). */
@@ -320,42 +210,7 @@ class AuthControllerIT {
    */
   private static String expectSuccess(final ResultActions result, final String msgId)
       throws Exception {
-    final var body =
-        result.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-
-    final Map<String, Object> envelope = JsonPath.read(body, "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "SUCCESS")
-        .containsEntry("errorCode", null)
-        .containsEntry("text", SUCCESS_TEXTS.get(msgId));
-    return body;
-  }
-
-  /** Asserts a complete ERROR envelope, including the generated {@code errorCode} UUID. */
-  private static void expectError(
-      final ResultActions result,
-      final HttpStatus expectedStatus,
-      final String msgId,
-      final String data,
-      final String text)
-      throws Exception {
-    final var body =
-        result
-            .andExpect(status().is(expectedStatus.value()))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-
-    final Map<String, Object> envelope = JsonPath.read(body, "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "ERROR")
-        .containsEntry("data", data)
-        .containsEntry("text", text);
-    assertThat((String) envelope.get("errorCode")).matches(UUID_PATTERN);
+    return expectSuccess(result, msgId, SUCCESS_TEXTS.get(msgId));
   }
 
   private static void expectValidationError(final ResultActions result) throws Exception {

@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.RepsyApplication;
+import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.security.scan.dtos.FixStatus;
 import io.repsy.os.server.security.scan.dtos.Severity;
 import io.repsy.os.server.security.scan.repositories.VulnerabilityScanRepository;
@@ -38,19 +38,12 @@ import io.repsy.os.server.security.scanner.dtos.ScanOutcome;
 import io.repsy.os.server.security.scanner.dtos.ScanRequest;
 import io.repsy.os.server.security.scanner.dtos.ScannerFinding;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.persistence.EntityManagerFactory;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -69,7 +62,6 @@ import org.hibernate.SessionFactory;
 import org.hibernate.stat.Statistics;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -78,10 +70,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
@@ -92,10 +81,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Full-stack integration tests for the global security-scan summary API ({@code GET
@@ -112,7 +99,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * {@code @Transactional}: {@code created_at} is a {@code @CreationTimestamp} that is overwritten on
  * INSERT, so tests pin it with a bulk update afterwards, and inside one persistence context the
  * controller would then be handed the stale managed entity instead of the pinned row. Every fixture
- * is therefore committed for real and removed again in {@link #cleanUp()}.
+ * is therefore committed for real and removed again in {@link #cleanUp()}, which deletes only what
+ * the test created because the database is shared with the other IT classes.
  *
  * <p>Scans are seeded through the real {@link VulnerabilityScanTxService} lifecycle ({@code
  * createPendingScan} → {@code markQueued} → {@code markRunning} → {@code recordScanOutcome} /
@@ -127,23 +115,14 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * (MAVEN, NPM, PYPI, DOCKER) without needing its HTTP client or configuration. The "scanner
  * disabled" answer (an empty list) is covered by spying the registry for that one test.
  */
-@Testcontainers
-@AutoConfigureMockMvc
 @Import(SecurityScanControllerIT.StubScannerConfig.class)
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("SecurityScanController /api/security/*")
-class SecurityScanControllerIT {
+class SecurityScanControllerIT extends AbstractIntegrationTest {
 
-  private static final int API_PORT = 8080;
   private static final String SCANS_PATH = "/api/security/scans";
   private static final String SUMMARY_PATH = "/api/security/scans/summary";
   private static final String SUPPORTED_REPO_TYPES_PATH = "/api/security/supported-repo-types";
-  private static final String VALID_PASSWORD = "Password1!";
-  private static final String SEEDED_ADMIN_USERNAME = "admin";
-  private static final String UUID_PATTERN =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   private static final String USER_NOT_FOUND_TEXT = "User not found.";
   private static final String SCANNER_NAME = "trivy";
   private static final String SCANNER_VERSION = "0.58.0";
@@ -152,7 +131,6 @@ class SecurityScanControllerIT {
   private static final Set<String> STUB_SCANNER_REPO_TYPES =
       Set.of("MAVEN", "NPM", "PYPI", "DOCKER");
 
-  private static final String[] ENVELOPE_KEYS = {"msgId", "type", "data", "errorCode", "text"};
   private static final List<String> SCAN_INFO_KEYS =
       List.of(
           "id",
@@ -173,26 +151,11 @@ class SecurityScanControllerIT {
     "criticalCount", "highCount", "mediumCount", "lowCount", "unknownCount", "totalCount"
   };
 
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
+  // Named differently from the base class' method, or it would hide that one.
   @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", SecurityScanControllerIT::tempStoragePath);
+  static void registerStatisticsProperty(final DynamicPropertyRegistry registry) {
     // Lets the query-count tests read the number of statements a request ran.
     registry.add("spring.jpa.properties.hibernate.generate_statistics", () -> "true");
-  }
-
-  private static String tempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-security-scan-it").toString();
-    } catch (final IOException e) {
-      throw new UncheckedIOException(e);
-    }
   }
 
   /**
@@ -223,13 +186,8 @@ class SecurityScanControllerIT {
     }
   }
 
-  @Autowired private MockMvc mockMvc;
-  @Autowired private JwtUtils jwtUtils;
   @Autowired private JdbcTemplate jdbcTemplate;
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
   @Autowired private RepoTxService repoTxService;
-  @Autowired private RepoRepository repoRepository;
   @Autowired private VulnerabilityScanRepository scanRepository;
   @Autowired private VulnerabilityScanTxService scanTxService;
   @Autowired private EntityManagerFactory entityManagerFactory;
@@ -239,37 +197,27 @@ class SecurityScanControllerIT {
   private final List<UUID> createdRepoIds = new ArrayList<>();
   private final AtomicInteger cveCounter = new AtomicInteger();
 
-  @BeforeEach
-  void resetScans() {
-    // Scans (and their findings, by FK cascade) are global; start every test from none.
-    this.scanRepository.deleteAll();
-  }
-
   @AfterEach
   void cleanUp() {
-    this.scanRepository.deleteAll();
+    this.deleteOwnScans();
     this.repoRepository.deleteAllById(this.createdRepoIds);
     this.userRepository.deleteAllById(this.createdUserIds);
+  }
+
+  /**
+   * Removes the scans (and their findings, by FK cascade) of the repositories this test created.
+   * Scans are global, but the database is shared with the other IT classes, so never delete
+   * anything else.
+   */
+  private void deleteOwnScans() {
+    this.createdRepoIds.forEach(
+        repoId ->
+            this.jdbcTemplate.update("delete from vulnerability_scan where repo_id = ?", repoId));
   }
 
   // ---------------------------------------------------------------------------------------------
   // Request / fixture helpers
   // ---------------------------------------------------------------------------------------------
-
-  private static RequestPostProcessor apiPort() {
-    return request -> {
-      request.setLocalPort(API_PORT);
-      return request;
-    };
-  }
-
-  private static String randomTag() {
-    return UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-  }
-
-  private ResultActions perform(final MockHttpServletRequestBuilder request) throws Exception {
-    return this.mockMvc.perform(request.with(apiPort()));
-  }
 
   private ResultActions getScans(final String authorization) throws Exception {
     return this.perform(get(SCANS_PATH).header(AUTHORIZATION, authorization));
@@ -295,7 +243,7 @@ class SecurityScanControllerIT {
 
   /** Creates a committed user with the given role and returns its username. */
   private String createUser(final UserRole role) {
-    final var username = "scan" + randomTag();
+    final var username = uniqueUsername("scan");
     final var salt = PasswordGeneratorUtil.generateSalt();
     final var hash = PasswordGeneratorUtil.hashPassword(VALID_PASSWORD, salt);
     final var userInfo = this.userTxService.create(username, role, hash, salt);
@@ -308,11 +256,6 @@ class SecurityScanControllerIT {
     return this.bearerTokenFor(userId, username);
   }
 
-  private String bearerTokenFor(final UUID userId, final String username) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofMinutes(30));
-  }
-
   private String expiredBearerTokenFor(final String username) {
     final var userId = this.userRepository.findByUsername(username).orElseThrow().getId();
     return AuthUtils.AUTH_BEARER
@@ -320,7 +263,7 @@ class SecurityScanControllerIT {
   }
 
   /** A valid bearer token for the {@code admin} user that the application seeds at startup. */
-  private String adminBearerToken() {
+  private String seededAdminBearerToken() {
     return this.bearerTokenFor(SEEDED_ADMIN_USERNAME);
   }
 
@@ -438,25 +381,6 @@ class SecurityScanControllerIT {
   // Response helpers
   // ---------------------------------------------------------------------------------------------
 
-  /**
-   * Asserts a 200 SUCCESS envelope (exact key set, {@code errorCode} null, the given {@code msgId}
-   * and resolved {@code text}) and returns the raw body for further assertions on {@code data}.
-   */
-  private static String expectSuccess(
-      final ResultActions result, final String msgId, final String text) throws Exception {
-    final var body =
-        result.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-
-    final Map<String, Object> envelope = JsonPath.read(body, "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "SUCCESS")
-        .containsEntry("errorCode", null)
-        .containsEntry("text", text);
-    return body;
-  }
-
   private static String expectScans(final ResultActions result) throws Exception {
     return expectSuccess(result, "scansFetched", "Vulnerability scans fetched.");
   }
@@ -468,31 +392,6 @@ class SecurityScanControllerIT {
   private static String expectSupportedRepoTypes(final ResultActions result) throws Exception {
     return expectSuccess(
         result, "supportedRepoTypesFetched", "Supported repository types fetched.");
-  }
-
-  /** Asserts a complete ERROR envelope, including the generated {@code errorCode} UUID. */
-  private static void expectError(
-      final ResultActions result,
-      final HttpStatus expectedStatus,
-      final String msgId,
-      final String data,
-      final String text)
-      throws Exception {
-    final var body =
-        result
-            .andExpect(status().is(expectedStatus.value()))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-
-    final Map<String, Object> envelope = JsonPath.read(body, "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "ERROR")
-        .containsEntry("data", data)
-        .containsEntry("text", text);
-    assertThat((String) envelope.get("errorCode")).matches(UUID_PATTERN);
   }
 
   private static void expectAccessNotAllowed(final ResultActions result) throws Exception {
@@ -712,7 +611,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken()));
+                  SecurityScanControllerIT.this.seededAdminBearerToken()));
 
       assertPagedModelShape(body);
       assertThat(content(body)).isEmpty();
@@ -727,7 +626,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken()));
+                  SecurityScanControllerIT.this.seededAdminBearerToken()));
 
       assertThat(content(body)).isEmpty();
       assertPage(body, 10, 0, 0, 0);
@@ -748,7 +647,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken()));
+                  SecurityScanControllerIT.this.seededAdminBearerToken()));
 
       assertPagedModelShape(body);
       assertPage(body, 10, 0, 1, 1);
@@ -786,7 +685,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken()));
+                  SecurityScanControllerIT.this.seededAdminBearerToken()));
 
       final var scan = content(body).getFirst();
       final var persisted =
@@ -817,7 +716,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken()));
+                  SecurityScanControllerIT.this.seededAdminBearerToken()));
 
       final var scan = content(body).getFirst();
       assertScanKeys(
@@ -839,7 +738,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken()));
+                  SecurityScanControllerIT.this.seededAdminBearerToken()));
 
       final var scan = content(body).getFirst();
       assertScanKeys(scan, "highestSeverity", "scannerVersion", "errorMessage", "completedAt");
@@ -864,7 +763,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken()));
+                  SecurityScanControllerIT.this.seededAdminBearerToken()));
 
       assertThat(artifactVersions(body)).containsExactly("v4", "v3", "v2", "v1");
       assertThat(content(body))
@@ -908,7 +807,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken()));
+                  SecurityScanControllerIT.this.seededAdminBearerToken()));
 
       assertThat(content(body))
           .extracting(scan -> scan.get("artifactVersion"), scan -> scan.get("highestSeverity"))
@@ -930,7 +829,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken()));
+                  SecurityScanControllerIT.this.seededAdminBearerToken()));
 
       assertThat(content(body))
           .extracting(scan -> scan.get("highestSeverity"))
@@ -978,7 +877,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken(),
+                  SecurityScanControllerIT.this.seededAdminBearerToken(),
                   Map.of("severity", severity.name())));
 
       assertThat(artifactVersions(body)).containsExactlyElementsOf(expectedVersions);
@@ -1004,7 +903,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken(),
+                  SecurityScanControllerIT.this.seededAdminBearerToken(),
                   Map.of("repoType", repoType.name())));
 
       assertThat(artifactVersions(body)).containsExactlyElementsOf(expectedVersions);
@@ -1033,7 +932,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken(),
+                  SecurityScanControllerIT.this.seededAdminBearerToken(),
                   Map.of("repoName", this.repoNames.get("mavenA"))));
 
       assertThat(artifactVersions(body))
@@ -1052,7 +951,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken(),
+                  SecurityScanControllerIT.this.seededAdminBearerToken(),
                   Map.of("severity", "HIGH", "repoType", "MAVEN")));
 
       assertThat(artifactVersions(body)).containsExactly("mavenB-high", "mavenA-high");
@@ -1067,7 +966,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken(),
+                  SecurityScanControllerIT.this.seededAdminBearerToken(),
                   Map.of("severity", "HIGH", "repoName", this.repoNames.get("mavenB"))));
 
       assertThat(artifactVersions(body)).containsExactly("mavenB-high");
@@ -1082,7 +981,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken(),
+                  SecurityScanControllerIT.this.seededAdminBearerToken(),
                   Map.of("repoType", "NPM", "repoName", this.repoNames.get("npm"))));
 
       assertThat(artifactVersions(body)).containsExactly("npm-low", "npm-critical");
@@ -1097,7 +996,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken(),
+                  SecurityScanControllerIT.this.seededAdminBearerToken(),
                   Map.of(
                       "severity",
                       "CRITICAL",
@@ -1119,7 +1018,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken(),
+                  SecurityScanControllerIT.this.seededAdminBearerToken(),
                   Map.of("repoType", "NPM", "repoName", this.repoNames.get("mavenA"))));
 
       assertThat(content(body)).isEmpty();
@@ -1135,7 +1034,7 @@ class SecurityScanControllerIT {
         final var body =
             expectScans(
                 SecurityScanControllerIT.this.getScans(
-                    SecurityScanControllerIT.this.adminBearerToken(),
+                    SecurityScanControllerIT.this.seededAdminBearerToken(),
                     Map.of("severity", severity.name())));
 
         assertThat(artifactVersions(body)).doesNotContain("mavenA-clean");
@@ -1154,7 +1053,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken(),
+                  SecurityScanControllerIT.this.seededAdminBearerToken(),
                   Map.of("repoName", "no-such-repo-" + randomTag())));
 
       assertThat(content(body)).isEmpty();
@@ -1170,12 +1069,12 @@ class SecurityScanControllerIT {
       final var prefix =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken(),
+                  SecurityScanControllerIT.this.seededAdminBearerToken(),
                   Map.of("repoName", name.substring(0, name.length() - 1))));
       final var upperCase =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken(),
+                  SecurityScanControllerIT.this.seededAdminBearerToken(),
                   Map.of("repoName", name.toUpperCase(Locale.ROOT))));
 
       assertThat(content(prefix)).isEmpty();
@@ -1188,7 +1087,7 @@ class SecurityScanControllerIT {
     void invalidSeverity(final String value) throws Exception {
       expectValidationError(
           SecurityScanControllerIT.this.getScans(
-              SecurityScanControllerIT.this.adminBearerToken(), Map.of("severity", value)),
+              SecurityScanControllerIT.this.seededAdminBearerToken(), Map.of("severity", value)),
           "severity");
     }
 
@@ -1198,7 +1097,7 @@ class SecurityScanControllerIT {
     void invalidRepoType(final String value) throws Exception {
       expectValidationError(
           SecurityScanControllerIT.this.getScans(
-              SecurityScanControllerIT.this.adminBearerToken(), Map.of("repoType", value)),
+              SecurityScanControllerIT.this.seededAdminBearerToken(), Map.of("repoType", value)),
           "repoType");
     }
 
@@ -1233,7 +1132,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken()));
+                  SecurityScanControllerIT.this.seededAdminBearerToken()));
 
       assertThat(artifactVersions(body)).containsExactlyElementsOf(versionsDescending(25, 16));
       assertPage(body, 10, 0, 25, 3);
@@ -1243,7 +1142,7 @@ class SecurityScanControllerIT {
     @DisplayName("walks every page: full pages first, a partial last page, then nothing")
     void pageBoundaries() throws Exception {
       this.seedScans(25);
-      final var token = SecurityScanControllerIT.this.adminBearerToken();
+      final var token = SecurityScanControllerIT.this.seededAdminBearerToken();
 
       final var first =
           expectScans(
@@ -1277,7 +1176,7 @@ class SecurityScanControllerIT {
     @DisplayName("honours a custom size, and a size that evenly divides the total")
     void customSize() throws Exception {
       this.seedScans(6);
-      final var token = SecurityScanControllerIT.this.adminBearerToken();
+      final var token = SecurityScanControllerIT.this.seededAdminBearerToken();
 
       final var body =
           expectScans(SecurityScanControllerIT.this.getScans(token, Map.of("size", "3")));
@@ -1299,7 +1198,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken(), Map.of("size", "100")));
+                  SecurityScanControllerIT.this.seededAdminBearerToken(), Map.of("size", "100")));
 
       assertThat(artifactVersions(body)).containsExactly("v3", "v2", "v1");
       assertPage(body, 100, 0, 3, 1);
@@ -1324,7 +1223,7 @@ class SecurityScanControllerIT {
       final var body =
           expectScans(
               SecurityScanControllerIT.this.getScans(
-                  SecurityScanControllerIT.this.adminBearerToken(),
+                  SecurityScanControllerIT.this.seededAdminBearerToken(),
                   Map.of("repoType", "MAVEN", "size", "2", "page", "1")));
 
       assertThat(artifactVersions(body)).containsExactly("m3", "m2");
@@ -1337,7 +1236,7 @@ class SecurityScanControllerIT {
     void nonNumericPagingParam(final String param, final String value) throws Exception {
       expectValidationError(
           SecurityScanControllerIT.this.getScans(
-              SecurityScanControllerIT.this.adminBearerToken(), Map.of(param, value)),
+              SecurityScanControllerIT.this.seededAdminBearerToken(), Map.of(param, value)),
           param);
     }
 
@@ -1360,7 +1259,7 @@ class SecurityScanControllerIT {
     void outOfRangePagingParam(final String param, final String value) throws Exception {
       expectValidationError(
           SecurityScanControllerIT.this.getScans(
-              SecurityScanControllerIT.this.adminBearerToken(), Map.of(param, value)),
+              SecurityScanControllerIT.this.seededAdminBearerToken(), Map.of(param, value)),
           param);
     }
 
@@ -1377,7 +1276,7 @@ class SecurityScanControllerIT {
     @DisplayName("accepts the boundary values page=0 and size=100 (and size=1)")
     void pagingBoundaryValuesAreAccepted() throws Exception {
       this.seedScans(3);
-      final var token = SecurityScanControllerIT.this.adminBearerToken();
+      final var token = SecurityScanControllerIT.this.seededAdminBearerToken();
 
       final var maxSize =
           expectScans(
@@ -1425,7 +1324,7 @@ class SecurityScanControllerIT {
     @Test
     @DisplayName("loads a page of scans from many repositories in a constant number of queries")
     void constantQueryCountAcrossRepositories() throws Exception {
-      final var token = SecurityScanControllerIT.this.adminBearerToken();
+      final var token = SecurityScanControllerIT.this.seededAdminBearerToken();
       final var params = Map.of("size", "10");
 
       final var oneRepo = SecurityScanControllerIT.this.createRepo(RepoType.MAVEN);
@@ -1433,7 +1332,7 @@ class SecurityScanControllerIT {
           .forEach(i -> SecurityScanControllerIT.this.completedScan(oneRepo, "a", "v" + i, at(i)));
       final var singleRepoStatements = this.statementsFor(token, params);
 
-      SecurityScanControllerIT.this.scanRepository.deleteAll();
+      SecurityScanControllerIT.this.deleteOwnScans();
       final var repos = this.seedScansAcross(this.createRepos(10, RepoType.MAVEN));
       final var manyReposStatements = this.statementsFor(token, params);
 
@@ -1450,7 +1349,7 @@ class SecurityScanControllerIT {
     @Test
     @DisplayName("keeps the query count constant when a repository filter applies")
     void constantQueryCountWithFilter() throws Exception {
-      final var token = SecurityScanControllerIT.this.adminBearerToken();
+      final var token = SecurityScanControllerIT.this.seededAdminBearerToken();
       this.seedScansAcross(this.createRepos(10, RepoType.NPM));
       SecurityScanControllerIT.this.completedScan(
           SecurityScanControllerIT.this.createRepo(RepoType.MAVEN), "a", "other", at(100));
@@ -1484,7 +1383,7 @@ class SecurityScanControllerIT {
       final var body =
           expectSummary(
               SecurityScanControllerIT.this.getSummary(
-                  SecurityScanControllerIT.this.adminBearerToken()));
+                  SecurityScanControllerIT.this.seededAdminBearerToken()));
 
       assertSummary(body, 0, 0, 0, 0, 0);
     }
@@ -1499,7 +1398,7 @@ class SecurityScanControllerIT {
       final var body =
           expectSummary(
               SecurityScanControllerIT.this.getSummary(
-                  SecurityScanControllerIT.this.adminBearerToken()));
+                  SecurityScanControllerIT.this.seededAdminBearerToken()));
 
       assertSummary(body, 0, 0, 0, 0, 0);
     }
@@ -1521,7 +1420,7 @@ class SecurityScanControllerIT {
       t.pendingScan(docker, "c", "2", at(6));
       t.runningScan(maven, "a", "3", at(7));
 
-      final var body = expectSummary(t.getSummary(t.adminBearerToken()));
+      final var body = expectSummary(t.getSummary(t.seededAdminBearerToken()));
 
       assertSummary(body, 2, 2, 1, 3, 1);
       assertThat((Map<String, Object>) JsonPath.read(body, "$.data"))
@@ -1543,7 +1442,7 @@ class SecurityScanControllerIT {
       // 3.0 has a single scan.
       t.completedScan(repo, "a", "3.0", at(5), t.findings(Severity.MEDIUM));
 
-      final var body = expectSummary(t.getSummary(t.adminBearerToken()));
+      final var body = expectSummary(t.getSummary(t.seededAdminBearerToken()));
 
       assertSummary(body, 0, 1, 1, 1, 0);
     }
@@ -1580,7 +1479,7 @@ class SecurityScanControllerIT {
       t.failedScan(repo, artifact, "completed-after-failure", at(2));
       t.completedScan(repo, artifact, "completed-after-failure", at(3), t.findings(Severity.LOW));
 
-      final var body = expectSummary(t.getSummary(t.adminBearerToken()));
+      final var body = expectSummary(t.getSummary(t.seededAdminBearerToken()));
 
       assertSummary(body, 0, 4, 0, 1, 0);
     }
@@ -1594,7 +1493,7 @@ class SecurityScanControllerIT {
       t.completedScan(first, "a", "1.0", at(1), t.findings(Severity.HIGH));
       t.completedScan(second, "a", "1.0", at(2), t.findings(Severity.HIGH));
 
-      final var body = expectSummary(t.getSummary(t.adminBearerToken()));
+      final var body = expectSummary(t.getSummary(t.seededAdminBearerToken()));
 
       assertSummary(body, 0, 2, 0, 0, 0);
     }
@@ -1617,10 +1516,11 @@ class SecurityScanControllerIT {
       this.seedFilterFixture();
 
       final var maven =
-          expectSummary(t.getSummary(t.adminBearerToken(), Map.of("repoType", "MAVEN")));
-      final var npm = expectSummary(t.getSummary(t.adminBearerToken(), Map.of("repoType", "NPM")));
+          expectSummary(t.getSummary(t.seededAdminBearerToken(), Map.of("repoType", "MAVEN")));
+      final var npm =
+          expectSummary(t.getSummary(t.seededAdminBearerToken(), Map.of("repoType", "NPM")));
       final var docker =
-          expectSummary(t.getSummary(t.adminBearerToken(), Map.of("repoType", "DOCKER")));
+          expectSummary(t.getSummary(t.seededAdminBearerToken(), Map.of("repoType", "DOCKER")));
 
       assertSummary(maven, 1, 2, 0, 1, 0);
       assertSummary(npm, 0, 0, 1, 0, 1);
@@ -1634,11 +1534,14 @@ class SecurityScanControllerIT {
       final var repos = this.seedFilterFixture();
 
       final var mavenA =
-          expectSummary(t.getSummary(t.adminBearerToken(), Map.of("repoName", repos[0].name())));
+          expectSummary(
+              t.getSummary(t.seededAdminBearerToken(), Map.of("repoName", repos[0].name())));
       final var mavenB =
-          expectSummary(t.getSummary(t.adminBearerToken(), Map.of("repoName", repos[1].name())));
+          expectSummary(
+              t.getSummary(t.seededAdminBearerToken(), Map.of("repoName", repos[1].name())));
       final var npm =
-          expectSummary(t.getSummary(t.adminBearerToken(), Map.of("repoName", repos[2].name())));
+          expectSummary(
+              t.getSummary(t.seededAdminBearerToken(), Map.of("repoName", repos[2].name())));
 
       assertSummary(mavenA, 1, 1, 0, 0, 0);
       assertSummary(mavenB, 0, 1, 0, 1, 0);
@@ -1654,11 +1557,13 @@ class SecurityScanControllerIT {
       final var match =
           expectSummary(
               t.getSummary(
-                  t.adminBearerToken(), Map.of("repoType", "MAVEN", "repoName", repos[0].name())));
+                  t.seededAdminBearerToken(),
+                  Map.of("repoType", "MAVEN", "repoName", repos[0].name())));
       final var contradiction =
           expectSummary(
               t.getSummary(
-                  t.adminBearerToken(), Map.of("repoType", "NPM", "repoName", repos[0].name())));
+                  t.seededAdminBearerToken(),
+                  Map.of("repoType", "NPM", "repoName", repos[0].name())));
 
       assertSummary(match, 1, 1, 0, 0, 0);
       assertSummary(contradiction, 0, 0, 0, 0, 0);
@@ -1674,7 +1579,7 @@ class SecurityScanControllerIT {
       final var body =
           expectSummary(
               t.getSummary(
-                  t.adminBearerToken(), Map.of("repoName", "no-such-repo-" + randomTag())));
+                  t.seededAdminBearerToken(), Map.of("repoName", "no-such-repo-" + randomTag())));
 
       assertSummary(body, 0, 0, 0, 0, 0);
     }
@@ -1688,7 +1593,8 @@ class SecurityScanControllerIT {
       final var body =
           expectSummary(
               t.getSummary(
-                  t.adminBearerToken(), Map.of("severity", "CRITICAL", "page", "5", "size", "1")));
+                  t.seededAdminBearerToken(),
+                  Map.of("severity", "CRITICAL", "page", "5", "size", "1")));
 
       assertSummary(body, 1, 2, 1, 1, 1);
     }
@@ -1700,7 +1606,8 @@ class SecurityScanControllerIT {
       final var t = SecurityScanControllerIT.this;
 
       final var body =
-          expectSummary(t.getSummary(t.adminBearerToken(), Map.of("repoType", repoType.name())));
+          expectSummary(
+              t.getSummary(t.seededAdminBearerToken(), Map.of("repoType", repoType.name())));
 
       assertSummary(body, 0, 0, 0, 0, 0);
     }
@@ -1712,7 +1619,7 @@ class SecurityScanControllerIT {
       final var t = SecurityScanControllerIT.this;
 
       expectValidationError(
-          t.getSummary(t.adminBearerToken(), Map.of("repoType", value)), "repoType");
+          t.getSummary(t.seededAdminBearerToken(), Map.of("repoType", value)), "repoType");
     }
 
     static Stream<String> invalidRepoTypes() {
@@ -1804,7 +1711,8 @@ class SecurityScanControllerIT {
       final var admin =
           expectSupportedRepoTypes(
               t.perform(
-                  get(SUPPORTED_REPO_TYPES_PATH).header(AUTHORIZATION, t.adminBearerToken())));
+                  get(SUPPORTED_REPO_TYPES_PATH)
+                      .header(AUTHORIZATION, t.seededAdminBearerToken())));
       final var user =
           expectSupportedRepoTypes(
               t.perform(get(SUPPORTED_REPO_TYPES_PATH).header(AUTHORIZATION, nonAdmin)));
@@ -1868,7 +1776,7 @@ class SecurityScanControllerIT {
     @DisplayName("answers 404 itemNotFound for a verb the path does not map")
     void unsupportedMethod(final String name, final MockHttpServletRequestBuilder request)
         throws Exception {
-      final var token = SecurityScanControllerIT.this.adminBearerToken();
+      final var token = SecurityScanControllerIT.this.seededAdminBearerToken();
 
       expectError(
           SecurityScanControllerIT.this.perform(request.header(AUTHORIZATION, token)),

@@ -835,10 +835,8 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     @Test
     @DisplayName("returns 400 cannotDeleteLastAdminUser for the last remaining ADMIN")
     void cannotDeleteLastAdmin() throws Exception {
-      // AdminUserInitializer seeds exactly one "admin" ADMIN user at application startup;
-      // no other admin exists unless a test creates one (and @Transactional rolls that back).
-      final var lastAdmin =
-          ProfileControllerIT.this.userRepository.findByUsername("admin").orElseThrow();
+      // The database is shared with other IT classes, so drop any other committed ADMIN first.
+      final var lastAdmin = ProfileControllerIT.this.seededAdminAsLastAdmin();
       final var token =
           ProfileControllerIT.this.bearerTokenFor(lastAdmin.getId(), lastAdmin.getUsername());
 

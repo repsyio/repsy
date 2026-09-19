@@ -25,26 +25,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.RepsyApplication;
+import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.server.protocols.maven.ui.facades.MavenApiFacade;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -58,61 +51,15 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** End-to-end coverage for the Maven artifact-management API. */
-@Testcontainers
-@AutoConfigureMockMvc
-@Transactional
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("MavenArtifactController /api/mvn/artifacts/*")
-class MavenArtifactControllerIT {
+class MavenArtifactControllerIT extends AbstractIntegrationTest {
 
-  private static final int API_PORT = 8080;
-  private static final String UUID_PATTERN =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   private static final String GROUP = "com.example.app";
   private static final String ARTIFACT = "demo";
-  private static final String STORAGE_BASE_PATH = createTempStoragePath();
 
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", () -> STORAGE_BASE_PATH);
-  }
-
-  private static String createTempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-maven-artifacts-it").toString();
-    } catch (final IOException exception) {
-      throw new java.io.UncheckedIOException(exception);
-    }
-  }
-
-  @Autowired private MockMvc mockMvc;
-  @Autowired private JwtUtils jwtUtils;
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
   @Autowired private RepoTxService repoTxService;
-  @Autowired private RepoRepository repoRepository;
   @Autowired private MavenApiFacade mavenApiFacade;
   @Autowired private ArtifactRepository artifactRepository;
   @Autowired private ArtifactVersionRepository artifactVersionRepository;
@@ -120,15 +67,13 @@ class MavenArtifactControllerIT {
   @Value("${storage-gateway.fs.base-path}")
   private String storageBasePath;
 
-  @PersistenceContext private EntityManager entityManager;
-
   private Repo repo;
   private User admin;
   private String repoName;
 
   @BeforeEach
   void setUp() throws IOException {
-    this.admin = this.createUser(UserRole.ADMIN);
+    this.admin = this.createUser(uniqueUsername("mvn"), UserRole.ADMIN);
     this.repoName = "mvn" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     final var repoInfo =
         this.repoTxService.createRepo(this.repoName, RepoType.MAVEN, false, "Maven IT");
@@ -137,15 +82,6 @@ class MavenArtifactControllerIT {
     this.seedVersion("1.0.0", false);
     this.seedVersion("1.1.0-SNAPSHOT", true);
     this.entityManager.flush();
-  }
-
-  private User createUser(final UserRole role) {
-    final var username = "mvn" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-    final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword("Password1!", salt);
-    final var info = this.userTxService.create(username, role, hash, salt);
-    this.entityManager.flush();
-    return this.userRepository.findById(info.getId()).orElseThrow();
   }
 
   private void seedVersion(final String versionName, final boolean snapshot) throws IOException {
@@ -240,13 +176,6 @@ class MavenArtifactControllerIT {
         + "<snapshotVersions><snapshotVersion><extension>pom</extension><value>"
         + "1.1.0-20260918.000000-1</value><updated>20260918000000</updated></snapshotVersion>"
         + "</snapshotVersions></versioning></metadata>";
-  }
-
-  private static RequestPostProcessor apiPort() {
-    return request -> {
-      request.setLocalPort(API_PORT);
-      return request;
-    };
   }
 
   private String bearerToken() {
