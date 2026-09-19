@@ -15,26 +15,37 @@
  */
 package io.repsy.protocols.ruby.shared.utils;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.yaml.snakeyaml.LoaderOptions;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.Construct;
+import org.yaml.snakeyaml.composer.Composer;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.nodes.MappingNode;
 import org.yaml.snakeyaml.nodes.Node;
+import org.yaml.snakeyaml.nodes.SequenceNode;
 import org.yaml.snakeyaml.nodes.Tag;
+import org.yaml.snakeyaml.parser.Parser;
+import org.yaml.snakeyaml.parser.ParserImpl;
+import org.yaml.snakeyaml.reader.StreamReader;
+import org.yaml.snakeyaml.resolver.Resolver;
 
 /**
  * Parses metadata.gz from a .gem tar archive without extracting to disk.
@@ -65,11 +76,10 @@ public class GemspecParser {
     throw new BadRequestException("invalidGemFile");
   }
 
-  @SuppressWarnings("unchecked")
   private static GemMetadata parseMetadataGz(final byte[] gzBytes) {
-    final Map<String, Object> spec;
+    final @Nullable Map<String, Object> spec;
     try (final var gzip = new GZIPInputStream(new ByteArrayInputStream(gzBytes))) {
-      spec = new Yaml(new GemspecConstructor()).load(gzip);
+      spec = loadGemspec(gzip);
     } catch (final IOException | RuntimeException e) {
       throw new BadRequestException("invalidGemFile");
     }
@@ -213,27 +223,53 @@ public class GemspecParser {
   }
 
   /**
-   * A {@link SafeConstructor} that also accepts the Ruby-specific local tags of a gemspec (<code>
-   * !ruby/object:Gem::Specification</code>, <code>!ruby/object:Gem::Version</code>, ...) by reading
-   * their mappings as plain maps. Global tags (<code>!!java.lang.Foo</code>, <code>
-   * !&lt;tag:yaml.org,2002:...&gt;</code>) that SafeConstructor does not know are still rejected.
+   * Reads the gemspec YAML into plain maps, lists and scalars through a {@link SafeConstructor}.
+   * The Ruby-specific local tags of a gemspec (<code>!ruby/object:Gem::Specification</code>, <code>
+   * !ruby/object:Gem::Version</code>, ...) are turned into plain maps by {@link RubyTagComposer}
+   * before the constructor sees them. Any other tag SafeConstructor does not know, such as a global
+   * tag (<code>!!javax.script.ScriptEngineManager</code>), is still rejected.
    */
-  private static final class GemspecConstructor extends SafeConstructor {
+  @Nullable
+  @SuppressWarnings("unchecked")
+  private static Map<String, Object> loadGemspec(final InputStream in) {
+    final var options = new LoaderOptions();
+    final var constructor = new SafeConstructor(options);
+    final var parser = new ParserImpl(new StreamReader(new InputStreamReader(in, UTF_8)), options);
+    constructor.setComposer(new RubyTagComposer(parser, options));
+    return (Map<String, Object>) constructor.getSingleData(Object.class);
+  }
 
-    GemspecConstructor() {
-      super(new LoaderOptions());
+  /** Composes the node tree, then turns every <code>!ruby/...</code> mapping into a plain map. */
+  private static final class RubyTagComposer extends Composer {
+
+    RubyTagComposer(final Parser parser, final LoaderOptions options) {
+      super(parser, new Resolver(), options);
     }
 
     @Override
-    protected Construct getConstructor(final Node node) {
-      if (node instanceof MappingNode && isRubyLocalTag(node.getTag())) {
-        return this.yamlConstructors.get(Tag.MAP);
+    public Node getSingleNode() {
+      final var root = super.getSingleNode();
+      if (root != null) {
+        retagRubyMappings(root, Collections.newSetFromMap(new IdentityHashMap<>()));
       }
-      return super.getConstructor(node);
+      return root;
     }
 
-    private static boolean isRubyLocalTag(final Tag tag) {
-      return tag.getValue().startsWith(RUBY_TAG_PREFIX);
+    private static void retagRubyMappings(final Node node, final Set<Node> visited) {
+      if (!visited.add(node)) {
+        return;
+      }
+      if (node instanceof final MappingNode mapping) {
+        if (mapping.getTag().getValue().startsWith(RUBY_TAG_PREFIX)) {
+          mapping.setTag(Tag.MAP);
+        }
+        for (final var tuple : mapping.getValue()) {
+          retagRubyMappings(tuple.getKeyNode(), visited);
+          retagRubyMappings(tuple.getValueNode(), visited);
+        }
+      } else if (node instanceof final SequenceNode sequence) {
+        sequence.getValue().forEach(child -> retagRubyMappings(child, visited));
+      }
     }
   }
 }
