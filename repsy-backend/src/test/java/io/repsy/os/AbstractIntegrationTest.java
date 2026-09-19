@@ -25,6 +25,7 @@ import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
+import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.user.entities.User;
@@ -234,7 +235,7 @@ public abstract class AbstractIntegrationTest {
    */
   protected User createUser(final String username, final UserRole role) {
     final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword(VALID_PASSWORD, salt);
+    final var hash = PasswordHasher.hash(VALID_PASSWORD);
     final var userInfo = this.userTxService.create(username, role, hash, salt);
     this.entityManager.flush();
     return this.userRepository.findById(userInfo.getId()).orElseThrow();

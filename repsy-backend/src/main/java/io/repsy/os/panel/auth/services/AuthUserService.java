@@ -24,12 +24,12 @@ import io.repsy.os.generated.model.LoginInfo;
 import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.auth.services.LoginInfoFactory;
 import io.repsy.os.shared.auth.utils.AuthUtils;
+import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.services.UserTxService;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -42,11 +42,6 @@ public class AuthUserService {
 
   private static final @NonNull String INVALID_CREDENTIALS = "invalidCredentials";
   private static final @NonNull String REFRESH_TOKEN_EXPIRED = "refreshTokenExpired";
-  private static final @NonNull UserInfo DUMMY_USER =
-      UserInfo.builder()
-          .salt("repsy-login-dummy")
-          .hash("0000000000000000000000000000000000000000000000000000000000000000")
-          .build();
 
   private final @NonNull UserTxService userTxService;
   private final @NonNull LoginInfoFactory loginInfoFactory;
@@ -60,11 +55,18 @@ public class AuthUserService {
       user = this.userTxService.getUserByUsername(form.getUsername());
     } catch (final ItemNotFoundException exception) {
       // Perform the same hash work for unknown usernames to avoid leaking account existence.
-      this.checkPassword(DUMMY_USER, form);
+      PasswordHasher.verifyDummy(form.getPassword());
       throw new AccessNotAllowedException(INVALID_CREDENTIALS);
     }
 
-    this.checkPassword(user, form);
+    if (!PasswordHasher.matches(form.getPassword(), user.getHash(), user.getSalt())) {
+      throw new AccessNotAllowedException(INVALID_CREDENTIALS);
+    }
+
+    // Hashes from an older algorithm or work factor are replaced now that the password is known.
+    if (PasswordHasher.needsUpgrade(user.getHash(), form.getPassword())) {
+      this.userTxService.upgradePasswordHash(user, form.getPassword());
+    }
 
     // Publish login event for lastLoginAt update
     this.eventPublisher.publishEvent(new UserLoginEvent(user.getUsername()));
@@ -87,14 +89,5 @@ public class AuthUserService {
     }
 
     return this.loginInfoFactory.create(user, claims.sessionStart());
-  }
-
-  private void checkPassword(final @NonNull UserInfo user, final @NonNull LoginForm form) {
-
-    final var hash = DigestUtils.sha256Hex(form.getPassword() + user.getSalt());
-
-    if (!hash.equals(user.getHash())) {
-      throw new AccessNotAllowedException(INVALID_CREDENTIALS);
-    }
   }
 }

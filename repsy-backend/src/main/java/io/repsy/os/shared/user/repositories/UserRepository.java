@@ -23,6 +23,7 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -47,4 +48,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       @NonNull @Param("search") String search, @NonNull Pageable pageable);
 
   Long countByRole(UserRole userRole);
+
+  /**
+   * Swaps a user's password hash only while it still holds {@code oldHash}, so a password change
+   * that committed in the meantime is never overwritten by a re-hash of the old password. Written
+   * as a bulk update because a full-row entity save would also write back every stale column.
+   *
+   * @return 1 if the hash was replaced, 0 if the user is gone or the hash had changed
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("update User u set u.hash = :newHash where u.id = :id and u.hash = :oldHash")
+  int replaceHash(
+      @NonNull @Param("id") UUID id,
+      @NonNull @Param("oldHash") String oldHash,
+      @NonNull @Param("newHash") String newHash);
 }

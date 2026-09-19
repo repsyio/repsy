@@ -23,11 +23,11 @@ import io.repsy.os.generated.model.UserRole;
 import io.repsy.os.panel.profile.repositories.ReservedUsernameRepository;
 import io.repsy.os.shared.auth.services.LoginInfoFactory;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
+import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.services.UserTxService;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,7 +77,7 @@ public class ProfileService {
     final var salt = PasswordGeneratorUtil.generateSalt();
 
     user.setSalt(salt);
-    user.setHash(DigestUtils.sha256Hex(form.getPassword() + salt));
+    user.setHash(PasswordHasher.hash(form.getPassword()));
     this.userTxService.updatePassword(user.getId(), user.getHash(), salt);
   }
 

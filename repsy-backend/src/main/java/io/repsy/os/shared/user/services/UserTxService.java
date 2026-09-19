@@ -21,6 +21,7 @@ import io.repsy.os.generated.model.UserCreateForm;
 import io.repsy.os.generated.model.UserResponse;
 import io.repsy.os.generated.model.UserUpdateForm;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
+import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -31,12 +32,12 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
@@ -127,7 +128,7 @@ public class UserTxService {
     }
 
     final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = this.hashPassword(dto.getPassword(), salt);
+    final var hash = PasswordHasher.hash(dto.getPassword());
 
     final var user = new User();
     user.setUsername(dto.getUsername());
@@ -174,7 +175,7 @@ public class UserTxService {
     final var newPassword = PasswordGeneratorUtil.generatePassword();
     final var salt = PasswordGeneratorUtil.generateSalt();
 
-    user.setHash(this.hashPassword(newPassword, salt));
+    user.setHash(PasswordHasher.hash(newPassword));
     user.setSalt(salt);
     user.revokeRefreshTokens();
 
@@ -191,6 +192,25 @@ public class UserTxService {
     }
 
     this.userRepository.delete(user);
+  }
+
+  /**
+   * Replaces the hash of a user who just logged in with a hash from the current algorithm
+   * (RPS-961). Call it only when {@link PasswordHasher#needsUpgrade} is true, and only after the
+   * password was verified against {@code user}'s hash. The password is not changing, so sessions
+   * stay valid. If the password was changed in the meantime the stored hash no longer matches
+   * {@code user} and nothing is written.
+   *
+   * <p>It runs in its own transaction: the caller may hold a read-only one (protocol facades do),
+   * which could not write, and a failed upgrade must not roll the caller back.
+   *
+   * @param user the user as it was read for the login
+   * @param password the password that was just verified against {@code user}'s hash
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void upgradePasswordHash(final @NonNull UserInfo user, final @NonNull String password) {
+
+    this.userRepository.replaceHash(user.getId(), user.getHash(), PasswordHasher.hash(password));
   }
 
   @Transactional
@@ -210,9 +230,5 @@ public class UserTxService {
     return this.userRepository
         .findByUsername(username)
         .orElseThrow(() -> new ItemNotFoundException(ERR_USER_NOT_FOUND));
-  }
-
-  private @NonNull String hashPassword(final @NonNull String password, final @NonNull String salt) {
-    return DigestUtils.sha256Hex(password + salt);
   }
 }
