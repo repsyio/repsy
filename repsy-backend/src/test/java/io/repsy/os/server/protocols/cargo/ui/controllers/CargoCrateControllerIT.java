@@ -58,6 +58,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -558,6 +560,20 @@ class CargoCrateControllerIT {
             "unAuthorized",
             "The user has logged in but has no permissions.");
       }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"Basic !!!", "Basic dXNlcg=="})
+    @DisplayName("answers a Basic header that is not base64 or has no colon with 401 (RPS-927)")
+    void undecodableBasicHeaderIsUnauthorized(final String authHeader) throws Exception {
+      final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, true);
+
+      expectError(
+          CargoCrateControllerIT.this.request(
+              "GET", "/api/cargo/crates/" + repo.getName(), authHeader),
+          HttpStatus.UNAUTHORIZED,
+          "unAuthorized",
+          "The user has logged in but has no permissions.");
     }
 
     @Test

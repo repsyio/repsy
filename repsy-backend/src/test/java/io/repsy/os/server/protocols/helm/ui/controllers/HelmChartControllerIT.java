@@ -1554,16 +1554,14 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       expectUnauthorized(this.send(endpoint, repo.getName(), "Token abc"));
     }
 
-    /**
-     * A Basic header that is not valid base64 is not rejected as 401: decoding it throws and the
-     * error handler answers 500. Pinned as-is; see the follow-up story linked from the PR.
-     */
-    @Test
-    @DisplayName("a Basic header that is not base64 is a 500 today")
-    void undecodableBasicHeader() throws Exception {
+    /** RPS-927: an undecodable Basic credential is a plain 401, not a 500. */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"Basic !!!", "Basic dXNlcg=="})
+    @DisplayName("a Basic header that is not base64 or has no colon is 401 unAuthorized")
+    void undecodableBasicHeader(final String authHeader) throws Exception {
       final var repo = this.repoWithChart(false);
 
-      expectInternalError(this.send(Endpoint.SEARCH, repo.getName(), "Basic !!!"));
+      expectUnauthorized(this.send(Endpoint.SEARCH, repo.getName(), authHeader));
     }
 
     @ParameterizedTest(name = "{0}")
