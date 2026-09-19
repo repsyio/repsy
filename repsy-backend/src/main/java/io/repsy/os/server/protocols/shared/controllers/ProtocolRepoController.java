@@ -42,6 +42,7 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -191,6 +192,7 @@ public class ProtocolRepoController {
   @RepoOperation
   public RestResponse<String> getRepoType(final RepoInfo repoInfo) {
 
-    return this.responseFactory.success("repoTypeFetched", repoInfo.getType().name().toLowerCase());
+    return this.responseFactory.success(
+        "repoTypeFetched", repoInfo.getType().name().toLowerCase(Locale.ROOT));
   }
 }

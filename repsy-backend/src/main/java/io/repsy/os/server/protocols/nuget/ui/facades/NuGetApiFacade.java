@@ -28,6 +28,7 @@ import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import java.io.IOException;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -117,7 +118,9 @@ public class NuGetApiFacade implements ProtocolApiFacade {
     this.nugetPackageService.deletePackage(repoInfo, packageId);
     long freed = 0L;
     try {
-      freed = this.nugetStorageService.deletePackage(repoInfo.getId(), packageId.toLowerCase());
+      freed =
+          this.nugetStorageService.deletePackage(
+              repoInfo.getId(), packageId.toLowerCase(Locale.ROOT));
     } catch (final Exception e) {
       log.warn("Storage delete failed for NuGet package {}: {}", packageId, e.getMessage());
     }
@@ -147,10 +150,13 @@ public class NuGetApiFacade implements ProtocolApiFacade {
 
         freed =
             this.nugetStorageService.deletePackageVersion(
-                repoInfo.getId(), packageId.toLowerCase(), version.toLowerCase());
+                repoInfo.getId(),
+                packageId.toLowerCase(Locale.ROOT),
+                version.toLowerCase(Locale.ROOT));
         try {
 
-          this.nugetStorageService.deletePackage(repoInfo.getId(), packageId.toLowerCase());
+          this.nugetStorageService.deletePackage(
+              repoInfo.getId(), packageId.toLowerCase(Locale.ROOT));
         } catch (final Exception cleanupException) {
           log.debug(
               "NuGet package directory cleanup skipped for {}: {}",
@@ -160,7 +166,9 @@ public class NuGetApiFacade implements ProtocolApiFacade {
       } else {
         freed =
             this.nugetStorageService.deletePackageVersion(
-                repoInfo.getId(), packageId.toLowerCase(), version.toLowerCase());
+                repoInfo.getId(),
+                packageId.toLowerCase(Locale.ROOT),
+                version.toLowerCase(Locale.ROOT));
       }
     } catch (final Exception e) {
       log.warn(

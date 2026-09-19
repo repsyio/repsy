@@ -113,7 +113,8 @@ public class GoVersionUtils {
     final var sb = new StringBuilder(encoded.length());
     boolean escape = false;
 
-    for (final char c : encoded.toCharArray()) {
+    for (int i = 0; i < encoded.length(); i++) {
+      final char c = encoded.charAt(i);
       if (escape) {
         sb.append(Character.toUpperCase(c));
         escape = false;

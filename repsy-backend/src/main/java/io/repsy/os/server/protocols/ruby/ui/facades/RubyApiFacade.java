@@ -111,6 +111,7 @@ public class RubyApiFacade implements ProtocolApiFacade {
     return BaseUsages.ofDisk(-1L * freed);
   }
 
+  @Override
   public void createRepo(final UUID repoId) {
     this.storageService.createRepo(repoId);
   }

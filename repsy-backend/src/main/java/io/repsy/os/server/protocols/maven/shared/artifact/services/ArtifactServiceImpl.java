@@ -26,8 +26,6 @@ import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.generated.model.ArtifactVersionInfo;
-import io.repsy.os.server.protocols.maven.shared.artifact.dtos.VersionDeveloperInfo;
-import io.repsy.os.server.protocols.maven.shared.artifact.dtos.VersionLicenseInfo;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactConverter;
@@ -573,18 +571,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     final var customKeys = this.keyStoreService.findHostsByRepoId(repo.getId());
 
     this.pgpVerifierService.verify(nonSignedFileResource, signedFileResource, customKeys);
-  }
-
-  /* Return developer info's of given artifact version */
-  private List<VersionDeveloperInfo> getVersionDevelopers(final UUID versionId) {
-
-    return this.versionDeveloperRepository.findAllByArtifactVersionId(versionId);
-  }
-
-  /* Return license info's of given artifact version */
-  private List<VersionLicenseInfo> getVersionLicenses(final UUID versionId) {
-
-    return this.versionLicenseRepository.findAllByArtifactVersionId(versionId);
   }
 
   private MutablePair<ArtifactDeployType, @Nullable ArtifactVersionType>

@@ -43,6 +43,7 @@ public class PypiApiFacade implements ProtocolApiFacade {
   private final @NonNull PypiPackageServiceImpl pypiPackageService;
   private final @NonNull ApplicationEventPublisher eventPublisher;
 
+  @Override
   public void deleteRepo(final @NonNull RepoInfo repoInfo) {
 
     this.pypiStorageService.deleteRepo(repoInfo.getStorageKey());
@@ -162,6 +163,7 @@ public class PypiApiFacade implements ProtocolApiFacade {
     return releaseDetail;
   }
 
+  @Override
   public void createRepo(final @NonNull UUID repoId) {
 
     this.pypiStorageService.createRepo(repoId);

@@ -31,6 +31,7 @@ import org.springframework.stereotype.Repository;
 @NullMarked
 public interface NpmPackageRepository extends JpaRepository<NpmPackage, UUID> {
 
+  @Override
   Optional<NpmPackage> findById(UUID packageId);
 
   Optional<NpmPackage> findByRepoIdAndScopeAndName(

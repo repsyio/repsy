@@ -48,11 +48,13 @@ public class GolangApiFacade implements ProtocolApiFacade {
   private final @NonNull ApplicationEventPublisher eventPublisher;
 
   @Transactional
+  @Override
   public void createRepo(final @NonNull UUID repoId) {
     this.golangStorageService.createRepo(repoId);
   }
 
   @Transactional
+  @Override
   public void deleteRepo(final @NonNull RepoInfo repoInfo) {
 
     this.golangStorageService.deleteRepo(repoInfo.getStorageKey());

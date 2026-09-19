@@ -43,6 +43,7 @@ public class NpmApiFacade implements ProtocolApiFacade {
   private final @NonNull NpmPackageConverter npmPackageConverter;
   private final @NonNull ApplicationEventPublisher eventPublisher;
 
+  @Override
   public void deleteRepo(final @NonNull RepoInfo repoInfo) {
 
     this.npmStorageService.deleteRepo(repoInfo.getStorageKey());
@@ -144,6 +145,7 @@ public class NpmApiFacade implements ProtocolApiFacade {
     return BaseUsages.builder().diskUsage(pair.getSecond() * -1L).build();
   }
 
+  @Override
   public void createRepo(final @NonNull UUID repoId) {
 
     this.npmStorageService.createRepo(repoId);

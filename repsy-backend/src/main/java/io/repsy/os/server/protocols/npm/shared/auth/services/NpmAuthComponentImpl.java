@@ -42,6 +42,7 @@ public class NpmAuthComponentImpl extends ProtocolAuthService implements NpmAuth
     super(userTxService, jwtUtils, deployTokenService);
   }
 
+  @Override
   public @NonNull String authenticateRepoUser(
       final @NonNull BaseRepoInfo<UUID> repoInfo,
       final @NonNull String username,

@@ -34,7 +34,7 @@ public final class ProtocolContext {
     this.contextMap.put(key, value);
   }
 
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings({"unchecked", "TypeParameterUnusedInFormals"})
   public <T> T getProperty(final String key) {
 
     return (T) this.contextMap.get(key);

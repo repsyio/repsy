@@ -66,6 +66,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
   private final @NonNull OrphanLayerCleanupService orphanLayerCleanupService;
   private final @NonNull ApplicationEventPublisher eventPublisher;
 
+  @Override
   public void deleteRepo(final @NonNull RepoInfo repoInfo) {
 
     RepoUtils.validateRepoName(repoInfo.getName());
@@ -234,6 +235,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
     this.orphanLayerCleanupService.cleanupBlobs(repoInfo.getStorageKey(), orphans);
   }
 
+  @Override
   public void createRepo(final @NonNull UUID repoId) {
     this.dockerStorageService.createRepo(repoId);
   }

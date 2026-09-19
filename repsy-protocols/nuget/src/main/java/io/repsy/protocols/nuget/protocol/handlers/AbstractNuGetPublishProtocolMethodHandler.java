@@ -27,6 +27,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
@@ -113,7 +114,8 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler implements Proto
 
     final var contentType = request.getContentType();
 
-    if (contentType == null || !contentType.toLowerCase().contains("multipart/form-data")) {
+    if (contentType == null
+        || !contentType.toLowerCase(Locale.ROOT).contains("multipart/form-data")) {
       throw new IllegalArgumentException("Content-Type must be multipart/form-data");
     }
   }

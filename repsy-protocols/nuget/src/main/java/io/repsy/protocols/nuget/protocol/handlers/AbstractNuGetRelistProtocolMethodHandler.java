@@ -15,7 +15,6 @@
  */
 package io.repsy.protocols.nuget.protocol.handlers;
 
-import static io.repsy.protocols.nuget.protocol.dtos.NuGetErrorResponse.of;
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
@@ -24,6 +23,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
+import io.repsy.protocols.nuget.protocol.dtos.NuGetErrorResponse;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
@@ -95,10 +95,11 @@ public abstract class AbstractNuGetRelistProtocolMethodHandler implements Protoc
       this.facade.relistVersion(context);
       return ResponseEntity.ok().build();
     } catch (final ItemNotFoundException e) {
-      return ResponseEntity.status(NOT_FOUND).body(of(e.getMessage()));
+      return ResponseEntity.status(NOT_FOUND).body(NuGetErrorResponse.of(e.getMessage()));
     } catch (final Exception e) {
       log.error("NuGet relist failed", e);
-      return ResponseEntity.status(INTERNAL_SERVER_ERROR).body(of("Relist failed"));
+      return ResponseEntity.status(INTERNAL_SERVER_ERROR)
+          .body(NuGetErrorResponse.of("Relist failed"));
     }
   }
 }

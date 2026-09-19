@@ -29,6 +29,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface RepoRepository extends JpaRepository<Repo, UUID> {
 
+  @Override
   @NonNull Optional<Repo> findById(@NonNull UUID repoId);
 
   boolean existsByName(@NonNull String name);

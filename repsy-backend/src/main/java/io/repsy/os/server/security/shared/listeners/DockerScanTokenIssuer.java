@@ -27,13 +27,12 @@ import org.springframework.stereotype.Component;
 class DockerScanTokenIssuer {
 
   private static final @NonNull Duration TOKEN_DURATION = Duration.ofMinutes(5);
-  private static final @NonNull String PULL_SCOPE_TEMPLATE = "repository:%s:pull";
 
   private final @NonNull JwtUtils jwtUtils;
 
   @NonNull String mintReadOnlyPullToken(
       final @NonNull UUID repoId, final @NonNull String repoName) {
-    final var scope = PULL_SCOPE_TEMPLATE.formatted(repoName);
+    final var scope = "repository:%s:pull".formatted(repoName);
 
     return this.jwtUtils.createRepoScopedToken(repoId, scope, TOKEN_DURATION);
   }

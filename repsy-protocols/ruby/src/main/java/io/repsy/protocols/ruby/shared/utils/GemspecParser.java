@@ -174,19 +174,14 @@ public class GemspecParser {
       final var depType = depMap.get("type");
       final var depReqs = depMap.get("requirement");
 
-      if (!(depName instanceof String)) {
+      if (!(depName instanceof final String name)) {
         continue;
       }
 
       final var typeStr = depType instanceof final String s ? normalizeType(s) : RUNTIME_DEP;
       final var reqStr = formatDepRequirement(depReqs);
 
-      result.add(
-          GemDependency.builder()
-              .name((String) depName)
-              .requirements(reqStr)
-              .type(typeStr)
-              .build());
+      result.add(GemDependency.builder().name(name).requirements(reqStr).type(typeStr).build());
     }
     return List.copyOf(result);
   }

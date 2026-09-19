@@ -265,7 +265,7 @@ public final class NuGetPackageUtils {
     try (final var zipIn = new ZipInputStream(inputStream)) {
       ZipEntry entry;
       while ((entry = zipIn.getNextEntry()) != null) {
-        if (!entry.isDirectory() && entry.getName().toLowerCase().endsWith(".nuspec")) {
+        if (!entry.isDirectory() && entry.getName().toLowerCase(Locale.ROOT).endsWith(".nuspec")) {
           return new String(zipIn.readAllBytes(), StandardCharsets.UTF_8);
         }
       }
@@ -276,13 +276,13 @@ public final class NuGetPackageUtils {
 
   public static String extractPackageId(final ProtocolContext context) {
     final var path = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var parts = path.split("/");
+    final var parts = path.split("/", -1);
     return parts.length > THREE ? parts[THREE] : "";
   }
 
   public static PackageIdVersion extractPackageIdAndVersion(final ProtocolContext context) {
     final var path = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var parts = path.split("/");
+    final var parts = path.split("/", -1);
     return new PackageIdVersion(
         parts.length > THREE ? parts[THREE] : "", parts.length > FOUR ? parts[FOUR] : "");
   }
