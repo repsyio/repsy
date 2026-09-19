@@ -34,9 +34,11 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -185,6 +187,11 @@ public abstract class AbstractIntegrationTest {
 
   protected ResultActions perform(final MockHttpServletRequestBuilder request) throws Exception {
     return this.mockMvc.perform(request.with(apiPort()));
+  }
+
+  protected static String basicAuth(final String username, final String password) {
+    final var raw = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
+    return "Basic " + Base64.getEncoder().encodeToString(raw);
   }
 
   protected static String randomTag() {

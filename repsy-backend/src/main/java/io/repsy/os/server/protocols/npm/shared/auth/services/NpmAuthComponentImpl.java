@@ -19,11 +19,11 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
-import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.npm.shared.auth.services.NpmAuthComponent;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.repo.dtos.Credentials;
 import java.time.Period;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
@@ -58,11 +58,9 @@ public class NpmAuthComponentImpl extends ProtocolAuthService implements NpmAuth
   private @NonNull String authenticateWithUserCredentials(
       final @NonNull String username, final @NonNull String password) {
 
-    final var userInfo = super.userTxService.getUserByUsername(username);
-
-    if (!AuthUtils.checkPassword(userInfo.getHash(), userInfo.getSalt(), password)) {
-      throw new UnAuthorizedException("unAuthorized");
-    }
+    final var userInfo =
+        this.authenticateWithPassword(
+            Credentials.builder().username(username).password(password).build());
 
     return super.jwtUtils.createTokenWithDuration(
         userInfo.getId(), username, Period.ofDays(TOKEN_EXPIRATION_DAYS));
