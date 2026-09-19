@@ -38,15 +38,21 @@ public class AuthUtils {
 
   /**
    * Extract auth credentials from the basic authorization header. This function returns null if the
-   * header is not basic and is invalid.
+   * decoded token has no {@code username:password} separator. The decoder skips characters outside
+   * the base64 alphabet, so a token that is not base64 at all decodes to an empty value and is
+   * treated the same way.
    *
    * @param authHeader Authorization HTTP header from request
-   * @return request Credentials
+   * @return request Credentials, or null if the token is invalid
    */
   public static @Nullable Credentials extractCredentialsFromBasicToken(
       final @NonNull String authHeader) {
 
     final var credentials = new String(decodeBase64(authHeader), UTF_8).split(":", -1);
+
+    if (credentials.length < 2) {
+      return null;
+    }
 
     final var username =
         switch (credentials[0]) {
