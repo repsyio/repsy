@@ -103,8 +103,8 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
     return this.jdbcTemplate.queryForMap(
         """
         select jsonb_typeof("dependencies") as json_type,
-               jsonb_array_length("dependencies") as json_length,
-               "dependencies"::text as json_text
+          jsonb_array_length("dependencies") as json_length,
+          "dependencies"::text as json_text
         from "public"."nuget_package_version"
         where "package_id" = ? and "version" = ?
         """,
