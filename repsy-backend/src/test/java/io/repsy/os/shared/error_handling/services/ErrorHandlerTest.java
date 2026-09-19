@@ -25,6 +25,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
+import io.repsy.core.error_handling.exceptions.MfaException;
+import io.repsy.core.error_handling.exceptions.RedirectToPathException;
 import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.services.RestResponseFactory;
@@ -247,6 +250,47 @@ class ErrorHandlerTest {
   }
 
   @Test
+  @DisplayName("answers 301 movedToPath with a readable text and the Location header")
+  void movedToPath() throws Exception {
+    this.mockMvc
+        .perform(get("/moved"))
+        .andExpect(status().isMovedPermanently())
+        .andExpect(header().string(HttpHeaders.LOCATION, "/new/path"))
+        .andExpect(jsonPath("$.msgId").value("movedToPath"))
+        .andExpect(jsonPath("$.text").value("The requested resource has moved permanently."));
+  }
+
+  @Test
+  @DisplayName("falls back to a readable unauthorizedRequest when the exception has no message")
+  void unauthorizedWithoutMessage() throws Exception {
+    this.mockMvc
+        .perform(get("/unauthorized/no-message"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.msgId").value("unauthorizedRequest"))
+        .andExpect(jsonPath("$.text").value("Authentication is required to access this resource."));
+  }
+
+  @Test
+  @DisplayName("falls back to a readable itemAlreadyExists when the exception has no message")
+  void itemAlreadyExistsWithoutMessage() throws Exception {
+    this.mockMvc
+        .perform(get("/conflict/no-message"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.msgId").value("itemAlreadyExists"))
+        .andExpect(jsonPath("$.text").value("The item already exists."));
+  }
+
+  @Test
+  @DisplayName("falls back to a readable mfaException when the exception has no message")
+  void mfaWithoutMessage() throws Exception {
+    this.mockMvc
+        .perform(get("/mfa/no-message"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.msgId").value("mfaException"))
+        .andExpect(jsonPath("$.text").value("Multi-factor authentication failed."));
+  }
+
+  @Test
   @DisplayName("announces the Bearer scheme on a panel 401 for a missing Authorization header")
   void panelMissingAuthorizationHeaderChallenge() throws Exception {
     this.mockMvc
@@ -379,6 +423,26 @@ class ErrorHandlerTest {
     @GetMapping("/unauthorized")
     String unauthorized() {
       throw new UnAuthorizedException("accessNotAllowed");
+    }
+
+    @GetMapping("/unauthorized/no-message")
+    String unauthorizedWithoutMessage() {
+      throw new UnAuthorizedException(null);
+    }
+
+    @GetMapping("/conflict/no-message")
+    String conflictWithoutMessage() {
+      throw new ItemAlreadyExistException(null);
+    }
+
+    @GetMapping("/mfa/no-message")
+    String mfaWithoutMessage() {
+      throw new MfaException(null);
+    }
+
+    @GetMapping("/moved")
+    String moved() {
+      throw new RedirectToPathException("/new/path");
     }
   }
 
