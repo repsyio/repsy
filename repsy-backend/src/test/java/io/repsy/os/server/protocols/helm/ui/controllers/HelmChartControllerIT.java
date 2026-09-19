@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.helm.ui.controllers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -267,6 +268,20 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     }
   }
 
+  /** Archive whose {@code Chart.yaml} is exactly {@code chartYaml}. */
+  private static byte[] archiveOf(final String chartName, final String chartYaml) {
+    try {
+      final var bytes = new ByteArrayOutputStream();
+      try (final var gzip = new GZIPOutputStream(bytes);
+          final var tar = new TarArchiveOutputStream(gzip)) {
+        addEntry(tar, chartName + "/Chart.yaml", chartYaml);
+      }
+      return bytes.toByteArray();
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
   /** Uploads a chart through {@code POST /{repo}/api/charts} (ChartMuseum-style). */
   private Pushed upload(final Repo repo, final ChartSpec spec, final String token)
       throws Exception {
@@ -294,6 +309,18 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       final String token)
       throws Exception {
     final var bytes = archive(spec);
+    requireStatus(this.putOciChart(repo, ociName, tag, bytes, token), 201, "OCI manifest push");
+    return new Pushed(spec, bytes);
+  }
+
+  /** Pushes {@code bytes} as the chart layer and answers the manifest {@code PUT}. */
+  private MockHttpServletResponse putOciChart(
+      final Repo repo,
+      final String ociName,
+      final String tag,
+      final byte[] bytes,
+      final String token)
+      throws Exception {
     final var layerDigest = sha256(bytes);
     final var configBytes = "{}".getBytes(StandardCharsets.UTF_8);
 
@@ -326,16 +353,13 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
                 OCI_LAYER_TYPE,
                 layerDigest,
                 bytes.length);
-    final var push =
-        this.protocol(
-                put("/v2/{repo}/{name}/manifests/{tag}", repo.getName(), ociName, tag)
-                    .contentType(OCI_MANIFEST_TYPE)
-                    .content(manifest)
-                    .header(AUTHORIZATION, token))
-            .andReturn()
-            .getResponse();
-    requireStatus(push, 201, "OCI manifest push");
-    return new Pushed(spec, bytes);
+    return this.protocol(
+            put("/v2/{repo}/{name}/manifests/{tag}", repo.getName(), ociName, tag)
+                .contentType(OCI_MANIFEST_TYPE)
+                .content(manifest)
+                .header(AUTHORIZATION, token))
+        .andReturn()
+        .getResponse();
   }
 
   private void uploadOciBlob(
@@ -1593,6 +1617,146 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
           Arguments.of(HttpMethod.PUT, "/api/helm/charts/%s/payments/tags"),
           Arguments.of(HttpMethod.GET, "/api/helm/charts/%s/payments/1.0.0/extra"),
           Arguments.of(HttpMethod.DELETE, "/api/helm/charts/%s/payments/1.0.0/extra"));
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // POST /{repo}/api/charts and OCI push: Chart.yaml scalars that are not strings (RPS-928)
+  // ---------------------------------------------------------------------------------------------
+
+  @Nested
+  @DisplayName("Chart.yaml scalar types on upload")
+  class ChartYamlScalars {
+
+    private static final String BASE = "name: payments\nversion: 1.0.0\n";
+
+    private static Arguments rejected(
+        final String label, final String chartYaml, final String msgId, final String text) {
+      return Arguments.of(label, chartYaml, msgId, text);
+    }
+
+    static Stream<Arguments> rejectedChartYamls() {
+      final var appVersionText =
+          "Invalid chart appVersion: it must be a string, quote it (for example" + " \"2\").";
+      final var descriptionText = "Invalid chart description: it must be a string, quote it.";
+      final var yamlText = "Chart.yaml is not a valid YAML mapping.";
+      return Stream.of(
+          rejected(
+              "integer appVersion",
+              BASE + "appVersion: 2\n",
+              "chartAppVersionInvalid",
+              appVersionText),
+          rejected(
+              "float appVersion",
+              BASE + "appVersion: 1.10\n",
+              "chartAppVersionInvalid",
+              appVersionText),
+          rejected(
+              "boolean appVersion",
+              BASE + "appVersion: true\n",
+              "chartAppVersionInvalid",
+              appVersionText),
+          rejected(
+              "list appVersion",
+              BASE + "appVersion: [1, 2]\n",
+              "chartAppVersionInvalid",
+              appVersionText),
+          rejected(
+              "integer description",
+              BASE + "description: 42\n",
+              "chartDescriptionInvalid",
+              descriptionText),
+          rejected(
+              "integer type",
+              BASE + "type: 3\n",
+              "chartTypeInvalid",
+              "Invalid chart type: it must be a string."),
+          rejected(
+              "integer name",
+              "name: 5\nversion: 1.0.0\n",
+              "chartNameInvalid",
+              "Invalid chart name."),
+          rejected(
+              "integer version",
+              "name: payments\nversion: 2\n",
+              "chartVersionInvalid",
+              "Invalid chart version."),
+          rejected(
+              "float version",
+              "name: payments\nversion: 1.0\n",
+              "chartVersionInvalid",
+              "Invalid chart version."),
+          rejected("empty document", "", "chartYamlInvalid", yamlText),
+          rejected("list document", "- a\n- b\n", "chartYamlInvalid", yamlText),
+          rejected(
+              "malformed YAML", "name: [unclosed\nversion: 1.0.0\n", "chartYamlInvalid", yamlText));
+    }
+
+    private ResultActions postChartYaml(final Repo repo, final String chartYaml) throws Exception {
+      final var it = HelmChartControllerIT.this;
+      return it.protocol(
+          multipart("/{repo}/api/charts", repo.getName())
+              .part(new MockPart("chart", "payments-1.0.0.tgz", archiveOf("payments", chartYaml)))
+              .header(AUTHORIZATION, it.adminBearerToken()));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("rejectedChartYamls")
+    @DisplayName("POST /{repo}/api/charts answers 400 with a specific message, not 500")
+    void uploadIsRejected(
+        final String label, final String chartYaml, final String msgId, final String text)
+        throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var repo = it.helmRepo();
+      clearInvocations(it.usageUpdateService);
+
+      expectError(this.postChartYaml(repo, chartYaml), HttpStatus.BAD_REQUEST, msgId, msgId, text);
+
+      assertThat(it.chartRowExists(repo, "payments")).isFalse();
+      verifyNoInteractions(it.usageUpdateService);
+    }
+
+    @Test
+    @DisplayName("quoted scalars are strings and keep their exact value")
+    void quotedScalarsAreAccepted() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var repo = it.helmRepo();
+      final var chartYaml = BASE + "appVersion: \"2\"\ndescription: \"42\"\ntype: application\n";
+
+      final var response = this.postChartYaml(repo, chartYaml).andReturn().getResponse();
+
+      requireStatus(response, 201, "chart upload");
+      final var detail = dataMap(it.detail(repo, "payments", "1.0.0", it.userBearerToken()));
+      assertThat(detail)
+          .containsEntry("appVersion", "2")
+          .containsEntry("description", "42")
+          .containsEntry("type", "application");
+    }
+
+    @Test
+    @DisplayName("omitted optional scalars are still accepted")
+    void omittedOptionalScalars() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var repo = it.helmRepo();
+
+      requireStatus(this.postChartYaml(repo, BASE).andReturn().getResponse(), 201, "chart upload");
+
+      assertThat(it.storedVersions(repo, "payments")).containsExactly("1.0.0");
+    }
+
+    @Test
+    @DisplayName("an OCI push with a non-string appVersion is rejected the same way")
+    void ociPushIsRejected() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var repo = it.helmRepo();
+      final var bytes = archiveOf("payments", BASE + "appVersion: 2\n");
+
+      final var push = it.putOciChart(repo, "payments", "1.0.0", bytes, it.adminBearerToken());
+
+      requireStatus(push, 400, "OCI manifest push");
+      assertThat(push.getContentAsString(StandardCharsets.UTF_8))
+          .contains("\"msgId\":\"chartAppVersionInvalid\"");
+      assertThat(it.chartRowExists(repo, "payments")).isFalse();
     }
   }
 }

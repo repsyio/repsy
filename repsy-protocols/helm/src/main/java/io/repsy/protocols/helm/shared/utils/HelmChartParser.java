@@ -26,7 +26,9 @@ import java.util.zip.GZIPInputStream;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.error.YAMLException;
 
 /** Parses Chart.yaml from a .tgz stream without extracting to disk. */
 @UtilityClass
@@ -61,17 +63,43 @@ public class HelmChartParser {
   }
 
   private static HelmChartMetadata parseYaml(final byte[] bytes) {
-    final var yaml = new Yaml();
-    final Map<String, Object> parsed = yaml.load(new ByteArrayInputStream(bytes));
-    final var name = validateName((String) parsed.get("name"));
-    final var version = validateVersion((String) parsed.get("version"));
+    final var parsed = loadYaml(bytes);
+    final var name = validateName(stringField(parsed, "name", "chartNameInvalid"));
+    final var version = validateVersion(stringField(parsed, "version", "chartVersionInvalid"));
     return HelmChartMetadata.builder()
         .name(name)
         .version(version)
-        .description((String) parsed.get("description"))
-        .appVersion((String) parsed.get("appVersion"))
-        .type((String) parsed.get("type"))
+        .description(stringField(parsed, "description", "chartDescriptionInvalid"))
+        .appVersion(stringField(parsed, "appVersion", "chartAppVersionInvalid"))
+        .type(stringField(parsed, "type", "chartTypeInvalid"))
         .build();
+  }
+
+  private static Map<?, ?> loadYaml(final byte[] bytes) {
+    final Object parsed;
+    try {
+      parsed = new Yaml().load(new ByteArrayInputStream(bytes));
+    } catch (final YAMLException e) {
+      throw new BadRequestException("chartYamlInvalid");
+    }
+    if (!(parsed instanceof Map<?, ?> map)) {
+      throw new BadRequestException("chartYamlInvalid");
+    }
+    return map;
+  }
+
+  /**
+   * Reads a scalar that Helm declares as a string. YAML types an unquoted {@code 2} or {@code 1.10}
+   * as a number, and coercing it would silently change the value ({@code 1.10} becomes {@code
+   * 1.1}), so anything but a string is rejected, as Helm itself does.
+   */
+  private static @Nullable String stringField(
+      final Map<?, ?> parsed, final String key, final String errorKey) {
+    final var value = parsed.get(key);
+    if (value != null && !(value instanceof String)) {
+      throw new BadRequestException(errorKey);
+    }
+    return (String) value;
   }
 
   private static String validateName(final String name) {
