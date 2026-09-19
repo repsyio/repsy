@@ -26,6 +26,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.generated.model.RepoPermissionInfo;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
+import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.dtos.PermissionInfo;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
@@ -64,24 +65,18 @@ public class ProtocolAuthService {
     return request.getHeader(HttpHeaders.AUTHORIZATION);
   }
 
-  public void handleBearerAuth(
-      final @NonNull String authHeader,
-      final @NonNull UUID repoId,
-      final @NonNull Permission permission) {
-
-    this.handleBearerAuth(authHeader, repoId, permission, TokenRealm.PROTOCOL);
-  }
-
   /**
-   * Authorizes a bearer JWT issued for the given realm. Protocol endpoints take {@link
-   * TokenRealm#PROTOCOL} tokens only; a caller that hands a UI session over to a protocol endpoint
-   * passes {@link TokenRealm#PANEL}.
+   * Authorizes a bearer JWT or deploy token. Protocol endpoints take protocol tokens only.
+   *
+   * <p>A JWT minted from a deploy token ({@link AuthenticationType#DEPLOY_TOKEN}) is authorized as
+   * that deploy token: bound to its repo, read-only and expiry checked. Its {@code username} claim
+   * is whatever the client typed into the Basic credentials, so it never identifies a user
+   * (RPS-979).
    */
   public void handleBearerAuth(
       final @NonNull String authHeader,
       final @NonNull UUID repoId,
-      final @NonNull Permission permission,
-      final @NonNull TokenRealm realm) {
+      final @NonNull Permission permission) {
 
     final var bearerToken = authHeader.substring(AUTH_BEARER.length());
 
@@ -89,7 +84,39 @@ public class ProtocolAuthService {
       return;
     }
 
-    this.authorizeJWTRequest(authHeader, permission, realm);
+    final var authenticationType =
+        this.jwtUtils.extractAuthenticationType(authHeader, TokenRealm.PROTOCOL);
+
+    if (authenticationType == AuthenticationType.DEPLOY_TOKEN) {
+      this.authorizeTokenRequestTokenId(
+          repoId, this.jwtUtils.extractUserId(authHeader, TokenRealm.PROTOCOL), permission);
+      return;
+    }
+
+    // A scanner token is repo-scoped and has no user; only Docker knows how to authorize it.
+    if (authenticationType == AuthenticationType.DOCKER_SCAN) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    this.authorizeJWTRequest(authHeader, permission);
+  }
+
+  /**
+   * Authorizes a read with a download token, which the web UI hands to a browser navigation because
+   * that cannot set an {@code Authorization} header. The token opens one path of one repo, for
+   * reads only; the caller was authorized when it asked for the token.
+   */
+  public void handleDownloadToken(
+      final @NonNull String token,
+      final @NonNull UUID repoId,
+      final @NonNull String path,
+      final @NonNull Permission permission) {
+
+    if (permission != Permission.READ) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    this.jwtUtils.verifyDownloadToken(token, repoId, path);
   }
 
   public void handleBasicAuth(
@@ -234,11 +261,9 @@ public class ProtocolAuthService {
   }
 
   private void authorizeJWTRequest(
-      final @NonNull String authHeader,
-      final @NonNull Permission permission,
-      final @NonNull TokenRealm realm) {
+      final @NonNull String authHeader, final @NonNull Permission permission) {
 
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, realm);
+    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
     final var userInfo = this.userTxService.getAuthenticatedUserByUsername(username);
 
     this.authorizeUser(userInfo, permission);

@@ -148,10 +148,7 @@ export class MavenBrowserComponent implements OnDestroy {
       this.updateRepoUrl();
       this.fetchCurrentRepoContent();
     } else {
-      const token = localStorage.getItem('token');
-      const fullPath = this.directoryStack[this.directoryStack.length - 1].path + fsItem.name;
-
-      location.href = `${environment.repoBaseUrl}/${this.activeRepo.repoName}` + `/${fullPath}?token=${token}`;
+      this.download(this.directoryStack[this.directoryStack.length - 1].path + fsItem.name);
     }
   }
 
@@ -180,6 +177,14 @@ export class MavenBrowserComponent implements OnDestroy {
 
   public formatBytes(bytes: number, decimals = 2): string {
     return ByteFormatter.formatBytes(bytes, decimals);
+  }
+
+  // A navigation cannot set an Authorization header, so the file is requested with a token that
+  // opens only this path for a minute, instead of the session's access token.
+  private download(fullPath: string): void {
+    this.mavenService.createDownloadToken(fullPath).subscribe((downloadToken) => {
+      location.href = `${environment.repoBaseUrl}/${this.activeRepo.repoName}${fullPath}?downloadToken=${encodeURIComponent(downloadToken)}`;
+    });
   }
 
   private fetchCurrentRepoContent(): void {

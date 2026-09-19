@@ -34,11 +34,13 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepository;
 import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
+import io.repsy.os.server.protocols.helm.shared.oci.services.HelmOciManifestService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestForm;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -131,6 +133,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   @MockitoBean private UsageUpdateService usageUpdateService;
   @Autowired private HelmChartService helmChartService;
   @Autowired private HelmChartRepository helmChartRepository;
+  @Autowired private HelmOciManifestService helmOciManifestService;
 
   // ---------------------------------------------------------------------------------------------
   // Fixtures: real chart archives, uploaded through the real Helm protocol handlers
@@ -447,6 +450,40 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     final var file = this.chartFile(repo, chartName, "tags");
     Files.createDirectories(file.getParent());
     Files.write(file, content);
+    this.entityManager.flush();
+    this.entityManager.clear();
+  }
+
+  /**
+   * Stores a chart together with an OCI manifest under {@code ociName}, the state a push under a
+   * name other than the {@code Chart.yaml} name left behind before RPS-978 rejected it.
+   */
+  private void seedOciManifestUnderOtherName(
+      final Repo repo, final String ociName, final String reference, final ChartSpec spec) {
+    final var content = "{}";
+    final var bytes = archive(spec);
+    final var chart =
+        this.helmChartService.findOrCreate(
+            HelmChartForm.builder()
+                .name(spec.name())
+                .version(spec.version())
+                .description(spec.description())
+                .appVersion(spec.appVersion())
+                .type("application")
+                .digest(sha256(bytes))
+                .size(bytes.length)
+                .build(),
+            repo.getId());
+    this.helmOciManifestService.save(
+        HelmOciManifestForm.builder()
+            .chartId(chart.id())
+            .name(ociName)
+            .reference(reference)
+            .digest(sha256(content.getBytes(StandardCharsets.UTF_8)))
+            .mediaType(OCI_MANIFEST_TYPE)
+            .content(content)
+            .build(),
+        repo.getId());
     this.entityManager.flush();
     this.entityManager.clear();
   }
@@ -1273,16 +1310,17 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     }
 
     /**
-     * The OCI name comes from the push path and is not checked against {@code Chart.yaml}, so tags
-     * can exist under a name no chart carries. They are still listed rather than answered 404.
+     * A push under a name other than the {@code Chart.yaml} name is rejected (RPS-978), but
+     * manifests stored before that check can carry such a name. They are still listed rather than
+     * answered 404.
      */
     @Test
-    @DisplayName("tags pushed under a name that differs from the chart name are listed")
+    @DisplayName("tags stored under a name that differs from the chart name are listed")
     void listsTagsOfNameDifferingFromChartName() throws Exception {
       final var it = HelmChartControllerIT.this;
       final var token = it.adminBearerToken();
       final var repo = it.helmRepo();
-      it.pushOci(repo, "alias", "1.0.0", ChartSpec.of("real-name", "1.0.0"), token);
+      it.seedOciManifestUnderOtherName(repo, "alias", "1.0.0", ChartSpec.of("real-name", "1.0.0"));
 
       assertThat(stringList(it.tags(repo, "alias", token))).containsExactly("1.0.0");
     }
@@ -1999,6 +2037,101 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       assertThat(push.getContentAsString(StandardCharsets.UTF_8))
           .contains("\"msgId\":\"chartAppVersionInvalid\"");
       assertThat(it.chartRowExists(repo, "payments")).isFalse();
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // OCI manifest push: path name vs Chart.yaml name (RPS-978)
+  // ---------------------------------------------------------------------------------------------
+
+  @Nested
+  @DisplayName("OCI manifest push name validation")
+  class OciPushNameValidation {
+
+    private static final String MISMATCH_TEXT =
+        "The chart name in Chart.yaml must match the name in the push path.";
+
+    private void expectMismatch(final MockHttpServletResponse push) throws Exception {
+      requireStatus(push, 400, "OCI manifest push");
+      final var body = push.getContentAsString(StandardCharsets.UTF_8);
+      assertThat((String) JsonPath.read(body, "$.msgId")).isEqualTo("chartNameMismatch");
+      assertThat((String) JsonPath.read(body, "$.text")).isEqualTo(MISMATCH_TEXT);
+    }
+
+    @Test
+    @DisplayName("a path name that differs from the Chart.yaml name is 400 and stores nothing")
+    void differingNameIsRejected() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      clearInvocations(it.usageUpdateService);
+
+      final var push =
+          it.putOciChart(
+              repo,
+              "alias",
+              "1.0.0",
+              archive(ChartSpec.of("real-name", "1.0.0")),
+              it.asProtocolBearer(token));
+
+      this.expectMismatch(push);
+      assertThat(it.chartRowExists(repo, "real-name")).isFalse();
+      assertThat(it.ociManifestFile(repo, "alias", "1.0.0")).doesNotExist();
+      expectChartNotFound(it.tagsRequest(repo, "alias", token));
+      verifyNoInteractions(it.usageUpdateService);
+    }
+
+    @Test
+    @DisplayName("a rejected push leaves the chart already stored under that name untouched")
+    void rejectedPushKeepsExistingChart() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.pushOci(repo, "payments", "1.0.0", ChartSpec.of("payments", "1.0.0"), token);
+
+      final var push =
+          it.putOciChart(
+              repo,
+              "payments",
+              "1.1.0",
+              archive(ChartSpec.of("orders", "1.1.0")),
+              it.asProtocolBearer(token));
+
+      this.expectMismatch(push);
+      assertThat(it.chartRowExists(repo, "orders")).isFalse();
+      assertThat(it.storedVersions(repo, "payments")).containsExactly("1.0.0");
+      assertThat(stringList(it.tags(repo, "payments", token))).containsExactly("1.0.0");
+    }
+
+    @Test
+    @DisplayName("a path name that only differs in case is rejected too")
+    void differingCaseIsRejected() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var repo = it.helmRepo();
+
+      final var push =
+          it.putOciChart(
+              repo,
+              "Payments",
+              "1.0.0",
+              archive(ChartSpec.of("payments", "1.0.0")),
+              it.adminProtocolBearerToken());
+
+      this.expectMismatch(push);
+      assertThat(it.chartRowExists(repo, "payments")).isFalse();
+    }
+
+    @Test
+    @DisplayName("a path name equal to the Chart.yaml name is accepted")
+    void matchingNameIsAccepted() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+
+      it.pushOci(repo, "payments", "1.0.0", ChartSpec.of("payments", "1.0.0"), token);
+
+      assertThat(it.storedVersions(repo, "payments")).containsExactly("1.0.0");
+      assertThat(stringList(it.tags(repo, "payments", token))).containsExactly("1.0.0");
     }
   }
 

@@ -78,6 +78,10 @@ export class MavenService {
       .pipe(map((r) => r.data as unknown as FsItemInfo[]));
   }
 
+  public createDownloadToken(path: string): Observable<string> {
+    return this.protocolRepoControllerService.createDownloadToken(path, this.repoName).pipe(map((r) => r.data!));
+  }
+
   public searchGroups(
     groupName: string,
     sortOption: Sort,

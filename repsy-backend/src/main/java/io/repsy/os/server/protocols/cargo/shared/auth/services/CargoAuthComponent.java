@@ -16,14 +16,12 @@
 package io.repsy.os.server.protocols.cargo.shared.auth.services;
 
 import static io.repsy.os.shared.auth.utils.AuthUtils.TIMEOUT_ACCESS_TOKEN;
-import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromAuthHeader;
 import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBearerToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.removeBasicPrefix;
 import static io.repsy.protocols.shared.repo.dtos.RepoType.CARGO;
 
-import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
@@ -31,15 +29,10 @@ import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
-import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.services.UserTxService;
-import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
-import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.Optional;
-import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -54,30 +47,6 @@ public class CargoAuthComponent extends ProtocolAuthService {
     super(userTxService, jwtUtils, deployTokenService);
   }
 
-  public void authorizeRequest(
-      final BaseRepoInfo<UUID> repoInfo,
-      final @Nullable String authHeader,
-      final Permission permission) {
-
-    final var authRequired = repoInfo.isPrivateRepo() || this.isWritePermissionRequired(permission);
-
-    if (!authRequired) {
-      if (authHeader != null) {
-        this.processAuthRequest(repoInfo, authHeader, permission);
-      }
-      return;
-    }
-
-    if (authHeader == null) {
-      if (repoInfo.isPrivateRepo()) {
-        throw new ItemNotFoundException("repoNotFound");
-      }
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    this.processAuthRequest(repoInfo, authHeader, permission);
-  }
-
   public String authenticateAndCreateToken(final String authHeader) {
 
     if (isBasicToken(authHeader)) {
@@ -85,6 +54,13 @@ public class CargoAuthComponent extends ProtocolAuthService {
     }
 
     if (isBearerToken(authHeader)) {
+      // Only a token issued to a user is renewed. A deploy-token JWT carries a username the client
+      // chose, so exchanging it would hand out the token of the user of that name (RPS-979).
+      if (this.jwtUtils.extractAuthenticationType(authHeader, TokenRealm.PROTOCOL)
+          != AuthenticationType.USERNAME_PASSWORD) {
+        throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      }
+
       final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
       final var userInfo = this.userTxService.getAuthenticatedUserByUsername(username);
       return this.jwtUtils.createProtocolToken(
@@ -92,50 +68,6 @@ public class CargoAuthComponent extends ProtocolAuthService {
     }
 
     throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-  }
-
-  private void processAuthRequest(
-      final BaseRepoInfo<UUID> repoInfo, final String authHeader, final Permission permission) {
-
-    // Cargo CLI sends tokens without a prefix — normalise to Bearer for uniform handling.
-    final var normalized =
-        (isBasicToken(authHeader) || isBearerToken(authHeader))
-            ? authHeader
-            : "Bearer " + authHeader;
-
-    final UserInfo userInfo;
-
-    if (isBasicToken(normalized)) {
-      userInfo = this.resolveBasicAuthUser(normalized);
-    } else {
-      userInfo = this.resolveBearerAuthUser(repoInfo, normalized);
-    }
-
-    this.authorizeUser(userInfo, permission);
-  }
-
-  private UserInfo resolveBasicAuthUser(final String authHeader) {
-
-    final var credentials = extractCredentialsFromAuthHeader(authHeader);
-
-    if (credentials == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    return this.authenticateWithPassword(credentials);
-  }
-
-  private @Nullable UserInfo resolveBearerAuthUser(
-      final BaseRepoInfo<UUID> repoInfo, final String authHeader) {
-
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
-    final var userInfoOpt = this.userTxService.getUserByUsernameOptional(username);
-
-    if (userInfoOpt.isEmpty() && repoInfo.isPrivateRepo()) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    return userInfoOpt.orElse(null);
   }
 
   private String authenticateBasicAndCreateToken(final String authHeader) {

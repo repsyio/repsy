@@ -173,8 +173,9 @@ public class HelmApiFacade implements ProtocolApiFacade {
   public List<String> getOciTags(final RepoInfo repoInfo, final String name) {
     final var tags = this.helmOciManifestService.listTagsByName(repoInfo.getStorageKey(), name);
 
-    // The OCI name comes from the request path and may differ from the name in Chart.yaml, so a
-    // chart only counts as unknown when it has neither tags nor a chart of that name.
+    // A push whose path name differs from the Chart.yaml name is rejected, but manifests stored
+    // before that check can still carry such a name, so a chart only counts as unknown when it has
+    // neither tags nor a chart of that name.
     if (tags.isEmpty()
         && !this.helmChartService.existsByRepoIdAndName(repoInfo.getStorageKey(), name)) {
       throw new ItemNotFoundException("chartNotFound");

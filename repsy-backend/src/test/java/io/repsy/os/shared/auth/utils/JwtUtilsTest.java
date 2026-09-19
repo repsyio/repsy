@@ -563,4 +563,115 @@ class JwtUtilsTest {
           .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
   }
+
+  @Test
+  @DisplayName("download token is accepted for the repo and path it was issued for")
+  void downloadTokenIsAcceptedForItsRepoAndPath() {
+    final var repoId = UUID.randomUUID();
+    final var token =
+        this.jwtUtils.createDownloadToken(repoId, "/com/example/lib.jar", Duration.ofMinutes(1));
+
+    this.jwtUtils.verifyDownloadToken(token, repoId, "/com/example/lib.jar");
+  }
+
+  @Test
+  @DisplayName("download token treats a doubled or missing leading slash as the same path")
+  void downloadTokenPathIsCanonical() {
+    final var repoId = UUID.randomUUID();
+    final var token =
+        this.jwtUtils.createDownloadToken(repoId, "/com/example/lib.jar", Duration.ofMinutes(1));
+
+    this.jwtUtils.verifyDownloadToken(token, repoId, "//com//example/lib.jar");
+    this.jwtUtils.verifyDownloadToken(token, repoId, "com/example/lib.jar");
+  }
+
+  @Test
+  @DisplayName("download token is rejected for another repo")
+  void downloadTokenIsRejectedForAnotherRepo() {
+    final var token =
+        this.jwtUtils.createDownloadToken(UUID.randomUUID(), "/lib.jar", Duration.ofMinutes(1));
+    final var otherRepoId = UUID.randomUUID();
+
+    assertThatThrownBy(() -> this.jwtUtils.verifyDownloadToken(token, otherRepoId, "/lib.jar"))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("download token is rejected for another path, including a sibling and a parent")
+  void downloadTokenIsRejectedForAnotherPath() {
+    final var repoId = UUID.randomUUID();
+    final var token =
+        this.jwtUtils.createDownloadToken(repoId, "/com/lib/a.jar", Duration.ofMinutes(1));
+
+    for (final var other : new String[] {"/com/lib/b.jar", "/com/lib", "/com/lib/a.jar/x", ""}) {
+      assertThatThrownBy(() -> this.jwtUtils.verifyDownloadToken(token, repoId, other))
+          .isInstanceOf(UnAuthorizedException.class)
+          .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+  }
+
+  @Test
+  @DisplayName("expired download token yields downloadTokenExpired")
+  void expiredDownloadTokenYieldsDownloadTokenExpired() {
+    final var repoId = UUID.randomUUID();
+    final var token = this.jwtUtils.createDownloadToken(repoId, "/lib.jar", Duration.ofSeconds(-1));
+
+    assertThatThrownBy(() -> this.jwtUtils.verifyDownloadToken(token, repoId, "/lib.jar"))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining("downloadTokenExpired");
+  }
+
+  @Test
+  @DisplayName("download token signed with a different secret is rejected")
+  void downloadTokenWithForeignSignatureIsRejected() {
+    final var repoId = UUID.randomUUID();
+    final var token =
+        JWT.create()
+            .withSubject(repoId.toString())
+            .withAudience(TokenRealm.DOWNLOAD.getAudience())
+            .withClaim("path", "/lib.jar")
+            .withExpiresAt(Instant.now().plus(Duration.ofMinutes(1)))
+            .sign(Algorithm.HMAC512("another-secret-another-secret-00000"));
+
+    assertThatThrownBy(() -> this.jwtUtils.verifyDownloadToken(token, repoId, "/lib.jar"))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("panel, protocol, refresh and claim-less tokens are not download tokens")
+  void otherTokensAreNotDownloadTokens() {
+    final var repoId = UUID.randomUUID();
+    final var tokens =
+        new String[] {
+          this.jwtUtils.createPanelAccessToken(repoId, "testuser", Duration.ofMinutes(1)),
+          this.jwtUtils.createProtocolToken(repoId, "testuser", Duration.ofMinutes(1)),
+          this.jwtUtils.createRepoScopedToken(repoId, "repo:pull", Duration.ofMinutes(1)),
+          this.jwtUtils.createRefreshToken(
+              repoId, "testuser", Duration.ofMinutes(1), SESSION_START, TOKEN_VERSION),
+          this.signedToken(repoId.toString(), null, null)
+        };
+
+    for (final var token : tokens) {
+      assertThatThrownBy(() -> this.jwtUtils.verifyDownloadToken(token, repoId, "/lib.jar"))
+          .isInstanceOf(UnAuthorizedException.class)
+          .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+  }
+
+  @Test
+  @DisplayName("download token is rejected on the panel and protocol sides")
+  void downloadTokenIsRejectedOnEveryBearerSide() {
+    final var header =
+        AuthUtils.AUTH_BEARER
+            + this.jwtUtils.createDownloadToken(
+                UUID.randomUUID(), "/lib.jar", Duration.ofMinutes(1));
+
+    for (final var realm : new TokenRealm[] {TokenRealm.PANEL, TokenRealm.PROTOCOL}) {
+      assertThatThrownBy(() -> this.jwtUtils.verify(header, realm))
+          .isInstanceOf(UnAuthorizedException.class)
+          .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+  }
 }

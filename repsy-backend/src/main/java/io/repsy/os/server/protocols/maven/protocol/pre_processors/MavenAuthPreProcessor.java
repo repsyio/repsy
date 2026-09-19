@@ -23,7 +23,6 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.maven.shared.auth.services.MavenAuthComponent;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
-import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -40,6 +39,12 @@ import org.springframework.stereotype.Component;
 public class MavenAuthPreProcessor extends ProtocolProcessor {
 
   private static final int PRIORITY = 100;
+
+  /**
+   * The web UI downloads a file by navigating to it, which cannot set an {@code Authorization}
+   * header, so it carries a short-lived download token for that one file in this parameter.
+   */
+  private static final @NonNull String DOWNLOAD_TOKEN_PARAMETER = "downloadToken";
 
   private static final String AUTH_BEARER = "Bearer ";
   private static final String AUTH_BASIC = "Basic ";
@@ -74,6 +79,19 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
+    final var permission = (Permission) properties.get(PERMISSION_KEY);
+    final var downloadToken = request.getParameter(DOWNLOAD_TOKEN_PARAMETER);
+
+    if (downloadToken != null) {
+      this.authComponent.handleDownloadToken(
+          downloadToken,
+          repoInfo.getStorageKey(),
+          ProtocolContextUtils.getRelativePath(context).getPath(),
+          permission);
+
+      return ProcessorResult.next();
+    }
+
     final var authHeader = this.authComponent.emulateAuthHeader(request);
 
     if (authHeader == null) {
@@ -83,9 +101,7 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
               .build());
     }
 
-    final var permission = (Permission) properties.get(PERMISSION_KEY);
-
-    this.authenticateRequest(authHeader, repoInfo.getStorageKey(), permission, request);
+    this.authenticateRequest(authHeader, repoInfo.getStorageKey(), permission);
 
     return ProcessorResult.next();
   }
@@ -93,26 +109,15 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
   private void authenticateRequest(
       final @NonNull String authHeader,
       final @NonNull UUID repoId,
-      final @NonNull Permission permission,
-      final @NonNull HttpServletRequest request) {
+      final @NonNull Permission permission) {
 
     switch (authHeader) {
       case final String header when header.startsWith(AUTH_BASIC) ->
           this.authComponent.handleBasicAuth(header, permission, repoId);
       case final String header when header.startsWith(AUTH_BEARER) ->
-          this.authComponent.handleBearerAuth(header, repoId, permission, realmOf(request));
+          this.authComponent.handleBearerAuth(header, repoId, permission);
       default -> throw new UnAuthorizedException("unAuthorized");
     }
-  }
-
-  /**
-   * The Maven browser in the web UI downloads a file by navigating to it with the session's access
-   * token in the {@code token} query parameter, because a navigation cannot set headers. Only that
-   * hand-off carries a panel token to a protocol endpoint; a bearer token in the {@code
-   * Authorization} header is a protocol token.
-   */
-  private static @NonNull TokenRealm realmOf(final @NonNull HttpServletRequest request) {
-    return request.getParameter("token") != null ? TokenRealm.PANEL : TokenRealm.PROTOCOL;
   }
 
   private boolean shouldSkipAuthentication(
