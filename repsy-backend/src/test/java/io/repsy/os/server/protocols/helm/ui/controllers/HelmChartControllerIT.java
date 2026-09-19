@@ -505,13 +505,15 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
         "chartsFetched");
   }
 
+  private ResultActions versionsRequest(final Repo repo, final String name, final String token)
+      throws Exception {
+    return this.perform(
+        get("/api/helm/charts/{repo}/{name}", repo.getName(), name).header(AUTHORIZATION, token));
+  }
+
   private String versions(final Repo repo, final String name, final String token) throws Exception {
     return expectSuccess(
-        this.perform(
-            get("/api/helm/charts/{repo}/{name}", repo.getName(), name)
-                .header(AUTHORIZATION, token)),
-        "chartVersionsFetched",
-        "chartVersionsFetched");
+        this.versionsRequest(repo, name, token), "chartVersionsFetched", "chartVersionsFetched");
   }
 
   private ResultActions detailRequest(
@@ -529,13 +531,16 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
         this.detailRequest(repo, name, version, token), "chartDetailFetched", "chartDetailFetched");
   }
 
+  private ResultActions tagsRequest(final Repo repo, final String name, final String token)
+      throws Exception {
+    return this.perform(
+        get("/api/helm/charts/{repo}/{name}/tags", repo.getName(), name)
+            .header(AUTHORIZATION, token));
+  }
+
   private String tags(final Repo repo, final String name, final String token) throws Exception {
     return expectSuccess(
-        this.perform(
-            get("/api/helm/charts/{repo}/{name}/tags", repo.getName(), name)
-                .header(AUTHORIZATION, token)),
-        "chartTagsFetched",
-        "chartTagsFetched");
+        this.tagsRequest(repo, name, token), "chartTagsFetched", "chartTagsFetched");
   }
 
   private ResultActions deleteVersionRequest(
@@ -911,13 +916,14 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
       final var body = it.versions(repo, "payments", token);
 
-      // The list is a plain, unpaged array; the service does not sort it, so compare as a set.
+      // The list is a plain, unpaged array, newest upload first.
       final var items = dataList(body);
-      assertThat(items).hasSize(3);
+      assertThat(items)
+          .extracting(item -> item.get("version"))
+          .containsExactly("1.2.0+build.5", "1.1.0-rc.1", "1.0.0");
       items.forEach(item -> assertInstantBetween(item.get("createdAt"), from, to));
 
       final var versions = byVersion(items);
-      assertThat(versions).containsOnlyKeys("1.0.0", "1.1.0-rc.1", "1.2.0+build.5");
 
       final var stableItem = versions.get("1.0.0");
       assertKeys(stableItem, VERSION_ITEM_KEYS);
@@ -980,19 +986,42 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     }
 
     /**
-     * The story expected an unknown chart to answer 404. It answers 200 with an empty list: {@code
-     * HelmChartService.findAllVersionsByName} maps a missing chart to an empty list, unlike the
-     * detail and delete endpoints, which answer 404 {@code chartNotFound}. Pinned as-is.
+     * The order is by upload time (newest first), the same notion of "latest" the chart list uses;
+     * it does not follow the semantic version, so an older release uploaded last comes first.
      */
     @Test
-    @DisplayName("an unknown chart is an empty list, not a 404")
-    void unknownChartIsEmptyList() throws Exception {
+    @DisplayName("lists the most recently uploaded version first, whatever its version number")
+    void newestUploadFirst() throws Exception {
       final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
       final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "2.0.0"), token);
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+      it.upload(repo, ChartSpec.of("payments", "1.5.0"), token);
 
-      final var body = it.versions(repo, "does-not-exist", it.userBearerToken());
+      final var items = dataList(it.versions(repo, "payments", token));
 
-      assertThat(dataList(body)).isEmpty();
+      assertThat(items)
+          .extracting(item -> item.get("version"))
+          .containsExactly("1.5.0", "1.0.0", "2.0.0");
+    }
+
+    @Test
+    @DisplayName("an unknown chart is 404 chartNotFound, like detail and delete")
+    void unknownChartIsNotFound() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      final var other = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+      it.upload(other, ChartSpec.of("elsewhere", "1.0.0"), token);
+
+      expectChartNotFound(it.versionsRequest(repo, "does-not-exist", it.userBearerToken()));
+      // A chart that exists only in another repo is not visible here.
+      expectChartNotFound(it.versionsRequest(repo, "elsewhere", token));
+      // The chart name is matched exactly: no prefix, no case folding.
+      expectChartNotFound(it.versionsRequest(repo, "pay", token));
+      expectChartNotFound(it.versionsRequest(repo, "PAYMENTS", token));
     }
   }
 
@@ -1145,12 +1174,9 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       assertThat(stringList(it.tags(other, "payments", token))).containsExactly("9.0.0");
     }
 
-    /**
-     * The story asks to pin "empty list vs 404" for a chart that was only uploaded the classic way
-     * and for an unknown chart: both are 200 with an empty list.
-     */
+    /** A chart that exists but was only uploaded the classic way has no tags: that is not a 404. */
     @Test
-    @DisplayName("a classic-only or unknown chart has an empty tag list, not a 404")
+    @DisplayName("a chart without OCI tags has an empty tag list")
     void noTagsIsEmptyList() throws Exception {
       final var it = HelmChartControllerIT.this;
       final var token = it.adminBearerToken();
@@ -1159,8 +1185,38 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       it.pushOci(repo, "oci", "1.0.0", ChartSpec.of("oci", "1.0.0"), token);
 
       assertThat(stringList(it.tags(repo, "classic", token))).isEmpty();
-      assertThat(stringList(it.tags(repo, "does-not-exist", token))).isEmpty();
       assertThat(stringList(it.tags(repo, "oci", token))).containsExactly("1.0.0");
+    }
+
+    @Test
+    @DisplayName("an unknown chart is 404 chartNotFound, unlike a chart without tags")
+    void unknownChartIsNotFound() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      final var other = it.helmRepo();
+      it.pushOci(repo, "payments", "1.0.0", ChartSpec.of("payments", "1.0.0"), token);
+      it.pushOci(other, "elsewhere", "1.0.0", ChartSpec.of("elsewhere", "1.0.0"), token);
+
+      expectChartNotFound(it.tagsRequest(repo, "does-not-exist", it.userBearerToken()));
+      // A chart that exists only in another repo is not visible here.
+      expectChartNotFound(it.tagsRequest(repo, "elsewhere", token));
+      expectChartNotFound(it.tagsRequest(repo, "PAYMENTS", token));
+    }
+
+    /**
+     * The OCI name comes from the push path and is not checked against {@code Chart.yaml}, so tags
+     * can exist under a name no chart carries. They are still listed rather than answered 404.
+     */
+    @Test
+    @DisplayName("tags pushed under a name that differs from the chart name are listed")
+    void listsTagsOfNameDifferingFromChartName() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.pushOci(repo, "alias", "1.0.0", ChartSpec.of("real-name", "1.0.0"), token);
+
+      assertThat(stringList(it.tags(repo, "alias", token))).containsExactly("1.0.0");
     }
 
     /**
@@ -1249,7 +1305,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       assertThat(it.storedVersions(repo, "payments")).isEmpty();
       assertThat(it.chartRowExists(repo, "orders")).isTrue();
       assertThat(namesOf(it.search(repo, token))).containsExactly("orders");
-      assertThat(dataList(it.versions(repo, "payments", token))).isEmpty();
+      expectChartNotFound(it.versionsRequest(repo, "payments", token));
       assertThat(it.indexYaml(repo)).doesNotContain("payments-1.0.0.tgz");
     }
 
@@ -1350,7 +1406,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       assertThat(it.chartRowExists(repo, "orders")).isTrue();
       assertThat(Files.exists(it.chartFile(repo, "orders", "0.1.0"))).isTrue();
       assertThat(namesOf(it.search(repo, token))).containsExactly("orders");
-      assertThat(dataList(it.versions(repo, "payments", token))).isEmpty();
+      expectChartNotFound(it.versionsRequest(repo, "payments", token));
     }
 
     @Test
@@ -1365,7 +1421,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
       expectDeleted(it.deleteAllRequest(repo, "payments", token));
 
-      assertThat(stringList(it.tags(repo, "payments", token))).isEmpty();
+      expectChartNotFound(it.tagsRequest(repo, "payments", token));
       assertThat(Files.exists(it.ociManifestFile(repo, "payments", "1.0.0"))).isFalse();
       assertThat(Files.exists(it.ociManifestFile(repo, "payments", "latest"))).isFalse();
       assertThat(stringList(it.tags(repo, "orders", token))).containsExactly("0.1.0");
@@ -1414,7 +1470,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     VERSIONS(
         false,
         "chartVersionsFetched",
-        200,
+        404,
         name -> get("/api/helm/charts/{repo}/{name}", name, "payments")),
     DETAIL(
         false,
@@ -1424,7 +1480,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     TAGS(
         false,
         "chartTagsFetched",
-        200,
+        404,
         name -> get("/api/helm/charts/{repo}/{name}/tags", name, "payments")),
     DELETE_ALL(
         true,
@@ -1609,8 +1665,8 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
     /**
      * The endpoints do not check the repo type ({@code @RepoOperation} defaults to every scope), so
-     * a repo of another type answers as an empty Helm repo: lists are empty, lookups and deletes
-     * are 404 chartNotFound. Pinned as-is.
+     * a repo of another type answers as an empty Helm repo: the chart list is empty, every
+     * per-chart endpoint is 404 chartNotFound. Pinned as-is.
      */
     @ParameterizedTest(name = "{0}")
     @EnumSource(Endpoint.class)
