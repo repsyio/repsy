@@ -16,7 +16,9 @@
 package io.repsy.protocols.ruby.shared.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -132,5 +134,49 @@ class GemspecParserTest {
 
     assertThat(metadata.getRuntimeDependencies()).isEmpty();
     assertThat(metadata.getDevelopmentDependencies()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("parse() rejects a global tag that would instantiate an arbitrary class")
+  void rejectsGlobalTagOnMapping() throws IOException {
+    final var yaml =
+        HEADER
+            + """
+            extensions: !!javax.script.ScriptEngineManager
+              key: value
+            """;
+
+    assertThatThrownBy(() -> GemspecParser.parse(gem(yaml)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("invalidGemFile");
+  }
+
+  @Test
+  @DisplayName("parse() rejects a global tag with a constructor argument list")
+  void rejectsGlobalTagOnSequence() throws IOException {
+    final var yaml =
+        HEADER
+            + """
+            extensions: !!java.net.URL ["http://localhost/"]
+            """;
+
+    assertThatThrownBy(() -> GemspecParser.parse(gem(yaml)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("invalidGemFile");
+  }
+
+  @Test
+  @DisplayName("parse() rejects a global tag written in verbatim form")
+  void rejectsVerbatimGlobalTag() throws IOException {
+    final var yaml =
+        HEADER
+            + """
+            extensions: !<tag:yaml.org,2002:javax.script.ScriptEngineManager>
+              key: value
+            """;
+
+    assertThatThrownBy(() -> GemspecParser.parse(gem(yaml)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("invalidGemFile");
   }
 }
