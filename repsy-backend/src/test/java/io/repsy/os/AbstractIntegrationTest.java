@@ -19,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.algorithms.Algorithm;
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -34,9 +36,13 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.TemporalAmount;
+import java.util.Base64;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -50,6 +56,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -187,6 +194,11 @@ public abstract class AbstractIntegrationTest {
     return this.mockMvc.perform(request.with(apiPort()));
   }
 
+  protected static String basicAuth(final String username, final String password) {
+    final var raw = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
+    return "Basic " + Base64.getEncoder().encodeToString(raw);
+  }
+
   protected static String randomTag() {
     return UUID.randomUUID().toString().replace("-", "").substring(0, 8);
   }
@@ -223,12 +235,59 @@ public abstract class AbstractIntegrationTest {
 
   protected String bearerTokenFor(final UUID userId, final String username) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofMinutes(30));
+        + this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofMinutes(30));
+  }
+
+  /** A token of the kind package managers hold (npm, Cargo, Docker), which the panel rejects. */
+  protected String protocolBearerTokenFor(final User user) {
+    return AuthUtils.AUTH_BEARER
+        + this.jwtUtils.createProtocolToken(
+            user.getId(), user.getUsername(), Duration.ofMinutes(30));
+  }
+
+  /** Creates a fresh, non-seeded ADMIN and returns a protocol token for it. */
+  protected String adminProtocolBearerToken() {
+    return this.protocolBearerTokenFor(this.createUser(uniqueUsername("admin"), UserRole.ADMIN));
+  }
+
+  /**
+   * Re-issues a panel bearer header as a protocol one for the same user. Suites that seed data
+   * through a wire protocol and then read it through the panel API hold one panel token, but the
+   * protocol endpoints no longer take it.
+   */
+  protected String asProtocolBearer(final String panelBearer) {
+    final var decoded = JWT.decode(panelBearer.substring(AuthUtils.AUTH_BEARER.length()));
+
+    return AuthUtils.AUTH_BEARER
+        + this.jwtUtils.createProtocolToken(
+            UUID.fromString(decoded.getSubject()),
+            decoded.getClaim("username").asString(),
+            Duration.ofMinutes(30));
+  }
+
+  /**
+   * A signed token without an {@code aud} claim, like every token issued before tokens carried a
+   * realm.
+   */
+  protected String claimlessToken(
+      final UUID userId, final String username, final TemporalAmount ttl) {
+    final var secret = (String) ReflectionTestUtils.getField(this.jwtUtils, "secret");
+
+    return JWT.create()
+        .withSubject(userId.toString())
+        .withClaim("username", username)
+        .withExpiresAt(Instant.now().plus(ttl))
+        .sign(Algorithm.HMAC512(secret));
+  }
+
+  protected String claimlessBearerTokenFor(final User user) {
+    return AuthUtils.AUTH_BEARER
+        + this.claimlessToken(user.getId(), user.getUsername(), Duration.ofMinutes(30));
   }
 
   protected String expiredBearerTokenFor(final User user) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(
+        + this.jwtUtils.createPanelAccessToken(
             user.getId(), user.getUsername(), Duration.ofSeconds(-30));
   }
 

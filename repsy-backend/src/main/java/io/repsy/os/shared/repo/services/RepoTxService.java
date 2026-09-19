@@ -84,6 +84,10 @@ public class RepoTxService {
     return this.mapToRepoInfo(this.findRepoOrThrowException(this.repoRepository.findByName(name)));
   }
 
+  public @NonNull Optional<RepoInfo> findRepoByName(final @NonNull String name) {
+    return this.repoRepository.findByName(name).map(this::mapToRepoInfo);
+  }
+
   public @NonNull Optional<RepoInfo> getRepoByNameAndType(
       final @NonNull String name, final @NonNull RepoType type) {
     return this.repoRepository.findByNameAndType(name, type).map(this::mapToRepoInfo);

@@ -57,4 +57,12 @@ public class User {
 
   @Column(name = "last_login_at")
   private Instant lastLoginAt;
+
+  /** Embedded in refresh tokens; bumping it revokes every refresh token issued before. */
+  @Column(name = "token_version", nullable = false)
+  private int tokenVersion;
+
+  public void revokeRefreshTokens() {
+    this.tokenVersion++;
+  }
 }

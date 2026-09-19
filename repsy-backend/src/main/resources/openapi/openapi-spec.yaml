@@ -1107,42 +1107,6 @@ paths:
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/{ignoredScope}":
-    get:
-      tags:
-        - npm-package-api-controller
-      operationId: listScopedNpmPackages
-      parameters:
-        - name: ignoredScope
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: name
-          in: query
-          required: false
-          schema:
-            type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
-      summary: List artifact groups in a Maven repository
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
   "/api/npm/packages/{repoName}/scope":
     get:
       tags:
@@ -2809,6 +2773,9 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponseVulnerabilityScanInfo"
       summary: Manually trigger a vulnerability re-scan for an artifact version
+      description: >-
+        Scans the version regardless of the repository's `securityScanEnabled` setting: that setting
+        only governs the automatic scan on push, and a manual scan is an explicit override.
     parameters:
       - name: repoName
         in: path
@@ -2928,7 +2895,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoSecurityDetail"
-      summary: Get a repo-wide severity breakdown (each artifact-version's latest scan) plus its most recently scanned versions
+      summary: Get a repo-wide severity breakdown (each artifact-version's latest completed scan) plus its most recently scanned versions
     parameters:
       - name: repoName
         in: path
@@ -2953,7 +2920,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseRepoSecurityDetail"
-      summary: Get one artifact's severity breakdown (each version's latest scan) plus its most recently scanned versions
+      summary: Get one artifact's severity breakdown (each version's latest completed scan) plus its most recently scanned versions
     parameters:
       - name: repoName
         in: path
@@ -2987,7 +2954,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseSecuritySummary"
-      summary: Get the worst known severity per repo, across all of that repo's scans (not just the latest scan)
+      summary: Get the worst known severity per repo, across each artifact version's latest completed scan
   "/api/security/scans":
     get:
       tags:
@@ -3041,7 +3008,9 @@ paths:
         '400':
           description: Invalid paging parameter (page below 0, size outside 1-100, or not a number)
         '401':
-          description: Missing or invalid token, or the authenticated user is not an admin
+          description: Missing or invalid token
+        '403':
+          description: Admin role required
       summary: List vulnerability scans across all repositories, filterable by severity/repoType/repoName
   "/api/security/scans/summary":
     get:
@@ -3072,8 +3041,10 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponseSecurityScansSummary"
         '401':
-          description: Missing or invalid token, or the authenticated user is not an admin
-      summary: Get the system-wide severity distribution (each artifact-version's latest scan), filterable by repoType/repoName, independent of the scans list's severity filter
+          description: Missing or invalid token
+        '403':
+          description: Admin role required
+      summary: Get the system-wide severity distribution (each artifact-version's latest completed scan), filterable by repoType/repoName, independent of the scans list's severity filter
   "/api/security/supported-repo-types":
     get:
       tags:
@@ -3371,6 +3342,9 @@ components:
         securityScanEnabled:
           type: boolean
           nullable: false
+          description: >-
+            Whether newly pushed versions are scanned automatically. Manually triggered scans ignore
+            this setting.
         type:
           "$ref": "#/components/schemas/RepoType"
     RepoSettingsForm:
@@ -3391,6 +3365,9 @@ components:
         securityScanEnabled:
           type: boolean
           nullable: false
+          description: >-
+            Whether newly pushed versions are scanned automatically. Manually triggered scans ignore
+            this setting.
     RestResponseVoid:
       type: object
       properties:
@@ -3501,7 +3478,7 @@ components:
           minLength: 1
         username:
           type: string
-          maxLength: 150
+          maxLength: 80
           minLength: 0
         description:
           type: string
@@ -3797,6 +3774,9 @@ components:
         securityScanEnabled:
           type: boolean
           nullable: false
+          description: >-
+            Whether newly pushed versions are scanned automatically. Manually triggered scans ignore
+            this setting.
       required:
         - privateRepo
         - allowOverride

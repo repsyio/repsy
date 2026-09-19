@@ -32,4 +32,5 @@ public class UserInfo {
   private UserRole role;
   private Instant createdAt;
   private Instant lastLoginAt;
+  private int tokenVersion;
 }

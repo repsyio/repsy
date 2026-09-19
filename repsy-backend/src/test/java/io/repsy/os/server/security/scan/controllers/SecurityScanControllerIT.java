@@ -40,12 +40,14 @@ import io.repsy.os.server.security.scanner.dtos.ScannerFinding;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
+import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import jakarta.persistence.EntityManagerFactory;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -63,6 +65,8 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -179,6 +183,8 @@ class SecurityScanControllerIT {
   @DynamicPropertySource
   static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
     registry.add("storage-gateway.fs.base-path", SecurityScanControllerIT::tempStoragePath);
+    // Lets the query-count tests read the number of statements a request ran.
+    registry.add("spring.jpa.properties.hibernate.generate_statistics", () -> "true");
   }
 
   private static String tempStoragePath() {
@@ -226,6 +232,7 @@ class SecurityScanControllerIT {
   @Autowired private RepoRepository repoRepository;
   @Autowired private VulnerabilityScanRepository scanRepository;
   @Autowired private VulnerabilityScanTxService scanTxService;
+  @Autowired private EntityManagerFactory entityManagerFactory;
   @MockitoSpyBean private VulnerabilityScannerRegistry scannerRegistry;
 
   private final List<UUID> createdUserIds = new ArrayList<>();
@@ -303,13 +310,13 @@ class SecurityScanControllerIT {
 
   private String bearerTokenFor(final UUID userId, final String username) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofMinutes(30));
+        + this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofMinutes(30));
   }
 
   private String expiredBearerTokenFor(final String username) {
     final var userId = this.userRepository.findByUsername(username).orElseThrow().getId();
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofSeconds(-30));
+        + this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofSeconds(-30));
   }
 
   /** A valid bearer token for the {@code admin} user that the application seeds at startup. */
@@ -409,6 +416,20 @@ class SecurityScanControllerIT {
     return scanId;
   }
 
+  private UUID queuedScan(
+      final TestRepo repo, final String artifact, final String version, final Instant createdAt) {
+
+    final var scanId =
+        this.scanTxService.createPendingScan(repo.id(), artifact, version, SCANNER_NAME);
+    this.scanTxService.markQueued(scanId);
+    this.pinCreatedAt(scanId, createdAt);
+    return scanId;
+  }
+
+  private Statistics hibernateStatistics() {
+    return this.entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+  }
+
   private static Instant at(final int minutesAfterBase) {
     return BASE_TIME.plus(minutesAfterBase, ChronoUnit.MINUTES);
   }
@@ -440,17 +461,13 @@ class SecurityScanControllerIT {
     return expectSuccess(result, "scansFetched", "Vulnerability scans fetched.");
   }
 
-  /**
-   * {@code scansSummaryFetched} and {@code supportedRepoTypesFetched} have no entry in
-   * messages.properties, so {@code text} is the raw key. Pinned as current behavior; RPS-895 adds
-   * the sentences and this text then changes.
-   */
   private static String expectSummary(final ResultActions result) throws Exception {
-    return expectSuccess(result, "scansSummaryFetched", "scansSummaryFetched");
+    return expectSuccess(result, "scansSummaryFetched", "Vulnerability scans summary fetched.");
   }
 
   private static String expectSupportedRepoTypes(final ResultActions result) throws Exception {
-    return expectSuccess(result, "supportedRepoTypesFetched", "supportedRepoTypesFetched");
+    return expectSuccess(
+        result, "supportedRepoTypesFetched", "Supported repository types fetched.");
   }
 
   /** Asserts a complete ERROR envelope, including the generated {@code errorCode} UUID. */
@@ -481,7 +498,7 @@ class SecurityScanControllerIT {
   private static void expectAccessNotAllowed(final ResultActions result) throws Exception {
     expectError(
         result,
-        HttpStatus.FORBIDDEN,
+        HttpStatus.UNAUTHORIZED,
         "accessNotAllowed",
         "accessNotAllowed",
         "Access isn't allowed.");
@@ -577,11 +594,11 @@ class SecurityScanControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("adminEndpoints")
-    @DisplayName("returns 403 when the Authorization header is missing")
+    @DisplayName("returns 401 when the Authorization header is missing")
     void missingAuthorizationHeader(final String path) throws Exception {
       expectError(
           SecurityScanControllerIT.this.perform(get(path)),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "missingRequestHeader",
           "Authorization",
           "A required request header is missing.");
@@ -589,7 +606,7 @@ class SecurityScanControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("adminEndpoints")
-    @DisplayName("returns 403 for a header without a Bearer prefix")
+    @DisplayName("returns 401 for a header without a Bearer prefix")
     void nonBearerAuthorizationHeader(final String path) throws Exception {
       expectAccessNotAllowed(
           SecurityScanControllerIT.this.perform(get(path).header(AUTHORIZATION, "Basic dXNlcjpw")));
@@ -597,7 +614,7 @@ class SecurityScanControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("adminEndpoints")
-    @DisplayName("returns 403 for a malformed/garbage bearer token")
+    @DisplayName("returns 401 for a malformed/garbage bearer token")
     void malformedBearerToken(final String path) throws Exception {
       expectAccessNotAllowed(
           SecurityScanControllerIT.this.perform(
@@ -606,13 +623,13 @@ class SecurityScanControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("adminEndpoints")
-    @DisplayName("returns 403 sessionExpired for an expired token")
+    @DisplayName("returns 401 sessionExpired for an expired token")
     void expiredToken(final String path) throws Exception {
       final var token = SecurityScanControllerIT.this.expiredBearerTokenFor(SEEDED_ADMIN_USERNAME);
 
       expectError(
           SecurityScanControllerIT.this.perform(get(path).header(AUTHORIZATION, token)),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "sessionExpired",
           "sessionExpired",
           "Session expired.");
@@ -620,14 +637,14 @@ class SecurityScanControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("adminEndpoints")
-    @DisplayName("returns 401 accessDenied for an authenticated non-admin caller")
+    @DisplayName("returns 403 accessDenied for an authenticated non-admin caller")
     void nonAdminCaller(final String path) throws Exception {
       final var username = SecurityScanControllerIT.this.createUser(UserRole.USER);
       final var token = SecurityScanControllerIT.this.bearerTokenFor(username);
 
       expectError(
           SecurityScanControllerIT.this.perform(get(path).header(AUTHORIZATION, token)),
-          HttpStatus.UNAUTHORIZED,
+          HttpStatus.FORBIDDEN,
           "accessDenied",
           "accessDenied",
           "Access Denied. Please check your credentials.");
@@ -1374,6 +1391,83 @@ class SecurityScanControllerIT {
       assertThat(artifactVersions(minSize)).containsExactly("v3");
       assertPage(minSize, 1, 0, 3, 3);
     }
+
+    // -------------------------------------------------------------------------------------------
+    // Query count (RPS-909)
+    // -------------------------------------------------------------------------------------------
+
+    /** Seeds one scan in each of {@code repos}, newest last, and returns the repos. */
+    private List<TestRepo> seedScansAcross(final List<TestRepo> repos) {
+      IntStream.range(0, repos.size())
+          .forEach(
+              i -> SecurityScanControllerIT.this.completedScan(repos.get(i), "a", "v" + i, at(i)));
+      return repos;
+    }
+
+    private List<TestRepo> createRepos(final int count, final RepoType type) {
+      return IntStream.range(0, count)
+          .mapToObj(i -> SecurityScanControllerIT.this.createRepo(type))
+          .toList();
+    }
+
+    /** Runs the request and returns how many JDBC statements Hibernate prepared for it. */
+    private long statementsFor(final String token, final Map<String, String> params)
+        throws Exception {
+      final var statistics = SecurityScanControllerIT.this.hibernateStatistics();
+      statistics.clear();
+      expectScans(SecurityScanControllerIT.this.getScans(token, params));
+      assertThat(statistics.getEntityStatistics(Repo.class.getName()).getFetchCount())
+          .as("repositories loaded lazily, one query each")
+          .isZero();
+      return statistics.getPrepareStatementCount();
+    }
+
+    @Test
+    @DisplayName("loads a page of scans from many repositories in a constant number of queries")
+    void constantQueryCountAcrossRepositories() throws Exception {
+      final var token = SecurityScanControllerIT.this.adminBearerToken();
+      final var params = Map.of("size", "10");
+
+      final var oneRepo = SecurityScanControllerIT.this.createRepo(RepoType.MAVEN);
+      IntStream.range(0, 10)
+          .forEach(i -> SecurityScanControllerIT.this.completedScan(oneRepo, "a", "v" + i, at(i)));
+      final var singleRepoStatements = this.statementsFor(token, params);
+
+      SecurityScanControllerIT.this.scanRepository.deleteAll();
+      final var repos = this.seedScansAcross(this.createRepos(10, RepoType.MAVEN));
+      final var manyReposStatements = this.statementsFor(token, params);
+
+      final var body = expectScans(SecurityScanControllerIT.this.getScans(token, params));
+      assertThat(content(body))
+          .extracting(scan -> scan.get("repoName"), scan -> scan.get("repoType"))
+          .containsExactlyElementsOf(
+              repos.reversed().stream().map(r -> tuple(r.name(), r.type().name())).toList());
+
+      // The caller lookup, the page query and the count query, whatever the repositories.
+      assertThat(manyReposStatements).isEqualTo(singleRepoStatements).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("keeps the query count constant when a repository filter applies")
+    void constantQueryCountWithFilter() throws Exception {
+      final var token = SecurityScanControllerIT.this.adminBearerToken();
+      this.seedScansAcross(this.createRepos(10, RepoType.NPM));
+      SecurityScanControllerIT.this.completedScan(
+          SecurityScanControllerIT.this.createRepo(RepoType.MAVEN), "a", "other", at(100));
+
+      final var statements =
+          this.statementsFor(token, Map.of("size", "5", "repoType", RepoType.NPM.name()));
+
+      final var body =
+          expectScans(
+              SecurityScanControllerIT.this.getScans(
+                  token, Map.of("size", "5", "repoType", RepoType.NPM.name())));
+      assertThat(content(body))
+          .hasSize(5)
+          .allSatisfy(s -> assertThat(s).containsEntry("repoType", "NPM"));
+      assertPage(body, 5, 0, 10, 2);
+      assertThat(statements).isEqualTo(3);
+    }
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -1435,15 +1529,15 @@ class SecurityScanControllerIT {
     }
 
     @Test
-    @DisplayName("counts only the latest scan of each artifact version")
+    @DisplayName("counts only the latest completed scan of each artifact version")
     void supersededScansAreIgnored() throws Exception {
       final var t = SecurityScanControllerIT.this;
       final var repo = t.createRepo(RepoType.MAVEN);
       // 1.0 was rescanned: only the newer result counts.
       t.completedScan(repo, "a", "1.0", at(1), t.findings(Severity.CRITICAL, Severity.CRITICAL));
       t.completedScan(repo, "a", "1.0", at(2), t.findings(Severity.LOW));
-      // 2.0 was rescanned and the newer scan failed: it has no findings, so none count. Pinned as
-      // current behavior; RPS-896 questions it (the earlier findings arguably still apply).
+      // 2.0 was rescanned and the newer scan failed: the earlier completed scan's findings still
+      // apply.
       t.completedScan(repo, "a", "2.0", at(3), t.findings(Severity.HIGH));
       t.failedScan(repo, "a", "2.0", at(4));
       // 3.0 has a single scan.
@@ -1451,7 +1545,44 @@ class SecurityScanControllerIT {
 
       final var body = expectSummary(t.getSummary(t.adminBearerToken()));
 
-      assertSummary(body, 0, 0, 1, 1, 0);
+      assertSummary(body, 0, 1, 1, 1, 0);
+    }
+
+    @Test
+    @DisplayName("keeps the last completed findings while a rescan is not completed")
+    void unfinishedRescansKeepTheLastKnownFindings() throws Exception {
+      final var t = SecurityScanControllerIT.this;
+      final var repo = t.createRepo(RepoType.MAVEN);
+      final var artifact = "a";
+
+      // Pending rescan: earlier completed scan's findings still count.
+      t.completedScan(repo, artifact, "pending", at(1), t.findings(Severity.HIGH));
+      t.pendingScan(repo, artifact, "pending", at(2));
+
+      // Queued rescan: earlier completed scan's findings still count.
+      t.completedScan(repo, artifact, "queued", at(1), t.findings(Severity.HIGH));
+      t.queuedScan(repo, artifact, "queued", at(2));
+
+      // Running rescan: earlier completed scan's findings still count.
+      t.completedScan(repo, artifact, "running", at(1), t.findings(Severity.HIGH));
+      t.runningScan(repo, artifact, "running", at(2));
+
+      // Failed rescan: earlier completed scan's findings still count.
+      t.completedScan(repo, artifact, "failed", at(1), t.findings(Severity.HIGH));
+      t.failedScan(repo, artifact, "failed", at(2));
+
+      // Only failed scans, no completed: contributes nothing.
+      t.failedScan(repo, artifact, "never-completed", at(3));
+
+      // Multiple completed scans: only the latest one counts.
+      t.completedScan(
+          repo, artifact, "completed-after-failure", at(1), t.findings(Severity.CRITICAL));
+      t.failedScan(repo, artifact, "completed-after-failure", at(2));
+      t.completedScan(repo, artifact, "completed-after-failure", at(3), t.findings(Severity.LOW));
+
+      final var body = expectSummary(t.getSummary(t.adminBearerToken()));
+
+      assertSummary(body, 0, 4, 0, 1, 0);
     }
 
     @Test

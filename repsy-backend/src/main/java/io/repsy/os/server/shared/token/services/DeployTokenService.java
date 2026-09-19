@@ -55,13 +55,7 @@ public class DeployTokenService {
   public @NonNull Page<DeployTokenInfoListItem> getDeployTokensByRepoInfo(
       final @NonNull UUID repoId, final @NonNull Pageable pageable) {
 
-    final var repoDeployTokens = this.deployTokenRepository.findAllByRepoId(repoId, pageable);
-
-    if (repoDeployTokens.isEmpty()) {
-      return Page.empty();
-    }
-
-    return repoDeployTokens;
+    return this.deployTokenRepository.findAllByRepoId(repoId, pageable);
   }
 
   public @NonNull Optional<DeployTokenInfo> findByTokenAndRepoType(

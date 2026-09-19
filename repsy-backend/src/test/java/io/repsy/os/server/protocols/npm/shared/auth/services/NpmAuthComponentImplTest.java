@@ -1,0 +1,89 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.repsy.os.server.protocols.npm.shared.auth.services;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
+import io.repsy.os.server.shared.token.services.DeployTokenService;
+import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.os.shared.user.dtos.UserInfo;
+import io.repsy.os.shared.user.entities.UserRole;
+import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.util.Optional;
+import java.util.UUID;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
+/** RPS-906: `npm login` must not reveal whether the username exists. */
+@DisplayName("NpmAuthComponentImpl")
+class NpmAuthComponentImplTest {
+
+  private static final String USERNAME = "alice";
+  private static final String PASSWORD = "s3cret";
+  private static final String SALT = "salt";
+
+  private final UserTxService userTxService = Mockito.mock(UserTxService.class);
+
+  private final NpmAuthComponentImpl authComponent =
+      new NpmAuthComponentImpl(
+          this.userTxService, Mockito.mock(JwtUtils.class), Mockito.mock(DeployTokenService.class));
+
+  private final BaseRepoInfo<UUID> repo =
+      BaseRepoInfo.<UUID>builder().name("npm").storageKey(UUID.randomUUID()).build();
+
+  private static void assertUnauthorized(final ThrowingCallable call) {
+    assertThatThrownBy(call)
+        .isExactlyInstanceOf(UnAuthorizedException.class)
+        .hasMessage(ErrorConstants.UN_AUTHORIZED);
+  }
+
+  @BeforeEach
+  void seedUser() {
+    final var alice =
+        UserInfo.builder()
+            .id(UUID.randomUUID())
+            .username(USERNAME)
+            .salt(SALT)
+            .hash(DigestUtils.sha256Hex(PASSWORD + SALT))
+            .role(UserRole.USER)
+            .build();
+    when(this.userTxService.getUserByUsernameOptional(USERNAME)).thenReturn(Optional.of(alice));
+  }
+
+  @Test
+  @DisplayName("authenticateRepoUser answers unAuthorized for an unknown user")
+  void unknownUser() {
+    assertUnauthorized(() -> this.authComponent.authenticateRepoUser(this.repo, "ghost", "x"));
+    verify(this.userTxService, never()).getUserByUsername(anyString());
+  }
+
+  @Test
+  @DisplayName("authenticateRepoUser answers unAuthorized for a wrong password")
+  void wrongPassword() {
+    assertUnauthorized(() -> this.authComponent.authenticateRepoUser(this.repo, USERNAME, "wrong"));
+  }
+}

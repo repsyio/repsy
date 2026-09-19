@@ -234,6 +234,10 @@ public final class NuGetPackageUtils {
     }
   }
 
+  public static String toDependenciesJson(final List<NuGetDependencyInfo> dependencies) {
+    return OBJECT_MAPPER.writeValueAsString(dependencies);
+  }
+
   public static List<NuGetDependencyInfo> parseDependenciesJson(@Nullable final String json) {
     if (json == null || json.isBlank()) {
       return List.of();

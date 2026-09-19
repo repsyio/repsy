@@ -74,9 +74,15 @@ public class HelmApiFacade implements ProtocolApiFacade {
 
   @Transactional(readOnly = true)
   public List<HelmChartVersionItem> getVersions(final RepoInfo repoInfo, final String name) {
-    return this.helmChartService.findAllVersionsByName(repoInfo.getStorageKey(), name).stream()
-        .map(this.helmChartMapper::toVersionItem)
-        .toList();
+    final var versions =
+        this.helmChartService.findAllVersionsByName(repoInfo.getStorageKey(), name);
+
+    // A chart is removed together with its last version, so no versions means no such chart.
+    if (versions.isEmpty()) {
+      throw new ItemNotFoundException("chartNotFound");
+    }
+
+    return versions.stream().map(this.helmChartMapper::toVersionItem).toList();
   }
 
   @Transactional(readOnly = true)
@@ -164,6 +170,15 @@ public class HelmApiFacade implements ProtocolApiFacade {
 
   @Transactional(readOnly = true)
   public List<String> getOciTags(final RepoInfo repoInfo, final String name) {
-    return this.helmOciManifestService.listTagsByName(repoInfo.getStorageKey(), name);
+    final var tags = this.helmOciManifestService.listTagsByName(repoInfo.getStorageKey(), name);
+
+    // The OCI name comes from the request path and may differ from the name in Chart.yaml, so a
+    // chart only counts as unknown when it has neither tags nor a chart of that name.
+    if (tags.isEmpty()
+        && !this.helmChartService.existsByRepoIdAndName(repoInfo.getStorageKey(), name)) {
+      throw new ItemNotFoundException("chartNotFound");
+    }
+
+    return tags;
   }
 }

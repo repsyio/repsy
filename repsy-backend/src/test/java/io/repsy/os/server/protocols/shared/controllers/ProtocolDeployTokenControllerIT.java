@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.shared.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -96,8 +95,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * <p>Several assertions pin behavior that is surprising rather than desirable; each is called out
  * in the test's display name or comment so a future fix shows up as a deliberate test change:
  * deploy tokens are persisted as SHA-256 hashes, {@code DeployTokenForm} has no name pattern or
- * permission field, token names are not unique per repo, and the list endpoint answers a page past
- * the end (and an empty repo) with a synthetic empty page.
+ * permission field, and token names are not unique per repo.
  */
 @Testcontainers
 @AutoConfigureMockMvc
@@ -115,6 +113,7 @@ class ProtocolDeployTokenControllerIT {
   private static final String DEPLOY_TOKEN_PATTERN = "rdt-[A-Za-z0-9_-]{43}";
   private static final String DEPLOY_USERNAME_PATTERN = "repsy-deploy-token-[a-z0-9]{7}";
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
+  private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String TOKEN_NOT_FOUND_TEXT = "Deploy token not found.";
   private static final String REPO_NOT_FOUND_TEXT = "Repository not found";
   private static final String UNAUTHORIZED_TEXT = "The user has logged in but has no permissions.";
@@ -218,12 +217,12 @@ class ProtocolDeployTokenControllerIT {
 
   private String bearerTokenFor(final UUID userId, final String username) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofMinutes(30));
+        + this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofMinutes(30));
   }
 
   private String expiredBearerTokenFor(final User user) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(
+        + this.jwtUtils.createPanelAccessToken(
             user.getId(), user.getUsername(), Duration.ofSeconds(-30));
   }
 
@@ -376,6 +375,15 @@ class ProtocolDeployTokenControllerIT {
     assertThat((String) envelope.get("errorCode")).matches(UUID_PATTERN);
   }
 
+  private static void expectUnsupportedMediaType(final ResultActions result) throws Exception {
+    expectError(
+        result,
+        HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+        "unsupportedMediaType",
+        null,
+        UNSUPPORTED_MEDIA_TYPE_TEXT);
+  }
+
   private static void expectValidationError(final ResultActions result, final String data)
       throws Exception {
     expectError(result, HttpStatus.BAD_REQUEST, "validationError", data, VALIDATION_TEXT);
@@ -494,7 +502,7 @@ class ProtocolDeployTokenControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 403 for a malformed/garbage bearer token")
+    @DisplayName("returns 401 for a malformed/garbage bearer token")
     void malformedBearerToken(final Endpoint endpoint) throws Exception {
       final var repo = ProtocolDeployTokenControllerIT.this.createRepo(RepoType.MAVEN);
 
@@ -505,7 +513,7 @@ class ProtocolDeployTokenControllerIT {
                   .apply(repo.getName())
                   .apply(UUID.randomUUID())
                   .header(AUTHORIZATION, "Bearer not-a-jwt")),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "accessNotAllowed",
           "accessNotAllowed",
           "Access isn't allowed.");
@@ -513,7 +521,7 @@ class ProtocolDeployTokenControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 403 for an expired token")
+    @DisplayName("returns 401 for an expired token")
     void expiredToken(final Endpoint endpoint) throws Exception {
       final var repo = ProtocolDeployTokenControllerIT.this.createRepo(RepoType.MAVEN);
       final var admin =
@@ -528,7 +536,7 @@ class ProtocolDeployTokenControllerIT {
                   .header(
                       AUTHORIZATION,
                       ProtocolDeployTokenControllerIT.this.expiredBearerTokenFor(admin))),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "sessionExpired",
           "sessionExpired",
           "Session expired.");
@@ -597,6 +605,80 @@ class ProtocolDeployTokenControllerIT {
           "repoNotFound",
           "repoNotFound",
           REPO_NOT_FOUND_TEXT);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 401 unAuthorized, not 404, for a missing repo without credentials")
+    void repoDoesNotExistWithoutCredentials(final Endpoint endpoint) throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+
+      expectUnauthorized(
+          it.perform(endpoint.request().apply(uniqueName("missing")).apply(UUID.randomUUID())));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("answers a missing repo and an existing private repo identically without a header")
+    void missingAndPrivateRepoAreIndistinguishableWithoutCredentials(final Endpoint endpoint)
+        throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var privateRepo =
+          it.repoTxService.createRepo(uniqueName("private"), RepoType.MAVEN, true, null);
+      final var tokenId = UUID.randomUUID();
+
+      final var forPrivate =
+          it.perform(endpoint.request().apply(privateRepo.getName()).apply(tokenId))
+              .andExpect(status().isUnauthorized())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      final var forMissing =
+          it.perform(endpoint.request().apply(uniqueName("missing")).apply(tokenId))
+              .andExpect(status().isUnauthorized())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+
+      // Everything but the per-error correlation id must match.
+      assertThat(forMissing.replaceAll(UUID_PATTERN, "<id>"))
+          .isEqualTo(forPrivate.replaceAll(UUID_PATTERN, "<id>"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 401 unAuthorized, not 404, for a missing repo and a non-admin caller")
+    void repoDoesNotExistForCallerWithoutManagePermission(final Endpoint endpoint)
+        throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var caller = it.createUser(uniqueName("plain"), UserRole.USER);
+
+      expectUnauthorized(
+          it.perform(
+              endpoint
+                  .request()
+                  .apply(uniqueName("missing"))
+                  .apply(UUID.randomUUID())
+                  .header(AUTHORIZATION, it.bearerTokenFor(caller))));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("still rejects an invalid token before revealing that the repo is missing")
+    void repoDoesNotExistWithMalformedToken(final Endpoint endpoint) throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+
+      expectError(
+          it.perform(
+              endpoint
+                  .request()
+                  .apply(uniqueName("missing"))
+                  .apply(UUID.randomUUID())
+                  .header(AUTHORIZATION, "Bearer not-a-jwt")),
+          HttpStatus.UNAUTHORIZED,
+          "accessNotAllowed",
+          "accessNotAllowed",
+          "Access isn't allowed.");
     }
   }
 
@@ -777,36 +859,6 @@ class ProtocolDeployTokenControllerIT {
     }
 
     /**
-     * {@code DeployTokenForm} allows a username of up to 150 characters but the {@code username}
-     * column is {@code varchar(80)}, so 81..150 characters pass request validation and are only
-     * rejected by the database. The INSERT is deferred to the flush, which is why the failure is
-     * observed there rather than in the response: the test's outer transaction keeps the handler's
-     * own commit-time flush from running. In production that flush runs when the service method
-     * returns. Widening the column or lowering the form limit to 80 should replace this test with
-     * one of the boundary cases above.
-     */
-    @Test
-    @DisplayName("passes validation for an 81-character username that the database then rejects")
-    void usernameLongerThanColumnIsRejectedByTheDatabase() {
-      final var it = ProtocolDeployTokenControllerIT.this;
-      final var repo = it.createRepo(RepoType.MAVEN);
-      final var token = it.adminBearerToken();
-
-      assertThatThrownBy(
-              () -> {
-                it.perform(
-                    post(tokensUrl(repo))
-                        .header(AUTHORIZATION, token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                            "{\"name\":\"long-user\",\"username\":\"%s\"}"
-                                .formatted("u".repeat(81))));
-                it.entityManager.flush();
-              })
-          .hasStackTraceContaining("value too long for type character varying(80)");
-    }
-
-    /**
      * {@code DeployTokenForm} declares no name pattern, so any 1..80-character string is accepted,
      * including whitespace-only and punctuation-heavy names.
      */
@@ -913,8 +965,8 @@ class ProtocolDeployTokenControllerIT {
           Arguments.of("null name", "{\"name\":null}"),
           Arguments.of("name too long", "{\"name\":\"%s\"}".formatted("n".repeat(81))),
           Arguments.of(
-              "username too long",
-              "{\"name\":\"n\",\"username\":\"%s\"}".formatted("u".repeat(151))),
+              "username longer than the column",
+              "{\"name\":\"n\",\"username\":\"%s\"}".formatted("u".repeat(81))),
           Arguments.of(
               "description too long",
               "{\"name\":\"n\",\"description\":\"%s\"}".formatted("d".repeat(501))),
@@ -928,18 +980,17 @@ class ProtocolDeployTokenControllerIT {
     }
 
     @Test
-    @DisplayName("returns 400 validationError for an unsupported content type")
+    @DisplayName("returns 415 unsupportedMediaType for an unsupported content type")
     void unsupportedContentType() throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var repo = it.createRepo(RepoType.MAVEN);
 
-      expectValidationError(
+      expectUnsupportedMediaType(
           it.perform(
               post(tokensUrl(repo))
                   .header(AUTHORIZATION, it.adminBearerToken())
                   .contentType(MediaType.TEXT_PLAIN)
-                  .content(form("plain"))),
-          null);
+                  .content(form("plain"))));
     }
   }
 
@@ -964,8 +1015,7 @@ class ProtocolDeployTokenControllerIT {
 
       final List<Object> content = JsonPath.read(body, "$.data.content");
       assertThat(content).isEmpty();
-      // The service short-circuits to Page.empty(), an unpaged page, so the metadata is synthetic.
-      assertPage(body, 0, 0, 0, 1);
+      assertPage(body, 10, 0, 0, 0);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -1085,13 +1135,8 @@ class ProtocolDeployTokenControllerIT {
       }
     }
 
-    /**
-     * {@code getDeployTokensByRepoInfo} returns {@code Page.empty()} whenever the requested page
-     * has no rows, even though the repo does have tokens, so the metadata of a page past the end is
-     * synthetic (size 0, totalElements 0) rather than the real totals.
-     */
     @Test
-    @DisplayName("answers a page past the end with a synthetic empty page")
+    @DisplayName("answers a page past the end with empty content and the real totals")
     void pagePastTheEnd() throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var repo = it.createRepo(RepoType.MAVEN);
@@ -1108,7 +1153,7 @@ class ProtocolDeployTokenControllerIT {
 
       final List<Object> content = JsonPath.read(body, "$.data.content");
       assertThat(content).isEmpty();
-      assertPage(body, 0, 0, 0, 1);
+      assertPage(body, 2, 5, 1, 1);
     }
 
     @Test
@@ -1136,21 +1181,35 @@ class ProtocolDeployTokenControllerIT {
       assertThat(namesOf(descending)).containsExactly("charlie", "bravo", "alpha");
     }
 
-    /**
-     * The story expected out-of-range paging to answer 500 (RPS-848) and asked to pin it. That is
-     * not what happens here: RPS-848 validated only the explicit {@code page}/{@code size} params
-     * of {@code GET /api/users} and {@code GET /api/security/scans}. This endpoint takes a Spring
-     * Data {@code Pageable}, whose argument resolver silently falls back to the defaults (page 0,
-     * size 10) for non-numeric values, clamps a negative page to 0, and replaces a size below 1
-     * with the default. Nothing caps the size at 100 either. Pinned as-is; tightening it belongs
-     * with RPS-848 follow-up work and should turn this into a 400 {@code validationError} test.
-     */
     @ParameterizedTest(name = "{0}={1}")
-    @MethodSource("lenientPagingParams")
-    @DisplayName("falls back to defaults instead of failing for non-numeric or out-of-range paging")
-    void lenientPagingParam(
-        final String param, final String value, final long expectedSize, final long expectedNumber)
-        throws Exception {
+    @MethodSource("invalidPagingParams")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String param, final String value) throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var repo = it.createRepo(RepoType.MAVEN);
+      it.seedToken(repo, "only");
+
+      expectValidationError(
+          it.perform(
+              get(tokensUrl(repo))
+                  .header(AUTHORIZATION, it.adminBearerToken())
+                  .param(param, value)),
+          param);
+    }
+
+    static Stream<Arguments> invalidPagingParams() {
+      return Stream.of(
+          Arguments.of("page", "abc"),
+          Arguments.of("size", "abc"),
+          Arguments.of("page", "-1"),
+          Arguments.of("size", "0"),
+          Arguments.of("size", "-1"),
+          Arguments.of("size", "101"));
+    }
+
+    @Test
+    @DisplayName("accepts the largest allowed size")
+    void acceptsMaxPageSize() throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var repo = it.createRepo(RepoType.MAVEN);
       it.seedToken(repo, "only");
@@ -1160,21 +1219,20 @@ class ProtocolDeployTokenControllerIT {
               it.perform(
                   get(tokensUrl(repo))
                       .header(AUTHORIZATION, it.adminBearerToken())
-                      .param(param, value)),
+                      .param("size", "100")),
               "TokenFetched");
 
       assertThat(namesOf(body)).containsExactly("only");
-      assertPage(body, expectedSize, expectedNumber, 1, 1);
+      assertPage(body, 100, 0, 1, 1);
     }
 
-    static Stream<Arguments> lenientPagingParams() {
-      return Stream.of(
-          Arguments.of("page", "abc", 10, 0),
-          Arguments.of("size", "abc", 10, 0),
-          Arguments.of("page", "-1", 10, 0),
-          Arguments.of("size", "0", 10, 0),
-          Arguments.of("size", "-1", 10, 0),
-          Arguments.of("size", "101", 101, 0));
+    @Test
+    @DisplayName("answers 401 unAuthorized, not 400, when a bad size comes without credentials")
+    void authenticationComesBeforePagingValidation() throws Exception {
+      final var repo = ProtocolDeployTokenControllerIT.this.createRepo(RepoType.MAVEN);
+
+      expectUnauthorized(
+          ProtocolDeployTokenControllerIT.this.perform(get(tokensUrl(repo)).param("size", "0")));
     }
   }
 

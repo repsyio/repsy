@@ -15,6 +15,8 @@
  */
 package io.repsy.os.server.protocols.npm.ui.controllers;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
@@ -22,11 +24,12 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
@@ -48,15 +51,21 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.server.PathContainer;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -64,6 +73,8 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -110,6 +121,7 @@ class NpmPackageApiControllerIT {
   }
 
   @Autowired private MockMvc mockMvc;
+  @Autowired private RequestMappingHandlerMapping handlerMapping;
   @Autowired private JwtUtils jwtUtils;
   @Autowired private UserTxService userTxService;
   @Autowired private UserRepository userRepository;
@@ -204,7 +216,7 @@ class NpmPackageApiControllerIT {
 
   private String bearerToken(final User user, final Duration duration) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(user.getId(), user.getUsername(), duration);
+        + this.jwtUtils.createPanelAccessToken(user.getId(), user.getUsername(), duration);
   }
 
   private static RequestPostProcessor apiPort() {
@@ -249,12 +261,6 @@ class NpmPackageApiControllerIT {
           .andExpect(jsonPath("$.data.content", hasSize(1)))
           .andExpect(jsonPath("$.data.content[0].scope").value("tools"));
       NpmPackageApiControllerIT.this
-          .perform(get("/api/npm/packages/{repo}/ignored", repoName).param("name", "plain"))
-          .andExpect(
-              result ->
-                  org.assertj.core.api.Assertions.assertThat(result.getResponse().getStatus())
-                      .isIn(200, 404));
-      NpmPackageApiControllerIT.this
           .perform(
               get("/api/npm/packages/{repo}/scope/{scope}", repoName, "tools")
                   .param("name", "scoped"))
@@ -298,6 +304,51 @@ class NpmPackageApiControllerIT {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
           .andExpect(jsonPath("$.data.packageName").value("scope"));
+    }
+
+    @Test
+    void populatesCompleteVersionDetailForAnExplicitVersion() throws Exception {
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/packages/{repo}/plain-package/versions/1.0.0", repoName))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.id").value(notNullValue()))
+          .andExpect(jsonPath("$.data.packageName").value("plain-package"))
+          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
+          .andExpect(jsonPath("$.data.description").value("integration fixture"))
+          .andExpect(jsonPath("$.data.authorName").value("Repsy"))
+          .andExpect(jsonPath("$.data.authorEmail").value("test@repsy.io"))
+          .andExpect(jsonPath("$.data.license").value("Apache-2.0"))
+          .andExpect(jsonPath("$.data.homepage").value("https://repsy.io"))
+          .andExpect(jsonPath("$.data.deprecated").value(false))
+          .andExpect(
+              jsonPath("$.data.keywords[*].keyword").value(containsInAnyOrder("fixture", "npm")));
+      NpmPackageApiControllerIT.this
+          .perform(
+              get(
+                  "/api/npm/packages/{repo}/{scope}/{package}/versions/1.0.0",
+                  repoName,
+                  "tools",
+                  "scoped-package"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.scopeName").value("tools"))
+          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
+          .andExpect(jsonPath("$.data.description").value("integration fixture"));
+    }
+
+    @Test
+    void populatesVersionNameWhenTheVersionIsOmittedAndDefaultsToLatest() throws Exception {
+      NpmPackageApiControllerIT.this
+          .perform(
+              get(
+                  "/api/npm/packages/{repo}/{scope}/{package}",
+                  repoName,
+                  "tools",
+                  "scoped-package"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.scopeName").value("tools"))
+          .andExpect(jsonPath("$.data.packageName").value("scoped-package"))
+          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
+          .andExpect(jsonPath("$.data.license").value("Apache-2.0"));
     }
 
     @Test
@@ -354,14 +405,14 @@ class NpmPackageApiControllerIT {
       perform(
               get("/api/npm/packages/{repo}", privateRepoName)
                   .header(AUTHORIZATION, "Bearer malformed"))
-          .andExpect(status().isForbidden());
+          .andExpect(status().isUnauthorized());
       perform(
               get("/api/npm/packages/{repo}", privateRepoName)
                   .header(AUTHORIZATION, bearerToken(admin, Duration.ofSeconds(-30))))
-          .andExpect(status().isForbidden());
+          .andExpect(status().isUnauthorized());
       final var unknown =
           AuthUtils.AUTH_BEARER
-              + jwtUtils.createTokenWithDuration(
+              + jwtUtils.createPanelAccessToken(
                   UUID.randomUUID(), "deleted-user", Duration.ofMinutes(30));
       perform(get("/api/npm/packages/{repo}", privateRepoName).header(AUTHORIZATION, unknown))
           .andExpect(status().isNotFound());
@@ -379,7 +430,11 @@ class NpmPackageApiControllerIT {
               delete("/api/npm/packages/{repo}/{package}", repoName, "plain-package")
                   .header(AUTHORIZATION, bearerToken(user, Duration.ofMinutes(30))))
           .andExpect(status().isUnauthorized());
-      perform(get("/api/npm/packages/missing-repo"))
+      // Anonymous callers cannot tell a missing repo from a private one (RPS-887).
+      perform(get("/api/npm/packages/missing-repo")).andExpect(status().isUnauthorized());
+      perform(
+              get("/api/npm/packages/missing-repo")
+                  .header(AUTHORIZATION, bearerToken(user, Duration.ofMinutes(30))))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.*", hasSize(5)))
           .andExpect(jsonPath("$.type").value("ERROR"))
@@ -387,11 +442,38 @@ class NpmPackageApiControllerIT {
       perform(get("/api/npm/packages/{repo}/missing/versions/1.0.0", repoName))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
-      perform(post("/api/npm/packages/{repo}/{package}", repoName, "plain-package"))
-          .andExpect(
-              result ->
-                  org.assertj.core.api.Assertions.assertThat(result.getResponse().getStatus())
-                      .isIn(404, 500));
+    }
+
+    @Test
+    void answersNotFoundWithTheErrorEnvelopeForAMissingPackage() throws Exception {
+      perform(get("/api/npm/packages/{repo}/{package}", repoName, "missing"))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.*", hasSize(5)))
+          .andExpect(jsonPath("$.msgId").value("packageNotFound"))
+          .andExpect(jsonPath("$.type").value("ERROR"))
+          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+    }
+
+    @Test
+    void routesTwoSegmentGetPathsOnlyToTheVersionHandler() {
+      // Two handlers once matched /api/npm/packages/{repo}/{x}, so which one answered depended on
+      // registration order: a listing of every package, a 404, or an ambiguous-handler 500.
+      final var matching =
+          handlerMapping.getHandlerMethods().entrySet().stream()
+              .filter(
+                  entry ->
+                      entry.getKey().getMethodsCondition().getMethods().contains(RequestMethod.GET))
+              .filter(
+                  entry ->
+                      entry.getKey().getPathPatternsCondition().getPatterns().stream()
+                          .anyMatch(
+                              pattern ->
+                                  pattern.matches(
+                                      PathContainer.parsePath("/api/npm/packages/repo/missing"))))
+              .map(entry -> entry.getValue().getMethod().getName())
+              .toList();
+
+      assertThat(matching).containsExactly("getVersion");
     }
 
     @Test
@@ -428,6 +510,151 @@ class NpmPackageApiControllerIT {
               delete("/api/npm/packages/{repo}/{package}", repoName, "plain-package")
                   .header(AUTHORIZATION, bearerToken(admin, Duration.ofMinutes(30))))
           .andExpect(status().isNotFound());
+    }
+  }
+
+  /**
+   * The port-based handler mapping does not raise {@code HttpRequestMethodNotSupportedException}
+   * for a verb the path does not map, so the request falls through to the static-resource handler
+   * and fails with {@code NoResourceFoundException}, which {@code ErrorHandler} answers with 404
+   * {@code itemNotFound} (RPS-849). Publishing verbs on these read/delete routes must never reach
+   * the generic error handler and answer 500 (RPS-900).
+   */
+  @Nested
+  @DisplayName("unsupported verbs")
+  class UnsupportedVerbs {
+
+    @ParameterizedTest(name = "{0} {1}")
+    @MethodSource("unsupportedRequests")
+    @DisplayName("answers 404 itemNotFound in the standard error envelope")
+    void answersClientErrorWithStandardEnvelope(final HttpMethod method, final String pathTemplate)
+        throws Exception {
+      final var path = pathTemplate.formatted(repoName);
+
+      perform(request(method, path).contentType(MediaType.APPLICATION_JSON).content("{}"))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.*", hasSize(5)))
+          .andExpect(jsonPath("$.msgId").value("itemNotFound"))
+          .andExpect(jsonPath("$.type").value("ERROR"))
+          .andExpect(jsonPath("$.data").value(nullValue()))
+          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)))
+          .andExpect(jsonPath("$.text").value("The requested item is not found."));
+    }
+
+    @ParameterizedTest(name = "{0} {1} with an admin token")
+    @MethodSource("unsupportedRequests")
+    @DisplayName("answers the same 404 to an authenticated admin and leaves the package alone")
+    void answersSameErrorToAdminAndKeepsPackage(final HttpMethod method, final String pathTemplate)
+        throws Exception {
+      final var path = pathTemplate.formatted(repoName);
+
+      perform(
+              request(method, path)
+                  .header(AUTHORIZATION, bearerToken(admin, Duration.ofMinutes(30)))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{}"))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.msgId").value("itemNotFound"))
+          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+
+      org.assertj.core.api.Assertions.assertThat(
+              npmPackageRepository.findByRepoIdAndScopeAndName(repo.getId(), null, "plain-package"))
+          .isPresent();
+    }
+
+    static Stream<Arguments> unsupportedRequests() {
+      return Stream.of(
+              "/api/npm/packages/%s",
+              "/api/npm/packages/%s/plain-package",
+              "/api/npm/packages/%s/plain-package/versions/1.0.0",
+              "/api/npm/packages/%s/tools/scoped-package/versions/1.0.0")
+          .flatMap(
+              path ->
+                  Stream.of(HttpMethod.PUT, HttpMethod.POST, HttpMethod.PATCH)
+                      .map(method -> Arguments.of(method, path)));
+    }
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the list endpoints")
+  class PagingAndSorting {
+
+    private static final String PACKAGES = "/api/npm/packages/{repo}";
+    private static final String UNSCOPED = "/api/npm/packages/{repo}/scope";
+    private static final String SCOPED = "/api/npm/packages/{repo}/scope/tools";
+    private static final String VERSIONS =
+        "/api/npm/packages/{repo}/package/plain-package/versions";
+    private static final String SCOPED_VERSIONS =
+        "/api/npm/packages/{repo}/tools/package/scoped-package/versions";
+
+    static Stream<String> endpoints() {
+      return Stream.of(PACKAGES, UNSCOPED, SCOPED, VERSIONS, SCOPED_VERSIONS);
+    }
+
+    static Stream<Arguments> acceptedSorts() {
+      final var packageSorts =
+          Stream.of(PACKAGES, UNSCOPED, SCOPED)
+              .flatMap(
+                  path ->
+                      Stream.of("id", "name", "scope", "updatedAt")
+                          .map(property -> Arguments.of(path, property)));
+      final var versionSorts =
+          Stream.of(VERSIONS, SCOPED_VERSIONS)
+              .flatMap(
+                  path ->
+                      Stream.of("id", "version", "createdAt")
+                          .map(property -> Arguments.of(path, property)));
+
+      return Stream.concat(packageSorts, versionSorts);
+    }
+
+    static Stream<Arguments> invalidPagingOnEveryEndpoint() {
+      return endpoints()
+          .flatMap(
+              path ->
+                  PagingAssertions.invalidPagingParams()
+                      .map(args -> Arguments.of(path, args.get()[0], args.get()[1])));
+    }
+
+    private ResultActions list(final String path, final String param, final String value)
+        throws Exception {
+      return NpmPackageApiControllerIT.this.perform(
+          get(path, NpmPackageApiControllerIT.this.repoName).param(param, value));
+    }
+
+    @ParameterizedTest(name = "{0} sort={1}")
+    @MethodSource("acceptedSorts")
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String path, final String property) throws Exception {
+      this.list(path, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(path, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("orders the versions by the requested sort property")
+    void ordersVersions() throws Exception {
+      this.list(VERSIONS, "sort", "version,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("1.0.0"));
+      this.list(VERSIONS, "sort", "version,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("2.0.0-next.1"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400(final String path) throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(path, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0} {1}={2}")
+    @MethodSource("invalidPagingOnEveryEndpoint")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String path, final String param, final String value)
+        throws Exception {
+      PagingAssertions.expectInvalidParameter(this.list(path, param, value), param);
     }
   }
 }

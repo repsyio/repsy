@@ -27,7 +27,9 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Pageable;
@@ -46,6 +48,10 @@ import org.springframework.web.bind.annotation.RestController;
 @NullMarked
 public class RubyGemApiController {
 
+  private static final Set<String> GEM_SORT_PROPERTIES = Set.of("id", "name", "updatedAt");
+
+  private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("id", "version", "createdAt");
+
   private final RubyApiFacade rubyApiFacade;
   private final RestResponseFactory responseFactory;
   private final UsageUpdateService usageUpdateService;
@@ -56,6 +62,9 @@ public class RubyGemApiController {
       final RepoInfo repoInfo,
       @RequestParam(defaultValue = "") final String name,
       final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, GEM_SORT_PROPERTIES);
+
     final var gems = this.rubyApiFacade.listGems(repoInfo, name, pageable);
     return this.responseFactory.success("gemsFetched", new PagedModel<>(gems));
   }
@@ -67,6 +76,9 @@ public class RubyGemApiController {
       @PathVariable final String gemName,
       @RequestParam(defaultValue = "") final String version,
       final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
+
     final var versions = this.rubyApiFacade.listVersions(repoInfo, gemName, version, pageable);
     return this.responseFactory.success("gemVersionsFetched", new PagedModel<>(versions));
   }

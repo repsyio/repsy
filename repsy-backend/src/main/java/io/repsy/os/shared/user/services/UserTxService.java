@@ -97,6 +97,7 @@ public class UserTxService {
   public void updateUsername(final @NonNull UUID userId, final @NonNull String newUsername) {
     final var user = this.findUserById(userId);
     user.setUsername(newUsername);
+    user.revokeRefreshTokens();
     this.userRepository.save(user);
   }
 
@@ -107,6 +108,7 @@ public class UserTxService {
     final var user = this.findUserById(userId);
     user.setHash(newHash);
     user.setSalt(newSalt);
+    user.revokeRefreshTokens();
     this.userRepository.save(user);
   }
 
@@ -158,6 +160,7 @@ public class UserTxService {
         throw new BadRequestException(ERR_USERNAME_IN_USE);
       }
       user.setUsername(dto.getUsername());
+      user.revokeRefreshTokens();
     }
 
     user.setRole(newRole);
@@ -173,6 +176,7 @@ public class UserTxService {
 
     user.setHash(this.hashPassword(newPassword, salt));
     user.setSalt(salt);
+    user.revokeRefreshTokens();
 
     this.userRepository.save(user);
     return newPassword;

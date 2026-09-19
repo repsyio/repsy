@@ -21,11 +21,10 @@ import io.repsy.os.generated.model.PasswordForm;
 import io.repsy.os.generated.model.ProfileInfo;
 import io.repsy.os.generated.model.UserRole;
 import io.repsy.os.panel.profile.repositories.ReservedUsernameRepository;
-import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.services.LoginInfoFactory;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
-import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.services.UserTxService;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -38,22 +37,24 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ProfileService {
 
-  private final @NonNull JwtUtils jwtUtils;
+  private final @NonNull LoginInfoFactory loginInfoFactory;
   private final @NonNull ReservedUsernameRepository reservedUsernameRepository;
   private final @NonNull UserTxService userTxService;
 
   @Transactional
   public @NonNull LoginInfo updateUsername(
-      final @NonNull UUID userId, final @NonNull String newUsername) {
+      final @NonNull UUID userId,
+      final @NonNull String newUsername,
+      final @NonNull Instant sessionStart) {
 
-    final var user = this.userTxService.getUserById(userId);
+    this.userTxService.getUserById(userId);
 
     this.validateUsernameAvailability(newUsername);
 
-    user.setUsername(newUsername);
-    this.userTxService.updateUsername(user.getId(), newUsername);
+    this.userTxService.updateUsername(userId, newUsername);
 
-    return this.createLoginInfo(user, newUsername);
+    // Re-read so the tokens carry the username and the token version after the change.
+    return this.loginInfoFactory.create(this.userTxService.getUserById(userId), sessionStart);
   }
 
   public ProfileInfo getProfile(final @NonNull UUID userId) {
@@ -93,22 +94,5 @@ public class ProfileService {
     if (isUsernameInUse || isUsernameReserved) {
       throw new BadRequestException("usernameInUse");
     }
-  }
-
-  private @NonNull LoginInfo createLoginInfo(
-      final @NonNull UserInfo user, final @NonNull String newUsername) {
-
-    final var accessToken =
-        this.jwtUtils.createTokenWithDuration(
-            user.getId(), newUsername, AuthUtils.TIMEOUT_ACCESS_TOKEN);
-    final var refreshToken =
-        this.jwtUtils.createRefreshToken(
-            user.getId(), newUsername, AuthUtils.TIMEOUT_REFRESH_TOKEN);
-
-    return LoginInfo.builder()
-        .username(newUsername)
-        .token(accessToken)
-        .refreshToken(refreshToken)
-        .build();
   }
 }
