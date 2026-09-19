@@ -247,6 +247,7 @@ public class GemspecParser {
     }
 
     @Override
+    @Nullable
     public Node getSingleNode() {
       final var root = super.getSingleNode();
       if (root != null) {

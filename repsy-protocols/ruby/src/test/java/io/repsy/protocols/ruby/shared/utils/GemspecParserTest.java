@@ -28,6 +28,8 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @DisplayName("GemspecParser")
 class GemspecParserTest {
@@ -136,46 +138,18 @@ class GemspecParserTest {
     assertThat(metadata.getDevelopmentDependencies()).isEmpty();
   }
 
-  @Test
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(
+      strings = {
+        "extensions: !!javax.script.ScriptEngineManager\n  key: value\n",
+        "extensions: !!java.net.URL [\"http://localhost/\"]\n",
+        "extensions: !<tag:yaml.org,2002:javax.script.ScriptEngineManager>\n  key: value\n"
+      })
   @DisplayName("parse() rejects a global tag that would instantiate an arbitrary class")
-  void rejectsGlobalTagOnMapping() throws IOException {
-    final var yaml =
-        HEADER
-            + """
-            extensions: !!javax.script.ScriptEngineManager
-              key: value
-            """;
+  void rejectsGlobalTags(final String extensions) throws IOException {
+    final var gem = gem(HEADER + extensions);
 
-    assertThatThrownBy(() -> GemspecParser.parse(gem(yaml)))
-        .isInstanceOf(BadRequestException.class)
-        .hasMessageContaining("invalidGemFile");
-  }
-
-  @Test
-  @DisplayName("parse() rejects a global tag with a constructor argument list")
-  void rejectsGlobalTagOnSequence() throws IOException {
-    final var yaml =
-        HEADER
-            + """
-            extensions: !!java.net.URL ["http://localhost/"]
-            """;
-
-    assertThatThrownBy(() -> GemspecParser.parse(gem(yaml)))
-        .isInstanceOf(BadRequestException.class)
-        .hasMessageContaining("invalidGemFile");
-  }
-
-  @Test
-  @DisplayName("parse() rejects a global tag written in verbatim form")
-  void rejectsVerbatimGlobalTag() throws IOException {
-    final var yaml =
-        HEADER
-            + """
-            extensions: !<tag:yaml.org,2002:javax.script.ScriptEngineManager>
-              key: value
-            """;
-
-    assertThatThrownBy(() -> GemspecParser.parse(gem(yaml)))
+    assertThatThrownBy(() -> GemspecParser.parse(gem))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("invalidGemFile");
   }
