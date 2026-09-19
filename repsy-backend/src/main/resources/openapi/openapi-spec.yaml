@@ -2773,6 +2773,9 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponseVulnerabilityScanInfo"
       summary: Manually trigger a vulnerability re-scan for an artifact version
+      description: >-
+        Scans the version regardless of the repository's `securityScanEnabled` setting: that setting
+        only governs the automatic scan on push, and a manual scan is an explicit override.
     parameters:
       - name: repoName
         in: path
@@ -3335,6 +3338,9 @@ components:
         securityScanEnabled:
           type: boolean
           nullable: false
+          description: >-
+            Whether newly pushed versions are scanned automatically. Manually triggered scans ignore
+            this setting.
         type:
           "$ref": "#/components/schemas/RepoType"
     RepoSettingsForm:
@@ -3355,6 +3361,9 @@ components:
         securityScanEnabled:
           type: boolean
           nullable: false
+          description: >-
+            Whether newly pushed versions are scanned automatically. Manually triggered scans ignore
+            this setting.
     RestResponseVoid:
       type: object
       properties:
@@ -3761,6 +3770,9 @@ components:
         securityScanEnabled:
           type: boolean
           nullable: false
+          description: >-
+            Whether newly pushed versions are scanned automatically. Manually triggered scans ignore
+            this setting.
       required:
         - privateRepo
         - allowOverride
