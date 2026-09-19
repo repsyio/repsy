@@ -29,6 +29,7 @@ import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
+import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import io.repsy.os.shared.error_handling.exceptions.InvalidPagingParameterException;
 import io.repsy.protocols.golang.shared.exceptions.GoVersionGoneException;
@@ -41,6 +42,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.convert.ConversionFailedException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -59,10 +61,12 @@ import org.springframework.web.bind.UnsatisfiedServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
@@ -71,6 +75,8 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 public class ErrorHandler {
 
   private static final int UNPROCESSABLE_ENTITY = 422;
+
+  private static final @NonNull String PANEL_AUTH_CHALLENGE = "Bearer";
 
   private static final @NonNull String ERR_BAD_REQUEST = "badRequest";
   private static final @NonNull String ERR_VALIDATION = "validationError";
@@ -544,6 +550,10 @@ public class ErrorHandler {
       ex.getHeaders().forEach(response::addHeader);
     }
 
+    if (isPanelRequest(request) && !response.containsHeader(HttpHeaders.WWW_AUTHENTICATE)) {
+      response.addHeader(HttpHeaders.WWW_AUTHENTICATE, PANEL_AUTH_CHALLENGE);
+    }
+
     log.info(exceptionToString(ex, request));
 
     final var exceptionMessage = ex.getMessage();
@@ -552,6 +562,18 @@ public class ErrorHandler {
     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(messageText, ex.getMessage()));
+  }
+
+  /**
+   * Tells whether the failed request was served by a panel API controller. Those are the ones
+   * carrying {@link RestApiPort}; the protocol endpoints on the main port announce their own
+   * challenges (Basic, or a Docker Bearer realm) and must not get the panel's.
+   */
+  private static boolean isPanelRequest(final @NonNull HttpServletRequest request) {
+    return request.getAttribute(HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE)
+            instanceof final HandlerMethod handler
+        && (AnnotationUtils.findAnnotation(handler.getMethod(), RestApiPort.class) != null
+            || AnnotationUtils.findAnnotation(handler.getBeanType(), RestApiPort.class) != null);
   }
 
   /**
@@ -749,7 +771,8 @@ public class ErrorHandler {
   /**
    * Handles a missing required request header. A missing {@code Authorization} header is a failed
    * authentication and answers 401 like the other panel authentication failures (malformed,
-   * non-Bearer and expired tokens); any other missing header is a plain 400.
+   * non-Bearer and expired tokens), announcing the Bearer scheme on a panel endpoint; any other
+   * missing header is a plain 400.
    *
    * @param ex Thrown exception
    * @return REST response carrying the header name
@@ -767,12 +790,14 @@ public class ErrorHandler {
 
     log.info(exceptionToString(ex, request));
 
-    final var status =
-        HttpHeaders.AUTHORIZATION.equalsIgnoreCase(ex.getHeaderName())
-            ? HttpStatus.UNAUTHORIZED
-            : HttpStatus.BAD_REQUEST;
+    final var authorizationMissing = HttpHeaders.AUTHORIZATION.equalsIgnoreCase(ex.getHeaderName());
 
-    return ResponseEntity.status(status)
+    if (authorizationMissing && isPanelRequest(request)) {
+      response.addHeader(HttpHeaders.WWW_AUTHENTICATE, PANEL_AUTH_CHALLENGE);
+    }
+
+    return ResponseEntity.status(
+            authorizationMissing ? HttpStatus.UNAUTHORIZED : HttpStatus.BAD_REQUEST)
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(ERR_MISSING_REQUEST_HEADER, ex.getHeaderName()));
   }

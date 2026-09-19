@@ -21,11 +21,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.core.error_handling.exceptions.RetryableException;
+import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.services.RestResponseFactory;
+import io.repsy.libs.multiport.annotations.RestApiPort;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,6 +45,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -62,7 +66,7 @@ class ErrorHandlerTest {
     messageSource.setBasename("messages");
 
     this.mockMvc =
-        MockMvcBuilders.standaloneSetup(new ThrowingController())
+        MockMvcBuilders.standaloneSetup(new ThrowingController(), new PanelController())
             .setControllerAdvice(new ErrorHandler(new RestResponseFactory(messageSource)))
             .build();
   }
@@ -229,6 +233,63 @@ class ErrorHandlerTest {
   }
 
   @Test
+  @DisplayName("announces the Bearer scheme on a panel 401 for a missing Authorization header")
+  void panelMissingAuthorizationHeaderChallenge() throws Exception {
+    this.mockMvc
+        .perform(get("/panel/header/authorization"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(header().stringValues(HttpHeaders.WWW_AUTHENTICATE, "Bearer"))
+        .andExpect(jsonPath("$.msgId").value("missingRequestHeader"));
+  }
+
+  @Test
+  @DisplayName("announces the Bearer scheme on a panel 401 for a failed token")
+  void panelTokenFailureChallenge() throws Exception {
+    this.mockMvc
+        .perform(get("/panel/unauthorized"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(header().stringValues(HttpHeaders.WWW_AUTHENTICATE, "Bearer"))
+        .andExpect(jsonPath("$.msgId").value("accessNotAllowed"));
+  }
+
+  @Test
+  @DisplayName("keeps the challenge a panel exception carries instead of adding a second one")
+  void panelKeepsOwnChallenge() throws Exception {
+    this.mockMvc
+        .perform(get("/panel/unauthorized/basic"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(header().stringValues(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"Repsy\""));
+  }
+
+  @Test
+  @DisplayName("does not announce a challenge on a panel 400 for another missing header")
+  void panelOtherMissingHeaderHasNoChallenge() throws Exception {
+    this.mockMvc
+        .perform(get("/panel/header/other"))
+        .andExpect(status().isBadRequest())
+        .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE));
+  }
+
+  @Test
+  @DisplayName("does not add the panel challenge to a protocol endpoint's 401")
+  void protocolUnauthorizedHasNoPanelChallenge() throws Exception {
+    this.mockMvc
+        .perform(get("/unauthorized"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE))
+        .andExpect(jsonPath("$.msgId").value("accessNotAllowed"));
+  }
+
+  @Test
+  @DisplayName("does not add the panel challenge to a protocol endpoint's missing Authorization")
+  void protocolMissingAuthorizationHasNoPanelChallenge() throws Exception {
+    this.mockMvc
+        .perform(get("/header/authorization"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE));
+  }
+
+  @Test
   @DisplayName("does not render a retryable failure when no servlet response is available")
   void retryableFailureWithoutResponse() {
     final var handler =
@@ -299,6 +360,39 @@ class ErrorHandlerTest {
     @GetMapping("/retryable")
     String retryable() {
       throw new RetryableException("scanExecutorSaturated");
+    }
+
+    @GetMapping("/unauthorized")
+    String unauthorized() {
+      throw new UnAuthorizedException("accessNotAllowed");
+    }
+  }
+
+  /** Stands for the panel API controllers, which are the ones bound to the API port. */
+  @RestApiPort("api")
+  @RestController
+  @RequestMapping("/panel")
+  static class PanelController {
+
+    @GetMapping("/header/authorization")
+    String authorization(@RequestHeader(HttpHeaders.AUTHORIZATION) final String header) {
+      return header;
+    }
+
+    @GetMapping("/header/other")
+    String other(@RequestHeader("X-Custom") final String header) {
+      return header;
+    }
+
+    @GetMapping("/unauthorized")
+    String unauthorized() {
+      throw new UnAuthorizedException("accessNotAllowed");
+    }
+
+    @GetMapping("/unauthorized/basic")
+    String unauthorizedBasic() {
+      throw new UnAuthorizedException(
+          "unAuthorized", Map.of(HttpHeaders.WWW_AUTHENTICATE, "Basic realm=\"Repsy\""));
     }
   }
 }
