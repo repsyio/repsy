@@ -282,48 +282,22 @@ class TokenRealmIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("maven browser hand-off: a panel token in ?token= is accepted")
-    void mavenAcceptsPanelTokenInQuery() throws Exception {
-      final var user = createUser(uniqueUsername("mvnqry"), UserRole.USER);
-      final var repoName = uniqueRepoName("realm-mvn");
-      seedRepo(RepoType.MAVEN, repoName, true, null);
+    @DisplayName("a panel token in ?token= is not accepted by any protocol, maven included")
+    void panelTokenInQueryIsRefused() throws Exception {
+      final var user = createUser(uniqueUsername("qry"), UserRole.USER);
+      final var npmRepo = uniqueRepoName("realm-npm");
+      final var mavenRepo = uniqueRepoName("realm-mvn");
+      seedRepo(RepoType.NPM, npmRepo, true, null);
+      seedRepo(RepoType.MAVEN, mavenRepo, true, null);
 
-      final var result =
+      final var npm = protocol(get(PACKUMENT, npmRepo).param("token", panelTokenValue(user)));
+      final var maven =
           protocol(
-              get("/{repo}/com/example/lib/1.0/lib-1.0.pom", repoName)
+              get("/{repo}/com/example/lib/1.0/lib-1.0.pom", mavenRepo)
                   .param("token", panelTokenValue(user)));
 
-      // Authenticated: the file does not exist, which is a 404, not an auth failure.
-      assertThat(result.getResponse().getStatus()).isEqualTo(404);
-    }
-
-    @Test
-    @DisplayName("maven rejects a token without a realm and a protocol token in ?token=")
-    void mavenQueryTokenMustBeAPanelToken() throws Exception {
-      final var user = createUser(uniqueUsername("mvnbad"), UserRole.USER);
-      final var repoName = uniqueRepoName("realm-mvn");
-      seedRepo(RepoType.MAVEN, repoName, true, null);
-
-      final var protocolToken =
-          protocolBearerTokenFor(user).substring(AuthUtils.AUTH_BEARER.length());
-      final var result =
-          protocol(
-              get("/{repo}/com/example/lib/1.0/lib-1.0.pom", repoName)
-                  .param("token", protocolToken));
-
-      assertThat(result.getResponse().getStatus()).isEqualTo(401);
-    }
-
-    @Test
-    @DisplayName("a panel token in ?token= is not accepted by the other protocols")
-    void queryHandOffIsMavenOnly() throws Exception {
-      final var user = createUser(uniqueUsername("npmqry"), UserRole.USER);
-      final var repoName = uniqueRepoName("realm-npm");
-      seedRepo(RepoType.NPM, repoName, true, null);
-
-      final var result = protocol(get(PACKUMENT, repoName).param("token", panelTokenValue(user)));
-
-      assertThat(result.getResponse().getStatus()).isEqualTo(401);
+      assertThat(npm.getResponse().getStatus()).isEqualTo(401);
+      assertThat(maven.getResponse().getStatus()).isEqualTo(401);
     }
 
     private String panelTokenValue(final User user) {
