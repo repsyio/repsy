@@ -95,8 +95,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * <p>Several assertions pin behavior that is surprising rather than desirable; each is called out
  * in the test's display name or comment so a future fix shows up as a deliberate test change:
  * deploy tokens are persisted as SHA-256 hashes, {@code DeployTokenForm} has no name pattern or
- * permission field, token names are not unique per repo, and the list endpoint answers a page past
- * the end (and an empty repo) with a synthetic empty page.
+ * permission field, and token names are not unique per repo.
  */
 @Testcontainers
 @AutoConfigureMockMvc
@@ -933,8 +932,7 @@ class ProtocolDeployTokenControllerIT {
 
       final List<Object> content = JsonPath.read(body, "$.data.content");
       assertThat(content).isEmpty();
-      // The service short-circuits to Page.empty(), an unpaged page, so the metadata is synthetic.
-      assertPage(body, 0, 0, 0, 1);
+      assertPage(body, 10, 0, 0, 0);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -1054,13 +1052,8 @@ class ProtocolDeployTokenControllerIT {
       }
     }
 
-    /**
-     * {@code getDeployTokensByRepoInfo} returns {@code Page.empty()} whenever the requested page
-     * has no rows, even though the repo does have tokens, so the metadata of a page past the end is
-     * synthetic (size 0, totalElements 0) rather than the real totals.
-     */
     @Test
-    @DisplayName("answers a page past the end with a synthetic empty page")
+    @DisplayName("answers a page past the end with empty content and the real totals")
     void pagePastTheEnd() throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var repo = it.createRepo(RepoType.MAVEN);
@@ -1077,7 +1070,7 @@ class ProtocolDeployTokenControllerIT {
 
       final List<Object> content = JsonPath.read(body, "$.data.content");
       assertThat(content).isEmpty();
-      assertPage(body, 0, 0, 0, 1);
+      assertPage(body, 2, 5, 1, 1);
     }
 
     @Test
