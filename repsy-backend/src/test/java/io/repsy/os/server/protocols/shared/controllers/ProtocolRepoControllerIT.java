@@ -34,11 +34,10 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.persistence.PersistenceException;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -146,11 +145,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
   private static String repoUrl(final Repo repo, final String suffix) {
     return "/api/repos/" + repo.getName() + suffix;
-  }
-
-  private static String basicAuth(final String username, final String password) {
-    final var raw = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
-    return "Basic " + Base64.getEncoder().encodeToString(raw);
   }
 
   private Repo seedMaven() {
@@ -390,17 +384,14 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 404 userNotFound for a non-Bearer header naming an unknown user")
+    @DisplayName("returns 401 unAuthorized for HTTP Basic credentials naming an unknown user")
     void nonBearerAuthorizationHeader(final Endpoint endpoint) throws Exception {
       final var target = this.target();
 
-      expectError(
+      // RPS-906: must match basicCredentialsWrongPassword, so usernames cannot be enumerated.
+      expectUnauthorized(
           ProtocolRepoControllerIT.this.perform(
-              endpoint.request().apply(target).header(AUTHORIZATION, "Basic dXNlcjpw")),
-          HttpStatus.NOT_FOUND,
-          "userNotFound",
-          "userNotFound",
-          USER_NOT_FOUND_TEXT);
+              endpoint.request().apply(target).header(AUTHORIZATION, "Basic dXNlcjpw")));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -566,6 +557,36 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       expectUnauthorized(
           ProtocolRepoControllerIT.this.perform(
               get("/api/repos/MAVEN/count").header(AUTHORIZATION, basicAuth(username, "wrong"))));
+    }
+
+    @Test
+    @DisplayName("answers an unknown username exactly like a wrong password, including for admin")
+    void basicCredentialsDoNotRevealUsernames() throws Exception {
+      final var username = uniqueUsername("basic");
+      ProtocolRepoControllerIT.this.createUser(username, UserRole.USER);
+
+      final var wrongPassword = this.basicError(basicAuth(username, "wrong"));
+      final var seededAdmin = this.basicError(basicAuth("admin", "wrong"));
+      final var unknownUser = this.basicError(basicAuth(uniqueUsername("ghost"), "wrong"));
+      final var emptyUsername = this.basicError(basicAuth("", "wrong"));
+
+      assertThat(List.of(seededAdmin, unknownUser, emptyUsername))
+          .allSatisfy(response -> assertThat(response).isEqualTo(wrongPassword));
+    }
+
+    /** The status and error envelope of a Basic-authenticated call, minus the random errorCode. */
+    private Map<String, Object> basicError(final String authHeader) throws Exception {
+      final var response =
+          ProtocolRepoControllerIT.this
+              .perform(get("/api/repos/MAVEN/count").header(AUTHORIZATION, authHeader))
+              .andExpect(status().isUnauthorized())
+              .andReturn()
+              .getResponse();
+      final Map<String, Object> envelope =
+          new HashMap<>(JsonPath.read(response.getContentAsString(), "$"));
+      envelope.remove("errorCode");
+      envelope.put("status", response.getStatus());
+      return envelope;
     }
   }
 

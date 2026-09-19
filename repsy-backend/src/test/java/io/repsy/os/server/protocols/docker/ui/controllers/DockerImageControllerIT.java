@@ -36,6 +36,7 @@ import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -327,6 +328,25 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           "layerNotFound",
           "layerNotFound",
           "Layer not found.");
+    }
+
+    @Test
+    @DisplayName("answers an unknown Basic username exactly like a wrong password (RPS-906)")
+    void basicCredentialsDoNotRevealUsernames() throws Exception {
+      final var repo = DockerImageControllerIT.this.privateDockerRepo();
+      final var username = uniqueUsername("basic");
+      DockerImageControllerIT.this.createUser(username, UserRole.USER);
+
+      for (final var auth :
+          List.of(basicAuth(username, "wrong"), basicAuth(uniqueUsername("ghost"), "wrong"))) {
+        DockerImageControllerIT.this.expectError(
+            DockerImageControllerIT.this.perform(
+                get("/api/docker/images/%s".formatted(repo.getName())).header(AUTHORIZATION, auth)),
+            HttpStatus.UNAUTHORIZED,
+            "unAuthorized",
+            "unAuthorized",
+            "The user has logged in but has no permissions.");
+      }
     }
 
     @Test
