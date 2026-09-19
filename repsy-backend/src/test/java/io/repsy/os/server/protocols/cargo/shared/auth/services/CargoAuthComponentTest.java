@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
+import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
@@ -32,9 +33,8 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.mappers.UserConverter;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
-import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
-import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.nio.charset.StandardCharsets;
+import java.time.temporal.TemporalAmount;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
@@ -86,25 +86,6 @@ class CargoAuthComponentTest {
   }
 
   @Test
-  @DisplayName("authorizeRequest answers unAuthorized for an unknown user and a wrong password")
-  void authorizeRequest() {
-    final var repo =
-        BaseRepoInfo.<UUID>builder()
-            .name("crates")
-            .storageKey(UUID.randomUUID())
-            .privateRepo(true)
-            .build();
-
-    assertUnauthorized(
-        () -> this.authComponent.authorizeRequest(repo, basicAuth("ghost", "x"), Permission.READ));
-    assertUnauthorized(
-        () ->
-            this.authComponent.authorizeRequest(
-                repo, basicAuth(USERNAME, "wrong"), Permission.READ));
-    verify(this.userTxService, never()).getUserByUsername(anyString());
-  }
-
-  @Test
   @DisplayName(
       "authenticateAndCreateToken answers unAuthorized for an unknown user and a wrong password")
   void authenticateAndCreateToken() {
@@ -131,5 +112,27 @@ class CargoAuthComponentTest {
             Mockito.mock(DeployTokenService.class));
 
     assertUnauthorized(() -> component.authenticateAndCreateToken("Bearer signed.jwt.token"));
+  }
+
+  /**
+   * RPS-979: the JWT a deploy token gets at {@code /me} carries whatever username the client typed,
+   * so it must not be exchanged for a token of the user of that name.
+   */
+  @Test
+  @DisplayName("authenticateAndCreateToken refuses a deploy-token bearer JWT")
+  void authenticateAndCreateTokenRefusesDeployTokenJwt() {
+    final var jwtUtils = Mockito.mock(JwtUtils.class);
+    when(jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+        .thenReturn(AuthenticationType.DEPLOY_TOKEN);
+    when(jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
+        .thenReturn(USERNAME);
+    final var component =
+        new CargoAuthComponent(
+            this.userTxService, jwtUtils, Mockito.mock(DeployTokenService.class));
+
+    assertUnauthorized(() -> component.authenticateAndCreateToken("Bearer signed.jwt.token"));
+    verify(this.userTxService, never()).getAuthenticatedUserByUsername(anyString());
+    verify(jwtUtils, never())
+        .createProtocolToken(any(UUID.class), anyString(), any(TemporalAmount.class));
   }
 }

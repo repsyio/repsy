@@ -26,6 +26,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.generated.model.RepoPermissionInfo;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
+import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.dtos.PermissionInfo;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
@@ -76,6 +77,11 @@ public class ProtocolAuthService {
    * Authorizes a bearer JWT issued for the given realm. Protocol endpoints take {@link
    * TokenRealm#PROTOCOL} tokens only; a caller that hands a UI session over to a protocol endpoint
    * passes {@link TokenRealm#PANEL}.
+   *
+   * <p>A JWT minted from a deploy token ({@link AuthenticationType#DEPLOY_TOKEN}) is authorized as
+   * that deploy token: bound to its repo, read-only and expiry checked. Its {@code username} claim
+   * is whatever the client typed into the Basic credentials, so it never identifies a user
+   * (RPS-979).
    */
   public void handleBearerAuth(
       final @NonNull String authHeader,
@@ -87,6 +93,19 @@ public class ProtocolAuthService {
 
     if (this.tryAuthorizeWithDeployToken(repoId, bearerToken, permission)) {
       return;
+    }
+
+    final var authenticationType = this.jwtUtils.extractAuthenticationType(authHeader, realm);
+
+    if (authenticationType == AuthenticationType.DEPLOY_TOKEN) {
+      this.authorizeTokenRequestTokenId(
+          repoId, this.jwtUtils.extractUserId(authHeader, realm), permission);
+      return;
+    }
+
+    // A scanner token is repo-scoped and has no user; only Docker knows how to authorize it.
+    if (authenticationType == AuthenticationType.DOCKER_SCAN) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
     this.authorizeJWTRequest(authHeader, permission, realm);
