@@ -70,8 +70,7 @@ public final class NuGetPackageUtils {
       Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$");
   private static final Pattern NUGET_VERSION_PATTERN =
       Pattern.compile(
-          "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)"
-              + "(?:\\.(0|[1-9][0-9]*))?(?:-[a-zA-Z0-9][a-zA-Z0-9.-]*)?"
+          "^(0|[1-9][0-9]*)(?:\\.(0|[1-9][0-9]*)){0,3}(?:-[a-zA-Z0-9][a-zA-Z0-9.-]*)?"
               + "(?:\\+[a-zA-Z0-9][a-zA-Z0-9.-]*)?$");
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -88,14 +87,14 @@ public final class NuGetPackageUtils {
   /**
    * Normalizes a NuGet version string to its canonical form: - Lowercased - Trailing zero
    * components stripped (min 3: major.minor.patch) - 1.0 → 1.0.0, 1.0.0.0 → 1.0.0, 1.0.0-Alpha →
-   * 1.0.0-alpha
+   * 1.0.0-alpha. The pre-release and build suffix is kept as is.
    */
   public static String normalizeNuGetVersion(final String rawVersion) {
 
     final var lower = rawVersion.strip().toLowerCase(Locale.ROOT);
-    final var dashIdx = lower.indexOf('-');
-    final var core = dashIdx >= 0 ? lower.substring(0, dashIdx) : lower;
-    final var preRelease = dashIdx >= 0 ? lower.substring(dashIdx) : "";
+    final var suffixIdx = indexOfSuffix(lower);
+    final var core = suffixIdx >= 0 ? lower.substring(0, suffixIdx) : lower;
+    final var preRelease = suffixIdx >= 0 ? lower.substring(suffixIdx) : "";
 
     final var components = core.split("\\.");
 
@@ -105,6 +104,15 @@ public final class NuGetPackageUtils {
     }
 
     return buildVersionString(components, end) + preRelease;
+  }
+
+  private static int indexOfSuffix(final String version) {
+    final var dashIdx = version.indexOf('-');
+    final var plusIdx = version.indexOf('+');
+    if (dashIdx < 0 || plusIdx < 0) {
+      return Math.max(dashIdx, plusIdx);
+    }
+    return Math.min(dashIdx, plusIdx);
   }
 
   private static String buildVersionString(final String[] components, final int end) {

@@ -414,6 +414,25 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("accepts a two-part version and stores it as its three-part form (RPS-949)")
+    void acceptsTwoPartVersion() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var pkg = new Pkg(uniquePackageId(), "1.0");
+
+      assertStatus(
+          NuGetPublishProtocolIT.this.pushAs(
+              repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
+          201);
+
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, pkg.id()))
+          .singleElement()
+          .satisfies(v -> assertThat(v.getVersion()).isEqualTo("1.0.0"));
+      assertThat(java.nio.file.Path.of(packageDir(repo, pkg.id(), "1.0.0")))
+          .isDirectory()
+          .isNotEmptyDirectory();
+    }
+
+    @Test
     @DisplayName("can be read back through the version list and the download endpoints")
     void readBack() throws Exception {
       final var repo = NuGetPublishProtocolIT.this.nugetRepo();
@@ -623,25 +642,6 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
           .andExpect(jsonPath("$.errors[0].message").value("Invalid NuGet package id."));
 
       verifyNoInteractions(NuGetPublishProtocolIT.this.usageUpdateService);
-    }
-
-    /**
-     * Pins today's behaviour: NuGet accepts a two-part version and the normalizer maps it to {@code
-     * 1.0.0}, but the validator rejects it first. Flip it to expect 201 and {@code 1.0.0} with the
-     * fix.
-     */
-    @Test
-    @DisplayName("rejects a two-part version today (RPS-949)")
-    void rejectsTwoPartVersion() throws Exception {
-      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
-      final var pkg = new Pkg(uniquePackageId(), "1.0");
-
-      NuGetPublishProtocolIT.this
-          .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.errors[0].message").value("Invalid NuGet version format."));
-
-      NuGetPublishProtocolIT.this.assertNothingStored(repo, pkg.id());
     }
 
     @Test
