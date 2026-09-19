@@ -48,8 +48,10 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -135,6 +137,11 @@ class CargoCrateControllerIT {
     final var info = this.userTxService.create(unique(prefix), role, hash, salt);
     this.entityManager.flush();
     return this.userRepository.findById(info.getId()).orElseThrow();
+  }
+
+  private static String basicAuth(final String username, final String password) {
+    final var raw = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
+    return "Basic " + Base64.getEncoder().encodeToString(raw);
   }
 
   private String token(final User user) {
@@ -533,6 +540,25 @@ class CargoCrateControllerIT {
   @Nested
   @DisplayName("Authorization")
   class Authorization {
+
+    @Test
+    @DisplayName("answers an unknown Basic username exactly like a wrong password (RPS-906)")
+    void basicCredentialsDoNotRevealUsernames() throws Exception {
+      final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, true);
+      final var user = CargoCrateControllerIT.this.createUser("basic", UserRole.USER);
+      final var path = "/api/cargo/crates/" + repo.getName();
+
+      for (final var auth :
+          List.of(
+              basicAuth(user.getUsername(), "wrong"),
+              basicAuth("ghost-" + UUID.randomUUID(), "wrong"))) {
+        expectError(
+            CargoCrateControllerIT.this.request("GET", path, auth),
+            HttpStatus.UNAUTHORIZED,
+            "unAuthorized",
+            "The user has logged in but has no permissions.");
+      }
+    }
 
     @Test
     void rejectsMissingMalformedExpiredAndDeletedUserTokens() throws Exception {

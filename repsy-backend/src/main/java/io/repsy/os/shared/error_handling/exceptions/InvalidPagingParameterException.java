@@ -19,7 +19,10 @@ import java.io.Serial;
 import lombok.Getter;
 import org.jspecify.annotations.NonNull;
 
-/** Thrown when a paged request carries a {@code page} or {@code size} that is not acceptable. */
+/**
+ * Thrown when a paged request carries a {@code page}, {@code size} or {@code sort} that is not
+ * acceptable.
+ */
 @Getter
 public class InvalidPagingParameterException extends RuntimeException {
 

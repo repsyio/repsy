@@ -229,19 +229,33 @@ public class ProtocolAuthService {
   protected void handleUsernamePasswordAuthentication(
       final @NonNull Credentials credentials, final @NonNull Permission permission) {
 
+    this.authorizeUser(this.authenticateWithPassword(credentials), permission);
+  }
+
+  /**
+   * Resolves the user behind a username/password pair. An unknown username, a missing username and
+   * a wrong password all fail with the same {@code unAuthorized} error, so the response does not
+   * reveal which usernames exist.
+   */
+  protected @NonNull UserInfo authenticateWithPassword(final @NonNull Credentials credentials) {
+
     final var username = credentials.getUsername();
+    final var password = credentials.getPassword();
 
-    if (username == null || !this.userTxService.existsByUsername(username)) {
+    if (username == null || password == null) {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
-    final var userInfo = this.userTxService.getUserByUsername(username);
+    final var userInfo =
+        this.userTxService
+            .getUserByUsernameOptional(username)
+            .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
 
-    if (!checkPassword(userInfo.getHash(), userInfo.getSalt(), credentials.getPassword())) {
+    if (!checkPassword(userInfo.getHash(), userInfo.getSalt(), password)) {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
-    this.authorizeUser(userInfo, permission);
+    return userInfo;
   }
 
   private @NonNull RepoPermissionInfo authorizeRepoUser(
@@ -270,13 +284,7 @@ public class ProtocolAuthService {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
-    final var userInfo = this.userTxService.getUserByUsername(credentials.getUsername());
-
-    if (!checkPassword(userInfo.getHash(), userInfo.getSalt(), credentials.getPassword())) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    return userInfo;
+    return this.authenticateWithPassword(credentials);
   }
 
   private @NonNull UserInfo authenticateWithBearer(final @NonNull String authHeader) {
