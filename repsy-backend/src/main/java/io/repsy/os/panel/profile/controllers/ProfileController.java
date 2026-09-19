@@ -77,14 +77,17 @@ class ProfileController {
   }
 
   @PutMapping("/password")
-  public @NonNull RestResponse<Void> updatePassword(
+  public @NonNull RestResponse<LoginInfo> updatePassword(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestBody @Valid final @NonNull PasswordForm form) {
 
-    this.profileService.updatePassword(
-        this.jwtUtils.extractUserId(authHeader, TokenRealm.PANEL), form);
+    final var loginInfo =
+        this.profileService.updatePassword(
+            this.jwtUtils.extractUserId(authHeader, TokenRealm.PANEL),
+            form,
+            this.jwtUtils.extractSessionStart(authHeader));
 
-    return this.resp.success("passwordChanged");
+    return this.resp.success("passwordChanged", loginInfo);
   }
 
   @DeleteMapping

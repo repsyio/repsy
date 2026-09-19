@@ -607,7 +607,9 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           .andExpect(jsonPath("$.*", hasSize(5)))
           .andExpect(jsonPath("$.msgId").value("passwordChanged"))
           .andExpect(jsonPath("$.type").value("SUCCESS"))
-          .andExpect(jsonPath("$.data").value(nullValue()))
+          .andExpect(jsonPath("$.data.username").value(user.getUsername()))
+          .andExpect(jsonPath("$.data.token").value(notNullValue()))
+          .andExpect(jsonPath("$.data.refreshToken").value(notNullValue()))
           .andExpect(jsonPath("$.errorCode").value(nullValue()))
           .andExpect(jsonPath("$.text").value("Password changed."));
 
@@ -626,19 +628,35 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var oldRefreshToken = ProfileControllerIT.this.refreshTokenFor(user);
       final var newPassword = "NewPassword2@";
 
-      ProfileControllerIT.this
-          .mockMvc
-          .perform(
-              put("/api/profile/password")
-                  .with(apiPort())
-                  .header(AUTHORIZATION, token)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(body(newPassword)))
-          .andExpect(status().isOk());
+      final var passwordChangeBody =
+          ProfileControllerIT.this
+              .mockMvc
+              .perform(
+                  put("/api/profile/password")
+                      .with(apiPort())
+                      .header(AUTHORIZATION, token)
+                      .contentType(MediaType.APPLICATION_JSON)
+                      .content(body(newPassword)))
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
 
       ProfileControllerIT.this.expectRefreshRejected(oldRefreshToken);
 
-      // A login after the change gets a refresh token that works.
+      final String currentRefreshToken =
+          JsonPath.read(passwordChangeBody, "$.data.refreshToken");
+      ProfileControllerIT.this
+          .mockMvc
+          .perform(
+              post("/api/auth/tokens/refresh")
+                  .with(apiPort())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"refreshToken\":\"%s\"}".formatted(currentRefreshToken)))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("tokenRefreshed"));
+
+      // A subsequent login also gets a refresh token that works.
       final var loginBody =
           ProfileControllerIT.this
               .mockMvc

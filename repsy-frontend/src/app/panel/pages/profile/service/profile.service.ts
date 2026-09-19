@@ -38,10 +38,16 @@ export class ProfileService {
     return this.profileControllerService.getProfile(this.authorizationHeader).pipe(map((r) => r.data!));
   }
 
-  public updatePassword(password: string): Observable<void> {
+  public updatePassword(password: string): Observable<LoginInfo> {
     return this.profileControllerService
       .updatePassword(this.authorizationHeader, { password })
-      .pipe(map(() => undefined));
+      .pipe(
+        map((r) => {
+          const loginInfo = r.data!;
+          this.authService.updateLoginInfo(loginInfo);
+          return loginInfo;
+        }),
+      );
   }
 
   public updateUsername(username: string): Observable<LoginInfo> {

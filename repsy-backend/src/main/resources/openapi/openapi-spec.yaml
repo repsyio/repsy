@@ -197,7 +197,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
+                "$ref": "#/components/schemas/RestResponseLoginInfo"
       summary: Update the current user's password
   "/api/users":
     get:
