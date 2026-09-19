@@ -359,6 +359,28 @@ different casing variants may be registered separately.
 The admin user search is case-insensitive for convenience, so a search result may not be usable
 for login unless its displayed casing is entered exactly.
 
+### Repository Access
+
+Repsy has no per-repository owners or access lists. What a caller may do depends only on whether
+they are signed in, and on their role:
+
+| Caller | Public repository | Private repository |
+| --- | --- | --- |
+| Anonymous | Read | No access |
+| Signed-in `USER` | Read, write, and create repositories | Read, write, and create repositories |
+| `ADMIN` | Everything a `USER` can do, plus manage | Everything a `USER` can do, plus manage |
+
+"Private" therefore means **login required**, not "restricted to specific users". Every user account
+on the instance can read and modify every repository, including private ones, and can see their
+names. Only *manage* operations need the `ADMIN` role: renaming a repository or changing its
+description and settings, deleting it, deleting its artifacts and versions, managing its deploy
+tokens, and managing users.
+
+Deploy tokens are scoped to a single repository, so use one to give a CI job or an external party
+access to that repository without a user account. Only create user accounts for people you trust
+with every repository on the instance; to keep repositories apart between teams, run one Repsy
+instance per team.
+
 For detailed information on creating repositories, managing deploy tokens, and using different protocols (Golang, Cargo(Rust), Maven, npm, PyPI, Docker), see the [documentation](https://docs.repsy.io).
 
 ## Troubleshooting

@@ -26,11 +26,13 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Optional;
@@ -194,6 +196,86 @@ class ProtocolAuthServiceTest {
           () -> ProtocolAuthServiceTest.this.authService.authenticateUser(basicAuth("ghost", "x")));
 
       verify(ProtocolAuthServiceTest.this.userTxService, never()).getUserByUsername(anyString());
+    }
+  }
+
+  /**
+   * RPS-939: repos have no owner or access list, so "private" means "login required". Any signed-in
+   * user can read and write every repo; only MANAGE needs the ADMIN role. These tests pin that
+   * model, which the README documents, so a change to it has to be deliberate.
+   */
+  @Nested
+  @DisplayName("a private repo is open to every signed-in user")
+  class PrivateMeansLoginRequired {
+
+    private final UserInfo admin =
+        UserInfo.builder()
+            .id(UUID.randomUUID())
+            .username("root")
+            .salt(SALT)
+            .hash(DigestUtils.sha256Hex(PASSWORD + SALT))
+            .role(UserRole.ADMIN)
+            .build();
+
+    private final RepoInfo privateRepo =
+        RepoInfo.builder()
+            .id(UUID.randomUUID())
+            .name("secret")
+            .privateRepo(true)
+            .type(RepoType.MAVEN)
+            .build();
+
+    @Test
+    @DisplayName("a non-admin user can read and write, but not manage")
+    void userCanReadAndWriteButNotManage() {
+      final var authService = ProtocolAuthServiceTest.this.authService;
+
+      final var permissionInfo = authService.authorizeUser(ALICE, Permission.WRITE);
+
+      assertThat(authService.authorizeUser(ALICE, Permission.READ).isCanRead()).isTrue();
+      assertThat(permissionInfo.isCanRead()).isTrue();
+      assertThat(permissionInfo.isCanWrite()).isTrue();
+      assertThat(permissionInfo.isCanManage()).isFalse();
+      assertUnauthorized(() -> authService.authorizeUser(ALICE, Permission.MANAGE));
+    }
+
+    @Test
+    @DisplayName("an admin can also manage")
+    void adminCanManage() {
+      final var permissionInfo =
+          ProtocolAuthServiceTest.this.authService.authorizeUser(this.admin, Permission.MANAGE);
+
+      assertThat(permissionInfo.isCanRead()).isTrue();
+      assertThat(permissionInfo.isCanWrite()).isTrue();
+      assertThat(permissionInfo.isCanManage()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a non-admin user with valid credentials gets read and write on a private repo")
+    void userReachesPrivateRepo() {
+      final var authService = ProtocolAuthServiceTest.this.authService;
+      final var authHeader = basicAuth(USERNAME, PASSWORD);
+
+      final var read =
+          authService.authorizeUserRequest(this.privateRepo, authHeader, Permission.READ);
+      final var write =
+          authService.authorizeUserRequest(this.privateRepo, authHeader, Permission.WRITE);
+
+      assertThat(read.getCanRead()).isTrue();
+      assertThat(write.getCanRead()).isTrue();
+      assertThat(write.getCanWrite()).isTrue();
+      assertThat(write.getCanManage()).isFalse();
+      assertUnauthorized(
+          () -> authService.authorizeUserRequest(this.privateRepo, authHeader, Permission.MANAGE));
+    }
+
+    @Test
+    @DisplayName("an anonymous caller is still turned away from a private repo")
+    void anonymousCannotReachPrivateRepo() {
+      assertUnauthorized(
+          () ->
+              ProtocolAuthServiceTest.this.authService.authorizeUserRequest(
+                  this.privateRepo, null, Permission.READ));
     }
   }
 }
