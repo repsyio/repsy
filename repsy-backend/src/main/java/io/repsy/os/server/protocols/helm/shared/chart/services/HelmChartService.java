@@ -100,15 +100,22 @@ public class HelmChartService implements ChartService<UUID> {
         .map(this::toDetail);
   }
 
+  /** Versions of the chart, newest first by creation time. Empty when the chart does not exist. */
   public List<HelmChartInfo> findAllVersionsByName(final UUID repoId, final String name) {
     return this.helmChartRepository
         .findByRepoIdAndName(repoId, name)
         .map(
             chart ->
-                this.helmChartVersionRepository.findAllByChart(chart).stream()
+                this.helmChartVersionRepository
+                    .findAllByChartOrderByCreatedAtDescIdDesc(chart)
+                    .stream()
                     .<HelmChartInfo>map(this::toDetail)
                     .toList())
         .orElse(List.of());
+  }
+
+  public boolean existsByRepoIdAndName(final UUID repoId, final String name) {
+    return this.helmChartRepository.findByRepoIdAndName(repoId, name).isPresent();
   }
 
   @Override
