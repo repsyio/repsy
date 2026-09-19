@@ -23,6 +23,7 @@ import io.repsy.os.server.shared.token.dtos.DeployTokenInfoListItem;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.mappers.DeployTokenConverter;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
+import io.repsy.os.server.shared.token.utils.DeployTokenHash;
 import io.repsy.os.server.shared.token.utils.DeployTokenUtils;
 import io.repsy.os.server.shared.token.utils.TokenUsernameGenerator;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -67,14 +68,14 @@ public class DeployTokenService {
       final @NonNull String token, final @NonNull RepoType repoType) {
 
     return this.deployTokenRepository
-        .findByTokenAndRepoType(token, repoType)
+        .findByTokenAndRepoType(DeployTokenHash.hash(token), repoType)
         .map(this.deployTokenConverter::toDeployTokenInfo);
   }
 
   public @NonNull Optional<DeployTokenInfo> findByToken(final @NonNull String token) {
 
     return this.deployTokenRepository
-        .findByToken(token)
+        .findByToken(DeployTokenHash.hash(token))
         .map(this.deployTokenConverter::toDeployTokenInfo);
   }
 
@@ -82,7 +83,7 @@ public class DeployTokenService {
       final @NonNull UUID repoId, final @NonNull String token) {
 
     return this.deployTokenRepository
-        .findByRepoIdAndToken(repoId, token)
+        .findByRepoIdAndToken(repoId, DeployTokenHash.hash(token))
         .map(this.deployTokenConverter::toDeployTokenInfo);
   }
 
@@ -104,7 +105,7 @@ public class DeployTokenService {
     final var repoDeployToken = this.deployTokenConverter.toDeployToken(deployTokenForm);
 
     repoDeployToken.setRepo(repo);
-    repoDeployToken.setToken(generatedToken);
+    repoDeployToken.setToken(DeployTokenHash.hash(generatedToken));
 
     if (repoDeployToken.getUsername() == null || repoDeployToken.getUsername().isEmpty()) {
       repoDeployToken.setUsername(TokenUsernameGenerator.deployTokenUsername());
@@ -148,7 +149,7 @@ public class DeployTokenService {
           Instant.now().plus(repoDeployToken.getTokenDurationDay(), ChronoUnit.DAYS));
     }
 
-    repoDeployToken.setToken(newToken);
+    repoDeployToken.setToken(DeployTokenHash.hash(newToken));
 
     this.deployTokenRepository.save(repoDeployToken);
 

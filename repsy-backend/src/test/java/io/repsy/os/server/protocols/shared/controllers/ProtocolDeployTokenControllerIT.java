@@ -29,6 +29,7 @@ import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
+import io.repsy.os.server.shared.token.utils.DeployTokenHash;
 import io.repsy.os.server.shared.token.utils.TokenUsernameGenerator;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -94,7 +95,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  *
  * <p>Several assertions pin behavior that is surprising rather than desirable; each is called out
  * in the test's display name or comment so a future fix shows up as a deliberate test change:
- * deploy tokens are persisted in clear text, {@code DeployTokenForm} has no name pattern or
+ * deploy tokens are persisted as SHA-256 hashes, {@code DeployTokenForm} has no name pattern or
  * permission field, token names are not unique per repo, and the list endpoint answers a page past
  * the end (and an empty repo) with a synthetic empty page.
  */
@@ -233,7 +234,8 @@ class ProtocolDeployTokenControllerIT {
 
   /**
    * Inserts a deploy token row directly and returns it re-read from the database. The secret is
-   * generated exactly as the application does, so it satisfies the unique index on {@code token}.
+   * generated and hashed exactly as the application does, so it satisfies the unique index on
+   * {@code token}.
    */
   private RepoDeployToken seedToken(
       final RepoInfo repo,
@@ -245,7 +247,7 @@ class ProtocolDeployTokenControllerIT {
     entity.setName(name);
     entity.setDescription("seeded " + name);
     entity.setUsername(TokenUsernameGenerator.deployTokenUsername());
-    entity.setToken(TokenFactory.deployToken());
+    entity.setToken(DeployTokenHash.hash(TokenFactory.deployToken()));
     entity.setReadOnly(readOnly);
     entity.setExpirationDate(expirationDate);
     entity.setTokenDurationDay(30);
@@ -722,14 +724,9 @@ class ProtocolDeployTokenControllerIT {
       assertThat(row.getId()).isNotNull();
     }
 
-    /**
-     * The story asks to assert that only a hash is persisted. It is not: the secret is stored
-     * verbatim (protocol auth looks tokens up by equality via {@code findByRepoIdAndToken}), so
-     * this pins the current behavior. Switching to hashed storage must update this test.
-     */
     @Test
-    @DisplayName("returns the secret once; it is persisted in clear text and never listed again")
-    void secretIsReturnedOnceAndStoredVerbatim() throws Exception {
+    @DisplayName("returns the secret once; only its hash is persisted and never listed again")
+    void secretIsReturnedOnceAndStoredHashed() throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var repo = it.createRepo(RepoType.MAVEN);
       final var token = it.adminBearerToken();
@@ -745,9 +742,10 @@ class ProtocolDeployTokenControllerIT {
       final String secret = JsonPath.read(created, "$.data.token");
 
       final var row = it.tokensOf(repo).getFirst();
-      assertThat(row.getToken()).isEqualTo(secret);
+      assertThat(row.getToken()).isEqualTo(DeployTokenHash.hash(secret));
+      assertThat(row.getToken()).isNotEqualTo(secret);
       assertThat(it.deployTokenRepository.findByRepoIdAndToken(repo.getStorageKey(), secret))
-          .isPresent();
+          .isEmpty();
 
       final var listed =
           expectSuccess(
@@ -1287,11 +1285,11 @@ class ProtocolDeployTokenControllerIT {
       // Only the secret changes; id, name, username, description, read_only, expiry, duration and
       // created_at all stay as they were before the request.
       final var after = it.stateOf(before.id());
-      assertThat(after).isEqualTo(before.withToken(newSecret));
+      assertThat(after).isEqualTo(before.withToken(DeployTokenHash.hash(newSecret)));
       assertThat(it.deployTokenRepository.findByRepoIdAndToken(repo.getStorageKey(), oldSecret))
           .isEmpty();
       assertThat(it.deployTokenRepository.findByRepoIdAndToken(repo.getStorageKey(), newSecret))
-          .isPresent();
+          .isEmpty();
       assertThat(it.tokensOf(repo)).hasSize(1);
     }
 
