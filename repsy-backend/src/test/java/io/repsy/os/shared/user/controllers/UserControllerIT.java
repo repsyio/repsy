@@ -41,6 +41,7 @@ import java.nio.file.Files;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
@@ -782,6 +783,32 @@ class UserControllerIT {
           USERNAME_IN_USE_TEXT);
 
       assertThat(UserControllerIT.this.userRepository.count()).isEqualTo(countBefore);
+    }
+
+    @Test
+    @DisplayName("treats usernames with different casing as distinct")
+    void usernamesAreCaseSensitive() throws Exception {
+      final var token = UserControllerIT.this.adminBearerToken();
+      final var username = uniqueUsername("Case");
+
+      expectSuccess(
+          UserControllerIT.this.perform(
+              post("/api/users")
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(createBody(username, VALID_PASSWORD, "USER"))),
+          "userCreated");
+
+      final var lowerCaseUsername = username.toLowerCase(Locale.ROOT);
+      assertThat(lowerCaseUsername).isNotEqualTo(username);
+
+      expectSuccess(
+          UserControllerIT.this.perform(
+              post("/api/users")
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(createBody(lowerCaseUsername, VALID_PASSWORD, "USER"))),
+          "userCreated");
     }
 
     @Test

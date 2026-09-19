@@ -347,6 +347,16 @@ proxy_set_header X-Forwarded-Port $server_port;
     - **Username**: `admin`
     - **Password**: the value you set for `ADMIN_INITIAL_PASSWORD`
 
+### Username Casing
+
+Usernames are case-sensitive. Users must use the exact casing chosen when the account was
+created when signing in or changing a username; for example, `MixedCase123`, `mixedcase123`, and
+`MIXEDCASE123` are distinct usernames. Username uniqueness is also checked with exact casing, so
+different casing variants may be registered separately.
+
+The admin user search is case-insensitive for convenience, so a search result may not be usable
+for login unless its displayed casing is entered exactly.
+
 For detailed information on creating repositories, managing deploy tokens, and using different protocols (Golang, Cargo(Rust), Maven, npm, PyPI, Docker), see the [documentation](https://docs.repsy.io).
 
 ## Troubleshooting
