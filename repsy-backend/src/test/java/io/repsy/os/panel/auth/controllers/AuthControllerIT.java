@@ -149,12 +149,15 @@ class AuthControllerIT extends AbstractIntegrationTest {
 
   private String refreshTokenFor(
       final User user, final Instant sessionStart, final int tokenVersion) {
-    return this.jwtUtils.createRefreshToken(
-        user.getId(),
-        user.getUsername(),
-        AuthUtils.TIMEOUT_REFRESH_TOKEN,
-        sessionStart,
-        tokenVersion);
+    final var refreshToken =
+        this.jwtUtils.createRefreshToken(
+            user.getId(),
+            user.getUsername(),
+            AuthUtils.TIMEOUT_REFRESH_TOKEN,
+            sessionStart,
+            tokenVersion);
+    this.registerRefreshToken(refreshToken);
+    return refreshToken;
   }
 
   /** The signing secret of the running application (random per context unless configured). */
@@ -722,6 +725,23 @@ class AuthControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("rejects a replay and revokes the whole refresh-token family")
+    void rejectsReplayAndRevokesFamily() throws Exception {
+      final var user = AuthControllerIT.this.createUser(uniqueUsername("replay"), UserRole.USER);
+      final var loginBody =
+          expectSuccess(
+              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
+      final String originalRefreshToken = JsonPath.read(loginBody, "$.data.refreshToken");
+
+      final var firstRefreshBody =
+          expectSuccess(AuthControllerIT.this.refreshWith(originalRefreshToken), "tokenRefreshed");
+      final String childRefreshToken = JsonPath.read(firstRefreshBody, "$.data.refreshToken");
+
+      expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(originalRefreshToken));
+      expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(childRefreshToken));
+    }
+
+    @Test
     @DisplayName("needs no Authorization header, and ignores an invalid one")
     void ignoresAuthorizationHeader() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("noauth"), UserRole.USER);
@@ -1005,6 +1025,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
               AuthUtils.TIMEOUT_REFRESH_TOKEN,
               Instant.now(),
               0);
+      AuthControllerIT.this.registerRefreshToken(token);
 
       expectUserNotFound(AuthControllerIT.this.refreshWith(token));
     }

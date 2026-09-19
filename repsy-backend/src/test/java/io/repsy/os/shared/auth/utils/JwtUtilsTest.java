@@ -22,7 +22,6 @@ import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
-import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.constants.ErrorConstants;
 import java.time.Duration;
 import java.time.Instant;
@@ -58,7 +57,12 @@ class JwtUtilsTest {
 
     final var result = this.jwtUtils.verifyRefreshToken(refreshToken);
 
-    assertThat(result).isEqualTo(new RefreshTokenClaims(userId, SESSION_START, TOKEN_VERSION));
+    assertThat(result.userId()).isEqualTo(userId);
+    assertThat(result.sessionStart()).isEqualTo(SESSION_START);
+    assertThat(result.tokenVersion()).isEqualTo(TOKEN_VERSION);
+    assertThat(result.tokenId()).isEqualTo(UUID.fromString(JWT.decode(refreshToken).getId()));
+    assertThat(result.familyId())
+        .isEqualTo(UUID.fromString(JWT.decode(refreshToken).getClaim("token_family").asString()));
   }
 
   @Test

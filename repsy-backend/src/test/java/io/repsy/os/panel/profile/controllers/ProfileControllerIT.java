@@ -58,12 +58,15 @@ import org.springframework.test.util.ReflectionTestUtils;
 class ProfileControllerIT extends AbstractIntegrationTest {
 
   private String refreshTokenFor(final User user) {
-    return this.jwtUtils.createRefreshToken(
-        user.getId(),
-        user.getUsername(),
-        AuthUtils.TIMEOUT_REFRESH_TOKEN,
-        Instant.now(),
-        user.getTokenVersion());
+    final var token =
+        this.jwtUtils.createRefreshToken(
+            user.getId(),
+            user.getUsername(),
+            AuthUtils.TIMEOUT_REFRESH_TOKEN,
+            Instant.now(),
+            user.getTokenVersion());
+    this.registerRefreshToken(token);
+    return token;
   }
 
   private void expectRefreshRejected(final String refreshToken) throws Exception {
