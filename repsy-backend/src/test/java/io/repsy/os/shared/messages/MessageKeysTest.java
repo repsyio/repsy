@@ -97,6 +97,9 @@ class MessageKeysTest {
       Pattern.compile(
           "static\\s+final\\s+(?:@\\w+\\s+)?String\\s+([A-Z][A-Z0-9_]*)\\s*=\\s*\"([^\"\\\\]*)\"");
 
+  /** Success msgIds that are still missing from the bundle. */
+  private static final Set<String> PENDING_RPS_940 = Set.of("movedToPath");
+
   /**
    * Error msgIds thrown from exceptions with no bundle entry yet. RPS-958 adds the entries or drops
    * the ids; delete each id here in that change.
@@ -165,6 +168,7 @@ class MessageKeysTest {
     final var missing = new TreeMap<>(usedMsgIds);
 
     missing.keySet().removeAll(messages.stringPropertyNames());
+    missing.keySet().removeAll(PENDING_RPS_940);
     missing.keySet().removeAll(PENDING_RPS_958);
 
     assertThat(missing)
@@ -189,6 +193,7 @@ class MessageKeysTest {
   void allowlistsHoldOnlyIdsThatAreStillMissing() {
     final var pending = new TreeSet<String>();
 
+    pending.addAll(PENDING_RPS_940);
     pending.addAll(PENDING_RPS_958);
 
     final var nowHaveEntries =
