@@ -946,8 +946,7 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName(
-        "currently answers 500 errorOccurred for a validly signed token whose subject is no UUID")
+    @DisplayName("returns 403 accessNotAllowed for a validly signed token whose subject is no UUID")
     void nonUuidSubject() throws Exception {
       final var token =
           signedToken(
@@ -956,11 +955,11 @@ class AuthControllerIT {
               Instant.now().plus(AuthUtils.TIMEOUT_REFRESH_TOKEN),
               Algorithm.HMAC512(AuthControllerIT.this.serverSecret()));
 
-      expectInternalError(AuthControllerIT.this.refreshWith(token));
+      expectAccessNotAllowed(AuthControllerIT.this.refreshWith(token));
     }
 
     @Test
-    @DisplayName("currently answers 500 errorOccurred for a validly signed token without a subject")
+    @DisplayName("returns 403 accessNotAllowed for a validly signed token without a subject")
     void missingSubject() throws Exception {
       final var token =
           signedToken(
@@ -969,7 +968,7 @@ class AuthControllerIT {
               Instant.now().plus(AuthUtils.TIMEOUT_REFRESH_TOKEN),
               Algorithm.HMAC512(AuthControllerIT.this.serverSecret()));
 
-      expectInternalError(AuthControllerIT.this.refreshWith(token));
+      expectAccessNotAllowed(AuthControllerIT.this.refreshWith(token));
     }
 
     @ParameterizedTest(name = "{0}")

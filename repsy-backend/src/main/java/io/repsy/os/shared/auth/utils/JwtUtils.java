@@ -124,7 +124,11 @@ public class JwtUtils {
   }
 
   public @NonNull UUID getUserId(final @NonNull String token) {
-    return UUID.fromString(this.verifyAndDecode(token).getSubject());
+    try {
+      return UUID.fromString(this.verifyAndDecode(token).getSubject());
+    } catch (final IllegalArgumentException | NullPointerException _) {
+      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
   }
 
   public void isRefreshTokenExpired(final @NonNull String token) {
