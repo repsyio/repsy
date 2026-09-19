@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
@@ -52,10 +53,14 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -64,6 +69,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -437,6 +443,88 @@ class MavenArtifactControllerIT {
           .andExpect(jsonPath("$.data").value("artifactNotFound"))
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)))
           .andExpect(jsonPath("$.text").value(notNullValue()));
+    }
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the list endpoints")
+  class PagingAndSorting {
+
+    private static final String ARTIFACTS = "/api/mvn/artifacts/{repo}";
+    private static final String GROUP_ARTIFACTS = "/api/mvn/artifacts/{repo}/{group}";
+    private static final String VERSIONS = "/api/mvn/artifacts/{repo}/{group}/{artifact}/versions";
+    private static final String VERSIONS_LIKE = VERSIONS + "?version=1";
+
+    static Stream<String> endpoints() {
+      return Stream.of(ARTIFACTS, GROUP_ARTIFACTS, VERSIONS, VERSIONS_LIKE);
+    }
+
+    static Stream<Arguments> acceptedSorts() {
+      final var artifactSorts =
+          Stream.of(ARTIFACTS, GROUP_ARTIFACTS)
+              .flatMap(
+                  path ->
+                      Stream.of("id", "groupName", "artifactName", "lastUpdatedAt")
+                          .map(property -> Arguments.of(path, property)));
+      final var versionSorts =
+          Stream.of(VERSIONS, VERSIONS_LIKE)
+              .flatMap(
+                  path ->
+                      Stream.of("id", "versionName", "lastUpdatedAt")
+                          .map(property -> Arguments.of(path, property)));
+
+      return Stream.concat(artifactSorts, versionSorts);
+    }
+
+    static Stream<Arguments> invalidPagingOnEveryEndpoint() {
+      return endpoints()
+          .flatMap(
+              path ->
+                  PagingAssertions.invalidPagingParams()
+                      .map(args -> Arguments.of(path, args.get()[0], args.get()[1])));
+    }
+
+    private ResultActions list(final String path, final String param, final String value)
+        throws Exception {
+      final var it = MavenArtifactControllerIT.this;
+
+      return it.mockMvc.perform(
+          get(path, it.repoName, GROUP, ARTIFACT).param(param, value).with(apiPort()));
+    }
+
+    @ParameterizedTest(name = "{0} sort={1}")
+    @MethodSource("acceptedSorts")
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String path, final String property) throws Exception {
+      this.list(path, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(path, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("orders the versions by the requested sort property")
+    void ordersVersions() throws Exception {
+      this.list(VERSIONS, "sort", "versionName,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].versionName").value("1.0.0"));
+      this.list(VERSIONS, "sort", "versionName,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].versionName").value("1.1.0-SNAPSHOT"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400(final String path) throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(path, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0} {1}={2}")
+    @MethodSource("invalidPagingOnEveryEndpoint")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String path, final String param, final String value)
+        throws Exception {
+      PagingAssertions.expectInvalidParameter(this.list(path, param, value), param);
     }
   }
 }

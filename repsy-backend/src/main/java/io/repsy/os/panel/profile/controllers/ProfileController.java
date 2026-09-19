@@ -55,8 +55,6 @@ class ProfileController {
   public @NonNull RestResponse<ProfileInfo> get(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
-    this.jwtUtils.verify(authHeader, TokenRealm.PANEL);
-
     final var userId = this.jwtUtils.extractUserId(authHeader, TokenRealm.PANEL);
 
     final var profileInfo = this.profileService.getProfile(userId);
@@ -92,8 +90,6 @@ class ProfileController {
   @DeleteMapping
   public @NonNull RestResponse<Void> deleteProfile(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
-
-    this.jwtUtils.verify(authHeader, TokenRealm.PANEL);
 
     final var userId = this.jwtUtils.extractUserId(authHeader, TokenRealm.PANEL);
 

@@ -28,7 +28,9 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Pageable;
@@ -48,6 +50,10 @@ import org.springframework.web.bind.annotation.RestController;
 @SuppressWarnings("java:S6856")
 public class NuGetPackageController {
 
+  private static final Set<String> PACKAGE_SORT_PROPERTIES = Set.of("packageId");
+
+  private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("version", "publishedAt");
+
   private final NuGetApiFacade nugetApiFacade;
   private final RestResponseFactory responseFactory;
   private final UsageUpdateService usageUpdateService;
@@ -58,6 +64,8 @@ public class NuGetPackageController {
       final RepoInfo repoInfo,
       @RequestParam(defaultValue = "") final String query,
       final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, PACKAGE_SORT_PROPERTIES);
 
     final var packages = this.nugetApiFacade.search(repoInfo, query, pageable);
 
@@ -78,6 +86,8 @@ public class NuGetPackageController {
   @RepoOperation
   public RestResponse<PagedModel<NuGetVersionListItem>> listVersions(
       final RepoInfo repoInfo, @PathVariable final String packageId, final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
 
     final var versions = this.nugetApiFacade.getVersions(repoInfo, packageId, pageable);
 
