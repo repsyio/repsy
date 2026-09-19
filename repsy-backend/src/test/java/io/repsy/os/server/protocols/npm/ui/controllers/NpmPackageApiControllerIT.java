@@ -352,6 +352,23 @@ class NpmPackageApiControllerIT {
     }
 
     @Test
+    void returnsTheLatestVersionDetailOfAnUnscopedPackageWhenTheVersionIsOmitted()
+        throws Exception {
+      // plain-package also has a newer 2.0.0-next.1 published under the "next" tag: the fallback
+      // follows the package's latest version, not the newest one.
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/packages/{repo}/{package}", repoName, "plain-package"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
+          .andExpect(jsonPath("$.type").value("SUCCESS"))
+          .andExpect(jsonPath("$.data.packageName").value("plain-package"))
+          .andExpect(jsonPath("$.data.scopeName").doesNotExist())
+          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
+          .andExpect(jsonPath("$.data.license").value("Apache-2.0"))
+          .andExpect(jsonPath("$.data.content").doesNotExist());
+    }
+
+    @Test
     void listsVersionsAndTagsForBothScopeForms() throws Exception {
       NpmPackageApiControllerIT.this
           .perform(
