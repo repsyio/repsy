@@ -29,6 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -320,12 +321,32 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     return existingFileLength;
   }
 
+  /**
+   * Renames the object to its digest. The target is content-addressed, so when it already exists
+   * (the same layer pushed twice, or concurrently) it holds the same bytes: the redundant source is
+   * dropped and the call succeeds. The digest comes from the client, so it has to be a plain file
+   * name: anything that could leave the source's directory is refused.
+   */
   @SneakyThrows
   @Override
   public void renameObject(final @NonNull StoragePath storagePath, final @NonNull String digest) {
+    if (digest.isEmpty()
+        || digest.equals(".")
+        || digest.contains("..")
+        || digest.contains("/")
+        || digest.contains("\\")) {
+      throw new InvalidStoragePathException("invalidStoragePath");
+    }
     final Path basePathObj = this.toPhysicalPath(storagePath);
-    final Path renamedPath = basePathObj.resolveSibling(digest);
-    Files.move(basePathObj, renamedPath);
+    this.moveOrDropDuplicate(basePathObj, basePathObj.resolveSibling(digest));
+  }
+
+  private void moveOrDropDuplicate(final Path source, final Path target) throws IOException {
+    try {
+      Files.move(source, target);
+    } catch (final FileAlreadyExistsException e) {
+      Files.deleteIfExists(source);
+    }
   }
 
   private @NonNull Path toPhysicalPath(final @NonNull StoragePath storagePath) {

@@ -17,17 +17,16 @@
 import { HttpErrorResponse, HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
-import { EMPTY, Observable, Subject, throwError } from 'rxjs';
-import { catchError, switchMap, tap } from 'rxjs/operators';
+import { EMPTY, Observable, throwError } from 'rxjs';
+import { catchError, finalize, share, switchMap } from 'rxjs/operators';
 
 import { AuthService } from '../../auth/pages/service/auth.service';
 
 @Injectable()
 export class RefreshTokenInterceptor implements HttpInterceptor {
-  private _tokenRefreshInProgress = false;
-
-  private readonly _refreshTokenSource = new Subject<string>();
-  private readonly _tokenRefreshed$ = this._refreshTokenSource.asObservable();
+  // The refresh currently in flight, shared by every request that hit sessionExpired meanwhile.
+  // It is cleared once the refresh settles, so the next refresh always starts from a clean state.
+  private _refresh$: Observable<string> | null = null;
 
   constructor(
     private readonly router: Router,
@@ -37,7 +36,7 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
   public intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     return next.handle(req).pipe(
       catchError((res: HttpErrorResponse) => {
-        if (res && res.status && res.error && res.status === 403 && res.error.msgId === 'sessionExpired') {
+        if (res && res.status && res.error && res.status === 401 && res.error.msgId === 'sessionExpired') {
           return this._refreshToken().pipe(
             switchMap((accessToken: string) => {
               return next.handle(
@@ -49,7 +48,7 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
           );
         }
 
-        if (res && res.status && res.error && res.status === 403 && res.error.msgId === 'refreshTokenExpired') {
+        if (res && res.status && res.error && res.status === 401 && res.error.msgId === 'refreshTokenExpired') {
           this._logOut();
           return EMPTY;
         }
@@ -64,35 +63,16 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
   }
 
   private _refreshToken(): Observable<string> {
-    if (this._tokenRefreshInProgress) {
-      return new Observable<string>((observer) => {
-        this._tokenRefreshed$.subscribe(
-          (accessToken: string) => {
-            observer.next(accessToken);
-            observer.complete();
-          },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (error: any) => {
-            observer.error(error);
-            observer.complete();
-          },
-        );
-      });
-    } else {
-      this._tokenRefreshInProgress = true;
-
-      return this.authService.refreshToken().pipe(
-        tap((accessToken: string) => {
-          this._tokenRefreshInProgress = false;
-          this._refreshTokenSource.next(accessToken);
-        }),
+    if (!this._refresh$) {
+      this._refresh$ = this.authService.refreshToken().pipe(
         catchError((error: HttpErrorResponse) => {
-          this._tokenRefreshInProgress = false;
-          this._refreshTokenSource.error(error);
           this._logOut();
-          return throwError(error);
+          return throwError(() => error);
         }),
+        finalize(() => (this._refresh$ = null)),
+        share(),
       );
     }
+    return this._refresh$;
   }
 }

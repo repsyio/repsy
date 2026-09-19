@@ -23,6 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.AllowedKeyserver;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.AllowedKeyserverRepository;
@@ -44,12 +45,16 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -58,6 +63,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -135,7 +141,7 @@ class KeyStoreControllerIT {
 
   private String tokenFor(final User user) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(
+        + this.jwtUtils.createPanelAccessToken(
             user.getId(), user.getUsername(), Duration.ofMinutes(30));
   }
 
@@ -259,7 +265,7 @@ class KeyStoreControllerIT {
       final var path = "/api/mvn/key-stores/allowed-servers";
       final var missing =
           KeyStoreControllerIT.this.mockMvc.perform(get(path).with(apiPort())).andReturn();
-      assertThat(missing.getResponse().getStatus()).isEqualTo(403);
+      assertThat(missing.getResponse().getStatus()).isEqualTo(401);
       assertError(missing.getResponse().getContentAsString(), "missingRequestHeader");
 
       final var malformed =
@@ -267,31 +273,31 @@ class KeyStoreControllerIT {
               .mockMvc
               .perform(get(path).with(apiPort()).header(AUTHORIZATION, "Bearer invalid"))
               .andReturn();
-      assertThat(malformed.getResponse().getStatus()).isEqualTo(403);
+      assertThat(malformed.getResponse().getStatus()).isEqualTo(401);
       assertError(malformed.getResponse().getContentAsString(), "accessNotAllowed");
 
       final var expired =
           AuthUtils.AUTH_BEARER
-              + KeyStoreControllerIT.this.jwtUtils.createTokenWithDuration(
+              + KeyStoreControllerIT.this.jwtUtils.createPanelAccessToken(
                   user.getId(), user.getUsername(), Duration.ofSeconds(-1));
       final var expiredResponse =
           KeyStoreControllerIT.this
               .mockMvc
               .perform(get(path).with(apiPort()).header(AUTHORIZATION, expired))
               .andReturn();
-      assertThat(expiredResponse.getResponse().getStatus()).isEqualTo(403);
+      assertThat(expiredResponse.getResponse().getStatus()).isEqualTo(401);
       assertError(expiredResponse.getResponse().getContentAsString(), "sessionExpired");
 
       final var refreshToken =
           AuthUtils.AUTH_BEARER
               + KeyStoreControllerIT.this.jwtUtils.createRefreshToken(
-                  user.getId(), user.getUsername(), Duration.ofMinutes(30));
+                  user.getId(), user.getUsername(), Duration.ofMinutes(30), Instant.now(), 0);
       final var refreshTokenResponse =
           KeyStoreControllerIT.this
               .mockMvc
               .perform(get(path).with(apiPort()).header(AUTHORIZATION, refreshToken))
               .andReturn();
-      assertThat(refreshTokenResponse.getResponse().getStatus()).isEqualTo(403);
+      assertThat(refreshTokenResponse.getResponse().getStatus()).isEqualTo(401);
       assertError(refreshTokenResponse.getResponse().getContentAsString(), "accessNotAllowed");
     }
   }
@@ -487,6 +493,63 @@ class KeyStoreControllerIT {
               .andReturn();
       assertThat(malformed.getResponse().getStatus()).isEqualTo(400);
       assertError(malformed.getResponse().getContentAsString(), "validationError");
+    }
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the key-store list")
+  class PagingAndSorting {
+
+    private ResultActions list(
+        final Repo repo, final String token, final String param, final String value)
+        throws Exception {
+      return KeyStoreControllerIT.this.mockMvc.perform(
+          get("/api/mvn/key-stores/" + repo.getName())
+              .with(apiPort())
+              .header(AUTHORIZATION, token)
+              .param(param, value));
+    }
+
+    private Repo seededRepo(final String token) throws Exception {
+      final var it = KeyStoreControllerIT.this;
+      final var repo = it.createRepo(RepoType.MAVEN);
+      final var server = it.keyserver("keyserver.pgp.com");
+      assertSuccess(it.performCreate(repo, token, it.body(server.getId())), "keyStoreCreated");
+      return repo;
+    }
+
+    @ParameterizedTest(name = "sort={0}")
+    @ValueSource(strings = {"id", "host", "displayName"})
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String property) throws Exception {
+      final var it = KeyStoreControllerIT.this;
+      final var token = it.tokenFor(it.createUser(UserRole.ADMIN));
+      final var repo = this.seededRepo(token);
+
+      this.list(repo, token, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(repo, token, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400() throws Exception {
+      final var it = KeyStoreControllerIT.this;
+      final var token = it.tokenFor(it.createUser(UserRole.ADMIN));
+      final var repo = this.seededRepo(token);
+
+      PagingAssertions.expectInvalidParameter(
+          this.list(repo, token, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0}={1}")
+    @MethodSource("io.repsy.os.PagingAssertions#invalidPagingParams")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String param, final String value) throws Exception {
+      final var it = KeyStoreControllerIT.this;
+      final var token = it.tokenFor(it.createUser(UserRole.ADMIN));
+      final var repo = this.seededRepo(token);
+
+      PagingAssertions.expectInvalidParameter(this.list(repo, token, param, value), param);
     }
   }
 }

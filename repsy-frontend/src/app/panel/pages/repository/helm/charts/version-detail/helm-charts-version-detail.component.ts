@@ -28,6 +28,7 @@ import {CopyClipboardComponent} from '../../../../../shared/components/copy-clip
 import {DangerModalService} from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import {SecurityScanSectionComponent} from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import {ToastService} from '../../../../../shared/components/toast/toast.service';
+import {ByteFormatter} from '../../../../../shared/util/byte-formatter';
 import {HelmService} from '../../service/helm.service';
 
 @Component({
@@ -77,12 +78,6 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
     this.repositoryChanges$.unsubscribe();
   }
 
-  public formatSize(bytes: number): string {
-    if (bytes < 1024) {return `${bytes} B`;}
-    if (bytes < 1024 * 1024) {return `${(bytes / 1024).toFixed(1)} KB`;}
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  }
-
   public deleteVersion(): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
@@ -124,7 +119,7 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
         next: (detail) => {
           this.chart = detail;
           this.error = null;
-          this.formattedSize = this.formatSize(this.chart.size);
+          this.formattedSize = ByteFormatter.formatBytes(this.chart.size);
           this.chartYaml = [
             'apiVersion: v2',
             `name: ${this.chart.name}`,

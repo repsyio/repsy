@@ -29,6 +29,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
+import io.repsy.os.shared.error_handling.exceptions.InvalidPagingParameterException;
 import io.repsy.protocols.golang.shared.exceptions.GoVersionGoneException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -72,6 +73,7 @@ public class ErrorHandler {
   private static final @NonNull String ERR_ITEM_NOT_FOUND = "itemNotFound";
   private static final @NonNull String ERR_ERROR_OCCURRED = "errorOccurred";
   private static final @NonNull String ERR_METHOD_NOT_SUPPORTED = "methodNotSupported";
+  private static final @NonNull String ERR_UNSUPPORTED_MEDIA_TYPE = "unsupportedMediaType";
   private static final @NonNull String ERR_ACCESS_NOT_ALLOWED = "accessNotAllowed";
   private static final @NonNull String ERR_UNAUTHORIZED = "unauthorizedRequest";
   private static final @NonNull String ERR_ITEM_ALREADY_EXISTS = "itemAlreadyExists";
@@ -306,6 +308,31 @@ public class ErrorHandler {
         .body(this.resp.error(ERR_VALIDATION, invalidParameters));
   }
 
+  /**
+   * Handles an unacceptable {@code page}, {@code size} or {@code sort} on a paged endpoint,
+   * answering like a constraint violation on an explicit request parameter does.
+   *
+   * @param ex Thrown paging exception
+   * @return REST response
+   */
+  @ExceptionHandler(InvalidPagingParameterException.class)
+  @Nullable ResponseEntity<RestResponse<String>> handleException(
+      final @NonNull InvalidPagingParameterException ex,
+      final @NonNull HttpServletRequest request,
+      final @Nullable HttpServletResponse response) {
+
+    if (response == null) {
+      log.debug("Invalid paging parameter", ex);
+      return null;
+    }
+
+    log.info(exceptionToString(ex, request));
+
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(this.resp.error(ERR_VALIDATION, ex.getParameterNames()));
+  }
+
   @ExceptionHandler(ErrorOccurredException.class)
   @Nullable ResponseEntity<RestResponse<String>> handleException(
       final @NonNull ErrorOccurredException ex,
@@ -370,6 +397,13 @@ public class ErrorHandler {
         .body(this.resp.error(ERR_VALIDATION));
   }
 
+  /**
+   * Handles a request method the endpoint does not support, answering 405 with an {@code Allow}
+   * header listing the methods it does.
+   *
+   * @param ex Thrown exception
+   * @return REST response
+   */
   @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
   @Nullable ResponseEntity<RestResponse<String>> handleException(
       final @NonNull HttpRequestMethodNotSupportedException ex,
@@ -377,14 +411,15 @@ public class ErrorHandler {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Wrong mime type", ex);
+      log.debug("HTTP method not supported", ex);
 
       return null;
     }
 
     log.info(exceptionToString(ex, request));
 
-    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+    return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+        .headers(ex.getHeaders())
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(ERR_METHOD_NOT_SUPPORTED));
   }
@@ -512,6 +547,13 @@ public class ErrorHandler {
         .body(this.resp.error(messageText, ex.getMessage()));
   }
 
+  /**
+   * Handles a request body with a content type the endpoint cannot read, answering 415 with an
+   * {@code Accept} header listing the content types it can.
+   *
+   * @param ex Thrown exception
+   * @return REST response
+   */
   @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
   @Nullable ResponseEntity<RestResponse<String>> handleException(
       final @NonNull HttpMediaTypeNotSupportedException ex,
@@ -519,16 +561,17 @@ public class ErrorHandler {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug(ERR_ILLEGAL_ARGUMENT, ex);
+      log.debug("Media type not supported", ex);
 
       return null;
     }
 
     log.info(exceptionToString(ex, request));
 
-    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+    return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+        .headers(ex.getHeaders())
         .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error(ERR_VALIDATION));
+        .body(this.resp.error(ERR_UNSUPPORTED_MEDIA_TYPE));
   }
 
   /**
@@ -599,9 +642,9 @@ public class ErrorHandler {
   }
 
   /**
-   * Handles a missing required request header. A missing {@code Authorization} header stays a 403
-   * like every other failed authentication on the panel (malformed, non-Bearer and expired tokens),
-   * which is what the frontend interceptors expect; any other missing header is a plain 400.
+   * Handles a missing required request header. A missing {@code Authorization} header is a failed
+   * authentication and answers 401 like the other panel authentication failures (malformed,
+   * non-Bearer and expired tokens); any other missing header is a plain 400.
    *
    * @param ex Thrown exception
    * @return REST response carrying the header name
@@ -621,7 +664,7 @@ public class ErrorHandler {
 
     final var status =
         HttpHeaders.AUTHORIZATION.equalsIgnoreCase(ex.getHeaderName())
-            ? HttpStatus.FORBIDDEN
+            ? HttpStatus.UNAUTHORIZED
             : HttpStatus.BAD_REQUEST;
 
     return ResponseEntity.status(status)

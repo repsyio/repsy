@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.cargo.shared.auth.services;
 
 import static io.repsy.os.shared.auth.utils.AuthUtils.TIMEOUT_ACCESS_TOKEN;
-import static io.repsy.os.shared.auth.utils.AuthUtils.checkPassword;
 import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromAuthHeader;
 import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBasicToken;
@@ -30,6 +29,7 @@ import io.repsy.os.server.shared.auth.ProtocolAuthService;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.services.UserTxService;
@@ -85,9 +85,9 @@ public class CargoAuthComponent extends ProtocolAuthService {
     }
 
     if (isBearerToken(authHeader)) {
-      final var username = this.jwtUtils.verifyAndExtractUsername(authHeader);
+      final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
       final var userInfo = this.userTxService.getUserByUsername(username);
-      return this.jwtUtils.createTokenWithDuration(
+      return this.jwtUtils.createProtocolToken(
           userInfo.getId(), userInfo.getUsername(), TIMEOUT_ACCESS_TOKEN);
     }
 
@@ -122,19 +122,13 @@ public class CargoAuthComponent extends ProtocolAuthService {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
-    final var userInfo = this.userTxService.getUserByUsername(credentials.getUsername());
-
-    if (!checkPassword(userInfo.getHash(), userInfo.getSalt(), credentials.getPassword())) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    return userInfo;
+    return this.authenticateWithPassword(credentials);
   }
 
   private @Nullable UserInfo resolveBearerAuthUser(
       final BaseRepoInfo<UUID> repoInfo, final String authHeader) {
 
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader);
+    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
     final var userInfoOpt = this.userTxService.getUserByUsernameOptional(username);
 
     if (userInfoOpt.isEmpty() && repoInfo.isPrivateRepo()) {
@@ -173,7 +167,7 @@ public class CargoAuthComponent extends ProtocolAuthService {
     this.deployTokenService.updateLastUsedTime(deployTokenOpt.get().getId());
 
     final var token =
-        this.jwtUtils.createTokenWithDuration(
+        this.jwtUtils.createProtocolToken(
             deployTokenOpt.get().getId(),
             credentials.getUsername(),
             TIMEOUT_ACCESS_TOKEN,
@@ -184,14 +178,10 @@ public class CargoAuthComponent extends ProtocolAuthService {
 
   private Optional<String> authenticateWithUsernamePassword(final Credentials credentials) {
 
-    final var userInfo = this.userTxService.getUserByUsername(credentials.getUsername());
-
-    if (!checkPassword(userInfo.getHash(), userInfo.getSalt(), credentials.getPassword())) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
+    final var userInfo = this.authenticateWithPassword(credentials);
 
     final var token =
-        this.jwtUtils.createTokenWithDuration(
+        this.jwtUtils.createProtocolToken(
             userInfo.getId(), userInfo.getUsername(), TIMEOUT_ACCESS_TOKEN);
 
     return Optional.of(token);

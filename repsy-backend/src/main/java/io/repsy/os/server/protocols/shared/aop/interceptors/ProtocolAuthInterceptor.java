@@ -20,9 +20,11 @@ import static io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils.REPO_P
 import static org.springframework.web.servlet.HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
+import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -31,7 +33,6 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
@@ -61,21 +62,65 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
       return true;
     }
 
-    final var repoInfoOpt = this.getRepoInfo(request);
+    final var repoName = ResolverUtils.extractRepoInfo(this.getUriVariables(request));
 
-    if (repoInfoOpt.isEmpty()) {
+    if (repoName == null) {
       this.authenticateUser(request);
       return true;
+    }
+
+    final var repoInfoOpt = this.repoTxService.findRepoByName(repoName);
+
+    if (repoInfoOpt.isEmpty()) {
+      throw this.authorizeUnknownRepo(methodHandler, request);
     }
 
     final var repoInfo = repoInfoOpt.get();
     final var authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
     final var authComponent = this.authComponents.get(repoInfo.getType());
 
-    this.checkRepoScope(methodHandler, repoInfo);
+    request.setAttribute(REPO_INFO, repoInfo);
+
+    // Authorize before checking the scope, so a caller who may not access the repo cannot learn
+    // its type from a scope mismatch either.
     this.putRepoPermission(authComponent, methodHandler, repoInfo, request, authHeader);
+    this.checkRepoScope(methodHandler, repoInfo);
 
     return true;
+  }
+
+  /**
+   * Handles a request for a repo that does not exist. The caller is authenticated and authorized as
+   * if the repo were a private one, so anyone who could not use an existing private repo gets the
+   * same response as for one that is missing, and only a caller allowed to see it learns that it
+   * does not exist.
+   *
+   * @return the exception to throw once the caller has passed the checks
+   */
+  private ItemNotFoundException authorizeUnknownRepo(
+      final HandlerMethod methodHandler, final HttpServletRequest request) {
+
+    final var authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+
+    if (authHeader == null) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    final var authComponent = this.getUnknownRepoAuthComponent(methodHandler);
+    final var userInfo = authComponent.authenticateUser(authHeader);
+
+    authComponent.authorizeUser(userInfo, this.getPermission(methodHandler));
+
+    return new ItemNotFoundException("repoNotFound");
+  }
+
+  private ProtocolAuthService getUnknownRepoAuthComponent(final HandlerMethod methodHandler) {
+
+    // Only Docker authenticates differently. Use the endpoint's own type where it has one, and any
+    // other protocol's generic authentication otherwise.
+    final var scopeType = RepoType.fromString(this.getRepoScope(methodHandler).name());
+
+    return this.authComponents.get(scopeType.orElse(RepoType.MAVEN));
   }
 
   private void authenticateUser(final HttpServletRequest request) {
@@ -91,22 +136,6 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
     final var authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
     authComponent.authenticateUser(authHeader);
-  }
-
-  private Optional<RepoInfo> getRepoInfo(final HttpServletRequest request) {
-
-    final var uriVariables = this.getUriVariables(request);
-    final var repoName = ResolverUtils.extractRepoInfo(uriVariables);
-
-    if (repoName == null) {
-      return Optional.empty();
-    }
-
-    final var repoInfo = this.repoTxService.getRepoByName(repoName);
-
-    request.setAttribute(REPO_INFO, repoInfo);
-
-    return Optional.of(repoInfo);
   }
 
   @SuppressWarnings("unchecked")

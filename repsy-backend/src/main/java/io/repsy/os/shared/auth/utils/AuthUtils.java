@@ -20,8 +20,8 @@ import static org.apache.commons.codec.binary.Base64.decodeBase64;
 
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalAmount;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -33,20 +33,44 @@ public class AuthUtils {
 
   public static final String AUTH_BEARER = "Bearer ";
   public static final String AUTH_BASIC = "Basic ";
-  public static final TemporalAmount TIMEOUT_ACCESS_TOKEN = Duration.of(30, ChronoUnit.MINUTES);
-  public static final TemporalAmount TIMEOUT_REFRESH_TOKEN = Duration.of(60, ChronoUnit.MINUTES);
+  public static final Duration TIMEOUT_ACCESS_TOKEN = Duration.of(30, ChronoUnit.MINUTES);
+  public static final Duration TIMEOUT_REFRESH_TOKEN = Duration.of(60, ChronoUnit.MINUTES);
+
+  /** Absolute lifetime of a panel session, however often its refresh token is exchanged. */
+  public static final Duration TIMEOUT_SESSION = Duration.of(24, ChronoUnit.HOURS);
+
+  /**
+   * Caps a token lifetime so the token cannot outlive the session it belongs to.
+   *
+   * @param timeout the token's regular lifetime
+   * @param sessionStart when the session's login happened
+   * @return {@code timeout}, or the time left until the session ends if that is shorter
+   */
+  public static @NonNull Duration boundBySession(
+      final @NonNull Duration timeout, final @NonNull Instant sessionStart) {
+
+    final var untilSessionEnd = Duration.between(Instant.now(), sessionStart.plus(TIMEOUT_SESSION));
+
+    return untilSessionEnd.compareTo(timeout) < 0 ? untilSessionEnd : timeout;
+  }
 
   /**
    * Extract auth credentials from the basic authorization header. This function returns null if the
-   * header is not basic and is invalid.
+   * decoded token has no {@code username:password} separator. The decoder skips characters outside
+   * the base64 alphabet, so a token that is not base64 at all decodes to an empty value and is
+   * treated the same way.
    *
    * @param authHeader Authorization HTTP header from request
-   * @return request Credentials
+   * @return request Credentials, or null if the token is invalid
    */
   public static @Nullable Credentials extractCredentialsFromBasicToken(
       final @NonNull String authHeader) {
 
     final var credentials = new String(decodeBase64(authHeader), UTF_8).split(":", -1);
+
+    if (credentials.length < 2) {
+      return null;
+    }
 
     final var username =
         switch (credentials[0]) {

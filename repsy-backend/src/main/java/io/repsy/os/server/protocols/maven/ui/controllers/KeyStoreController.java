@@ -24,10 +24,13 @@ import io.repsy.os.generated.model.KeyStoreItem;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -53,6 +56,8 @@ import org.springframework.web.bind.annotation.RestController;
 @SuppressWarnings("java:S6856")
 public class KeyStoreController {
 
+  private static final Set<String> SORT_PROPERTIES = Set.of("id", "host", "displayName");
+
   private final KeyStoreService keyStoreService;
   private final RestResponseFactory restResponseFactory;
   private final JwtUtils jwtUtils;
@@ -61,7 +66,7 @@ public class KeyStoreController {
   public RestResponse<List<AllowedKeyserverItem>> listAllowedServers(
       @RequestHeader(HttpHeaders.AUTHORIZATION) final String authHeader) {
 
-    this.jwtUtils.verify(authHeader);
+    this.jwtUtils.verify(authHeader, TokenRealm.PANEL);
 
     return this.restResponseFactory.success(
         "allowedKeyserversFetched", this.keyStoreService.findAllActiveKeyservers());
@@ -92,6 +97,8 @@ public class KeyStoreController {
   public RestResponse<PagedModel<KeyStoreItem>> list(
       final RepoInfo repoInfo,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, SORT_PROPERTIES);
 
     final var result = this.keyStoreService.findAll(repoInfo, pageable);
 
