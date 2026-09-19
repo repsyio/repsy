@@ -24,6 +24,7 @@ import io.repsy.os.generated.model.KeyStoreItem;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -61,7 +62,7 @@ public class KeyStoreController {
   public RestResponse<List<AllowedKeyserverItem>> listAllowedServers(
       @RequestHeader(HttpHeaders.AUTHORIZATION) final String authHeader) {
 
-    this.jwtUtils.verify(authHeader);
+    this.jwtUtils.verify(authHeader, TokenRealm.PANEL);
 
     return this.restResponseFactory.success(
         "allowedKeyserversFetched", this.keyStoreService.findAllActiveKeyservers());

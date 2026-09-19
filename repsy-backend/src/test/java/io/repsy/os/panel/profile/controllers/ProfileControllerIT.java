@@ -85,6 +85,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     final var secret = (String) ReflectionTestUtils.getField(this.jwtUtils, "secret");
     var builder =
         JWT.create()
+            .withAudience("panel")
             .withClaim("username", "someuser")
             .withExpiresAt(Instant.now().plus(1, ChronoUnit.HOURS));
     if (subject != null) {

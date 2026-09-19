@@ -17,6 +17,7 @@ package io.repsy.os.shared.auth;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
@@ -34,7 +35,7 @@ public final class PanelAuthHelper {
   private final @NonNull UserTxService userTxService;
 
   public @NonNull UserInfo authenticate(final @NonNull String authHeader) {
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader);
+    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PANEL);
     return this.userTxService.getUserByUsername(username);
   }
 

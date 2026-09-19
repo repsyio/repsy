@@ -62,7 +62,7 @@ public class NpmAuthComponentImpl extends ProtocolAuthService implements NpmAuth
         this.authenticateWithPassword(
             Credentials.builder().username(username).password(password).build());
 
-    return super.jwtUtils.createTokenWithDuration(
+    return super.jwtUtils.createProtocolToken(
         userInfo.getId(), username, Period.ofDays(TOKEN_EXPIRATION_DAYS));
   }
 

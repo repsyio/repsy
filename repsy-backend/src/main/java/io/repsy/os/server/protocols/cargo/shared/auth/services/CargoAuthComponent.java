@@ -29,6 +29,7 @@ import io.repsy.os.server.shared.auth.ProtocolAuthService;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.services.UserTxService;
@@ -84,9 +85,9 @@ public class CargoAuthComponent extends ProtocolAuthService {
     }
 
     if (isBearerToken(authHeader)) {
-      final var username = this.jwtUtils.verifyAndExtractUsername(authHeader);
+      final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
       final var userInfo = this.userTxService.getUserByUsername(username);
-      return this.jwtUtils.createTokenWithDuration(
+      return this.jwtUtils.createProtocolToken(
           userInfo.getId(), userInfo.getUsername(), TIMEOUT_ACCESS_TOKEN);
     }
 
@@ -127,7 +128,7 @@ public class CargoAuthComponent extends ProtocolAuthService {
   private @Nullable UserInfo resolveBearerAuthUser(
       final BaseRepoInfo<UUID> repoInfo, final String authHeader) {
 
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader);
+    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
     final var userInfoOpt = this.userTxService.getUserByUsernameOptional(username);
 
     if (userInfoOpt.isEmpty() && repoInfo.isPrivateRepo()) {
@@ -166,7 +167,7 @@ public class CargoAuthComponent extends ProtocolAuthService {
     this.deployTokenService.updateLastUsedTime(deployTokenOpt.get().getId());
 
     final var token =
-        this.jwtUtils.createTokenWithDuration(
+        this.jwtUtils.createProtocolToken(
             deployTokenOpt.get().getId(),
             credentials.getUsername(),
             TIMEOUT_ACCESS_TOKEN,
@@ -180,7 +181,7 @@ public class CargoAuthComponent extends ProtocolAuthService {
     final var userInfo = this.authenticateWithPassword(credentials);
 
     final var token =
-        this.jwtUtils.createTokenWithDuration(
+        this.jwtUtils.createProtocolToken(
             userInfo.getId(), userInfo.getUsername(), TIMEOUT_ACCESS_TOKEN);
 
     return Optional.of(token);

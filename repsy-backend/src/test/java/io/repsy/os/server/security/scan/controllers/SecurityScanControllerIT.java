@@ -310,13 +310,13 @@ class SecurityScanControllerIT {
 
   private String bearerTokenFor(final UUID userId, final String username) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofMinutes(30));
+        + this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofMinutes(30));
   }
 
   private String expiredBearerTokenFor(final String username) {
     final var userId = this.userRepository.findByUsername(username).orElseThrow().getId();
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofSeconds(-30));
+        + this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofSeconds(-30));
   }
 
   /** A valid bearer token for the {@code admin} user that the application seeds at startup. */

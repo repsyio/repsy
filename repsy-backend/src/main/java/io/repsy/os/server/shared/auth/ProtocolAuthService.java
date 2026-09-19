@@ -29,6 +29,7 @@ import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.PermissionInfo;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.user.dtos.UserInfo;
@@ -68,13 +69,27 @@ public class ProtocolAuthService {
       final @NonNull UUID repoId,
       final @NonNull Permission permission) {
 
+    this.handleBearerAuth(authHeader, repoId, permission, TokenRealm.PROTOCOL);
+  }
+
+  /**
+   * Authorizes a bearer JWT issued for the given realm. Protocol endpoints take {@link
+   * TokenRealm#PROTOCOL} tokens only; a caller that hands a UI session over to a protocol endpoint
+   * passes {@link TokenRealm#PANEL}.
+   */
+  public void handleBearerAuth(
+      final @NonNull String authHeader,
+      final @NonNull UUID repoId,
+      final @NonNull Permission permission,
+      final @NonNull TokenRealm realm) {
+
     final var bearerToken = authHeader.substring(AUTH_BEARER.length());
 
     if (this.tryAuthorizeWithDeployToken(repoId, bearerToken, permission)) {
       return;
     }
 
-    this.authorizeJWTRequest(authHeader, permission);
+    this.authorizeJWTRequest(authHeader, permission, realm);
   }
 
   public void handleBasicAuth(
@@ -134,6 +149,7 @@ public class ProtocolAuthService {
     throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
   }
 
+  /** Authenticates a web UI API request, so a bearer token has to be a panel access token. */
   public @NonNull UserInfo authenticateUser(final @Nullable String authHeader) {
 
     if (authHeader == null) {
@@ -218,9 +234,11 @@ public class ProtocolAuthService {
   }
 
   private void authorizeJWTRequest(
-      final @NonNull String authHeader, final @NonNull Permission permission) {
+      final @NonNull String authHeader,
+      final @NonNull Permission permission,
+      final @NonNull TokenRealm realm) {
 
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader);
+    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, realm);
     final var userInfo = this.userTxService.getUserByUsername(username);
 
     this.authorizeUser(userInfo, permission);
@@ -289,7 +307,7 @@ public class ProtocolAuthService {
 
   private @NonNull UserInfo authenticateWithBearer(final @NonNull String authHeader) {
 
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader);
+    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PANEL);
 
     return this.userTxService.getUserByUsername(username);
   }

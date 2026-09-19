@@ -34,6 +34,7 @@ import io.repsy.os.RepsyApplication;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
+import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.repositories.UserRepository;
@@ -224,9 +225,19 @@ class AuthControllerIT {
     return this.userRepository.findByUsername(SEEDED_ADMIN_USERNAME).orElseThrow();
   }
 
+  /** A signed token without an {@code aud} claim, like those issued before tokens had a realm. */
+  private String claimlessToken(
+      final UUID userId, final String username, final TemporalAmount timeout) {
+    return JWT.create()
+        .withSubject(userId.toString())
+        .withClaim("username", username)
+        .withExpiresAt(Instant.now().plus(timeout))
+        .sign(Algorithm.HMAC512(this.serverSecret()));
+  }
+
   private String bearerTokenFor(final User user) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(
+        + this.jwtUtils.createPanelAccessToken(
             user.getId(), user.getUsername(), Duration.ofMinutes(30));
   }
 
@@ -411,10 +422,13 @@ class AuthControllerIT {
 
     // The access token works on the access side and carries no token type.
     final var accessTokenDecoded = JWT.decode(accessToken);
-    assertThat(this.jwtUtils.getUserId(accessToken)).isEqualTo(expectedUserId);
-    assertThat(this.jwtUtils.verifyAndExtractUsername(AuthUtils.AUTH_BEARER + accessToken))
+    assertThat(this.jwtUtils.getUserId(accessToken, TokenRealm.PANEL)).isEqualTo(expectedUserId);
+    assertThat(
+            this.jwtUtils.verifyAndExtractUsername(
+                AuthUtils.AUTH_BEARER + accessToken, TokenRealm.PANEL))
         .isEqualTo(expectedUsername);
     assertThat(accessTokenDecoded.getClaim("token_type").asString()).isNull();
+    assertThat(accessTokenDecoded.getAudience()).containsExactly("panel");
 
     // The refresh token is only valid as a refresh token.
     final var refreshTokenDecoded = JWT.decode(refreshToken);
@@ -893,11 +907,11 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 401 accessNotAllowed for a claim-less legacy token from the 3-arg method")
+    @DisplayName("returns 401 accessNotAllowed for a claim-less legacy token without an audience")
     void rejectsAClaimlessLegacyToken() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("legacy"), UserRole.USER);
       final var legacyToken =
-          AuthControllerIT.this.jwtUtils.createTokenWithDuration(
+          AuthControllerIT.this.claimlessToken(
               user.getId(), user.getUsername(), AuthUtils.TIMEOUT_REFRESH_TOKEN);
 
       expectAccessNotAllowed(AuthControllerIT.this.refreshWith(legacyToken));

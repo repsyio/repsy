@@ -217,12 +217,12 @@ class ProtocolDeployTokenControllerIT {
 
   private String bearerTokenFor(final UUID userId, final String username) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofMinutes(30));
+        + this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofMinutes(30));
   }
 
   private String expiredBearerTokenFor(final User user) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(
+        + this.jwtUtils.createPanelAccessToken(
             user.getId(), user.getUsername(), Duration.ofSeconds(-30));
   }
 
