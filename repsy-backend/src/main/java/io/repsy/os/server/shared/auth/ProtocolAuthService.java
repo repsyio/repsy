@@ -239,7 +239,7 @@ public class ProtocolAuthService {
       final @NonNull TokenRealm realm) {
 
     final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, realm);
-    final var userInfo = this.userTxService.getUserByUsername(username);
+    final var userInfo = this.userTxService.getAuthenticatedUserByUsername(username);
 
     this.authorizeUser(userInfo, permission);
   }
@@ -309,7 +309,7 @@ public class ProtocolAuthService {
 
     final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PANEL);
 
-    return this.userTxService.getUserByUsername(username);
+    return this.userTxService.getAuthenticatedUserByUsername(username);
   }
 
   /**

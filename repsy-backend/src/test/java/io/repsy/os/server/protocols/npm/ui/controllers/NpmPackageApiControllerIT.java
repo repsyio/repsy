@@ -411,7 +411,7 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
               + jwtUtils.createPanelAccessToken(
                   UUID.randomUUID(), "deleted-user", Duration.ofMinutes(30));
       perform(get("/api/npm/packages/{repo}", privateRepoName).header(AUTHORIZATION, unknown))
-          .andExpect(status().isNotFound());
+          .andExpect(status().isUnauthorized());
     }
 
     @Test

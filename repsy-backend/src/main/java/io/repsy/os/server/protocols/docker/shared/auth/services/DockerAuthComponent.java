@@ -72,7 +72,7 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
 
     final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PANEL);
 
-    return this.userTxService.getUserByUsername(username);
+    return this.userTxService.getAuthenticatedUserByUsername(username);
   }
 
   @Override
