@@ -73,7 +73,16 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
 
   private void publish(
       final RepoInfo repoInfo, final UUID packageId, final String version, final String nuspec) {
-    this.packageService.publishVersion(repoInfo, packageId, version, nuspec);
+    this.publish(repoInfo, packageId, version, nuspec, null);
+  }
+
+  private void publish(
+      final RepoInfo repoInfo,
+      final UUID packageId,
+      final String version,
+      final String nuspec,
+      final String readme) {
+    this.packageService.publishVersion(repoInfo, packageId, version, nuspec, readme);
     this.entityManager.flush();
     this.entityManager.clear();
   }
@@ -247,5 +256,67 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
                 packageId,
                 "4.0.0-beta.1"))
         .isTrue();
+  }
+
+  @Test
+  @DisplayName("stores the repository URL and README and returns them with the version detail")
+  void storesRepositoryUrlAndReadme() {
+    final var repoInfo = this.seedNuGetRepo();
+    final var packageId = this.createPackage(repoInfo);
+
+    this.publish(
+        repoInfo,
+        packageId,
+        "5.0.0",
+        nuspec(
+            "5.0.0",
+            """
+            <repository type="git" url="https://github.com/repsyio/fixture" />
+            <readme>docs/README.md</readme>
+            """),
+        "# Fixture\n\nA README.");
+
+    final var info = this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, "5.0.0");
+
+    assertThat(info).isPresent();
+    assertThat(info.get().repositoryUrl()).isEqualTo("https://github.com/repsyio/fixture");
+    assertThat(info.get().readme()).isEqualTo("# Fixture\n\nA README.");
+  }
+
+  @Test
+  @DisplayName("keeps the README out of the version list but still returns the repository URL")
+  void versionListOmitsReadme() {
+    final var repoInfo = this.seedNuGetRepo();
+    final var packageId = this.createPackage(repoInfo);
+
+    this.publish(
+        repoInfo,
+        packageId,
+        "5.1.0",
+        nuspec("5.1.0", "<repository type=\"git\" url=\"https://github.com/repsyio/fixture\" />"),
+        "# Fixture");
+
+    assertThat(this.packageService.getVersionInfos(repoInfo, PACKAGE_ID))
+        .singleElement()
+        .satisfies(
+            v -> {
+              assertThat(v.repositoryUrl()).isEqualTo("https://github.com/repsyio/fixture");
+              assertThat(v.readme()).isNull();
+            });
+  }
+
+  @Test
+  @DisplayName("leaves the repository URL and README empty when the nuspec declares neither")
+  void repositoryUrlAndReadmeAreOptional() {
+    final var repoInfo = this.seedNuGetRepo();
+    final var packageId = this.createPackage(repoInfo);
+
+    this.publish(repoInfo, packageId, "5.2.0", nuspec("5.2.0", ""));
+
+    final var info = this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, "5.2.0");
+
+    assertThat(info).isPresent();
+    assertThat(info.get().repositoryUrl()).isNull();
+    assertThat(info.get().readme()).isNull();
   }
 }

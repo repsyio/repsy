@@ -75,10 +75,14 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
       List.of("catalog:CatalogRoot", "PackageRegistration", "catalog:Permalink");
 
   protected void doPublish(
-      final BaseRepoInfo<ID> repoInfo, final ID pkgId, final String version, final String nuspecXml)
+      final BaseRepoInfo<ID> repoInfo,
+      final ID pkgId,
+      final String version,
+      final String nuspecXml,
+      final @Nullable String readme)
       throws IOException {
 
-    this.packageService.publishVersion(repoInfo, pkgId, version, nuspecXml);
+    this.packageService.publishVersion(repoInfo, pkgId, version, nuspecXml, readme);
   }
 
   @Override
@@ -116,7 +120,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
 
       final var pkgId = this.packageService.findOrCreatePackage(repoInfo, metadata.packageId());
       final var usages = this.storePackage(repoInfo, metadata, tempFile);
-      this.doPublish(repoInfo, pkgId, metadata.version(), metadata.nuspecXml());
+      this.doPublish(repoInfo, pkgId, metadata.version(), metadata.nuspecXml(), metadata.readme());
 
       log.info(
           "Successfully published and stored NuGet package {} {}",

@@ -40,18 +40,20 @@ public interface NuGetPackageConverter {
   @Mapping(source = "v.iconUrl", target = "iconUrl")
   @Mapping(source = "v.licenseUrl", target = "licenseUrl")
   @Mapping(source = "v.projectUrl", target = "projectUrl")
+  @Mapping(source = "v.repositoryUrl", target = "repositoryUrl")
   @Mapping(source = "v.listed", target = "listed")
   @Mapping(source = "v.downloadCount", target = "downloadCount")
   @Mapping(source = "v.publishedAt", target = "publishedAt")
   @Mapping(target = "dependencies", ignore = true)
+  @Mapping(target = "readme", ignore = true)
   NuGetVersionInfo toVersionInfo(NuGetPackageVersion v, String packageId);
 
   @Mapping(source = "version", target = "version")
   @Mapping(source = "downloadCount", target = "downloads")
   NuGetPackageSearchResult.VersionSummary toVersionSummary(NuGetPackageVersion v);
 
-  default NuGetVersionInfo toVersionInfoWithDeps(
-      final NuGetPackageVersion v, final String packageId) {
+  /** Adds the fields only the single-version view needs: the dependencies and the README. */
+  default NuGetVersionInfo toVersionDetail(final NuGetPackageVersion v, final String packageId) {
 
     final var base = this.toVersionInfo(v, packageId);
     final var deps = NuGetPackageUtils.parseDependenciesJson(v.getDependencies());
@@ -65,10 +67,12 @@ public interface NuGetPackageConverter {
         base.iconUrl(),
         base.licenseUrl(),
         base.projectUrl(),
+        base.repositoryUrl(),
         base.listed(),
         base.downloadCount(),
         base.publishedAt(),
-        deps.isEmpty() ? null : deps);
+        deps.isEmpty() ? null : deps,
+        v.getReadme());
   }
 
   default NuGetPackageSearchResult toSearchResult(

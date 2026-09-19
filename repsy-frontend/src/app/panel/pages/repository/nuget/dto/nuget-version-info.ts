@@ -26,6 +26,8 @@ export class NugetVersionInfo {
   public iconUrl: string;
   public licenseUrl: string;
   public projectUrl: string;
+  public repositoryUrl?: string;
+  public readme?: string;
   public listed: boolean;
   public downloadCount: number;
   public publishedAt: string;

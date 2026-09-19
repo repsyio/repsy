@@ -353,6 +353,73 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
                   repo.getId(), BaseUsages.ofDisk(Files.size(nupkgFile) + Files.size(nuspecFile))));
     }
 
+    @Test
+    @DisplayName("stores the repository URL and the README declared in the nuspec")
+    void storesRepositoryUrlAndReadme() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var id = uniquePackageId();
+      final var nuspec =
+          """
+          <?xml version="1.0" encoding="utf-8"?>
+          <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+            <metadata>
+              <id>%s</id>
+              <version>1.0.0</version>
+              <authors>Repsy</authors>
+              <description>readme fixture</description>
+              <readme>docs\\README.md</readme>
+              <repository type="git" url="https://github.com/repsyio/%s.git" commit="abc123" />
+            </metadata>
+          </package>
+          """
+              .formatted(id, id);
+      final var nupkg =
+          zip(
+              entry("[Content_Types].xml", "<Types/>"),
+              entry("_rels/.rels", "<Relationships/>"),
+              entry(id + ".nuspec", nuspec),
+              entry("docs/README.md", "# " + id + "\n\nShips a readme."),
+              entry("lib/net8.0/" + id + ".dll", "MZ fixture assembly"));
+
+      assertStatus(
+          NuGetPublishProtocolIT.this.pushAs(
+              repo, nupkg, NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
+          201);
+
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, id))
+          .singleElement()
+          .satisfies(
+              v -> {
+                assertThat(v.getRepositoryUrl())
+                    .isEqualTo("https://github.com/repsyio/" + id + ".git");
+                assertThat(v.getReadme()).isEqualTo("# " + id + "\n\nShips a readme.");
+              });
+    }
+
+    @Test
+    @DisplayName("still publishes when the declared README is missing from the package")
+    void publishesWithoutDeclaredReadme() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var id = uniquePackageId();
+      final var nupkg =
+          zip(
+              entry("[Content_Types].xml", "<Types/>"),
+              entry(
+                  id + ".nuspec",
+                  "<package><metadata><id>%s</id><version>1.0.0</version><readme>README.md</readme>"
+                          .formatted(id)
+                      + "</metadata></package>"));
+
+      assertStatus(
+          NuGetPublishProtocolIT.this.pushAs(
+              repo, nupkg, NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
+          201);
+
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, id))
+          .singleElement()
+          .satisfies(v -> assertThat(v.getReadme()).isNull());
+    }
+
     /**
      * Fails today: the service serializes the dependencies with the injected {@code XmlMapper}, so
      * PostgreSQL receives XML for its {@code jsonb} column. Enable it together with the fix.
