@@ -101,53 +101,7 @@ class MessageKeysTest {
    * Success msgIds with no bundle entry yet. RPS-940 adds the entries; delete each id here in that
    * change. {@link #allowlistsHoldOnlyIdsThatAreStillMissing()} fails if one is left behind.
    */
-  private static final Set<String> PENDING_RPS_940 =
-      Set.of(
-          "artifactSecurityDetailFetched",
-          "artifactSecuritySummaryFetched",
-          "chartDeleted",
-          "chartDetailFetched",
-          "chartTagsFetched",
-          "chartVersionsFetched",
-          "chartsFetched",
-          "crateDeleted",
-          "crateFetched",
-          "crateVersionDeleted",
-          "crateVersionFetched",
-          "crateVersionsFetched",
-          "cratesFetched",
-          "gemDeleted",
-          "gemVersionDeleted",
-          "gemVersionFetched",
-          "gemVersionsFetched",
-          "gemsFetched",
-          "keyStoresFetched",
-          "moduleDeleted",
-          "moduleInfoFetched",
-          "moduleVersionDeleted",
-          "moduleVersionsFetched",
-          "modulesFetched",
-          "movedToPath",
-          "nugetPackageDeleted",
-          "nugetPackageFetched",
-          "nugetPackagesFetched",
-          "nugetVersionDeleted",
-          "nugetVersionFetched",
-          "nugetVersionsFetched",
-          "passwordReset",
-          "profileFetched",
-          "releaseDetailFetched",
-          "releasesFetched",
-          "repoSecurityDetailFetched",
-          "scanFindingsFetched",
-          "securitySummaryFetched",
-          "tokenRefreshed",
-          "userCreated",
-          "userDeleted",
-          "userUpdated",
-          "usersFetched",
-          "versionGone",
-          "versionSecuritySummaryFetched");
+  private static final Set<String> PENDING_RPS_940 = Set.of("movedToPath");
 
   /**
    * Error msgIds thrown from exceptions with no bundle entry yet. RPS-958 adds the entries or drops
