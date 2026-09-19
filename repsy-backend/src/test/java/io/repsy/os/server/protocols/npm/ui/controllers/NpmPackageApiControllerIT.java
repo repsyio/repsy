@@ -23,8 +23,8 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -49,14 +49,19 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -437,11 +442,6 @@ class NpmPackageApiControllerIT {
       perform(get("/api/npm/packages/{repo}/missing/versions/1.0.0", repoName))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
-      perform(post("/api/npm/packages/{repo}/{package}", repoName, "plain-package"))
-          .andExpect(
-              result ->
-                  org.assertj.core.api.Assertions.assertThat(result.getResponse().getStatus())
-                      .isIn(404, 500));
     }
 
     @Test
@@ -478,6 +478,68 @@ class NpmPackageApiControllerIT {
               delete("/api/npm/packages/{repo}/{package}", repoName, "plain-package")
                   .header(AUTHORIZATION, bearerToken(admin, Duration.ofMinutes(30))))
           .andExpect(status().isNotFound());
+    }
+  }
+
+  /**
+   * The port-based handler mapping does not raise {@code HttpRequestMethodNotSupportedException}
+   * for a verb the path does not map, so the request falls through to the static-resource handler
+   * and fails with {@code NoResourceFoundException}, which {@code ErrorHandler} answers with 404
+   * {@code itemNotFound} (RPS-849). Publishing verbs on these read/delete routes must never reach
+   * the generic error handler and answer 500 (RPS-900).
+   */
+  @Nested
+  @DisplayName("unsupported verbs")
+  class UnsupportedVerbs {
+
+    @ParameterizedTest(name = "{0} {1}")
+    @MethodSource("unsupportedRequests")
+    @DisplayName("answers 404 itemNotFound in the standard error envelope")
+    void answersClientErrorWithStandardEnvelope(final HttpMethod method, final String pathTemplate)
+        throws Exception {
+      final var path = pathTemplate.formatted(repoName);
+
+      perform(request(method, path).contentType(MediaType.APPLICATION_JSON).content("{}"))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.*", hasSize(5)))
+          .andExpect(jsonPath("$.msgId").value("itemNotFound"))
+          .andExpect(jsonPath("$.type").value("ERROR"))
+          .andExpect(jsonPath("$.data").value(nullValue()))
+          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)))
+          .andExpect(jsonPath("$.text").value("The requested item is not found."));
+    }
+
+    @ParameterizedTest(name = "{0} {1} with an admin token")
+    @MethodSource("unsupportedRequests")
+    @DisplayName("answers the same 404 to an authenticated admin and leaves the package alone")
+    void answersSameErrorToAdminAndKeepsPackage(final HttpMethod method, final String pathTemplate)
+        throws Exception {
+      final var path = pathTemplate.formatted(repoName);
+
+      perform(
+              request(method, path)
+                  .header(AUTHORIZATION, bearerToken(admin, Duration.ofMinutes(30)))
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{}"))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.msgId").value("itemNotFound"))
+          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+
+      org.assertj.core.api.Assertions.assertThat(
+              npmPackageRepository.findByRepoIdAndScopeAndName(repo.getId(), null, "plain-package"))
+          .isPresent();
+    }
+
+    static Stream<Arguments> unsupportedRequests() {
+      return Stream.of(
+              "/api/npm/packages/%s",
+              "/api/npm/packages/%s/plain-package",
+              "/api/npm/packages/%s/plain-package/versions/1.0.0",
+              "/api/npm/packages/%s/tools/scoped-package/versions/1.0.0")
+          .flatMap(
+              path ->
+                  Stream.of(HttpMethod.PUT, HttpMethod.POST, HttpMethod.PATCH)
+                      .map(method -> Arguments.of(method, path)));
     }
   }
 }
