@@ -24,13 +24,13 @@ import static org.mockito.Mockito.when;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.os.panel.profile.services.ProfileService;
+import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.mappers.UserConverter;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
-import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -42,21 +42,25 @@ class ProfileControllerTest {
 
   private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
   private final UserRepository userRepository = Mockito.mock(UserRepository.class);
+  private final UserTxService userTxService =
+      new UserTxService(this.userRepository, Mockito.mock(UserConverter.class));
+  private final PanelAuthHelper panelAuthHelper =
+      new PanelAuthHelper(this.jwtUtils, this.userTxService);
 
   // A real UserTxService over an empty repository: the lookup itself is under test.
   private final ProfileController controller =
       new ProfileController(
           this.jwtUtils,
+          this.panelAuthHelper,
           Mockito.mock(ProfileService.class),
-          new UserTxService(this.userRepository, Mockito.mock(UserConverter.class)),
+          this.userTxService,
           Mockito.mock(RestResponseFactory.class));
 
   /** RPS-962: a valid token whose user is gone is an authentication failure, not a 404. */
   @Test
   @DisplayName("deleteProfile answers unAuthorized when the token's user no longer exists")
   void deleteProfileTokenUserNoLongerExists() {
-    final var ghostId = UUID.randomUUID();
-    when(this.jwtUtils.extractUserId(AUTH_HEADER, TokenRealm.PANEL)).thenReturn(ghostId);
+    when(this.jwtUtils.verifyAndExtractUsername(AUTH_HEADER, TokenRealm.PANEL)).thenReturn("ghost");
 
     assertThatThrownBy(() -> this.controller.deleteProfile(AUTH_HEADER))
         .isExactlyInstanceOf(UnAuthorizedException.class)
