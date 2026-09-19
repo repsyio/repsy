@@ -3605,9 +3605,12 @@ components:
           type: string
     RefreshTokenForm:
       type: object
+      required:
+        - refreshToken
       properties:
         refreshToken:
           type: string
+          minLength: 1
     LoginForm:
       type: object
       properties:

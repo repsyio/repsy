@@ -869,9 +869,9 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 403 accessNotAllowed for an empty token")
+    @DisplayName("returns 400 validationError for an empty token")
     void emptyToken() throws Exception {
-      expectAccessNotAllowed(AuthControllerIT.this.refreshWith(""));
+      expectValidationError(AuthControllerIT.this.refreshWith(""));
     }
 
     @Test
@@ -990,16 +990,16 @@ class AuthControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("bodiesWithoutToken")
-    @DisplayName(
-        "answers 403 accessNotAllowed when the form carries no refreshToken (no @NotNull on it)")
+    @DisplayName("returns 400 validationError when the form carries no usable refreshToken")
     void missingRefreshToken(final String name, final String body) throws Exception {
-      expectAccessNotAllowed(AuthControllerIT.this.refresh(body));
+      expectValidationError(AuthControllerIT.this.refresh(body));
     }
 
     static Stream<Arguments> bodiesWithoutToken() {
       return Stream.of(
           Arguments.of("empty object", "{}"),
-          Arguments.of("null refreshToken", "{\"refreshToken\":null}"));
+          Arguments.of("null refreshToken", "{\"refreshToken\":null}"),
+          Arguments.of("empty refreshToken", "{\"refreshToken\":\"\"}"));
     }
 
     @Test
