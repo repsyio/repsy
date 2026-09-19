@@ -295,14 +295,14 @@ class NuGetPackageControllerIT {
               get("/api/nuget/packages/{repo}", repo.getName())
                   .with(apiPort())
                   .header(AUTHORIZATION, "Bearer garbage"))
-          .andExpect(status().isForbidden());
+          .andExpect(status().isUnauthorized());
       NuGetPackageControllerIT.this
           .mockMvc
           .perform(
               get("/api/nuget/packages/{repo}", repo.getName())
                   .with(apiPort())
                   .header(AUTHORIZATION, expired))
-          .andExpect(status().isForbidden());
+          .andExpect(status().isUnauthorized());
       NuGetPackageControllerIT.this
           .mockMvc
           .perform(

@@ -73,7 +73,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
                 .with(apiPort())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"refreshToken\":\"%s\"}".formatted(refreshToken)))
-        .andExpect(status().isForbidden())
+        .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.msgId").value("refreshTokenExpired"));
   }
 
@@ -161,12 +161,12 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 403 when the Authorization header is missing")
+    @DisplayName("returns 401 when the Authorization header is missing")
     void missingAuthorizationHeader() throws Exception {
       ProfileControllerIT.this
           .mockMvc
           .perform(get("/api/profile").with(apiPort()))
-          .andExpect(status().isForbidden())
+          .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.*", hasSize(5)))
           .andExpect(jsonPath("$.msgId").value("missingRequestHeader"))
           .andExpect(jsonPath("$.type").value("ERROR"))
@@ -180,12 +180,12 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 403 for a header without a Bearer prefix")
+    @DisplayName("returns 401 for a header without a Bearer prefix")
     void nonBearerAuthorizationHeader() throws Exception {
       ProfileControllerIT.this
           .mockMvc
           .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, "Basic dXNlcjpwYXNz"))
-          .andExpect(status().isForbidden())
+          .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.msgId").value("accessNotAllowed"))
           .andExpect(jsonPath("$.data").value("accessNotAllowed"))
           .andExpect(jsonPath("$.text").value("Access isn't allowed."))
@@ -197,18 +197,18 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 403 for a malformed/garbage bearer token")
+    @DisplayName("returns 401 for a malformed/garbage bearer token")
     void malformedBearerToken() throws Exception {
       ProfileControllerIT.this
           .mockMvc
           .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, "Bearer not-a-jwt"))
-          .andExpect(status().isForbidden())
+          .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.msgId").value("accessNotAllowed"))
           .andExpect(jsonPath("$.text").value("Access isn't allowed."));
     }
 
     @Test
-    @DisplayName("returns 403 for an expired token")
+    @DisplayName("returns 401 for an expired token")
     void expiredToken() throws Exception {
       final var user =
           ProfileControllerIT.this.createUser(uniqueUsername("expired"), UserRole.USER);
@@ -217,35 +217,35 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       ProfileControllerIT.this
           .mockMvc
           .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isForbidden())
+          .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.msgId").value("sessionExpired"))
           .andExpect(jsonPath("$.data").value("sessionExpired"))
           .andExpect(jsonPath("$.text").value("Session expired."));
     }
 
     @Test
-    @DisplayName("returns 403 accessNotAllowed for a validly signed token whose subject is no UUID")
+    @DisplayName("returns 401 accessNotAllowed for a validly signed token whose subject is no UUID")
     void nonUuidSubject() throws Exception {
       final var token = ProfileControllerIT.this.serverSignedBearerToken("not-a-uuid");
 
       ProfileControllerIT.this
           .mockMvc
           .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isForbidden())
+          .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.msgId").value("accessNotAllowed"))
           .andExpect(jsonPath("$.data").value("accessNotAllowed"))
           .andExpect(jsonPath("$.text").value("Access isn't allowed."));
     }
 
     @Test
-    @DisplayName("returns 403 accessNotAllowed for a validly signed token without a subject")
+    @DisplayName("returns 401 accessNotAllowed for a validly signed token without a subject")
     void missingSubject() throws Exception {
       final var token = ProfileControllerIT.this.serverSignedBearerToken(null);
 
       ProfileControllerIT.this
           .mockMvc
           .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isForbidden())
+          .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.msgId").value("accessNotAllowed"))
           .andExpect(jsonPath("$.data").value("accessNotAllowed"))
           .andExpect(jsonPath("$.text").value("Access isn't allowed."));
@@ -529,7 +529,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 403 when the Authorization header is missing")
+    @DisplayName("returns 401 when the Authorization header is missing")
     void missingAuthorizationHeader() throws Exception {
       ProfileControllerIT.this
           .mockMvc
@@ -538,14 +538,14 @@ class ProfileControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body(uniqueUsername("nobody"))))
-          .andExpect(status().isForbidden())
+          .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.msgId").value("missingRequestHeader"))
           .andExpect(jsonPath("$.text").value("A required request header is missing."));
     }
 
     @Test
     @DisplayName(
-        "returns 403 for an expired token (extractUserId verifies internally, same as GET)")
+        "returns 401 for an expired token (extractUserId verifies internally, same as GET)")
     void expiredToken() throws Exception {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("expusr"), UserRole.USER);
       final var token = ProfileControllerIT.this.expiredBearerTokenFor(user);
@@ -558,7 +558,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body(uniqueUsername("newone"))))
-          .andExpect(status().isForbidden())
+          .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.msgId").value("sessionExpired"));
     }
 
@@ -760,7 +760,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 403 when the Authorization header is missing")
+    @DisplayName("returns 401 when the Authorization header is missing")
     void missingAuthorizationHeader() throws Exception {
       ProfileControllerIT.this
           .mockMvc
@@ -769,7 +769,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
                   .with(apiPort())
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("NewPassword2@")))
-          .andExpect(status().isForbidden())
+          .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.msgId").value("missingRequestHeader"))
           .andExpect(jsonPath("$.text").value("A required request header is missing."));
     }
@@ -855,18 +855,18 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 403 when the Authorization header is missing")
+    @DisplayName("returns 401 when the Authorization header is missing")
     void missingAuthorizationHeader() throws Exception {
       ProfileControllerIT.this
           .mockMvc
           .perform(delete("/api/profile").with(apiPort()))
-          .andExpect(status().isForbidden())
+          .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.msgId").value("missingRequestHeader"))
           .andExpect(jsonPath("$.text").value("A required request header is missing."));
     }
 
     @Test
-    @DisplayName("returns 403 for an expired token")
+    @DisplayName("returns 401 for an expired token")
     void expiredToken() throws Exception {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("delexp"), UserRole.USER);
       final var token = ProfileControllerIT.this.expiredBearerTokenFor(user);
@@ -874,7 +874,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       ProfileControllerIT.this
           .mockMvc
           .perform(delete("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
-          .andExpect(status().isForbidden())
+          .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.msgId").value("sessionExpired"));
 
       assertThat(ProfileControllerIT.this.userRepository.findById(user.getId())).isPresent();

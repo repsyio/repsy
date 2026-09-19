@@ -36,7 +36,7 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
   public intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     return next.handle(req).pipe(
       catchError((res: HttpErrorResponse) => {
-        if (res && res.status && res.error && res.status === 403 && res.error.msgId === 'sessionExpired') {
+        if (res && res.status && res.error && res.status === 401 && res.error.msgId === 'sessionExpired') {
           return this._refreshToken().pipe(
             switchMap((accessToken: string) => {
               return next.handle(
@@ -48,7 +48,7 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
           );
         }
 
-        if (res && res.status && res.error && res.status === 403 && res.error.msgId === 'refreshTokenExpired') {
+        if (res && res.status && res.error && res.status === 401 && res.error.msgId === 'refreshTokenExpired') {
           this._logOut();
           return EMPTY;
         }

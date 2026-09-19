@@ -17,6 +17,7 @@ package io.repsy.os.panel.auth.services;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.events.UserLoginEvent;
 import io.repsy.os.generated.model.LoginForm;
 import io.repsy.os.generated.model.LoginInfo;
@@ -77,12 +78,12 @@ public class AuthUserService {
 
     // A password or username change bumps the version, which revokes the older refresh tokens.
     if (claims.tokenVersion() != user.getTokenVersion()) {
-      throw new AccessNotAllowedException(REFRESH_TOKEN_EXPIRED);
+      throw new UnAuthorizedException(REFRESH_TOKEN_EXPIRED);
     }
 
     // The tokens' own expiry is capped at the session end; this guards it independently.
     if (!Instant.now().isBefore(claims.sessionStart().plus(AuthUtils.TIMEOUT_SESSION))) {
-      throw new AccessNotAllowedException(REFRESH_TOKEN_EXPIRED);
+      throw new UnAuthorizedException(REFRESH_TOKEN_EXPIRED);
     }
 
     return this.loginInfoFactory.create(user, claims.sessionStart());

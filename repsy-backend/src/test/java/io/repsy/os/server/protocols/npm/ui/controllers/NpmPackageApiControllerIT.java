@@ -404,11 +404,11 @@ class NpmPackageApiControllerIT {
       perform(
               get("/api/npm/packages/{repo}", privateRepoName)
                   .header(AUTHORIZATION, "Bearer malformed"))
-          .andExpect(status().isForbidden());
+          .andExpect(status().isUnauthorized());
       perform(
               get("/api/npm/packages/{repo}", privateRepoName)
                   .header(AUTHORIZATION, bearerToken(admin, Duration.ofSeconds(-30))))
-          .andExpect(status().isForbidden());
+          .andExpect(status().isUnauthorized());
       final var unknown =
           AuthUtils.AUTH_BEARER
               + jwtUtils.createTokenWithDuration(

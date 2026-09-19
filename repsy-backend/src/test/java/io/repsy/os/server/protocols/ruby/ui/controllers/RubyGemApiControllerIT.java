@@ -508,14 +508,14 @@ class RubyGemApiControllerIT {
               get("/api/ruby/gems/{repo}", repo.getName())
                   .with(apiPort())
                   .header(AUTHORIZATION, "Bearer garbage"))
-          .andExpect(status().isForbidden());
+          .andExpect(status().isUnauthorized());
       RubyGemApiControllerIT.this
           .mockMvc
           .perform(
               get("/api/ruby/gems/{repo}", repo.getName())
                   .with(apiPort())
                   .header(AUTHORIZATION, expired))
-          .andExpect(status().isForbidden());
+          .andExpect(status().isUnauthorized());
       RubyGemApiControllerIT.this
           .mockMvc
           .perform(

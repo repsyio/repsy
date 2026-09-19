@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
-import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
+import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.constants.ErrorConstants;
 import java.time.Duration;
@@ -69,7 +69,7 @@ class JwtUtilsTest {
         this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofMinutes(15));
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(accessToken))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 
@@ -82,7 +82,7 @@ class JwtUtilsTest {
         this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofMinutes(30));
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(legacyToken))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 
@@ -96,7 +96,7 @@ class JwtUtilsTest {
             userId, username, Duration.ofMinutes(30), SESSION_START, TOKEN_VERSION);
 
     assertThatThrownBy(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + refreshToken))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 
@@ -123,7 +123,7 @@ class JwtUtilsTest {
 
     assertThatThrownBy(
             () -> this.jwtUtils.verifyAndExtractUsername(AuthUtils.AUTH_BEARER + refreshToken))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 
@@ -150,7 +150,7 @@ class JwtUtilsTest {
             userId, username, Duration.ofMinutes(30), SESSION_START, TOKEN_VERSION);
 
     assertThatThrownBy(() -> this.jwtUtils.extractUserId(AuthUtils.AUTH_BEARER + refreshToken))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 
@@ -178,7 +178,7 @@ class JwtUtilsTest {
 
     assertThatThrownBy(
             () -> this.jwtUtils.extractAuthenticationType(AuthUtils.AUTH_BEARER + refreshToken))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 
@@ -201,7 +201,7 @@ class JwtUtilsTest {
     final var token = this.signedToken("not-a-uuid", "refresh");
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 
@@ -211,7 +211,7 @@ class JwtUtilsTest {
     final var token = this.signedToken(null, "refresh");
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 
@@ -221,7 +221,7 @@ class JwtUtilsTest {
     final var token = this.signedToken("not-a-uuid", null);
 
     assertThatThrownBy(() -> this.jwtUtils.getUserId(token))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 
@@ -231,7 +231,7 @@ class JwtUtilsTest {
     final var token = this.signedToken(null, null);
 
     assertThatThrownBy(() -> this.jwtUtils.getUserId(token))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 
@@ -256,7 +256,7 @@ class JwtUtilsTest {
             userId, username, Duration.ofSeconds(-1), SESSION_START, TOKEN_VERSION);
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(expiredToken))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining("refreshTokenExpired");
   }
 
@@ -269,7 +269,7 @@ class JwtUtilsTest {
         this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofSeconds(-1));
 
     assertThatThrownBy(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + expiredToken))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining("sessionExpired");
   }
 
@@ -282,7 +282,7 @@ class JwtUtilsTest {
             UUID.randomUUID(), "testuser", Duration.ofSeconds(-1), SESSION_START, TOKEN_VERSION);
 
     assertThatThrownBy(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + expiredToken))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining("sessionExpired");
   }
 
@@ -301,7 +301,7 @@ class JwtUtilsTest {
             .sign(Algorithm.HMAC512(otherSecret));
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 
@@ -319,7 +319,7 @@ class JwtUtilsTest {
             .sign(Algorithm.HMAC512(otherSecret));
 
     assertThatThrownBy(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + token))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 
@@ -335,7 +335,7 @@ class JwtUtilsTest {
             .sign(Algorithm.HMAC512(TEST_SECRET));
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 
@@ -351,7 +351,7 @@ class JwtUtilsTest {
             .sign(Algorithm.HMAC512(TEST_SECRET));
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 
@@ -389,7 +389,7 @@ class JwtUtilsTest {
 
     assertThatThrownBy(
             () -> this.jwtUtils.extractSessionStart(AuthUtils.AUTH_BEARER + refreshToken))
-        .isInstanceOf(AccessNotAllowedException.class)
+        .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
 }

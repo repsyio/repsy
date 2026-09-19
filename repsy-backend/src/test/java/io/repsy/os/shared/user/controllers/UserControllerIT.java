@@ -196,11 +196,11 @@ class UserControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 403 when the Authorization header is missing")
+    @DisplayName("returns 401 when the Authorization header is missing")
     void missingAuthorizationHeader(final Endpoint endpoint) throws Exception {
       expectError(
           UserControllerIT.this.perform(endpoint.request().apply(UUID.randomUUID())),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "missingRequestHeader",
           "Authorization",
           "A required request header is missing.");
@@ -208,12 +208,12 @@ class UserControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 403 for a header without a Bearer prefix")
+    @DisplayName("returns 401 for a header without a Bearer prefix")
     void nonBearerAuthorizationHeader(final Endpoint endpoint) throws Exception {
       expectError(
           UserControllerIT.this.perform(
               endpoint.request().apply(UUID.randomUUID()).header(AUTHORIZATION, "Basic dXNlcjpw")),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "accessNotAllowed",
           "accessNotAllowed",
           "Access isn't allowed.");
@@ -221,7 +221,7 @@ class UserControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 403 for a malformed/garbage bearer token")
+    @DisplayName("returns 401 for a malformed/garbage bearer token")
     void malformedBearerToken(final Endpoint endpoint) throws Exception {
       expectError(
           UserControllerIT.this.perform(
@@ -229,7 +229,7 @@ class UserControllerIT extends AbstractIntegrationTest {
                   .request()
                   .apply(UUID.randomUUID())
                   .header(AUTHORIZATION, "Bearer not-a-jwt")),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "accessNotAllowed",
           "accessNotAllowed",
           "Access isn't allowed.");
@@ -237,7 +237,7 @@ class UserControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 403 for an expired token")
+    @DisplayName("returns 401 for an expired token")
     void expiredToken(final Endpoint endpoint) throws Exception {
       final var admin = UserControllerIT.this.createUser(uniqueUsername("expired"), UserRole.ADMIN);
 
@@ -247,7 +247,7 @@ class UserControllerIT extends AbstractIntegrationTest {
                   .request()
                   .apply(UUID.randomUUID())
                   .header(AUTHORIZATION, UserControllerIT.this.expiredBearerTokenFor(admin))),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "sessionExpired",
           "sessionExpired",
           "Session expired.");
@@ -272,7 +272,7 @@ class UserControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 401 accessDenied for a non-admin caller and changes nothing")
+    @DisplayName("returns 403 accessDenied for a non-admin caller and changes nothing")
     void nonAdminCaller(final Endpoint endpoint) throws Exception {
       final var caller = UserControllerIT.this.createUser(uniqueUsername("plain"), UserRole.USER);
       final var target = UserControllerIT.this.createUser(uniqueUsername("target"), UserRole.USER);
@@ -288,7 +288,7 @@ class UserControllerIT extends AbstractIntegrationTest {
       expectError(
           UserControllerIT.this.perform(
               endpoint.request().apply(target.getId()).header(AUTHORIZATION, token)),
-          HttpStatus.UNAUTHORIZED,
+          HttpStatus.FORBIDDEN,
           "accessDenied",
           "accessDenied",
           "Access Denied. Please check your credentials.");

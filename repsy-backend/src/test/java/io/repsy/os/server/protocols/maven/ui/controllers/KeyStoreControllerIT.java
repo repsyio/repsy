@@ -260,7 +260,7 @@ class KeyStoreControllerIT {
       final var path = "/api/mvn/key-stores/allowed-servers";
       final var missing =
           KeyStoreControllerIT.this.mockMvc.perform(get(path).with(apiPort())).andReturn();
-      assertThat(missing.getResponse().getStatus()).isEqualTo(403);
+      assertThat(missing.getResponse().getStatus()).isEqualTo(401);
       assertError(missing.getResponse().getContentAsString(), "missingRequestHeader");
 
       final var malformed =
@@ -268,7 +268,7 @@ class KeyStoreControllerIT {
               .mockMvc
               .perform(get(path).with(apiPort()).header(AUTHORIZATION, "Bearer invalid"))
               .andReturn();
-      assertThat(malformed.getResponse().getStatus()).isEqualTo(403);
+      assertThat(malformed.getResponse().getStatus()).isEqualTo(401);
       assertError(malformed.getResponse().getContentAsString(), "accessNotAllowed");
 
       final var expired =
@@ -280,7 +280,7 @@ class KeyStoreControllerIT {
               .mockMvc
               .perform(get(path).with(apiPort()).header(AUTHORIZATION, expired))
               .andReturn();
-      assertThat(expiredResponse.getResponse().getStatus()).isEqualTo(403);
+      assertThat(expiredResponse.getResponse().getStatus()).isEqualTo(401);
       assertError(expiredResponse.getResponse().getContentAsString(), "sessionExpired");
 
       final var refreshToken =
@@ -292,7 +292,7 @@ class KeyStoreControllerIT {
               .mockMvc
               .perform(get(path).with(apiPort()).header(AUTHORIZATION, refreshToken))
               .andReturn();
-      assertThat(refreshTokenResponse.getResponse().getStatus()).isEqualTo(403);
+      assertThat(refreshTokenResponse.getResponse().getStatus()).isEqualTo(401);
       assertError(refreshTokenResponse.getResponse().getContentAsString(), "accessNotAllowed");
     }
   }

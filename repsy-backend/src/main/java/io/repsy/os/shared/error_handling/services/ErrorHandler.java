@@ -642,9 +642,9 @@ public class ErrorHandler {
   }
 
   /**
-   * Handles a missing required request header. A missing {@code Authorization} header stays a 403
-   * like every other failed authentication on the panel (malformed, non-Bearer and expired tokens),
-   * which is what the frontend interceptors expect; any other missing header is a plain 400.
+   * Handles a missing required request header. A missing {@code Authorization} header is a failed
+   * authentication and answers 401 like the other panel authentication failures (malformed,
+   * non-Bearer and expired tokens); any other missing header is a plain 400.
    *
    * @param ex Thrown exception
    * @return REST response carrying the header name
@@ -664,7 +664,7 @@ public class ErrorHandler {
 
     final var status =
         HttpHeaders.AUTHORIZATION.equalsIgnoreCase(ex.getHeaderName())
-            ? HttpStatus.FORBIDDEN
+            ? HttpStatus.UNAUTHORIZED
             : HttpStatus.BAD_REQUEST;
 
     return ResponseEntity.status(status)

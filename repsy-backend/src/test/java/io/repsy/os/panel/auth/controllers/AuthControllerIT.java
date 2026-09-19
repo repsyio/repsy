@@ -370,7 +370,7 @@ class AuthControllerIT {
   private static void expectAccessNotAllowed(final ResultActions result) throws Exception {
     expectError(
         result,
-        HttpStatus.FORBIDDEN,
+        HttpStatus.UNAUTHORIZED,
         "accessNotAllowed",
         "accessNotAllowed",
         ACCESS_NOT_ALLOWED_TEXT);
@@ -379,7 +379,7 @@ class AuthControllerIT {
   private static void expectRefreshTokenExpired(final ResultActions result) throws Exception {
     expectError(
         result,
-        HttpStatus.FORBIDDEN,
+        HttpStatus.UNAUTHORIZED,
         "refreshTokenExpired",
         "refreshTokenExpired",
         "refreshTokenExpired");
@@ -881,7 +881,7 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 403 accessNotAllowed for an access token")
+    @DisplayName("returns 401 accessNotAllowed for an access token")
     void rejectsAnAccessTokenAsRefreshToken() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("access"), UserRole.USER);
       final var loginBody =
@@ -893,7 +893,7 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 403 accessNotAllowed for a claim-less legacy token from the 3-arg method")
+    @DisplayName("returns 401 accessNotAllowed for a claim-less legacy token from the 3-arg method")
     void rejectsAClaimlessLegacyToken() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("legacy"), UserRole.USER);
       final var legacyToken =
@@ -904,7 +904,7 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 403 refreshTokenExpired for an expired token")
+    @DisplayName("returns 401 refreshTokenExpired for an expired token")
     void expiredToken() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("expired"), UserRole.USER);
       final var expired =
@@ -970,7 +970,7 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 403 refreshTokenExpired once the session's absolute lifetime has passed")
+    @DisplayName("returns 401 refreshTokenExpired once the session's absolute lifetime has passed")
     void rejectsARefreshAfterSessionEnd() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("ended"), UserRole.USER);
       final var sessionStart =
@@ -987,7 +987,7 @@ class AuthControllerIT {
 
     @Test
     @DisplayName(
-        "returns 403 refreshTokenExpired for a token issued before the user's token version")
+        "returns 401 refreshTokenExpired for a token issued before the user's token version")
     void rejectsATokenFromAnOlderVersion() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("revoked"), UserRole.USER);
       final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
@@ -998,7 +998,7 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 403 refreshTokenExpired once an admin has reset the user's password")
+    @DisplayName("returns 401 refreshTokenExpired once an admin has reset the user's password")
     void rejectsATokenAfterAnAdminPasswordReset() throws Exception {
       final var adminToken = AuthControllerIT.this.adminBearerToken();
       final var user = AuthControllerIT.this.createUser(uniqueUsername("reset"), UserRole.USER);
@@ -1014,7 +1014,7 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 403 refreshTokenExpired once an admin has renamed the user")
+    @DisplayName("returns 401 refreshTokenExpired once an admin has renamed the user")
     void rejectsATokenAfterAnAdminRename() throws Exception {
       final var adminToken = AuthControllerIT.this.adminBearerToken();
       final var user = AuthControllerIT.this.createUser(uniqueUsername("rename"), UserRole.USER);
@@ -1053,7 +1053,7 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 403 accessNotAllowed for a token without session claims")
+    @DisplayName("returns 401 accessNotAllowed for a token without session claims")
     void rejectsATokenWithoutSessionClaims() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("noclaims"), UserRole.USER);
       final var token =
@@ -1068,7 +1068,7 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 403 accessNotAllowed for a token that is not a JWT")
+    @DisplayName("returns 401 accessNotAllowed for a token that is not a JWT")
     void malformedToken() throws Exception {
       expectAccessNotAllowed(AuthControllerIT.this.refreshWith("not-a-jwt"));
     }
@@ -1080,7 +1080,7 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 403 accessNotAllowed for a token whose payload was tampered with")
+    @DisplayName("returns 401 accessNotAllowed for a token whose payload was tampered with")
     void tamperedToken() throws Exception {
       final var victim = AuthControllerIT.this.createUser(uniqueUsername("victim"), UserRole.USER);
       final var attacker =
@@ -1093,7 +1093,7 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 403 accessNotAllowed for a token signed with a different secret")
+    @DisplayName("returns 401 accessNotAllowed for a token signed with a different secret")
     void wronglySignedToken() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("wrongkey"), UserRole.USER);
       final var token =
@@ -1107,7 +1107,7 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 403 accessNotAllowed for an unsigned (alg=none) token")
+    @DisplayName("returns 401 accessNotAllowed for an unsigned (alg=none) token")
     void unsignedToken() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("nonealg"), UserRole.USER);
       final var token =
@@ -1153,7 +1153,7 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 403 accessNotAllowed for a validly signed token whose subject is no UUID")
+    @DisplayName("returns 401 accessNotAllowed for a validly signed token whose subject is no UUID")
     void nonUuidSubject() throws Exception {
       final var token =
           signedRefreshToken(
@@ -1166,7 +1166,7 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 403 accessNotAllowed for a validly signed token without a subject")
+    @DisplayName("returns 401 accessNotAllowed for a validly signed token without a subject")
     void missingSubject() throws Exception {
       final var token =
           signedRefreshToken(
@@ -1209,7 +1209,7 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName("returns 403 accessNotAllowed when used as Bearer on an authenticated endpoint")
+    @DisplayName("returns 401 accessNotAllowed when used as Bearer on an authenticated endpoint")
     void refreshTokenRejectedOnAuthenticatedEndpoint() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("refbearer"), UserRole.USER);
       final var loginBody =

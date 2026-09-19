@@ -502,7 +502,7 @@ class ProtocolDeployTokenControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 403 for a malformed/garbage bearer token")
+    @DisplayName("returns 401 for a malformed/garbage bearer token")
     void malformedBearerToken(final Endpoint endpoint) throws Exception {
       final var repo = ProtocolDeployTokenControllerIT.this.createRepo(RepoType.MAVEN);
 
@@ -513,7 +513,7 @@ class ProtocolDeployTokenControllerIT {
                   .apply(repo.getName())
                   .apply(UUID.randomUUID())
                   .header(AUTHORIZATION, "Bearer not-a-jwt")),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "accessNotAllowed",
           "accessNotAllowed",
           "Access isn't allowed.");
@@ -521,7 +521,7 @@ class ProtocolDeployTokenControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 403 for an expired token")
+    @DisplayName("returns 401 for an expired token")
     void expiredToken(final Endpoint endpoint) throws Exception {
       final var repo = ProtocolDeployTokenControllerIT.this.createRepo(RepoType.MAVEN);
       final var admin =
@@ -536,7 +536,7 @@ class ProtocolDeployTokenControllerIT {
                   .header(
                       AUTHORIZATION,
                       ProtocolDeployTokenControllerIT.this.expiredBearerTokenFor(admin))),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "sessionExpired",
           "sessionExpired",
           "Session expired.");
@@ -675,7 +675,7 @@ class ProtocolDeployTokenControllerIT {
                   .apply(uniqueName("missing"))
                   .apply(UUID.randomUUID())
                   .header(AUTHORIZATION, "Bearer not-a-jwt")),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "accessNotAllowed",
           "accessNotAllowed",
           "Access isn't allowed.");

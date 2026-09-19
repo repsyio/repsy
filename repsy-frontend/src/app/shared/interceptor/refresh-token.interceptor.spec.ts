@@ -29,7 +29,7 @@ import { Subject } from 'rxjs';
 import { AuthService } from '../../auth/pages/service/auth.service';
 import { RefreshTokenInterceptor } from './refresh-token.interceptor';
 
-const SESSION_EXPIRED = { status: 403, statusText: 'Forbidden' };
+const SESSION_EXPIRED = { status: 401, statusText: 'Unauthorized' };
 
 describe('RefreshTokenInterceptor', () => {
   let http: HttpClient;
@@ -98,7 +98,7 @@ describe('RefreshTokenInterceptor', () => {
 
     expireSession('/a');
     expireSession('/b');
-    const failure = new HttpErrorResponse({ status: 403, error: { msgId: 'refreshTokenExpired' } });
+    const failure = new HttpErrorResponse({ status: 401, error: { msgId: 'refreshTokenExpired' } });
     refreshes[0].error(failure);
 
     expect(errors).toEqual([failure, failure]);
@@ -112,7 +112,7 @@ describe('RefreshTokenInterceptor', () => {
     http.get('/b').subscribe({ error: (e) => errors.push(e) });
     expireSession('/a');
     expireSession('/b');
-    refreshes[0].error(new HttpErrorResponse({ status: 403, error: { msgId: 'refreshTokenExpired' } }));
+    refreshes[0].error(new HttpErrorResponse({ status: 401, error: { msgId: 'refreshTokenExpired' } }));
     expect(errors.length).toBe(2);
 
     // The user signs in again, and two requests expire together.
