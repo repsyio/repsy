@@ -42,6 +42,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -170,8 +171,15 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
 
+    final var sortedPageable =
+        PageRequest.of(
+            pageable.getPageNumber(),
+            pageable.getPageSize(),
+            withTiebreaker(
+                pageable.getSort(), Sort.by(Sort.Direction.DESC, "publishedAt"), "version"));
+
     return this.packageVersionRepository
-        .findByNugetPackageIdOrderByPublishedAtDesc(pkg.getId(), pageable)
+        .findByNugetPackageId(pkg.getId(), sortedPageable)
         .map(v -> this.converter.toVersionInfo(v, packageId));
   }
 
@@ -200,12 +208,28 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       return new org.springframework.data.domain.PageImpl<>(List.of());
     }
 
-    final var page = skip / take;
-    final var pageable = PageRequest.of(page, take);
+    return this.searchPage(repoInfo, query, PageRequest.of(skip / take, take), prerelease);
+  }
+
+  @Override
+  public Page<NuGetPackageSearchResult> searchPage(
+      final BaseRepoInfo<UUID> repoInfo,
+      final String query,
+      final Pageable pageable,
+      final boolean prerelease) {
+
+    // package_id is unique per repo, so it alone gives every page a stable order.
+    final var sortedPageable =
+        PageRequest.of(
+            pageable.getPageNumber(),
+            pageable.getPageSize(),
+            pageable.getSort().isSorted()
+                ? pageable.getSort()
+                : Sort.by(Sort.Direction.ASC, "packageId"));
 
     final var pkgPage =
         this.packageRepository.findByRepoIdAndPackageIdContainingIgnoreCase(
-            repoInfo.getId(), query, pageable);
+            repoInfo.getId(), query, sortedPageable);
 
     return pkgPage.map(pkg -> this.toSearchResult(pkg, prerelease));
   }
@@ -430,6 +454,20 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     }
 
     return pkgVersion;
+  }
+
+  /**
+   * Returns the requested sort, or {@code defaultSort} when there is none, followed by {@code
+   * tiebreaker} ascending so rows with equal sort values keep a stable order across pages.
+   */
+  private static Sort withTiebreaker(
+      final Sort requested, final Sort defaultSort, final String tiebreaker) {
+
+    final var sort = requested.isSorted() ? requested : defaultSort;
+
+    return sort.getOrderFor(tiebreaker) == null
+        ? sort.and(Sort.by(Sort.Direction.ASC, tiebreaker))
+        : sort;
   }
 
   private NuGetPackageSearchResult toSearchResult(

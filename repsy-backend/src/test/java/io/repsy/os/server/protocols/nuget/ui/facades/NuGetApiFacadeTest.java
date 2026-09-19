@@ -27,8 +27,10 @@ import io.repsy.os.generated.model.NuGetDeletedItem;
 import io.repsy.os.server.protocols.nuget.shared.packages.services.NuGetPackageServiceImpl;
 import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,6 +40,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("NuGetApiFacade")
@@ -61,6 +66,48 @@ class NuGetApiFacadeTest {
   @BeforeEach
   void setUp() {
     facade = new NuGetApiFacade(nugetPackageService, nugetStorageService, eventPublisher);
+  }
+
+  @Nested
+  @DisplayName("search()")
+  class SearchTests {
+
+    @Test
+    @DisplayName("passes the requested page and sort to the package service")
+    void passesPageableThrough() {
+      final var pageable = PageRequest.of(2, 5, Sort.by(Sort.Direction.DESC, "packageId"));
+      when(nugetPackageService.searchPage(REPO_INFO, "fixture", pageable, false))
+          .thenReturn(
+              new PageImpl<>(
+                  List.of(
+                      new NuGetPackageSearchResult(
+                          "some.package",
+                          "1.0.0",
+                          null,
+                          "desc",
+                          null,
+                          null,
+                          null,
+                          null,
+                          null,
+                          7L,
+                          List.of())),
+                  pageable,
+                  11));
+
+      final var page = facade.search(REPO_INFO, "fixture", pageable);
+
+      assertThat(page.getNumber()).isEqualTo(2);
+      assertThat(page.getTotalElements()).isEqualTo(11);
+      assertThat(page.getContent())
+          .singleElement()
+          .satisfies(
+              item -> {
+                assertThat(item.getPackageId()).isEqualTo("some.package");
+                assertThat(item.getLatestVersion()).isEqualTo("1.0.0");
+                assertThat(item.getTotalDownloads()).isEqualTo(7L);
+              });
+    }
   }
 
   @Nested

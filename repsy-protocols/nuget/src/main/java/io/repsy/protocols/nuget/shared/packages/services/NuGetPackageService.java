@@ -66,4 +66,7 @@ public interface NuGetPackageService<ID> {
 
   Page<NuGetPackageSearchResult> search(
       BaseRepoInfo<ID> repoInfo, String query, int skip, int take, boolean prerelease);
+
+  Page<NuGetPackageSearchResult> searchPage(
+      BaseRepoInfo<ID> repoInfo, String query, Pageable pageable, boolean prerelease);
 }

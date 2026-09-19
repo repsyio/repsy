@@ -46,8 +46,7 @@ public interface NuGetPackageVersionRepository extends JpaRepository<NuGetPackag
   List<NuGetPackageVersion> findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(
       UUID packageId);
 
-  Page<NuGetPackageVersion> findByNugetPackageIdOrderByPublishedAtDesc(
-      UUID packageId, Pageable pageable);
+  Page<NuGetPackageVersion> findByNugetPackageId(UUID packageId, Pageable pageable);
 
   boolean existsByNugetPackageId(UUID packageId);
 }
