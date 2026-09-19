@@ -218,17 +218,11 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
     return archiveFiles;
   }
 
-  /** mark repo directory as deleted and return usage */
+  /** mark repo directory as deleted */
   @Override
-  public long deleteRepo(final UUID repoUuid) {
-
+  public void deleteRepo(final UUID repoUuid) {
     final var storagePath = StoragePath.of(repoUuid);
-
-    final var usage = this.storageStrategy.calculatePathUsage(storagePath);
-
     this.storageStrategy.deleteDirectory(storagePath);
-
-    return usage;
   }
 
   @Override

@@ -36,7 +36,7 @@ public final class PanelAuthHelper {
 
   public @NonNull UserInfo authenticate(final @NonNull String authHeader) {
     final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PANEL);
-    return this.userTxService.getUserByUsername(username);
+    return this.userTxService.getAuthenticatedUserByUsername(username);
   }
 
   public void requireAdmin(final @NonNull UserInfo userInfo) {

@@ -241,12 +241,12 @@ class AbstractCargoStorageServiceTest {
   }
 
   @Test
-  @DisplayName("deleteRepo() deletes the repo directory and returns its usage")
+  @DisplayName("deleteRepo() deletes the repo directory without sizing it first")
   void deleteRepo() {
-    when(storageStrategy.calculatePathUsage(path(REPO_ID.toString()))).thenReturn(999L);
+    service.deleteRepo(REPO_ID);
 
-    assertThat(service.deleteRepo(REPO_ID)).isEqualTo(999L);
     verify(storageStrategy).deleteDirectory(path(REPO_ID.toString()));
+    verify(storageStrategy, never()).calculatePathUsage(any());
   }
 
   @Test

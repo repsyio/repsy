@@ -18,7 +18,7 @@ package db.migration.h2;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import io.repsy.os.panel.shared.config.configs.XmlMapperConfig;
+import io.repsy.os.panel.shared.config.configs.Jackson2MapperConfig;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
 import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import java.sql.Connection;
@@ -126,7 +126,7 @@ class V0014ConvertNuGetDependenciesToJsonTest {
   private static String legacyXml(final List<NuGetDependencyInfo> dependencies)
       throws JsonProcessingException {
     // The service serialized the ArrayList that extractDependenciesFromNuspec returns.
-    return new XmlMapperConfig().xmlMapper().writeValueAsString(new ArrayList<>(dependencies));
+    return new Jackson2MapperConfig().xmlMapper().writeValueAsString(new ArrayList<>(dependencies));
   }
 
   private void migrateTo(final String version) {

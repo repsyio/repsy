@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.cargo.shared.auth.services;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -24,9 +25,12 @@ import static org.mockito.Mockito.when;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
+import io.repsy.os.shared.user.mappers.UserConverter;
+import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -109,5 +113,23 @@ class CargoAuthComponentTest {
     assertUnauthorized(
         () -> this.authComponent.authenticateAndCreateToken(basicAuth(USERNAME, "wrong")));
     verify(this.userTxService, never()).getUserByUsername(anyString());
+  }
+
+  /** RPS-962: a valid bearer token whose user no longer exists is an authentication failure. */
+  @Test
+  @DisplayName(
+      "authenticateAndCreateToken answers unAuthorized for a bearer token whose user is gone")
+  void authenticateAndCreateTokenUserNoLongerExists() {
+    final var jwtUtils = Mockito.mock(JwtUtils.class);
+    when(jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class))).thenReturn("ghost");
+    // A real UserTxService over an empty repository: the lookup itself is under test.
+    final var component =
+        new CargoAuthComponent(
+            new UserTxService(
+                Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)),
+            jwtUtils,
+            Mockito.mock(DeployTokenService.class));
+
+    assertUnauthorized(() -> component.authenticateAndCreateToken("Bearer signed.jwt.token"));
   }
 }

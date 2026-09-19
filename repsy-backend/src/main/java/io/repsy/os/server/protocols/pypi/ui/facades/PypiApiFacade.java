@@ -43,11 +43,9 @@ public class PypiApiFacade implements ProtocolApiFacade {
   private final @NonNull PypiPackageServiceImpl pypiPackageService;
   private final @NonNull ApplicationEventPublisher eventPublisher;
 
-  public BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
+  public void deleteRepo(final @NonNull RepoInfo repoInfo) {
 
-    final var free = this.pypiStorageService.deleteRepo(repoInfo.getStorageKey());
-
-    return BaseUsages.ofDisk(-1 * free);
+    this.pypiStorageService.deleteRepo(repoInfo.getStorageKey());
   }
 
   public @NonNull BaseUsages deletePackage(

@@ -66,7 +66,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
   private final @NonNull OrphanLayerCleanupService orphanLayerCleanupService;
   private final @NonNull ApplicationEventPublisher eventPublisher;
 
-  public @NonNull BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
+  public void deleteRepo(final @NonNull RepoInfo repoInfo) {
 
     RepoUtils.validateRepoName(repoInfo.getName());
 
@@ -79,9 +79,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
 
     this.layerTxService.deleteAllLayers(repoInfo.getStorageKey());
 
-    final var free = this.dockerStorageService.deleteRepo(repoInfo.getStorageKey());
-
-    return BaseUsages.builder().diskUsage(-1L * free).build();
+    this.dockerStorageService.deleteRepo(repoInfo.getStorageKey());
   }
 
   // Event is published after the DB image delete but before the storage manifest delete. If

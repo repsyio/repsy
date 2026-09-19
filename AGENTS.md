@@ -72,6 +72,28 @@ for SonarCloud.
 - Commit messages: conventional commits, prefixed with the Jira key where there is one
   (for example `RPS-844: ...`).
 
+## Merging to `main`
+
+Two PRs can each pass CI against an older `main`, merge without a textual conflict, and still break
+the build together (RPS-901 and RPS-904 did: an unused import failed Checkstyle on `main` and then
+on every open PR). To rule that out, `main` is merged through a **GitHub merge queue**. The queue
+builds each PR on top of the entries ahead of it and merges it only if that combination is green.
+
+- Enqueue a PR with `gh pr merge <n> --auto --squash` (or the "Merge when ready" button). Do not
+  update the branch by hand before merging: the queue already tests it against the latest `main`.
+- `.github/workflows/pr-checks.yml` runs on `pull_request` and on `merge_group`, so every check
+  below reports on both. A workflow that a required check comes from must keep the `merge_group`
+  trigger, or queued PRs never get a result and time out.
+- Required checks in the `protect default` ruleset: `Repsy check`, `Repsy frontend` and
+  `Editorconfig check - All`. Add a new job to that list when it should gate merges.
+- Queue settings: squash merge, `ALLGREEN` grouping, up to 5 entries built at once, 60 minutes
+  to report checks.
+- `gh pr merge --admin` skips the queue and the required checks. Org admins keep that bypass as a
+  break-glass for a red `main` or a stuck queue only. A PR merged that way is not re-verified
+  against the other open PRs, so do not use it for routine merges.
+- If `main` still goes red, fix it with a PR of its own (as RPS-960 did) rather than folding the
+  fix into an unrelated PR.
+
 ## API spec
 
 `repsy-backend/src/main/resources/openapi/openapi-spec.yaml` is the single source of truth for the
@@ -94,4 +116,7 @@ panel API. Edit that file for any API change; there is no other copy. Both sides
 ## Submodule
 
 `core/` is pinned to a specific `repsy-core` commit. Bump it only as a deliberate change (its own
-PR, or a clearly called-out part of one), and re-run the core install above afterwards.
+PR, or a clearly called-out part of one), and re-run the core install above afterwards. Pin it
+only to a commit that is on `repsy-core`'s `main`, so merge the `repsy-core` PR first: a commit
+that only exists on a PR branch disappears from the remote when that branch is deleted on merge.
+`repsy-core` merges to `main` through the same merge queue flow described above.
