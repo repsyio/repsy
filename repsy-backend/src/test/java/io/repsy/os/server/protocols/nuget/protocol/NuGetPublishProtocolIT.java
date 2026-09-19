@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.nuget.protocol;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
@@ -39,6 +40,8 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
+import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
+import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -53,7 +56,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -430,12 +432,12 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
     }
 
     /**
-     * Fails today: the service serializes the dependencies with the injected {@code XmlMapper}, so
-     * PostgreSQL receives XML for its {@code jsonb} column. Enable it together with the fix.
+     * A substring check on the column is not enough: an XML rendering of the same dependencies
+     * contains the same words. So the stored value must parse back through the JSON reader, and the
+     * management API, which reads it the same way, must return the dependency.
      */
     @Test
-    @Disabled("RPS-953: NuGet dependencies are serialized as XML instead of JSON")
-    @DisplayName("stores the declared dependencies as JSON")
+    @DisplayName("stores the declared dependencies as JSON and returns them from the API")
     void storesDependencies() throws Exception {
       final var repo = NuGetPublishProtocolIT.this.nugetRepo();
       final var pkg = new Pkg(uniquePackageId(), "1.0.0", true);
@@ -448,11 +450,22 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, pkg.id()))
           .singleElement()
           .satisfies(
-              v ->
-                  assertThat(v.getDependencies())
-                      .contains("Newtonsoft.Json")
-                      .contains("13.0.3")
-                      .contains("net8.0"));
+              v -> {
+                assertThat(v.getDependencies()).startsWith("[");
+                assertThat(NuGetPackageUtils.parseDependenciesJson(v.getDependencies()))
+                    .containsExactly(
+                        new NuGetDependencyInfo("Newtonsoft.Json", "13.0.3", "net8.0"));
+              });
+
+      NuGetPublishProtocolIT.this
+          .perform(
+              get("/api/nuget/packages/{repo}/{id}/{version}", repo.getName(), pkg.id(), "1.0.0")
+                  .header(AUTHORIZATION, NuGetPublishProtocolIT.this.adminBearerToken()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.dependencies", hasSize(1)))
+          .andExpect(jsonPath("$.data.dependencies[0].packageId").value("Newtonsoft.Json"))
+          .andExpect(jsonPath("$.data.dependencies[0].versionRange").value("13.0.3"))
+          .andExpect(jsonPath("$.data.dependencies[0].targetFramework").value("net8.0"));
     }
 
     @Test
