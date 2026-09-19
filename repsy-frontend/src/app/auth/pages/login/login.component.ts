@@ -15,6 +15,7 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, OnInit, ViewEncapsulation } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -92,7 +93,12 @@ export class LoginComponent implements OnInit {
       )
       .subscribe({
         next: () => this.router.navigateByUrl('/'),
-        error: () => {},
+        error: (error: HttpErrorResponse) => {
+          // errorHandlerInterceptor leaves 401 responses to their callers, so show invalidCredentials here.
+          if (error.status === 401) {
+            this.toastService.show(error.error?.text || 'Username or password is incorrect.', 'error');
+          }
+        },
       });
   }
 

@@ -15,7 +15,6 @@
  */
 package io.repsy.os.panel.auth.services;
 
-import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.events.UserLoginEvent;
@@ -58,11 +57,11 @@ public class AuthUserService {
     } catch (final ItemNotFoundException exception) {
       // Perform the same hash work for unknown usernames to avoid leaking account existence.
       PasswordHasher.verifyDummy(form.getPassword());
-      throw new AccessNotAllowedException(INVALID_CREDENTIALS);
+      throw new UnAuthorizedException(INVALID_CREDENTIALS);
     }
 
     if (!PasswordHasher.matches(form.getPassword(), user.getHash(), user.getSalt())) {
-      throw new AccessNotAllowedException(INVALID_CREDENTIALS);
+      throw new UnAuthorizedException(INVALID_CREDENTIALS);
     }
 
     // Hashes from an older algorithm or work factor are replaced now that the password is known.
