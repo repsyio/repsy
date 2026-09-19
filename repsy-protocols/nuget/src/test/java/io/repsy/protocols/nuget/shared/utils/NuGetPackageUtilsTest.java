@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.nuget.shared.utils;
 
+import static io.repsy.protocols.nuget.NuGetTestContexts.context;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -100,6 +101,25 @@ class NuGetPackageUtilsTest {
     assertThatThrownBy(() -> NuGetPackageUtils.readNuspecMetadata(nupkg))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("Invalid NuGet version format.");
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "/v3/package/Some.Package/1.0.0, Some.Package, 1.0.0",
+    "/v3/package/Some.Package/1.0.0/, Some.Package, 1.0.0",
+    "/v3/package/Some.Package/, Some.Package, ''",
+    "/v3/package/Some.Package, Some.Package, ''",
+    "/v3/package, '', ''"
+  })
+  @DisplayName("extracts the package id and version from the request path")
+  void extractsPackageIdAndVersion(
+      final String path, final String expectedId, final String expectedVersion) {
+    final var ctx = context(path);
+
+    assertThat(NuGetPackageUtils.extractPackageId(ctx)).isEqualTo(expectedId);
+    final var idAndVersion = NuGetPackageUtils.extractPackageIdAndVersion(ctx);
+    assertThat(idAndVersion.id()).isEqualTo(expectedId);
+    assertThat(idAndVersion.version()).isEqualTo(expectedVersion);
   }
 
   private Path nupkg(final String id, final String version) throws IOException {

@@ -52,11 +52,13 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
   private final @NonNull MavenStorageService mavenStorageService;
 
   @Transactional
+  @Override
   public void deleteRepo(final @NonNull RepoInfo repoInfo) {
 
     this.mavenStorageService.deleteRepo(repoInfo.getStorageKey());
   }
 
+  @Override
   public @NonNull List<StorageItemInfo> getItems(
       final @NonNull RepoInfo repoInfo, final @NonNull RelativePath relativePath) {
 
@@ -146,6 +148,7 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
   }
 
   @Transactional
+  @Override
   public void createRepo(final @NonNull UUID repoId) {
     this.mavenStorageService.createRepo(repoId);
   }

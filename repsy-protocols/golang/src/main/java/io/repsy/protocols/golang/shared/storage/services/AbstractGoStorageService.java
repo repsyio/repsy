@@ -26,9 +26,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
+@Slf4j
 @RequiredArgsConstructor
 @NullMarked
 public abstract class AbstractGoStorageService<ID> implements GoStorageService<ID> {
@@ -103,8 +105,12 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
       for (final var item : items) {
         this.tryDeleteVersionFile(item, versionPrefix, atVDirPath, storageKey);
       }
-    } catch (final Exception _) {
-
+    } catch (final ItemNotFoundException _) {
+      // No @v directory means there are no files left to remove.
+      log.debug("Nothing to delete under {}", atVStoragePath);
+    } catch (final Exception e) {
+      // Cleanup is best effort: the caller still removes the version's database row.
+      log.warn("Could not list {} while deleting version files", atVStoragePath, e);
     }
   }
 
@@ -119,8 +125,9 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
     final var filePath = StoragePath.of(storageKey, atVDirPath + item.getName());
     try {
       this.storageStrategy.delete(filePath);
-    } catch (final Exception _) {
-
+    } catch (final Exception e) {
+      // Best effort: one file that cannot be removed must not stop the others from being removed.
+      log.warn("Could not delete version file {}", filePath, e);
     }
   }
 

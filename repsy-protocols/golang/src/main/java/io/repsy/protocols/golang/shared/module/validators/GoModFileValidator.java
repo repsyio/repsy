@@ -49,7 +49,7 @@ public class GoModFileValidator {
     if (!matcher.find()) {
       return;
     }
-    final var firstSegment = matcher.group(1).split("/")[0];
+    final var firstSegment = matcher.group(1).split("/", -1)[0];
     if (!firstSegment.contains(".")) {
       throw new BadRequestException("goModInvalidModulePath");
     }

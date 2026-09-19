@@ -28,8 +28,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
 import lombok.SneakyThrows;
@@ -87,7 +89,7 @@ public class CrateUtils {
 
   public static String normalizeCrateName(final String name) {
 
-    return name.toLowerCase().replace('-', '_');
+    return name.toLowerCase(Locale.ROOT).replace('-', '_');
   }
 
   public static void validatePublishRequest(final CratePublishRequest request) {
@@ -282,7 +284,7 @@ public class CrateUtils {
         }
 
         if (entryName.endsWith("/Cargo.toml")) {
-          final var toml = new String(tar.readAllBytes());
+          final var toml = new String(tar.readAllBytes(), StandardCharsets.UTF_8);
           if (toml.lines().anyMatch(line -> line.trim().equals("[lib]"))) {
             return true;
           }

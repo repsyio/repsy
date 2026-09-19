@@ -54,11 +54,13 @@ public class HelmApiFacade implements ProtocolApiFacade {
   private final HelmChartMapper helmChartMapper;
   private final ApplicationEventPublisher eventPublisher;
 
+  @Override
   public void createRepo(final UUID repoId) {
     this.helmStorageService.createRepo(repoId);
   }
 
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  @Override
   public void deleteRepo(final RepoInfo repoInfo) throws IOException {
     this.helmStorageService.deleteRepo(repoInfo.getStorageKey());
   }

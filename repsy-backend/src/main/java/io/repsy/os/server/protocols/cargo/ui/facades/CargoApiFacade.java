@@ -59,6 +59,7 @@ public class CargoApiFacade implements ProtocolApiFacade {
   private final ApplicationEventPublisher eventPublisher;
 
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  @Override
   public void deleteRepo(final RepoInfo repoInfo) throws IOException {
 
     this.cargoStorageService.deleteRepo(repoInfo.getId());
@@ -170,6 +171,7 @@ public class CargoApiFacade implements ProtocolApiFacade {
     return BaseUsages.builder().diskUsage(-1L * crateFreed + indexDelta).build();
   }
 
+  @Override
   public void createRepo(final UUID repoId) {
 
     this.cargoStorageService.createRepo(repoId);

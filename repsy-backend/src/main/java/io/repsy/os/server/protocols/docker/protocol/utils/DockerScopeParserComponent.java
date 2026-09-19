@@ -40,6 +40,7 @@ public class DockerScopeParserComponent implements DockerScopeParser<UUID> {
     return this.repoTxService.getRepo(repoName, RepoType.DOCKER);
   }
 
+  @Override
   public Optional<RepoInfo> getRepoInfoByScope(final String scope) {
 
     for (final var repo : Splitter.on(' ').split(scope)) {

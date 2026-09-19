@@ -34,8 +34,6 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
 
   private static final String GEMS_PATH = "gems";
   private static final String DEFAULT_PLATFORM = "ruby";
-  private static final String GEM_FILE_FMT = "%s-%s.gem";
-  private static final String GEM_FILE_PLATFORM_FMT = "%s-%s-%s.gem";
 
   private static final Pattern VERSION_START = Pattern.compile("-(?=\\d)");
 
@@ -121,8 +119,8 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
   public static String buildFilename(
       final String gemName, final String version, final String platform) {
     return DEFAULT_PLATFORM.equals(platform)
-        ? String.format(GEM_FILE_FMT, gemName, version)
-        : String.format(GEM_FILE_PLATFORM_FMT, gemName, version, platform);
+        ? String.format("%s-%s.gem", gemName, version)
+        : String.format("%s-%s-%s.gem", gemName, version, platform);
   }
 
   private static String extractGemName(final String filename) {

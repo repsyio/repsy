@@ -46,6 +46,7 @@ import io.repsy.protocols.cargo.shared.crate.services.SemverComparator;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -212,14 +213,14 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
 
     final var crate = this.findCrate(repoInfo.getId(), name);
     final var versions = this.crateMetaRepository.findAllByCrateId(crate.getId());
-    final var normalizedQuery = query.toLowerCase();
+    final var normalizedQuery = query.toLowerCase(Locale.ROOT);
 
     final var sortedAndFiltered =
         versions.stream()
             .filter(
                 item ->
                     normalizedQuery.isBlank()
-                        || item.getVersion().toLowerCase().contains(normalizedQuery))
+                        || item.getVersion().toLowerCase(Locale.ROOT).contains(normalizedQuery))
             .map(item -> new CrateVersionListItem(item.getVersion(), item.getCreatedAt()))
             .sorted(CrateUtils.resolveVersionSort(pageable))
             .toList();

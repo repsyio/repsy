@@ -90,7 +90,7 @@ public class TagDeletionComponent {
       final RepoInfo repoInfo,
       final String imageName,
       final List<ManifestDetail> manifestsToDelete,
-      final HashSet<String> manifestsToDeleteFileNames) {
+      final Set<String> manifestsToDeleteFileNames) {
 
     for (final var manifest : manifestsToDelete) {
       final var manifestName = generate(repoInfo.getStorageKey(), imageName, manifest.getName());

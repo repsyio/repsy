@@ -70,7 +70,6 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
   private static final String STORAGE_PATH = "storagePath";
-  private static final String NUPKG_STORAGE_PATH_FMT = "packages/%s/%s/%s.%s.nupkg";
   private static final List<String> REGISTRATION_INDEX_TYPES =
       List.of("catalog:CatalogRoot", "PackageRegistration", "catalog:Permalink");
 
@@ -135,11 +134,8 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
       context.addProperty(
           STORAGE_PATH,
           String.format(
-              NUPKG_STORAGE_PATH_FMT,
-              normalizedId,
-              normalizedVersion,
-              normalizedId,
-              normalizedVersion));
+              "packages/%s/%s/%s.%s.nupkg",
+              normalizedId, normalizedVersion, normalizedId, normalizedVersion));
       context.addProperty(USAGES, usages);
     } finally {
       Files.deleteIfExists(tempFile);

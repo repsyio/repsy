@@ -27,6 +27,7 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
@@ -77,7 +78,7 @@ public abstract class AbstractNuGetServiceIndexProtocolMethodHandler
         return Optional.empty();
       }
 
-      if (!uri.toLowerCase().endsWith("/v3/index.json")) {
+      if (!uri.toLowerCase(Locale.ROOT).endsWith("/v3/index.json")) {
         return Optional.empty();
       }
 
