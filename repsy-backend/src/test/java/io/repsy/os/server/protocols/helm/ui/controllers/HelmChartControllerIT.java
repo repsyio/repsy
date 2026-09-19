@@ -2064,21 +2064,18 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       final var it = HelmChartControllerIT.this;
       final var token = it.adminBearerToken();
       final var repo = it.helmRepo();
+      final var chart = archive(ChartSpec.of("real-name", "1.0.0"));
       clearInvocations(it.usageUpdateService);
 
-      final var push =
-          it.putOciChart(
-              repo,
-              "alias",
-              "1.0.0",
-              archive(ChartSpec.of("real-name", "1.0.0")),
-              it.asProtocolBearer(token));
+      final var push = it.putOciChart(repo, "alias", "1.0.0", chart, it.asProtocolBearer(token));
 
       this.expectMismatch(push);
       assertThat(it.chartRowExists(repo, "real-name")).isFalse();
       assertThat(it.ociManifestFile(repo, "alias", "1.0.0")).doesNotExist();
       expectChartNotFound(it.tagsRequest(repo, "alias", token));
-      verifyNoInteractions(it.usageUpdateService);
+      // The chart blob was uploaded before the manifest was refused and stays on disk, so it is
+      // charged (RPS-977); the refused manifest push itself adds nothing.
+      assertThat(it.netUsage(repo)).isEqualTo(chart.length);
     }
 
     @Test
