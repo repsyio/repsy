@@ -41,7 +41,7 @@ public interface CargoStorageService {
 
   long deletePackage(UUID repoId, String repoName, String crateName) throws IOException;
 
-  long deleteRepo(UUID repoId);
+  void deleteRepo(UUID repoId);
 
   long rewriteIndex(UUID repoId, String repoName, String crateName, List<String> jsonLines)
       throws IOException;

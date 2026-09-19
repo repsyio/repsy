@@ -28,7 +28,7 @@ public interface HelmStorageService<ID> {
 
   void createRepo(UUID repoUuid);
 
-  long deleteRepo(UUID repoUuid);
+  void deleteRepo(UUID repoUuid);
 
   void saveChart(String repoName, StoragePath storagePath, InputStream chartStream);
 

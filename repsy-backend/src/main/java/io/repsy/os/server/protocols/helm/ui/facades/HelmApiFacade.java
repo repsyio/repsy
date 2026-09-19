@@ -59,9 +59,8 @@ public class HelmApiFacade implements ProtocolApiFacade {
   }
 
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public BaseUsages deleteRepo(final RepoInfo repoInfo) throws IOException {
-    final var freed = this.helmStorageService.deleteRepo(repoInfo.getStorageKey());
-    return BaseUsages.builder().diskUsage(-1L * freed).build();
+  public void deleteRepo(final RepoInfo repoInfo) throws IOException {
+    this.helmStorageService.deleteRepo(repoInfo.getStorageKey());
   }
 
   @Transactional(readOnly = true)
