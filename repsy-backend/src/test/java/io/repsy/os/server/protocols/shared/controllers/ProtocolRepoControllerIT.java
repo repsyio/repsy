@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -1721,8 +1722,15 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
       final var items = dataList(this.info("NPM", ProtocolRepoControllerIT.this.userBearerToken()));
 
-      // The query has no ORDER BY, so the order is unspecified and deliberately not asserted.
       assertThat(items).hasSize(3);
+      final var expectedNames =
+          Stream.of(open, secret, used)
+              .sorted(
+                  Comparator.comparing(Repo::getCreatedAt).reversed().thenComparing(Repo::getName))
+              .map(Repo::getName)
+              .toList();
+      assertThat(names(this.info("NPM", ProtocolRepoControllerIT.this.userBearerToken())))
+          .containsExactlyElementsOf(expectedNames);
       final var byName =
           items.stream().collect(Collectors.toMap(i -> (String) i.get("name"), i -> i));
       assertThat(byName).containsOnlyKeys(open.getName(), secret.getName(), used.getName());
@@ -1740,6 +1748,33 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       assertThat(byName.get(secret.getName())).containsEntry("privateRepo", true);
       assertThat(((Number) byName.get(used.getName()).get("diskUsage")).longValue())
           .isEqualTo(4096L);
+    }
+
+    @Test
+    @DisplayName("keeps creation order stable after a repo is renamed")
+    void stableOrderAfterRename() throws Exception {
+      ProtocolRepoControllerIT.this.deleteDefaultRepos();
+      final var oldest =
+          ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("zulu"));
+      final var middle =
+          ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("alpha"));
+      final var newest =
+          ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("bravo"));
+      final var token = ProtocolRepoControllerIT.this.adminBearerToken();
+      final var renamed = uniqueRepoName("aardvark");
+
+      assertThat(names(this.info("NPM", token)))
+          .containsExactly(newest.getName(), middle.getName(), oldest.getName());
+
+      expectSuccess(
+          ProtocolRepoControllerIT.this.perform(
+              json(patch(repoUrl(oldest, "/name")), nameBody(renamed))
+                  .header(AUTHORIZATION, token)),
+          "repoRenamed",
+          "Repo renamed.");
+
+      assertThat(names(this.info("NPM", token)))
+          .containsExactly(newest.getName(), middle.getName(), renamed);
     }
 
     @Test
