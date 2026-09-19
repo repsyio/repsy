@@ -273,7 +273,7 @@ class ProtocolAuthServiceTest {
         try {
           ProtocolAuthServiceTest.this.authService.authenticateWithPassword(
               credentials(username, "wrong"));
-        } catch (final UnAuthorizedException expected) {
+        } catch (final UnAuthorizedException _) {
           // The outcome is asserted elsewhere; only the elapsed time matters here.
         }
       }

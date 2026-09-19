@@ -20,8 +20,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import java.security.MessageDigest;
 import java.util.Map;
+import java.util.Objects;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -52,17 +54,20 @@ public class PasswordHasher {
   private static final String BCRYPT_ID = "bcrypt";
   private static final String ID_PREFIX = "{";
   private static final String PASSWORD_TOO_LONG = "passwordTooLong";
+  private static final int DUMMY_PASSWORD_LENGTH = 32;
 
   /** Only algorithms listed here can verify, so a "noop" plain-text row cannot be planted. */
   private static final PasswordEncoder ENCODER =
       new DelegatingPasswordEncoder(BCRYPT_ID, Map.of(BCRYPT_ID, new BCryptPasswordEncoder()));
 
   /**
-   * A real hash at the current work factor, checked when there is no real hash to check. It makes
-   * the failing paths (unknown user, wrong password on a legacy hash) cost about one BCrypt, like a
-   * wrong password on a BCrypt hash.
+   * A real hash of a random password, made at the current work factor and checked when there is no
+   * real hash to check. The password is generated per process, so no credential lives in the
+   * source. It makes the failing paths (unknown user, wrong password on a legacy hash) cost about
+   * one BCrypt, like a wrong password on a BCrypt hash.
    */
-  private static final String DUMMY_HASH = ENCODER.encode("repsy-timing-equaliser");
+  private static final String DUMMY_HASH =
+      encode(RandomStringUtils.secure().nextAlphanumeric(DUMMY_PASSWORD_LENGTH));
 
   /**
    * Hashes a password with the current algorithm.
@@ -75,7 +80,7 @@ public class PasswordHasher {
       throw new BadRequestException(PASSWORD_TOO_LONG);
     }
 
-    return ENCODER.encode(password);
+    return encode(password);
   }
 
   /**
@@ -131,12 +136,18 @@ public class PasswordHasher {
     ENCODER.matches(password, DUMMY_HASH);
   }
 
+  /** {@link PasswordEncoder#encode} is nullable in the signature, but BCrypt always returns. */
+  private static @NonNull String encode(final @NonNull String password) {
+
+    return Objects.requireNonNull(ENCODER.encode(password), "the encoder returned no hash");
+  }
+
   private static boolean matchesPrefixed(
       final @NonNull String password, final @NonNull String hash) {
 
     try {
       return ENCODER.matches(password, hash);
-    } catch (final IllegalArgumentException exception) {
+    } catch (final IllegalArgumentException _) {
       // An algorithm id this build does not know.
       return false;
     }

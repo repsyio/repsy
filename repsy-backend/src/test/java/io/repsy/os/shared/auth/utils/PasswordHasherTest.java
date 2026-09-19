@@ -68,7 +68,9 @@ class PasswordHasherTest {
     @Test
     @DisplayName("rejects a password of 73 bytes instead of truncating it")
     void rejectsOneByteOverTheLimit() {
-      assertThatThrownBy(() -> PasswordHasher.hash("a".repeat(73)))
+      final var password = "a".repeat(73);
+
+      assertThatThrownBy(() -> PasswordHasher.hash(password))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("passwordTooLong");
     }
@@ -76,7 +78,9 @@ class PasswordHasherTest {
     @Test
     @DisplayName("counts bytes, not characters: 37 two-byte characters are too long")
     void countsBytes() {
-      assertThatThrownBy(() -> PasswordHasher.hash("é".repeat(37)))
+      final var password = "é".repeat(37);
+
+      assertThatThrownBy(() -> PasswordHasher.hash(password))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("passwordTooLong");
     }
