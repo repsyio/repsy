@@ -46,11 +46,14 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.SneakyThrows;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @NullMarked
@@ -62,6 +65,8 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
   private static final long WAIT_RETRY = 100;
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
+  private static final Pattern SHA256_DIGEST_PATTERN = Pattern.compile("^sha256:[0-9a-fA-F]{64}$");
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final PathParser basePathParser;
   private final HelmFacade<ID> helmFacade;
@@ -140,10 +145,9 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     final var contentBytes = request.getInputStream().readAllBytes();
     final var manifestJson = new String(contentBytes, StandardCharsets.UTF_8);
 
-    final var jsonObject = new ObjectMapper().readTree(manifestJson);
-    final var layers = jsonObject.get("layers");
-    final var layerDigest = layers.get(0).get("digest").asText();
-    final var layerSize = layers.get(0).get("size").asLong();
+    final var chartLayer = this.parseChartLayer(manifestJson);
+    final var layerDigest = chartLayer.digest();
+    final var layerSize = chartLayer.size();
 
     final var digest = this.calculateDigest(contentBytes);
 
@@ -196,6 +200,52 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
         .header(CONTENT_TYPE, mediaType)
         .build();
   }
+
+  /**
+   * The chart archive is the first layer of the manifest. A manifest without one, or whose layer
+   * lacks a digest or a size, is the client's mistake and is answered with a 400 that names it.
+   */
+  private ChartLayer parseChartLayer(final String manifestJson) {
+    final var layers = this.parseManifest(manifestJson).get("layers");
+    if (layers == null || !layers.isArray() || layers.isEmpty()) {
+      throw new BadRequestException("manifestLayersMissing");
+    }
+
+    final var layer = layers.get(0);
+    final var digest = layer.get("digest");
+    final var size = layer.get("size");
+    if (!isSha256Digest(digest) || !isNonNegativeInteger(size)) {
+      throw new BadRequestException("manifestLayerInvalid");
+    }
+
+    return new ChartLayer(digest.asString(), size.asLong());
+  }
+
+  private JsonNode parseManifest(final String manifestJson) {
+    final JsonNode manifest;
+    try {
+      manifest = OBJECT_MAPPER.readTree(manifestJson);
+    } catch (final JacksonException e) {
+      throw new BadRequestException("manifestInvalidJson");
+    }
+
+    if (!manifest.isObject()) {
+      throw new BadRequestException("manifestInvalidJson");
+    }
+    return manifest;
+  }
+
+  private static boolean isSha256Digest(@Nullable final JsonNode digest) {
+    return digest != null
+        && digest.isString()
+        && SHA256_DIGEST_PATTERN.matcher(digest.asString()).matches();
+  }
+
+  private static boolean isNonNegativeInteger(@Nullable final JsonNode size) {
+    return size != null && size.isIntegralNumber() && size.asLong() >= 0;
+  }
+
+  private record ChartLayer(String digest, long size) {}
 
   /**
    * The chart and its version are stored under the {@code Chart.yaml} name and the manifest and its
