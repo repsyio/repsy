@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.nuget.shared.packages.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
@@ -32,6 +33,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
@@ -56,6 +58,15 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
   private RepoInfo seedNuGetRepo() {
     final var repo = this.seedRepo(RepoType.NUGET, uniqueRepoName("nuget"));
     return this.repoTxService.getRepoByName(repo.getName());
+  }
+
+  @Test
+  @DisplayName("propagates non-duplicate integrity violations from package creation")
+  void propagatesNonDuplicateIntegrityViolation() {
+    final var repoInfo = this.seedNuGetRepo();
+
+    assertThatThrownBy(() -> this.packageService.findOrCreatePackage(repoInfo, PACKAGE_ID))
+        .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   /**
