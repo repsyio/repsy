@@ -20,7 +20,7 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.exceptions.TokenExpiredException;
 import com.auth0.jwt.interfaces.DecodedJWT;
-import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
+import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.constants.ErrorConstants;
 import jakarta.annotation.PostConstruct;
@@ -68,9 +68,9 @@ public class JwtUtils {
     try {
       return JWT.require(Algorithm.HMAC512(this.secret)).build().verify(token);
     } catch (final TokenExpiredException _) {
-      throw new AccessNotAllowedException(expiredMessageId);
+      throw new UnAuthorizedException(expiredMessageId);
     } catch (final JWTVerificationException _) {
-      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
   }
 
@@ -78,7 +78,7 @@ public class JwtUtils {
     final var decodedJWT = this.decode(token, "sessionExpired");
 
     if (isRefreshToken(decodedJWT)) {
-      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
 
     return decodedJWT;
@@ -90,7 +90,7 @@ public class JwtUtils {
 
   private @NonNull String getToken(final @NonNull String authHeader) {
     if (!authHeader.contains("Bearer")) {
-      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
 
     return authHeader.replaceFirst("^Bearer ", "");
@@ -156,7 +156,7 @@ public class JwtUtils {
     final var decodedJWT = this.decode(token, "refreshTokenExpired");
 
     if (!isRefreshToken(decodedJWT)) {
-      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
 
     return subjectAsUuid(decodedJWT);
@@ -166,7 +166,7 @@ public class JwtUtils {
     try {
       return UUID.fromString(decodedJWT.getSubject());
     } catch (final IllegalArgumentException | NullPointerException _) {
-      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
   }
 

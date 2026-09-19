@@ -233,7 +233,7 @@ export class SecurityComponent implements OnInit, OnDestroy {
 
 
         error: (err: HttpErrorResponse) => {
-          if (err.status === 401) {
+          if (err.status === 403) {
             this.toastService.show('You do not have permission to view this page', 'error');
             this.router.navigateByUrl('/');
           }

@@ -1448,16 +1448,16 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
           endpoint.successMsgId);
     }
 
-    /** A JWT that does not verify is 403 accessNotAllowed, even for a public repo. */
+    /** A JWT that does not verify is 401 accessNotAllowed, even for a public repo. */
     @ParameterizedTest(name = "{0}")
     @EnumSource(Endpoint.class)
-    @DisplayName("a malformed bearer token is 403 accessNotAllowed")
+    @DisplayName("a malformed bearer token is 401 accessNotAllowed")
     void malformedBearerToken(final Endpoint endpoint) throws Exception {
       final var repo = this.repoWithChart(false);
 
       expectError(
           this.send(endpoint, repo.getName(), "Bearer not-a-jwt"),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "accessNotAllowed",
           "accessNotAllowed",
           "Access isn't allowed.");
@@ -1486,7 +1486,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @EnumSource(Endpoint.class)
-    @DisplayName("an expired token is 403 sessionExpired, even for a public repo")
+    @DisplayName("an expired token is 401 sessionExpired, even for a public repo")
     void expiredToken(final Endpoint endpoint) throws Exception {
       final var it = HelmChartControllerIT.this;
       final var repo = this.repoWithChart(false);
@@ -1495,7 +1495,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
       expectError(
           this.send(endpoint, repo.getName(), expired),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "sessionExpired",
           "sessionExpired",
           "Session expired.");

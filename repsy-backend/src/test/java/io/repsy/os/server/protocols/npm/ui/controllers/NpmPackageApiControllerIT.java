@@ -404,7 +404,7 @@ class NpmPackageApiControllerIT {
       perform(
               get("/api/npm/packages/{repo}", privateRepoName)
                   .header(AUTHORIZATION, "Bearer malformed"))
-          .andExpect(status().isForbidden());
+          .andExpect(status().isUnauthorized());
       perform(
               get("/api/npm/packages/{repo}", privateRepoName)
                   .header(AUTHORIZATION, bearerToken(admin, Duration.ofSeconds(-30))))

@@ -398,7 +398,7 @@ class GolangModuleControllerIT {
             get("/api/go/modules/{repo}", repo)
                 .with(apiPort())
                 .header(AUTHORIZATION, "Bearer malformed"))
-        .andExpect(status().isForbidden())
+        .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.type").value("ERROR"));
 
     this.mockMvc

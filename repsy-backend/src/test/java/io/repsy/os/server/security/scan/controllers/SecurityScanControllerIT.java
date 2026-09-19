@@ -498,7 +498,7 @@ class SecurityScanControllerIT {
   private static void expectAccessNotAllowed(final ResultActions result) throws Exception {
     expectError(
         result,
-        HttpStatus.FORBIDDEN,
+        HttpStatus.UNAUTHORIZED,
         "accessNotAllowed",
         "accessNotAllowed",
         "Access isn't allowed.");
@@ -594,11 +594,11 @@ class SecurityScanControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("adminEndpoints")
-    @DisplayName("returns 403 when the Authorization header is missing")
+    @DisplayName("returns 401 when the Authorization header is missing")
     void missingAuthorizationHeader(final String path) throws Exception {
       expectError(
           SecurityScanControllerIT.this.perform(get(path)),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "missingRequestHeader",
           "Authorization",
           "A required request header is missing.");
@@ -606,7 +606,7 @@ class SecurityScanControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("adminEndpoints")
-    @DisplayName("returns 403 for a header without a Bearer prefix")
+    @DisplayName("returns 401 for a header without a Bearer prefix")
     void nonBearerAuthorizationHeader(final String path) throws Exception {
       expectAccessNotAllowed(
           SecurityScanControllerIT.this.perform(get(path).header(AUTHORIZATION, "Basic dXNlcjpw")));
@@ -614,7 +614,7 @@ class SecurityScanControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("adminEndpoints")
-    @DisplayName("returns 403 for a malformed/garbage bearer token")
+    @DisplayName("returns 401 for a malformed/garbage bearer token")
     void malformedBearerToken(final String path) throws Exception {
       expectAccessNotAllowed(
           SecurityScanControllerIT.this.perform(
@@ -623,13 +623,13 @@ class SecurityScanControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("adminEndpoints")
-    @DisplayName("returns 403 sessionExpired for an expired token")
+    @DisplayName("returns 401 sessionExpired for an expired token")
     void expiredToken(final String path) throws Exception {
       final var token = SecurityScanControllerIT.this.expiredBearerTokenFor(SEEDED_ADMIN_USERNAME);
 
       expectError(
           SecurityScanControllerIT.this.perform(get(path).header(AUTHORIZATION, token)),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "sessionExpired",
           "sessionExpired",
           "Session expired.");
@@ -637,14 +637,14 @@ class SecurityScanControllerIT {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("adminEndpoints")
-    @DisplayName("returns 401 accessDenied for an authenticated non-admin caller")
+    @DisplayName("returns 403 accessDenied for an authenticated non-admin caller")
     void nonAdminCaller(final String path) throws Exception {
       final var username = SecurityScanControllerIT.this.createUser(UserRole.USER);
       final var token = SecurityScanControllerIT.this.bearerTokenFor(username);
 
       expectError(
           SecurityScanControllerIT.this.perform(get(path).header(AUTHORIZATION, token)),
-          HttpStatus.UNAUTHORIZED,
+          HttpStatus.FORBIDDEN,
           "accessDenied",
           "accessDenied",
           "Access Denied. Please check your credentials.");

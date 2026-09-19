@@ -59,11 +59,11 @@ class ErrorHandlerTest {
   }
 
   @Test
-  @DisplayName("answers 403 missingRequestHeader for a missing Authorization header")
+  @DisplayName("answers 401 missingRequestHeader for a missing Authorization header")
   void missingAuthorizationHeader() throws Exception {
     this.mockMvc
         .perform(get("/header/authorization"))
-        .andExpect(status().isForbidden())
+        .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.msgId").value("missingRequestHeader"))
         .andExpect(jsonPath("$.type").value("ERROR"))
         .andExpect(jsonPath("$.text").value("A required request header is missing."))

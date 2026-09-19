@@ -15,7 +15,7 @@
  */
 package io.repsy.os.shared.auth;
 
-import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
+import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -40,7 +40,7 @@ public final class PanelAuthHelper {
 
   public void requireAdmin(final @NonNull UserInfo userInfo) {
     if (userInfo.getRole() != UserRole.ADMIN) {
-      throw new UnAuthorizedException(ACCESS_DENIED);
+      throw new AccessNotAllowedException(ACCESS_DENIED);
     }
   }
 }

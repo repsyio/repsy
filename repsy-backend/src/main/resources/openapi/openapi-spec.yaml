@@ -3008,7 +3008,9 @@ paths:
         '400':
           description: Invalid paging parameter (page below 0, size outside 1-100, or not a number)
         '401':
-          description: Missing or invalid token, or the authenticated user is not an admin
+          description: Missing or invalid token
+        '403':
+          description: Admin role required
       summary: List vulnerability scans across all repositories, filterable by severity/repoType/repoName
   "/api/security/scans/summary":
     get:
@@ -3039,7 +3041,9 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponseSecurityScansSummary"
         '401':
-          description: Missing or invalid token, or the authenticated user is not an admin
+          description: Missing or invalid token
+        '403':
+          description: Admin role required
       summary: Get the system-wide severity distribution (each artifact-version's latest completed scan), filterable by repoType/repoName, independent of the scans list's severity filter
   "/api/security/supported-repo-types":
     get:

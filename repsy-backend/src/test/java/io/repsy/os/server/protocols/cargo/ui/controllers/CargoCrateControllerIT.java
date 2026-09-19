@@ -572,13 +572,13 @@ class CargoCrateControllerIT {
           "The user has logged in but has no permissions.");
       expectError(
           CargoCrateControllerIT.this.request("GET", path, "Bearer garbage"),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "accessNotAllowed",
           "Access isn't allowed.");
       expectError(
           CargoCrateControllerIT.this.request(
               "GET", path, CargoCrateControllerIT.this.expiredToken(user)),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "sessionExpired",
           "Session expired.");
       CargoCrateControllerIT.this.userRepository.deleteById(user.getId());
