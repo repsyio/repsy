@@ -1,0 +1,57 @@
+///
+/// Copyright 2026 the original author or authors.
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+///      https://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+///
+
+import { ScanStatus } from '../../../../generated/api';
+import { scanStatusLabel } from './scan-status-label.util';
+
+/**
+ * Severity and finding counts always describe a version's newest COMPLETED scan. Whenever its
+ * newest scan is in any other state, those numbers are the last known ones, so the UI marks them.
+ */
+
+export function isRescanInProgress(status: ScanStatus | null | undefined): boolean {
+  return status === ScanStatus.Pending || status === ScanStatus.Queued || status === ScanStatus.Running;
+}
+
+export function hasRescanFailed(status: ScanStatus | null | undefined): boolean {
+  return status === ScanStatus.Failed;
+}
+
+/** Tooltip for a badge that shows the last completed scan while the newest one is not completed. */
+export function rescanTitle(status: ScanStatus | null | undefined): string {
+  if (isRescanInProgress(status)) {
+    return 'Rescan in progress. Showing the last completed scan.';
+  }
+
+  return hasRescanFailed(status) ? 'Last rescan failed. Showing the last completed scan.' : '';
+}
+
+/**
+ * Text for a recent scan whose newest scan is not completed, or an empty string when there is
+ * nothing to flag. A version that never completed a scan has no earlier result to show, so it
+ * reads as a first scan rather than a rescan.
+ */
+export function recentScanNote(status: ScanStatus | null | undefined, hasCompletedScan: boolean): string {
+  if (!isRescanInProgress(status) && !hasRescanFailed(status)) {
+    return '';
+  }
+
+  if (!hasCompletedScan) {
+    return scanStatusLabel(status);
+  }
+
+  return isRescanInProgress(status) ? 'Rescanning...' : 'Last rescan failed';
+}

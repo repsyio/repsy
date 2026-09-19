@@ -113,6 +113,7 @@
                     [artifactName]="groupName + ':' + artifactName"
                     [versionName]="version.versionName"
                     [severity]="securitySummary[version.versionName]?.severity ?? null"
+                    [scanStatus]="securitySummary[version.versionName]?.latestScanStatus ?? null"
                     [scanned]="securitySummary[version.versionName]?.scanned ?? false"
                   />
 
@@ -201,6 +202,7 @@
                       [artifactName]="groupName + ':' + artifactName"
                       [versionName]="version.versionName"
                       [severity]="securitySummary[version.versionName]?.severity ?? null"
+                      [scanStatus]="securitySummary[version.versionName]?.latestScanStatus ?? null"
                       [scanned]="securitySummary[version.versionName]?.scanned ?? false"
                     />
                   </div>

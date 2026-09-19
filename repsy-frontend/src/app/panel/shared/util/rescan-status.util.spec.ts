@@ -1,0 +1,65 @@
+///
+/// Copyright 2026 the original author or authors.
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+///      https://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+///
+
+import { ScanStatus } from '../../../../generated/api';
+import { hasRescanFailed, isRescanInProgress, recentScanNote, rescanTitle } from './rescan-status.util';
+
+const IN_PROGRESS = [ScanStatus.Pending, ScanStatus.Queued, ScanStatus.Running];
+
+describe('rescan status', () => {
+  it('treats pending, queued and running as in progress', () => {
+    for (const status of IN_PROGRESS) {
+      expect(isRescanInProgress(status)).toBeTrue();
+      expect(hasRescanFailed(status)).toBeFalse();
+    }
+  });
+
+  it('treats failed as failed and not in progress', () => {
+    expect(hasRescanFailed(ScanStatus.Failed)).toBeTrue();
+    expect(isRescanInProgress(ScanStatus.Failed)).toBeFalse();
+  });
+
+  it('flags nothing for a completed or absent status', () => {
+    for (const status of [ScanStatus.Completed, null, undefined]) {
+      expect(isRescanInProgress(status)).toBeFalse();
+      expect(hasRescanFailed(status)).toBeFalse();
+      expect(rescanTitle(status)).toBe('');
+      expect(recentScanNote(status, true)).toBe('');
+      expect(recentScanNote(status, false)).toBe('');
+    }
+  });
+
+  it('explains that a badge shows the last completed scan', () => {
+    for (const status of IN_PROGRESS) {
+      expect(rescanTitle(status)).toContain('Rescan in progress');
+    }
+    expect(rescanTitle(ScanStatus.Failed)).toContain('Last rescan failed');
+  });
+
+  it('calls an unfinished scan of a previously scanned version a rescan', () => {
+    for (const status of IN_PROGRESS) {
+      expect(recentScanNote(status, true)).toBe('Rescanning...');
+    }
+    expect(recentScanNote(ScanStatus.Failed, true)).toBe('Last rescan failed');
+  });
+
+  it('calls an unfinished scan of a never completed version by its plain status', () => {
+    expect(recentScanNote(ScanStatus.Pending, false)).toBe('Waiting...');
+    expect(recentScanNote(ScanStatus.Queued, false)).toBe('Queued...');
+    expect(recentScanNote(ScanStatus.Running, false)).toBe('Scanning...');
+    expect(recentScanNote(ScanStatus.Failed, false)).toBe('Failed');
+  });
+});
