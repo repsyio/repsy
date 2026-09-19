@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.maven.ui.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -186,6 +187,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
       final var missing =
           KeyStoreControllerIT.this.mockMvc.perform(get(path).with(apiPort())).andReturn();
       assertThat(missing.getResponse().getStatus()).isEqualTo(401);
+      assertThat(missing.getResponse().getHeader(WWW_AUTHENTICATE)).isEqualTo("Bearer");
       assertError(missing.getResponse().getContentAsString(), "missingRequestHeader");
 
       final var malformed =
@@ -194,6 +196,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
               .perform(get(path).with(apiPort()).header(AUTHORIZATION, "Bearer invalid"))
               .andReturn();
       assertThat(malformed.getResponse().getStatus()).isEqualTo(401);
+      assertThat(malformed.getResponse().getHeader(WWW_AUTHENTICATE)).isEqualTo("Bearer");
       assertError(malformed.getResponse().getContentAsString(), "accessNotAllowed");
 
       final var expired =
@@ -206,6 +209,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
               .perform(get(path).with(apiPort()).header(AUTHORIZATION, expired))
               .andReturn();
       assertThat(expiredResponse.getResponse().getStatus()).isEqualTo(401);
+      assertThat(expiredResponse.getResponse().getHeader(WWW_AUTHENTICATE)).isEqualTo("Bearer");
       assertError(expiredResponse.getResponse().getContentAsString(), "sessionExpired");
 
       final var refreshToken =
@@ -218,6 +222,8 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
               .perform(get(path).with(apiPort()).header(AUTHORIZATION, refreshToken))
               .andReturn();
       assertThat(refreshTokenResponse.getResponse().getStatus()).isEqualTo(401);
+      assertThat(refreshTokenResponse.getResponse().getHeader(WWW_AUTHENTICATE))
+          .isEqualTo("Bearer");
       assertError(refreshTokenResponse.getResponse().getContentAsString(), "accessNotAllowed");
     }
   }

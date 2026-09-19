@@ -17,8 +17,10 @@ package io.repsy.os.shared.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -118,6 +120,7 @@ class TokenRealmIT extends AbstractIntegrationTest {
 
       perform(get("/api/profile").header(AUTHORIZATION, protocolBearerTokenFor(user)))
           .andExpect(status().isUnauthorized())
+          .andExpect(header().string(WWW_AUTHENTICATE, "Bearer"))
           .andExpect(jsonPath("$.msgId").value("accessNotAllowed"));
     }
 
@@ -219,6 +222,7 @@ class TokenRealmIT extends AbstractIntegrationTest {
 
       assertThat(result.getResponse().getStatus()).isEqualTo(401);
       assertThat(result.getResponse().getContentAsString()).contains("accessNotAllowed");
+      assertThat(result.getResponse().getHeader(WWW_AUTHENTICATE)).isNull();
     }
 
     @Test
@@ -279,6 +283,7 @@ class TokenRealmIT extends AbstractIntegrationTest {
                   .header(AUTHORIZATION, bearerTokenFor(user)));
 
       assertThat(result.getResponse().getStatus()).isEqualTo(401);
+      assertThat(result.getResponse().getHeader(WWW_AUTHENTICATE)).isNull();
     }
 
     @Test

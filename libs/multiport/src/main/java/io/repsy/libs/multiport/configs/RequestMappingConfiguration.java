@@ -96,6 +96,9 @@ public class RequestMappingConfiguration {
 
       final var handler = handlerOptional.get();
 
+      // Spring's own lookup records the match; this override replaces it, so an exception handler
+      // (e.g. an error advice) can only tell which controller served the request if it is set here.
+      request.setAttribute(HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE, handler.handlerMethod());
       this.handleMatch(handler.mappingInfo(), lookupPath, request);
 
       return handler.handlerMethod();

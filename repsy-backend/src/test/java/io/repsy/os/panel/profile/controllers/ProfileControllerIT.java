@@ -22,10 +22,12 @@ import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -170,6 +172,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(get("/api/profile").with(apiPort()))
           .andExpect(status().isUnauthorized())
+          .andExpect(header().string(WWW_AUTHENTICATE, "Bearer"))
           .andExpect(jsonPath("$.*", hasSize(5)))
           .andExpect(jsonPath("$.msgId").value("missingRequestHeader"))
           .andExpect(jsonPath("$.type").value("ERROR"))
@@ -189,6 +192,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, "Basic dXNlcjpwYXNz"))
           .andExpect(status().isUnauthorized())
+          .andExpect(header().string(WWW_AUTHENTICATE, "Bearer"))
           .andExpect(jsonPath("$.msgId").value("accessNotAllowed"))
           .andExpect(jsonPath("$.data").value("accessNotAllowed"))
           .andExpect(jsonPath("$.text").value("Access isn't allowed."))
@@ -206,6 +210,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, "Bearer not-a-jwt"))
           .andExpect(status().isUnauthorized())
+          .andExpect(header().string(WWW_AUTHENTICATE, "Bearer"))
           .andExpect(jsonPath("$.msgId").value("accessNotAllowed"))
           .andExpect(jsonPath("$.text").value("Access isn't allowed."));
     }
@@ -221,6 +226,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
           .andExpect(status().isUnauthorized())
+          .andExpect(header().string(WWW_AUTHENTICATE, "Bearer"))
           .andExpect(jsonPath("$.msgId").value("sessionExpired"))
           .andExpect(jsonPath("$.data").value("sessionExpired"))
           .andExpect(jsonPath("$.text").value("Session expired."));
