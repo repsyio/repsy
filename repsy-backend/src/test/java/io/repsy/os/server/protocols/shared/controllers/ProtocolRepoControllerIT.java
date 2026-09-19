@@ -17,7 +17,6 @@ package io.repsy.os.server.protocols.shared.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -30,7 +29,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -56,7 +54,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -87,7 +84,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  *
  * <p>{@code UsageUpdateService.updateUsage} is {@code @Async}, so it runs on another thread and can
  * never see rows that only exist inside a test-managed, rolled-back transaction. It is therefore
- * replaced by a mock, and the delete tests assert the {@link UsageChangedInfo} it receives.
+ * replaced by a mock, and the tests assert that no endpoint here calls it: a deleted repo's usage
+ * goes with its row. {@code ProtocolRepoDeleteUsageIT} covers the delete with the real service.
  */
 @DisplayName("ProtocolRepoController /api/repos/*")
 class ProtocolRepoControllerIT extends AbstractIntegrationTest {
@@ -961,15 +959,11 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       assertThat(ProtocolRepoControllerIT.this.repoRepository.findById(repo.getId())).isEmpty();
       assertThat(storageDirOf(repo)).doesNotExist();
 
-      final var captor = ArgumentCaptor.forClass(UsageChangedInfo.class);
-      verify(ProtocolRepoControllerIT.this.usageUpdateService).updateUsage(captor.capture());
-      assertThat(captor.getValue().repoId()).isEqualTo(repo.getId());
-      assertThat(captor.getValue().usages().getDiskUsage()).isZero();
+      verifyNoInteractions(ProtocolRepoControllerIT.this.usageUpdateService);
     }
 
     @Test
-    @DisplayName(
-        "removes a repo with content and reports the freed bytes as a negative usage delta")
+    @DisplayName("removes a repo with content without submitting a usage update for its row")
     void deletesRepoWithContent() throws Exception {
       final var repo = ProtocolRepoControllerIT.this.seedMaven();
       writeFile(repo, "com/acme/lib/1.0/lib-1.0.jar", "jar-bytes");
@@ -986,10 +980,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(repo.getName())).isEmpty();
       assertThat(storageDirOf(repo)).doesNotExist();
 
-      final var captor = ArgumentCaptor.forClass(UsageChangedInfo.class);
-      verify(ProtocolRepoControllerIT.this.usageUpdateService).updateUsage(captor.capture());
-      assertThat(captor.getValue().repoId()).isEqualTo(repo.getId());
-      assertThat(captor.getValue().usages().getDiskUsage()).isEqualTo(-(9 + 11 + 4));
+      verifyNoInteractions(ProtocolRepoControllerIT.this.usageUpdateService);
     }
 
     @Test
