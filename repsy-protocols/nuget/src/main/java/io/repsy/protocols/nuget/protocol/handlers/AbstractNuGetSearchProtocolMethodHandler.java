@@ -103,7 +103,7 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler implements Protoc
 
       return ResponseEntity.ok().contentType(APPLICATION_JSON).body(results);
     } catch (final Exception e) {
-      log.debug("NuGet search failed: {}", e.getMessage());
+      log.error("NuGet search failed", e);
       return ResponseEntity.internalServerError().build();
     }
   }

@@ -131,6 +131,7 @@
                   [artifactName]="imageName"
                   [versionName]="tag.name"
                   [severity]="securitySummary[tag.name]?.severity ?? null"
+                  [scanStatus]="securitySummary[tag.name]?.latestScanStatus ?? null"
                   [scanned]="securitySummary[tag.name]?.scanned ?? false"
                 />
 
@@ -222,6 +223,7 @@
                     [artifactName]="imageName"
                     [versionName]="tag.name"
                     [severity]="securitySummary[tag.name]?.severity ?? null"
+                    [scanStatus]="securitySummary[tag.name]?.latestScanStatus ?? null"
                     [scanned]="securitySummary[tag.name]?.scanned ?? false"
                   />
                 </div>

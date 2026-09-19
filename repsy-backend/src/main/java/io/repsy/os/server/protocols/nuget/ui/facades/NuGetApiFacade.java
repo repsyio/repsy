@@ -204,6 +204,8 @@ public class NuGetApiFacade implements ProtocolApiFacade {
         .iconUrl(v.iconUrl())
         .licenseUrl(v.licenseUrl())
         .projectUrl(v.projectUrl())
+        .repositoryUrl(v.repositoryUrl())
+        .readme(v.readme())
         .listed(v.listed())
         .downloadCount(v.downloadCount())
         .publishedAt(v.publishedAt())

@@ -85,8 +85,15 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * </ul>
  *
  * <p>Every test method runs in one transaction that is rolled back afterwards, so the only data
- * that survives between tests is what the application seeds at startup (the {@code admin} user).
- * The same transaction is visible to MockMvc requests because they run on the test thread.
+ * that survives between tests is what the application seeds at startup (the {@code admin} user,
+ * whose password is {@link #SEEDED_ADMIN_PASSWORD}). The same transaction is visible to MockMvc
+ * requests because they run on the test thread.
+ *
+ * <p>The database is shared by every subclass, so a class that has to commit data (an
+ * {@code @Async} listener cannot see an open test transaction) opts out with
+ * {@code @Transactional(propagation = Propagation.NOT_SUPPORTED)} and must track and delete only
+ * the rows it created. Never empty a table other classes rely on, and don't assert on the absolute
+ * size of one: measure it before the fixtures and compare against that.
  */
 @AutoConfigureMockMvc
 @Transactional
@@ -98,6 +105,7 @@ public abstract class AbstractIntegrationTest {
   protected static final int API_PORT = 8080;
   protected static final String VALID_PASSWORD = "Password1!";
   protected static final String SEEDED_ADMIN_USERNAME = "admin";
+  protected static final String SEEDED_ADMIN_PASSWORD = "SeededAdmin1!";
   protected static final String UUID_PATTERN =
       "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
@@ -126,6 +134,9 @@ public abstract class AbstractIntegrationTest {
   @DynamicPropertySource
   static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
     registry.add("storage-gateway.fs.base-path", STORAGE_ROOT::toString);
+    // The database is shared by every context of the JVM, so whichever one boots first creates the
+    // admin. Without this the admin gets a random password that is only ever logged.
+    registry.add("admin.initial-password", () -> SEEDED_ADMIN_PASSWORD);
   }
 
   private static final Duration SEEDING_TIMEOUT = Duration.ofSeconds(30);
@@ -303,6 +314,25 @@ public abstract class AbstractIntegrationTest {
 
   protected User seededAdmin() {
     return this.userRepository.findByUsername(SEEDED_ADMIN_USERNAME).orElseThrow();
+  }
+
+  /**
+   * Makes the seeded admin the only ADMIN of the database and returns it, so a test can exercise
+   * the "last admin" guards without assuming what other classes have committed. The other admins
+   * are deleted inside the test transaction, so the rollback brings them back.
+   */
+  protected User seededAdminAsLastAdmin() {
+    final var seeded = this.seededAdmin();
+    final var otherAdmins =
+        this.userRepository.findAll().stream()
+            .filter(
+                user -> user.getRole() == UserRole.ADMIN && !user.getId().equals(seeded.getId()))
+            .toList();
+
+    this.userRepository.deleteAll(otherAdmins);
+    this.entityManager.flush();
+
+    return seeded;
   }
 
   // ---------------------------------------------------------------------------------------------

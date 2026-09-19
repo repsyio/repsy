@@ -195,6 +195,12 @@ public class ManifestTxService implements ManifestService<UUID> {
     return this.tagRepository.findAllByImageRepoIdAndImageId(repoId, imageId);
   }
 
+  public boolean existsByImageIdAndConfigDigest(final UUID imageId, final String configDigest) {
+
+    return this.manifestRepository.existsByTagPlatformTagImageIdAndConfigDigest(
+        imageId, configDigest);
+  }
+
   private void deleteOldManifests(
       final UUID repoId, final UUID imageId, final Tag tag, final List<Manifest> newManifests) {
 
@@ -225,17 +231,46 @@ public class ManifestTxService implements ManifestService<UUID> {
     }
   }
 
-  public Tag findActiveTagByRepoAndReference(
+  /**
+   * Resolves a tag name or a {@code sha256:} digest to the name its manifest file is stored under.
+   * A digest is matched against the tag rows first and then against the stored manifests, so the
+   * per-platform children of a multi-platform tag, which have no tag row of their own, resolve too.
+   */
+  public String findManifestNameByReference(
       final UUID repoId, final String imageName, final String reference) {
 
-    final var tag =
+    final var name =
         reference.startsWith(DockerConstants.SHA256_PREFIX)
-            ? this.tagRepository
-                .findDistinctFirstByImageRepoIdAndImageNameAndDigestOrderByCreatedAtDesc(
-                    repoId, imageName, reference)
-            : this.tagRepository.findByImageRepoIdAndImageNameAndName(repoId, imageName, reference);
+            ? this.findTagNameByDigest(repoId, imageName, reference)
+                .or(() -> this.findManifestNameByDigest(repoId, imageName, reference))
+            : this.tagRepository
+                .findByImageRepoIdAndImageNameAndName(repoId, imageName, reference)
+                .map(Tag::getName);
 
-    return tag.orElseThrow(() -> new ItemNotFoundException("tagNotFound"));
+    return name.orElseThrow(() -> new ItemNotFoundException("tagNotFound"));
+  }
+
+  private Optional<String> findTagNameByDigest(
+      final UUID repoId, final String imageName, final String digest) {
+
+    return this.tagRepository
+        .findDistinctFirstByImageRepoIdAndImageNameAndDigestOrderByCreatedAtDesc(
+            repoId, imageName, digest)
+        .map(Tag::getName);
+  }
+
+  private Optional<String> findManifestNameByDigest(
+      final UUID repoId, final String imageName, final String digest) {
+
+    return this.imageRepository
+        .findByRepoIdAndName(repoId, imageName)
+        .flatMap(
+            image ->
+                this.manifestRepository
+                    .findByRepoIdAndImageIdAndDigestList(repoId, image.getId(), digest)
+                    .stream()
+                    .findFirst())
+        .map(Manifest::getName);
   }
 
   public Page<io.repsy.os.generated.model.ManifestListItem> findManifestsByTagIdContainsName(

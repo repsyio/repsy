@@ -39,15 +39,17 @@
     </div>
   </div>
 
-  <button
-    (click)="openCreateRepoModal()"
-    class="repsy-btn-confirm flex h-[40px] w-full items-center gap-2 px-4 text-[14px] font-bold transition-all sm:w-auto"
-  >
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M8 2V14M2 8H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-    </svg>
-    Create Repository
-  </button>
+  @if (isAdmin) {
+    <button
+      (click)="openCreateRepoModal()"
+      class="repsy-btn-confirm flex h-[40px] w-full items-center gap-2 px-4 text-[14px] font-bold transition-all sm:w-auto"
+    >
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 2V14M2 8H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      </svg>
+      Create Repository
+    </button>
+  }
 </div>
 
 @if (loading) {

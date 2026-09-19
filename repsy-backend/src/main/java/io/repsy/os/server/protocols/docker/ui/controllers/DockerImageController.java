@@ -32,9 +32,11 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Pageable;
@@ -55,6 +57,13 @@ import org.springframework.web.bind.annotation.RestController;
 @SuppressWarnings("java:S6856")
 public class DockerImageController {
 
+  private static final Set<String> IMAGE_SORT_PROPERTIES =
+      Set.of("id", "name", "updatedAt", "lastUpdatedAt");
+
+  private static final Set<String> TAG_SORT_PROPERTIES = Set.of("id", "name", "createdAt");
+
+  private static final Set<String> MANIFEST_SORT_PROPERTIES = Set.of("id", "name", "createdAt");
+
   private static final String DEFAULT_TAG = "latest";
 
   private final @NonNull ImageTxService imageService;
@@ -71,6 +80,8 @@ public class DockerImageController {
       @RequestParam(required = false, defaultValue = "") final String name,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
+    SortValidator.requireSortableBy(pageable, IMAGE_SORT_PROPERTIES);
+
     final var packages =
         this.imageService.findAllByRepoIdAndContainsName(repoInfo.getStorageKey(), name, pageable);
 
@@ -84,6 +95,8 @@ public class DockerImageController {
       @PathVariable final String imageName,
       @RequestParam(required = false, defaultValue = "") final String name,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, TAG_SORT_PROPERTIES);
 
     final var imageTags =
         this.manifestService.getImageTagsContainsName(
@@ -156,6 +169,8 @@ public class DockerImageController {
       @RequestParam(required = false, defaultValue = "") final String name,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
+    SortValidator.requireSortableBy(pageable, MANIFEST_SORT_PROPERTIES);
+
     final var tagLayers =
         this.dockerApiFacade.getTagManifestsLikeName(repoInfo, imageName, tagName, name, pageable);
 
@@ -170,27 +185,28 @@ public class DockerImageController {
       @PathVariable final String reference)
       throws IOException {
 
-    final var tag =
-        this.manifestService.findActiveTagByRepoAndReference(
+    final var manifestName =
+        this.manifestService.findManifestNameByReference(
             repoInfo.getStorageKey(), imageName, reference);
 
     final var fileName =
-        ManifestNameGenerator.generate(repoInfo.getStorageKey(), imageName, tag.getName());
+        ManifestNameGenerator.generate(repoInfo.getStorageKey(), imageName, manifestName);
 
     final var manifest = this.dockerApiFacade.getManifest(repoInfo, fileName);
 
     return this.restResponseFactory.success("manifestFetched", manifest);
   }
 
-  @GetMapping("/{repoName}/{ignoredImageName}/configs/{digest}")
+  @GetMapping("/{repoName}/{imageName}/configs/{digest}")
   @RepoOperation
   public RestResponse<String> getConfig(
       final RepoInfo repoInfo,
-      @PathVariable final String ignoredImageName,
+      @PathVariable final String imageName,
       @PathVariable final String digest)
       throws IOException {
 
-    final var layer = this.dockerApiFacade.findLayerByDigestAndRepoAndImageName(repoInfo, digest);
+    final var layer =
+        this.dockerApiFacade.findConfigLayerByImageAndDigest(repoInfo, imageName, digest);
 
     final var config = this.dockerApiFacade.getConfig(repoInfo, layer.getDigest());
 

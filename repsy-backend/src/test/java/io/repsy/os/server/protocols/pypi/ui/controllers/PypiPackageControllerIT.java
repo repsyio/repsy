@@ -23,17 +23,18 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.RepsyApplication;
+import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacadeImpl;
 import io.repsy.os.server.protocols.pypi.ui.facades.PypiApiFacade;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -41,89 +42,43 @@ import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** Full-stack integration tests for {@code /api/pypi/packages/*}. */
-@Testcontainers
-@Transactional
-@AutoConfigureMockMvc
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("PypiPackageController /api/pypi/packages/*")
-class PypiPackageControllerIT {
+class PypiPackageControllerIT extends AbstractIntegrationTest {
 
-  private static final int API_PORT = 8080;
-  private static final String VALID_PASSWORD = "Password1!";
-  private static final String[] ENVELOPE_KEYS = {"msgId", "type", "data", "errorCode", "text"};
-  private static final String UUID_PATTERN =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", PypiPackageControllerIT::tempStoragePath);
-  }
-
-  private static String tempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-pypi-it").toString();
-    } catch (final IOException e) {
-      throw new UncheckedIOException(e);
-    }
-  }
-
-  @Autowired private MockMvc mockMvc;
-  @Autowired private JwtUtils jwtUtils;
-  @Autowired private UserTxService userTxService;
   @Autowired private RepoTxService repoTxService;
   @Autowired private PypiApiFacade pypiApiFacade;
   @Autowired private PypiProtocolFacadeImpl pypiProtocolFacade;
   @MockitoBean private UsageUpdateService usageUpdateService;
-  @PersistenceContext private EntityManager entityManager;
 
   private static RequestPostProcessor port(final int port) {
     return request -> {
@@ -585,5 +540,111 @@ class PypiPackageControllerIT {
         .containsEntry("data", null);
     assertThat((String) JsonPath.read(unsupportedResponse, "$.errorCode")).matches(UUID_PATTERN);
     verify(this.usageUpdateService, atLeastOnce()).updateUsage(any(UsageChangedInfo.class));
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the list endpoints")
+  class PagingAndSorting {
+
+    private static final String PACKAGES = "/api/pypi/packages/{repo}";
+    private static final String PACKAGES_LIKE = PACKAGES + "?name=alpha";
+    private static final String RELEASES = PACKAGES + "/alpha/releases";
+    private static final String RELEASES_LIKE = RELEASES + "?version=1";
+
+    static Stream<String> endpoints() {
+      return Stream.of(PACKAGES, PACKAGES_LIKE, RELEASES, RELEASES_LIKE);
+    }
+
+    static Stream<Arguments> acceptedSorts() {
+      final var packageSorts =
+          Stream.of(PACKAGES, PACKAGES_LIKE)
+              .flatMap(
+                  path ->
+                      Stream.of("id", "name", "latestVersion", "updatedAt")
+                          .map(property -> Arguments.of(path, property)));
+      final var releaseSorts =
+          Stream.of(RELEASES, RELEASES_LIKE)
+              .flatMap(
+                  path ->
+                      Stream.of("id", "version", "createdAt")
+                          .map(property -> Arguments.of(path, property)));
+
+      return Stream.concat(packageSorts, releaseSorts);
+    }
+
+    static Stream<Arguments> invalidPagingOnEveryEndpoint() {
+      return endpoints()
+          .flatMap(
+              path ->
+                  PagingAssertions.invalidPagingParams()
+                      .map(args -> Arguments.of(path, args.get()[0], args.get()[1])));
+    }
+
+    private record Seed(RepoInfo repo, String token) {}
+
+    private Seed seed() throws Exception {
+      final var it = PypiPackageControllerIT.this;
+      final var repo = it.createRepo(true);
+      final var token = it.bearerToken(it.createUser(UserRole.USER));
+
+      it.upload(repo, "alpha", "1.0.0", "alpha-1.0.0.tar.gz");
+      it.upload(repo, "alpha", "1.1.0", "alpha-1.1.0.tar.gz");
+      it.upload(repo, "beta", "2.0.0", "beta-2.0.0.tar.gz");
+
+      return new Seed(repo, token);
+    }
+
+    private ResultActions list(
+        final Seed seed, final String path, final String param, final String value)
+        throws Exception {
+      return PypiPackageControllerIT.this.mockMvc.perform(
+          api(get(path, seed.repo().getName()).param(param, value))
+              .header(AUTHORIZATION, seed.token()));
+    }
+
+    @ParameterizedTest(name = "{0} sort={1}")
+    @MethodSource("acceptedSorts")
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String path, final String property) throws Exception {
+      final var seed = this.seed();
+
+      this.list(seed, path, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(seed, path, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("orders the packages and releases by the requested sort property")
+    void ordersByRequestedProperty() throws Exception {
+      final var seed = this.seed();
+
+      this.list(seed, PACKAGES, "sort", "name,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("alpha"));
+      this.list(seed, PACKAGES, "sort", "name,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("beta"));
+      this.list(seed, RELEASES, "sort", "version,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("1.0.0"));
+      this.list(seed, RELEASES, "sort", "version,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("1.1.0"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400(final String path) throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(this.seed(), path, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0} {1}={2}")
+    @MethodSource("invalidPagingOnEveryEndpoint")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String path, final String param, final String value)
+        throws Exception {
+      PagingAssertions.expectInvalidParameter(this.list(this.seed(), path, param, value), param);
+    }
   }
 }

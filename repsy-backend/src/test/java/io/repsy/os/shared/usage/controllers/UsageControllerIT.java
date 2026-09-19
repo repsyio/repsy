@@ -23,33 +23,24 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.core.events.UserCreatedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.RepsyApplication;
+import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,20 +51,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Full-stack integration tests for {@code GET /api/usages}, exercising the real Spring context, MVC
@@ -84,89 +68,63 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * multiport connector, so every request is routed through {@link #apiPort()} to fake the local port
  * onto {@code multiport.ports.api} (8080).
  *
- * <p>Unlike those classes, this one is <em>not</em> {@code @Transactional}. {@code
+ * <p>Unlike those classes, this one is <em>not</em> transactional. {@code
  * UsageUpdateService#updateUsage} is {@code @Async}: it runs on another thread in its own
  * transaction, so it can only see repositories that have already been committed. Every fixture is
- * therefore committed for real.
+ * therefore committed for real, and {@link #cleanUp()} removes exactly what the test created.
  *
- * <p>{@code TotalUsageInfo} is a global aggregate over the {@code repo} table, and a fresh
- * application is not empty: on startup {@code AdminUserInitializer} seeds the {@code admin} user
- * and publishes a {@code UserCreatedEvent}, whose {@code @Async} per-protocol listeners create one
- * default zero-usage repository per {@link RepoType}. {@link #resetRepos()} waits for that once and
- * then empties the table before every test, so each test starts from zero repositories and asserts
- * absolute totals; {@link #freshInstallation()} re-fires the event to cover the untouched state.
- * {@link #cleanUp()} removes what a test created (the seeded {@code admin} user is left alone).
- * Tests must not run in parallel with each other.
+ * <p>The database is shared with every other IT class and {@code TotalUsageInfo} is a global
+ * aggregate over the {@code repo} table, which is not empty: on startup {@code
+ * AdminUserInitializer} seeds the {@code admin} user and publishes a {@code UserCreatedEvent},
+ * whose {@code @Async} per-protocol listeners create one default zero-usage repository per {@link
+ * RepoType}. {@link #measureBaseline()} records what the table holds before each test and {@link
+ * #assertTotals} adds the test's own repositories and usage on top, so no test needs the table to
+ * be empty. Tests must not run in parallel with each other.
  */
-@Testcontainers
-@AutoConfigureMockMvc
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("UsageController GET /api/usages")
-class UsageControllerIT {
+class UsageControllerIT extends AbstractIntegrationTest {
 
-  private static final int API_PORT = 8080;
   private static final String USAGES_PATH = "/api/usages";
-  private static final String VALID_PASSWORD = "Password1!";
-  private static final String SEEDED_ADMIN_USERNAME = "admin";
-  private static final String UUID_PATTERN =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   private static final String USER_NOT_FOUND_TEXT = "User not found.";
   private static final Duration ASYNC_TIMEOUT = Duration.ofSeconds(10);
 
-  private static final String[] ENVELOPE_KEYS = {"msgId", "type", "data", "errorCode", "text"};
   private static final String[] TOTAL_USAGE_KEYS = {"diskUsed", "reposCount"};
   private static final String[] USAGE_INFO_KEYS = {"value", "text"};
 
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", UsageControllerIT::tempStoragePath);
-  }
-
-  private static String tempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-usages-it").toString();
-    } catch (final IOException e) {
-      throw new UncheckedIOException(e);
-    }
-  }
-
-  @Autowired private MockMvc mockMvc;
-  @Autowired private JwtUtils jwtUtils;
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
   @Autowired private RepoTxService repoTxService;
-  @Autowired private RepoRepository repoRepository;
   @Autowired private UsageUpdateService usageUpdateService;
   @Autowired private ApplicationEventPublisher eventPublisher;
 
   private final List<UUID> createdUserIds = new ArrayList<>();
+  private final List<UUID> createdRepoIds = new ArrayList<>();
 
-  /** Set once the startup seeding of the default repositories has been observed to finish. */
-  private static final AtomicBoolean STARTUP_SEEDING_AWAITED = new AtomicBoolean();
+  /**
+   * What the {@code repo} table held before the test: the startup-seeded default repositories. The
+   * database is shared with every other IT class, so the totals are asserted as this baseline plus
+   * what the test created.
+   */
+  private long baselineRepos;
+
+  private long baselineDiskUsage;
 
   @BeforeEach
-  void resetRepos() {
-    if (STARTUP_SEEDING_AWAITED.compareAndSet(false, true)) {
-      await()
-          .atMost(ASYNC_TIMEOUT)
-          .untilAsserted(
-              () -> assertThat(this.repoRepository.count()).isEqualTo(RepoType.values().length));
-    }
-    this.repoRepository.deleteAll();
+  void measureBaseline() {
+    final var totalDiskUsage = this.repoRepository.getTotalDiskUsage();
+
+    this.baselineRepos = this.repoRepository.count();
+    this.baselineDiskUsage = totalDiskUsage == null ? 0 : totalDiskUsage;
+
+    // The totals text is pinned per absolute size, which only holds while the repositories already
+    // in the table (the zero-usage defaults) add nothing to it.
+    assertThat(this.baselineDiskUsage)
+        .as("disk usage of the repositories that exist before the test")
+        .isZero();
   }
 
   @AfterEach
   void cleanUp() {
-    this.repoRepository.deleteAll();
+    this.repoRepository.deleteAllById(this.createdRepoIds);
     this.userRepository.deleteAllById(this.createdUserIds);
   }
 
@@ -174,28 +132,13 @@ class UsageControllerIT {
   // Request / fixture helpers
   // ---------------------------------------------------------------------------------------------
 
-  private static RequestPostProcessor apiPort() {
-    return request -> {
-      request.setLocalPort(API_PORT);
-      return request;
-    };
-  }
-
-  private static String randomTag() {
-    return UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-  }
-
-  private ResultActions perform(final MockHttpServletRequestBuilder request) throws Exception {
-    return this.mockMvc.perform(request.with(apiPort()));
-  }
-
   private ResultActions getUsages(final String authorization) throws Exception {
     return this.perform(get(USAGES_PATH).header(AUTHORIZATION, authorization));
   }
 
   /** Creates a committed user with the given role and returns its username. */
   private String createUser(final UserRole role) {
-    final var username = "usage" + randomTag();
+    final var username = uniqueUsername("usage");
     final var salt = PasswordGeneratorUtil.generateSalt();
     final var hash = PasswordGeneratorUtil.hashPassword(VALID_PASSWORD, salt);
     final var userInfo = this.userTxService.create(username, role, hash, salt);
@@ -208,11 +151,6 @@ class UsageControllerIT {
     return this.bearerTokenFor(userId, username);
   }
 
-  private String bearerTokenFor(final UUID userId, final String username) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createPanelAccessToken(userId, username, Duration.ofMinutes(30));
-  }
-
   private String expiredBearerTokenFor(final String username) {
     final var userId = this.userRepository.findByUsername(username).orElseThrow().getId();
     return AuthUtils.AUTH_BEARER
@@ -220,13 +158,15 @@ class UsageControllerIT {
   }
 
   /** A valid bearer token for the {@code admin} user that the application seeds at startup. */
-  private String adminBearerToken() {
+  private String seededAdminBearerToken() {
     return this.bearerTokenFor(SEEDED_ADMIN_USERNAME);
   }
 
   private UUID createRepo(final RepoType type, final boolean privateRepo) {
     final var name = "u" + randomTag() + "-" + type.name().toLowerCase(Locale.ROOT);
-    return this.repoTxService.createRepo(name, type, privateRepo, null).getId();
+    final var repoId = this.repoTxService.createRepo(name, type, privateRepo, null).getId();
+    this.createdRepoIds.add(repoId);
+    return repoId;
   }
 
   private UUID createRepo(final RepoType type) {
@@ -262,54 +202,23 @@ class UsageControllerIT {
    * further assertions on {@code data}.
    */
   private static String expectSuccess(final ResultActions result) throws Exception {
-    final var body =
-        result.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-
-    final Map<String, Object> envelope = JsonPath.read(body, "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", "usageFetched")
-        .containsEntry("type", "SUCCESS")
-        .containsEntry("errorCode", null)
-        .containsEntry("text", "Usage fetched");
-    return body;
+    return expectSuccess(result, "usageFetched", "Usage fetched");
   }
 
-  /** Asserts the complete {@code TotalUsageInfo} shape: exact key sets and every value. */
-  private static void assertTotals(
+  /**
+   * Asserts the complete {@code TotalUsageInfo} shape: exact key sets and every value. {@code
+   * diskUsed} and {@code reposCount} are what the test itself added on top of {@link
+   * #baselineDiskUsage} and {@link #baselineRepos}.
+   */
+  private void assertTotals(
       final String body, final long diskUsed, final String diskUsedText, final long reposCount) {
     final Map<String, Object> data = JsonPath.read(body, "$.data");
     assertThat(data).containsOnlyKeys(TOTAL_USAGE_KEYS);
-    assertThat(number(data.get("reposCount"))).isEqualTo(reposCount);
+    assertThat(number(data.get("reposCount"))).isEqualTo(this.baselineRepos + reposCount);
 
     final Map<String, Object> usageInfo = JsonPath.read(body, "$.data.diskUsed");
     assertThat(usageInfo).containsOnlyKeys(USAGE_INFO_KEYS).containsEntry("text", diskUsedText);
-    assertThat(number(usageInfo.get("value"))).isEqualTo(diskUsed);
-  }
-
-  /** Asserts a complete ERROR envelope, including the generated {@code errorCode} UUID. */
-  private static void expectError(
-      final ResultActions result,
-      final HttpStatus expectedStatus,
-      final String msgId,
-      final String data,
-      final String text)
-      throws Exception {
-    final var body =
-        result
-            .andExpect(status().is(expectedStatus.value()))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-
-    final Map<String, Object> envelope = JsonPath.read(body, "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "ERROR")
-        .containsEntry("data", data)
-        .containsEntry("text", text);
-    assertThat((String) envelope.get("errorCode")).matches(UUID_PATTERN);
+    assertThat(number(usageInfo.get("value"))).isEqualTo(this.baselineDiskUsage + diskUsed);
   }
 
   private static void expectAccessNotAllowed(final ResultActions result) throws Exception {
@@ -432,13 +341,11 @@ class UsageControllerIT {
   class Totals {
 
     @Test
-    @DisplayName("without any repository returns zero usage and a zero count")
+    @DisplayName("without a repository of its own reports the baseline: zero usage")
     void noRepositories() throws Exception {
-      assertThat(UsageControllerIT.this.repoRepository.count()).isZero();
-
       final var body =
           expectSuccess(
-              UsageControllerIT.this.getUsages(UsageControllerIT.this.adminBearerToken()));
+              UsageControllerIT.this.getUsages(UsageControllerIT.this.seededAdminBearerToken()));
 
       assertTotals(body, 0, "0 B", 0);
     }
@@ -446,21 +353,21 @@ class UsageControllerIT {
     @Test
     @DisplayName("on a fresh installation reports the default repositories with zero usage")
     void freshInstallation() throws Exception {
-      // Same event, same async listeners as at startup: one default repository per type.
-      UsageControllerIT.this.eventPublisher.publishEvent(
-          new UserCreatedEvent<>(UUID.randomUUID(), SEEDED_ADMIN_USERNAME));
-      await()
-          .atMost(ASYNC_TIMEOUT)
-          .untilAsserted(
-              () ->
-                  assertThat(UsageControllerIT.this.repoRepository.count())
-                      .isEqualTo(RepoType.values().length));
+      // The startup seeding has finished (AbstractIntegrationTest waits for it): one default
+      // repository per type, none of which has any usage.
+      final var seededTypes = new HashSet<RepoType>();
+      for (final var repo : UsageControllerIT.this.repoRepository.findAll()) {
+        seededTypes.add(repo.getType());
+      }
+      assertThat(seededTypes).containsExactlyInAnyOrder(RepoType.values());
+      assertThat(UsageControllerIT.this.baselineRepos)
+          .isGreaterThanOrEqualTo(RepoType.values().length);
 
       final var body =
           expectSuccess(
-              UsageControllerIT.this.getUsages(UsageControllerIT.this.adminBearerToken()));
+              UsageControllerIT.this.getUsages(UsageControllerIT.this.seededAdminBearerToken()));
 
-      assertTotals(body, 0, "0 B", RepoType.values().length);
+      assertTotals(body, 0, "0 B", 0);
     }
 
     @Test
@@ -471,7 +378,7 @@ class UsageControllerIT {
 
       final var body =
           expectSuccess(
-              UsageControllerIT.this.getUsages(UsageControllerIT.this.adminBearerToken()));
+              UsageControllerIT.this.getUsages(UsageControllerIT.this.seededAdminBearerToken()));
 
       assertTotals(body, 0, "0 B", 2);
     }
@@ -495,11 +402,13 @@ class UsageControllerIT {
 
       final var body =
           expectSuccess(
-              UsageControllerIT.this.getUsages(UsageControllerIT.this.adminBearerToken()));
+              UsageControllerIT.this.getUsages(UsageControllerIT.this.seededAdminBearerToken()));
 
       assertTotals(body, 45_000, "43.95 KB", RepoType.values().length);
-      assertThat(UsageControllerIT.this.repoRepository.getTotalDiskUsage()).isEqualTo(45_000L);
-      assertThat(UsageControllerIT.this.repoRepository.count()).isEqualTo(RepoType.values().length);
+      assertThat(UsageControllerIT.this.repoRepository.getTotalDiskUsage())
+          .isEqualTo(UsageControllerIT.this.baselineDiskUsage + 45_000L);
+      assertThat(UsageControllerIT.this.repoRepository.count())
+          .isEqualTo(UsageControllerIT.this.baselineRepos + RepoType.values().length);
     }
 
     @Test
@@ -511,7 +420,7 @@ class UsageControllerIT {
 
       final var body =
           expectSuccess(
-              UsageControllerIT.this.getUsages(UsageControllerIT.this.adminBearerToken()));
+              UsageControllerIT.this.getUsages(UsageControllerIT.this.seededAdminBearerToken()));
 
       assertTotals(body, 2560, "2.50 KB", 3);
     }
@@ -524,7 +433,7 @@ class UsageControllerIT {
 
       final var body =
           expectSuccess(
-              UsageControllerIT.this.getUsages(UsageControllerIT.this.adminBearerToken()));
+              UsageControllerIT.this.getUsages(UsageControllerIT.this.seededAdminBearerToken()));
 
       assertTotals(body, bytes, text, 1);
     }
@@ -557,7 +466,7 @@ class UsageControllerIT {
     @Test
     @DisplayName("moves up as UsageUpdateService records uploads")
     void uploadsIncreaseTotals() throws Exception {
-      final var token = UsageControllerIT.this.adminBearerToken();
+      final var token = UsageControllerIT.this.seededAdminBearerToken();
       final var maven = UsageControllerIT.this.createRepo(RepoType.MAVEN);
       final var npm = UsageControllerIT.this.createRepo(RepoType.NPM);
       assertTotals(expectSuccess(UsageControllerIT.this.getUsages(token)), 0, "0 B", 2);
@@ -575,7 +484,7 @@ class UsageControllerIT {
     @Test
     @DisplayName("moves down when UsageUpdateService records a removal")
     void removalsDecreaseTotals() throws Exception {
-      final var token = UsageControllerIT.this.adminBearerToken();
+      final var token = UsageControllerIT.this.seededAdminBearerToken();
       final var repoId = UsageControllerIT.this.createRepo(RepoType.DOCKER);
       UsageControllerIT.this.recordUsage(repoId, 5000);
       assertTotals(expectSuccess(UsageControllerIT.this.getUsages(token)), 5000, "4.89 KB", 1);
@@ -588,7 +497,7 @@ class UsageControllerIT {
     @Test
     @DisplayName("drops a deleted repository's usage and count, back to zero after the last one")
     void repositoryDeletionDecreasesTotals() throws Exception {
-      final var token = UsageControllerIT.this.adminBearerToken();
+      final var token = UsageControllerIT.this.seededAdminBearerToken();
       final var first = UsageControllerIT.this.createRepo(RepoType.MAVEN);
       final var second = UsageControllerIT.this.createRepo(RepoType.NPM);
       UsageControllerIT.this.recordUsage(first, 1024);
@@ -622,7 +531,7 @@ class UsageControllerIT {
     @DisplayName("answers 404 itemNotFound for a verb the path does not map")
     void unsupportedMethod(final String name, final MockHttpServletRequestBuilder request)
         throws Exception {
-      final var token = UsageControllerIT.this.adminBearerToken();
+      final var token = UsageControllerIT.this.seededAdminBearerToken();
 
       expectError(
           UsageControllerIT.this.perform(request.header(AUTHORIZATION, token)),

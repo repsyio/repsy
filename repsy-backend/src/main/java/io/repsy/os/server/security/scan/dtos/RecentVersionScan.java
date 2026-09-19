@@ -22,7 +22,11 @@ public interface RecentVersionScan {
 
   String getArtifactVersion();
 
+  ScanStatus getStatus();
+
   Severity getSeverity();
 
   Instant getScannedAt();
+
+  Instant getLastCompletedAt();
 }

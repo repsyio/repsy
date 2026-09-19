@@ -15,4 +15,9 @@
  */
 package io.repsy.protocols.nuget.protocol.facades.dtos;
 
-public record NuspecMetadata(String packageId, String version, String nuspecXml) {}
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+@NullMarked
+public record NuspecMetadata(
+    String packageId, String version, String nuspecXml, @Nullable String readme) {}

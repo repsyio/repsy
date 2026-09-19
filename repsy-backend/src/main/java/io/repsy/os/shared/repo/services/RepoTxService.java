@@ -150,7 +150,7 @@ public class RepoTxService {
   }
 
   public List<@NonNull RepoListInfo> findAllByRepoType(final @NonNull RepoType repoType) {
-    return this.repoRepository.findAllByType(repoType).stream()
+    return this.repoRepository.findAllByTypeOrderByCreatedAtDescNameAsc(repoType).stream()
         .map(this::mapToRepoListInfo)
         .toList();
   }

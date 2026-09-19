@@ -21,6 +21,7 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -29,7 +30,12 @@ public interface NuGetPackageService<ID> {
 
   ID findOrCreatePackage(BaseRepoInfo<ID> repoInfo, String packageId);
 
-  void publishVersion(BaseRepoInfo<ID> repoInfo, ID pkgId, String version, String nuspecXml);
+  void publishVersion(
+      BaseRepoInfo<ID> repoInfo,
+      ID pkgId,
+      String version,
+      String nuspecXml,
+      @Nullable String readme);
 
   boolean versionExists(BaseRepoInfo<ID> repoInfo, String packageId, String version);
 

@@ -17,67 +17,23 @@ package io.repsy.os.shared.user.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.RepsyApplication;
+import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Integration tests for {@link UserTxService} against a containerized PostgreSQL database
  * (Flyway-migrated).
  *
- * <p>Every test method runs in one transaction that is rolled back afterwards, which is what makes
- * these tests meaningful for generated values: the returned DTO must already carry them without the
- * test flushing the persistence context first.
+ * <p>Every test method runs in the transaction inherited from {@link AbstractIntegrationTest} and
+ * is rolled back afterwards, which is what makes these tests meaningful for generated values: the
+ * returned DTO must already carry them without the test flushing the persistence context first.
  */
-@Testcontainers
-@Transactional
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("UserTxService")
-class UserTxServiceIT {
-
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", UserTxServiceIT::tempStoragePath);
-  }
-
-  private static String tempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-user-tx-service-it").toString();
-    } catch (final IOException e) {
-      throw new UncheckedIOException(e);
-    }
-  }
-
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
-  @PersistenceContext private EntityManager entityManager;
+class UserTxServiceIT extends AbstractIntegrationTest {
 
   @Test
   @DisplayName("create() returns the persisted createdAt")

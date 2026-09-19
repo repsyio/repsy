@@ -113,9 +113,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
               .andExpect(jsonPath("$.msgId").value("profileFetched"))
               .andExpect(jsonPath("$.type").value("SUCCESS"))
               .andExpect(jsonPath("$.errorCode").value(nullValue()))
-              // "profileFetched" has no entry in messages.properties, so text falls back to the
-              // msgId itself.
-              .andExpect(jsonPath("$.text").value("profileFetched"))
+              .andExpect(jsonPath("$.text").value("Profile fetched."))
               .andExpect(jsonPath("$.data.*", hasSize(6)))
               .andExpect(jsonPath("$.data.id").value(user.getId().toString()))
               .andExpect(jsonPath("$.data.username").value(user.getUsername()))
@@ -837,10 +835,8 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     @Test
     @DisplayName("returns 400 cannotDeleteLastAdminUser for the last remaining ADMIN")
     void cannotDeleteLastAdmin() throws Exception {
-      // AdminUserInitializer seeds exactly one "admin" ADMIN user at application startup;
-      // no other admin exists unless a test creates one (and @Transactional rolls that back).
-      final var lastAdmin =
-          ProfileControllerIT.this.userRepository.findByUsername("admin").orElseThrow();
+      // The database is shared with other IT classes, so drop any other committed ADMIN first.
+      final var lastAdmin = ProfileControllerIT.this.seededAdminAsLastAdmin();
       final var token =
           ProfileControllerIT.this.bearerTokenFor(lastAdmin.getId(), lastAdmin.getUsername());
 

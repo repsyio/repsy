@@ -25,7 +25,9 @@ import io.repsy.os.server.protocols.golang.ui.facades.GolangApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Pageable;
@@ -48,6 +50,10 @@ import org.springframework.web.bind.annotation.RestController;
 @SuppressWarnings("java:S6856")
 public class GolangModuleController {
 
+  private static final Set<String> MODULE_SORT_PROPERTIES = Set.of("id", "modulePath", "createdAt");
+
+  private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("id", "version", "createdAt");
+
   private final GolangApiFacade golangApiFacade;
   private final RestResponseFactory restResponseFactory;
 
@@ -67,6 +73,8 @@ public class GolangModuleController {
       final RepoInfo repoInfo,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
+    SortValidator.requireSortableBy(pageable, MODULE_SORT_PROPERTIES);
+
     final var modules = this.golangApiFacade.getModules(repoInfo.getStorageKey(), pageable);
 
     return this.restResponseFactory.success("modulesFetched", new PagedModel<>(modules));
@@ -78,6 +86,8 @@ public class GolangModuleController {
       final RepoInfo repoInfo,
       @RequestParam(required = false, defaultValue = "") final String search,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, MODULE_SORT_PROPERTIES);
 
     final var modules =
         this.golangApiFacade.searchModules(repoInfo.getStorageKey(), search, pageable);
@@ -92,6 +102,8 @@ public class GolangModuleController {
       @RequestParam final String modulePath,
       @RequestParam(required = false, defaultValue = "") final String search,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
 
     final var versions =
         this.golangApiFacade.getModuleVersions(

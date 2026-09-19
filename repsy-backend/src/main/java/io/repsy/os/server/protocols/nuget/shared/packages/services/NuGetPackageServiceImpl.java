@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -94,7 +95,8 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final BaseRepoInfo<UUID> repoInfo,
       final UUID pkgId,
       final String version,
-      final String nuspecXml) {
+      final String nuspecXml,
+      final @Nullable String readme) {
 
     final var pkg =
         this.packageRepository
@@ -111,9 +113,12 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
             "Version " + version + " of package " + pkg.getPackageId() + " already exists.");
       }
       this.packageVersionRepository.delete(existingVersion.get());
+      // Hibernate runs inserts before deletes at flush, so the new row would hit the unique
+      // (package_id, version) index while the old one is still there. Flush the delete first.
+      this.packageVersionRepository.flush();
     }
 
-    final var pkgVersion = this.createNuGetPackageVersion(pkg, nuspecXml, version);
+    final var pkgVersion = this.createNuGetPackageVersion(pkg, nuspecXml, version, readme);
 
     this.packageVersionRepository.save(pkgVersion);
   }
@@ -177,7 +182,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
             pkg ->
                 this.packageVersionRepository.findByNugetPackageIdAndVersionIgnoreCase(
                     pkg.getId(), version))
-        .map(v -> this.converter.toVersionInfoWithDeps(v, packageId));
+        .map(v -> this.converter.toVersionDetail(v, packageId));
   }
 
   @Override
@@ -368,7 +373,10 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   }
 
   private NuGetPackageVersion createNuGetPackageVersion(
-      final NuGetPackage nugetPackage, final String nuspecXml, final String version) {
+      final NuGetPackage nugetPackage,
+      final String nuspecXml,
+      final String version,
+      final @Nullable String readme) {
 
     final var pkgVersion = new NuGetPackageVersion();
     pkgVersion.setNugetPackage(nugetPackage);
@@ -385,7 +393,8 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     pkgVersion.setIconUrl(NuGetPackageUtils.extractXmlTag(nuspecXml, "iconUrl"));
     pkgVersion.setLicenseUrl(NuGetPackageUtils.extractXmlTag(nuspecXml, "licenseUrl"));
     pkgVersion.setProjectUrl(NuGetPackageUtils.extractXmlTag(nuspecXml, "projectUrl"));
-    pkgVersion.setRepositoryUrl(NuGetPackageUtils.extractXmlTag(nuspecXml, "repository"));
+    pkgVersion.setRepositoryUrl(NuGetPackageUtils.extractRepositoryUrl(nuspecXml));
+    pkgVersion.setReadme(readme);
 
     final var deps = NuGetPackageUtils.extractDependenciesFromNuspec(nuspecXml);
     if (!deps.isEmpty()) {

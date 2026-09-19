@@ -16,7 +16,9 @@
 package io.repsy.os.server.protocols.nuget.protocol;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
@@ -55,12 +57,16 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -97,7 +103,10 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
 
   @Autowired private NuGetPackageRepository nugetPackageRepository;
   @Autowired private NuGetPackageVersionRepository nugetPackageVersionRepository;
-  @Autowired private NuGetStorageService nugetStorageService;
+
+  /** A spy that calls through, so only the test that stubs it changes the storage behaviour. */
+  @MockitoSpyBean private NuGetStorageService nugetStorageService;
+
   @Autowired private RepoTxService repoTxService;
   @Autowired private PlatformTransactionManager transactionManager;
 
@@ -353,6 +362,73 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
                   repo.getId(), BaseUsages.ofDisk(Files.size(nupkgFile) + Files.size(nuspecFile))));
     }
 
+    @Test
+    @DisplayName("stores the repository URL and the README declared in the nuspec")
+    void storesRepositoryUrlAndReadme() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var id = uniquePackageId();
+      final var nuspec =
+          """
+          <?xml version="1.0" encoding="utf-8"?>
+          <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+            <metadata>
+              <id>%s</id>
+              <version>1.0.0</version>
+              <authors>Repsy</authors>
+              <description>readme fixture</description>
+              <readme>docs\\README.md</readme>
+              <repository type="git" url="https://github.com/repsyio/%s.git" commit="abc123" />
+            </metadata>
+          </package>
+          """
+              .formatted(id, id);
+      final var nupkg =
+          zip(
+              entry("[Content_Types].xml", "<Types/>"),
+              entry("_rels/.rels", "<Relationships/>"),
+              entry(id + ".nuspec", nuspec),
+              entry("docs/README.md", "# " + id + "\n\nShips a readme."),
+              entry("lib/net8.0/" + id + ".dll", "MZ fixture assembly"));
+
+      assertStatus(
+          NuGetPublishProtocolIT.this.pushAs(
+              repo, nupkg, NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
+          201);
+
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, id))
+          .singleElement()
+          .satisfies(
+              v -> {
+                assertThat(v.getRepositoryUrl())
+                    .isEqualTo("https://github.com/repsyio/" + id + ".git");
+                assertThat(v.getReadme()).isEqualTo("# " + id + "\n\nShips a readme.");
+              });
+    }
+
+    @Test
+    @DisplayName("still publishes when the declared README is missing from the package")
+    void publishesWithoutDeclaredReadme() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var id = uniquePackageId();
+      final var nupkg =
+          zip(
+              entry("[Content_Types].xml", "<Types/>"),
+              entry(
+                  id + ".nuspec",
+                  "<package><metadata><id>%s</id><version>1.0.0</version><readme>README.md</readme>"
+                          .formatted(id)
+                      + "</metadata></package>"));
+
+      assertStatus(
+          NuGetPublishProtocolIT.this.pushAs(
+              repo, nupkg, NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
+          201);
+
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, id))
+          .singleElement()
+          .satisfies(v -> assertThat(v.getReadme()).isNull());
+    }
+
     /**
      * Fails today: the service serializes the dependencies with the injected {@code XmlMapper}, so
      * PostgreSQL receives XML for its {@code jsonb} column. Enable it together with the fix.
@@ -399,6 +475,25 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
     void normalizesVersion() throws Exception {
       final var repo = NuGetPublishProtocolIT.this.nugetRepo();
       final var pkg = new Pkg(uniquePackageId(), "1.0.0.0");
+
+      assertStatus(
+          NuGetPublishProtocolIT.this.pushAs(
+              repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
+          201);
+
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, pkg.id()))
+          .singleElement()
+          .satisfies(v -> assertThat(v.getVersion()).isEqualTo("1.0.0"));
+      assertThat(java.nio.file.Path.of(packageDir(repo, pkg.id(), "1.0.0")))
+          .isDirectory()
+          .isNotEmptyDirectory();
+    }
+
+    @Test
+    @DisplayName("accepts a two-part version and stores it as its three-part form (RPS-949)")
+    void acceptsTwoPartVersion() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var pkg = new Pkg(uniquePackageId(), "1.0");
 
       assertStatus(
           NuGetPublishProtocolIT.this.pushAs(
@@ -625,25 +720,6 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       verifyNoInteractions(NuGetPublishProtocolIT.this.usageUpdateService);
     }
 
-    /**
-     * Pins today's behaviour: NuGet accepts a two-part version and the normalizer maps it to {@code
-     * 1.0.0}, but the validator rejects it first. Flip it to expect 201 and {@code 1.0.0} with the
-     * fix.
-     */
-    @Test
-    @DisplayName("rejects a two-part version today (RPS-949)")
-    void rejectsTwoPartVersion() throws Exception {
-      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
-      final var pkg = new Pkg(uniquePackageId(), "1.0");
-
-      NuGetPublishProtocolIT.this
-          .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
-          .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.errors[0].message").value("Invalid NuGet version format."));
-
-      NuGetPublishProtocolIT.this.assertNothingStored(repo, pkg.id());
-    }
-
     @Test
     @DisplayName("rejects an invalid version")
     void rejectsInvalidVersion() throws Exception {
@@ -698,13 +774,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       verifyNoInteractions(NuGetPublishProtocolIT.this.usageUpdateService);
     }
 
-    /**
-     * Fails today: the service deletes the old version row and inserts the new one in the same
-     * flush, and Hibernate runs the insert first, which violates the unique (package_id, version)
-     * index. Enable it together with the fix.
-     */
     @Test
-    @Disabled("RPS-948: overriding an existing NuGet version violates the unique index")
     @DisplayName("replaces an existing version when the repo allows overrides")
     void overridesWhenAllowed() throws Exception {
       final var created = NuGetPublishProtocolIT.this.nugetRepo();
@@ -761,6 +831,33 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
                   .value("Release packages are not allowed in this repository."));
 
       NuGetPublishProtocolIT.this.assertNothingStored(repo, pkg.id());
+    }
+  }
+
+  @Nested
+  @DisplayName("an unexpected failure")
+  @ExtendWith(OutputCaptureExtension.class)
+  class UnexpectedFailure {
+
+    @Test
+    @DisplayName("answers 500 'Publish failed' and logs the exception with its stack trace")
+    void logsTheException(final CapturedOutput output) throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var pkg = new Pkg(uniquePackageId(), "1.0.0");
+      doThrow(new IllegalStateException("storage backend down"))
+          .when(NuGetPublishProtocolIT.this.nugetStorageService)
+          .writePackage(any(), any(), any(), any(), any());
+
+      NuGetPublishProtocolIT.this
+          .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
+          .andExpect(status().isInternalServerError())
+          .andExpect(jsonPath("$.errors[0].message").value("Publish failed"));
+
+      assertThat(output.getAll())
+          .contains("ERROR")
+          .contains("NuGet publish failed")
+          .contains("java.lang.IllegalStateException: storage backend down");
+      verifyNoInteractions(NuGetPublishProtocolIT.this.usageUpdateService);
     }
   }
 

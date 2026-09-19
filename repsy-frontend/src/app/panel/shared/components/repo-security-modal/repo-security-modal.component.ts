@@ -23,13 +23,14 @@ import { RecentScannedVersion, RepoSecurityDetail, RepoType } from '../../../../
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { SecurityService } from '../../../pages/security/service/security.service';
 import { buildArtifactDetailRoute } from '../../util/security-detail-route.util';
+import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
 import { SeverityBadgeComponent } from '../severity-badge/severity-badge.component';
 import { SeverityBreakdownComponent } from '../severity-breakdown/severity-breakdown.component';
 
 @Component({
   selector: 'app-repo-security-modal',
   standalone: true,
-  imports: [CommonModule, SpinnerComponent, SeverityBadgeComponent, SeverityBreakdownComponent],
+  imports: [CommonModule, SpinnerComponent, RescanNoteComponent, SeverityBadgeComponent, SeverityBreakdownComponent],
   templateUrl: './repo-security-modal.component.html',
 })
 export class RepoSecurityModalComponent implements OnChanges {

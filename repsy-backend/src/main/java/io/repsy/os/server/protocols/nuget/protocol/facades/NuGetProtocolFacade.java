@@ -24,6 +24,7 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -44,11 +45,12 @@ public class NuGetProtocolFacade extends AbstractNuGetProtocolFacade<UUID> {
       final BaseRepoInfo<UUID> repoInfo,
       final UUID pkgId,
       final String version,
-      final String nuspecXml)
+      final String nuspecXml,
+      final @Nullable String readme)
       throws IOException {
 
     try {
-      super.doPublish(repoInfo, pkgId, version, nuspecXml);
+      super.doPublish(repoInfo, pkgId, version, nuspecXml, readme);
     } catch (final DataIntegrityViolationException e) {
       throw new ResponseStatusException(CONFLICT, "Version %s already exists.".formatted(version));
     }

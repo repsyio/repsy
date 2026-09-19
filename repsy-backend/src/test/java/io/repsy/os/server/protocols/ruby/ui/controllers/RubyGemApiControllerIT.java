@@ -25,116 +25,46 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.RepsyApplication;
+import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.services.RubyGemServiceImpl;
 import io.repsy.os.server.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
-import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
 import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.test.web.servlet.ResultActions;
 
 /** Full-stack integration coverage for the Ruby gem-management API. */
-@Testcontainers
-@AutoConfigureMockMvc
-@Transactional
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("RubyGemApiController /api/ruby/gems/*")
-class RubyGemApiControllerIT {
+class RubyGemApiControllerIT extends AbstractIntegrationTest {
 
-  private static final int API_PORT = 8080;
-  private static final String PASSWORD = "Password1!";
-  private static final String UUID_PATTERN =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", RubyGemApiControllerIT::tempStoragePath);
-  }
-
-  private static String tempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-ruby-gem-it").toString();
-    } catch (final IOException e) {
-      throw new java.io.UncheckedIOException(e);
-    }
-  }
-
-  @Autowired private MockMvc mockMvc;
-  @Autowired private JwtUtils jwtUtils;
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
   @Autowired private RepoTxService repoTxService;
   @Autowired private RubyGemServiceImpl rubyGemService;
   @Autowired private RubyStorageService rubyStorageService;
-  @PersistenceContext private EntityManager entityManager;
-
-  private static RequestPostProcessor apiPort() {
-    return request -> {
-      request.setLocalPort(API_PORT);
-      return request;
-    };
-  }
 
   private static String unique(final String prefix) {
     return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
-  }
-
-  private User createUser(final UserRole role) {
-    final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword(PASSWORD, salt);
-    final var info = this.userTxService.create(unique("ruby"), role, hash, salt);
-    this.entityManager.flush();
-    return this.userRepository.findById(info.getId()).orElseThrow();
-  }
-
-  private String bearer(final User user) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createPanelAccessToken(
-            user.getId(), user.getUsername(), Duration.ofMinutes(30));
   }
 
   private RepoInfo createRepo(final boolean privateRepo) {
@@ -265,9 +195,10 @@ class RubyGemApiControllerIT {
     @Test
     @DisplayName("returns gem list, versions, and complete version metadata")
     void returnsGemViews() throws Exception {
-      final var user = RubyGemApiControllerIT.this.createUser(UserRole.USER);
+      final var user =
+          RubyGemApiControllerIT.this.createUser(uniqueUsername("ruby"), UserRole.USER);
       final var repo = RubyGemApiControllerIT.this.createRepo(true);
-      final var token = RubyGemApiControllerIT.this.bearer(user);
+      final var token = RubyGemApiControllerIT.this.bearerTokenFor(user);
       RubyGemApiControllerIT.this.publish(
           repo.getName(), "fixture-gem", "1.0.0", "ruby", "stable fixture");
       RubyGemApiControllerIT.this.publish(
@@ -288,7 +219,7 @@ class RubyGemApiControllerIT {
           .andExpect(jsonPath("$.msgId").value("gemsFetched"))
           .andExpect(jsonPath("$.type").value("SUCCESS"))
           .andExpect(jsonPath("$.errorCode").value(nullValue()))
-          .andExpect(jsonPath("$.text").value("gemsFetched"))
+          .andExpect(jsonPath("$.text").value("Gems fetched."))
           .andExpect(jsonPath("$.data.content", hasSize(1)))
           .andExpect(jsonPath("$.data.content[0].name").value("fixture-gem"))
           .andExpect(jsonPath("$.data.content[0].latest").value("1.1.0"))
@@ -372,14 +303,15 @@ class RubyGemApiControllerIT {
     @DisplayName("allows authenticated private reads and returns unknown repositories")
     void privateReadAndUnknownItems() throws Exception {
       final var repo = RubyGemApiControllerIT.this.createRepo(true);
-      final var user = RubyGemApiControllerIT.this.createUser(UserRole.USER);
+      final var user =
+          RubyGemApiControllerIT.this.createUser(uniqueUsername("ruby"), UserRole.USER);
 
       RubyGemApiControllerIT.this
           .mockMvc
           .perform(
               get("/api/ruby/gems/{repo}", repo.getName())
                   .with(apiPort())
-                  .header(AUTHORIZATION, RubyGemApiControllerIT.this.bearer(user)))
+                  .header(AUTHORIZATION, RubyGemApiControllerIT.this.bearerTokenFor(user)))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.msgId").value("gemsFetched"));
 
@@ -388,7 +320,7 @@ class RubyGemApiControllerIT {
           .perform(
               get("/api/ruby/gems/{repo}", "missing-ruby-repo")
                   .with(apiPort())
-                  .header(AUTHORIZATION, RubyGemApiControllerIT.this.bearer(user)))
+                  .header(AUTHORIZATION, RubyGemApiControllerIT.this.bearerTokenFor(user)))
           .andExpect(status().isNotFound());
 
       // Anonymous callers cannot tell a missing repo from a private one (RPS-887).
@@ -401,9 +333,10 @@ class RubyGemApiControllerIT {
     @Test
     @DisplayName("supports filtering, pagination, and empty results")
     void filtersAndPaginatesGemList() throws Exception {
-      final var user = RubyGemApiControllerIT.this.createUser(UserRole.USER);
+      final var user =
+          RubyGemApiControllerIT.this.createUser(uniqueUsername("ruby"), UserRole.USER);
       final var repo = RubyGemApiControllerIT.this.createRepo(true);
-      final var token = RubyGemApiControllerIT.this.bearer(user);
+      final var token = RubyGemApiControllerIT.this.bearerTokenFor(user);
       RubyGemApiControllerIT.this.publish(repo.getName(), "alpha-gem", "1.0.0", "ruby", "alpha");
       RubyGemApiControllerIT.this.publish(repo.getName(), "beta-gem", "1.0.0", "ruby", "beta");
       RubyGemApiControllerIT.this.publish(repo.getName(), "gamma-gem", "1.0.0", "ruby", "gamma");
@@ -488,7 +421,8 @@ class RubyGemApiControllerIT {
     @DisplayName("rejects missing, malformed, expired, and unknown-user authorization")
     void rejectsInvalidAuthorization() throws Exception {
       final var repo = RubyGemApiControllerIT.this.createRepo(true);
-      final var user = RubyGemApiControllerIT.this.createUser(UserRole.USER);
+      final var user =
+          RubyGemApiControllerIT.this.createUser(uniqueUsername("ruby"), UserRole.USER);
       final var expired =
           AuthUtils.AUTH_BEARER
               + RubyGemApiControllerIT.this.jwtUtils.createPanelAccessToken(
@@ -533,9 +467,10 @@ class RubyGemApiControllerIT {
     @Test
     @DisplayName("deletes one platform, then the complete gem, and rejects a repeated delete")
     void deletesVersionAndGem() throws Exception {
-      final var admin = RubyGemApiControllerIT.this.createUser(UserRole.ADMIN);
+      final var admin =
+          RubyGemApiControllerIT.this.createUser(uniqueUsername("ruby"), UserRole.ADMIN);
       final var repo = RubyGemApiControllerIT.this.createRepo(true);
-      final var token = RubyGemApiControllerIT.this.bearer(admin);
+      final var token = RubyGemApiControllerIT.this.bearerTokenFor(admin);
       RubyGemApiControllerIT.this.publish(repo.getName(), "delete-me", "1.0.0", "ruby", "first");
       RubyGemApiControllerIT.this.publish(
           repo.getName(), "delete-me", "1.0.0", "java", "java variant");
@@ -605,9 +540,10 @@ class RubyGemApiControllerIT {
     @Test
     @DisplayName("deleting the last version also removes its gem")
     void deletingLastVersionRemovesGem() throws Exception {
-      final var admin = RubyGemApiControllerIT.this.createUser(UserRole.ADMIN);
+      final var admin =
+          RubyGemApiControllerIT.this.createUser(uniqueUsername("ruby"), UserRole.ADMIN);
       final var repo = RubyGemApiControllerIT.this.createRepo(true);
-      final var token = RubyGemApiControllerIT.this.bearer(admin);
+      final var token = RubyGemApiControllerIT.this.bearerTokenFor(admin);
       RubyGemApiControllerIT.this.publish(repo.getName(), "last-version", "1.0.0", "ruby", "only");
 
       RubyGemApiControllerIT.this
@@ -638,15 +574,17 @@ class RubyGemApiControllerIT {
     @DisplayName("does not allow a read-only caller to delete")
     void readOnlyCallerCannotDelete() throws Exception {
       final var repo = RubyGemApiControllerIT.this.createRepo(true);
-      final var owner = RubyGemApiControllerIT.this.createUser(UserRole.ADMIN);
-      final var user = RubyGemApiControllerIT.this.createUser(UserRole.USER);
+      final var owner =
+          RubyGemApiControllerIT.this.createUser(uniqueUsername("ruby"), UserRole.ADMIN);
+      final var user =
+          RubyGemApiControllerIT.this.createUser(uniqueUsername("ruby"), UserRole.USER);
       RubyGemApiControllerIT.this.publish(repo.getName(), "existing", "1.0.0", "ruby", "fixture");
       RubyGemApiControllerIT.this
           .mockMvc
           .perform(
               delete("/api/ruby/gems/{repo}/{gem}", repo.getName(), "existing")
                   .with(apiPort())
-                  .header(AUTHORIZATION, RubyGemApiControllerIT.this.bearer(user)))
+                  .header(AUTHORIZATION, RubyGemApiControllerIT.this.bearerTokenFor(user)))
           .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
     }
@@ -664,6 +602,102 @@ class RubyGemApiControllerIT {
           .mockMvc
           .perform(post("/api/ruby/gems/{repo}/{gem}", repo.getName(), "missing").with(apiPort()))
           .andExpect(status().isNotFound());
+    }
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the list endpoints")
+  class PagingAndSorting {
+
+    private static final String GEMS = "/api/ruby/gems/{repo}";
+    private static final String VERSIONS = "/api/ruby/gems/{repo}/fixture-gem/versions";
+
+    static Stream<String> endpoints() {
+      return Stream.of(GEMS, VERSIONS);
+    }
+
+    static Stream<Arguments> acceptedSorts() {
+      return Stream.concat(
+          Stream.of("id", "name", "updatedAt").map(property -> Arguments.of(GEMS, property)),
+          Stream.of("id", "version", "createdAt")
+              .map(property -> Arguments.of(VERSIONS, property)));
+    }
+
+    static Stream<Arguments> invalidPagingOnEveryEndpoint() {
+      return endpoints()
+          .flatMap(
+              path ->
+                  PagingAssertions.invalidPagingParams()
+                      .map(args -> Arguments.of(path, args.get()[0], args.get()[1])));
+    }
+
+    private record Seed(RepoInfo repo, String token) {}
+
+    private Seed seed() throws Exception {
+      final var it = RubyGemApiControllerIT.this;
+      final var user = it.createUser(uniqueUsername("ruby"), UserRole.USER);
+      final var repo = it.createRepo(true);
+
+      it.publish(repo.getName(), "fixture-gem", "1.0.0", "ruby", "stable fixture");
+      it.publish(repo.getName(), "fixture-gem", "1.1.0", "ruby", "latest fixture");
+      it.publish(repo.getName(), "other-gem", "0.1.0", "ruby", "other fixture");
+
+      return new Seed(repo, it.bearerTokenFor(user));
+    }
+
+    private ResultActions list(
+        final Seed seed, final String path, final String param, final String value)
+        throws Exception {
+      return RubyGemApiControllerIT.this.mockMvc.perform(
+          get(path, seed.repo().getName())
+              .param(param, value)
+              .with(apiPort())
+              .header(AUTHORIZATION, seed.token()));
+    }
+
+    @ParameterizedTest(name = "{0} sort={1}")
+    @MethodSource("acceptedSorts")
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String path, final String property) throws Exception {
+      final var seed = this.seed();
+
+      this.list(seed, path, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(seed, path, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("orders the gems and versions by the requested sort property")
+    void ordersByRequestedProperty() throws Exception {
+      final var seed = this.seed();
+
+      this.list(seed, GEMS, "sort", "name,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("fixture-gem"));
+      this.list(seed, GEMS, "sort", "name,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("other-gem"));
+      this.list(seed, VERSIONS, "sort", "version,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("1.0.0"));
+      this.list(seed, VERSIONS, "sort", "version,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("1.1.0"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400(final String path) throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(this.seed(), path, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0} {1}={2}")
+    @MethodSource("invalidPagingOnEveryEndpoint")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String path, final String param, final String value)
+        throws Exception {
+      PagingAssertions.expectInvalidParameter(this.list(this.seed(), path, param, value), param);
     }
   }
 }

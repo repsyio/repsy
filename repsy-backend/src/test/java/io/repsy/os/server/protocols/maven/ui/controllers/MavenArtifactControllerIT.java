@@ -25,26 +25,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.RepsyApplication;
+import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.server.protocols.maven.ui.facades.MavenApiFacade;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -52,67 +46,26 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.test.web.servlet.ResultActions;
 
 /** End-to-end coverage for the Maven artifact-management API. */
-@Testcontainers
-@AutoConfigureMockMvc
-@Transactional
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("MavenArtifactController /api/mvn/artifacts/*")
-class MavenArtifactControllerIT {
+class MavenArtifactControllerIT extends AbstractIntegrationTest {
 
-  private static final int API_PORT = 8080;
-  private static final String UUID_PATTERN =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   private static final String GROUP = "com.example.app";
   private static final String ARTIFACT = "demo";
-  private static final String STORAGE_BASE_PATH = createTempStoragePath();
 
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", () -> STORAGE_BASE_PATH);
-  }
-
-  private static String createTempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-maven-artifacts-it").toString();
-    } catch (final IOException exception) {
-      throw new java.io.UncheckedIOException(exception);
-    }
-  }
-
-  @Autowired private MockMvc mockMvc;
-  @Autowired private JwtUtils jwtUtils;
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
   @Autowired private RepoTxService repoTxService;
-  @Autowired private RepoRepository repoRepository;
   @Autowired private MavenApiFacade mavenApiFacade;
   @Autowired private ArtifactRepository artifactRepository;
   @Autowired private ArtifactVersionRepository artifactVersionRepository;
@@ -120,15 +73,13 @@ class MavenArtifactControllerIT {
   @Value("${storage-gateway.fs.base-path}")
   private String storageBasePath;
 
-  @PersistenceContext private EntityManager entityManager;
-
   private Repo repo;
   private User admin;
   private String repoName;
 
   @BeforeEach
   void setUp() throws IOException {
-    this.admin = this.createUser(UserRole.ADMIN);
+    this.admin = this.createUser(uniqueUsername("mvn"), UserRole.ADMIN);
     this.repoName = "mvn" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     final var repoInfo =
         this.repoTxService.createRepo(this.repoName, RepoType.MAVEN, false, "Maven IT");
@@ -137,15 +88,6 @@ class MavenArtifactControllerIT {
     this.seedVersion("1.0.0", false);
     this.seedVersion("1.1.0-SNAPSHOT", true);
     this.entityManager.flush();
-  }
-
-  private User createUser(final UserRole role) {
-    final var username = "mvn" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-    final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword("Password1!", salt);
-    final var info = this.userTxService.create(username, role, hash, salt);
-    this.entityManager.flush();
-    return this.userRepository.findById(info.getId()).orElseThrow();
   }
 
   private void seedVersion(final String versionName, final boolean snapshot) throws IOException {
@@ -240,13 +182,6 @@ class MavenArtifactControllerIT {
         + "<snapshotVersions><snapshotVersion><extension>pom</extension><value>"
         + "1.1.0-20260918.000000-1</value><updated>20260918000000</updated></snapshotVersion>"
         + "</snapshotVersions></versioning></metadata>";
-  }
-
-  private static RequestPostProcessor apiPort() {
-    return request -> {
-      request.setLocalPort(API_PORT);
-      return request;
-    };
   }
 
   private String bearerToken() {
@@ -437,6 +372,88 @@ class MavenArtifactControllerIT {
           .andExpect(jsonPath("$.data").value("artifactNotFound"))
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)))
           .andExpect(jsonPath("$.text").value(notNullValue()));
+    }
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the list endpoints")
+  class PagingAndSorting {
+
+    private static final String ARTIFACTS = "/api/mvn/artifacts/{repo}";
+    private static final String GROUP_ARTIFACTS = "/api/mvn/artifacts/{repo}/{group}";
+    private static final String VERSIONS = "/api/mvn/artifacts/{repo}/{group}/{artifact}/versions";
+    private static final String VERSIONS_LIKE = VERSIONS + "?version=1";
+
+    static Stream<String> endpoints() {
+      return Stream.of(ARTIFACTS, GROUP_ARTIFACTS, VERSIONS, VERSIONS_LIKE);
+    }
+
+    static Stream<Arguments> acceptedSorts() {
+      final var artifactSorts =
+          Stream.of(ARTIFACTS, GROUP_ARTIFACTS)
+              .flatMap(
+                  path ->
+                      Stream.of("id", "groupName", "artifactName", "lastUpdatedAt")
+                          .map(property -> Arguments.of(path, property)));
+      final var versionSorts =
+          Stream.of(VERSIONS, VERSIONS_LIKE)
+              .flatMap(
+                  path ->
+                      Stream.of("id", "versionName", "lastUpdatedAt")
+                          .map(property -> Arguments.of(path, property)));
+
+      return Stream.concat(artifactSorts, versionSorts);
+    }
+
+    static Stream<Arguments> invalidPagingOnEveryEndpoint() {
+      return endpoints()
+          .flatMap(
+              path ->
+                  PagingAssertions.invalidPagingParams()
+                      .map(args -> Arguments.of(path, args.get()[0], args.get()[1])));
+    }
+
+    private ResultActions list(final String path, final String param, final String value)
+        throws Exception {
+      final var it = MavenArtifactControllerIT.this;
+
+      return it.mockMvc.perform(
+          get(path, it.repoName, GROUP, ARTIFACT).param(param, value).with(apiPort()));
+    }
+
+    @ParameterizedTest(name = "{0} sort={1}")
+    @MethodSource("acceptedSorts")
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String path, final String property) throws Exception {
+      this.list(path, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(path, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("orders the versions by the requested sort property")
+    void ordersVersions() throws Exception {
+      this.list(VERSIONS, "sort", "versionName,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].versionName").value("1.0.0"));
+      this.list(VERSIONS, "sort", "versionName,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].versionName").value("1.1.0-SNAPSHOT"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400(final String path) throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(path, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0} {1}={2}")
+    @MethodSource("invalidPagingOnEveryEndpoint")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String path, final String param, final String value)
+        throws Exception {
+      PagingAssertions.expectInvalidParameter(this.list(path, param, value), param);
     }
   }
 }

@@ -98,7 +98,7 @@ public abstract class AbstractNuGetServiceIndexProtocolMethodHandler
 
       return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(serviceIndex);
     } catch (final Exception e) {
-      log.debug("NuGet service index failed: {}", e.getMessage());
+      log.error("NuGet service index failed", e);
       return ResponseEntity.internalServerError().build();
     }
   }

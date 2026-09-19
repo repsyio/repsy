@@ -25,111 +25,40 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.RepsyApplication;
+import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
-import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.test.web.servlet.ResultActions;
 
 /** Full-stack integration coverage for the NuGet package-management API. */
-@Testcontainers
-@AutoConfigureMockMvc
-@Transactional
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("NuGetPackageController /api/nuget/packages/*")
-class NuGetPackageControllerIT {
+class NuGetPackageControllerIT extends AbstractIntegrationTest {
 
-  private static final int API_PORT = 8080;
-  private static final String PASSWORD = "Password1!";
-  private static final String UUID_PATTERN =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", NuGetPackageControllerIT::tempStoragePath);
-  }
-
-  private static String tempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-nuget-api-it").toString();
-    } catch (final IOException e) {
-      throw new java.io.UncheckedIOException(e);
-    }
-  }
-
-  @Autowired private MockMvc mockMvc;
-  @Autowired private JwtUtils jwtUtils;
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
   @Autowired private RepoTxService repoTxService;
   @Autowired private NuGetPackageRepository nugetPackageRepository;
   @Autowired private JdbcTemplate jdbcTemplate;
   @Autowired private NuGetStorageService nugetStorageService;
-  @PersistenceContext private EntityManager entityManager;
-
-  private static RequestPostProcessor apiPort() {
-    return request -> {
-      request.setLocalPort(API_PORT);
-      return request;
-    };
-  }
 
   private static String unique(final String prefix) {
     return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
-  }
-
-  private User createUser(final UserRole role) {
-    final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword(PASSWORD, salt);
-    final var info = this.userTxService.create(unique("nuget"), role, hash, salt);
-    this.entityManager.flush();
-    return this.userRepository.findById(info.getId()).orElseThrow();
-  }
-
-  private String bearer(final User user) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createPanelAccessToken(
-            user.getId(), user.getUsername(), Duration.ofMinutes(30));
   }
 
   private RepoInfo createRepo(final RepoType type, final boolean privateRepo) {
@@ -162,8 +91,8 @@ class NuGetPackageControllerIT {
         insert into "public"."nuget_package_version"
           ("id", "package_id", "version", "is_prerelease", "is_listed", "published_at",
           "download_count", "title", "description", "authors", "tags", "license_url",
-          "project_url", "dependencies", "created_at")
-        values (?, ?, ?, ?, true, current_timestamp, 0, ?, ?, ?, ?, ?, ?, cast(? as jsonb), current_timestamp)
+          "project_url", "repository_url", "readme", "dependencies", "created_at")
+        values (?, ?, ?, ?, true, current_timestamp, 0, ?, ?, ?, ?, ?, ?, ?, ?, cast(? as jsonb), current_timestamp)
         """,
         UUID.randomUUID(),
         packageId,
@@ -175,6 +104,8 @@ class NuGetPackageControllerIT {
         "searchable fixture",
         "https://example.test/license",
         "https://example.test/project",
+        "https://example.test/repository.git",
+        "# NuGet fixture",
         "[]");
   }
 
@@ -197,9 +128,10 @@ class NuGetPackageControllerIT {
     @Test
     @DisplayName("returns full search, package, version-list, and version DTOs")
     void returnsPackageViews() throws Exception {
-      final var user = NuGetPackageControllerIT.this.createUser(UserRole.USER);
+      final var user =
+          NuGetPackageControllerIT.this.createUser(uniqueUsername("nuget"), UserRole.USER);
       final var repo = NuGetPackageControllerIT.this.createRepo(RepoType.NUGET, true);
-      final var token = NuGetPackageControllerIT.this.bearer(user);
+      final var token = NuGetPackageControllerIT.this.bearerTokenFor(user);
       NuGetPackageControllerIT.this.publish(repo.getName(), "Fixture.Package", "1.0.0");
       NuGetPackageControllerIT.this.publish(repo.getName(), "Fixture.Package", "1.0.1-beta.1");
 
@@ -268,6 +200,8 @@ class NuGetPackageControllerIT {
           .andExpect(jsonPath("$.msgId").value("nugetVersionFetched"))
           .andExpect(jsonPath("$.data.packageId").value("fixture.package"))
           .andExpect(jsonPath("$.data.version").value("1.0.0"))
+          .andExpect(jsonPath("$.data.repositoryUrl").value("https://example.test/repository.git"))
+          .andExpect(jsonPath("$.data.readme").value("# NuGet fixture"))
           .andExpect(jsonPath("$.data.dependencies", hasSize(0)));
     }
 
@@ -275,7 +209,8 @@ class NuGetPackageControllerIT {
     @DisplayName("rejects missing, malformed, expired, and unknown-user authorization")
     void rejectsInvalidAuthorization() throws Exception {
       final var repo = NuGetPackageControllerIT.this.createRepo(RepoType.NUGET, true);
-      final var user = NuGetPackageControllerIT.this.createUser(UserRole.USER);
+      final var user =
+          NuGetPackageControllerIT.this.createUser(uniqueUsername("nuget"), UserRole.USER);
       final var expired =
           AuthUtils.AUTH_BEARER
               + NuGetPackageControllerIT.this.jwtUtils.createPanelAccessToken(
@@ -348,9 +283,10 @@ class NuGetPackageControllerIT {
     @Test
     @DisplayName("deletes a version and package, returning the correct deleted item")
     void deletesVersionAndPackage() throws Exception {
-      final var admin = NuGetPackageControllerIT.this.createUser(UserRole.ADMIN);
+      final var admin =
+          NuGetPackageControllerIT.this.createUser(uniqueUsername("nuget"), UserRole.ADMIN);
       final var repo = NuGetPackageControllerIT.this.createRepo(RepoType.NUGET, true);
-      final var token = NuGetPackageControllerIT.this.bearer(admin);
+      final var token = NuGetPackageControllerIT.this.bearerTokenFor(admin);
       NuGetPackageControllerIT.this.publish(repo.getName(), "Delete.Me", "1.0.0");
       NuGetPackageControllerIT.this.publish(repo.getName(), "Delete.Me", "2.0.0");
 
@@ -393,13 +329,14 @@ class NuGetPackageControllerIT {
     @DisplayName("does not allow a read-only caller to delete")
     void readOnlyCallerCannotDelete() throws Exception {
       final var repo = NuGetPackageControllerIT.this.createRepo(RepoType.NUGET, false);
-      final var user = NuGetPackageControllerIT.this.createUser(UserRole.USER);
+      final var user =
+          NuGetPackageControllerIT.this.createUser(uniqueUsername("nuget"), UserRole.USER);
       NuGetPackageControllerIT.this
           .mockMvc
           .perform(
               delete("/api/nuget/packages/{repo}/{id}", repo.getName(), "missing")
                   .with(apiPort())
-                  .header(AUTHORIZATION, NuGetPackageControllerIT.this.bearer(user)))
+                  .header(AUTHORIZATION, NuGetPackageControllerIT.this.bearerTokenFor(user)))
           .andExpect(status().isUnauthorized())
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
     }
@@ -413,6 +350,81 @@ class NuGetPackageControllerIT {
           .perform(post("/api/nuget/packages/{repo}", repo.getName()).with(apiPort()))
           // RPS-849 owns the unsupported-verb behavior; pin today's error-handler response.
           .andExpect(status().isNotFound());
+    }
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the list endpoints")
+  class PagingAndSorting {
+
+    private static final String PACKAGES = "/api/nuget/packages/{repo}";
+    private static final String VERSIONS = "/api/nuget/packages/{repo}/fixture.package/versions";
+
+    static Stream<String> endpoints() {
+      return Stream.of(PACKAGES, VERSIONS);
+    }
+
+    static Stream<Arguments> acceptedSorts() {
+      return Stream.concat(
+          Stream.of(Arguments.of(PACKAGES, "packageId")),
+          Stream.of("version", "publishedAt").map(property -> Arguments.of(VERSIONS, property)));
+    }
+
+    static Stream<Arguments> invalidPagingOnEveryEndpoint() {
+      return endpoints()
+          .flatMap(
+              path ->
+                  PagingAssertions.invalidPagingParams()
+                      .map(args -> Arguments.of(path, args.get()[0], args.get()[1])));
+    }
+
+    private record Seed(RepoInfo repo, String token) {}
+
+    private Seed seed() {
+      final var it = NuGetPackageControllerIT.this;
+      final var user = it.createUser(uniqueUsername("nuget"), UserRole.USER);
+      final var repo = it.createRepo(RepoType.NUGET, true);
+
+      it.publish(repo.getName(), "Fixture.Package", "1.0.0");
+      it.publish(repo.getName(), "Fixture.Package", "1.0.1-beta.1");
+
+      return new Seed(repo, it.bearerTokenFor(user));
+    }
+
+    private ResultActions list(
+        final Seed seed, final String path, final String param, final String value)
+        throws Exception {
+      return NuGetPackageControllerIT.this.mockMvc.perform(
+          get(path, seed.repo().getName())
+              .param(param, value)
+              .with(apiPort())
+              .header(AUTHORIZATION, seed.token()));
+    }
+
+    @ParameterizedTest(name = "{0} sort={1}")
+    @MethodSource("acceptedSorts")
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String path, final String property) throws Exception {
+      final var seed = this.seed();
+
+      this.list(seed, path, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(seed, path, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400(final String path) throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(this.seed(), path, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0} {1}={2}")
+    @MethodSource("invalidPagingOnEveryEndpoint")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String path, final String param, final String value)
+        throws Exception {
+      PagingAssertions.expectInvalidParameter(this.list(this.seed(), path, param, value), param);
     }
   }
 }

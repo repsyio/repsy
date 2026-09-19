@@ -18,7 +18,7 @@ import { CommonModule } from '@angular/common';
 import { Component, Input, OnInit } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { Severity } from '../../../../../generated/api';
+import { ScanStatus, Severity } from '../../../../../generated/api';
 import { SecurityScanSupportService } from '../../service/security-scan-support.service';
 import { SeverityBadgeComponent } from '../severity-badge/severity-badge.component';
 import { VersionSecurityModalComponent } from '../version-security-modal/version-security-modal.component';
@@ -36,6 +36,7 @@ export class VersionSecurityBadgeComponent implements OnInit {
   @Input({ required: true }) public versionName: string;
   @Input() public severity: Severity | null = null;
   @Input() public scanned = false;
+  @Input() public scanStatus: ScanStatus | null = null;
 
   public isSupported$: Observable<boolean>;
   public showModal = false;

@@ -29,24 +29,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.RepsyApplication;
+import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
 import io.repsy.os.server.protocols.npm.ui.facades.NpmApiFacade;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.UUID;
@@ -59,73 +53,22 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.PathContainer;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** End-to-end coverage for every npm package-management API mapping. */
-@Testcontainers
-@AutoConfigureMockMvc
-@Transactional
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("NpmPackageApiController /api/npm/packages/*")
-class NpmPackageApiControllerIT {
+class NpmPackageApiControllerIT extends AbstractIntegrationTest {
 
-  private static final int API_PORT = 8080;
   private static final int REPOSITORY_PORT = 9090;
-  private static final String PASSWORD = "Password1!";
-  private static final String UUID_PATTERN =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-  private static final Path STORAGE_PATH = createTempStoragePath();
 
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", NpmPackageApiControllerIT::tempStoragePath);
-  }
-
-  private static String tempStoragePath() {
-    return STORAGE_PATH.toString();
-  }
-
-  private static Path createTempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-npm-package-api-it");
-    } catch (final java.io.IOException exception) {
-      throw new java.io.UncheckedIOException(exception);
-    }
-  }
-
-  @Autowired private MockMvc mockMvc;
   @Autowired private RequestMappingHandlerMapping handlerMapping;
-  @Autowired private JwtUtils jwtUtils;
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
   @Autowired private RepoTxService repoTxService;
-  @Autowired private RepoRepository repoRepository;
   @Autowired private NpmApiFacade npmApiFacade;
   @Autowired private NpmPackageRepository npmPackageRepository;
   @Autowired private PackageVersionRepository packageVersionRepository;
@@ -136,7 +79,7 @@ class NpmPackageApiControllerIT {
 
   @BeforeEach
   void setUp() throws Exception {
-    this.admin = this.createUser(UserRole.ADMIN);
+    this.admin = this.createUser(uniqueUsername("npm-it-"), UserRole.ADMIN);
     this.repoName = "npm-it-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
     final var repoInfo =
         this.repoTxService.createRepo(this.repoName, RepoType.NPM, false, "Npm IT");
@@ -147,14 +90,6 @@ class NpmPackageApiControllerIT {
     this.publish(null, "plain-package", "2.0.0-next.1", "next");
     this.publish("tools", "scoped-package", "1.0.0", "latest");
     this.publish(null, "scope", "1.0.0", "latest");
-  }
-
-  private User createUser(final UserRole role) {
-    final var username = "npm-it-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-    final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword(PASSWORD, salt);
-    final var info = this.userTxService.create(username, role, hash, salt);
-    return this.userRepository.findById(info.getId()).orElseThrow();
   }
 
   private void publish(
@@ -208,7 +143,7 @@ class NpmPackageApiControllerIT {
   }
 
   private String basicAuth() {
-    final var credentials = this.admin.getUsername() + ":" + PASSWORD;
+    final var credentials = this.admin.getUsername() + ":" + VALID_PASSWORD;
     return AuthUtils.AUTH_BASIC
         + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
   }
@@ -218,22 +153,11 @@ class NpmPackageApiControllerIT {
         + this.jwtUtils.createPanelAccessToken(user.getId(), user.getUsername(), duration);
   }
 
-  private static RequestPostProcessor apiPort() {
-    return request -> {
-      request.setLocalPort(API_PORT);
-      return request;
-    };
-  }
-
   private static RequestPostProcessor repositoryPort() {
     return request -> {
       request.setLocalPort(REPOSITORY_PORT);
       return request;
     };
-  }
-
-  private ResultActions perform(final MockHttpServletRequestBuilder request) throws Exception {
-    return this.mockMvc.perform(request.with(apiPort()));
   }
 
   @Nested
@@ -351,6 +275,23 @@ class NpmPackageApiControllerIT {
     }
 
     @Test
+    void returnsTheLatestVersionDetailOfAnUnscopedPackageWhenTheVersionIsOmitted()
+        throws Exception {
+      // plain-package also has a newer 2.0.0-next.1 published under the "next" tag: the fallback
+      // follows the package's latest version, not the newest one.
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/packages/{repo}/{package}", repoName, "plain-package"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
+          .andExpect(jsonPath("$.type").value("SUCCESS"))
+          .andExpect(jsonPath("$.data.packageName").value("plain-package"))
+          .andExpect(jsonPath("$.data.scopeName").doesNotExist())
+          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
+          .andExpect(jsonPath("$.data.license").value("Apache-2.0"))
+          .andExpect(jsonPath("$.data.content").doesNotExist());
+    }
+
+    @Test
     void listsVersionsAndTagsForBothScopeForms() throws Exception {
       NpmPackageApiControllerIT.this
           .perform(
@@ -424,7 +365,7 @@ class NpmPackageApiControllerIT {
           .andExpect(jsonPath("$.*", hasSize(5)))
           .andExpect(jsonPath("$.data").value("unAuthorized"))
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
-      final var user = createUser(UserRole.USER);
+      final var user = createUser(uniqueUsername("npm-it-"), UserRole.USER);
       perform(
               delete("/api/npm/packages/{repo}/{package}", repoName, "plain-package")
                   .header(AUTHORIZATION, bearerToken(user, Duration.ofMinutes(30))))
@@ -571,6 +512,89 @@ class NpmPackageApiControllerIT {
               path ->
                   Stream.of(HttpMethod.PUT, HttpMethod.POST, HttpMethod.PATCH)
                       .map(method -> Arguments.of(method, path)));
+    }
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the list endpoints")
+  class PagingAndSorting {
+
+    private static final String PACKAGES = "/api/npm/packages/{repo}";
+    private static final String UNSCOPED = "/api/npm/packages/{repo}/scope";
+    private static final String SCOPED = "/api/npm/packages/{repo}/scope/tools";
+    private static final String VERSIONS =
+        "/api/npm/packages/{repo}/package/plain-package/versions";
+    private static final String SCOPED_VERSIONS =
+        "/api/npm/packages/{repo}/tools/package/scoped-package/versions";
+
+    static Stream<String> endpoints() {
+      return Stream.of(PACKAGES, UNSCOPED, SCOPED, VERSIONS, SCOPED_VERSIONS);
+    }
+
+    static Stream<Arguments> acceptedSorts() {
+      final var packageSorts =
+          Stream.of(PACKAGES, UNSCOPED, SCOPED)
+              .flatMap(
+                  path ->
+                      Stream.of("id", "name", "scope", "updatedAt")
+                          .map(property -> Arguments.of(path, property)));
+      final var versionSorts =
+          Stream.of(VERSIONS, SCOPED_VERSIONS)
+              .flatMap(
+                  path ->
+                      Stream.of("id", "version", "createdAt")
+                          .map(property -> Arguments.of(path, property)));
+
+      return Stream.concat(packageSorts, versionSorts);
+    }
+
+    static Stream<Arguments> invalidPagingOnEveryEndpoint() {
+      return endpoints()
+          .flatMap(
+              path ->
+                  PagingAssertions.invalidPagingParams()
+                      .map(args -> Arguments.of(path, args.get()[0], args.get()[1])));
+    }
+
+    private ResultActions list(final String path, final String param, final String value)
+        throws Exception {
+      return NpmPackageApiControllerIT.this.perform(
+          get(path, NpmPackageApiControllerIT.this.repoName).param(param, value));
+    }
+
+    @ParameterizedTest(name = "{0} sort={1}")
+    @MethodSource("acceptedSorts")
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String path, final String property) throws Exception {
+      this.list(path, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(path, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("orders the versions by the requested sort property")
+    void ordersVersions() throws Exception {
+      this.list(VERSIONS, "sort", "version,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("1.0.0"));
+      this.list(VERSIONS, "sort", "version,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("2.0.0-next.1"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400(final String path) throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(path, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0} {1}={2}")
+    @MethodSource("invalidPagingOnEveryEndpoint")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String path, final String param, final String value)
+        throws Exception {
+      PagingAssertions.expectInvalidParameter(this.list(path, param, value), param);
     }
   }
 }
