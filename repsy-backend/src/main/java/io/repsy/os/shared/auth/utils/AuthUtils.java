@@ -20,8 +20,8 @@ import static org.apache.commons.codec.binary.Base64.decodeBase64;
 
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalAmount;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -33,8 +33,26 @@ public class AuthUtils {
 
   public static final String AUTH_BEARER = "Bearer ";
   public static final String AUTH_BASIC = "Basic ";
-  public static final TemporalAmount TIMEOUT_ACCESS_TOKEN = Duration.of(30, ChronoUnit.MINUTES);
-  public static final TemporalAmount TIMEOUT_REFRESH_TOKEN = Duration.of(60, ChronoUnit.MINUTES);
+  public static final Duration TIMEOUT_ACCESS_TOKEN = Duration.of(30, ChronoUnit.MINUTES);
+  public static final Duration TIMEOUT_REFRESH_TOKEN = Duration.of(60, ChronoUnit.MINUTES);
+
+  /** Absolute lifetime of a panel session, however often its refresh token is exchanged. */
+  public static final Duration TIMEOUT_SESSION = Duration.of(24, ChronoUnit.HOURS);
+
+  /**
+   * Caps a token lifetime so the token cannot outlive the session it belongs to.
+   *
+   * @param timeout the token's regular lifetime
+   * @param sessionStart when the session's login happened
+   * @return {@code timeout}, or the time left until the session ends if that is shorter
+   */
+  public static @NonNull Duration boundBySession(
+      final @NonNull Duration timeout, final @NonNull Instant sessionStart) {
+
+    final var untilSessionEnd = Duration.between(Instant.now(), sessionStart.plus(TIMEOUT_SESSION));
+
+    return untilSessionEnd.compareTo(timeout) < 0 ? untilSessionEnd : timeout;
+  }
 
   /**
    * Extract auth credentials from the basic authorization header. This function returns null if the

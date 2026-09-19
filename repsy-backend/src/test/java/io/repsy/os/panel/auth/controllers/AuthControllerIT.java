@@ -229,6 +229,21 @@ class AuthControllerIT {
             user.getId(), user.getUsername(), Duration.ofMinutes(30));
   }
 
+  /** A refresh token of a session the user logged into just now, at the user's current version. */
+  private String refreshTokenFor(final User user) {
+    return this.refreshTokenFor(user, Instant.now(), user.getTokenVersion());
+  }
+
+  private String refreshTokenFor(
+      final User user, final Instant sessionStart, final int tokenVersion) {
+    return this.jwtUtils.createRefreshToken(
+        user.getId(),
+        user.getUsername(),
+        AuthUtils.TIMEOUT_REFRESH_TOKEN,
+        sessionStart,
+        tokenVersion);
+  }
+
   private String adminBearerToken() {
     return this.bearerTokenFor(this.createUser(uniqueUsername("caller"), UserRole.ADMIN));
   }
@@ -253,6 +268,8 @@ class AuthControllerIT {
         JWT.create()
             .withClaim("username", username)
             .withClaim("token_type", "refresh")
+            .withClaim("session_start", Instant.now())
+            .withClaim("token_version", 0)
             .withExpiresAt(expiresAt);
     if (subject != null) {
       builder = builder.withSubject(subject);
@@ -349,6 +366,15 @@ class AuthControllerIT {
         ACCESS_NOT_ALLOWED_TEXT);
   }
 
+  private static void expectRefreshTokenExpired(final ResultActions result) throws Exception {
+    expectError(
+        result,
+        HttpStatus.UNAUTHORIZED,
+        "refreshTokenExpired",
+        "refreshTokenExpired",
+        "refreshTokenExpired");
+  }
+
   private static void expectInternalError(final ResultActions result) throws Exception {
     expectError(
         result, HttpStatus.INTERNAL_SERVER_ERROR, "errorOccurred", null, INTERNAL_ERROR_TEXT);
@@ -382,7 +408,7 @@ class AuthControllerIT {
 
     // The refresh token is only valid as a refresh token.
     final var refreshTokenDecoded = JWT.decode(refreshToken);
-    assertThat(this.jwtUtils.verifyRefreshToken(refreshToken)).isEqualTo(expectedUserId);
+    assertThat(this.jwtUtils.verifyRefreshToken(refreshToken).userId()).isEqualTo(expectedUserId);
     assertThat(refreshTokenDecoded.getClaim("username").asString()).isEqualTo(expectedUsername);
     assertThat(refreshTokenDecoded.getClaim("token_type").asString()).isEqualTo("refresh");
 
@@ -814,9 +840,7 @@ class AuthControllerIT {
     @DisplayName("needs no Authorization header, and ignores an invalid one")
     void ignoresAuthorizationHeader() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("noauth"), UserRole.USER);
-      final var refreshToken =
-          AuthControllerIT.this.jwtUtils.createRefreshToken(
-              user.getId(), user.getUsername(), AuthUtils.TIMEOUT_REFRESH_TOKEN);
+      final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
 
       expectSuccess(
           AuthControllerIT.this.perform(
@@ -832,9 +856,9 @@ class AuthControllerIT {
         "reflects the user's current username, since the user is resolved by token subject")
     void usesCurrentUsername() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("before"), UserRole.USER);
+      // Carries the old username, and the version the rename below bumps the user to.
       final var refreshToken =
-          AuthControllerIT.this.jwtUtils.createRefreshToken(
-              user.getId(), user.getUsername(), AuthUtils.TIMEOUT_REFRESH_TOKEN);
+          AuthControllerIT.this.refreshTokenFor(user, Instant.now(), user.getTokenVersion() + 1);
       final var newUsername = uniqueUsername("after");
       AuthControllerIT.this.userTxService.updateUsername(user.getId(), newUsername);
       AuthControllerIT.this.entityManager.flush();
@@ -875,14 +899,162 @@ class AuthControllerIT {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("expired"), UserRole.USER);
       final var expired =
           AuthControllerIT.this.jwtUtils.createRefreshToken(
-              user.getId(), user.getUsername(), Duration.ofSeconds(-30));
+              user.getId(),
+              user.getUsername(),
+              Duration.ofSeconds(-30),
+              Instant.now(),
+              user.getTokenVersion());
 
-      expectError(
-          AuthControllerIT.this.refreshWith(expired),
-          HttpStatus.UNAUTHORIZED,
-          "refreshTokenExpired",
-          "refreshTokenExpired",
-          "refreshTokenExpired");
+      expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(expired));
+    }
+
+    @Test
+    @DisplayName("keeps the session start of the login across refreshes")
+    void keepsTheSessionStart() throws Exception {
+      final var user = AuthControllerIT.this.createUser(uniqueUsername("keep"), UserRole.USER);
+      final var sessionStart =
+          Instant.now().minus(Duration.ofHours(3)).truncatedTo(ChronoUnit.SECONDS);
+      final var refreshToken =
+          AuthControllerIT.this.refreshTokenFor(user, sessionStart, user.getTokenVersion());
+
+      final var first =
+          expectSuccess(AuthControllerIT.this.refreshWith(refreshToken), "tokenRefreshed");
+      final String firstRefreshToken = JsonPath.read(first, "$.data.refreshToken");
+      final var second =
+          expectSuccess(AuthControllerIT.this.refreshWith(firstRefreshToken), "tokenRefreshed");
+
+      final String secondRefreshToken = JsonPath.read(second, "$.data.refreshToken");
+      assertThat(
+              AuthControllerIT.this.jwtUtils.verifyRefreshToken(secondRefreshToken).sessionStart())
+          .isEqualTo(sessionStart);
+      final String secondAccessToken = JsonPath.read(second, "$.data.token");
+      assertThat(
+              AuthControllerIT.this.jwtUtils.extractSessionStart(
+                  AuthUtils.AUTH_BEARER + secondAccessToken))
+          .isEqualTo(sessionStart);
+    }
+
+    @Test
+    @DisplayName("issues tokens that expire no later than the session's absolute lifetime")
+    void boundsTokensBySessionEnd() throws Exception {
+      final var user = AuthControllerIT.this.createUser(uniqueUsername("bound"), UserRole.USER);
+      final var sessionStart =
+          Instant.now()
+              .minus(AuthUtils.TIMEOUT_SESSION)
+              .plus(Duration.ofMinutes(10))
+              .truncatedTo(ChronoUnit.SECONDS);
+      final var sessionEnd = sessionStart.plus(AuthUtils.TIMEOUT_SESSION);
+      final var refreshToken =
+          AuthControllerIT.this.refreshTokenFor(user, sessionStart, user.getTokenVersion());
+
+      final var body =
+          expectSuccess(AuthControllerIT.this.refreshWith(refreshToken), "tokenRefreshed");
+
+      // Regular lifetimes (30 / 60 minutes) would run past the session end, which is 10 minutes
+      // away.
+      final String newAccessToken = JsonPath.read(body, "$.data.token");
+      final String newRefreshToken = JsonPath.read(body, "$.data.refreshToken");
+      assertThat(JWT.decode(newAccessToken).getExpiresAtAsInstant()).isBeforeOrEqualTo(sessionEnd);
+      assertThat(JWT.decode(newRefreshToken).getExpiresAtAsInstant()).isBeforeOrEqualTo(sessionEnd);
+      assertThat(JWT.decode(newRefreshToken).getExpiresAtAsInstant()).isAfter(Instant.now());
+    }
+
+    @Test
+    @DisplayName("returns 401 refreshTokenExpired once the session's absolute lifetime has passed")
+    void rejectsARefreshAfterSessionEnd() throws Exception {
+      final var user = AuthControllerIT.this.createUser(uniqueUsername("ended"), UserRole.USER);
+      final var sessionStart =
+          Instant.now()
+              .minus(AuthUtils.TIMEOUT_SESSION)
+              .minusSeconds(5)
+              .truncatedTo(ChronoUnit.SECONDS);
+      // The token itself is still within its own lifetime: only the session has ended.
+      final var refreshToken =
+          AuthControllerIT.this.refreshTokenFor(user, sessionStart, user.getTokenVersion());
+
+      expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(refreshToken));
+    }
+
+    @Test
+    @DisplayName(
+        "returns 401 refreshTokenExpired for a token issued before the user's token version")
+    void rejectsATokenFromAnOlderVersion() throws Exception {
+      final var user = AuthControllerIT.this.createUser(uniqueUsername("revoked"), UserRole.USER);
+      final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
+      AuthControllerIT.this.userTxService.updatePassword(user.getId(), "newhash", "newsalt");
+      AuthControllerIT.this.entityManager.flush();
+
+      expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(refreshToken));
+    }
+
+    @Test
+    @DisplayName("returns 401 refreshTokenExpired once an admin has reset the user's password")
+    void rejectsATokenAfterAnAdminPasswordReset() throws Exception {
+      final var adminToken = AuthControllerIT.this.adminBearerToken();
+      final var user = AuthControllerIT.this.createUser(uniqueUsername("reset"), UserRole.USER);
+      final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
+      expectSuccess(
+          AuthControllerIT.this.perform(
+              post("/api/users/" + user.getId() + "/actions/reset-password")
+                  .header(AUTHORIZATION, adminToken)),
+          "passwordReset");
+      AuthControllerIT.this.entityManager.flush();
+
+      expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(refreshToken));
+    }
+
+    @Test
+    @DisplayName("returns 401 refreshTokenExpired once an admin has renamed the user")
+    void rejectsATokenAfterAnAdminRename() throws Exception {
+      final var adminToken = AuthControllerIT.this.adminBearerToken();
+      final var user = AuthControllerIT.this.createUser(uniqueUsername("rename"), UserRole.USER);
+      final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
+      expectSuccess(
+          AuthControllerIT.this.perform(
+              put("/api/users/" + user.getId())
+                  .header(AUTHORIZATION, adminToken)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      "{\"username\":\"%s\",\"role\":\"USER\"}"
+                          .formatted(uniqueUsername("renamed")))),
+          "userUpdated");
+      AuthControllerIT.this.entityManager.flush();
+
+      expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(refreshToken));
+    }
+
+    @Test
+    @DisplayName("keeps a token valid when an admin edit leaves the username unchanged")
+    void keepsATokenWhenTheUsernameIsUnchanged() throws Exception {
+      final var adminToken = AuthControllerIT.this.adminBearerToken();
+      final var user = AuthControllerIT.this.createUser(uniqueUsername("samename"), UserRole.USER);
+      final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
+      expectSuccess(
+          AuthControllerIT.this.perform(
+              put("/api/users/" + user.getId())
+                  .header(AUTHORIZATION, adminToken)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      "{\"username\":\"%s\",\"role\":\"ADMIN\"}".formatted(user.getUsername()))),
+          "userUpdated");
+      AuthControllerIT.this.entityManager.flush();
+
+      expectSuccess(AuthControllerIT.this.refreshWith(refreshToken), "tokenRefreshed");
+    }
+
+    @Test
+    @DisplayName("returns 401 accessNotAllowed for a token without session claims")
+    void rejectsATokenWithoutSessionClaims() throws Exception {
+      final var user = AuthControllerIT.this.createUser(uniqueUsername("noclaims"), UserRole.USER);
+      final var token =
+          JWT.create()
+              .withSubject(user.getId().toString())
+              .withClaim("username", user.getUsername())
+              .withClaim("token_type", "refresh")
+              .withExpiresAt(Instant.now().plus(AuthUtils.TIMEOUT_REFRESH_TOKEN))
+              .sign(Algorithm.HMAC512(AuthControllerIT.this.serverSecret()));
+
+      expectAccessNotAllowed(AuthControllerIT.this.refreshWith(token));
     }
 
     @Test
@@ -903,9 +1075,7 @@ class AuthControllerIT {
       final var victim = AuthControllerIT.this.createUser(uniqueUsername("victim"), UserRole.USER);
       final var attacker =
           AuthControllerIT.this.createUser(uniqueUsername("attack"), UserRole.USER);
-      final var attackerToken =
-          AuthControllerIT.this.jwtUtils.createRefreshToken(
-              attacker.getId(), attacker.getUsername(), AuthUtils.TIMEOUT_REFRESH_TOKEN);
+      final var attackerToken = AuthControllerIT.this.refreshTokenFor(attacker);
       final var forged = withSubject(attackerToken, attacker.getId(), victim.getId());
       assertThat(forged).isNotEqualTo(attackerToken);
 
@@ -945,7 +1115,11 @@ class AuthControllerIT {
     void unknownUser() throws Exception {
       final var token =
           AuthControllerIT.this.jwtUtils.createRefreshToken(
-              UUID.randomUUID(), uniqueUsername("ghost"), AuthUtils.TIMEOUT_REFRESH_TOKEN);
+              UUID.randomUUID(),
+              uniqueUsername("ghost"),
+              AuthUtils.TIMEOUT_REFRESH_TOKEN,
+              Instant.now(),
+              0);
 
       expectUserNotFound(AuthControllerIT.this.refreshWith(token));
     }

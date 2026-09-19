@@ -44,6 +44,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -285,7 +286,7 @@ class KeyStoreControllerIT {
       final var refreshToken =
           AuthUtils.AUTH_BEARER
               + KeyStoreControllerIT.this.jwtUtils.createRefreshToken(
-                  user.getId(), user.getUsername(), Duration.ofMinutes(30));
+                  user.getId(), user.getUsername(), Duration.ofMinutes(30), Instant.now(), 0);
       final var refreshTokenResponse =
           KeyStoreControllerIT.this
               .mockMvc

@@ -22,6 +22,7 @@ import com.auth0.jwt.exceptions.TokenExpiredException;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
+import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.constants.ErrorConstants;
 import jakarta.annotation.PostConstruct;
 import java.security.SecureRandom;
@@ -42,6 +43,8 @@ public class JwtUtils {
   private static final @NonNull String AUTH_TYPE = "authentication_type";
   private static final @NonNull String CLAIM_SCOPE = "scope";
   private static final @NonNull String CLAIM_TOKEN_TYPE = "token_type";
+  private static final @NonNull String CLAIM_SESSION_START = "session_start";
+  private static final @NonNull String CLAIM_TOKEN_VERSION = "token_version";
   private static final @NonNull String TOKEN_TYPE_REFRESH = "refresh";
   private static final int SECRET_BYTE_LENGTH = 32;
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -120,14 +123,35 @@ public class JwtUtils {
         .sign(Algorithm.HMAC512(this.secret));
   }
 
+  /**
+   * Creates the access token of a panel session. It carries the session start, so that a fresh
+   * token pair issued from it (e.g. after a username change) stays within the same session.
+   */
+  public @NonNull String createSessionAccessToken(
+      final @NonNull UUID userId,
+      final @NonNull String username,
+      final @NonNull TemporalAmount timeoutDuration,
+      final @NonNull Instant sessionStart) {
+    return JWT.create()
+        .withSubject(userId.toString())
+        .withClaim(CLAIM_USERNAME, username)
+        .withClaim(CLAIM_SESSION_START, sessionStart)
+        .withExpiresAt(Instant.now().plus(timeoutDuration))
+        .sign(Algorithm.HMAC512(this.secret));
+  }
+
   public @NonNull String createRefreshToken(
       final @NonNull UUID userId,
       final @NonNull String username,
-      final @NonNull TemporalAmount timeoutDuration) {
+      final @NonNull TemporalAmount timeoutDuration,
+      final @NonNull Instant sessionStart,
+      final int tokenVersion) {
     return JWT.create()
         .withSubject(userId.toString())
         .withClaim(CLAIM_USERNAME, username)
         .withClaim(CLAIM_TOKEN_TYPE, TOKEN_TYPE_REFRESH)
+        .withClaim(CLAIM_SESSION_START, sessionStart)
+        .withClaim(CLAIM_TOKEN_VERSION, tokenVersion)
         .withExpiresAt(Instant.now().plus(timeoutDuration))
         .sign(Algorithm.HMAC512(this.secret));
   }
@@ -152,14 +176,34 @@ public class JwtUtils {
     return subjectAsUuid(this.verifyAndDecode(token));
   }
 
-  public @NonNull UUID verifyRefreshToken(final @NonNull String token) {
+  /**
+   * Returns the start of the session the access token belongs to. A token without the claim (issued
+   * before sessions were bounded) starts a new session now, which is safe as such a token expires
+   * within {@link AuthUtils#TIMEOUT_ACCESS_TOKEN}.
+   */
+  public @NonNull Instant extractSessionStart(final @NonNull String authHeader) {
+    final var sessionStart =
+        this.verifyAndDecode(this.getToken(authHeader)).getClaim(CLAIM_SESSION_START).asInstant();
+
+    return sessionStart != null ? sessionStart : Instant.now();
+  }
+
+  public @NonNull RefreshTokenClaims verifyRefreshToken(final @NonNull String token) {
     final var decodedJWT = this.decode(token, "refreshTokenExpired");
 
     if (!isRefreshToken(decodedJWT)) {
       throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
 
-    return subjectAsUuid(decodedJWT);
+    final var sessionStart = decodedJWT.getClaim(CLAIM_SESSION_START).asInstant();
+    final var tokenVersion = decodedJWT.getClaim(CLAIM_TOKEN_VERSION).asInt();
+
+    // A refresh token without these claims predates bounded sessions and cannot be exchanged.
+    if (sessionStart == null || tokenVersion == null) {
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+
+    return new RefreshTokenClaims(subjectAsUuid(decodedJWT), sessionStart, tokenVersion);
   }
 
   private static @NonNull UUID subjectAsUuid(final @NonNull DecodedJWT decodedJWT) {

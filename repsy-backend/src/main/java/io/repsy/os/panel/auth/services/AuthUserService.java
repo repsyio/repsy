@@ -17,14 +17,17 @@ package io.repsy.os.panel.auth.services;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.events.UserLoginEvent;
 import io.repsy.os.generated.model.LoginForm;
 import io.repsy.os.generated.model.LoginInfo;
+import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
+import io.repsy.os.shared.auth.services.LoginInfoFactory;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.services.UserTxService;
-import java.util.UUID;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.jspecify.annotations.NonNull;
@@ -38,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthUserService {
 
   private static final @NonNull String INVALID_CREDENTIALS = "invalidCredentials";
+  private static final @NonNull String REFRESH_TOKEN_EXPIRED = "refreshTokenExpired";
   private static final @NonNull UserInfo DUMMY_USER =
       UserInfo.builder()
           .salt("repsy-login-dummy")
@@ -45,7 +49,7 @@ public class AuthUserService {
           .build();
 
   private final @NonNull UserTxService userTxService;
-  private final @NonNull JwtUtils jwtUtils;
+  private final @NonNull LoginInfoFactory loginInfoFactory;
   private final @NonNull ApplicationEventPublisher eventPublisher;
 
   @Transactional
@@ -65,14 +69,24 @@ public class AuthUserService {
     // Publish login event for lastLoginAt update
     this.eventPublisher.publishEvent(new UserLoginEvent(user.getUsername()));
 
-    return this.createLoginInfo(user);
+    return this.loginInfoFactory.create(user, Instant.now().truncatedTo(ChronoUnit.SECONDS));
   }
 
-  public @NonNull LoginInfo refreshToken(final @NonNull UUID userId) {
+  public @NonNull LoginInfo refreshToken(final @NonNull RefreshTokenClaims claims) {
 
-    final var user = this.userTxService.getUserById(userId);
+    final var user = this.userTxService.getUserById(claims.userId());
 
-    return this.createLoginInfo(user);
+    // A password or username change bumps the version, which revokes the older refresh tokens.
+    if (claims.tokenVersion() != user.getTokenVersion()) {
+      throw new UnAuthorizedException(REFRESH_TOKEN_EXPIRED);
+    }
+
+    // The tokens' own expiry is capped at the session end; this guards it independently.
+    if (!Instant.now().isBefore(claims.sessionStart().plus(AuthUtils.TIMEOUT_SESSION))) {
+      throw new UnAuthorizedException(REFRESH_TOKEN_EXPIRED);
+    }
+
+    return this.loginInfoFactory.create(user, claims.sessionStart());
   }
 
   private void checkPassword(final @NonNull UserInfo user, final @NonNull LoginForm form) {
@@ -82,22 +96,5 @@ public class AuthUserService {
     if (!hash.equals(user.getHash())) {
       throw new AccessNotAllowedException(INVALID_CREDENTIALS);
     }
-  }
-
-  private @NonNull LoginInfo createLoginInfo(final @NonNull UserInfo user) {
-
-    final var accessToken =
-        this.jwtUtils.createTokenWithDuration(
-            user.getId(), user.getUsername(), AuthUtils.TIMEOUT_ACCESS_TOKEN);
-
-    final var refreshToken =
-        this.jwtUtils.createRefreshToken(
-            user.getId(), user.getUsername(), AuthUtils.TIMEOUT_REFRESH_TOKEN);
-
-    return LoginInfo.builder()
-        .username(user.getUsername())
-        .token(accessToken)
-        .refreshToken(refreshToken)
-        .build();
   }
 }

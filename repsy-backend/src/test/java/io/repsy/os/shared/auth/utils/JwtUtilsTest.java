@@ -21,9 +21,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
+import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.constants.ErrorConstants;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,6 +36,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 class JwtUtilsTest {
 
   private static final String TEST_SECRET = "0123456789abcdef0123456789abcdef";
+  private static final Instant SESSION_START = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+  private static final int TOKEN_VERSION = 3;
   private JwtUtils jwtUtils;
 
   @BeforeEach
@@ -43,16 +47,17 @@ class JwtUtilsTest {
   }
 
   @Test
-  @DisplayName("refresh token is accepted by verifyRefreshToken and returns the user id")
+  @DisplayName("refresh token is accepted by verifyRefreshToken and returns its claims")
   void verifyRefreshTokenAcceptsRefreshToken() {
     final var userId = UUID.randomUUID();
     final var username = "testuser";
     final var refreshToken =
-        this.jwtUtils.createRefreshToken(userId, username, Duration.ofMinutes(30));
+        this.jwtUtils.createRefreshToken(
+            userId, username, Duration.ofMinutes(30), SESSION_START, TOKEN_VERSION);
 
     final var result = this.jwtUtils.verifyRefreshToken(refreshToken);
 
-    assertThat(result).isEqualTo(userId);
+    assertThat(result).isEqualTo(new RefreshTokenClaims(userId, SESSION_START, TOKEN_VERSION));
   }
 
   @Test
@@ -87,7 +92,8 @@ class JwtUtilsTest {
     final var userId = UUID.randomUUID();
     final var username = "testuser";
     final var refreshToken =
-        this.jwtUtils.createRefreshToken(userId, username, Duration.ofMinutes(30));
+        this.jwtUtils.createRefreshToken(
+            userId, username, Duration.ofMinutes(30), SESSION_START, TOKEN_VERSION);
 
     assertThatThrownBy(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + refreshToken))
         .isInstanceOf(UnAuthorizedException.class)
@@ -112,7 +118,8 @@ class JwtUtilsTest {
     final var userId = UUID.randomUUID();
     final var username = "testuser";
     final var refreshToken =
-        this.jwtUtils.createRefreshToken(userId, username, Duration.ofMinutes(30));
+        this.jwtUtils.createRefreshToken(
+            userId, username, Duration.ofMinutes(30), SESSION_START, TOKEN_VERSION);
 
     assertThatThrownBy(
             () -> this.jwtUtils.verifyAndExtractUsername(AuthUtils.AUTH_BEARER + refreshToken))
@@ -139,7 +146,8 @@ class JwtUtilsTest {
     final var userId = UUID.randomUUID();
     final var username = "testuser";
     final var refreshToken =
-        this.jwtUtils.createRefreshToken(userId, username, Duration.ofMinutes(30));
+        this.jwtUtils.createRefreshToken(
+            userId, username, Duration.ofMinutes(30), SESSION_START, TOKEN_VERSION);
 
     assertThatThrownBy(() -> this.jwtUtils.extractUserId(AuthUtils.AUTH_BEARER + refreshToken))
         .isInstanceOf(UnAuthorizedException.class)
@@ -165,7 +173,8 @@ class JwtUtilsTest {
     final var userId = UUID.randomUUID();
     final var username = "testuser";
     final var refreshToken =
-        this.jwtUtils.createRefreshToken(userId, username, Duration.ofMinutes(30));
+        this.jwtUtils.createRefreshToken(
+            userId, username, Duration.ofMinutes(30), SESSION_START, TOKEN_VERSION);
 
     assertThatThrownBy(
             () -> this.jwtUtils.extractAuthenticationType(AuthUtils.AUTH_BEARER + refreshToken))
@@ -231,6 +240,8 @@ class JwtUtilsTest {
         .withSubject(subject)
         .withClaim("username", "testuser")
         .withClaim("token_type", tokenType)
+        .withClaim("session_start", SESSION_START)
+        .withClaim("token_version", TOKEN_VERSION)
         .withExpiresAt(Instant.now().plus(Duration.ofMinutes(30)))
         .sign(Algorithm.HMAC512(TEST_SECRET));
   }
@@ -241,7 +252,8 @@ class JwtUtilsTest {
     final var userId = UUID.randomUUID();
     final var username = "testuser";
     final var expiredToken =
-        this.jwtUtils.createRefreshToken(userId, username, Duration.ofSeconds(-1));
+        this.jwtUtils.createRefreshToken(
+            userId, username, Duration.ofSeconds(-1), SESSION_START, TOKEN_VERSION);
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(expiredToken))
         .isInstanceOf(UnAuthorizedException.class)
@@ -266,7 +278,8 @@ class JwtUtilsTest {
       "expired refresh token yields sessionExpired, not accessNotAllowed, on the access side")
   void expiredRefreshTokenOnAccessSideYieldsSessionExpired() {
     final var expiredToken =
-        this.jwtUtils.createRefreshToken(UUID.randomUUID(), "testuser", Duration.ofSeconds(-1));
+        this.jwtUtils.createRefreshToken(
+            UUID.randomUUID(), "testuser", Duration.ofSeconds(-1), SESSION_START, TOKEN_VERSION);
 
     assertThatThrownBy(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + expiredToken))
         .isInstanceOf(UnAuthorizedException.class)
@@ -306,6 +319,76 @@ class JwtUtilsTest {
             .sign(Algorithm.HMAC512(otherSecret));
 
     assertThatThrownBy(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + token))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("refresh token without a session_start claim is rejected by verifyRefreshToken")
+  void verifyRefreshTokenRejectsMissingSessionStart() {
+    final var token =
+        JWT.create()
+            .withSubject(UUID.randomUUID().toString())
+            .withClaim("token_type", "refresh")
+            .withClaim("token_version", TOKEN_VERSION)
+            .withExpiresAt(Instant.now().plus(Duration.ofMinutes(30)))
+            .sign(Algorithm.HMAC512(TEST_SECRET));
+
+    assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("refresh token without a token_version claim is rejected by verifyRefreshToken")
+  void verifyRefreshTokenRejectsMissingTokenVersion() {
+    final var token =
+        JWT.create()
+            .withSubject(UUID.randomUUID().toString())
+            .withClaim("token_type", "refresh")
+            .withClaim("session_start", SESSION_START)
+            .withExpiresAt(Instant.now().plus(Duration.ofMinutes(30)))
+            .sign(Algorithm.HMAC512(TEST_SECRET));
+
+    assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("session access token carries its session start, readable by extractSessionStart")
+  void extractSessionStartReturnsTheSessionStart() {
+    final var accessToken =
+        this.jwtUtils.createSessionAccessToken(
+            UUID.randomUUID(), "testuser", Duration.ofMinutes(15), SESSION_START);
+
+    final var result = this.jwtUtils.extractSessionStart(AuthUtils.AUTH_BEARER + accessToken);
+
+    assertThat(result).isEqualTo(SESSION_START);
+  }
+
+  @Test
+  @DisplayName("access token without a session start begins a new session in extractSessionStart")
+  void extractSessionStartFallsBackToNow() {
+    final var accessToken =
+        this.jwtUtils.createTokenWithDuration(
+            UUID.randomUUID(), "testuser", Duration.ofMinutes(15));
+
+    final var before = Instant.now().minusSeconds(1);
+    final var result = this.jwtUtils.extractSessionStart(AuthUtils.AUTH_BEARER + accessToken);
+
+    assertThat(result).isBetween(before, Instant.now().plusSeconds(1));
+  }
+
+  @Test
+  @DisplayName("refresh token is rejected by extractSessionStart")
+  void extractSessionStartRejectsRefreshToken() {
+    final var refreshToken =
+        this.jwtUtils.createRefreshToken(
+            UUID.randomUUID(), "testuser", Duration.ofMinutes(30), SESSION_START, TOKEN_VERSION);
+
+    assertThatThrownBy(
+            () -> this.jwtUtils.extractSessionStart(AuthUtils.AUTH_BEARER + refreshToken))
         .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
   }
