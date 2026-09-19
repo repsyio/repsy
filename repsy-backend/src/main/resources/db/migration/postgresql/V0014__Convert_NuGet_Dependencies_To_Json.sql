@@ -1,0 +1,2 @@
+-- Intentionally empty. It keeps the PostgreSQL and H2 migration versions aligned.
+-- Only H2 held NuGet dependencies stored as XML, see the H2 migration of the same version.
