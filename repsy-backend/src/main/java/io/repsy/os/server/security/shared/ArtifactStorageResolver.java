@@ -22,6 +22,12 @@ import org.jspecify.annotations.NonNull;
 
 public interface ArtifactStorageResolver {
 
+  /**
+   * Resolves the storage path of an artifact version for a scan.
+   *
+   * @return the path, or empty when the artifact version does not exist in the repository, so that
+   *     a manual scan of it can be refused before a scan is created
+   */
   @NonNull Optional<String> resolve(
       @NonNull UUID repoId,
       @NonNull String repoName,

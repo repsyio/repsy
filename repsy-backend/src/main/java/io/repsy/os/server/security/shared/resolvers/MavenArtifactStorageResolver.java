@@ -117,7 +117,11 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
             false,
             null);
 
-    return Optional.of(new M2GavCalculator().gavToPath(gav));
+    final var artifactPath = new M2GavCalculator().gavToPath(gav);
+
+    return this.mavenStorageStrategy.get(StoragePath.of(repoId, artifactPath), repoName).isPresent()
+        ? Optional.of(artifactPath)
+        : Optional.empty();
   }
 
   private @Nullable String resolveSnapshotBuildVersion(

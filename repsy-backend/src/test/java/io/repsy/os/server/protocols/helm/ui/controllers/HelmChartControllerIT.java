@@ -748,31 +748,113 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
           .containsExactly("bravo", "alpha", "charlie");
       assertThat(namesOf(it.searchWith(repo, token, "sort", "lastUpdatedAt,asc")))
           .containsExactly("charlie", "alpha", "bravo");
-      assertThat(namesOf(it.searchWith(repo, token, "sort", "chart.name,asc")))
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "name,asc")))
           .containsExactly("alpha", "bravo", "charlie");
-      assertThat(namesOf(it.searchWith(repo, token, "sort", "chart.name,desc")))
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "name,desc")))
           .containsExactly("charlie", "bravo", "alpha");
     }
 
+    @Test
+    @DisplayName("sorts by the list item's own keys: updatedAt and latestVersion")
+    void sortsByListItemKeys() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("charlie", "1.0.0"), token);
+      it.upload(repo, ChartSpec.of("alpha", "3.0.0"), token);
+      it.upload(repo, ChartSpec.of("bravo", "2.0.0"), token);
+
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "updatedAt,desc")))
+          .containsExactly("bravo", "alpha", "charlie");
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "updatedAt,asc")))
+          .containsExactly("charlie", "alpha", "bravo");
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "latestVersion,asc")))
+          .containsExactly("charlie", "bravo", "alpha");
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "latestVersion,desc")))
+          .containsExactly("alpha", "bravo", "charlie");
+    }
+
+    @Test
+    @DisplayName("keeps the createdAt key the panel sends")
+    void sortsByCreatedAt() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      for (final var name : List.of("charlie", "alpha", "bravo")) {
+        it.upload(repo, ChartSpec.of(name, "1.0.0"), token);
+      }
+
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "createdAt,desc")))
+          .containsExactly("bravo", "alpha", "charlie");
+      assertThat(namesOf(it.searchWith(repo, token, "sort", "createdAt,asc")))
+          .containsExactly("charlie", "alpha", "bravo");
+    }
+
     /**
-     * Sorting is applied to the {@code HelmChartVersion} entity, not to the list item, so the
-     * item's own {@code name} is not a sort key: it is a property path error that surfaces as a
-     * generic 500. Pinned as-is; see the follow-up story linked from the PR.
+     * The entity paths the query sorts by ({@code chart.name}, {@code version}) are not part of the
+     * API, so they are rejected like any other unknown key.
      */
     @ParameterizedTest(name = "sort={0}")
-    @ValueSource(strings = {"name,asc", "bogus,asc"})
-    @DisplayName("an unknown sort property is a 500 today")
-    void unknownSortPropertyIs500(final String sort) throws Exception {
+    @ValueSource(strings = {"bogus,asc", "chart.name,asc", "version,asc", "Name,asc"})
+    @DisplayName("returns 400 validationError naming sort for an unsupported sort property")
+    void unknownSortPropertyIs400(final String sort) throws Exception {
       final var it = HelmChartControllerIT.this;
       final var token = it.adminBearerToken();
       final var repo = it.helmRepo();
       it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
 
-      expectInternalError(
+      expectError(
           it.perform(
               get("/api/helm/charts/{repo}", repo.getName())
                   .param("sort", sort)
-                  .header(AUTHORIZATION, token)));
+                  .header(AUTHORIZATION, token)),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          "sort",
+          "Incoming data couldn't be validated.");
+    }
+
+    @Test
+    @DisplayName("rejects the request when only one of several sort properties is unsupported")
+    void oneUnknownAmongSeveralSortProperties() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+
+      expectError(
+          it.perform(
+              get("/api/helm/charts/{repo}", repo.getName())
+                  .param("sort", "name,asc")
+                  .param("sort", "bogus,desc")
+                  .header(AUTHORIZATION, token)),
+          HttpStatus.BAD_REQUEST,
+          "validationError",
+          "sort",
+          "Incoming data couldn't be validated.");
+    }
+
+    @Test
+    @DisplayName("applies several supported sort keys in order")
+    void sortsByMultipleKeys() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("charlie", "1.0.0"), token);
+      it.upload(repo, ChartSpec.of("alpha", "1.0.0"), token);
+      it.upload(repo, ChartSpec.of("bravo", "2.0.0"), token);
+
+      final var body =
+          expectSuccess(
+              it.perform(
+                  get("/api/helm/charts/{repo}", repo.getName())
+                      .param("sort", "latestVersion,desc")
+                      .param("sort", "name,asc")
+                      .header(AUTHORIZATION, token)),
+              "chartsFetched",
+              "chartsFetched");
+
+      assertThat(namesOf(body)).containsExactly("bravo", "alpha", "charlie");
     }
 
     @ParameterizedTest(name = "{0}={1}")
