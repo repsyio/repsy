@@ -661,7 +661,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       final var result = new ArrayList<Arguments>();
 
       for (final var route : routes) {
-        // The interceptor matches case-insensitively but does not know "go"; it only knows GOLANG.
+        // The interceptor accepts only the exact RepoType names.
         result.add(
             Arguments.of(
                 "unknown type",
@@ -680,35 +680,35 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
                 "repoTypeNotFound",
                 "repoTypeNotFound",
                 "Repository type not found."));
-        // The interceptor accepts these, but the enum conversion of @PathVariable is case
-        // sensitive, so they fail there instead.
+        // RepoType lookup is deliberately case-sensitive, so the interceptor rejects these
+        // consistently before Spring's enum conversion runs.
         result.add(
             Arguments.of(
                 "lower case",
                 route,
                 "maven",
-                HttpStatus.BAD_REQUEST,
-                "validationError",
-                "repoType",
-                VALIDATION_TEXT));
+                HttpStatus.NOT_FOUND,
+                "repoTypeNotFound",
+                "repoTypeNotFound",
+                "Repository type not found."));
         result.add(
             Arguments.of(
                 "mixed case",
                 route,
                 "Maven",
-                HttpStatus.BAD_REQUEST,
-                "validationError",
-                "repoType",
-                VALIDATION_TEXT));
+                HttpStatus.NOT_FOUND,
+                "repoTypeNotFound",
+                "repoTypeNotFound",
+                "Repository type not found."));
         result.add(
             Arguments.of(
                 "lower case golang",
                 route,
                 "golang",
-                HttpStatus.BAD_REQUEST,
-                "validationError",
-                "repoType",
-                VALIDATION_TEXT));
+                HttpStatus.NOT_FOUND,
+                "repoTypeNotFound",
+                "repoTypeNotFound",
+                "Repository type not found."));
       }
 
       return result.stream();
@@ -723,10 +723,10 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           ProtocolRepoControllerIT.this.perform(
               json(post("/api/repos/maven"), createBody(name))
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          HttpStatus.BAD_REQUEST,
-          "validationError",
-          "repoType",
-          VALIDATION_TEXT);
+          HttpStatus.NOT_FOUND,
+          "repoTypeNotFound",
+          "repoTypeNotFound",
+          "Repository type not found.");
 
       assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(name)).isEmpty();
     }
