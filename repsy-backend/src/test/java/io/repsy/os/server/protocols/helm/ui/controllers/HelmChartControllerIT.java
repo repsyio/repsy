@@ -41,6 +41,7 @@ import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestForm;
+import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -1968,7 +1969,12 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
           rejected("empty document", "", "chartYamlInvalid", yamlText),
           rejected("list document", "- a\n- b\n", "chartYamlInvalid", yamlText),
           rejected(
-              "malformed YAML", "name: [unclosed\nversion: 1.0.0\n", "chartYamlInvalid", yamlText));
+              "malformed YAML", "name: [unclosed\nversion: 1.0.0\n", "chartYamlInvalid", yamlText),
+          rejected(
+              "Chart.yaml over the size limit",
+              BASE + "#".repeat((int) HelmConstants.MAX_CHART_YAML_BYTES),
+              "chartYamlTooLarge",
+              "Chart.yaml is larger than 10 MiB."));
     }
 
     private ResultActions postChartYaml(final Repo repo, final String chartYaml) throws Exception {
