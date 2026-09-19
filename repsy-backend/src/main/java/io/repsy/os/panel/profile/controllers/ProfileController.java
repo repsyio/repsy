@@ -93,6 +93,8 @@ class ProfileController {
 
     final var userId = this.jwtUtils.extractUserId(authHeader, TokenRealm.PANEL);
 
+    // A token whose user is already gone is an authentication failure, not a missing resource.
+    this.userTxService.getAuthenticatedUserById(userId);
     this.userTxService.deleteUserById(userId);
 
     return this.resp.success("profileDeleted");

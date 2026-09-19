@@ -989,7 +989,7 @@ class UserControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("lets an admin delete their own account; the still-valid token then gets 404")
+    @DisplayName("lets an admin delete their own account; the still-valid token then gets 401")
     void deletingOwnAccountInvalidatesTheSession() throws Exception {
       final var admin = UserControllerIT.this.createUser(uniqueUsername("selfdel"), UserRole.ADMIN);
       final var token = UserControllerIT.this.bearerTokenFor(admin);
@@ -1002,10 +1002,10 @@ class UserControllerIT extends AbstractIntegrationTest {
 
       expectError(
           UserControllerIT.this.perform(get("/api/users").header(AUTHORIZATION, token)),
-          HttpStatus.NOT_FOUND,
-          "userNotFound",
-          "userNotFound",
-          USER_NOT_FOUND_TEXT);
+          HttpStatus.UNAUTHORIZED,
+          "unAuthorized",
+          "unAuthorized",
+          UNAUTHORIZED_TEXT);
     }
 
     @Test
