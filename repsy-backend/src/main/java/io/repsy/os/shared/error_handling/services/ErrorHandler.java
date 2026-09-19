@@ -47,6 +47,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -54,11 +55,13 @@ import org.springframework.web.bind.MissingMatrixVariableException;
 import org.springframework.web.bind.MissingRequestCookieException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.UnsatisfiedServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -75,6 +78,8 @@ public class ErrorHandler {
   private static final @NonNull String ERR_ERROR_OCCURRED = "errorOccurred";
   private static final @NonNull String ERR_METHOD_NOT_SUPPORTED = "methodNotSupported";
   private static final @NonNull String ERR_UNSUPPORTED_MEDIA_TYPE = "unsupportedMediaType";
+  private static final @NonNull String ERR_NOT_ACCEPTABLE = "notAcceptable";
+  private static final @NonNull String ERR_PAYLOAD_TOO_LARGE = "payloadTooLarge";
   private static final @NonNull String ERR_ACCESS_NOT_ALLOWED = "accessNotAllowed";
   private static final @NonNull String ERR_UNAUTHORIZED = "unauthorizedRequest";
   private static final @NonNull String ERR_ITEM_ALREADY_EXISTS = "itemAlreadyExists";
@@ -574,6 +579,86 @@ public class ErrorHandler {
         .headers(ex.getHeaders())
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(ERR_UNSUPPORTED_MEDIA_TYPE));
+  }
+
+  /**
+   * Handles a request whose {@code Accept} header names no media type the endpoint can produce,
+   * answering 406 with an {@code Accept} header listing the ones it can. The error body is written
+   * as JSON regardless, because an explicit {@code Content-Type} skips content negotiation.
+   *
+   * @param ex Thrown exception
+   * @return REST response
+   */
+  @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+  @Nullable ResponseEntity<RestResponse<String>> handleException(
+      final @NonNull HttpMediaTypeNotAcceptableException ex,
+      final @NonNull HttpServletRequest request,
+      final @Nullable HttpServletResponse response) {
+
+    if (response == null) {
+      log.debug("Media type not acceptable", ex);
+
+      return null;
+    }
+
+    log.info(exceptionToString(ex, request));
+
+    return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE)
+        .headers(ex.getHeaders())
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(this.resp.error(ERR_NOT_ACCEPTABLE));
+  }
+
+  /**
+   * Handles a multipart upload over the configured size limit, answering 413 instead of a server
+   * error because the client sent too much.
+   *
+   * @param ex Thrown exception
+   * @return REST response
+   */
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  @Nullable ResponseEntity<RestResponse<String>> handleException(
+      final @NonNull MaxUploadSizeExceededException ex,
+      final @NonNull HttpServletRequest request,
+      final @Nullable HttpServletResponse response) {
+
+    if (response == null) {
+      log.debug("Upload too large", ex);
+
+      return null;
+    }
+
+    log.info(exceptionToString(ex, request));
+
+    return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(this.resp.error(ERR_PAYLOAD_TOO_LARGE));
+  }
+
+  /**
+   * Handles a request that misses the request parameters a {@code params} condition on the mapping
+   * asks for, answering 400 like Spring's default resolver does.
+   *
+   * @param ex Thrown exception
+   * @return REST response
+   */
+  @ExceptionHandler(UnsatisfiedServletRequestParameterException.class)
+  @Nullable ResponseEntity<RestResponse<String>> handleException(
+      final @NonNull UnsatisfiedServletRequestParameterException ex,
+      final @NonNull HttpServletRequest request,
+      final @Nullable HttpServletResponse response) {
+
+    if (response == null) {
+      log.debug("Request parameter condition not satisfied", ex);
+
+      return null;
+    }
+
+    log.info(exceptionToString(ex, request));
+
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(this.resp.error(ERR_BAD_REQUEST));
   }
 
   /**

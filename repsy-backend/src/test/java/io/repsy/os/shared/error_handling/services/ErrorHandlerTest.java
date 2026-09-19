@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -43,6 +44,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
@@ -148,6 +150,56 @@ class ErrorHandlerTest {
   }
 
   @Test
+  @DisplayName("answers 406 notAcceptable as JSON for an Accept header the endpoint cannot satisfy")
+  void mediaTypeNotAcceptable() throws Exception {
+    final var result =
+        this.mockMvc
+            .perform(get("/json-only").accept(MediaType.TEXT_XML))
+            .andExpect(status().isNotAcceptable())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.msgId").value("notAcceptable"))
+            .andExpect(jsonPath("$.type").value("ERROR"))
+            .andExpect(
+                jsonPath("$.text").value("None of the requested media types can be produced."))
+            .andReturn();
+
+    assertThat(result.getResponse().getHeader(HttpHeaders.ACCEPT))
+        .contains(MediaType.APPLICATION_JSON_VALUE);
+  }
+
+  @Test
+  @DisplayName("answers 413 payloadTooLarge for an upload over the size limit")
+  void uploadTooLarge() throws Exception {
+    this.mockMvc
+        .perform(get("/too-large"))
+        .andExpect(status().isPayloadTooLarge())
+        .andExpect(jsonPath("$.msgId").value("payloadTooLarge"))
+        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(jsonPath("$.text").value("The uploaded content is too large."));
+  }
+
+  @Test
+  @DisplayName("answers 400 badRequest when the request parameters a mapping requires are missing")
+  void unsatisfiedRequestParameter() throws Exception {
+    this.mockMvc
+        .perform(get("/needs-param"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.msgId").value("badRequest"));
+  }
+
+  @Test
+  @DisplayName("does not render a size-limit failure when no servlet response is available")
+  void uploadTooLargeWithoutResponse() {
+    final var handler =
+        new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+
+    assertThat(
+            handler.handleException(
+                new MaxUploadSizeExceededException(1024), new MockHttpServletRequest(), null))
+        .isNull();
+  }
+
+  @Test
   @DisplayName("keeps 400 validationError for a body that cannot be read")
   void malformedBody() throws Exception {
     this.mockMvc
@@ -227,6 +279,21 @@ class ErrorHandlerTest {
     @GetMapping("/path-variable")
     String pathVariable(@PathVariable("id") final String id) {
       return id;
+    }
+
+    @GetMapping(value = "/json-only", produces = MediaType.APPLICATION_JSON_VALUE)
+    String jsonOnly() {
+      return "{}";
+    }
+
+    @GetMapping("/too-large")
+    String tooLarge() {
+      throw new MaxUploadSizeExceededException(1024);
+    }
+
+    @GetMapping(value = "/needs-param", params = "name")
+    String needsParam() {
+      return "ok";
     }
 
     @GetMapping("/retryable")
