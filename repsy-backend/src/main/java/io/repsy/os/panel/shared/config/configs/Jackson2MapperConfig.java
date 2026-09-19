@@ -15,15 +15,40 @@
  */
 package io.repsy.os.panel.shared.config.configs;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
+/**
+ * The Jackson 2 mappers.
+ *
+ * <p>{@link XmlMapper} extends the Jackson 2 {@link ObjectMapper}, and Spring Boot 4 does not
+ * auto-configure a Jackson 2 JSON mapper, so on its own the XML mapper would be the only candidate
+ * for a plain {@code com.fasterxml.jackson.databind.ObjectMapper} injection point and silently
+ * serialize to XML (RPS-901). The {@link Primary} JSON mapper takes that role, so XML is only ever
+ * injected by asking for {@link XmlMapper} explicitly.
+ *
+ * <p>The mappers Spring MVC and the protocol handlers use are the Jackson 3 {@code
+ * tools.jackson.databind.ObjectMapper} and are not affected.
+ */
 @Configuration
-public class XmlMapperConfig {
+public class Jackson2MapperConfig {
+
+  @Bean
+  @Primary
+  public @NonNull ObjectMapper jsonObjectMapper() {
+
+    return JsonMapper.builder()
+        .addModule(new JavaTimeModule())
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+        .build();
+  }
 
   @Bean
   public @NonNull XmlMapper xmlMapper() {
