@@ -111,6 +111,9 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
             "Version " + version + " of package " + pkg.getPackageId() + " already exists.");
       }
       this.packageVersionRepository.delete(existingVersion.get());
+      // Hibernate runs inserts before deletes at flush, so the new row would hit the unique
+      // (package_id, version) index while the old one is still there. Flush the delete first.
+      this.packageVersionRepository.flush();
     }
 
     final var pkgVersion = this.createNuGetPackageVersion(pkg, nuspecXml, version);

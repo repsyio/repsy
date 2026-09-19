@@ -698,13 +698,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       verifyNoInteractions(NuGetPublishProtocolIT.this.usageUpdateService);
     }
 
-    /**
-     * Fails today: the service deletes the old version row and inserts the new one in the same
-     * flush, and Hibernate runs the insert first, which violates the unique (package_id, version)
-     * index. Enable it together with the fix.
-     */
     @Test
-    @Disabled("RPS-948: overriding an existing NuGet version violates the unique index")
     @DisplayName("replaces an existing version when the repo allows overrides")
     void overridesWhenAllowed() throws Exception {
       final var created = NuGetPublishProtocolIT.this.nugetRepo();
