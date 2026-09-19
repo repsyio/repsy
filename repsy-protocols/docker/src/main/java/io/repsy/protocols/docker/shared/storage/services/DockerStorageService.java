@@ -34,7 +34,7 @@ public interface DockerStorageService<ID> {
 
   void createRepo(UUID repoUuid);
 
-  long deleteRepo(UUID repoUuid);
+  void deleteRepo(UUID repoUuid);
 
   boolean existsResource(StoragePath storagePath, String repoName);
 

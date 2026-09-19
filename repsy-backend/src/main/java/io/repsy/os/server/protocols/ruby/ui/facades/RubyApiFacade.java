@@ -43,9 +43,8 @@ public class RubyApiFacade implements ProtocolApiFacade {
   private final ApplicationEventPublisher eventPublisher;
 
   @Override
-  public BaseUsages deleteRepo(final RepoInfo repoInfo) {
-    final var freed = this.storageService.deleteRepo(repoInfo.getStorageKey());
-    return BaseUsages.ofDisk(-1L * freed);
+  public void deleteRepo(final RepoInfo repoInfo) {
+    this.storageService.deleteRepo(repoInfo.getStorageKey());
   }
 
   public Page<GemListItem> listGems(

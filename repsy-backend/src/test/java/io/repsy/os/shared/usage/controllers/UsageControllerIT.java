@@ -87,7 +87,7 @@ import org.springframework.transaction.annotation.Transactional;
 class UsageControllerIT extends AbstractIntegrationTest {
 
   private static final String USAGES_PATH = "/api/usages";
-  private static final String USER_NOT_FOUND_TEXT = "User not found.";
+  private static final String UNAUTHORIZED_TEXT = "The user has logged in but has no permissions.";
   private static final Duration ASYNC_TIMEOUT = Duration.ofSeconds(10);
 
   private static final String[] TOTAL_USAGE_KEYS = {"diskUsed", "reposCount"};
@@ -280,7 +280,7 @@ class UsageControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 404 when the token's user never existed")
+    @DisplayName("returns 401 unAuthorized when the token's user never existed")
     void tokenUserNeverExisted() throws Exception {
       // Authentication resolves the caller by the token's username claim, not by its subject id.
       final var token =
@@ -288,14 +288,15 @@ class UsageControllerIT extends AbstractIntegrationTest {
 
       expectError(
           UsageControllerIT.this.getUsages(token),
-          HttpStatus.NOT_FOUND,
-          "userNotFound",
-          "userNotFound",
-          USER_NOT_FOUND_TEXT);
+          HttpStatus.UNAUTHORIZED,
+          "unAuthorized",
+          "unAuthorized",
+          UNAUTHORIZED_TEXT);
     }
 
     @Test
-    @DisplayName("returns 404 once the token's user has been deleted, though the token is valid")
+    @DisplayName(
+        "returns 401 unAuthorized once the token's user has been deleted, though the token is valid")
     void tokenUserDeleted() throws Exception {
       final var username = UsageControllerIT.this.createUser(UserRole.ADMIN);
       final var token = UsageControllerIT.this.bearerTokenFor(username);
@@ -306,10 +307,10 @@ class UsageControllerIT extends AbstractIntegrationTest {
 
       expectError(
           UsageControllerIT.this.getUsages(token),
-          HttpStatus.NOT_FOUND,
-          "userNotFound",
-          "userNotFound",
-          USER_NOT_FOUND_TEXT);
+          HttpStatus.UNAUTHORIZED,
+          "unAuthorized",
+          "unAuthorized",
+          UNAUTHORIZED_TEXT);
     }
 
     /**

@@ -17,7 +17,6 @@ package io.repsy.protocols.ruby.protocol.facades;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.ruby.protocol.facades.contract.RubyProtocolFacade;
 import io.repsy.protocols.ruby.shared.gem.services.RubyGemProtocolService;
 import io.repsy.protocols.ruby.shared.storage.services.RubyStorageService;
@@ -193,9 +192,8 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
     this.gemService.saveVersionsChecksum(repoInfo, gemName, checksum);
   }
 
-  public BaseUsages deleteRepo(final ProtocolContext context) {
+  public void deleteRepo(final ProtocolContext context) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var freed = this.storageService.deleteRepo(repoInfo.getStorageKey());
-    return BaseUsages.ofDisk(-1L * freed);
+    this.storageService.deleteRepo(repoInfo.getStorageKey());
   }
 }

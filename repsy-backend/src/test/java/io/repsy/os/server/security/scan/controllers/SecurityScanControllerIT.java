@@ -124,7 +124,7 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
   private static final String SCANS_PATH = "/api/security/scans";
   private static final String SUMMARY_PATH = "/api/security/scans/summary";
   private static final String SUPPORTED_REPO_TYPES_PATH = "/api/security/supported-repo-types";
-  private static final String USER_NOT_FOUND_TEXT = "User not found.";
+  private static final String UNAUTHORIZED_TEXT = "The user has logged in but has no permissions.";
   private static final String SCANNER_NAME = "trivy";
   private static final String SCANNER_VERSION = "0.58.0";
   private static final String FAILURE_MESSAGE = "Scanner timed out";
@@ -552,7 +552,7 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("adminEndpoints")
-    @DisplayName("returns 404 userNotFound when the token's user never existed")
+    @DisplayName("returns 401 unAuthorized when the token's user never existed")
     void tokenUserNeverExisted(final String path) throws Exception {
       // Authentication resolves the caller by the token's username claim, not by its subject id.
       final var token =
@@ -560,15 +560,15 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
 
       expectError(
           SecurityScanControllerIT.this.perform(get(path).header(AUTHORIZATION, token)),
-          HttpStatus.NOT_FOUND,
-          "userNotFound",
-          "userNotFound",
-          USER_NOT_FOUND_TEXT);
+          HttpStatus.UNAUTHORIZED,
+          "unAuthorized",
+          "unAuthorized",
+          UNAUTHORIZED_TEXT);
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("adminEndpoints")
-    @DisplayName("returns 404 userNotFound once the token's admin has been deleted")
+    @DisplayName("returns 401 unAuthorized once the token's admin has been deleted")
     void tokenUserDeleted(final String path) throws Exception {
       final var username = SecurityScanControllerIT.this.createUser(UserRole.ADMIN);
       final var token = SecurityScanControllerIT.this.bearerTokenFor(username);
@@ -579,10 +579,10 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
 
       expectError(
           SecurityScanControllerIT.this.perform(get(path).header(AUTHORIZATION, token)),
-          HttpStatus.NOT_FOUND,
-          "userNotFound",
-          "userNotFound",
-          USER_NOT_FOUND_TEXT);
+          HttpStatus.UNAUTHORIZED,
+          "unAuthorized",
+          "unAuthorized",
+          UNAUTHORIZED_TEXT);
     }
 
     @ParameterizedTest(name = "{0}")

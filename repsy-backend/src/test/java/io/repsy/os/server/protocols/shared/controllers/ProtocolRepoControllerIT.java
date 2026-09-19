@@ -92,7 +92,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String REPO_NOT_FOUND_TEXT = "Repository not found";
   private static final String REPO_EXISTS_TEXT = "The repository exists. Please try another name.";
-  private static final String USER_NOT_FOUND_TEXT = "User not found.";
   private static final String UNAUTHORIZED_TEXT = "The user has logged in but has no permissions.";
   private static final String ACCESS_NOT_ALLOWED_TEXT = "Access isn't allowed.";
   private static final String SESSION_EXPIRED_TEXT = "Session expired.";
@@ -447,7 +446,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 404 userNotFound when the token's user no longer exists")
+    @DisplayName("returns 401 unAuthorized when the token's user no longer exists")
     void tokenUserNoLongerExists(final Endpoint endpoint) throws Exception {
       final var target = this.target();
       // Authentication resolves the caller by the token's username claim, not by its subject id.
@@ -457,10 +456,10 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       expectError(
           ProtocolRepoControllerIT.this.perform(
               endpoint.request().apply(target).header(AUTHORIZATION, token)),
-          HttpStatus.NOT_FOUND,
-          "userNotFound",
-          "userNotFound",
-          USER_NOT_FOUND_TEXT);
+          HttpStatus.UNAUTHORIZED,
+          "unAuthorized",
+          "unAuthorized",
+          UNAUTHORIZED_TEXT);
     }
 
     @ParameterizedTest(name = "{0}")

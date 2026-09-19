@@ -72,6 +72,7 @@ class UserControllerIT extends AbstractIntegrationTest {
   private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String USERNAME_IN_USE_TEXT = "Username is in use. Please try another one.";
   private static final String USER_NOT_FOUND_TEXT = "User not found.";
+  private static final String UNAUTHORIZED_TEXT = "The user has logged in but has no permissions.";
   private static final Instant BASE_TIME = Instant.parse("2026-01-01T00:00:00Z");
 
   private static final String[] USER_KEYS = {"id", "username", "role", "createdAt", "lastLoginAt"};
@@ -259,7 +260,7 @@ class UserControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 404 when the token's user no longer exists")
+    @DisplayName("returns 401 unAuthorized when the token's user no longer exists")
     void tokenUserNoLongerExists(final Endpoint endpoint) throws Exception {
       // Authentication resolves the caller by the token's username claim, not by its subject id.
       final var token =
@@ -268,10 +269,10 @@ class UserControllerIT extends AbstractIntegrationTest {
       expectError(
           UserControllerIT.this.perform(
               endpoint.request().apply(UUID.randomUUID()).header(AUTHORIZATION, token)),
-          HttpStatus.NOT_FOUND,
-          "userNotFound",
-          "userNotFound",
-          USER_NOT_FOUND_TEXT);
+          HttpStatus.UNAUTHORIZED,
+          "unAuthorized",
+          "unAuthorized",
+          UNAUTHORIZED_TEXT);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -988,7 +989,7 @@ class UserControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("lets an admin delete their own account; the still-valid token then gets 404")
+    @DisplayName("lets an admin delete their own account; the still-valid token then gets 401")
     void deletingOwnAccountInvalidatesTheSession() throws Exception {
       final var admin = UserControllerIT.this.createUser(uniqueUsername("selfdel"), UserRole.ADMIN);
       final var token = UserControllerIT.this.bearerTokenFor(admin);
@@ -1001,10 +1002,10 @@ class UserControllerIT extends AbstractIntegrationTest {
 
       expectError(
           UserControllerIT.this.perform(get("/api/users").header(AUTHORIZATION, token)),
-          HttpStatus.NOT_FOUND,
-          "userNotFound",
-          "userNotFound",
-          USER_NOT_FOUND_TEXT);
+          HttpStatus.UNAUTHORIZED,
+          "unAuthorized",
+          "unAuthorized",
+          UNAUTHORIZED_TEXT);
     }
 
     @Test

@@ -44,6 +44,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -58,6 +59,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,10 +81,9 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Left alone, the async update nearly always reaches the row first (and its {@code UPDATE} lock
  * makes the delete wait), so the race only shows when the task is delayed. {@link GatedExecutor}
- * makes that delay deterministic: it replaces the default {@code @Async} executor (bean {@code
- * taskExecutor}; without it Spring falls back to a {@code SimpleAsyncTaskExecutor}, because the
- * {@code scanTaskExecutor} bean makes Spring Boot's {@code applicationTaskExecutor} back off) and
- * holds submitted tasks while it is closed. Registering it gives this class its own Spring context.
+ * makes that delay deterministic: it replaces the default {@code @Async} executor (through an
+ * {@link AsyncConfigurer}, which Spring Boot's {@code applicationTaskExecutor} defers to) and holds
+ * submitted tasks while it is closed. Registering it gives this class its own Spring context.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @Import(ProtocolRepoDeleteUsageIT.GatedExecutorConfig.class)
@@ -90,9 +91,8 @@ import org.springframework.transaction.annotation.Transactional;
 class ProtocolRepoDeleteUsageIT extends AbstractIntegrationTest {
 
   /**
-   * The default {@code @Async} executor for this class: runs every task on a new thread, like the
-   * {@code SimpleAsyncTaskExecutor} it stands in for, except that while {@link #close() closed} it
-   * holds the tasks back until {@link #open()}.
+   * The default {@code @Async} executor for this class: runs every task on a new thread, except
+   * that while {@link #close() closed} it holds the tasks back until {@link #open()}.
    */
   static final class GatedExecutor implements TaskExecutor {
 
@@ -123,9 +123,19 @@ class ProtocolRepoDeleteUsageIT extends AbstractIntegrationTest {
   @TestConfiguration(proxyBeanMethods = false)
   static class GatedExecutorConfig {
 
-    @Bean("taskExecutor")
-    GatedExecutor taskExecutor() {
+    @Bean
+    GatedExecutor gatedExecutor() {
       return new GatedExecutor();
+    }
+
+    @Bean
+    AsyncConfigurer gatedAsyncConfigurer(final GatedExecutor gatedExecutor) {
+      return new AsyncConfigurer() {
+        @Override
+        public Executor getAsyncExecutor() {
+          return gatedExecutor;
+        }
+      };
     }
   }
 

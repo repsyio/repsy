@@ -17,11 +17,13 @@ package io.repsy.os.shared.user.services;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.generated.model.UserCreateForm;
 import io.repsy.os.generated.model.UserResponse;
 import io.repsy.os.generated.model.UserUpdateForm;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
+import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -84,6 +86,24 @@ public class UserTxService {
 
   public @NonNull UserInfo getUserById(final @NonNull UUID userId) {
     return this.userConverter.toUserInfo(this.findUserById(userId));
+  }
+
+  /**
+   * Resolves the principal of a token that has already been verified. A principal that no longer
+   * exists (deleted, or never existed) is an authentication failure, not a missing resource, so it
+   * fails with {@code unAuthorized} and the client re-authenticates.
+   */
+  public @NonNull UserInfo getAuthenticatedUserByUsername(final @NonNull String username) {
+    return this.getUserByUsernameOptional(username)
+        .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
+  }
+
+  /** Same as {@link #getAuthenticatedUserByUsername(String)}, for tokens that carry a user id. */
+  public @NonNull UserInfo getAuthenticatedUserById(final @NonNull UUID userId) {
+    return this.userRepository
+        .findById(userId)
+        .map(this.userConverter::toUserInfo)
+        .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
   }
 
   public @NonNull Optional<UserInfo> getUserByUsernameOptional(final @NonNull String username) {

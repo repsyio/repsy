@@ -59,11 +59,9 @@ public class CargoApiFacade implements ProtocolApiFacade {
   private final ApplicationEventPublisher eventPublisher;
 
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public BaseUsages deleteRepo(final RepoInfo repoInfo) throws IOException {
+  public void deleteRepo(final RepoInfo repoInfo) throws IOException {
 
-    final var free = this.cargoStorageService.deleteRepo(repoInfo.getId());
-
-    return BaseUsages.builder().diskUsage(-1L * free).build();
+    this.cargoStorageService.deleteRepo(repoInfo.getId());
   }
 
   @Transactional(readOnly = true)

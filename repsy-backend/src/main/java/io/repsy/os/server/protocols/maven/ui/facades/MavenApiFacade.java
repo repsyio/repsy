@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.maven.ui.facades;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
-import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -53,11 +52,9 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
   private final @NonNull MavenStorageService mavenStorageService;
 
   @Transactional
-  public BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
+  public void deleteRepo(final @NonNull RepoInfo repoInfo) {
 
-    final var free = this.mavenStorageService.deleteRepo(repoInfo.getStorageKey());
-
-    return BaseUsages.ofDisk(-1 * free);
+    this.mavenStorageService.deleteRepo(repoInfo.getStorageKey());
   }
 
   public @NonNull List<StorageItemInfo> getItems(

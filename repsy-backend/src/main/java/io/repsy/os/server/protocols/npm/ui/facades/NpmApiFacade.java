@@ -43,11 +43,9 @@ public class NpmApiFacade implements ProtocolApiFacade {
   private final @NonNull NpmPackageConverter npmPackageConverter;
   private final @NonNull ApplicationEventPublisher eventPublisher;
 
-  public BaseUsages deleteRepo(final @NonNull RepoInfo repoInfo) {
+  public void deleteRepo(final @NonNull RepoInfo repoInfo) {
 
-    final var free = this.npmStorageService.deleteRepo(repoInfo.getStorageKey());
-
-    return BaseUsages.ofDisk(-1 * free);
+    this.npmStorageService.deleteRepo(repoInfo.getStorageKey());
   }
 
   public @NonNull PackageVersionDetail getVersion(

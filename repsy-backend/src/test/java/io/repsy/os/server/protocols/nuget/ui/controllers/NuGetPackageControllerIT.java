@@ -244,7 +244,7 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
               get("/api/nuget/packages/{repo}", repo.getName())
                   .with(apiPort())
                   .header(AUTHORIZATION, unknown))
-          .andExpect(status().isNotFound());
+          .andExpect(status().isUnauthorized());
     }
 
     @Test

@@ -30,6 +30,21 @@ spring:
     schemas: public
     default-schema: public
 
+  task:
+    execution:
+      # `scanTaskExecutor` makes Spring Boot skip the default executor unless it is forced, and
+      # unqualified @Async methods (usage bookkeeping, default repo seeding, ...) would then fall
+      # back to an unbounded thread-per-task SimpleAsyncTaskExecutor. See AsyncTaskExecutorConfig.
+      mode: force
+      thread-name-prefix: async-
+      pool:
+        core-size: 2
+        max-size: 4
+        queue-capacity: 500
+      shutdown:
+        await-termination: true
+        await-termination-period: 30s
+
 server:
   port: ${SERVER_PORT:9090}
   tomcat:
