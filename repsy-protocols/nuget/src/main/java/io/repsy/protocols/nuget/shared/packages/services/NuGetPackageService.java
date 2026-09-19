@@ -15,9 +15,11 @@
  */
 package io.repsy.protocols.nuget.shared.packages.services;
 
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
@@ -30,12 +32,25 @@ public interface NuGetPackageService<ID> {
 
   ID findOrCreatePackage(BaseRepoInfo<ID> repoInfo, String packageId);
 
-  void publishVersion(
+  /**
+   * Records the version and, while that write is still open, stores its files through {@code
+   * filesWriter}.
+   *
+   * <p>The row is written first (and flushed, so a unique-index conflict surfaces here) and the
+   * files second, inside one transaction. If the row cannot be written, the files are never
+   * touched, so a publish that loses a race for a version cannot replace the winner's files. If the
+   * files cannot be written, the row is rolled back.
+   *
+   * @return the usages reported by {@code filesWriter}
+   */
+  BaseUsages publishVersion(
       BaseRepoInfo<ID> repoInfo,
       ID pkgId,
       String version,
       String nuspecXml,
-      @Nullable String readme);
+      @Nullable String readme,
+      PackageFilesWriter filesWriter)
+      throws IOException;
 
   boolean versionExists(BaseRepoInfo<ID> repoInfo, String packageId, String version);
 
@@ -66,4 +81,15 @@ public interface NuGetPackageService<ID> {
 
   Page<NuGetPackageSearchResult> search(
       BaseRepoInfo<ID> repoInfo, String query, int skip, int take, boolean prerelease);
+
+  /** Stores the files of a version whose row {@link #publishVersion} has just written. */
+  @FunctionalInterface
+  interface PackageFilesWriter {
+
+    /**
+     * @param replacesExisting whether the version already had a row and files, which are being
+     *     replaced. A writer that fails must not delete files it did not create.
+     */
+    BaseUsages write(boolean replacesExisting) throws IOException;
+  }
 }

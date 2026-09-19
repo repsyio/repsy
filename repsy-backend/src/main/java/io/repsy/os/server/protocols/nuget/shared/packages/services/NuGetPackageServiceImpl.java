@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.nuget.shared.packages.services;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.NuGetDeletedItem;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
@@ -29,6 +30,7 @@ import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.io.IOException;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
@@ -93,13 +95,15 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   }
 
   @Override
-  @Transactional
-  public void publishVersion(
+  @Transactional(rollbackFor = IOException.class)
+  public BaseUsages publishVersion(
       final BaseRepoInfo<UUID> repoInfo,
       final UUID pkgId,
       final String version,
       final String nuspecXml,
-      final @Nullable String readme) {
+      final @Nullable String readme,
+      final PackageFilesWriter filesWriter)
+      throws IOException {
 
     final var pkg =
         this.packageRepository
@@ -123,7 +127,12 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
     final var pkgVersion = this.createNuGetPackageVersion(pkg, nuspecXml, version, readme);
 
-    this.packageVersionRepository.save(pkgVersion);
+    // Flush so a unique-index conflict (a concurrent push of the same version) fails here, before
+    // any file is written. The transaction, and the row lock it holds, stays open while the files
+    // are written, so a losing push waits for the winner instead of replacing its files.
+    this.packageVersionRepository.saveAndFlush(pkgVersion);
+
+    return filesWriter.write(existingVersion.isPresent());
   }
 
   @Override
