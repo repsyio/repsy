@@ -15,7 +15,6 @@
  */
 package io.repsy.os.server.protocols.nuget.shared.packages.services;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.generated.model.NuGetDeletedItem;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
@@ -48,6 +47,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Component
@@ -62,7 +62,6 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   private final NuGetPackageRepository packageRepository;
   private final NuGetPackageVersionRepository packageVersionRepository;
   private final NuGetPackageConverter converter;
-  private final ObjectMapper objectMapper;
 
   // Using for escape from spring proxy problem in same class.
   private final TransactionTemplate requiresNewTx;
@@ -72,14 +71,12 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final NuGetPackageRepository packageRepository,
       final NuGetPackageVersionRepository packageVersionRepository,
       final NuGetPackageConverter converter,
-      final ObjectMapper objectMapper,
       final PlatformTransactionManager txManager) {
 
     this.repoRepository = repoRepository;
     this.packageRepository = packageRepository;
     this.packageVersionRepository = packageVersionRepository;
     this.converter = converter;
-    this.objectMapper = objectMapper;
     this.requiresNewTx = new TransactionTemplate(txManager);
     this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
@@ -394,7 +391,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     final var deps = NuGetPackageUtils.extractDependenciesFromNuspec(nuspecXml);
     if (!deps.isEmpty()) {
       try {
-        pkgVersion.setDependencies(this.objectMapper.writeValueAsString(deps));
+        pkgVersion.setDependencies(NuGetPackageUtils.toDependenciesJson(deps));
       } catch (final Exception e) {
         log.warn("Failed to serialize NuGet dependencies for version {}", version, e);
       }

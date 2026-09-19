@@ -66,14 +66,4 @@ public interface NpmPackageRepository extends JpaRepository<NpmPackage, UUID> {
       and (:scope is null or p.scope like %:scope%)""")
   Page<PackageListItem> findAllByRepoIdAndLatestVersionContainsScope(
       UUID repoId, @Nullable String scope, Pageable pageable);
-
-  @Query(
-      """
-      select p.scope as scope, p.name as name, p.latest as latest, pv.createdAt as updatedAt
-      from NpmPackage p
-      join p.packageVersions pv
-      join p.repo r
-      where r.id = :repoId and p.latest = pv.version and p.name like %:name%""")
-  Page<PackageListItem> findAllByRepoIdAndLatestVersionContainsName(
-      UUID repoId, String name, Pageable pageable);
 }
