@@ -122,16 +122,19 @@ class AuthControllerIT {
   private static final String ACCESS_NOT_ALLOWED_TEXT = "Access isn't allowed.";
   private static final String INTERNAL_ERROR_TEXT = "An error occurred.";
 
-  /**
-   * The success ids that have an entry in messages.properties; every other success id renders its
-   * msgId as the text.
-   */
+  /** The text messages.properties gives each success id these tests assert on. */
   private static final Map<String, String> SUCCESS_TEXTS =
       Map.of(
           "loginSucceeded", "Log In succeeded.",
           "passwordChanged", "Password changed.",
+          "passwordReset", "Password reset.",
           "usernameUpdated", "Username successfully updated.",
-          "profileDeleted", "Profile account deleted.");
+          "profileDeleted", "Profile account deleted.",
+          "profileFetched", "Profile fetched.",
+          "tokenRefreshed", "Token refreshed.",
+          "userCreated", "User created.",
+          "userUpdated", "User updated.",
+          "userDeleted", "User deleted.");
 
   private static final String[] ENVELOPE_KEYS = {"msgId", "type", "data", "errorCode", "text"};
   private static final String[] LOGIN_INFO_KEYS = {"username", "token", "refreshToken"};
@@ -309,8 +312,7 @@ class AuthControllerIT {
 
   /**
    * Asserts a 200 SUCCESS envelope (exact key set, {@code errorCode} null, {@code text} taken from
-   * {@link #SUCCESS_TEXTS} or else falling back to the msgId) and returns the raw body for further
-   * assertions on {@code data}.
+   * {@link #SUCCESS_TEXTS}) and returns the raw body for further assertions on {@code data}.
    */
   private static String expectSuccess(final ResultActions result, final String msgId)
       throws Exception {
@@ -323,7 +325,7 @@ class AuthControllerIT {
         .containsEntry("msgId", msgId)
         .containsEntry("type", "SUCCESS")
         .containsEntry("errorCode", null)
-        .containsEntry("text", SUCCESS_TEXTS.getOrDefault(msgId, msgId));
+        .containsEntry("text", SUCCESS_TEXTS.get(msgId));
     return body;
   }
 
