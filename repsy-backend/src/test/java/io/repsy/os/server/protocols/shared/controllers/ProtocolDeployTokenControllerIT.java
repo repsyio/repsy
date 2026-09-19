@@ -412,7 +412,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 404 when the token's user no longer exists")
+    @DisplayName("returns 401 unAuthorized when the token's user no longer exists")
     void tokenUserNoLongerExists(final Endpoint endpoint) throws Exception {
       final var repo = ProtocolDeployTokenControllerIT.this.createRepo(RepoType.MAVEN);
       // Authentication resolves the caller by the token's username claim, not by its subject id.
@@ -427,10 +427,10 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
                   .apply(repo.getName())
                   .apply(UUID.randomUUID())
                   .header(AUTHORIZATION, token)),
-          HttpStatus.NOT_FOUND,
-          "userNotFound",
-          "userNotFound",
-          "User not found.");
+          HttpStatus.UNAUTHORIZED,
+          "unAuthorized",
+          "unAuthorized",
+          UNAUTHORIZED_TEXT);
     }
 
     @ParameterizedTest(name = "{0}")

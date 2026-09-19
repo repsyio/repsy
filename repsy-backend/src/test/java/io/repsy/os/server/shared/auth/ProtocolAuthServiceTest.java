@@ -17,6 +17,7 @@ package io.repsy.os.server.shared.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,10 +26,13 @@ import static org.mockito.Mockito.when;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
+import io.repsy.os.shared.user.mappers.UserConverter;
+import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -196,6 +200,45 @@ class ProtocolAuthServiceTest {
           () -> ProtocolAuthServiceTest.this.authService.authenticateUser(basicAuth("ghost", "x")));
 
       verify(ProtocolAuthServiceTest.this.userTxService, never()).getUserByUsername(anyString());
+    }
+  }
+
+  /**
+   * RPS-962: a correctly signed token whose user no longer exists is an authentication failure, so
+   * the client re-authenticates, instead of a 404 that reads as a missing resource.
+   */
+  @Nested
+  @DisplayName("a valid bearer token whose user no longer exists is unAuthorized")
+  class TokenUserNoLongerExists {
+
+    private static final String BEARER = "Bearer signed.jwt.token";
+
+    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+
+    // A real UserTxService over an empty repository: the lookup itself is under test.
+    private final ProtocolAuthService ghostAuthService =
+        new ProtocolAuthService(
+            new UserTxService(
+                Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)),
+            this.jwtUtils,
+            Mockito.mock(DeployTokenService.class));
+
+    TokenUserNoLongerExists() {
+      when(this.jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
+          .thenReturn("ghost");
+    }
+
+    @Test
+    @DisplayName("authenticateUser answers unAuthorized for a panel bearer token")
+    void authenticateUser() {
+      assertUnauthorized(() -> this.ghostAuthService.authenticateUser(BEARER));
+    }
+
+    @Test
+    @DisplayName("handleBearerAuth answers unAuthorized for a protocol bearer token")
+    void handleBearerAuth() {
+      assertUnauthorized(
+          () -> this.ghostAuthService.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
     }
   }
 

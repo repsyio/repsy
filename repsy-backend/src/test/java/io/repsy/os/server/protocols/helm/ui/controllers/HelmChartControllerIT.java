@@ -1653,7 +1653,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @EnumSource(Endpoint.class)
-    @DisplayName("a token whose user no longer exists is 404 userNotFound")
+    @DisplayName("a token whose user no longer exists is 401 unAuthorized")
     void tokenOfDeletedUser(final Endpoint endpoint) throws Exception {
       final var it = HelmChartControllerIT.this;
       final var repo = this.repoWithChart(false);
@@ -1661,10 +1661,10 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
       expectError(
           this.send(endpoint, repo.getName(), ghost),
-          HttpStatus.NOT_FOUND,
-          "userNotFound",
-          "userNotFound",
-          "User not found.");
+          HttpStatus.UNAUTHORIZED,
+          "unAuthorized",
+          "unAuthorized",
+          NO_PERMISSION_TEXT);
     }
 
     @ParameterizedTest(name = "{0}")

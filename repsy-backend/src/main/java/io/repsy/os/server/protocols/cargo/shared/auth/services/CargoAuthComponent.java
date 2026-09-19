@@ -86,7 +86,7 @@ public class CargoAuthComponent extends ProtocolAuthService {
 
     if (isBearerToken(authHeader)) {
       final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
-      final var userInfo = this.userTxService.getUserByUsername(username);
+      final var userInfo = this.userTxService.getAuthenticatedUserByUsername(username);
       return this.jwtUtils.createProtocolToken(
           userInfo.getId(), userInfo.getUsername(), TIMEOUT_ACCESS_TOKEN);
     }

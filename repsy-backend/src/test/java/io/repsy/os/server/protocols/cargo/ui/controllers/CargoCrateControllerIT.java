@@ -501,9 +501,9 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
       expectError(
           CargoCrateControllerIT.this.request(
               "GET", path, CargoCrateControllerIT.this.bearerTokenFor(user)),
-          HttpStatus.NOT_FOUND,
-          "userNotFound",
-          "User not found.");
+          HttpStatus.UNAUTHORIZED,
+          "unAuthorized",
+          "The user has logged in but has no permissions.");
     }
 
     @Test
