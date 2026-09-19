@@ -117,3 +117,21 @@ jobs:
 
       - name: Check
         run: pnpm run lint
+
+      # The specs import the generated API client (src/generated/api, git-ignored), and the
+      # generator is a Java tool that openapi-generator-cli downloads on first use.
+      - name: Set up JDK
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          java-version: "25"
+          distribution: "temurin"
+
+      - name: Generate API client
+        run: pnpm run gen:api
+
+      # Karma needs a Chrome binary; the runner image ships google-chrome. The CI launcher in
+      # karma.conf.cjs adds --no-sandbox. A failing spec makes ng test exit non-zero.
+      - name: Unit tests
+        run: |
+          google-chrome --version
+          pnpm test --watch=false --browsers=ChromeHeadlessCI
