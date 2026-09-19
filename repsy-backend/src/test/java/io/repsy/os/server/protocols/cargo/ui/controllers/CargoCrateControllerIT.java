@@ -649,7 +649,15 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
 
     static Stream<Arguments> acceptedSorts() {
       return Stream.concat(
-          Stream.of("id", "name", "maxVersion", "lastUpdatedAt")
+          Stream.of(
+                  "id",
+                  "name",
+                  "maxVersion",
+                  "lastUpdatedAt",
+                  "totalDownloads",
+                  "max_version",
+                  "updated_at",
+                  "downloads")
               .map(property -> Arguments.of(CRATES, property)),
           Stream.of("version", "createdAt").map(property -> Arguments.of(VERSIONS, property)));
     }
@@ -699,6 +707,43 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
       this.list(repo, VERSIONS, "sort", "version,desc")
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].version").value("1.1.0"));
+    }
+
+    @ParameterizedTest(name = "sort={0}")
+    @ValueSource(strings = {"max_version", "maxVersion"})
+    @DisplayName("orders the crates by the response's max_version or the entity's maxVersion")
+    void ordersCratesByMaxVersion(final String property) throws Exception {
+      final var repo = this.seededRepo();
+
+      this.list(repo, CRATES, "sort", property + ",asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("other"))
+          .andExpect(jsonPath("$.data.content[0].max_version").value("0.1.0"));
+      this.list(repo, CRATES, "sort", property + ",desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("paged"))
+          .andExpect(jsonPath("$.data.content[0].max_version").value("1.1.0"));
+    }
+
+    @ParameterizedTest(name = "sort={0}")
+    @ValueSource(strings = {"downloads", "totalDownloads"})
+    @DisplayName("orders the crates by the response's downloads or the entity's totalDownloads")
+    void ordersCratesByDownloads(final String property) throws Exception {
+      final var repo = this.seededRepo();
+      final var info = CargoCrateControllerIT.this.repoInfo(repo);
+      CargoCrateControllerIT.this.crateService.incrementDownloadCount(info, "other", "0.1.0");
+      CargoCrateControllerIT.this.crateService.incrementDownloadCount(info, "other", "0.1.0");
+      CargoCrateControllerIT.this.crateService.incrementDownloadCount(info, "paged", "1.0.0");
+
+      this.list(repo, CRATES, "sort", property + ",desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("other"))
+          .andExpect(jsonPath("$.data.content[0].downloads").value(2))
+          .andExpect(jsonPath("$.data.content[1].name").value("paged"));
+      this.list(repo, CRATES, "sort", property + ",asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("paged"))
+          .andExpect(jsonPath("$.data.content[0].downloads").value(1));
     }
 
     @ParameterizedTest(name = "{0}")

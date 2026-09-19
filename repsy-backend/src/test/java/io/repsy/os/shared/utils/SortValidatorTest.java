@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.os.shared.error_handling.exceptions.InvalidPagingParameterException;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,6 +67,43 @@ class SortValidatorTest {
 
     assertThatThrownBy(() -> SortValidator.requireSortableBy(pageable, ALLOWED))
         .isInstanceOf(InvalidPagingParameterException.class);
+  }
+
+  @Test
+  @DisplayName("maps each sort key to its path, keeping direction, page and size")
+  void resolvesSortPaths() {
+    final var pageable =
+        PageRequest.of(2, 15, Sort.by(Sort.Order.desc("max_version"), Sort.Order.asc("name")));
+
+    final var resolved =
+        SortValidator.resolveSortPaths(
+            pageable, Map.of("max_version", "maxVersion", "name", "name"));
+
+    assertThat(resolved.getPageNumber()).isEqualTo(2);
+    assertThat(resolved.getPageSize()).isEqualTo(15);
+    assertThat(resolved.getSort())
+        .containsExactly(Sort.Order.desc("maxVersion"), Sort.Order.asc("name"));
+  }
+
+  @Test
+  @DisplayName("keeps an unsorted request unsorted when mapping sort paths")
+  void resolvesUnsorted() {
+    final var resolved =
+        SortValidator.resolveSortPaths(PageRequest.of(0, 10), Map.of("max_version", "maxVersion"));
+
+    assertThat(resolved.getSort().isSorted()).isFalse();
+  }
+
+  @Test
+  @DisplayName("rejects a path the mapping does not list as a key, naming sort")
+  void resolveRejectsUnmappedKey() {
+    final var pageable = PageRequest.of(0, 10, Sort.by("maxVersion"));
+
+    assertThatThrownBy(
+            () -> SortValidator.resolveSortPaths(pageable, Map.of("max_version", "maxVersion")))
+        .isInstanceOf(InvalidPagingParameterException.class)
+        .extracting(e -> ((InvalidPagingParameterException) e).getParameterNames())
+        .isEqualTo("sort");
   }
 
   @Test
