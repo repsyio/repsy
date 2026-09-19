@@ -25,7 +25,7 @@ const EIB = PIB * 1024;
 
 describe('ByteFormatter.formatBytes', () => {
   it('formats zero, small and negative values', () => {
-    expect(ByteFormatter.formatBytes(0)).toBe("BROKEN" + '0 B');
+    expect(ByteFormatter.formatBytes(0)).toBe('0 B');
     expect(ByteFormatter.formatBytes(1)).toBe('1 B');
     expect(ByteFormatter.formatBytes(1023)).toBe('1023 B');
     expect(ByteFormatter.formatBytes(-KIB)).toBe('1 K');
