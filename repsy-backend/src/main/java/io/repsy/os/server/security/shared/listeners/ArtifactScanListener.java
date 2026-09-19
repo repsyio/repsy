@@ -16,6 +16,7 @@
 package io.repsy.os.server.security.shared.listeners;
 
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.core.events.ArtifactPushedEvent;
 import io.repsy.core.events.ArtifactVersionDeletedEvent;
@@ -237,6 +238,13 @@ public class ArtifactScanListener {
       log.warn(
           "Skipping vulnerability scan for {}@{} (repo={}): a scan is already PENDING/RUNNING for"
               + " this exact artifact version",
+          event.artifactName(),
+          event.artifactVersion(),
+          event.repoName());
+      return null;
+    } catch (final ItemNotFoundException exception) {
+      log.info(
+          "Skipping vulnerability scan for {}@{} (repo={}): the repo no longer exists",
           event.artifactName(),
           event.artifactVersion(),
           event.repoName());

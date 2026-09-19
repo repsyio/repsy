@@ -15,11 +15,20 @@
  */
 package io.repsy.os.server.security.shared.listeners;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.core.events.ArtifactPushedEvent;
 import io.repsy.libs.storage.core.services.StorageStrategy;
@@ -31,12 +40,14 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("ArtifactScanListener")
@@ -53,9 +64,16 @@ class ArtifactScanListenerTest {
   @Mock private Executor scanTaskExecutor;
 
   private ArtifactScanListener listener;
+  private Logger listenerLogger;
+  private ListAppender<ILoggingEvent> logAppender;
 
   @BeforeEach
   void setUp() {
+    this.listenerLogger = (Logger) LoggerFactory.getLogger(ArtifactScanListener.class);
+    this.logAppender = new ListAppender<>();
+    this.logAppender.start();
+    this.listenerLogger.addAppender(this.logAppender);
+
     this.listener =
         new ArtifactScanListener(
             this.scannerRegistry,
@@ -66,6 +84,27 @@ class ArtifactScanListenerTest {
             Map.<String, StorageStrategy>of());
   }
 
+  @AfterEach
+  void tearDown() {
+    this.listenerLogger.detachAppender(this.logAppender);
+  }
+
+  @Test
+  @DisplayName("skips the scan without an error when the repo was deleted before the listener ran")
+  void skipsScanWhenRepoIsGone() {
+    when(this.scannerRegistry.findScanner("MAVEN")).thenReturn(Optional.empty());
+    when(this.scanTxService.createPendingScan(REPO_ID, "artifact", "1.0.0", "none"))
+        .thenThrow(new ItemNotFoundException("repoNotFound"));
+
+    assertThatCode(() -> this.listener.handleArtifactPushed(this.event()))
+        .doesNotThrowAnyException();
+
+    verifyNoInteractions(this.scanTaskExecutor);
+    assertThat(this.logAppender.list)
+        .noneMatch(logEvent -> logEvent.getLevel().isGreaterOrEqual(Level.WARN))
+        .anyMatch(logEvent -> logEvent.getFormattedMessage().contains("no longer exists"));
+  }
+
   @Test
   @DisplayName("fails a pushed scan when the executor rejects it")
   void rejectedPushedScanIsFailed() {
@@ -73,9 +112,7 @@ class ArtifactScanListenerTest {
     when(this.scannerRegistry.findScanner("MAVEN")).thenReturn(Optional.empty());
     when(this.scanTxService.createPendingScan(REPO_ID, "artifact", "1.0.0", "none"))
         .thenReturn(SCAN_ID);
-    doThrow(new RejectedExecutionException())
-        .when(this.scanTaskExecutor)
-        .execute(org.mockito.ArgumentMatchers.any());
+    doThrow(new RejectedExecutionException()).when(this.scanTaskExecutor).execute(any());
 
     this.listener.handleArtifactPushed(event);
 
@@ -85,9 +122,7 @@ class ArtifactScanListenerTest {
   @Test
   @DisplayName("returns a retryable failure when a manual scan is rejected")
   void rejectedManualScanIsRetryable() {
-    doThrow(new RejectedExecutionException())
-        .when(this.scanTaskExecutor)
-        .execute(org.mockito.ArgumentMatchers.any());
+    doThrow(new RejectedExecutionException()).when(this.scanTaskExecutor).execute(any());
 
     assertThatThrownBy(() -> this.listener.executeManualScan(SCAN_ID, this.event()))
         .isInstanceOf(RetryableException.class)
