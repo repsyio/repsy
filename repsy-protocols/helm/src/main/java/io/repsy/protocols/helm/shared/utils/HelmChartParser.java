@@ -113,7 +113,7 @@ public class HelmChartParser {
     return (String) value;
   }
 
-  private static String validateName(final String name) {
+  private static String validateName(final @Nullable String name) {
     if (name == null || name.isBlank()) {
       throw new BadRequestException("chartNameMissing");
     }
@@ -123,7 +123,7 @@ public class HelmChartParser {
     return name;
   }
 
-  private static String validateVersion(final String version) {
+  private static String validateVersion(final @Nullable String version) {
     if (version == null || version.isBlank()) {
       throw new BadRequestException("chartVersionMissing");
     }
