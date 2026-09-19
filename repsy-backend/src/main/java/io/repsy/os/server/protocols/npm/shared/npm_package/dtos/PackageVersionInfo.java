@@ -20,21 +20,4 @@ import java.util.UUID;
 import lombok.experimental.SuperBuilder;
 
 @SuperBuilder
-public class PackageVersionInfo extends BasePackageVersionInfo<UUID> {
-  private String packageScope;
-  private String packageName;
-  private String version;
-  private String authorName;
-  private String authorEmail;
-  private String authorUrl;
-  private String bugsUrl;
-  private String bugsEmail;
-  private String description;
-  private String homepage;
-  private String license;
-  private String repositoryType;
-  private String repositoryUrl;
-  private boolean deprecated;
-  private String deprecationMessage;
-  private boolean deleted;
-}
+public class PackageVersionInfo extends BasePackageVersionInfo<UUID> {}
