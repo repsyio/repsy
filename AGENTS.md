@@ -72,6 +72,16 @@ for SonarCloud.
 - Commit messages: conventional commits, prefixed with the Jira key where there is one
   (for example `RPS-844: ...`).
 
+## API spec
+
+`repsy-backend/src/main/resources/openapi/openapi-spec.yaml` is the single source of truth for the
+panel API. Edit that file for any API change; there is no other copy. Both sides are generated from it:
+
+- Backend DTOs: `openapi-generator-maven-plugin` in `repsy-backend/pom.xml` writes them to
+  `target/generated-sources/openapi` during the Maven build.
+- Frontend client: `pnpm gen:api` in `repsy-frontend/` writes `src/generated/api`, which is git-ignored.
+  Re-run it after the spec changes. The `Dockerfile` runs the same generator.
+
 ## Database
 
 - PostgreSQL 18 is the supported production database; embedded H2 is also supported (see

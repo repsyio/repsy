@@ -23,6 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.AllowedKeyserver;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.AllowedKeyserverRepository;
@@ -51,6 +52,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -59,6 +63,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -488,6 +493,63 @@ class KeyStoreControllerIT {
               .andReturn();
       assertThat(malformed.getResponse().getStatus()).isEqualTo(400);
       assertError(malformed.getResponse().getContentAsString(), "validationError");
+    }
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the key-store list")
+  class PagingAndSorting {
+
+    private ResultActions list(
+        final Repo repo, final String token, final String param, final String value)
+        throws Exception {
+      return KeyStoreControllerIT.this.mockMvc.perform(
+          get("/api/mvn/key-stores/" + repo.getName())
+              .with(apiPort())
+              .header(AUTHORIZATION, token)
+              .param(param, value));
+    }
+
+    private Repo seededRepo(final String token) throws Exception {
+      final var it = KeyStoreControllerIT.this;
+      final var repo = it.createRepo(RepoType.MAVEN);
+      final var server = it.keyserver("keyserver.pgp.com");
+      assertSuccess(it.performCreate(repo, token, it.body(server.getId())), "keyStoreCreated");
+      return repo;
+    }
+
+    @ParameterizedTest(name = "sort={0}")
+    @ValueSource(strings = {"id", "host", "displayName"})
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String property) throws Exception {
+      final var it = KeyStoreControllerIT.this;
+      final var token = it.tokenFor(it.createUser(UserRole.ADMIN));
+      final var repo = this.seededRepo(token);
+
+      this.list(repo, token, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(repo, token, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400() throws Exception {
+      final var it = KeyStoreControllerIT.this;
+      final var token = it.tokenFor(it.createUser(UserRole.ADMIN));
+      final var repo = this.seededRepo(token);
+
+      PagingAssertions.expectInvalidParameter(
+          this.list(repo, token, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0}={1}")
+    @MethodSource("io.repsy.os.PagingAssertions#invalidPagingParams")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String param, final String value) throws Exception {
+      final var it = KeyStoreControllerIT.this;
+      final var token = it.tokenFor(it.createUser(UserRole.ADMIN));
+      final var repo = this.seededRepo(token);
+
+      PagingAssertions.expectInvalidParameter(this.list(repo, token, param, value), param);
     }
   }
 }

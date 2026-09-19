@@ -27,8 +27,10 @@ import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -53,6 +55,8 @@ import org.springframework.web.bind.annotation.RestController;
 @NullMarked
 @SuppressWarnings("java:S6856")
 public class KeyStoreController {
+
+  private static final Set<String> SORT_PROPERTIES = Set.of("id", "host", "displayName");
 
   private final KeyStoreService keyStoreService;
   private final RestResponseFactory restResponseFactory;
@@ -93,6 +97,8 @@ public class KeyStoreController {
   public RestResponse<PagedModel<KeyStoreItem>> list(
       final RepoInfo repoInfo,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, SORT_PROPERTIES);
 
     final var result = this.keyStoreService.findAll(repoInfo, pageable);
 

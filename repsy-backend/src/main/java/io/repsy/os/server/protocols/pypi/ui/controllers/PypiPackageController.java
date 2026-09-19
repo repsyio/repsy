@@ -29,7 +29,9 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -51,6 +53,11 @@ import org.springframework.web.bind.annotation.RestController;
 @NullMarked
 @SuppressWarnings("java:S6856")
 public class PypiPackageController {
+
+  private static final Set<String> PACKAGE_SORT_PROPERTIES =
+      Set.of("id", "name", "latestVersion", "updatedAt");
+
+  private static final Set<String> RELEASE_SORT_PROPERTIES = Set.of("id", "version", "createdAt");
 
   private final UsageUpdateService usageUpdateService;
   private final PypiApiFacade pypiApiFacade;
@@ -89,6 +96,8 @@ public class PypiPackageController {
       final RepoInfo repoInfo,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
+    SortValidator.requireSortableBy(pageable, PACKAGE_SORT_PROPERTIES);
+
     final var packageList =
         this.pypiPackageService.getPackageList(repoInfo.getStorageKey(), pageable);
 
@@ -101,6 +110,8 @@ public class PypiPackageController {
       final RepoInfo repoInfo,
       @RequestParam(required = false, defaultValue = "") final String name,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, PACKAGE_SORT_PROPERTIES);
 
     final var packageList =
         this.pypiPackageService.getPackagesContainsName(repoInfo.getStorageKey(), name, pageable);
@@ -115,6 +126,8 @@ public class PypiPackageController {
       @PathVariable final String packageName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
+    SortValidator.requireSortableBy(pageable, RELEASE_SORT_PROPERTIES);
+
     final var releases =
         this.pypiPackageService.getReleaseList(repoInfo.getStorageKey(), packageName, pageable);
 
@@ -128,6 +141,8 @@ public class PypiPackageController {
       @PathVariable final String packageName,
       @RequestParam(required = false, defaultValue = "") final String version,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, RELEASE_SORT_PROPERTIES);
 
     final var releases =
         this.pypiPackageService.getReleasesContainsVersion(
