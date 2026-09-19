@@ -70,7 +70,9 @@ class ProfileController {
 
     final var userId = this.jwtUtils.extractUserId(authHeader);
 
-    final var loginInfo = this.profileService.updateUsername(userId, form.getUsername());
+    final var loginInfo =
+        this.profileService.updateUsername(
+            userId, form.getUsername(), this.jwtUtils.extractSessionStart(authHeader));
 
     return this.resp.success("usernameUpdated", loginInfo);
   }

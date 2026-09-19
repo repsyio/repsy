@@ -13,24 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.shared.user.dtos;
+package io.repsy.os.shared.auth.dtos;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import io.repsy.os.shared.user.entities.UserRole;
 import java.time.Instant;
 import java.util.UUID;
-import lombok.Builder;
-import lombok.Data;
+import org.jspecify.annotations.NonNull;
 
-@Data
-@Builder
-public class UserInfo {
-  @JsonIgnore private UUID id;
-  private String username;
-  private String hash;
-  private String salt;
-  private UserRole role;
-  private Instant createdAt;
-  private Instant lastLoginAt;
-  private int tokenVersion;
-}
+/**
+ * The claims of a verified refresh token that decide whether it may be exchanged.
+ *
+ * @param userId the user the token was issued to
+ * @param sessionStart when the login this token descends from happened; carried unchanged across
+ *     refreshes so the session has an absolute lifetime
+ * @param tokenVersion the user's {@code token_version} when the token was issued; a later change of
+ *     it revokes the token
+ */
+public record RefreshTokenClaims(
+    @NonNull UUID userId, @NonNull Instant sessionStart, int tokenVersion) {}
