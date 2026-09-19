@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.shared.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -851,36 +850,6 @@ class ProtocolDeployTokenControllerIT {
     }
 
     /**
-     * {@code DeployTokenForm} allows a username of up to 150 characters but the {@code username}
-     * column is {@code varchar(80)}, so 81..150 characters pass request validation and are only
-     * rejected by the database. The INSERT is deferred to the flush, which is why the failure is
-     * observed there rather than in the response: the test's outer transaction keeps the handler's
-     * own commit-time flush from running. In production that flush runs when the service method
-     * returns. Widening the column or lowering the form limit to 80 should replace this test with
-     * one of the boundary cases above.
-     */
-    @Test
-    @DisplayName("passes validation for an 81-character username that the database then rejects")
-    void usernameLongerThanColumnIsRejectedByTheDatabase() {
-      final var it = ProtocolDeployTokenControllerIT.this;
-      final var repo = it.createRepo(RepoType.MAVEN);
-      final var token = it.adminBearerToken();
-
-      assertThatThrownBy(
-              () -> {
-                it.perform(
-                    post(tokensUrl(repo))
-                        .header(AUTHORIZATION, token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                            "{\"name\":\"long-user\",\"username\":\"%s\"}"
-                                .formatted("u".repeat(81))));
-                it.entityManager.flush();
-              })
-          .hasStackTraceContaining("value too long for type character varying(80)");
-    }
-
-    /**
      * {@code DeployTokenForm} declares no name pattern, so any 1..80-character string is accepted,
      * including whitespace-only and punctuation-heavy names.
      */
@@ -987,8 +956,8 @@ class ProtocolDeployTokenControllerIT {
           Arguments.of("null name", "{\"name\":null}"),
           Arguments.of("name too long", "{\"name\":\"%s\"}".formatted("n".repeat(81))),
           Arguments.of(
-              "username too long",
-              "{\"name\":\"n\",\"username\":\"%s\"}".formatted("u".repeat(151))),
+              "username longer than the column",
+              "{\"name\":\"n\",\"username\":\"%s\"}".formatted("u".repeat(81))),
           Arguments.of(
               "description too long",
               "{\"name\":\"n\",\"description\":\"%s\"}".formatted("d".repeat(501))),
@@ -1210,21 +1179,35 @@ class ProtocolDeployTokenControllerIT {
       assertThat(namesOf(descending)).containsExactly("charlie", "bravo", "alpha");
     }
 
-    /**
-     * The story expected out-of-range paging to answer 500 (RPS-848) and asked to pin it. That is
-     * not what happens here: RPS-848 validated only the explicit {@code page}/{@code size} params
-     * of {@code GET /api/users} and {@code GET /api/security/scans}. This endpoint takes a Spring
-     * Data {@code Pageable}, whose argument resolver silently falls back to the defaults (page 0,
-     * size 10) for non-numeric values, clamps a negative page to 0, and replaces a size below 1
-     * with the default. Nothing caps the size at 100 either. Pinned as-is; tightening it belongs
-     * with RPS-848 follow-up work and should turn this into a 400 {@code validationError} test.
-     */
     @ParameterizedTest(name = "{0}={1}")
-    @MethodSource("lenientPagingParams")
-    @DisplayName("falls back to defaults instead of failing for non-numeric or out-of-range paging")
-    void lenientPagingParam(
-        final String param, final String value, final long expectedSize, final long expectedNumber)
-        throws Exception {
+    @MethodSource("invalidPagingParams")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String param, final String value) throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var repo = it.createRepo(RepoType.MAVEN);
+      it.seedToken(repo, "only");
+
+      expectValidationError(
+          it.perform(
+              get(tokensUrl(repo))
+                  .header(AUTHORIZATION, it.adminBearerToken())
+                  .param(param, value)),
+          param);
+    }
+
+    static Stream<Arguments> invalidPagingParams() {
+      return Stream.of(
+          Arguments.of("page", "abc"),
+          Arguments.of("size", "abc"),
+          Arguments.of("page", "-1"),
+          Arguments.of("size", "0"),
+          Arguments.of("size", "-1"),
+          Arguments.of("size", "101"));
+    }
+
+    @Test
+    @DisplayName("accepts the largest allowed size")
+    void acceptsMaxPageSize() throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var repo = it.createRepo(RepoType.MAVEN);
       it.seedToken(repo, "only");
@@ -1234,21 +1217,20 @@ class ProtocolDeployTokenControllerIT {
               it.perform(
                   get(tokensUrl(repo))
                       .header(AUTHORIZATION, it.adminBearerToken())
-                      .param(param, value)),
+                      .param("size", "100")),
               "TokenFetched");
 
       assertThat(namesOf(body)).containsExactly("only");
-      assertPage(body, expectedSize, expectedNumber, 1, 1);
+      assertPage(body, 100, 0, 1, 1);
     }
 
-    static Stream<Arguments> lenientPagingParams() {
-      return Stream.of(
-          Arguments.of("page", "abc", 10, 0),
-          Arguments.of("size", "abc", 10, 0),
-          Arguments.of("page", "-1", 10, 0),
-          Arguments.of("size", "0", 10, 0),
-          Arguments.of("size", "-1", 10, 0),
-          Arguments.of("size", "101", 101, 0));
+    @Test
+    @DisplayName("answers 401 unAuthorized, not 400, when a bad size comes without credentials")
+    void authenticationComesBeforePagingValidation() throws Exception {
+      final var repo = ProtocolDeployTokenControllerIT.this.createRepo(RepoType.MAVEN);
+
+      expectUnauthorized(
+          ProtocolDeployTokenControllerIT.this.perform(get(tokensUrl(repo)).param("size", "0")));
     }
   }
 
