@@ -22,23 +22,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.RepsyApplication;
+import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import io.repsy.os.shared.user.services.UserTxService;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -53,104 +42,36 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Full-stack integration tests for {@code /api/users/*}, exercising the real Spring context, MVC
  * dispatch and a containerized PostgreSQL database (Flyway-migrated) end to end.
  *
- * <p>Follows the pattern established by {@code ProfileControllerIT}: requests go through {@link
- * MockMvc}, but {@code UserController} is only registered on the "api" multiport connector, so
- * every request is routed through {@link #apiPort()} to fake the local port onto {@code
- * multiport.ports.api} (8080).
- *
- * <p>Every test method runs in one transaction that is rolled back afterwards, so the only data
- * that survives between tests is what the application seeds at startup (the {@code admin} user).
- * Tests that list users therefore scope their query with a unique {@code search} tag instead of
- * relying on the table being empty.
+ * <p>The container, the fake {@code multiport.ports.api} local port ({@link #apiPort()}, needed
+ * because {@code UserController} is only registered on the "api" connector), the user and JWT
+ * fixtures and the per-test rollback all come from {@link AbstractIntegrationTest}. The only data
+ * that survives between tests is what the application seeds at startup (the {@code admin} user and
+ * the default repos), so tests that list users scope their query with a unique {@code search} tag
+ * instead of relying on the table being empty.
  */
-@Testcontainers
-@AutoConfigureMockMvc
-@Transactional
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("UserController /api/users/*")
-class UserControllerIT {
+class UserControllerIT extends AbstractIntegrationTest {
 
-  private static final int API_PORT = 8080;
-  private static final String VALID_PASSWORD = "Password1!";
-  private static final String SEEDED_ADMIN_USERNAME = "admin";
-  private static final String UUID_PATTERN =
-      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
   private static final String USERNAME_IN_USE_TEXT = "Username is in use. Please try another one.";
   private static final String USER_NOT_FOUND_TEXT = "User not found.";
   private static final Instant BASE_TIME = Instant.parse("2026-01-01T00:00:00Z");
 
-  private static final String[] ENVELOPE_KEYS = {"msgId", "type", "data", "errorCode", "text"};
   private static final String[] USER_KEYS = {"id", "username", "role", "createdAt", "lastLoginAt"};
   private static final String[] PAGE_KEYS = {"size", "number", "totalElements", "totalPages"};
-
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", UserControllerIT::tempStoragePath);
-  }
-
-  private static String tempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-users-it").toString();
-    } catch (final IOException e) {
-      throw new UncheckedIOException(e);
-    }
-  }
-
-  @Autowired private MockMvc mockMvc;
-  @Autowired private JwtUtils jwtUtils;
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
-  @PersistenceContext private EntityManager entityManager;
 
   // ---------------------------------------------------------------------------------------------
   // Request / fixture helpers
   // ---------------------------------------------------------------------------------------------
-
-  private static RequestPostProcessor apiPort() {
-    return request -> {
-      request.setLocalPort(API_PORT);
-      return request;
-    };
-  }
-
-  private static String randomTag() {
-    return UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-  }
-
-  private static String uniqueUsername(final String prefix) {
-    return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
-  }
 
   private static String createBody(
       final String username, final String password, final String role) {
@@ -160,25 +81,6 @@ class UserControllerIT {
 
   private static String updateBody(final String username, final String role) {
     return "{\"username\":\"%s\",\"role\":\"%s\"}".formatted(username, role);
-  }
-
-  private ResultActions perform(final MockHttpServletRequestBuilder request) throws Exception {
-    return this.mockMvc.perform(request.with(apiPort()));
-  }
-
-  /**
-   * Creates and returns a user with its {@code createdAt} populated. The whole test method runs in
-   * one transaction, so the newly persisted entity sits unflushed in Hibernate's first-level cache;
-   * {@code createdAt} is a before-execution generator that only assigns a value once the INSERT is
-   * actually flushed, and {@link UserRepository#findById} would otherwise just hand back the same
-   * managed, still-null instance.
-   */
-  private User createUser(final String username, final UserRole role) {
-    final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword(VALID_PASSWORD, salt);
-    final var userInfo = this.userTxService.create(username, role, hash, salt);
-    this.entityManager.flush();
-    return this.userRepository.findById(userInfo.getId()).orElseThrow();
   }
 
   /**
@@ -204,77 +106,17 @@ class UserControllerIT {
     return this.userRepository.findById(userId).orElseThrow();
   }
 
-  private String bearerTokenFor(final User user) {
-    return this.bearerTokenFor(user.getId(), user.getUsername());
-  }
-
-  private String bearerTokenFor(final UUID userId, final String username) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofMinutes(30));
-  }
-
-  private String expiredBearerTokenFor(final User user) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(
-            user.getId(), user.getUsername(), Duration.ofSeconds(-30));
-  }
-
-  /** Creates a fresh, non-seeded ADMIN and returns a valid bearer token for it. */
-  private String adminBearerToken() {
-    return this.bearerTokenFor(this.createUser(uniqueUsername("caller"), UserRole.ADMIN));
-  }
-
-  private User seededAdmin() {
-    return this.userRepository.findByUsername(SEEDED_ADMIN_USERNAME).orElseThrow();
-  }
-
   // ---------------------------------------------------------------------------------------------
   // Response helpers
   // ---------------------------------------------------------------------------------------------
 
   /**
-   * Asserts a 200 SUCCESS envelope (exact key set, {@code errorCode} null, {@code text} falling
-   * back to the msgId because the success ids have no entry in messages.properties) and returns the
-   * raw body for further assertions on {@code data}.
+   * Asserts a 200 SUCCESS envelope whose {@code text} falls back to the msgId, because the success
+   * ids used here have no entry in messages.properties.
    */
   private static String expectSuccess(final ResultActions result, final String msgId)
       throws Exception {
-    final var body =
-        result.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-
-    final Map<String, Object> envelope = JsonPath.read(body, "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "SUCCESS")
-        .containsEntry("errorCode", null)
-        .containsEntry("text", msgId);
-    return body;
-  }
-
-  /** Asserts a complete ERROR envelope, including the generated {@code errorCode} UUID. */
-  private static void expectError(
-      final ResultActions result,
-      final HttpStatus expectedStatus,
-      final String msgId,
-      final String data,
-      final String text)
-      throws Exception {
-    final var body =
-        result
-            .andExpect(status().is(expectedStatus.value()))
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
-
-    final Map<String, Object> envelope = JsonPath.read(body, "$");
-    assertThat(envelope)
-        .containsOnlyKeys(ENVELOPE_KEYS)
-        .containsEntry("msgId", msgId)
-        .containsEntry("type", "ERROR")
-        .containsEntry("data", data)
-        .containsEntry("text", text);
-    assertThat((String) envelope.get("errorCode")).matches(UUID_PATTERN);
+    return expectSuccess(result, msgId, msgId);
   }
 
   private static void expectValidationError(final ResultActions result) throws Exception {

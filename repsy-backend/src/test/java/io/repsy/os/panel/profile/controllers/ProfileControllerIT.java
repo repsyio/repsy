@@ -30,121 +30,27 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.auth0.jwt.JWT;
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.RepsyApplication;
+import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
-import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.repositories.UserRepository;
-import io.repsy.os.shared.user.services.UserTxService;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import java.nio.file.Files;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Full-stack integration tests for {@code /api/profile/*}, exercising the real Spring context, MVC
  * dispatch and a containerized PostgreSQL database (Flyway-migrated) end to end.
  *
- * <p>Requests are made through {@link MockMvc}, but {@code ProfileController} is only registered on
- * the "api" multiport connector, and the custom {@code PortBasedRequestMappingHandlerMapping}
- * buckets handlers by {@link jakarta.servlet.ServletRequest#getLocalPort()}. {@link
- * MockMvc#perform} defaults local port to 80, which matches nothing, so every request goes through
- * {@link #apiPort()} to fake the local port onto {@code multiport.ports.api} (8080).
+ * <p>The container, the fake {@code multiport.ports.api} local port ({@link #apiPort()}, needed
+ * because {@code ProfileController} is only registered on the "api" connector), the user and JWT
+ * fixtures and the per-test rollback all come from {@link AbstractIntegrationTest}.
  */
-@Testcontainers
-@AutoConfigureMockMvc
-@Transactional
-@SpringBootTest(
-    classes = RepsyApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @DisplayName("ProfileController /api/profile/*")
-class ProfileControllerIT {
-
-  private static final int API_PORT = 8080;
-  private static final String VALID_PASSWORD = "Password1!";
-
-  @Container @ServiceConnection
-  static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>("postgres:18")
-          .withDatabaseName("repsy")
-          .withUsername("repsy")
-          .withPassword("repsy123");
-
-  @DynamicPropertySource
-  static void registerDynamicProperties(final DynamicPropertyRegistry registry) {
-    registry.add("storage-gateway.fs.base-path", ProfileControllerIT::tempStoragePath);
-  }
-
-  private static String tempStoragePath() {
-    try {
-      return Files.createTempDirectory("repsy-profile-it").toString();
-    } catch (final java.io.IOException e) {
-      throw new java.io.UncheckedIOException(e);
-    }
-  }
-
-  @Autowired private MockMvc mockMvc;
-  @Autowired private JwtUtils jwtUtils;
-  @Autowired private UserTxService userTxService;
-  @Autowired private UserRepository userRepository;
-  @PersistenceContext private EntityManager entityManager;
-
-  private static RequestPostProcessor apiPort() {
-    return request -> {
-      request.setLocalPort(API_PORT);
-      return request;
-    };
-  }
-
-  private static String uniqueUsername(final String prefix) {
-    return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
-  }
-
-  /**
-   * Creates and returns a user with its {@code createdAt} populated. The whole test method runs in
-   * one transaction (see class Javadoc), so the newly persisted entity sits unflushed in
-   * Hibernate's first-level cache; {@code createdAt} is a before-execution generator that only
-   * assigns a value once the INSERT is actually flushed, and {@link UserRepository#findById} would
-   * otherwise just hand back the same managed, still-null instance.
-   */
-  private User createUser(final String username, final UserRole role) {
-    final var salt = PasswordGeneratorUtil.generateSalt();
-    final var hash = PasswordGeneratorUtil.hashPassword(VALID_PASSWORD, salt);
-    final var userInfo = this.userTxService.create(username, role, hash, salt);
-    this.entityManager.flush();
-    return this.userRepository.findById(userInfo.getId()).orElseThrow();
-  }
-
-  private String bearerTokenFor(final UUID userId, final String username) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofMinutes(30));
-  }
-
-  private String expiredBearerToken(final UUID userId, final String username) {
-    return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(userId, username, Duration.ofSeconds(-30));
-  }
+class ProfileControllerIT extends AbstractIntegrationTest {
 
   @Nested
   @DisplayName("GET /api/profile")
@@ -265,8 +171,7 @@ class ProfileControllerIT {
     void expiredToken() throws Exception {
       final var user =
           ProfileControllerIT.this.createUser(uniqueUsername("expired"), UserRole.USER);
-      final var token =
-          ProfileControllerIT.this.expiredBearerToken(user.getId(), user.getUsername());
+      final var token = ProfileControllerIT.this.expiredBearerTokenFor(user);
 
       ProfileControllerIT.this
           .mockMvc
@@ -507,8 +412,7 @@ class ProfileControllerIT {
         "returns 403 for an expired token (extractUserId verifies internally, same as GET)")
     void expiredToken() throws Exception {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("expusr"), UserRole.USER);
-      final var token =
-          ProfileControllerIT.this.expiredBearerToken(user.getId(), user.getUsername());
+      final var token = ProfileControllerIT.this.expiredBearerTokenFor(user);
 
       ProfileControllerIT.this
           .mockMvc
@@ -782,8 +686,7 @@ class ProfileControllerIT {
     @DisplayName("returns 403 for an expired token")
     void expiredToken() throws Exception {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("delexp"), UserRole.USER);
-      final var token =
-          ProfileControllerIT.this.expiredBearerToken(user.getId(), user.getUsername());
+      final var token = ProfileControllerIT.this.expiredBearerTokenFor(user);
 
       ProfileControllerIT.this
           .mockMvc
