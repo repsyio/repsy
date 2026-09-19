@@ -89,7 +89,6 @@ public class ErrorHandler {
   private static final @NonNull String ERR_SIGNATURE_NOT_VERIFIED = "artifactSignatureNotVerified";
   private static final @NonNull String ERR_MISSING_REQUEST_HEADER = "missingRequestHeader";
   private static final @NonNull String ERR_SCAN_EXECUTOR_SATURATED = "scanExecutorSaturated";
-  private static final @NonNull String ERR_ILLEGAL_ARGUMENT = "Invalid method argument";
 
   private final @NonNull RestResponseFactory resp;
 
@@ -479,7 +478,7 @@ public class ErrorHandler {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Item not found", ex);
+      log.debug("Resource not found", ex);
 
       return null;
     }
@@ -498,7 +497,7 @@ public class ErrorHandler {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug(ERR_ILLEGAL_ARGUMENT, ex);
+      log.debug("Method argument not valid", ex);
 
       return null;
     }
@@ -517,7 +516,7 @@ public class ErrorHandler {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug(ERR_ILLEGAL_ARGUMENT, ex);
+      log.debug("Missing request parameter", ex);
 
       return null;
     }
@@ -536,7 +535,7 @@ public class ErrorHandler {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug(ERR_ILLEGAL_ARGUMENT, ex);
+      log.debug("Unauthorized request", ex);
 
       return null;
     }
