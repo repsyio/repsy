@@ -16,14 +16,19 @@
 package io.repsy.os.server.protocols.cargo.ui.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.RepsyApplication;
+import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateIndexRepository;
+import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateMetaRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.services.CargoCrateServiceImpl;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -36,6 +41,7 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
+import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -107,6 +113,8 @@ class CargoCrateControllerIT {
   @Autowired private UserRepository userRepository;
   @Autowired private RepoRepository repoRepository;
   @Autowired private CargoCrateServiceImpl crateService;
+  @Autowired private CargoCrateIndexRepository crateIndexRepository;
+  @Autowired private CargoCrateMetaRepository crateMetaRepository;
   @Autowired private CargoStorageService cargoStorageService;
   @PersistenceContext private EntityManager entityManager;
 
@@ -211,6 +219,57 @@ class CargoCrateControllerIT {
             null));
   }
 
+  private void publishRich(final Repo repo, final String name, final String version)
+      throws Exception {
+    final var info = this.repoInfo(repo);
+    final var normalized = CrateUtils.normalizeCrateName(name);
+    final var dependency =
+        new CratePublishDep(
+            "serde",
+            "^1.0",
+            List.of("derive"),
+            true,
+            false,
+            "cfg(unix)",
+            "dev",
+            "https://example.test/registry",
+            "serde1");
+    final var features = Map.of("default", List.of("serde1"), "full", List.of("serde1"));
+    final var indexLine =
+        "{\"name\":\"%s\",\"vers\":\"%s\",\"deps\":[{\"name\":\"serde1\",\"req\":\"^1.0\",\"features\":[\"derive\"],\"optional\":true,\"default_features\":false,\"target\":\"cfg(unix)\",\"kind\":\"dev\",\"registry\":\"https://example.test/registry\",\"package\":\"serde\"}],\"cksum\":\"checksum-%s\",\"features\":{\"default\":[\"serde1\"],\"full\":[\"serde1\"]},\"features2\":{\"full\":[\"serde1\"]},\"yanked\":false,\"links\":\"native\",\"v\":2,\"rust_version\":\"1.85\"}"
+            .formatted(normalized, version, version);
+    this.cargoStorageService.writeCrateAndIndex(
+        repo.getId(),
+        repo.getName(),
+        normalized,
+        version,
+        ("crate-" + version).getBytes(java.nio.charset.StandardCharsets.UTF_8),
+        indexLine);
+    this.crateService.publish(
+        info,
+        new CratePublishRequest(
+            name,
+            version,
+            true,
+            List.of(dependency),
+            features,
+            List.of("Ada Lovelace"),
+            "A fully described crate",
+            "https://docs.example.test",
+            "https://example.test",
+            "README",
+            null,
+            List.of("cargo", "integration"),
+            List.of("testing", "ffi"),
+            "MIT",
+            "LICENSE",
+            "https://example.test/repo",
+            "native",
+            "1.85",
+            "checksum-" + version,
+            Map.of("full", List.of("serde1"))));
+  }
+
   private ResultActions request(final String method, final String path, final String auth)
       throws Exception {
     final var builder =
@@ -283,7 +342,19 @@ class CargoCrateControllerIT {
               .getResponse()
               .getContentAsString();
       final var envelope = (Map<String, Object>) JsonPath.read(response, "$");
-      assertThat(envelope).containsOnlyKeys(ENVELOPE_KEYS).containsEntry("msgId", "cratesFetched");
+      assertThat(envelope)
+          .containsOnlyKeys(ENVELOPE_KEYS)
+          .containsEntry("msgId", "cratesFetched")
+          .containsEntry("type", "SUCCESS")
+          .containsEntry("errorCode", null)
+          .containsEntry("text", "cratesFetched");
+      assertThat((Map<String, Object>) envelope.get("data")).containsOnlyKeys("content", "page");
+      assertThat((Map<String, Object>) ((Map<String, Object>) envelope.get("data")).get("page"))
+          .containsOnlyKeys("size", "number", "totalElements", "totalPages")
+          .containsEntry("size", 1)
+          .containsEntry("number", 0)
+          .containsEntry("totalElements", 1)
+          .containsEntry("totalPages", 1);
       assertThat(JsonPath.<Integer>read(response, "$.data.page.size")).isEqualTo(1);
       assertThat(JsonPath.<Integer>read(response, "$.data.page.totalElements")).isEqualTo(1);
       assertThat(JsonPath.<List<?>>read(response, "$.data.content")).hasSize(1);
@@ -305,8 +376,19 @@ class CargoCrateControllerIT {
               .getResponse()
               .getContentAsString();
       assertThat(data(crate))
-          .containsKeys(
-              "id", "name", "original_name", "max_version", "authors", "keywords", "categories");
+          .containsOnlyKeys(
+              "id",
+              "name",
+              "original_name",
+              "max_version",
+              "total_downloads",
+              "description",
+              "homepage",
+              "repository",
+              "authors",
+              "keywords",
+              "categories",
+              "hasLib");
       assertThat(JsonPath.<String>read(crate, "$.data.name")).isEqualTo("demo_crate");
       assertThat(JsonPath.<String>read(crate, "$.data.max_version")).isEqualTo("2.0.0");
 
@@ -345,6 +427,76 @@ class CargoCrateControllerIT {
               .getContentAsString();
       assertThat(JsonPath.<List<?>>read(versions, "$.data.content")).hasSize(1);
       assertThat(JsonPath.<String>read(versions, "$.data.content[0].version")).isEqualTo("2.0.0");
+    }
+
+    @Test
+    void returnsDependenciesFeaturesAndYankedVersionMetadata() throws Exception {
+      final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, false);
+      CargoCrateControllerIT.this.publishRich(repo, "rich_crate", "1.2.3");
+      CargoCrateControllerIT.this.crateService.yank(
+          CargoCrateControllerIT.this.repoInfo(repo), "rich_crate", "1.2.3");
+
+      final var response =
+          body(
+              CargoCrateControllerIT.this
+                  .request("GET", "/api/cargo/crates/" + repo.getName() + "/rich_crate/1.2.3", null)
+                  .andExpect(status().isOk()));
+      assertThat(JsonPath.<Map<String, Object>>read(response, "$.data"))
+          .containsOnlyKeys(
+              "crateId",
+              "name",
+              "version",
+              "readme",
+              "license",
+              "license_file",
+              "documentation",
+              "edition",
+              "rust_version",
+              "deps",
+              "downloads",
+              "hasLib",
+              "created_at");
+      assertThat(JsonPath.<Map<String, Object>>read(response, "$.data.deps[0]"))
+          .containsOnlyKeys(
+              "name",
+              "req",
+              "features",
+              "optional",
+              "default_features",
+              "target",
+              "kind",
+              "registry",
+              "package");
+      assertThat(JsonPath.<String>read(response, "$.data.license")).isEqualTo("MIT");
+      assertThat(JsonPath.<String>read(response, "$.data.rust_version")).isEqualTo("1.85");
+      assertThat(
+              CargoCrateControllerIT.this
+                  .crateIndexRepository
+                  .findAllByCrateRepoIdAndName(repo.getId(), "rich_crate")
+                  .getFirst()
+                  .isYanked())
+          .isTrue();
+    }
+
+    @Test
+    void honorsPaginationBoundariesAndCaseInsensitiveVersionQuery() throws Exception {
+      final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, false);
+      CargoCrateControllerIT.this.publish(repo, "paged", "1.0.0");
+      CargoCrateControllerIT.this.publish(repo, "paged", "2.0.0");
+      final var response =
+          body(
+              CargoCrateControllerIT.this
+                  .request(
+                      "GET",
+                      "/api/cargo/crates/"
+                          + repo.getName()
+                          + "/paged/versions?query=0.0&page=1&size=1",
+                      null)
+                  .andExpect(status().isOk()));
+      assertThat(JsonPath.<List<?>>read(response, "$.data.content")).hasSize(1);
+      assertThat(JsonPath.<String>read(response, "$.data.content[0].version")).isEqualTo("1.0.0");
+      assertThat(JsonPath.<Integer>read(response, "$.data.page.number")).isEqualTo(1);
+      assertThat(JsonPath.<Integer>read(response, "$.data.page.totalElements")).isEqualTo(2);
     }
 
     @Test
@@ -421,6 +573,27 @@ class CargoCrateControllerIT {
           "unAuthorized",
           "The user has logged in but has no permissions.");
     }
+
+    @Test
+    void allowsAnAuthenticatedUserToReadAPrivateRepo() throws Exception {
+      final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, true);
+      final var user = CargoCrateControllerIT.this.createUser("noaccess", UserRole.USER);
+      CargoCrateControllerIT.this
+          .request(
+              "GET", "/api/cargo/crates/" + repo.getName(), CargoCrateControllerIT.this.token(user))
+          .andExpect(status().isOk());
+    }
+
+    @Test
+    void pinsBehaviorForARepositoryOfAnotherType() throws Exception {
+      final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.MAVEN, false);
+      final var response =
+          body(
+              CargoCrateControllerIT.this
+                  .request("GET", "/api/cargo/crates/" + repo.getName(), null)
+                  .andExpect(status().isOk()));
+      assertThat(JsonPath.<List<?>>read(response, "$.data.content")).isEmpty();
+    }
   }
 
   @Nested
@@ -441,10 +614,20 @@ class CargoCrateControllerIT {
               CargoCrateControllerIT.this.token(user)),
           "crateVersionDeleted");
       CargoCrateControllerIT.this.entityManager.flush();
+      assertThat(CargoCrateControllerIT.this.crateIndexRepository.findAll()).hasSize(1);
+      assertThat(CargoCrateControllerIT.this.crateMetaRepository.findAll()).hasSize(1);
       assertThat(CargoCrateControllerIT.this.repoRepository.findByName(repo.getName())).isPresent();
+      assertThatThrownBy(
+              () ->
+                  CargoCrateControllerIT.this.cargoStorageService.getCrate(
+                      repo.getId(), repo.getName(), "delete-me", "1.0.0"))
+          .hasMessageContaining("crateNotFound");
       CargoCrateControllerIT.this
           .request("GET", "/api/cargo/crates/" + repo.getName() + "/delete-me/1.0.0", null)
           .andExpect(status().isNotFound());
+      CargoCrateControllerIT.this
+          .request("GET", "/api/cargo/crates/" + repo.getName() + "/delete-me/2.0.0", null)
+          .andExpect(status().isOk());
 
       expectSuccess(
           CargoCrateControllerIT.this.request(
@@ -452,6 +635,14 @@ class CargoCrateControllerIT {
               "/api/cargo/crates/" + repo.getName() + "/delete-me",
               CargoCrateControllerIT.this.token(user)),
           "crateDeleted");
+      CargoCrateControllerIT.this.entityManager.flush();
+      assertThat(CargoCrateControllerIT.this.crateIndexRepository.findAll()).isEmpty();
+      assertThat(CargoCrateControllerIT.this.crateMetaRepository.findAll()).isEmpty();
+      assertThatThrownBy(
+              () ->
+                  CargoCrateControllerIT.this.cargoStorageService.getCrate(
+                      repo.getId(), repo.getName(), "delete-me", "2.0.0"))
+          .hasMessageContaining("crateNotFound");
       expectError(
           CargoCrateControllerIT.this.request(
               "DELETE",
@@ -483,6 +674,12 @@ class CargoCrateControllerIT {
     final var repo = this.seedRepo(RepoType.CARGO, false);
     this.mockMvc
         .perform(post("/api/cargo/crates/" + repo.getName()).with(apiPort()))
+        .andExpect(status().isNotFound());
+    this.mockMvc
+        .perform(put("/api/cargo/crates/" + repo.getName()).with(apiPort()))
+        .andExpect(status().isNotFound());
+    this.mockMvc
+        .perform(patch("/api/cargo/crates/" + repo.getName()).with(apiPort()))
         .andExpect(status().isNotFound());
   }
 }
