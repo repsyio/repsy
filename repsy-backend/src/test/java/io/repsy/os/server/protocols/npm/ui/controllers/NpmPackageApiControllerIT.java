@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.npm.ui.controllers;
 
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
@@ -298,6 +299,51 @@ class NpmPackageApiControllerIT {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
           .andExpect(jsonPath("$.data.packageName").value("scope"));
+    }
+
+    @Test
+    void populatesCompleteVersionDetailForAnExplicitVersion() throws Exception {
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/packages/{repo}/plain-package/versions/1.0.0", repoName))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.id").value(notNullValue()))
+          .andExpect(jsonPath("$.data.packageName").value("plain-package"))
+          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
+          .andExpect(jsonPath("$.data.description").value("integration fixture"))
+          .andExpect(jsonPath("$.data.authorName").value("Repsy"))
+          .andExpect(jsonPath("$.data.authorEmail").value("test@repsy.io"))
+          .andExpect(jsonPath("$.data.license").value("Apache-2.0"))
+          .andExpect(jsonPath("$.data.homepage").value("https://repsy.io"))
+          .andExpect(jsonPath("$.data.deprecated").value(false))
+          .andExpect(
+              jsonPath("$.data.keywords[*].keyword").value(containsInAnyOrder("fixture", "npm")));
+      NpmPackageApiControllerIT.this
+          .perform(
+              get(
+                  "/api/npm/packages/{repo}/{scope}/{package}/versions/1.0.0",
+                  repoName,
+                  "tools",
+                  "scoped-package"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.scopeName").value("tools"))
+          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
+          .andExpect(jsonPath("$.data.description").value("integration fixture"));
+    }
+
+    @Test
+    void populatesVersionNameWhenTheVersionIsOmittedAndDefaultsToLatest() throws Exception {
+      NpmPackageApiControllerIT.this
+          .perform(
+              get(
+                  "/api/npm/packages/{repo}/{scope}/{package}",
+                  repoName,
+                  "tools",
+                  "scoped-package"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.scopeName").value("tools"))
+          .andExpect(jsonPath("$.data.packageName").value("scoped-package"))
+          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
+          .andExpect(jsonPath("$.data.license").value("Apache-2.0"));
     }
 
     @Test
