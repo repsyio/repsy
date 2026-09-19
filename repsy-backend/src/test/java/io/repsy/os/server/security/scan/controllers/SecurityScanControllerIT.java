@@ -440,17 +440,13 @@ class SecurityScanControllerIT {
     return expectSuccess(result, "scansFetched", "Vulnerability scans fetched.");
   }
 
-  /**
-   * {@code scansSummaryFetched} and {@code supportedRepoTypesFetched} have no entry in
-   * messages.properties, so {@code text} is the raw key. Pinned as current behavior; RPS-895 adds
-   * the sentences and this text then changes.
-   */
   private static String expectSummary(final ResultActions result) throws Exception {
-    return expectSuccess(result, "scansSummaryFetched", "scansSummaryFetched");
+    return expectSuccess(result, "scansSummaryFetched", "Vulnerability scans summary fetched.");
   }
 
   private static String expectSupportedRepoTypes(final ResultActions result) throws Exception {
-    return expectSuccess(result, "supportedRepoTypesFetched", "supportedRepoTypesFetched");
+    return expectSuccess(
+        result, "supportedRepoTypesFetched", "Supported repository types fetched.");
   }
 
   /** Asserts a complete ERROR envelope, including the generated {@code errorCode} UUID. */
