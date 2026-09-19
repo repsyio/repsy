@@ -39,14 +39,17 @@ public class UsageUpdateService {
   }
 
   private void updateRepoUsage(final @NonNull UUID repoId, final long diskUsageDiff) {
-    final var repo = this.repoTxService.getRepoEntity(repoId);
-
-    this.repoTxService.updateDiskUsage(repoId, diskUsageDiff);
-
-    final var newDiskUsage = repo.getDiskUsage() + diskUsageDiff;
-
-    if (newDiskUsage < 0) {
-      log.error("Repo {} disk usage is negative: {}", repo.getName(), newDiskUsage);
+    if (!this.repoTxService.updateDiskUsage(repoId, diskUsageDiff)) {
+      // The repo was deleted after this update was submitted, so there is nothing to update.
+      log.debug(
+          "Repo {} no longer exists, skipping disk usage update of {}", repoId, diskUsageDiff);
+      return;
     }
+
+    this.repoTxService
+        .findDiskUsage(repoId)
+        .filter(newDiskUsage -> newDiskUsage < 0)
+        .ifPresent(
+            newDiskUsage -> log.error("Repo {} disk usage is negative: {}", repoId, newDiskUsage));
   }
 }

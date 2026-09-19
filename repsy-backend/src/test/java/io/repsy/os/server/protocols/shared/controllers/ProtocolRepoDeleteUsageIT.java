@@ -78,6 +78,9 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code repoNotFound} on the async thread, where {@code SimpleAsyncUncaughtExceptionHandler} only
  * logs it at ERROR. The tests capture every ERROR logged while they run and require none.
  *
+ * <p>Any other caller of {@link UsageUpdateService#updateUsage} can hit the same race (RPS-966), so
+ * one test submits an update itself and holds it back past the delete.
+ *
  * <p>Left alone, the async update nearly always reaches the row first (and its {@code UPDATE} lock
  * makes the delete wait), so the race only shows when the task is delayed. {@link GatedExecutor}
  * makes that delay deterministic: it replaces the default {@code @Async} executor (through an
@@ -304,6 +307,23 @@ class ProtocolRepoDeleteUsageIT extends AbstractIntegrationTest {
     this.recordUsage(repo.getId(), 9);
 
     this.asyncExecutor.close();
+    this.deleteRepo(repo);
+    assertThat(this.repoRepository.existsById(repo.getId())).isFalse();
+    this.asyncExecutor.open();
+
+    this.assertNoErrorLogged();
+    assertThat(this.totals()).isEqualTo(baseline);
+  }
+
+  @Test
+  @DisplayName("skips a usage update that runs after its repo was deleted, logging no error")
+  void skipsUpdateHeldBackPastTheDelete() throws Exception {
+    final var baseline = this.totals();
+    final var repo = this.createRepo(RepoType.MAVEN);
+    this.recordUsage(repo.getId(), 9);
+
+    this.asyncExecutor.close();
+    this.usageUpdateService.updateUsage(new UsageChangedInfo(repo.getId(), BaseUsages.ofDisk(-9)));
     this.deleteRepo(repo);
     assertThat(this.repoRepository.existsById(repo.getId())).isFalse();
     this.asyncExecutor.open();
