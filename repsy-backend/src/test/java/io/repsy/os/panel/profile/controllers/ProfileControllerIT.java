@@ -391,6 +391,30 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("rejects an access token issued before the password change")
+    void revokesAccessTokensIssuedBefore() throws Exception {
+      final var user =
+          ProfileControllerIT.this.createUser(uniqueUsername("pwaccess"), UserRole.USER);
+      final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
+
+      ProfileControllerIT.this
+          .mockMvc
+          .perform(
+              put("/api/profile/password")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body("NewPassword2@")))
+          .andExpect(status().isOk());
+
+      ProfileControllerIT.this
+          .mockMvc
+          .perform(get("/api/profile").with(apiPort()).header(AUTHORIZATION, token))
+          .andExpect(status().isUnauthorized())
+          .andExpect(jsonPath("$.msgId").value("sessionExpired"));
+    }
+
+    @Test
     @DisplayName("returns 400 usernameInUse for a reserved username")
     void reservedUsername() throws Exception {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("resv"), UserRole.USER);

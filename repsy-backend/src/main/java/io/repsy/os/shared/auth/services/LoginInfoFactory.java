@@ -43,7 +43,8 @@ public class LoginInfoFactory {
             user.getId(),
             user.getUsername(),
             AuthUtils.boundBySession(AuthUtils.TIMEOUT_ACCESS_TOKEN, sessionStart),
-            sessionStart);
+            sessionStart,
+            user.getTokenVersion());
 
     final var refreshToken =
         this.jwtUtils.createRefreshToken(

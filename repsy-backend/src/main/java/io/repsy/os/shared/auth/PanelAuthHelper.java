@@ -16,6 +16,7 @@
 package io.repsy.os.shared.auth;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
+import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.user.dtos.UserInfo;
@@ -36,7 +37,13 @@ public final class PanelAuthHelper {
 
   public @NonNull UserInfo authenticate(final @NonNull String authHeader) {
     final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PANEL);
-    return this.userTxService.getAuthenticatedUserByUsername(username);
+    final var user = this.userTxService.getAuthenticatedUserByUsername(username);
+
+    if (this.jwtUtils.extractTokenVersion(authHeader) != user.getTokenVersion()) {
+      throw new UnAuthorizedException("sessionExpired");
+    }
+
+    return user;
   }
 
   public void requireAdmin(final @NonNull UserInfo userInfo) {
