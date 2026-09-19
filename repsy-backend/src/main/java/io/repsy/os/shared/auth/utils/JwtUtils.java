@@ -136,7 +136,16 @@ public class JwtUtils {
       final @NonNull UUID userId,
       final @NonNull String username,
       final @NonNull TemporalAmount timeoutDuration) {
-    return this.createSessionAccessToken(userId, username, timeoutDuration, Instant.now());
+    return this.createSessionAccessToken(userId, username, timeoutDuration, Instant.now(), 0);
+  }
+
+  public @NonNull String createPanelAccessToken(
+      final @NonNull UUID userId,
+      final @NonNull String username,
+      final @NonNull TemporalAmount timeoutDuration,
+      final int tokenVersion) {
+    return this.createSessionAccessToken(
+        userId, username, timeoutDuration, Instant.now(), tokenVersion);
   }
 
   public @NonNull String createProtocolToken(
@@ -174,11 +183,21 @@ public class JwtUtils {
       final @NonNull String username,
       final @NonNull TemporalAmount timeoutDuration,
       final @NonNull Instant sessionStart) {
+    return this.createSessionAccessToken(userId, username, timeoutDuration, sessionStart, 0);
+  }
+
+  public @NonNull String createSessionAccessToken(
+      final @NonNull UUID userId,
+      final @NonNull String username,
+      final @NonNull TemporalAmount timeoutDuration,
+      final @NonNull Instant sessionStart,
+      final int tokenVersion) {
     return JWT.create()
         .withSubject(userId.toString())
         .withAudience(TokenRealm.PANEL.getAudience())
         .withClaim(CLAIM_USERNAME, username)
         .withClaim(CLAIM_SESSION_START, sessionStart)
+        .withClaim(CLAIM_TOKEN_VERSION, tokenVersion)
         .withExpiresAt(Instant.now().plus(timeoutDuration))
         .sign(Algorithm.HMAC512(this.secret));
   }
@@ -233,6 +252,15 @@ public class JwtUtils {
             .asInstant();
 
     return sessionStart != null ? sessionStart : Instant.now();
+  }
+
+  public int extractTokenVersion(final @NonNull String authHeader) {
+    final var tokenVersion =
+        this.verifyAndDecode(this.getToken(authHeader), TokenRealm.PANEL)
+            .getClaim(CLAIM_TOKEN_VERSION)
+            .asInt();
+
+    return tokenVersion != null ? tokenVersion : 0;
   }
 
   public @NonNull RefreshTokenClaims verifyRefreshToken(final @NonNull String token) {
