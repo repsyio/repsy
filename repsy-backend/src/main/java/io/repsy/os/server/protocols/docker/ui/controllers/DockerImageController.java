@@ -185,12 +185,12 @@ public class DockerImageController {
       @PathVariable final String reference)
       throws IOException {
 
-    final var tag =
-        this.manifestService.findActiveTagByRepoAndReference(
+    final var manifestName =
+        this.manifestService.findManifestNameByReference(
             repoInfo.getStorageKey(), imageName, reference);
 
     final var fileName =
-        ManifestNameGenerator.generate(repoInfo.getStorageKey(), imageName, tag.getName());
+        ManifestNameGenerator.generate(repoInfo.getStorageKey(), imageName, manifestName);
 
     final var manifest = this.dockerApiFacade.getManifest(repoInfo, fileName);
 
