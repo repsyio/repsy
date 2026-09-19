@@ -31,6 +31,8 @@ import org.springframework.stereotype.Repository;
 @NullMarked
 public interface ManifestRepository extends JpaRepository<Manifest, UUID> {
 
+  boolean existsByTagPlatformTagImageIdAndConfigDigest(UUID imageId, String configDigest);
+
   @Query(
       """
       select m from Manifest m

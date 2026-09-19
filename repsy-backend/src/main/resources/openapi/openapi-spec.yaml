@@ -2152,13 +2152,13 @@ paths:
         required: true
         schema:
           type: string
-  "/api/docker/images/{repoName}/{ignoredImageName}/configs/{digest}":
+  "/api/docker/images/{repoName}/{imageName}/configs/{digest}":
     get:
       tags:
         - docker-image-controller
       operationId: getConfig
       parameters:
-        - name: ignoredImageName
+        - name: imageName
           in: path
           required: true
           schema:

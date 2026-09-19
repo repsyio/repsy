@@ -128,8 +128,17 @@ public class DockerApiFacade implements ProtocolApiFacade {
   }
 
   @Transactional(readOnly = true)
-  public @NonNull LayerInfo findLayerByDigestAndRepoAndImageName(
-      final @NonNull RepoInfo repoInfo, final @NonNull String configDigest) {
+  public @NonNull LayerInfo findConfigLayerByImageAndDigest(
+      final @NonNull RepoInfo repoInfo,
+      final @NonNull String imageName,
+      final @NonNull String configDigest) {
+
+    final var imageInfo =
+        this.imageTxService.findImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
+
+    if (!this.manifestService.existsByImageIdAndConfigDigest(imageInfo.getId(), configDigest)) {
+      throw new ItemNotFoundException("layerNotFound");
+    }
 
     return this.layerTxService
         .findLayerInfoByRepoIdAndDigest(repoInfo.getStorageKey(), configDigest)
