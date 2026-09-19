@@ -1107,42 +1107,6 @@ paths:
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/{ignoredScope}":
-    get:
-      tags:
-        - npm-package-api-controller
-      operationId: listScopedNpmPackages
-      parameters:
-        - name: ignoredScope
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: name
-          in: query
-          required: false
-          schema:
-            type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
-      summary: List artifact groups in a Maven repository
-    parameters:
-      - name: repoName
-        in: path
-        required: true
-        schema:
-          type: string
   "/api/npm/packages/{repoName}/scope":
     get:
       tags:
