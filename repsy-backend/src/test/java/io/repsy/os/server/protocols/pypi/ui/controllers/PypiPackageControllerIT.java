@@ -16,9 +16,13 @@
 package io.repsy.os.server.protocols.pypi.ui.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
@@ -33,20 +37,29 @@ import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
+import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.zip.GZIPOutputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,6 +70,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -108,6 +122,7 @@ class PypiPackageControllerIT {
   @Autowired private RepoTxService repoTxService;
   @Autowired private PypiApiFacade pypiApiFacade;
   @Autowired private PypiProtocolFacadeImpl pypiProtocolFacade;
+  @MockitoBean private UsageUpdateService usageUpdateService;
   @PersistenceContext private EntityManager entityManager;
 
   private static RequestPostProcessor port(final int port) {
@@ -152,7 +167,7 @@ class PypiPackageControllerIT {
       final RepoInfo repo, final String packageName, final String version, final String filename)
       throws Exception {
     assertThat(this.repoTxService.getRepoByNameAndType(repo.getName(), RepoType.PYPI)).isPresent();
-    final var content = (packageName + "-" + version + "\n").getBytes();
+    final var content = archiveContent(filename, packageName + "-" + version + "\n");
     final var sha256 = java.security.MessageDigest.getInstance("SHA-256").digest(content);
     final var digest = java.util.HexFormat.of().formatHex(sha256);
 
@@ -188,6 +203,32 @@ class PypiPackageControllerIT {
         parameters,
         new MockMultipartFile(
             "content", filename, MediaType.APPLICATION_OCTET_STREAM_VALUE, content));
+  }
+
+  private static byte[] archiveContent(final String filename, final String entryContent)
+      throws IOException {
+    if (filename.endsWith(".whl")) {
+      final var output = new ByteArrayOutputStream();
+      try (var zip = new ZipOutputStream(output)) {
+        zip.putNextEntry(new ZipEntry("fixture/data.txt"));
+        zip.write(entryContent.getBytes(StandardCharsets.UTF_8));
+        zip.closeEntry();
+      }
+      return output.toByteArray();
+    }
+
+    final var output = new ByteArrayOutputStream();
+    final var bytes = entryContent.getBytes(StandardCharsets.UTF_8);
+    try (var gzip = new GZIPOutputStream(output);
+        var tar = new TarArchiveOutputStream(gzip)) {
+      final var entry = new TarArchiveEntry("fixture/data.txt");
+      entry.setSize(bytes.length);
+      tar.putArchiveEntry(entry);
+      tar.write(bytes);
+      tar.closeArchiveEntry();
+      tar.finish();
+    }
+    return output.toByteArray();
   }
 
   private static String body(final ResultActions result) throws Exception {
@@ -314,7 +355,12 @@ class PypiPackageControllerIT {
         .containsEntry("stableVersion", "2.0.0")
         .containsEntry("version", "2.0.0")
         .containsEntry("requiresPython", ">=3.11")
-        .containsEntry("summary", "Integration test package 2.0.0");
+        .containsEntry("summary", "Integration test package 2.0.0")
+        .containsEntry("descriptionContentType", "text/plain");
+    assertThat((List<Map<String, Object>>) JsonPath.read(detailResponse, "$.data.classifiers"))
+        .containsExactly(Map.of("classifier", "Programming Language", "value", "Python :: 3"));
+    assertThat((List<Map<String, Object>>) JsonPath.read(detailResponse, "$.data.projectUrls"))
+        .containsExactly(Map.of("label", "Homepage", "url", "https://example.test/pypi"));
 
     final var latestResponse =
         body(
@@ -368,6 +414,78 @@ class PypiPackageControllerIT {
   }
 
   @Test
+  @DisplayName("returns complete pagination metadata for empty and out-of-range pages")
+  void handlesEmptyAndOutOfRangePages() throws Exception {
+    final var repo = this.createRepo(false);
+
+    final var emptyResponse =
+        body(
+            this.mockMvc
+                .perform(api(get("/api/pypi/packages/" + repo.getName() + "?page=0&size=2")))
+                .andExpect(status().isOk()));
+    assertSuccessEnvelope(emptyResponse, "packagesFetched");
+    assertThat((List<?>) JsonPath.read(emptyResponse, "$.data.content")).isEmpty();
+    assertThat((Map<String, Object>) JsonPath.read(emptyResponse, "$.data.page"))
+        .containsOnlyKeys("size", "number", "totalElements", "totalPages")
+        .containsEntry("size", 2)
+        .containsEntry("number", 0)
+        .containsEntry("totalElements", 0)
+        .containsEntry("totalPages", 0);
+
+    this.upload(repo, "page-package", "1.0.0", "page-package-1.0.0.tar.gz");
+    final var pageResponse =
+        body(
+            this.mockMvc
+                .perform(api(get("/api/pypi/packages/" + repo.getName() + "?page=1&size=1")))
+                .andExpect(status().isOk()));
+    assertSuccessEnvelope(pageResponse, "packagesFetched");
+    assertThat((List<?>) JsonPath.read(pageResponse, "$.data.content")).isEmpty();
+    assertThat((Map<String, Object>) JsonPath.read(pageResponse, "$.data.page"))
+        .containsEntry("size", 1)
+        .containsEntry("number", 1)
+        .containsEntry("totalElements", 1)
+        .containsEntry("totalPages", 1);
+
+    final var noMatchResponse =
+        body(
+            this.mockMvc
+                .perform(api(get("/api/pypi/packages/" + repo.getName() + "?name=does-not-exist")))
+                .andExpect(status().isOk()));
+    assertSuccessEnvelope(noMatchResponse, "packagesFetched");
+    assertThat((List<?>) JsonPath.read(noMatchResponse, "$.data.content")).isEmpty();
+  }
+
+  @Test
+  @DisplayName("returns complete errors for unknown packages, releases and release filters")
+  void handlesMissingPackageReleaseAndFilter() throws Exception {
+    final var repo = this.createRepo(false);
+    this.upload(repo, "known-package", "1.0.0", "known-package-1.0.0.tar.gz");
+    final var path = "/api/pypi/packages/" + repo.getName();
+
+    final var unknownPackage =
+        body(
+            this.mockMvc
+                .perform(api(get(path + "/missing-package")))
+                .andExpect(status().isNotFound()));
+    assertErrorEnvelope(unknownPackage, "packageNotFound", "packageNotFound");
+
+    final var unknownRelease =
+        body(
+            this.mockMvc
+                .perform(api(get(path + "/known-package/releases/9.9.9")))
+                .andExpect(status().isNotFound()));
+    assertErrorEnvelope(unknownRelease, "releaseNotFound", "releaseNotFound");
+
+    final var noReleaseMatch =
+        body(
+            this.mockMvc
+                .perform(api(get(path + "/known-package/releases?version=9.9")))
+                .andExpect(status().isOk()));
+    assertSuccessEnvelope(noReleaseMatch, "releasesFetched");
+    assertThat((List<?>) JsonPath.read(noReleaseMatch, "$.data.content")).isEmpty();
+  }
+
+  @Test
   @DisplayName("deletes a release and package, including normalized names and storage files")
   void deletesReleaseAndPackage() throws Exception {
     final var repo = this.createRepo(true);
@@ -409,5 +527,63 @@ class PypiPackageControllerIT {
             .getResponse()
             .getContentAsString();
     assertErrorEnvelope(missingResponse, "packageNotFound", "packageNotFound");
+  }
+
+  @Test
+  @DisplayName("preserves sibling releases and rejects read-only deletes and unsupported verbs")
+  void protectsDeletesAndRouteMappings() throws Exception {
+    final var repo = this.createRepo(true);
+    final var admin = this.createUser(UserRole.ADMIN);
+    final var user = this.createUser(UserRole.USER);
+    final var adminToken = this.bearerToken(admin);
+    final var userToken = this.bearerToken(user);
+    this.upload(repo, "keep-package", "1.0.0", "keep-package-1.0.0.tar.gz");
+    this.upload(repo, "keep-package", "2.0.0", "keep-package-2.0.0.whl");
+
+    final var readOnlyResponse =
+        body(
+            this.mockMvc
+                .perform(
+                    api(delete("/api/pypi/packages/" + repo.getName() + "/keep-package"))
+                        .header(AUTHORIZATION, userToken))
+                .andExpect(status().isUnauthorized()));
+    assertErrorEnvelope(readOnlyResponse, "unAuthorized", "unAuthorized");
+
+    final var releaseDeleteResponse =
+        body(
+            this.mockMvc
+                .perform(
+                    api(delete(
+                            "/api/pypi/packages/"
+                                + repo.getName()
+                                + "/KEEP_PACKAGE/releases/1.0.0"))
+                        .header(AUTHORIZATION, adminToken))
+                .andExpect(status().isOk()));
+    assertSuccessEnvelope(releaseDeleteResponse, "packageReleaseDeleted");
+
+    final var remainingResponse =
+        body(
+            this.mockMvc
+                .perform(
+                    api(get("/api/pypi/packages/" + repo.getName() + "/keep.package"))
+                        .header(AUTHORIZATION, adminToken))
+                .andExpect(status().isOk()));
+    assertSuccessEnvelope(remainingResponse, "releaseDetailFetched");
+    assertThat((String) JsonPath.read(remainingResponse, "$.data.version")).isEqualTo("2.0.0");
+
+    final var unsupportedResponse =
+        body(
+            this.mockMvc
+                .perform(
+                    api(post("/api/pypi/packages/" + repo.getName() + "/keep-package"))
+                        .header(AUTHORIZATION, adminToken))
+                .andExpect(status().isNotFound()));
+    assertThat(JsonPath.<Map<String, Object>>read(unsupportedResponse, "$"))
+        .containsOnlyKeys(ENVELOPE_KEYS)
+        .containsEntry("msgId", "itemNotFound")
+        .containsEntry("type", "ERROR")
+        .containsEntry("data", null);
+    assertThat((String) JsonPath.read(unsupportedResponse, "$.errorCode")).matches(UUID_PATTERN);
+    verify(this.usageUpdateService, atLeastOnce()).updateUsage(any(UsageChangedInfo.class));
   }
 }
