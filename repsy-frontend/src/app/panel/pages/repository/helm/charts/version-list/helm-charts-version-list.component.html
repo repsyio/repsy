@@ -71,6 +71,7 @@
                   [artifactName]="chartName"
                   [versionName]="version.version"
                   [severity]="securitySummary[version.version]?.severity ?? null"
+                  [scanStatus]="securitySummary[version.version]?.latestScanStatus ?? null"
                   [scanned]="securitySummary[version.version]?.scanned ?? false"
                 />
                 <span class="text-[#9FA0A0]">{{ version.appVersion || '—' }}</span>
@@ -134,6 +135,7 @@
                     [artifactName]="chartName"
                     [versionName]="version.version"
                     [severity]="securitySummary[version.version]?.severity ?? null"
+                    [scanStatus]="securitySummary[version.version]?.latestScanStatus ?? null"
                     [scanned]="securitySummary[version.version]?.scanned ?? false"
                   />
                 </div>

@@ -72,6 +72,7 @@
                   [artifactName]="packageName"
                   [versionName]="version.version"
                   [severity]="securitySummary[version.version]?.severity ?? null"
+                  [scanStatus]="securitySummary[version.version]?.latestScanStatus ?? null"
                   [scanned]="securitySummary[version.version]?.scanned ?? false"
                 />
                 <app-tooltip

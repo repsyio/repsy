@@ -57,9 +57,10 @@
               <span class="flex items-center gap-2 text-[#9C9C9D]">
                 @if (scan.severity) {
                   <app-severity-badge [severity]="scan.severity" [compact]="true" />
-                } @else {
+                } @else if (scan.lastCompletedAt) {
                   <span class="text-success-400">Clean</span>
                 }
+                <app-rescan-note [status]="scan.status" [hasCompletedScan]="!!scan.lastCompletedAt" />
                 {{ scan.scannedAt | date: 'medium' }}
               </span>
             </div>

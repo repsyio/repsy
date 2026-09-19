@@ -21,4 +21,6 @@ public interface VersionScanSummary {
   Severity getSeverity();
 
   Long getFindingCount();
+
+  ScanStatus getLatestScanStatus();
 }

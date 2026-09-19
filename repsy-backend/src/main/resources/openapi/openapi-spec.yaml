@@ -5373,6 +5373,15 @@ components:
           format: int32
         scanned:
           type: boolean
+        latestScanStatus:
+          description: >-
+            Status of the version's newest scan. Severity and findingCount always describe the
+            newest COMPLETED scan, so anything other than COMPLETED here means a rescan is still
+            pending, queued or running, or failed, and those numbers are the last known ones. Only
+            set on the per-version summary; absent on the per-artifact summary, which spans
+            several versions.
+          "$ref": "#/components/schemas/ScanStatus"
+          nullable: true
     VersionSecuritySummaryMap:
       type: object
       additionalProperties:
@@ -5441,12 +5450,27 @@ components:
           type: string
         artifactVersion:
           type: string
+        status:
+          description: Status of the version's newest scan.
+          "$ref": "#/components/schemas/ScanStatus"
         severity:
+          description: >-
+            Highest severity of the version's newest COMPLETED scan, so it stays the last known
+            value while a rescan is pending, queued, running or failed. Null when that scan found
+            nothing, or when the version has no completed scan (see lastCompletedAt).
           "$ref": "#/components/schemas/Severity"
           nullable: true
         scannedAt:
+          description: When the version's newest scan, of any status, was created.
           type: string
           format: date-time
+        lastCompletedAt:
+          description: >-
+            When the version's newest COMPLETED scan finished; null when no scan of the version
+            has completed yet.
+          type: string
+          format: date-time
+          nullable: true
     RepoSecurityDetail:
       type: object
       properties:
