@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.shared.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -779,36 +778,6 @@ class ProtocolDeployTokenControllerIT {
     }
 
     /**
-     * {@code DeployTokenForm} allows a username of up to 150 characters but the {@code username}
-     * column is {@code varchar(80)}, so 81..150 characters pass request validation and are only
-     * rejected by the database. The INSERT is deferred to the flush, which is why the failure is
-     * observed there rather than in the response: the test's outer transaction keeps the handler's
-     * own commit-time flush from running. In production that flush runs when the service method
-     * returns. Widening the column or lowering the form limit to 80 should replace this test with
-     * one of the boundary cases above.
-     */
-    @Test
-    @DisplayName("passes validation for an 81-character username that the database then rejects")
-    void usernameLongerThanColumnIsRejectedByTheDatabase() {
-      final var it = ProtocolDeployTokenControllerIT.this;
-      final var repo = it.createRepo(RepoType.MAVEN);
-      final var token = it.adminBearerToken();
-
-      assertThatThrownBy(
-              () -> {
-                it.perform(
-                    post(tokensUrl(repo))
-                        .header(AUTHORIZATION, token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                            "{\"name\":\"long-user\",\"username\":\"%s\"}"
-                                .formatted("u".repeat(81))));
-                it.entityManager.flush();
-              })
-          .hasStackTraceContaining("value too long for type character varying(80)");
-    }
-
-    /**
      * {@code DeployTokenForm} declares no name pattern, so any 1..80-character string is accepted,
      * including whitespace-only and punctuation-heavy names.
      */
@@ -915,8 +884,8 @@ class ProtocolDeployTokenControllerIT {
           Arguments.of("null name", "{\"name\":null}"),
           Arguments.of("name too long", "{\"name\":\"%s\"}".formatted("n".repeat(81))),
           Arguments.of(
-              "username too long",
-              "{\"name\":\"n\",\"username\":\"%s\"}".formatted("u".repeat(151))),
+              "username longer than the column",
+              "{\"name\":\"n\",\"username\":\"%s\"}".formatted("u".repeat(81))),
           Arguments.of(
               "description too long",
               "{\"name\":\"n\",\"description\":\"%s\"}".formatted("d".repeat(501))),
