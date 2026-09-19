@@ -15,6 +15,9 @@
  */
 package io.repsy.os.server.protocols.ruby.ui.controllers;
 
+import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.PUBLISH_PATH;
+import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.gem;
+import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.protocolPort;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.nullValue;
@@ -27,57 +30,33 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.PagingAssertions;
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.services.RubyGemServiceImpl;
-import io.repsy.os.server.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
-import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
-import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.stream.Stream;
-import java.util.zip.GZIPOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
 /** Full-stack integration coverage for the Ruby gem-management API. */
 @DisplayName("RubyGemApiController /api/ruby/gems/*")
 class RubyGemApiControllerIT extends AbstractIntegrationTest {
 
-  @Autowired private RepoTxService repoTxService;
-  @Autowired private RubyGemServiceImpl rubyGemService;
-  @Autowired private RubyStorageService rubyStorageService;
+  private String publisherToken;
 
-  private static String unique(final String prefix) {
-    return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+  private Repo createRepo(final boolean privateRepo) {
+    return this.seedRepo(RepoType.RUBY, uniqueRepoName("rubyrepo"), privateRepo, null);
   }
 
-  private RepoInfo createRepo(final boolean privateRepo) {
-    return this.createRepo(RepoType.RUBY, privateRepo);
-  }
-
-  private RepoInfo createRepo(final RepoType type, final boolean privateRepo) {
-    final var repo = this.repoTxService.createRepo(unique("rubyrepo"), type, privateRepo, null);
-    this.rubyStorageService.createRepo(repo.getId());
-    return repo;
-  }
-
-  /** Seeds a real RubyGems archive through the storage and metadata services. */
+  /** Pushes a real RubyGems archive through the protocol port, like {@code gem push} does. */
   private void publish(
       final String repoName,
       final String name,
@@ -85,107 +64,19 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
       final String platform,
       final String description)
       throws Exception {
-    final var repo = this.repoTxService.getRepoByName(repoName);
-    final var bytes = gem(name, version, platform, description);
-    this.rubyStorageService.writeGem(repo.getId(), repoName, name, version, platform, bytes);
-    this.rubyGemService.publishGem(
-        repo,
-        GemMetadata.builder()
-            .name(name)
-            .version(version)
-            .platform(platform)
-            .description(description)
-            .authors("Alice, Bob")
-            .homepage("https://example.test/" + name)
-            .requiredRubyVersion(">= 3.1.0")
-            .runtimeDependencies(
-                java.util.List.of(
-                    GemDependency.builder()
-                        .name("rack")
-                        .requirements(">= 3.0.0")
-                        .type("runtime")
-                        .build()))
-            .developmentDependencies(
-                java.util.List.of(
-                    GemDependency.builder()
-                        .name("rake")
-                        .requirements(">= 13.0.0")
-                        .type("development")
-                        .build()))
-            .build(),
-        CompactIndexFormatter.sha256Hex(bytes));
+    if (this.publisherToken == null) {
+      this.publisherToken = this.adminProtocolBearerToken();
+    }
+
+    this.mockMvc
+        .perform(
+            post(PUBLISH_PATH, repoName)
+                .with(protocolPort())
+                .header(AUTHORIZATION, this.publisherToken)
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .content(gem(name, version, platform, description)))
+        .andExpect(status().isOk());
     this.entityManager.flush();
-  }
-
-  /**
-   * Creates the minimal outer tar required by {@code GemspecParser}, with representative metadata.
-   */
-  private static byte[] gem(
-      final String name, final String version, final String platform, final String description)
-      throws IOException {
-    final var metadata =
-        "name: "
-            + name
-            + "\n"
-            + "version:\n"
-            + "  version: "
-            + version
-            + "\n"
-            + "platform: "
-            + platform
-            + "\n"
-            + "description: "
-            + description
-            + "\n"
-            + "authors:\n"
-            + "- Alice\n"
-            + "- Bob\n"
-            + "homepage: https://example.test/"
-            + name
-            + "\n"
-            + "required_ruby_version:\n"
-            + "  requirements:\n"
-            + "  - - \">=\"\n"
-            + "    - version: 3.1.0\n"
-            + "dependencies:\n"
-            + "- name: rack\n"
-            + "  type: runtime\n"
-            + "  requirement:\n"
-            + "    requirements:\n"
-            + "    - - \">=\"\n"
-            + "      - version: 3.0.0\n"
-            + "- name: rake\n"
-            + "  type: development\n"
-            + "  requirement:\n"
-            + "    requirements:\n"
-            + "    - - \">=\"\n"
-            + "      - version: 13.0.0\n";
-    final var metadataGz = gzip(metadata.getBytes(StandardCharsets.UTF_8));
-    final var dataGz = gzip(new byte[0]);
-    final var output = new ByteArrayOutputStream();
-    try (var tar = new TarArchiveOutputStream(output)) {
-      add(tar, "metadata.gz", metadataGz);
-      add(tar, "data.tar.gz", dataGz);
-      tar.finish();
-    }
-    return output.toByteArray();
-  }
-
-  private static byte[] gzip(final byte[] bytes) throws IOException {
-    final var output = new ByteArrayOutputStream();
-    try (var gzip = new GZIPOutputStream(output)) {
-      gzip.write(bytes);
-    }
-    return output.toByteArray();
-  }
-
-  private static void add(final TarArchiveOutputStream tar, final String name, final byte[] bytes)
-      throws IOException {
-    final var entry = new TarArchiveEntry(name);
-    entry.setSize(bytes.length);
-    tar.putArchiveEntry(entry);
-    tar.write(bytes);
-    tar.closeArchiveEntry();
   }
 
   @Nested
@@ -631,7 +522,7 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
                       .map(args -> Arguments.of(path, args.get()[0], args.get()[1])));
     }
 
-    private record Seed(RepoInfo repo, String token) {}
+    private record Seed(Repo repo, String token) {}
 
     private Seed seed() throws Exception {
       final var it = RubyGemApiControllerIT.this;
