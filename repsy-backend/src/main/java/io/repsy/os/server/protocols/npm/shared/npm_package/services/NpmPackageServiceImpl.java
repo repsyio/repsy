@@ -283,8 +283,9 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
   public List<PackageDistributionTagMapListItem> getDistributionTags(
       final UUID repoId, final @Nullable String scope, final String packageName) {
 
-    return this.packageDistTagRepository.findAllByRepoIdAndScopeAndPackageName(
-        repoId, scope, packageName);
+    final var npmPackage = this.findPackageByRepoIdAndScopeAndName(repoId, scope, packageName);
+
+    return this.getDistributionTags(npmPackage.getId());
   }
 
   @Transactional

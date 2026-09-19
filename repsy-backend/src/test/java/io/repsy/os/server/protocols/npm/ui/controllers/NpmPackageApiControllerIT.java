@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
+import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageDistTagRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
 import io.repsy.os.server.protocols.npm.ui.facades.NpmApiFacade;
 import io.repsy.os.shared.auth.utils.AuthUtils;
@@ -52,6 +53,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -72,6 +74,7 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
   @Autowired private NpmApiFacade npmApiFacade;
   @Autowired private NpmPackageRepository npmPackageRepository;
   @Autowired private PackageVersionRepository packageVersionRepository;
+  @Autowired private PackageDistTagRepository packageDistTagRepository;
 
   private Repo repo;
   private User admin;
@@ -326,6 +329,59 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data", hasSize(1)))
           .andExpect(jsonPath("$.data[0].tag").value("latest"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+        strings = {
+          "/api/npm/packages/{repo}/package/missing/tags",
+          "/api/npm/packages/{repo}/tools/package/missing/tags",
+          "/api/npm/packages/{repo}/other/package/scoped-package/tags"
+        })
+    @DisplayName("answers 404 packageNotFound for the tags of a missing package")
+    void answersNotFoundForTheTagsOfAMissingPackage(final String pathTemplate) throws Exception {
+      NpmPackageApiControllerIT.this
+          .perform(get(pathTemplate, repoName))
+          .andExpect(status().isNotFound())
+          .andExpect(jsonPath("$.*", hasSize(5)))
+          .andExpect(jsonPath("$.msgId").value("packageNotFound"))
+          .andExpect(jsonPath("$.type").value("ERROR"))
+          .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
+    }
+
+    @Test
+    void answersEmptyTagsForAnExistingPackageWithoutTagsForBothScopeForms() throws Exception {
+      removeLatestTag(null, "scope");
+      removeLatestTag("tools", "scoped-package");
+
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/packages/{repo}/package/{package}/tags", repoName, "scope"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("packageTagsFetched"))
+          .andExpect(jsonPath("$.data", hasSize(0)));
+      NpmPackageApiControllerIT.this
+          .perform(
+              get(
+                  "/api/npm/packages/{repo}/tools/package/{package}/tags",
+                  repoName,
+                  "scoped-package"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("packageTagsFetched"))
+          .andExpect(jsonPath("$.data", hasSize(0)));
+    }
+
+    private void removeLatestTag(final String scope, final String packageName) {
+      final var packageId =
+          npmPackageRepository
+              .findByRepoIdAndScopeAndName(repo.getId(), scope, packageName)
+              .orElseThrow()
+              .getId();
+      final var tag =
+          packageDistTagRepository
+              .findByPackageVersionNpmPackageIdAndTagName(packageId, "latest")
+              .orElseThrow();
+
+      packageDistTagRepository.delete(tag);
     }
   }
 

@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -42,17 +41,4 @@ public interface PackageDistTagRepository extends JpaRepository<PackageDistTag, 
       UUID packageId, String tagName);
 
   List<PackageDistributionTagListItem> findAllByPackageVersionId(UUID packageVersionId);
-
-  @Query(
-      """
-            select pdt.tagName as tag, pv.version as version
-            from PackageDistTag pdt
-            join pdt.packageVersion pv
-            join pv.npmPackage p
-            join p.repo r
-            where r.id = :repoId
-            and ((:scopeName is null and p.scope is null) or p.scope = :scopeName)
-            and p.name = :packageName""")
-  List<PackageDistributionTagMapListItem> findAllByRepoIdAndScopeAndPackageName(
-      UUID repoId, @Nullable String scopeName, String packageName);
 }
