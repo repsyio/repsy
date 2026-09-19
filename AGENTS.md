@@ -116,4 +116,7 @@ panel API. Edit that file for any API change; there is no other copy. Both sides
 ## Submodule
 
 `core/` is pinned to a specific `repsy-core` commit. Bump it only as a deliberate change (its own
-PR, or a clearly called-out part of one), and re-run the core install above afterwards.
+PR, or a clearly called-out part of one), and re-run the core install above afterwards. Pin it
+only to a commit that is on `repsy-core`'s `main`, so merge the `repsy-core` PR first: a commit
+that only exists on a PR branch disappears from the remote when that branch is deleted on merge.
+`repsy-core` merges to `main` through the same merge queue flow described above.
