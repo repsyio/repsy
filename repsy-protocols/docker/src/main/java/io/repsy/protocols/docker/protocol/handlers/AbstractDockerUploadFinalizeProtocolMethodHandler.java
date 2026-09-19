@@ -147,7 +147,7 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
           context, uploadPath, request.getInputStream(), request.getContentLengthLong());
     }
 
-    this.dockerFacade.finalizeLayerUpload(repoInfo, uploadPath, layerInfo);
+    this.dockerFacade.finalizeLayerUpload(context, uploadPath, layerInfo);
 
     final var location = this.getServletURILocation(context, imageName, digest);
 

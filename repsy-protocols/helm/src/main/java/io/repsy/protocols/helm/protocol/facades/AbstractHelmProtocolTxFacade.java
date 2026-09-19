@@ -209,8 +209,10 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
       final long contentLength)
       throws IOException {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    this.helmStorageService.saveBlobChunk(
-        repoInfo.getStorageKey(), uploadId, stream, repoInfo.getName());
+    final var usages =
+        this.helmStorageService.saveBlobChunk(
+            repoInfo.getStorageKey(), uploadId, stream, repoInfo.getName());
+    ProtocolContextUtils.addUsages(context, usages);
     return this.helmStorageService.getBlobSize(
         repoInfo.getStorageKey(), uploadId, repoInfo.getName());
   }
@@ -227,10 +229,16 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
       throws IOException {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     if (contentLength > 0) {
-      this.helmStorageService.saveBlobChunk(
-          repoInfo.getStorageKey(), uploadId, stream, repoInfo.getName());
+      final var chunkUsages =
+          this.helmStorageService.saveBlobChunk(
+              repoInfo.getStorageKey(), uploadId, stream, repoInfo.getName());
+      ProtocolContextUtils.addUsages(context, chunkUsages);
     }
-    this.helmStorageService.finalizeBlob(repoInfo.getStorageKey(), uploadId, digest);
+    // The upload was charged as it was written; a blob whose digest is already stored is dropped
+    // here, so the bytes it freed are refunded.
+    final var finalizeUsages =
+        this.helmStorageService.finalizeBlob(repoInfo.getStorageKey(), uploadId, digest);
+    ProtocolContextUtils.addUsages(context, finalizeUsages);
     final var resource =
         this.helmStorageService
             .getBlob(repoInfo.getStorageKey(), digest, repoInfo.getName())

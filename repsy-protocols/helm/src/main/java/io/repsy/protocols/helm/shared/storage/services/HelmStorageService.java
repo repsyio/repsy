@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.helm.shared.storage.services;
 
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,11 +47,11 @@ public interface HelmStorageService<ID> {
 
   String getChartRelativePath(String name, String version);
 
-  void saveBlobChunk(UUID repoUuid, UUID uploadId, InputStream chunk, String repoName);
+  BaseUsages saveBlobChunk(UUID repoUuid, UUID uploadId, InputStream chunk, String repoName);
 
   long getBlobSize(UUID repoUuid, UUID uploadId, String repoName) throws IOException;
 
-  void finalizeBlob(UUID repoUuid, UUID uploadId, String digest);
+  BaseUsages finalizeBlob(UUID repoUuid, UUID uploadId, String digest);
 
   Optional<Resource> getBlob(UUID repoUuid, String digest, String repoName);
 

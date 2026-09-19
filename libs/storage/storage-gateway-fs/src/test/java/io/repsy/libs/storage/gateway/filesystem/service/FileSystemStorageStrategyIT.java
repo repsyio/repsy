@@ -16,7 +16,6 @@
 package io.repsy.libs.storage.gateway.filesystem.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
@@ -409,11 +408,12 @@ class FileSystemStorageStrategyIT {
       FileSystemStorageStrategyIT.this.seedFile(key + "/original.bin", "bytes");
       final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "original.bin");
 
-      FileSystemStorageStrategyIT.this.strategy.renameObject(sp, "sha256digest");
+      final var usages = FileSystemStorageStrategyIT.this.strategy.renameObject(sp, "sha256digest");
 
       assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/original.bin"))
           .doesNotExist();
       assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/sha256digest")).exists();
+      assertThat(usages.getDiskUsage()).isZero();
     }
 
     @Test
@@ -424,14 +424,13 @@ class FileSystemStorageStrategyIT {
       FileSystemStorageStrategyIT.this.seedFile(key + "/upload.bin", "duplicate upload");
       final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "upload.bin");
 
-      assertThatCode(
-              () -> FileSystemStorageStrategyIT.this.strategy.renameObject(sp, "sha256digest"))
-          .doesNotThrowAnyException();
+      final var usages = FileSystemStorageStrategyIT.this.strategy.renameObject(sp, "sha256digest");
 
       assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/upload.bin"))
           .doesNotExist();
       assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/sha256digest"))
           .hasContent("stored");
+      assertThat(usages.getDiskUsage()).isEqualTo(-"duplicate upload".length());
     }
 
     @ParameterizedTest

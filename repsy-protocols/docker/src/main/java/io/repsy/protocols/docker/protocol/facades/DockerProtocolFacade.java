@@ -22,7 +22,6 @@ import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestDetails;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
-import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Optional;
@@ -41,8 +40,8 @@ public interface DockerProtocolFacade<ID> {
       long contentLength)
       throws IOException;
 
-  void finalizeLayerUpload(
-      BaseRepoInfo<ID> repoInfo, RelativePath relativePath, LayerInfo layerInfo) throws IOException;
+  void finalizeLayerUpload(ProtocolContext context, RelativePath relativePath, LayerInfo layerInfo)
+      throws IOException;
 
   @Nullable String saveManifest(
       ProtocolContext context, BaseImageInfo<ID> imageInfo, ManifestForm form) throws IOException;
