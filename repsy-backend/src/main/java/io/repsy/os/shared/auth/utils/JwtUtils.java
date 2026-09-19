@@ -149,11 +149,7 @@ public class JwtUtils {
   }
 
   public @NonNull UUID getUserId(final @NonNull String token) {
-    try {
-      return UUID.fromString(this.verifyAndDecode(token).getSubject());
-    } catch (final IllegalArgumentException | NullPointerException _) {
-      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
-    }
+    return subjectAsUserId(this.verifyAndDecode(token));
   }
 
   public @NonNull UUID verifyRefreshToken(final @NonNull String token) {
@@ -163,7 +159,21 @@ public class JwtUtils {
       throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
 
-    return UUID.fromString(decodedJWT.getSubject());
+    return subjectAsUserId(decodedJWT);
+  }
+
+  private static @NonNull UUID subjectAsUserId(final @NonNull DecodedJWT decodedJWT) {
+    final var subject = decodedJWT.getSubject();
+
+    if (subject == null) {
+      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+
+    try {
+      return UUID.fromString(subject);
+    } catch (final IllegalArgumentException _) {
+      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
   }
 
   public void verify(final @NonNull String authHeader) {

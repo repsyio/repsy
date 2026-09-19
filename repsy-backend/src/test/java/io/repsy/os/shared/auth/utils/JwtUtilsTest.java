@@ -187,6 +187,55 @@ class JwtUtilsTest {
   }
 
   @Test
+  @DisplayName("refresh token with a non-UUID subject is rejected by verifyRefreshToken")
+  void verifyRefreshTokenRejectsNonUuidSubject() {
+    final var token = this.signedToken("not-a-uuid", "refresh");
+
+    assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("refresh token without a subject is rejected by verifyRefreshToken")
+  void verifyRefreshTokenRejectsMissingSubject() {
+    final var token = this.signedToken(null, "refresh");
+
+    assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("access token with a non-UUID subject is rejected by getUserId")
+  void getUserIdRejectsNonUuidSubject() {
+    final var token = this.signedToken("not-a-uuid", null);
+
+    assertThatThrownBy(() -> this.jwtUtils.getUserId(token))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("access token without a subject is rejected by getUserId")
+  void getUserIdRejectsMissingSubject() {
+    final var token = this.signedToken(null, null);
+
+    assertThatThrownBy(() -> this.jwtUtils.getUserId(token))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  private String signedToken(final String subject, final String tokenType) {
+    return JWT.create()
+        .withSubject(subject)
+        .withClaim("username", "testuser")
+        .withClaim("token_type", tokenType)
+        .withExpiresAt(Instant.now().plus(Duration.ofMinutes(30)))
+        .sign(Algorithm.HMAC512(TEST_SECRET));
+  }
+
+  @Test
   @DisplayName("expired refresh token yields refreshTokenExpired on verifyRefreshToken")
   void expiredRefreshTokenYieldsRefreshTokenExpired() {
     final var userId = UUID.randomUUID();
