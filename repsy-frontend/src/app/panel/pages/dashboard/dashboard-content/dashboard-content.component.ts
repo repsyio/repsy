@@ -20,6 +20,7 @@ import { forkJoin, map, of, switchMap } from 'rxjs';
 
 import { RepoListInfo, RepoType, TotalUsageInfo } from '../../../../../generated/api';
 import { ProtocolRepoControllerService } from '../../../../../generated/api';
+import { ProfileService } from '../../profile/service/profile.service';
 import { RepositoryCreateModalComponent } from '../../../shared/components/modals/repository-create-modal/repository-create-modal.component';
 import { RecentActivityComponent } from '../recent-activity/recent-activity.component';
 import { RepositoryCardComponent } from '../repository-card/repository-card.component';
@@ -61,10 +62,12 @@ export class DashboardContentComponent {
   public repositories: Repository[] = [];
   public repoListInfos: RepoListInfo[] = [];
   public createRepoModal: boolean;
+  public isAdmin = false;
 
   constructor(
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly usageService: UsageService,
+    private readonly profileService: ProfileService,
     private readonly cdRef: ChangeDetectorRef,
   ) {
     this.usageService
@@ -73,12 +76,20 @@ export class DashboardContentComponent {
         Object.assign(this.usage, usage);
       });
 
-    this.fetchRepoCounts();
+    this.profileService.get().subscribe((profile) => {
+      this.isAdmin = profile.role === 'ADMIN';
+      if (this.isAdmin) {
+        this.fetchRepoCounts();
+      }
+      this.cdRef.markForCheck();
+    });
     this.fetchRepoInfos();
   }
 
   public openCreateRepo(): void {
-    this.createRepoModal = true;
+    if (this.isAdmin) {
+      this.createRepoModal = true;
+    }
   }
 
   private fetchRepoCounts(): void {
