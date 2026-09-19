@@ -102,6 +102,28 @@ class AuthUtilsTest {
       assertThat(credentials.getPassword()).isEmpty();
     }
 
+    @ParameterizedTest(name = "\"{0}\"")
+    @ValueSource(strings = {"pa:ss", "pa:ss:word", ":pass", "pass:", "::", "a::b"})
+    @DisplayName("keeps every colon after the first one in the password")
+    void colonsInThePasswordAreKept(final String password) {
+      final var credentials =
+          AuthUtils.extractCredentialsFromBasicToken(encode("user:" + password));
+
+      assertThat(credentials).isNotNull();
+      assertThat(credentials.getUsername()).isEqualTo("user");
+      assertThat(credentials.getPassword()).isEqualTo(password);
+    }
+
+    @Test
+    @DisplayName("maps an empty username to null when the password contains a colon")
+    void emptyUsernameWithColonPassword() {
+      final var credentials = AuthUtils.extractCredentialsFromBasicToken(encode(":pa:ss"));
+
+      assertThat(credentials).isNotNull();
+      assertThat(credentials.getUsername()).isNull();
+      assertThat(credentials.getPassword()).isEqualTo("pa:ss");
+    }
+
     @Test
     @DisplayName("returns null for a value without a colon")
     void noColonIsNull() {
