@@ -23,6 +23,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.maven.shared.auth.services.MavenAuthComponent;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -84,7 +85,7 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
 
     final var permission = (Permission) properties.get(PERMISSION_KEY);
 
-    this.authenticateRequest(authHeader, repoInfo.getStorageKey(), permission);
+    this.authenticateRequest(authHeader, repoInfo.getStorageKey(), permission, request);
 
     return ProcessorResult.next();
   }
@@ -92,15 +93,26 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
   private void authenticateRequest(
       final @NonNull String authHeader,
       final @NonNull UUID repoId,
-      final @NonNull Permission permission) {
+      final @NonNull Permission permission,
+      final @NonNull HttpServletRequest request) {
 
     switch (authHeader) {
       case final String header when header.startsWith(AUTH_BASIC) ->
           this.authComponent.handleBasicAuth(header, permission, repoId);
       case final String header when header.startsWith(AUTH_BEARER) ->
-          this.authComponent.handleBearerAuth(header, repoId, permission);
+          this.authComponent.handleBearerAuth(header, repoId, permission, realmOf(request));
       default -> throw new UnAuthorizedException("unAuthorized");
     }
+  }
+
+  /**
+   * The Maven browser in the web UI downloads a file by navigating to it with the session's access
+   * token in the {@code token} query parameter, because a navigation cannot set headers. Only that
+   * hand-off carries a panel token to a protocol endpoint; a bearer token in the {@code
+   * Authorization} header is a protocol token.
+   */
+  private static @NonNull TokenRealm realmOf(final @NonNull HttpServletRequest request) {
+    return request.getParameter("token") != null ? TokenRealm.PANEL : TokenRealm.PROTOCOL;
   }
 
   private boolean shouldSkipAuthentication(

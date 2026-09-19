@@ -20,8 +20,9 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.exceptions.TokenExpiredException;
 import com.auth0.jwt.interfaces.DecodedJWT;
-import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
+import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
+import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.constants.ErrorConstants;
 import jakarta.annotation.PostConstruct;
 import java.security.SecureRandom;
@@ -42,6 +43,8 @@ public class JwtUtils {
   private static final @NonNull String AUTH_TYPE = "authentication_type";
   private static final @NonNull String CLAIM_SCOPE = "scope";
   private static final @NonNull String CLAIM_TOKEN_TYPE = "token_type";
+  private static final @NonNull String CLAIM_SESSION_START = "session_start";
+  private static final @NonNull String CLAIM_TOKEN_VERSION = "token_version";
   private static final @NonNull String TOKEN_TYPE_REFRESH = "refresh";
   private static final int SECRET_BYTE_LENGTH = 32;
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -59,8 +62,11 @@ public class JwtUtils {
     }
   }
 
-  public @NonNull String verifyAndExtractUsername(final @NonNull String authHeader) {
-    return this.verifyAndDecode(this.getToken(authHeader)).getClaim(CLAIM_USERNAME).asString();
+  public @NonNull String verifyAndExtractUsername(
+      final @NonNull String authHeader, final @NonNull TokenRealm realm) {
+    return this.verifyAndDecode(this.getToken(authHeader), realm)
+        .getClaim(CLAIM_USERNAME)
+        .asString();
   }
 
   private @NonNull DecodedJWT decode(
@@ -68,20 +74,49 @@ public class JwtUtils {
     try {
       return JWT.require(Algorithm.HMAC512(this.secret)).build().verify(token);
     } catch (final TokenExpiredException _) {
-      throw new AccessNotAllowedException(expiredMessageId);
+      throw new UnAuthorizedException(expiredMessageId);
     } catch (final JWTVerificationException _) {
-      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
   }
 
-  private @NonNull DecodedJWT verifyAndDecode(final @NonNull String token) {
+  private @NonNull DecodedJWT verifyAndDecode(
+      final @NonNull String token, final @NonNull TokenRealm realm) {
     final var decodedJWT = this.decode(token, "sessionExpired");
 
     if (isRefreshToken(decodedJWT)) {
-      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
 
+    checkRealm(decodedJWT, realm);
+
     return decodedJWT;
+  }
+
+  private static void checkRealm(
+      final @NonNull DecodedJWT decodedJWT, final @NonNull TokenRealm realm) {
+    final var audience = decodedJWT.getAudience();
+
+    if (audience == null || audience.isEmpty()) {
+      acceptClaimlessToken(realm);
+      return;
+    }
+
+    if (!audience.contains(realm.getAudience())) {
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+  }
+
+  /**
+   * Tokens issued before they carried a realm have no audience and cannot be attributed to one
+   * entry point. Protocol tokens outlive a deployment by days (npm: 90), so the protocol side keeps
+   * accepting them. The panel side does not: its access tokens live for minutes, and answering
+   * {@code sessionExpired} makes the frontend swap the token through its refresh token once.
+   */
+  private static void acceptClaimlessToken(final @NonNull TokenRealm realm) {
+    if (realm != TokenRealm.PROTOCOL) {
+      throw new UnAuthorizedException("sessionExpired");
+    }
   }
 
   private static boolean isRefreshToken(final @NonNull DecodedJWT decodedJWT) {
@@ -90,32 +125,60 @@ public class JwtUtils {
 
   private @NonNull String getToken(final @NonNull String authHeader) {
     if (!authHeader.contains("Bearer")) {
-      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
 
     return authHeader.replaceFirst("^Bearer ", "");
   }
 
-  public @NonNull String createTokenWithDuration(
+  /** Creates the access token of a panel session that starts now. */
+  public @NonNull String createPanelAccessToken(
+      final @NonNull UUID userId,
+      final @NonNull String username,
+      final @NonNull TemporalAmount timeoutDuration) {
+    return this.createSessionAccessToken(userId, username, timeoutDuration, Instant.now());
+  }
+
+  public @NonNull String createProtocolToken(
       final @NonNull UUID userId,
       final @NonNull String username,
       final @NonNull TemporalAmount timeoutDuration) {
     return JWT.create()
         .withSubject(userId.toString())
+        .withAudience(TokenRealm.PROTOCOL.getAudience())
         .withClaim(CLAIM_USERNAME, username)
         .withExpiresAt(Instant.now().plus(timeoutDuration))
         .sign(Algorithm.HMAC512(this.secret));
   }
 
-  public @NonNull String createTokenWithDuration(
+  public @NonNull String createProtocolToken(
       final @NonNull UUID userId,
       final @NonNull String username,
       final @NonNull TemporalAmount timeoutDuration,
       final @NonNull AuthenticationType authenticationType) {
     return JWT.create()
         .withSubject(userId.toString())
+        .withAudience(TokenRealm.PROTOCOL.getAudience())
         .withClaim(CLAIM_USERNAME, username)
         .withClaim(AUTH_TYPE, authenticationType.getValue())
+        .withExpiresAt(Instant.now().plus(timeoutDuration))
+        .sign(Algorithm.HMAC512(this.secret));
+  }
+
+  /**
+   * Creates the access token of a panel session. It carries the session start, so that a fresh
+   * token pair issued from it (e.g. after a username change) stays within the same session.
+   */
+  public @NonNull String createSessionAccessToken(
+      final @NonNull UUID userId,
+      final @NonNull String username,
+      final @NonNull TemporalAmount timeoutDuration,
+      final @NonNull Instant sessionStart) {
+    return JWT.create()
+        .withSubject(userId.toString())
+        .withAudience(TokenRealm.PANEL.getAudience())
+        .withClaim(CLAIM_USERNAME, username)
+        .withClaim(CLAIM_SESSION_START, sessionStart)
         .withExpiresAt(Instant.now().plus(timeoutDuration))
         .sign(Algorithm.HMAC512(this.secret));
   }
@@ -123,11 +186,15 @@ public class JwtUtils {
   public @NonNull String createRefreshToken(
       final @NonNull UUID userId,
       final @NonNull String username,
-      final @NonNull TemporalAmount timeoutDuration) {
+      final @NonNull TemporalAmount timeoutDuration,
+      final @NonNull Instant sessionStart,
+      final int tokenVersion) {
     return JWT.create()
         .withSubject(userId.toString())
         .withClaim(CLAIM_USERNAME, username)
         .withClaim(CLAIM_TOKEN_TYPE, TOKEN_TYPE_REFRESH)
+        .withClaim(CLAIM_SESSION_START, sessionStart)
+        .withClaim(CLAIM_TOKEN_VERSION, tokenVersion)
         .withExpiresAt(Instant.now().plus(timeoutDuration))
         .sign(Algorithm.HMAC512(this.secret));
   }
@@ -138,44 +205,74 @@ public class JwtUtils {
       final @NonNull TemporalAmount timeoutDuration) {
     return JWT.create()
         .withSubject(repoId.toString())
+        .withAudience(TokenRealm.PROTOCOL.getAudience())
         .withClaim(AUTH_TYPE, AuthenticationType.DOCKER_SCAN.getValue())
         .withClaim(CLAIM_SCOPE, scope)
         .withExpiresAt(Instant.now().plus(timeoutDuration))
         .sign(Algorithm.HMAC512(this.secret));
   }
 
-  public @NonNull UUID extractUserId(final @NonNull String authHeader) {
-    return this.getUserId(this.getToken(authHeader));
+  public @NonNull UUID extractUserId(
+      final @NonNull String authHeader, final @NonNull TokenRealm realm) {
+    return this.getUserId(this.getToken(authHeader), realm);
   }
 
-  public @NonNull UUID getUserId(final @NonNull String token) {
-    try {
-      return UUID.fromString(this.verifyAndDecode(token).getSubject());
-    } catch (final IllegalArgumentException | NullPointerException _) {
-      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
-    }
+  public @NonNull UUID getUserId(final @NonNull String token, final @NonNull TokenRealm realm) {
+    return subjectAsUuid(this.verifyAndDecode(token, realm));
   }
 
-  public @NonNull UUID verifyRefreshToken(final @NonNull String token) {
+  /**
+   * Returns the start of the session the access token belongs to. A token without the claim (issued
+   * before sessions were bounded) starts a new session now, which is safe as such a token expires
+   * within {@link AuthUtils#TIMEOUT_ACCESS_TOKEN}.
+   */
+  public @NonNull Instant extractSessionStart(final @NonNull String authHeader) {
+    final var sessionStart =
+        this.verifyAndDecode(this.getToken(authHeader), TokenRealm.PANEL)
+            .getClaim(CLAIM_SESSION_START)
+            .asInstant();
+
+    return sessionStart != null ? sessionStart : Instant.now();
+  }
+
+  public @NonNull RefreshTokenClaims verifyRefreshToken(final @NonNull String token) {
     final var decodedJWT = this.decode(token, "refreshTokenExpired");
 
     if (!isRefreshToken(decodedJWT)) {
-      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
 
-    return UUID.fromString(decodedJWT.getSubject());
+    final var sessionStart = decodedJWT.getClaim(CLAIM_SESSION_START).asInstant();
+    final var tokenVersion = decodedJWT.getClaim(CLAIM_TOKEN_VERSION).asInt();
+
+    // A refresh token without these claims predates bounded sessions and cannot be exchanged.
+    if (sessionStart == null || tokenVersion == null) {
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+
+    return new RefreshTokenClaims(subjectAsUuid(decodedJWT), sessionStart, tokenVersion);
   }
 
-  public void verify(final @NonNull String authHeader) {
-    this.verifyAndDecode(this.getToken(authHeader));
+  private static @NonNull UUID subjectAsUuid(final @NonNull DecodedJWT decodedJWT) {
+    try {
+      return UUID.fromString(decodedJWT.getSubject());
+    } catch (final IllegalArgumentException | NullPointerException _) {
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
   }
 
-  public @NonNull AuthenticationType extractAuthenticationType(final @NonNull String authHeader) {
-    return this.getAuthenticationType(this.getToken(authHeader));
+  public void verify(final @NonNull String authHeader, final @NonNull TokenRealm realm) {
+    this.verifyAndDecode(this.getToken(authHeader), realm);
   }
 
-  public @NonNull AuthenticationType getAuthenticationType(final @NonNull String token) {
-    final var decodedJWT = this.verifyAndDecode(token);
+  public @NonNull AuthenticationType extractAuthenticationType(
+      final @NonNull String authHeader, final @NonNull TokenRealm realm) {
+    return this.getAuthenticationType(this.getToken(authHeader), realm);
+  }
+
+  public @NonNull AuthenticationType getAuthenticationType(
+      final @NonNull String token, final @NonNull TokenRealm realm) {
+    final var decodedJWT = this.verifyAndDecode(token, realm);
     final var authTypeClaim = decodedJWT.getClaim(AUTH_TYPE);
 
     if (authTypeClaim.isNull() || authTypeClaim.asString() == null) {

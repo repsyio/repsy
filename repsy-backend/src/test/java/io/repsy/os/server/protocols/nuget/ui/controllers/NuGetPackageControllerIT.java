@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
@@ -45,9 +46,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -56,6 +61,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -128,7 +134,7 @@ class NuGetPackageControllerIT {
 
   private String bearer(final User user) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(
+        + this.jwtUtils.createPanelAccessToken(
             user.getId(), user.getUsername(), Duration.ofMinutes(30));
   }
 
@@ -278,11 +284,11 @@ class NuGetPackageControllerIT {
       final var user = NuGetPackageControllerIT.this.createUser(UserRole.USER);
       final var expired =
           AuthUtils.AUTH_BEARER
-              + NuGetPackageControllerIT.this.jwtUtils.createTokenWithDuration(
+              + NuGetPackageControllerIT.this.jwtUtils.createPanelAccessToken(
                   user.getId(), user.getUsername(), Duration.ofSeconds(-30));
       final var unknown =
           AuthUtils.AUTH_BEARER
-              + NuGetPackageControllerIT.this.jwtUtils.createTokenWithDuration(
+              + NuGetPackageControllerIT.this.jwtUtils.createPanelAccessToken(
                   UUID.randomUUID(), unique("missing-user"), Duration.ofMinutes(30));
 
       NuGetPackageControllerIT.this
@@ -295,14 +301,14 @@ class NuGetPackageControllerIT {
               get("/api/nuget/packages/{repo}", repo.getName())
                   .with(apiPort())
                   .header(AUTHORIZATION, "Bearer garbage"))
-          .andExpect(status().isForbidden());
+          .andExpect(status().isUnauthorized());
       NuGetPackageControllerIT.this
           .mockMvc
           .perform(
               get("/api/nuget/packages/{repo}", repo.getName())
                   .with(apiPort())
                   .header(AUTHORIZATION, expired))
-          .andExpect(status().isForbidden());
+          .andExpect(status().isUnauthorized());
       NuGetPackageControllerIT.this
           .mockMvc
           .perform(
@@ -413,6 +419,81 @@ class NuGetPackageControllerIT {
           .perform(post("/api/nuget/packages/{repo}", repo.getName()).with(apiPort()))
           // RPS-849 owns the unsupported-verb behavior; pin today's error-handler response.
           .andExpect(status().isNotFound());
+    }
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the list endpoints")
+  class PagingAndSorting {
+
+    private static final String PACKAGES = "/api/nuget/packages/{repo}";
+    private static final String VERSIONS = "/api/nuget/packages/{repo}/fixture.package/versions";
+
+    static Stream<String> endpoints() {
+      return Stream.of(PACKAGES, VERSIONS);
+    }
+
+    static Stream<Arguments> acceptedSorts() {
+      return Stream.concat(
+          Stream.of(Arguments.of(PACKAGES, "packageId")),
+          Stream.of("version", "publishedAt").map(property -> Arguments.of(VERSIONS, property)));
+    }
+
+    static Stream<Arguments> invalidPagingOnEveryEndpoint() {
+      return endpoints()
+          .flatMap(
+              path ->
+                  PagingAssertions.invalidPagingParams()
+                      .map(args -> Arguments.of(path, args.get()[0], args.get()[1])));
+    }
+
+    private record Seed(RepoInfo repo, String token) {}
+
+    private Seed seed() {
+      final var it = NuGetPackageControllerIT.this;
+      final var user = it.createUser(UserRole.USER);
+      final var repo = it.createRepo(RepoType.NUGET, true);
+
+      it.publish(repo.getName(), "Fixture.Package", "1.0.0");
+      it.publish(repo.getName(), "Fixture.Package", "1.0.1-beta.1");
+
+      return new Seed(repo, it.bearer(user));
+    }
+
+    private ResultActions list(
+        final Seed seed, final String path, final String param, final String value)
+        throws Exception {
+      return NuGetPackageControllerIT.this.mockMvc.perform(
+          get(path, seed.repo().getName())
+              .param(param, value)
+              .with(apiPort())
+              .header(AUTHORIZATION, seed.token()));
+    }
+
+    @ParameterizedTest(name = "{0} sort={1}")
+    @MethodSource("acceptedSorts")
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String path, final String property) throws Exception {
+      final var seed = this.seed();
+
+      this.list(seed, path, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(seed, path, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400(final String path) throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(this.seed(), path, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0} {1}={2}")
+    @MethodSource("invalidPagingOnEveryEndpoint")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String path, final String param, final String value)
+        throws Exception {
+      PagingAssertions.expectInvalidParameter(this.list(this.seed(), path, param, value), param);
     }
   }
 }

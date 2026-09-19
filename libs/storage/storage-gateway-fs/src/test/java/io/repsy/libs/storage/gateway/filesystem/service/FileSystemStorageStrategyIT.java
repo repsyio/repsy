@@ -16,11 +16,13 @@
 package io.repsy.libs.storage.gateway.filesystem.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
+import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import io.repsy.libs.storage.core.exceptions.IsADirectoryException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -36,6 +38,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @DisplayName("FileSystemStorageStrategy")
 class FileSystemStorageStrategyIT {
@@ -410,6 +414,40 @@ class FileSystemStorageStrategyIT {
       assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/original.bin"))
           .doesNotExist();
       assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/sha256digest")).exists();
+    }
+
+    @Test
+    @DisplayName("drops the source and keeps the existing file when the digest already exists")
+    void dropSourceWhenDigestAlreadyExists() throws Exception {
+      final var key = UUID.randomUUID();
+      FileSystemStorageStrategyIT.this.seedFile(key + "/sha256digest", "stored");
+      FileSystemStorageStrategyIT.this.seedFile(key + "/upload.bin", "duplicate upload");
+      final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "upload.bin");
+
+      assertThatCode(
+              () -> FileSystemStorageStrategyIT.this.strategy.renameObject(sp, "sha256digest"))
+          .doesNotThrowAnyException();
+
+      assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/upload.bin"))
+          .doesNotExist();
+      assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/sha256digest"))
+          .hasContent("stored");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"../escaped", "../../escaped", "nested/digest", "a\\b", "", ".", ".."})
+    @DisplayName("rejects a digest that is not a plain sibling name and leaves the source alone")
+    void rejectDigestThatIsNotASibling(final String digest) throws Exception {
+      final var key = UUID.randomUUID();
+      FileSystemStorageStrategyIT.this.seedFile(key + "/upload.bin", "bytes");
+      final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "upload.bin");
+
+      assertThatThrownBy(() -> FileSystemStorageStrategyIT.this.strategy.renameObject(sp, digest))
+          .isInstanceOf(InvalidStoragePathException.class);
+
+      assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/upload.bin"))
+          .hasContent("bytes");
+      assertThat(FileSystemStorageStrategyIT.this.tempDir.resolve("escaped")).doesNotExist();
     }
   }
 

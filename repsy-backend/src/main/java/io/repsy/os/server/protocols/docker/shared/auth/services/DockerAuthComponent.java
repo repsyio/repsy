@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.docker.shared.auth.services;
 
 import static io.repsy.os.shared.auth.utils.AuthUtils.TIMEOUT_ACCESS_TOKEN;
-import static io.repsy.os.shared.auth.utils.AuthUtils.checkPassword;
 import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromAuthHeader;
 import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBasicToken;
@@ -29,6 +28,7 @@ import io.repsy.os.server.shared.auth.ProtocolAuthService;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.services.UserTxService;
@@ -59,18 +59,18 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
   @Override
   public String createAnonymousUser() {
 
-    return this.jwtUtils.createTokenWithDuration(
+    return this.jwtUtils.createProtocolToken(
         UUID.randomUUID(), ANONYMOUS_USER, TIMEOUT_ACCESS_TOKEN);
   }
 
   @Override
-  public UserInfo authenticateUser(final String authHeader) {
+  public UserInfo authenticateUser(final @Nullable String authHeader) {
 
-    if (!isBearerToken(authHeader)) {
+    if (authHeader == null || !isBearerToken(authHeader)) {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader);
+    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PANEL);
 
     return this.userTxService.getUserByUsername(username);
   }
@@ -146,7 +146,7 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
     final var authType = this.extractAuthenticationTypeSafely(authHeader);
 
     if (authType == AuthenticationType.DEPLOY_TOKEN) {
-      final var tokenId = this.jwtUtils.extractUserId(authHeader);
+      final var tokenId = this.jwtUtils.extractUserId(authHeader, TokenRealm.PROTOCOL);
 
       this.authorizeTokenRequestTokenId(repoInfo.getStorageKey(), tokenId, permission);
 
@@ -161,7 +161,7 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
   private @Nullable AuthenticationType extractAuthenticationTypeSafely(final String authHeader) {
 
     try {
-      return this.jwtUtils.extractAuthenticationType(authHeader);
+      return this.jwtUtils.extractAuthenticationType(authHeader, TokenRealm.PROTOCOL);
     } catch (final IllegalArgumentException _) {
       return null;
     }
@@ -199,19 +199,13 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
       return null;
     }
 
-    final var userInfo = this.userTxService.getUserByUsername(credentials.getUsername());
-
-    if (!checkPassword(userInfo.getHash(), userInfo.getSalt(), credentials.getPassword())) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    return userInfo;
+    return this.authenticateWithPassword(credentials);
   }
 
   private @Nullable UserInfo resolveBearerAuthUser(
       final BaseRepoInfo<UUID> repoInfo, final String authHeader) {
 
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader);
+    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
 
     final var userInfoOpt = this.userTxService.getUserByUsernameOptional(username);
 
@@ -235,14 +229,10 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
 
   private Optional<String> authenticateWithUsernamePassword(final Credentials credentials) {
 
-    final var userInfo = this.userTxService.getUserByUsername(credentials.getUsername());
-
-    if (!checkPassword(userInfo.getHash(), userInfo.getSalt(), credentials.getPassword())) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
+    final var userInfo = this.authenticateWithPassword(credentials);
 
     final var token =
-        this.jwtUtils.createTokenWithDuration(
+        this.jwtUtils.createProtocolToken(
             userInfo.getId(), userInfo.getUsername(), TIMEOUT_ACCESS_TOKEN);
 
     return Optional.of(token);
@@ -263,7 +253,7 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
     this.deployTokenService.updateLastUsedTime(deployTokenOpt.get().getId());
 
     final var token =
-        this.jwtUtils.createTokenWithDuration(
+        this.jwtUtils.createProtocolToken(
             deployTokenOpt.get().getId(),
             credentials.getUsername(),
             TIMEOUT_ACCESS_TOKEN,
@@ -280,7 +270,7 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
 
     if (authType == AuthenticationType.DEPLOY_TOKEN) {
       this.authorizeTokenRequestTokenId(
-          repoId, this.jwtUtils.extractUserId(authHeader), permission);
+          repoId, this.jwtUtils.extractUserId(authHeader, TokenRealm.PROTOCOL), permission);
       return;
     }
 
@@ -289,7 +279,7 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
       return;
     }
 
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader);
+    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
     final var userInfo = this.userTxService.getUserByUsernameOptional(username).orElse(null);
 
     if (userInfo == null) {
@@ -306,7 +296,7 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
-    final var tokenRepoId = this.jwtUtils.extractUserId(authHeader);
+    final var tokenRepoId = this.jwtUtils.extractUserId(authHeader, TokenRealm.PROTOCOL);
 
     if (!tokenRepoId.equals(repoId)) {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);

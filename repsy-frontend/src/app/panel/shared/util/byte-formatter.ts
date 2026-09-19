@@ -14,6 +14,9 @@
 /// limitations under the License.
 ///
 
+const UNITS = ['B', 'K', 'M', 'G', 'T', 'P'];
+const BASE = 1024;
+
 export class ByteFormatter {
   public static formatBytes(bytes: number, decimals = 2): string {
     bytes = Math.abs(bytes);
@@ -21,9 +24,20 @@ export class ByteFormatter {
       return '0 B';
     }
 
-    const sizes = ['B', 'K', 'M', 'G', 'T', 'P'];
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    let unit = 0;
+    let value = bytes;
+    while (value >= BASE && unit < UNITS.length - 1) {
+      value /= BASE;
+      unit++;
+    }
 
-    return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(decimals))} ${sizes[i]}`;
+    let rounded = parseFloat(value.toFixed(decimals));
+    if (rounded >= BASE && unit < UNITS.length - 1) {
+      // Rounding pushed the value up to the next unit boundary (e.g. 1023.999 K -> 1024 K).
+      rounded = parseFloat((value / BASE).toFixed(decimals));
+      unit++;
+    }
+
+    return `${rounded} ${UNITS[unit]}`;
   }
 }

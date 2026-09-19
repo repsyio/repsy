@@ -26,6 +26,7 @@ import io.repsy.os.generated.model.ProfileInfo;
 import io.repsy.os.generated.model.UpdateUsernameForm;
 import io.repsy.os.panel.profile.services.ProfileService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import jakarta.validation.Valid;
@@ -54,9 +55,7 @@ class ProfileController {
   public @NonNull RestResponse<ProfileInfo> get(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
-    this.jwtUtils.verify(authHeader);
-
-    final var userId = this.jwtUtils.extractUserId(authHeader);
+    final var userId = this.jwtUtils.extractUserId(authHeader, TokenRealm.PANEL);
 
     final var profileInfo = this.profileService.getProfile(userId);
 
@@ -68,9 +67,11 @@ class ProfileController {
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestBody @Valid final @NonNull UpdateUsernameForm form) {
 
-    final var userId = this.jwtUtils.extractUserId(authHeader);
+    final var userId = this.jwtUtils.extractUserId(authHeader, TokenRealm.PANEL);
 
-    final var loginInfo = this.profileService.updateUsername(userId, form.getUsername());
+    final var loginInfo =
+        this.profileService.updateUsername(
+            userId, form.getUsername(), this.jwtUtils.extractSessionStart(authHeader));
 
     return this.resp.success("usernameUpdated", loginInfo);
   }
@@ -80,7 +81,8 @@ class ProfileController {
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestBody @Valid final @NonNull PasswordForm form) {
 
-    this.profileService.updatePassword(this.jwtUtils.extractUserId(authHeader), form);
+    this.profileService.updatePassword(
+        this.jwtUtils.extractUserId(authHeader, TokenRealm.PANEL), form);
 
     return this.resp.success("passwordChanged");
   }
@@ -89,9 +91,7 @@ class ProfileController {
   public @NonNull RestResponse<Void> deleteProfile(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
 
-    this.jwtUtils.verify(authHeader);
-
-    final var userId = this.jwtUtils.extractUserId(authHeader);
+    final var userId = this.jwtUtils.extractUserId(authHeader, TokenRealm.PANEL);
 
     this.userTxService.deleteUserById(userId);
 

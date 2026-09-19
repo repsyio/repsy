@@ -17,7 +17,6 @@ package io.repsy.os.server.protocols.shared.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -30,17 +29,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.persistence.PersistenceException;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -56,7 +53,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -87,12 +83,14 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  *
  * <p>{@code UsageUpdateService.updateUsage} is {@code @Async}, so it runs on another thread and can
  * never see rows that only exist inside a test-managed, rolled-back transaction. It is therefore
- * replaced by a mock, and the delete tests assert the {@link UsageChangedInfo} it receives.
+ * replaced by a mock, and the tests assert that no endpoint here calls it: a deleted repo's usage
+ * goes with its row. {@code ProtocolRepoDeleteUsageIT} covers the delete with the real service.
  */
 @DisplayName("ProtocolRepoController /api/repos/*")
 class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
+  private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String REPO_NOT_FOUND_TEXT = "Repository not found";
   private static final String REPO_EXISTS_TEXT = "The repository exists. Please try another name.";
   private static final String USER_NOT_FOUND_TEXT = "User not found.";
@@ -149,11 +147,6 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
   private static String repoUrl(final Repo repo, final String suffix) {
     return "/api/repos/" + repo.getName() + suffix;
-  }
-
-  private static String basicAuth(final String username, final String password) {
-    final var raw = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
-    return "Basic " + Base64.getEncoder().encodeToString(raw);
   }
 
   private Repo seedMaven() {
@@ -393,29 +386,26 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 404 userNotFound for a non-Bearer header naming an unknown user")
+    @DisplayName("returns 401 unAuthorized for HTTP Basic credentials naming an unknown user")
     void nonBearerAuthorizationHeader(final Endpoint endpoint) throws Exception {
       final var target = this.target();
 
-      expectError(
+      // RPS-906: must match basicCredentialsWrongPassword, so usernames cannot be enumerated.
+      expectUnauthorized(
           ProtocolRepoControllerIT.this.perform(
-              endpoint.request().apply(target).header(AUTHORIZATION, "Basic dXNlcjpw")),
-          HttpStatus.NOT_FOUND,
-          "userNotFound",
-          "userNotFound",
-          USER_NOT_FOUND_TEXT);
+              endpoint.request().apply(target).header(AUTHORIZATION, "Basic dXNlcjpw")));
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 403 for a malformed/garbage bearer token")
+    @DisplayName("returns 401 for a malformed/garbage bearer token")
     void malformedBearerToken(final Endpoint endpoint) throws Exception {
       final var target = this.target();
 
       expectError(
           ProtocolRepoControllerIT.this.perform(
               endpoint.request().apply(target).header(AUTHORIZATION, "Bearer not-a-jwt")),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "accessNotAllowed",
           "accessNotAllowed",
           ACCESS_NOT_ALLOWED_TEXT);
@@ -423,7 +413,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 403 sessionExpired for an expired token")
+    @DisplayName("returns 401 sessionExpired for an expired token")
     void expiredToken(final Endpoint endpoint) throws Exception {
       final var target = this.target();
       final var admin =
@@ -436,7 +426,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
                   .apply(target)
                   .header(
                       AUTHORIZATION, ProtocolRepoControllerIT.this.expiredBearerTokenFor(admin))),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "sessionExpired",
           "sessionExpired",
           SESSION_EXPIRED_TEXT);
@@ -462,12 +452,26 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("repoScopedEndpoints")
-    @DisplayName("returns 404 repoNotFound for an unknown repo, before any auth check")
+    @DisplayName("returns 404 repoNotFound for an unknown repo once the caller is authorized")
     void unknownRepo(final Endpoint endpoint) throws Exception {
-      // No Authorization header at all: the interceptor resolves the repo first.
       final var target = new Target("nope-" + randomTag(), "MAVEN");
 
-      expectRepoNotFound(ProtocolRepoControllerIT.this.perform(endpoint.request().apply(target)));
+      expectRepoNotFound(
+          ProtocolRepoControllerIT.this.perform(
+              endpoint
+                  .request()
+                  .apply(target)
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("repoScopedEndpoints")
+    @DisplayName("returns 401 unAuthorized, not 404, for an unknown repo without credentials")
+    void unknownRepoWithoutHeader(final Endpoint endpoint) throws Exception {
+      // Checked after authentication, so a missing repo looks like a private one (RPS-887).
+      final var target = new Target("nope-" + randomTag(), "MAVEN");
+
+      expectUnauthorized(ProtocolRepoControllerIT.this.perform(endpoint.request().apply(target)));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -504,17 +508,11 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("typeOnlyEndpoints")
-    @DisplayName("KNOWN DEFECT: a missing Authorization header on a repoType route is a 500")
+    @DisplayName("returns 401 unAuthorized for a missing Authorization header on a repoType route")
     void typeOnlyRouteWithoutHeader(final Endpoint endpoint) throws Exception {
-      // ProtocolAuthService.authenticateUser(null) throws a NullPointerException, which the
-      // generic handler turns into errorOccurred instead of an authentication error.
-      expectError(
+      expectUnauthorized(
           ProtocolRepoControllerIT.this.perform(
-              endpoint.request().apply(new Target("unused", "MAVEN"))),
-          HttpStatus.INTERNAL_SERVER_ERROR,
-          "errorOccurred",
-          null,
-          ERROR_OCCURRED_TEXT);
+              endpoint.request().apply(new Target("unused", "MAVEN"))));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -549,7 +547,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               get("/api/repos/MAVEN/count")
                   .header(AUTHORIZATION, basicAuth(username, VALID_PASSWORD))),
           "repoCountFetched",
-          "repoCountFetched");
+          "Repo count fetched.");
     }
 
     @Test
@@ -561,6 +559,36 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       expectUnauthorized(
           ProtocolRepoControllerIT.this.perform(
               get("/api/repos/MAVEN/count").header(AUTHORIZATION, basicAuth(username, "wrong"))));
+    }
+
+    @Test
+    @DisplayName("answers an unknown username exactly like a wrong password, including for admin")
+    void basicCredentialsDoNotRevealUsernames() throws Exception {
+      final var username = uniqueUsername("basic");
+      ProtocolRepoControllerIT.this.createUser(username, UserRole.USER);
+
+      final var wrongPassword = this.basicError(basicAuth(username, "wrong"));
+      final var seededAdmin = this.basicError(basicAuth("admin", "wrong"));
+      final var unknownUser = this.basicError(basicAuth(uniqueUsername("ghost"), "wrong"));
+      final var emptyUsername = this.basicError(basicAuth("", "wrong"));
+
+      assertThat(List.of(seededAdmin, unknownUser, emptyUsername))
+          .allSatisfy(response -> assertThat(response).isEqualTo(wrongPassword));
+    }
+
+    /** The status and error envelope of a Basic-authenticated call, minus the random errorCode. */
+    private Map<String, Object> basicError(final String authHeader) throws Exception {
+      final var response =
+          ProtocolRepoControllerIT.this
+              .perform(get("/api/repos/MAVEN/count").header(AUTHORIZATION, authHeader))
+              .andExpect(status().isUnauthorized())
+              .andReturn()
+              .getResponse();
+      final Map<String, Object> envelope =
+          new HashMap<>(JsonPath.read(response.getContentAsString(), "$"));
+      envelope.remove("errorCode");
+      envelope.put("status", response.getStatus());
+      return envelope;
     }
   }
 
@@ -617,7 +645,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
                 HttpStatus.NOT_FOUND,
                 "repoTypeNotFound",
                 "repoTypeNotFound",
-                "repoTypeNotFound"));
+                "Repository type not found."));
         result.add(
             Arguments.of(
                 "short go alias",
@@ -626,7 +654,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
                 HttpStatus.NOT_FOUND,
                 "repoTypeNotFound",
                 "repoTypeNotFound",
-                "repoTypeNotFound"));
+                "Repository type not found."));
         // The interceptor accepts these, but the enum conversion of @PathVariable is case
         // sensitive, so they fail there instead.
         result.add(
@@ -830,13 +858,17 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 400 validationError when the body is not JSON")
+    @DisplayName("returns 415 unsupportedMediaType when the body has no JSON content type")
     void unsupportedMediaType() throws Exception {
-      expectValidationError(
+      expectError(
           ProtocolRepoControllerIT.this.perform(
               post("/api/repos/MAVEN")
                   .content("{\"name\":\"" + uniqueRepoName("nomedia") + "\"}")
-                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
+          HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+          "unsupportedMediaType",
+          null,
+          UNSUPPORTED_MEDIA_TYPE_TEXT);
     }
 
     @Test
@@ -954,15 +986,11 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       assertThat(ProtocolRepoControllerIT.this.repoRepository.findById(repo.getId())).isEmpty();
       assertThat(storageDirOf(repo)).doesNotExist();
 
-      final var captor = ArgumentCaptor.forClass(UsageChangedInfo.class);
-      verify(ProtocolRepoControllerIT.this.usageUpdateService).updateUsage(captor.capture());
-      assertThat(captor.getValue().repoId()).isEqualTo(repo.getId());
-      assertThat(captor.getValue().usages().getDiskUsage()).isZero();
+      verifyNoInteractions(ProtocolRepoControllerIT.this.usageUpdateService);
     }
 
     @Test
-    @DisplayName(
-        "removes a repo with content and reports the freed bytes as a negative usage delta")
+    @DisplayName("removes a repo with content without submitting a usage update for its row")
     void deletesRepoWithContent() throws Exception {
       final var repo = ProtocolRepoControllerIT.this.seedMaven();
       writeFile(repo, "com/acme/lib/1.0/lib-1.0.jar", "jar-bytes");
@@ -979,10 +1007,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(repo.getName())).isEmpty();
       assertThat(storageDirOf(repo)).doesNotExist();
 
-      final var captor = ArgumentCaptor.forClass(UsageChangedInfo.class);
-      verify(ProtocolRepoControllerIT.this.usageUpdateService).updateUsage(captor.capture());
-      assertThat(captor.getValue().repoId()).isEqualTo(repo.getId());
-      assertThat(captor.getValue().usages().getDiskUsage()).isEqualTo(-(9 + 11 + 4));
+      verifyNoInteractions(ProtocolRepoControllerIT.this.usageUpdateService);
     }
 
     @Test
@@ -1190,7 +1215,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               json(patch(repoUrl(repo, "/description")), descriptionBody(""))
                   .header(AUTHORIZATION, token)),
           "repoDescriptionEdited",
-          "repoDescriptionEdited");
+          "Repo description updated.");
 
       final var body =
           expectSuccess(
@@ -1729,7 +1754,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           ProtocolRepoControllerIT.this.perform(
               json(patch(repoUrl(keep, "/name")), nameBody(renamed)).header(AUTHORIZATION, token)),
           "repoRenamed",
-          "repoRenamed");
+          "Repo renamed.");
       expectSuccess(
           ProtocolRepoControllerIT.this.perform(
               delete(repoUrl(gone, "")).header(AUTHORIZATION, token)),
@@ -1769,7 +1794,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               ProtocolRepoControllerIT.this.perform(
                   get("/api/repos/" + type + "/count").header(AUTHORIZATION, token)),
               "repoCountFetched",
-              "repoCountFetched");
+              "Repo count fetched.");
       return ((Number) JsonPath.read(body, "$.data")).longValue();
     }
 
@@ -1848,7 +1873,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               json(patch(repoUrl(repo, "/name")), nameBody(newName))
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
           "repoRenamed",
-          "repoRenamed");
+          "Repo renamed.");
     }
 
     @Test
@@ -1885,7 +1910,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           ProtocolRepoControllerIT.this.perform(
               get("/api/repos/" + newName + "/format").header(AUTHORIZATION, token)),
           "repoTypeFetched",
-          "repoTypeFetched");
+          "Repo type fetched.");
       expectRepoNotFound(
           ProtocolRepoControllerIT.this.perform(
               get(repoUrl(repo, "/format")).header(AUTHORIZATION, token)));
@@ -2001,7 +2026,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
               json(patch(repoUrl(repo, "/description")), body)
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
           "repoDescriptionEdited",
-          "repoDescriptionEdited");
+          "Repo description updated.");
     }
 
     @Test
@@ -2137,7 +2162,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
                   get(repoUrl(repo, "/format"))
                       .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())),
               "repoTypeFetched",
-              "repoTypeFetched");
+              "Repo type fetched.");
 
       assertThat(JsonPath.<String>read(body, "$.data"))
           .isEqualTo(type.name().toLowerCase(Locale.ROOT));
@@ -2152,7 +2177,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
                   get("/api/repos/go/format")
                       .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())),
               "repoTypeFetched",
-              "repoTypeFetched");
+              "Repo type fetched.");
 
       assertThat(JsonPath.<String>read(body, "$.data")).isEqualTo("golang");
     }
@@ -2166,7 +2191,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           expectSuccess(
               ProtocolRepoControllerIT.this.perform(get(repoUrl(repo, "/format"))),
               "repoTypeFetched",
-              "repoTypeFetched");
+              "Repo type fetched.");
 
       assertThat(JsonPath.<String>read(body, "$.data")).isEqualTo("helm");
     }

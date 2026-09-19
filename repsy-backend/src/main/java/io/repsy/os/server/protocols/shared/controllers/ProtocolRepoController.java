@@ -35,9 +35,7 @@ import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacadeMavenAdapter;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
-import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageService;
-import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.RepoScope;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -68,7 +66,6 @@ public class ProtocolRepoController {
   private final RepoTxService repoTxService;
   private final UsageService usageService;
   private final RestResponseFactory responseFactory;
-  private final UsageUpdateService usageUpdateService;
 
   @PostMapping("/{repoType}")
   @RepoOperation
@@ -94,9 +91,9 @@ public class ProtocolRepoController {
   public RestResponse<Void> delete(final RepoInfo repoInfo, final ProtocolApiFacade facade)
       throws IOException {
 
-    final var usages = facade.deleteRepo(repoInfo);
-
-    this.usageUpdateService.updateUsage(new UsageChangedInfo(repoInfo.getId(), usages));
+    // No usage update for the freed bytes: the usage lives on the repo row, which goes with it.
+    // An async update would also race the delete and fail with repoNotFound (RPS-908).
+    facade.deleteRepo(repoInfo);
 
     this.repoTxService.deleteRepo(repoInfo.getId());
 

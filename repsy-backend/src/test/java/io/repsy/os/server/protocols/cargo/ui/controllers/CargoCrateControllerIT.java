@@ -23,9 +23,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import io.repsy.os.PagingAssertions;
 import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateIndexRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateMetaRepository;
@@ -48,14 +50,21 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -137,15 +146,20 @@ class CargoCrateControllerIT {
     return this.userRepository.findById(info.getId()).orElseThrow();
   }
 
+  private static String basicAuth(final String username, final String password) {
+    final var raw = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
+    return "Basic " + Base64.getEncoder().encodeToString(raw);
+  }
+
   private String token(final User user) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(
+        + this.jwtUtils.createPanelAccessToken(
             user.getId(), user.getUsername(), Duration.ofMinutes(30));
   }
 
   private String expiredToken(final User user) {
     return AuthUtils.AUTH_BEARER
-        + this.jwtUtils.createTokenWithDuration(
+        + this.jwtUtils.createPanelAccessToken(
             user.getId(), user.getUsername(), Duration.ofSeconds(-30));
   }
 
@@ -293,15 +307,15 @@ class CargoCrateControllerIT {
     return JsonPath.read(body, "$.data");
   }
 
-  private static void expectSuccess(final ResultActions result, final String msgId)
-      throws Exception {
+  private static void expectSuccess(
+      final ResultActions result, final String msgId, final String text) throws Exception {
     final var envelope = (Map<String, Object>) JsonPath.read(body(result), "$");
     assertThat(envelope)
         .containsOnlyKeys(ENVELOPE_KEYS)
         .containsEntry("msgId", msgId)
         .containsEntry("type", "SUCCESS")
         .containsEntry("errorCode", null)
-        .containsEntry("text", msgId);
+        .containsEntry("text", text);
   }
 
   private static void expectError(
@@ -347,7 +361,7 @@ class CargoCrateControllerIT {
           .containsEntry("msgId", "cratesFetched")
           .containsEntry("type", "SUCCESS")
           .containsEntry("errorCode", null)
-          .containsEntry("text", "cratesFetched");
+          .containsEntry("text", "Crates fetched.");
       assertThat((Map<String, Object>) envelope.get("data")).containsOnlyKeys("content", "page");
       assertThat((Map<String, Object>) ((Map<String, Object>) envelope.get("data")).get("page"))
           .containsOnlyKeys("size", "number", "totalElements", "totalPages")
@@ -502,11 +516,18 @@ class CargoCrateControllerIT {
     @Test
     void reportsNotFoundForMissingRepoCrateAndVersion() throws Exception {
       final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, false);
+      final var user = CargoCrateControllerIT.this.createUser("reader", UserRole.USER);
+      // A missing repo is only revealed to an authenticated caller; anonymous callers get the
+      // same 401 as for a private repo (RPS-887).
       expectError(
-          CargoCrateControllerIT.this.request("GET", "/api/cargo/crates/missing", null),
+          CargoCrateControllerIT.this.request(
+              "GET", "/api/cargo/crates/missing", CargoCrateControllerIT.this.token(user)),
           HttpStatus.NOT_FOUND,
           "repoNotFound",
           "Repository not found");
+      CargoCrateControllerIT.this
+          .request("GET", "/api/cargo/crates/missing", null)
+          .andExpect(status().isUnauthorized());
       expectError(
           CargoCrateControllerIT.this.request(
               "GET", "/api/cargo/crates/" + repo.getName() + "/missing", null),
@@ -528,6 +549,39 @@ class CargoCrateControllerIT {
   class Authorization {
 
     @Test
+    @DisplayName("answers an unknown Basic username exactly like a wrong password (RPS-906)")
+    void basicCredentialsDoNotRevealUsernames() throws Exception {
+      final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, true);
+      final var user = CargoCrateControllerIT.this.createUser("basic", UserRole.USER);
+      final var path = "/api/cargo/crates/" + repo.getName();
+
+      for (final var auth :
+          List.of(
+              basicAuth(user.getUsername(), "wrong"),
+              basicAuth("ghost-" + UUID.randomUUID(), "wrong"))) {
+        expectError(
+            CargoCrateControllerIT.this.request("GET", path, auth),
+            HttpStatus.UNAUTHORIZED,
+            "unAuthorized",
+            "The user has logged in but has no permissions.");
+      }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"Basic !!!", "Basic dXNlcg=="})
+    @DisplayName("answers a Basic header that is not base64 or has no colon with 401 (RPS-927)")
+    void undecodableBasicHeaderIsUnauthorized(final String authHeader) throws Exception {
+      final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, true);
+
+      expectError(
+          CargoCrateControllerIT.this.request(
+              "GET", "/api/cargo/crates/" + repo.getName(), authHeader),
+          HttpStatus.UNAUTHORIZED,
+          "unAuthorized",
+          "The user has logged in but has no permissions.");
+    }
+
+    @Test
     void rejectsMissingMalformedExpiredAndDeletedUserTokens() throws Exception {
       final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, true);
       final var user = CargoCrateControllerIT.this.createUser("reader", UserRole.USER);
@@ -539,13 +593,13 @@ class CargoCrateControllerIT {
           "The user has logged in but has no permissions.");
       expectError(
           CargoCrateControllerIT.this.request("GET", path, "Bearer garbage"),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "accessNotAllowed",
           "Access isn't allowed.");
       expectError(
           CargoCrateControllerIT.this.request(
               "GET", path, CargoCrateControllerIT.this.expiredToken(user)),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "sessionExpired",
           "Session expired.");
       CargoCrateControllerIT.this.userRepository.deleteById(user.getId());
@@ -612,7 +666,8 @@ class CargoCrateControllerIT {
               "DELETE",
               "/api/cargo/crates/" + repo.getName() + "/delete-me/1.0.0",
               CargoCrateControllerIT.this.token(user)),
-          "crateVersionDeleted");
+          "crateVersionDeleted",
+          "Crate version deleted.");
       CargoCrateControllerIT.this.entityManager.flush();
       assertThat(CargoCrateControllerIT.this.crateIndexRepository.findAll()).hasSize(1);
       assertThat(CargoCrateControllerIT.this.crateMetaRepository.findAll()).hasSize(1);
@@ -634,7 +689,8 @@ class CargoCrateControllerIT {
               "DELETE",
               "/api/cargo/crates/" + repo.getName() + "/delete-me",
               CargoCrateControllerIT.this.token(user)),
-          "crateDeleted");
+          "crateDeleted",
+          "Crate deleted.");
       CargoCrateControllerIT.this.entityManager.flush();
       assertThat(CargoCrateControllerIT.this.crateIndexRepository.findAll()).isEmpty();
       assertThat(CargoCrateControllerIT.this.crateMetaRepository.findAll()).isEmpty();
@@ -681,5 +737,88 @@ class CargoCrateControllerIT {
     this.mockMvc
         .perform(patch("/api/cargo/crates/" + repo.getName()).with(apiPort()))
         .andExpect(status().isNotFound());
+  }
+
+  @Nested
+  @DisplayName("paging and sorting of the list endpoints")
+  class PagingAndSorting {
+
+    private static final String CRATES = "/api/cargo/crates/{repo}";
+    private static final String VERSIONS = "/api/cargo/crates/{repo}/paged/versions";
+
+    static Stream<String> endpoints() {
+      return Stream.of(CRATES, VERSIONS);
+    }
+
+    static Stream<Arguments> acceptedSorts() {
+      return Stream.concat(
+          Stream.of("id", "name", "maxVersion", "lastUpdatedAt")
+              .map(property -> Arguments.of(CRATES, property)),
+          Stream.of("version", "createdAt").map(property -> Arguments.of(VERSIONS, property)));
+    }
+
+    static Stream<Arguments> invalidPagingOnEveryEndpoint() {
+      return endpoints()
+          .flatMap(
+              path ->
+                  PagingAssertions.invalidPagingParams()
+                      .map(args -> Arguments.of(path, args.get()[0], args.get()[1])));
+    }
+
+    private Repo seededRepo() throws Exception {
+      final var it = CargoCrateControllerIT.this;
+      final var repo = it.seedRepo(RepoType.CARGO, false);
+      it.publish(repo, "paged", "1.0.0");
+      it.publish(repo, "paged", "1.1.0");
+      it.publish(repo, "other", "0.1.0");
+      return repo;
+    }
+
+    private ResultActions list(
+        final Repo repo, final String path, final String param, final String value)
+        throws Exception {
+      return CargoCrateControllerIT.this.request(
+          "GET", path.replace("{repo}", repo.getName()) + "?" + param + "=" + value, null);
+    }
+
+    @ParameterizedTest(name = "{0} sort={1}")
+    @MethodSource("acceptedSorts")
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String path, final String property) throws Exception {
+      final var repo = this.seededRepo();
+
+      this.list(repo, path, "sort", property + ",asc").andExpect(status().isOk());
+      this.list(repo, path, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("orders the versions by the requested sort property")
+    void ordersVersions() throws Exception {
+      final var repo = this.seededRepo();
+
+      this.list(repo, VERSIONS, "sort", "version,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("1.0.0"));
+      this.list(repo, VERSIONS, "sort", "version,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].version").value("1.1.0"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400(final String path) throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(this.seededRepo(), path, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "{0} {1}={2}")
+    @MethodSource("invalidPagingOnEveryEndpoint")
+    @DisplayName("returns 400 validationError naming the parameter for a bad page or size")
+    void invalidPagingParam(final String path, final String param, final String value)
+        throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(this.seededRepo(), path, param, value), param);
+    }
   }
 }

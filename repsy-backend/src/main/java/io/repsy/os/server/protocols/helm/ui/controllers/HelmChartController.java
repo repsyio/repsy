@@ -27,11 +27,14 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -51,6 +54,20 @@ import org.springframework.web.bind.annotation.RestController;
 @SuppressWarnings("java:S6856")
 public class HelmChartController {
 
+  /**
+   * The sort keys of the chart search, mapped to the {@code HelmChartVersion} paths the query sorts
+   * by. The list item's own names ({@code name}, {@code latestVersion}, {@code updatedAt}) come
+   * first; {@code createdAt} and {@code lastUpdatedAt} are kept because the panel and the default
+   * order already send them.
+   */
+  private static final Map<String, String> CHART_SORT_PATHS =
+      Map.of(
+          "name", "chart.name",
+          "latestVersion", "version",
+          "updatedAt", "lastUpdatedAt",
+          "createdAt", "createdAt",
+          "lastUpdatedAt", "lastUpdatedAt");
+
   private final HelmApiFacade helmApiFacade;
   private final RestResponseFactory restResponseFactory;
   private final UsageUpdateService usageUpdateService;
@@ -63,7 +80,9 @@ public class HelmChartController {
       @PageableDefault(sort = "lastUpdatedAt", direction = Sort.Direction.DESC)
           final Pageable pageable) {
 
-    final var charts = this.helmApiFacade.search(repoInfo, query, pageable);
+    SortValidator.requireSortableBy(pageable, CHART_SORT_PATHS.keySet());
+
+    final var charts = this.helmApiFacade.search(repoInfo, query, withEntitySortPaths(pageable));
 
     return this.restResponseFactory.success("chartsFetched", new PagedModel<>(charts));
   }
@@ -121,5 +140,15 @@ public class HelmChartController {
     final var tags = this.helmApiFacade.getOciTags(repoInfo, name);
 
     return this.restResponseFactory.success("chartTagsFetched", tags);
+  }
+
+  private static Pageable withEntitySortPaths(final Pageable pageable) {
+    final var sort =
+        Sort.by(
+            pageable.getSort().stream()
+                .map(order -> order.withProperty(CHART_SORT_PATHS.get(order.getProperty())))
+                .toList());
+
+    return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
   }
 }
