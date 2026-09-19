@@ -51,6 +51,11 @@ public class HelmChartParser {
       var entry = tar.getNextEntry();
       while (entry != null) {
         if (!entry.isDirectory() && isChartYaml(entry.getName())) {
+          // The tar header gives the inflated size and a tar entry never reads past it, so this
+          // refuses a decompression bomb before a single byte of it is buffered.
+          if (entry.getSize() > HelmConstants.MAX_CHART_YAML_BYTES) {
+            throw new BadRequestException("chartYamlTooLarge");
+          }
           return parseYaml(tar.readAllBytes());
         }
         entry = tar.getNextEntry();
@@ -78,10 +83,13 @@ public class HelmChartParser {
   }
 
   private static Map<?, ?> loadYaml(final byte[] bytes) {
+    final var options = new LoaderOptions();
+    // SnakeYAML's default 3 MiB code point limit would reject a Chart.yaml that the size limit
+    // allows, and with a different error, so align the two. Bytes bound code points from above.
+    options.setCodePointLimit((int) HelmConstants.MAX_CHART_YAML_BYTES);
     final Object parsed;
     try {
-      parsed =
-          new Yaml(new SafeConstructor(new LoaderOptions())).load(new ByteArrayInputStream(bytes));
+      parsed = new Yaml(new SafeConstructor(options)).load(new ByteArrayInputStream(bytes));
     } catch (final YAMLException e) {
       throw new BadRequestException("chartYamlInvalid");
     }

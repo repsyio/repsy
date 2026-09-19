@@ -30,4 +30,11 @@ public final class HelmConstants {
   public static final String CONTENT_TYPE_YAML = "application/yaml";
   public static final String CHART_PART_NAME = "chart";
   public static final String SHA256_PREFIX = "sha256:";
+
+  /**
+   * The most bytes of Chart.yaml the server reads out of an uploaded archive. The archive size is
+   * bounded by the upload limit, but a tiny archive can inflate to gigabytes, so the inflated entry
+   * is capped as well. Real Chart.yaml files are a few kilobytes.
+   */
+  public static final long MAX_CHART_YAML_BYTES = 10L * 1024 * 1024;
 }
