@@ -41,6 +41,8 @@ public class JwtUtils {
   private static final @NonNull String CLAIM_USERNAME = "username";
   private static final @NonNull String AUTH_TYPE = "authentication_type";
   private static final @NonNull String CLAIM_SCOPE = "scope";
+  private static final @NonNull String CLAIM_TOKEN_TYPE = "token_type";
+  private static final @NonNull String TOKEN_TYPE_REFRESH = "refresh";
   private static final int SECRET_BYTE_LENGTH = 32;
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -61,18 +63,29 @@ public class JwtUtils {
     return this.verifyAndDecode(this.getToken(authHeader)).getClaim(CLAIM_USERNAME).asString();
   }
 
-  private @NonNull DecodedJWT verifyAndDecode(final @NonNull String token) {
-    final DecodedJWT decodedJWT;
-
+  private @NonNull DecodedJWT decode(
+      final @NonNull String token, final @NonNull String expiredMessageId) {
     try {
-      decodedJWT = JWT.require(Algorithm.HMAC512(this.secret)).build().verify(token);
+      return JWT.require(Algorithm.HMAC512(this.secret)).build().verify(token);
     } catch (final TokenExpiredException _) {
-      throw new AccessNotAllowedException("sessionExpired");
+      throw new AccessNotAllowedException(expiredMessageId);
     } catch (final JWTVerificationException _) {
+      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+  }
+
+  private @NonNull DecodedJWT verifyAndDecode(final @NonNull String token) {
+    final var decodedJWT = this.decode(token, "sessionExpired");
+
+    if (isRefreshToken(decodedJWT)) {
       throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
 
     return decodedJWT;
+  }
+
+  private static boolean isRefreshToken(final @NonNull DecodedJWT decodedJWT) {
+    return TOKEN_TYPE_REFRESH.equals(decodedJWT.getClaim(CLAIM_TOKEN_TYPE).asString());
   }
 
   private @NonNull String getToken(final @NonNull String authHeader) {
@@ -107,6 +120,18 @@ public class JwtUtils {
         .sign(Algorithm.HMAC512(this.secret));
   }
 
+  public @NonNull String createRefreshToken(
+      final @NonNull UUID userId,
+      final @NonNull String username,
+      final @NonNull TemporalAmount timeoutDuration) {
+    return JWT.create()
+        .withSubject(userId.toString())
+        .withClaim(CLAIM_USERNAME, username)
+        .withClaim(CLAIM_TOKEN_TYPE, TOKEN_TYPE_REFRESH)
+        .withExpiresAt(Instant.now().plus(timeoutDuration))
+        .sign(Algorithm.HMAC512(this.secret));
+  }
+
   public @NonNull String createRepoScopedToken(
       final @NonNull UUID repoId,
       final @NonNull String scope,
@@ -127,28 +152,18 @@ public class JwtUtils {
     return UUID.fromString(this.verifyAndDecode(token).getSubject());
   }
 
-  public void isRefreshTokenExpired(final @NonNull String token) {
-    try {
-      JWT.require(Algorithm.HMAC512(this.secret)).build().verify(token);
-    } catch (final TokenExpiredException _) {
-      throw new AccessNotAllowedException("refreshTokenExpired");
-    } catch (final JWTVerificationException _) {
+  public @NonNull UUID verifyRefreshToken(final @NonNull String token) {
+    final var decodedJWT = this.decode(token, "refreshTokenExpired");
+
+    if (!isRefreshToken(decodedJWT)) {
       throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
+
+    return UUID.fromString(decodedJWT.getSubject());
   }
 
   public void verify(final @NonNull String authHeader) {
-    this.isTokenExpired(this.getToken(authHeader));
-  }
-
-  private void isTokenExpired(final @NonNull String token) {
-    try {
-      JWT.require(Algorithm.HMAC512(this.secret)).build().verify(token);
-    } catch (final TokenExpiredException _) {
-      throw new AccessNotAllowedException("sessionExpired");
-    } catch (final JWTVerificationException _) {
-      throw new AccessNotAllowedException(ErrorConstants.ACCESS_NOT_ALLOWED);
-    }
+    this.verifyAndDecode(this.getToken(authHeader));
   }
 
   public @NonNull AuthenticationType extractAuthenticationType(final @NonNull String authHeader) {

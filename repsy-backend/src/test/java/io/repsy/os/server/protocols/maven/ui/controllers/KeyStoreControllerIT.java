@@ -281,6 +281,18 @@ class KeyStoreControllerIT {
               .andReturn();
       assertThat(expiredResponse.getResponse().getStatus()).isEqualTo(403);
       assertError(expiredResponse.getResponse().getContentAsString(), "sessionExpired");
+
+      final var refreshToken =
+          AuthUtils.AUTH_BEARER
+              + KeyStoreControllerIT.this.jwtUtils.createRefreshToken(
+                  user.getId(), user.getUsername(), Duration.ofMinutes(30));
+      final var refreshTokenResponse =
+          KeyStoreControllerIT.this
+              .mockMvc
+              .perform(get(path).with(apiPort()).header(AUTHORIZATION, refreshToken))
+              .andReturn();
+      assertThat(refreshTokenResponse.getResponse().getStatus()).isEqualTo(403);
+      assertError(refreshTokenResponse.getResponse().getContentAsString(), "accessNotAllowed");
     }
   }
 

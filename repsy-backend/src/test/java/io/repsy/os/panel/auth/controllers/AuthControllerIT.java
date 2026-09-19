@@ -248,6 +248,19 @@ class AuthControllerIT {
     return builder.sign(alg);
   }
 
+  private static String signedRefreshToken(
+      final String subject, final String username, final Instant expiresAt, final Algorithm alg) {
+    var builder =
+        JWT.create()
+            .withClaim("username", username)
+            .withClaim("token_type", "refresh")
+            .withExpiresAt(expiresAt);
+    if (subject != null) {
+      builder = builder.withSubject(subject);
+    }
+    return builder.sign(alg);
+  }
+
   /** Rewrites the subject inside a valid token's payload without touching its signature. */
   private static String withSubject(
       final String token, final UUID originalSubject, final UUID newSubject) {
@@ -352,19 +365,23 @@ class AuthControllerIT {
     assertThat(accessToken).isNotBlank().isNotEqualTo(refreshToken);
     assertThat(refreshToken).isNotBlank();
 
-    for (final var token : new String[] {accessToken, refreshToken}) {
-      assertThat(this.jwtUtils.getUserId(token)).isEqualTo(expectedUserId);
-      assertThat(this.jwtUtils.verifyAndExtractUsername(AuthUtils.AUTH_BEARER + token))
-          .isEqualTo(expectedUsername);
-    }
+    // The access token works on the access side and carries no token type.
+    final var accessTokenDecoded = JWT.decode(accessToken);
+    assertThat(this.jwtUtils.getUserId(accessToken)).isEqualTo(expectedUserId);
+    assertThat(this.jwtUtils.verifyAndExtractUsername(AuthUtils.AUTH_BEARER + accessToken))
+        .isEqualTo(expectedUsername);
+    assertThat(accessTokenDecoded.getClaim("token_type").asString()).isNull();
+
+    // The refresh token is only valid as a refresh token.
+    final var refreshTokenDecoded = JWT.decode(refreshToken);
+    assertThat(this.jwtUtils.verifyRefreshToken(refreshToken)).isEqualTo(expectedUserId);
+    assertThat(refreshTokenDecoded.getClaim("username").asString()).isEqualTo(expectedUsername);
+    assertThat(refreshTokenDecoded.getClaim("token_type").asString()).isEqualTo("refresh");
 
     assertExpiry(
-        JWT.decode(accessToken),
-        AuthUtils.TIMEOUT_ACCESS_TOKEN,
-        issuedNoEarlierThan,
-        issuedNoLaterThan);
+        accessTokenDecoded, AuthUtils.TIMEOUT_ACCESS_TOKEN, issuedNoEarlierThan, issuedNoLaterThan);
     assertExpiry(
-        JWT.decode(refreshToken),
+        refreshTokenDecoded,
         AuthUtils.TIMEOUT_REFRESH_TOKEN,
         issuedNoEarlierThan,
         issuedNoLaterThan);
@@ -797,7 +814,7 @@ class AuthControllerIT {
     void ignoresAuthorizationHeader() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("noauth"), UserRole.USER);
       final var refreshToken =
-          AuthControllerIT.this.jwtUtils.createTokenWithDuration(
+          AuthControllerIT.this.jwtUtils.createRefreshToken(
               user.getId(), user.getUsername(), AuthUtils.TIMEOUT_REFRESH_TOKEN);
 
       expectSuccess(
@@ -815,7 +832,7 @@ class AuthControllerIT {
     void usesCurrentUsername() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("before"), UserRole.USER);
       final var refreshToken =
-          AuthControllerIT.this.jwtUtils.createTokenWithDuration(
+          AuthControllerIT.this.jwtUtils.createRefreshToken(
               user.getId(), user.getUsername(), AuthUtils.TIMEOUT_REFRESH_TOKEN);
       final var newUsername = uniqueUsername("after");
       AuthControllerIT.this.userTxService.updateUsername(user.getId(), newUsername);
@@ -829,21 +846,26 @@ class AuthControllerIT {
     }
 
     @Test
-    @DisplayName(
-        "currently accepts an access token as a refresh token (both are identical apart from exp)")
-    void accessTokenIsAcceptedAsRefreshToken() throws Exception {
+    @DisplayName("returns 403 accessNotAllowed for an access token")
+    void rejectsAnAccessTokenAsRefreshToken() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("access"), UserRole.USER);
       final var loginBody =
           expectSuccess(
               AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
       final String accessToken = JsonPath.read(loginBody, "$.data.token");
 
-      final var before = Instant.now();
-      final var body =
-          expectSuccess(AuthControllerIT.this.refreshWith(accessToken), "tokenRefreshed");
+      expectAccessNotAllowed(AuthControllerIT.this.refreshWith(accessToken));
+    }
 
-      AuthControllerIT.this.assertLoginInfo(
-          body, user.getId(), user.getUsername(), before, Instant.now());
+    @Test
+    @DisplayName("returns 403 accessNotAllowed for a claim-less legacy token from the 3-arg method")
+    void rejectsAClaimlessLegacyToken() throws Exception {
+      final var user = AuthControllerIT.this.createUser(uniqueUsername("legacy"), UserRole.USER);
+      final var legacyToken =
+          AuthControllerIT.this.jwtUtils.createTokenWithDuration(
+              user.getId(), user.getUsername(), AuthUtils.TIMEOUT_REFRESH_TOKEN);
+
+      expectAccessNotAllowed(AuthControllerIT.this.refreshWith(legacyToken));
     }
 
     @Test
@@ -851,7 +873,7 @@ class AuthControllerIT {
     void expiredToken() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("expired"), UserRole.USER);
       final var expired =
-          AuthControllerIT.this.jwtUtils.createTokenWithDuration(
+          AuthControllerIT.this.jwtUtils.createRefreshToken(
               user.getId(), user.getUsername(), Duration.ofSeconds(-30));
 
       expectError(
@@ -881,7 +903,7 @@ class AuthControllerIT {
       final var attacker =
           AuthControllerIT.this.createUser(uniqueUsername("attack"), UserRole.USER);
       final var attackerToken =
-          AuthControllerIT.this.jwtUtils.createTokenWithDuration(
+          AuthControllerIT.this.jwtUtils.createRefreshToken(
               attacker.getId(), attacker.getUsername(), AuthUtils.TIMEOUT_REFRESH_TOKEN);
       final var forged = withSubject(attackerToken, attacker.getId(), victim.getId());
       assertThat(forged).isNotEqualTo(attackerToken);
@@ -921,7 +943,7 @@ class AuthControllerIT {
     @DisplayName("returns 404 userNotFound when the token's user does not exist")
     void unknownUser() throws Exception {
       final var token =
-          AuthControllerIT.this.jwtUtils.createTokenWithDuration(
+          AuthControllerIT.this.jwtUtils.createRefreshToken(
               UUID.randomUUID(), uniqueUsername("ghost"), AuthUtils.TIMEOUT_REFRESH_TOKEN);
 
       expectUserNotFound(AuthControllerIT.this.refreshWith(token));
@@ -950,7 +972,7 @@ class AuthControllerIT {
         "currently answers 500 errorOccurred for a validly signed token whose subject is no UUID")
     void nonUuidSubject() throws Exception {
       final var token =
-          signedToken(
+          signedRefreshToken(
               "not-a-uuid",
               "someuser",
               Instant.now().plus(AuthUtils.TIMEOUT_REFRESH_TOKEN),
@@ -963,7 +985,7 @@ class AuthControllerIT {
     @DisplayName("currently answers 500 errorOccurred for a validly signed token without a subject")
     void missingSubject() throws Exception {
       final var token =
-          signedToken(
+          signedRefreshToken(
               null,
               "someuser",
               Instant.now().plus(AuthUtils.TIMEOUT_REFRESH_TOKEN),
@@ -1000,6 +1022,20 @@ class AuthControllerIT {
       return Stream.of(
           Arguments.of("empty object", "{}"),
           Arguments.of("null refreshToken", "{\"refreshToken\":null}"));
+    }
+
+    @Test
+    @DisplayName("returns 403 accessNotAllowed when used as Bearer on an authenticated endpoint")
+    void refreshTokenRejectedOnAuthenticatedEndpoint() throws Exception {
+      final var user = AuthControllerIT.this.createUser(uniqueUsername("refbearer"), UserRole.USER);
+      final var loginBody =
+          expectSuccess(
+              AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
+      final String refreshToken = JsonPath.read(loginBody, "$.data.refreshToken");
+
+      expectAccessNotAllowed(
+          AuthControllerIT.this.perform(
+              get("/api/profile").header(AUTHORIZATION, AuthUtils.AUTH_BEARER + refreshToken)));
     }
 
     @Test

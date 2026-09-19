@@ -76,7 +76,7 @@ public class AuthUserService {
             user.getId(), user.getUsername(), AuthUtils.TIMEOUT_ACCESS_TOKEN);
 
     final var refreshToken =
-        this.jwtUtils.createTokenWithDuration(
+        this.jwtUtils.createRefreshToken(
             user.getId(), user.getUsername(), AuthUtils.TIMEOUT_REFRESH_TOKEN);
 
     return LoginInfo.builder()
