@@ -665,6 +665,31 @@ paths:
         required: true
         schema:
           type: string
+  "/api/repos/{repoName}/download-token":
+    post:
+      tags:
+        - protocol-repo-controller
+      operationId: createDownloadToken
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseString"
+      summary: Create a one-minute token that only authorizes downloading the given path of a Maven repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
   "/api/pypi/packages/{repoName}":
     get:
       tags:

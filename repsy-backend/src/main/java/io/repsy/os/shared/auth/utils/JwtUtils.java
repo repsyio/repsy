@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.time.temporal.TemporalAmount;
 import java.util.HexFormat;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
@@ -46,7 +47,9 @@ public class JwtUtils {
   private static final @NonNull String CLAIM_SESSION_START = "session_start";
   private static final @NonNull String CLAIM_TOKEN_VERSION = "token_version";
   private static final @NonNull String CLAIM_TOKEN_FAMILY = "token_family";
+  private static final @NonNull String CLAIM_PATH = "path";
   private static final @NonNull String TOKEN_TYPE_REFRESH = "refresh";
+  private static final @NonNull Pattern SLASHES = Pattern.compile("/{2,}");
   private static final int SECRET_BYTE_LENGTH = 32;
   private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -115,8 +118,12 @@ public class JwtUtils {
    * {@code sessionExpired} makes the frontend swap the token through its refresh token once.
    */
   private static void acceptClaimlessToken(final @NonNull TokenRealm realm) {
-    if (realm != TokenRealm.PROTOCOL) {
-      throw new UnAuthorizedException("sessionExpired");
+    switch (realm) {
+      case PROTOCOL -> {
+        /* Accepted, see above. */
+      }
+      case PANEL -> throw new UnAuthorizedException("sessionExpired");
+      case DOWNLOAD -> throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
     }
   }
 
@@ -250,6 +257,62 @@ public class JwtUtils {
         .withClaim(CLAIM_SCOPE, scope)
         .withExpiresAt(Instant.now().plus(timeoutDuration))
         .sign(Algorithm.HMAC512(this.secret));
+  }
+
+  /**
+   * Creates a token that authorizes reading {@code path} of the repo {@code repoId} and nothing
+   * else. It carries no user, as the caller was authorized when it asked for the token.
+   */
+  public @NonNull String createDownloadToken(
+      final @NonNull UUID repoId,
+      final @NonNull String path,
+      final @NonNull TemporalAmount timeoutDuration) {
+    return JWT.create()
+        .withSubject(repoId.toString())
+        .withAudience(TokenRealm.DOWNLOAD.getAudience())
+        .withClaim(CLAIM_PATH, canonicalPath(path))
+        .withExpiresAt(Instant.now().plus(timeoutDuration))
+        .sign(Algorithm.HMAC512(this.secret));
+  }
+
+  /**
+   * Checks that {@code token} is an unexpired download token for exactly this repo and path.
+   *
+   * @throws UnAuthorizedException if it is not
+   */
+  public void verifyDownloadToken(
+      final @NonNull String token, final @NonNull UUID repoId, final @NonNull String path) {
+    final var decodedJWT = this.decodeDownloadToken(token);
+
+    if (isRefreshToken(decodedJWT)) {
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+
+    checkRealm(decodedJWT, TokenRealm.DOWNLOAD);
+
+    if (!repoId.toString().equals(decodedJWT.getSubject())
+        || !canonicalPath(path).equals(decodedJWT.getClaim(CLAIM_PATH).asString())) {
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+  }
+
+  private @NonNull DecodedJWT decodeDownloadToken(final @NonNull String token) {
+    try {
+      return JWT.require(Algorithm.HMAC512(this.secret)).build().verify(token);
+    } catch (final TokenExpiredException _) {
+      throw new UnAuthorizedException("downloadTokenExpired");
+    } catch (final JWTVerificationException _) {
+      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+  }
+
+  /**
+   * The web UI asks for a token with the path it lists ({@code /com/lib/a.jar}) and the browser
+   * requests it as {@code /repo//com/lib/a.jar}, which the servlet container collapses. Both sides
+   * are compared in this one form.
+   */
+  private static @NonNull String canonicalPath(final @NonNull String path) {
+    return "/" + SLASHES.matcher(path).replaceAll("/").replaceFirst("^/", "");
   }
 
   public @NonNull UUID extractUserId(

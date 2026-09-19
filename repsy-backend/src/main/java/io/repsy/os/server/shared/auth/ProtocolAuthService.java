@@ -64,24 +64,11 @@ public class ProtocolAuthService {
     return request.getHeader(HttpHeaders.AUTHORIZATION);
   }
 
+  /** Authorizes a bearer JWT or deploy token. Protocol endpoints take protocol tokens only. */
   public void handleBearerAuth(
       final @NonNull String authHeader,
       final @NonNull UUID repoId,
       final @NonNull Permission permission) {
-
-    this.handleBearerAuth(authHeader, repoId, permission, TokenRealm.PROTOCOL);
-  }
-
-  /**
-   * Authorizes a bearer JWT issued for the given realm. Protocol endpoints take {@link
-   * TokenRealm#PROTOCOL} tokens only; a caller that hands a UI session over to a protocol endpoint
-   * passes {@link TokenRealm#PANEL}.
-   */
-  public void handleBearerAuth(
-      final @NonNull String authHeader,
-      final @NonNull UUID repoId,
-      final @NonNull Permission permission,
-      final @NonNull TokenRealm realm) {
 
     final var bearerToken = authHeader.substring(AUTH_BEARER.length());
 
@@ -89,7 +76,25 @@ public class ProtocolAuthService {
       return;
     }
 
-    this.authorizeJWTRequest(authHeader, permission, realm);
+    this.authorizeJWTRequest(authHeader, permission);
+  }
+
+  /**
+   * Authorizes a read with a download token, which the web UI hands to a browser navigation because
+   * that cannot set an {@code Authorization} header. The token opens one path of one repo, for
+   * reads only; the caller was authorized when it asked for the token.
+   */
+  public void handleDownloadToken(
+      final @NonNull String token,
+      final @NonNull UUID repoId,
+      final @NonNull String path,
+      final @NonNull Permission permission) {
+
+    if (permission != Permission.READ) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    this.jwtUtils.verifyDownloadToken(token, repoId, path);
   }
 
   public void handleBasicAuth(
@@ -234,11 +239,9 @@ public class ProtocolAuthService {
   }
 
   private void authorizeJWTRequest(
-      final @NonNull String authHeader,
-      final @NonNull Permission permission,
-      final @NonNull TokenRealm realm) {
+      final @NonNull String authHeader, final @NonNull Permission permission) {
 
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, realm);
+    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
     final var userInfo = this.userTxService.getAuthenticatedUserByUsername(username);
 
     this.authorizeUser(userInfo, permission);

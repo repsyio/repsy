@@ -29,7 +29,14 @@ public enum TokenRealm {
   PANEL("panel"),
 
   /** The package-manager endpoints: npm, Cargo, Docker and the other wire protocols. */
-  PROTOCOL("protocol");
+  PROTOCOL("protocol"),
+
+  /**
+   * A short-lived token that only authorizes reading one path of one repo. The web UI hands it to a
+   * browser navigation, which cannot set an {@code Authorization} header, in place of the session's
+   * access token.
+   */
+  DOWNLOAD("download");
 
   private final String audience;
 

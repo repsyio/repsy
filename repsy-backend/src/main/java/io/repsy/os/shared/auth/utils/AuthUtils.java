@@ -34,6 +34,7 @@ public class AuthUtils {
   public static final String AUTH_BASIC = "Basic ";
   public static final Duration TIMEOUT_ACCESS_TOKEN = Duration.of(30, ChronoUnit.MINUTES);
   public static final Duration TIMEOUT_REFRESH_TOKEN = Duration.of(60, ChronoUnit.MINUTES);
+  public static final Duration TIMEOUT_DOWNLOAD_TOKEN = Duration.of(1, ChronoUnit.MINUTES);
 
   /** Absolute lifetime of a panel session, however often its refresh token is exchanged. */
   public static final Duration TIMEOUT_SESSION = Duration.of(24, ChronoUnit.HOURS);

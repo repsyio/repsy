@@ -400,4 +400,56 @@ class ProtocolAuthServiceTest {
                   this.privateRepo, null, Permission.READ));
     }
   }
+
+  /** RPS-980: the web UI downloads a Maven file with a token that opens that one path for reads. */
+  @Nested
+  @DisplayName("a download token authorizes reads only")
+  class DownloadToken {
+
+    private static final String TOKEN = "signed.jwt.token";
+    private static final String PATH = "/com/example/lib.jar";
+
+    private final UUID repoId = UUID.randomUUID();
+    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+    private final ProtocolAuthService downloadAuthService =
+        new ProtocolAuthService(
+            ProtocolAuthServiceTest.this.userTxService,
+            this.jwtUtils,
+            Mockito.mock(DeployTokenService.class));
+
+    @Test
+    @DisplayName("a read is checked against the repo and path of the token")
+    void readIsVerifiedAgainstRepoAndPath() {
+      this.downloadAuthService.handleDownloadToken(TOKEN, this.repoId, PATH, Permission.READ);
+
+      verify(this.jwtUtils).verifyDownloadToken(TOKEN, this.repoId, PATH);
+    }
+
+    @Test
+    @DisplayName("a token that fails verification fails the request")
+    void failedVerificationFailsTheRequest() {
+      Mockito.doThrow(new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED))
+          .when(this.jwtUtils)
+          .verifyDownloadToken(TOKEN, this.repoId, PATH);
+
+      assertThatThrownBy(
+              () ->
+                  this.downloadAuthService.handleDownloadToken(
+                      TOKEN, this.repoId, PATH, Permission.READ))
+          .isInstanceOf(UnAuthorizedException.class)
+          .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+    }
+
+    @Test
+    @DisplayName("a write or manage request is refused without looking at the token")
+    void writeAndManageAreRefused() {
+      for (final var permission : new Permission[] {Permission.WRITE, Permission.MANAGE}) {
+        assertUnauthorized(
+            () ->
+                this.downloadAuthService.handleDownloadToken(TOKEN, this.repoId, PATH, permission));
+      }
+
+      verify(this.jwtUtils, never()).verifyDownloadToken(anyString(), any(), anyString());
+    }
+  }
 }

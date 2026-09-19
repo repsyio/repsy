@@ -33,6 +33,8 @@ import io.repsy.os.generated.model.RepoUsageInfo;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacadeMavenAdapter;
+import io.repsy.os.shared.auth.utils.AuthUtils;
+import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageService;
@@ -67,6 +69,7 @@ public class ProtocolRepoController {
   private final RepoTxService repoTxService;
   private final UsageService usageService;
   private final RestResponseFactory responseFactory;
+  private final JwtUtils jwtUtils;
 
   @PostMapping("/{repoType}")
   @RepoOperation(permission = MANAGE)
@@ -119,6 +122,26 @@ public class ProtocolRepoController {
     final var items = facade.getItems(repoInfo, new RelativePath(path));
 
     return this.responseFactory.success("itemsFetched", items);
+  }
+
+  /**
+   * Issues the token the Maven browser puts in the download URL instead of the session's access
+   * token, as a navigation cannot set an {@code Authorization} header. It opens the given path of
+   * this repo for reading, for a minute.
+   */
+  @PostMapping("/{repoName}/download-token")
+  @RepoOperation(scope = RepoScope.MAVEN)
+  public RestResponse<String> createDownloadToken(
+      final RepoInfo repoInfo, @RequestParam final String path) {
+
+    // Rejects a path that leaves the repo before a token is issued for it.
+    final var relativePath = new RelativePath(path);
+
+    final var token =
+        this.jwtUtils.createDownloadToken(
+            repoInfo.getStorageKey(), relativePath.getPath(), AuthUtils.TIMEOUT_DOWNLOAD_TOKEN);
+
+    return this.responseFactory.success("downloadTokenCreated", token);
   }
 
   @GetMapping("/{repoName}/settings")
