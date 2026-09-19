@@ -29,6 +29,7 @@ import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -57,6 +58,8 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
   private static final String ERR_PACKAGE_NOT_FOUND = "packageNotFound";
   private static final String ERR_VERSION_NOT_FOUND = "versionNotFound";
+  private static final String PACKAGE_UNIQUE_CONSTRAINT = "ux_nuget_package__repo_id_package_id";
+  private static final String UNIQUE_VIOLATION_SQL_STATE = "23505";
 
   private final RepoRepository repoRepository;
   private final NuGetPackageRepository packageRepository;
@@ -366,10 +369,31 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
             return this.packageRepository.save(pkg);
           });
     } catch (final DataIntegrityViolationException e) {
+      if (!this.isUniqueConstraintViolation(e, PACKAGE_UNIQUE_CONSTRAINT)) {
+        throw e;
+      }
+
       return this.packageRepository
           .findByRepoIdAndPackageIdIgnoreCase(repo.getId(), packageId)
           .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
     }
+  }
+
+  private boolean isUniqueConstraintViolation(
+      final DataIntegrityViolationException exception, final String constraintName) {
+
+    final var rootCause = exception.getMostSpecificCause();
+
+    if (!(rootCause instanceof final SQLException sqlException)) {
+      return false;
+    }
+
+    if (!UNIQUE_VIOLATION_SQL_STATE.equals(sqlException.getSQLState())) {
+      return false;
+    }
+
+    final var message = sqlException.getMessage();
+    return message != null && message.contains(constraintName);
   }
 
   private NuGetPackageVersion createNuGetPackageVersion(
