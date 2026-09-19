@@ -502,11 +502,18 @@ class CargoCrateControllerIT {
     @Test
     void reportsNotFoundForMissingRepoCrateAndVersion() throws Exception {
       final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, false);
+      final var user = CargoCrateControllerIT.this.createUser("reader", UserRole.USER);
+      // A missing repo is only revealed to an authenticated caller; anonymous callers get the
+      // same 401 as for a private repo (RPS-887).
       expectError(
-          CargoCrateControllerIT.this.request("GET", "/api/cargo/crates/missing", null),
+          CargoCrateControllerIT.this.request(
+              "GET", "/api/cargo/crates/missing", CargoCrateControllerIT.this.token(user)),
           HttpStatus.NOT_FOUND,
           "repoNotFound",
           "Repository not found");
+      CargoCrateControllerIT.this
+          .request("GET", "/api/cargo/crates/missing", null)
+          .andExpect(status().isUnauthorized());
       expectError(
           CargoCrateControllerIT.this.request(
               "GET", "/api/cargo/crates/" + repo.getName() + "/missing", null),

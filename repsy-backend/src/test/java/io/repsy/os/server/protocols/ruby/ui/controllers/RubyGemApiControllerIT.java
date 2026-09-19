@@ -385,8 +385,17 @@ class RubyGemApiControllerIT {
 
       RubyGemApiControllerIT.this
           .mockMvc
-          .perform(get("/api/ruby/gems/{repo}", "missing-ruby-repo").with(apiPort()))
+          .perform(
+              get("/api/ruby/gems/{repo}", "missing-ruby-repo")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, RubyGemApiControllerIT.this.bearer(user)))
           .andExpect(status().isNotFound());
+
+      // Anonymous callers cannot tell a missing repo from a private one (RPS-887).
+      RubyGemApiControllerIT.this
+          .mockMvc
+          .perform(get("/api/ruby/gems/{repo}", "missing-ruby-repo").with(apiPort()))
+          .andExpect(status().isUnauthorized());
     }
 
     @Test

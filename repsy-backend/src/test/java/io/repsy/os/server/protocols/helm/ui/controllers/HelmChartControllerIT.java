@@ -1523,12 +1523,12 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @EnumSource(Endpoint.class)
-    @DisplayName("an unknown repo is 404 repoNotFound, with or without credentials")
+    @DisplayName("an unknown repo is 404 repoNotFound with credentials, 401 without (RPS-887)")
     void unknownRepo(final Endpoint endpoint) throws Exception {
       final var it = HelmChartControllerIT.this;
 
       expectRepoNotFound(this.send(endpoint, "no-such-repo", it.adminBearerToken()));
-      expectRepoNotFound(this.send(endpoint, "no-such-repo", null));
+      expectUnauthorized(this.send(endpoint, "no-such-repo", null));
     }
 
     /**

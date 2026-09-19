@@ -596,6 +596,80 @@ class ProtocolDeployTokenControllerIT {
           "repoNotFound",
           REPO_NOT_FOUND_TEXT);
     }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 401 unAuthorized, not 404, for a missing repo without credentials")
+    void repoDoesNotExistWithoutCredentials(final Endpoint endpoint) throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+
+      expectUnauthorized(
+          it.perform(endpoint.request().apply(uniqueName("missing")).apply(UUID.randomUUID())));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("answers a missing repo and an existing private repo identically without a header")
+    void missingAndPrivateRepoAreIndistinguishableWithoutCredentials(final Endpoint endpoint)
+        throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var privateRepo =
+          it.repoTxService.createRepo(uniqueName("private"), RepoType.MAVEN, true, null);
+      final var tokenId = UUID.randomUUID();
+
+      final var forPrivate =
+          it.perform(endpoint.request().apply(privateRepo.getName()).apply(tokenId))
+              .andExpect(status().isUnauthorized())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      final var forMissing =
+          it.perform(endpoint.request().apply(uniqueName("missing")).apply(tokenId))
+              .andExpect(status().isUnauthorized())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+
+      // Everything but the per-error correlation id must match.
+      assertThat(forMissing.replaceAll(UUID_PATTERN, "<id>"))
+          .isEqualTo(forPrivate.replaceAll(UUID_PATTERN, "<id>"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("returns 401 unAuthorized, not 404, for a missing repo and a non-admin caller")
+    void repoDoesNotExistForCallerWithoutManagePermission(final Endpoint endpoint)
+        throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var caller = it.createUser(uniqueName("plain"), UserRole.USER);
+
+      expectUnauthorized(
+          it.perform(
+              endpoint
+                  .request()
+                  .apply(uniqueName("missing"))
+                  .apply(UUID.randomUUID())
+                  .header(AUTHORIZATION, it.bearerTokenFor(caller))));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("endpoints")
+    @DisplayName("still rejects an invalid token before revealing that the repo is missing")
+    void repoDoesNotExistWithMalformedToken(final Endpoint endpoint) throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+
+      expectError(
+          it.perform(
+              endpoint
+                  .request()
+                  .apply(uniqueName("missing"))
+                  .apply(UUID.randomUUID())
+                  .header(AUTHORIZATION, "Bearer not-a-jwt")),
+          HttpStatus.FORBIDDEN,
+          "accessNotAllowed",
+          "accessNotAllowed",
+          "Access isn't allowed.");
+    }
   }
 
   // ---------------------------------------------------------------------------------------------

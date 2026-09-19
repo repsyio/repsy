@@ -379,7 +379,11 @@ class NpmPackageApiControllerIT {
               delete("/api/npm/packages/{repo}/{package}", repoName, "plain-package")
                   .header(AUTHORIZATION, bearerToken(user, Duration.ofMinutes(30))))
           .andExpect(status().isUnauthorized());
-      perform(get("/api/npm/packages/missing-repo"))
+      // Anonymous callers cannot tell a missing repo from a private one (RPS-887).
+      perform(get("/api/npm/packages/missing-repo")).andExpect(status().isUnauthorized());
+      perform(
+              get("/api/npm/packages/missing-repo")
+                  .header(AUTHORIZATION, bearerToken(user, Duration.ofMinutes(30))))
           .andExpect(status().isNotFound())
           .andExpect(jsonPath("$.*", hasSize(5)))
           .andExpect(jsonPath("$.type").value("ERROR"))

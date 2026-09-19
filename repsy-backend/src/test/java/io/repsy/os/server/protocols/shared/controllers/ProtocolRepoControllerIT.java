@@ -461,12 +461,26 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("repoScopedEndpoints")
-    @DisplayName("returns 404 repoNotFound for an unknown repo, before any auth check")
+    @DisplayName("returns 404 repoNotFound for an unknown repo once the caller is authorized")
     void unknownRepo(final Endpoint endpoint) throws Exception {
-      // No Authorization header at all: the interceptor resolves the repo first.
       final var target = new Target("nope-" + randomTag(), "MAVEN");
 
-      expectRepoNotFound(ProtocolRepoControllerIT.this.perform(endpoint.request().apply(target)));
+      expectRepoNotFound(
+          ProtocolRepoControllerIT.this.perform(
+              endpoint
+                  .request()
+                  .apply(target)
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("repoScopedEndpoints")
+    @DisplayName("returns 401 unAuthorized, not 404, for an unknown repo without credentials")
+    void unknownRepoWithoutHeader(final Endpoint endpoint) throws Exception {
+      // Checked after authentication, so a missing repo looks like a private one (RPS-887).
+      final var target = new Target("nope-" + randomTag(), "MAVEN");
+
+      expectUnauthorized(ProtocolRepoControllerIT.this.perform(endpoint.request().apply(target)));
     }
 
     @ParameterizedTest(name = "{0}")
