@@ -45,6 +45,6 @@ public enum RepoType {
   }
 
   public static Optional<RepoType> fromString(final String value) {
-    return Arrays.stream(values()).filter(t -> t.name().equalsIgnoreCase(value)).findFirst();
+    return Arrays.stream(values()).filter(t -> t.name().equals(value)).findFirst();
   }
 }

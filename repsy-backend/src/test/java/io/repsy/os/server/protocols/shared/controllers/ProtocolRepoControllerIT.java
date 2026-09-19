@@ -626,35 +626,35 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
                 "repoTypeNotFound",
                 "repoTypeNotFound",
                 "repoTypeNotFound"));
-        // The interceptor accepts these, but the enum conversion of @PathVariable is case
-        // sensitive, so they fail there instead.
+        // RepoType lookup is deliberately case-sensitive, so the interceptor rejects these
+        // consistently before Spring's enum conversion runs.
         result.add(
             Arguments.of(
                 "lower case",
                 route,
                 "maven",
-                HttpStatus.BAD_REQUEST,
-                "validationError",
-                "repoType",
-                VALIDATION_TEXT));
+                HttpStatus.NOT_FOUND,
+                "repoTypeNotFound",
+                "repoTypeNotFound",
+                "repoTypeNotFound"));
         result.add(
             Arguments.of(
                 "mixed case",
                 route,
                 "Maven",
-                HttpStatus.BAD_REQUEST,
-                "validationError",
-                "repoType",
-                VALIDATION_TEXT));
+                HttpStatus.NOT_FOUND,
+                "repoTypeNotFound",
+                "repoTypeNotFound",
+                "repoTypeNotFound"));
         result.add(
             Arguments.of(
                 "lower case golang",
                 route,
                 "golang",
-                HttpStatus.BAD_REQUEST,
-                "validationError",
-                "repoType",
-                VALIDATION_TEXT));
+                HttpStatus.NOT_FOUND,
+                "repoTypeNotFound",
+                "repoTypeNotFound",
+                "repoTypeNotFound"));
       }
 
       return result.stream();
@@ -669,10 +669,10 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           ProtocolRepoControllerIT.this.perform(
               json(post("/api/repos/maven"), createBody(name))
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
-          HttpStatus.BAD_REQUEST,
-          "validationError",
-          "repoType",
-          VALIDATION_TEXT);
+          HttpStatus.NOT_FOUND,
+          "repoTypeNotFound",
+          "repoTypeNotFound",
+          "repoTypeNotFound");
 
       assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(name)).isEmpty();
     }
