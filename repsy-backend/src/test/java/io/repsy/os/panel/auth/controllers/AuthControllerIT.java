@@ -241,7 +241,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
   private static void expectInvalidCredentials(final ResultActions result) throws Exception {
     expectError(
         result,
-        HttpStatus.FORBIDDEN,
+        HttpStatus.UNAUTHORIZED,
         "invalidCredentials",
         "invalidCredentials",
         INVALID_CREDENTIALS_TEXT);
@@ -421,7 +421,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
         // A failed attempt publishes no event, so lastLoginAt stays empty.
         expectError(
             AuthControllerIT.this.login(username, OTHER_VALID_PASSWORD),
-            HttpStatus.FORBIDDEN,
+            HttpStatus.UNAUTHORIZED,
             "invalidCredentials",
             "invalidCredentials",
             INVALID_CREDENTIALS_TEXT);
@@ -450,14 +450,14 @@ class AuthControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 403 invalidCredentials for an unknown username")
+    @DisplayName("returns 401 invalidCredentials for an unknown username")
     void unknownUsername() throws Exception {
       expectInvalidCredentials(
           AuthControllerIT.this.login(uniqueUsername("ghost"), VALID_PASSWORD));
     }
 
     @Test
-    @DisplayName("returns 403 invalidCredentials for a wrong (but well-formed) password")
+    @DisplayName("returns 401 invalidCredentials for a wrong (but well-formed) password")
     void wrongPassword() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("wrongpw"), UserRole.USER);
 
@@ -467,7 +467,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
 
     @Test
     @DisplayName(
-        "returns 403 invalidCredentials for the seeded admin, so the admin row is resolvable")
+        "returns 401 invalidCredentials for the seeded admin, so the admin row is resolvable")
     void wrongPasswordForSeededAdmin() throws Exception {
       expectInvalidCredentials(AuthControllerIT.this.login(SEEDED_ADMIN_USERNAME, VALID_PASSWORD));
     }
@@ -606,7 +606,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
 
       expectError(
           AuthControllerIT.this.login(username, VALID_PASSWORD),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "invalidCredentials",
           "invalidCredentials",
           INVALID_CREDENTIALS_TEXT);
@@ -630,7 +630,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
 
       expectError(
           AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD),
-          HttpStatus.FORBIDDEN,
+          HttpStatus.UNAUTHORIZED,
           "invalidCredentials",
           "invalidCredentials",
           INVALID_CREDENTIALS_TEXT);
