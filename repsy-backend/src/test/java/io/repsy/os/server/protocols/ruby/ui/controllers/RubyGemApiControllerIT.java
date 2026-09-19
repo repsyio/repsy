@@ -288,7 +288,7 @@ class RubyGemApiControllerIT {
           .andExpect(jsonPath("$.msgId").value("gemsFetched"))
           .andExpect(jsonPath("$.type").value("SUCCESS"))
           .andExpect(jsonPath("$.errorCode").value(nullValue()))
-          .andExpect(jsonPath("$.text").value("gemsFetched"))
+          .andExpect(jsonPath("$.text").value("Gems fetched."))
           .andExpect(jsonPath("$.data.content", hasSize(1)))
           .andExpect(jsonPath("$.data.content[0].name").value("fixture-gem"))
           .andExpect(jsonPath("$.data.content[0].latest").value("1.1.0"))

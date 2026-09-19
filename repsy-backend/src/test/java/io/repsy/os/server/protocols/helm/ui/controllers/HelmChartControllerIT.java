@@ -101,6 +101,13 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   private static final String OCI_LAYER_TYPE =
       "application/vnd.cncf.helm.chart.content.v1.tar+gzip";
   private static final String NO_PERMISSION_TEXT = "The user has logged in but has no permissions.";
+  private static final Map<String, String> SUCCESS_TEXTS =
+      Map.of(
+          "chartsFetched", "Charts fetched.",
+          "chartVersionsFetched", "Chart versions fetched.",
+          "chartDetailFetched", "Chart detail fetched.",
+          "chartTagsFetched", "Chart tags fetched.",
+          "chartDeleted", "Chart deleted.");
 
   private static final Set<String> LIST_ITEM_KEYS =
       Set.of("name", "latestVersion", "description", "type", "updatedAt");
@@ -500,7 +507,6 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   private String search(final Repo repo, final String token) throws Exception {
     return expectSuccess(
         this.perform(get("/api/helm/charts/{repo}", repo.getName()).header(AUTHORIZATION, token)),
-        "chartsFetched",
         "chartsFetched");
   }
 
@@ -512,7 +518,6 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
             get("/api/helm/charts/{repo}", repo.getName())
                 .param(param, value)
                 .header(AUTHORIZATION, token)),
-        "chartsFetched",
         "chartsFetched");
   }
 
@@ -523,8 +528,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   }
 
   private String versions(final Repo repo, final String name, final String token) throws Exception {
-    return expectSuccess(
-        this.versionsRequest(repo, name, token), "chartVersionsFetched", "chartVersionsFetched");
+    return expectSuccess(this.versionsRequest(repo, name, token), "chartVersionsFetched");
   }
 
   private ResultActions detailRequest(
@@ -538,8 +542,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   private String detail(
       final Repo repo, final String name, final String version, final String token)
       throws Exception {
-    return expectSuccess(
-        this.detailRequest(repo, name, version, token), "chartDetailFetched", "chartDetailFetched");
+    return expectSuccess(this.detailRequest(repo, name, version, token), "chartDetailFetched");
   }
 
   private ResultActions tagsRequest(final Repo repo, final String name, final String token)
@@ -550,8 +553,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   }
 
   private String tags(final Repo repo, final String name, final String token) throws Exception {
-    return expectSuccess(
-        this.tagsRequest(repo, name, token), "chartTagsFetched", "chartTagsFetched");
+    return expectSuccess(this.tagsRequest(repo, name, token), "chartTagsFetched");
   }
 
   private ResultActions deleteVersionRequest(
@@ -569,8 +571,13 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
             .header(AUTHORIZATION, token));
   }
 
+  private static String expectSuccess(final ResultActions result, final String msgId)
+      throws Exception {
+    return expectSuccess(result, msgId, SUCCESS_TEXTS.get(msgId));
+  }
+
   private static String expectDeleted(final ResultActions result) throws Exception {
-    return expectSuccess(result, "chartDeleted", "chartDeleted");
+    return expectSuccess(result, "chartDeleted");
   }
 
   private static void expectUnauthorized(final ResultActions result) throws Exception {
@@ -741,7 +748,6 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
                   .param("size", "2")
                   .param("page", String.valueOf(number))
                   .header(AUTHORIZATION, token)),
-          "chartsFetched",
           "chartsFetched");
     }
 
@@ -862,7 +868,6 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
                       .param("sort", "latestVersion,desc")
                       .param("sort", "name,asc")
                       .header(AUTHORIZATION, token)),
-              "chartsFetched",
               "chartsFetched");
 
       assertThat(namesOf(body)).containsExactly("bravo", "alpha", "charlie");
@@ -1563,7 +1568,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       if (endpoint.manage) {
         expectUnauthorized(result);
       } else {
-        expectSuccess(result, endpoint.successMsgId, endpoint.successMsgId);
+        expectSuccess(result, endpoint.successMsgId);
       }
     }
 
@@ -1580,7 +1585,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
         expectUnauthorized(result);
         assertThat(it.storedVersions(repo, "payments")).containsExactly("1.0.0");
       } else {
-        expectSuccess(result, endpoint.successMsgId, endpoint.successMsgId);
+        expectSuccess(result, endpoint.successMsgId);
       }
     }
 
@@ -1592,9 +1597,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       final var repo = this.repoWithChart(true);
 
       expectSuccess(
-          this.send(endpoint, repo.getName(), it.adminBearerToken()),
-          endpoint.successMsgId,
-          endpoint.successMsgId);
+          this.send(endpoint, repo.getName(), it.adminBearerToken()), endpoint.successMsgId);
     }
 
     /** A JWT that does not verify is 401 accessNotAllowed, even for a public repo. */
@@ -1689,7 +1692,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       final var result = this.send(endpoint, maven.getName(), it.adminBearerToken());
 
       if (endpoint.otherTypeStatus == 200) {
-        expectSuccess(result, endpoint.successMsgId, endpoint.successMsgId);
+        expectSuccess(result, endpoint.successMsgId);
       } else {
         expectChartNotFound(result);
       }

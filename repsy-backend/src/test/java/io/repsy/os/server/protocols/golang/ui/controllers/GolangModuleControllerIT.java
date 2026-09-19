@@ -274,7 +274,7 @@ class GolangModuleControllerIT {
         .andExpect(jsonPath("$.data.latestVersion").value("v1.2.0"))
         .andExpect(jsonPath("$.data.createdAt", notNullValue()))
         .andExpect(jsonPath("$.data.versions", hasSize(2)))
-        .andExpect(jsonPath("$.text").value("moduleInfoFetched"));
+        .andExpect(jsonPath("$.text").value("Module info fetched."));
   }
 
   @Test
@@ -306,7 +306,7 @@ class GolangModuleControllerIT {
         .andExpect(jsonPath("$.data.page.totalElements").value(3))
         .andExpect(jsonPath("$.data.page.totalPages").value(2))
         .andExpect(jsonPath("$.errorCode").value(nullValue()))
-        .andExpect(jsonPath("$.text").value("modulesFetched"));
+        .andExpect(jsonPath("$.text").value("Modules fetched."));
 
     this.mockMvc
         .perform(

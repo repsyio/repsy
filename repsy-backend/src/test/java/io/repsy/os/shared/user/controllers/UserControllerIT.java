@@ -61,6 +61,13 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @DisplayName("UserController /api/users/*")
 class UserControllerIT extends AbstractIntegrationTest {
 
+  private static final Map<String, String> SUCCESS_TEXTS =
+      Map.of(
+          "usersFetched", "Users fetched.",
+          "userCreated", "User created.",
+          "userUpdated", "User updated.",
+          "userDeleted", "User deleted.",
+          "passwordReset", "Password reset.");
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
   private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String USERNAME_IN_USE_TEXT = "Username is in use. Please try another one.";
@@ -111,13 +118,10 @@ class UserControllerIT extends AbstractIntegrationTest {
   // Response helpers
   // ---------------------------------------------------------------------------------------------
 
-  /**
-   * Asserts a 200 SUCCESS envelope whose {@code text} falls back to the msgId, because the success
-   * ids used here have no entry in messages.properties.
-   */
+  /** Asserts a 200 SUCCESS envelope whose {@code text} is the one {@link #SUCCESS_TEXTS} lists. */
   private static String expectSuccess(final ResultActions result, final String msgId)
       throws Exception {
-    return expectSuccess(result, msgId, msgId);
+    return expectSuccess(result, msgId, SUCCESS_TEXTS.get(msgId));
   }
 
   private static void expectValidationError(final ResultActions result) throws Exception {

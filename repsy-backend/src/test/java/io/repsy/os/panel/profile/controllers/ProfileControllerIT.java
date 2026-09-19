@@ -113,9 +113,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
               .andExpect(jsonPath("$.msgId").value("profileFetched"))
               .andExpect(jsonPath("$.type").value("SUCCESS"))
               .andExpect(jsonPath("$.errorCode").value(nullValue()))
-              // "profileFetched" has no entry in messages.properties, so text falls back to the
-              // msgId itself.
-              .andExpect(jsonPath("$.text").value("profileFetched"))
+              .andExpect(jsonPath("$.text").value("Profile fetched."))
               .andExpect(jsonPath("$.data.*", hasSize(6)))
               .andExpect(jsonPath("$.data.id").value(user.getId().toString()))
               .andExpect(jsonPath("$.data.username").value(user.getUsername()))

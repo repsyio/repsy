@@ -302,15 +302,15 @@ class CargoCrateControllerIT {
     return JsonPath.read(body, "$.data");
   }
 
-  private static void expectSuccess(final ResultActions result, final String msgId)
-      throws Exception {
+  private static void expectSuccess(
+      final ResultActions result, final String msgId, final String text) throws Exception {
     final var envelope = (Map<String, Object>) JsonPath.read(body(result), "$");
     assertThat(envelope)
         .containsOnlyKeys(ENVELOPE_KEYS)
         .containsEntry("msgId", msgId)
         .containsEntry("type", "SUCCESS")
         .containsEntry("errorCode", null)
-        .containsEntry("text", msgId);
+        .containsEntry("text", text);
   }
 
   private static void expectError(
@@ -356,7 +356,7 @@ class CargoCrateControllerIT {
           .containsEntry("msgId", "cratesFetched")
           .containsEntry("type", "SUCCESS")
           .containsEntry("errorCode", null)
-          .containsEntry("text", "cratesFetched");
+          .containsEntry("text", "Crates fetched.");
       assertThat((Map<String, Object>) envelope.get("data")).containsOnlyKeys("content", "page");
       assertThat((Map<String, Object>) ((Map<String, Object>) envelope.get("data")).get("page"))
           .containsOnlyKeys("size", "number", "totalElements", "totalPages")
@@ -661,7 +661,8 @@ class CargoCrateControllerIT {
               "DELETE",
               "/api/cargo/crates/" + repo.getName() + "/delete-me/1.0.0",
               CargoCrateControllerIT.this.token(user)),
-          "crateVersionDeleted");
+          "crateVersionDeleted",
+          "Crate version deleted.");
       CargoCrateControllerIT.this.entityManager.flush();
       assertThat(CargoCrateControllerIT.this.crateIndexRepository.findAll()).hasSize(1);
       assertThat(CargoCrateControllerIT.this.crateMetaRepository.findAll()).hasSize(1);
@@ -683,7 +684,8 @@ class CargoCrateControllerIT {
               "DELETE",
               "/api/cargo/crates/" + repo.getName() + "/delete-me",
               CargoCrateControllerIT.this.token(user)),
-          "crateDeleted");
+          "crateDeleted",
+          "Crate deleted.");
       CargoCrateControllerIT.this.entityManager.flush();
       assertThat(CargoCrateControllerIT.this.crateIndexRepository.findAll()).isEmpty();
       assertThat(CargoCrateControllerIT.this.crateMetaRepository.findAll()).isEmpty();
