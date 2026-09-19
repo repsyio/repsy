@@ -30,6 +30,7 @@ import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.jayway.jsonpath.JsonPath;
+import io.repsy.core.events.UserLoginEvent;
 import io.repsy.os.RepsyApplication;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -67,6 +68,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -101,6 +104,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @Testcontainers
 @AutoConfigureMockMvc
+@RecordApplicationEvents
 @Transactional
 @SpringBootTest(
     classes = RepsyApplication.class,
@@ -1190,6 +1194,34 @@ class AuthControllerIT {
               Algorithm.HMAC512(AuthControllerIT.this.serverSecret()));
 
       expectAccessNotAllowed(AuthControllerIT.this.refreshWith(token));
+    }
+
+    @Test
+    @DisplayName("publishes no login event, neither when it rejects the token nor when it accepts")
+    void publishesNoLoginEvent(final ApplicationEvents events) throws Exception {
+      final var user = AuthControllerIT.this.createUser(uniqueUsername("noevent"), UserRole.USER);
+      final var algorithm = Algorithm.HMAC512(AuthControllerIT.this.serverSecret());
+      final var expiresAt = Instant.now().plus(AuthUtils.TIMEOUT_REFRESH_TOKEN);
+
+      expectAccessNotAllowed(
+          AuthControllerIT.this.refreshWith(
+              signedRefreshToken(null, "someuser", expiresAt, algorithm)));
+      expectAccessNotAllowed(
+          AuthControllerIT.this.refreshWith(
+              signedRefreshToken("not-a-uuid", "someuser", expiresAt, algorithm)));
+      expectSuccess(
+          AuthControllerIT.this.refreshWith(AuthControllerIT.this.refreshTokenFor(user)),
+          "tokenRefreshed");
+
+      assertThat(events.stream(UserLoginEvent.class)).isEmpty();
+
+      // Control: the same recorder does see the event that a login publishes.
+      expectSuccess(
+          AuthControllerIT.this.login(user.getUsername(), VALID_PASSWORD), "loginSucceeded");
+
+      assertThat(events.stream(UserLoginEvent.class))
+          .extracting(UserLoginEvent::username)
+          .containsExactly(user.getUsername());
     }
 
     @ParameterizedTest(name = "{0}")
