@@ -23,7 +23,8 @@ import org.jspecify.annotations.NonNull;
 public enum AuthenticationType {
   DEPLOY_TOKEN("deploy_token"),
   USERNAME_PASSWORD("username_password"),
-  DOCKER_SCAN("docker_scan");
+  DOCKER_SCAN("docker_scan"),
+  ANONYMOUS("anonymous");
 
   final String value;
 
@@ -42,6 +43,10 @@ public enum AuthenticationType {
 
     if (DOCKER_SCAN.value.equals(value)) {
       return DOCKER_SCAN;
+    }
+
+    if (ANONYMOUS.value.equals(value)) {
+      return ANONYMOUS;
     }
 
     throw new BadRequestException("invalidAuthType");

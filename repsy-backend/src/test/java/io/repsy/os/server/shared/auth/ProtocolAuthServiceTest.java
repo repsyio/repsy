@@ -435,6 +435,21 @@ class ProtocolAuthServiceTest {
           .getAuthenticatedUserByUsername(anyString());
     }
 
+    /** RPS-986: the username of an anonymous token is a label, never a user to look up. */
+    @Test
+    @DisplayName("an anonymous token is refused, whoever its username claim names")
+    void anonymousTokenIsRefused() {
+      when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenReturn(AuthenticationType.ANONYMOUS);
+
+      assertUnauthorized(
+          () -> this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.READ));
+      verify(ProtocolAuthServiceTest.this.userTxService, never())
+          .getAuthenticatedUserByUsername(anyString());
+      verify(ProtocolAuthServiceTest.this.userTxService, never())
+          .getUserByUsernameOptional(anyString());
+    }
+
     @Test
     @DisplayName("a user token still resolves the user, and MANAGE still needs an admin")
     void userTokenIsUnchanged() {

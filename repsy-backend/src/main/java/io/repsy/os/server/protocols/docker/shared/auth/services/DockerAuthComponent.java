@@ -59,8 +59,10 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
   @Override
   public String createAnonymousUser() {
 
+    // The username is only a label. The token type keeps it from being looked up as a real user,
+    // so a user who happens to be named "anonymous" is not reachable through it (RPS-986).
     return this.jwtUtils.createProtocolToken(
-        UUID.randomUUID(), ANONYMOUS_USER, TIMEOUT_ACCESS_TOKEN);
+        UUID.randomUUID(), ANONYMOUS_USER, TIMEOUT_ACCESS_TOKEN, AuthenticationType.ANONYMOUS);
   }
 
   @Override
@@ -153,9 +155,24 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
       return;
     }
 
+    if (authType == AuthenticationType.ANONYMOUS) {
+      this.authorizeAnonymousToken(repoInfo, permission);
+
+      return;
+    }
+
     final var userInfo = this.resolveUserInfo(repoInfo, authHeader);
 
     this.authorizeUser(userInfo, permission);
+  }
+
+  /** An anonymous token reads public repos and nothing else. */
+  private void authorizeAnonymousToken(
+      final BaseRepoInfo<UUID> repoInfo, final Permission permission) {
+
+    if (repoInfo.isPrivateRepo() || permission != Permission.READ) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
   }
 
   private @Nullable AuthenticationType extractAuthenticationTypeSafely(final String authHeader) {
@@ -277,6 +294,12 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
     if (authType == AuthenticationType.DOCKER_SCAN) {
       this.authorizeScannerToken(authHeader, repoId, permission);
       return;
+    }
+
+    // Public reads never reach this method, they skip authentication. Anything that does (a write
+    // or a private repo) needs a real credential, which an anonymous token is not.
+    if (authType == AuthenticationType.ANONYMOUS) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
     final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
