@@ -24,6 +24,7 @@ import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.MfaException;
 import io.repsy.core.error_handling.exceptions.RedirectToPathException;
+import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.dtos.RestResponse;
@@ -81,6 +82,7 @@ public class ErrorHandler {
   private static final @NonNull String ERR_MFA_EXCEPTION = "mfaException";
   private static final @NonNull String ERR_SIGNATURE_NOT_VERIFIED = "artifactSignatureNotVerified";
   private static final @NonNull String ERR_MISSING_REQUEST_HEADER = "missingRequestHeader";
+  private static final @NonNull String ERR_SCAN_EXECUTOR_SATURATED = "scanExecutorSaturated";
   private static final @NonNull String ERR_ILLEGAL_ARGUMENT = "Invalid method argument";
 
   private final @NonNull RestResponseFactory resp;
@@ -618,6 +620,24 @@ public class ErrorHandler {
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(messageText, ex.getMessage()));
+  }
+
+  @ExceptionHandler(RetryableException.class)
+  @Nullable ResponseEntity<RestResponse<String>> handleException(
+      final @NonNull RetryableException ex,
+      final @NonNull HttpServletRequest request,
+      final @Nullable HttpServletResponse response) {
+
+    if (response == null) {
+      log.debug("Retryable request failure", ex);
+      return null;
+    }
+
+    log.info(exceptionToString(ex, request));
+
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(this.resp.error(ERR_SCAN_EXECUTOR_SATURATED, ex.getMessage()));
   }
 
   @ExceptionHandler(MfaException.class)

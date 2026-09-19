@@ -23,6 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.core.response.services.RestResponseFactory;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -164,6 +166,30 @@ class ErrorHandlerTest {
         .andExpect(jsonPath("$.msgId").value("errorOccurred"));
   }
 
+  @Test
+  @DisplayName("answers 503 scanExecutorSaturated for a retryable scan failure")
+  void retryableScanFailure() throws Exception {
+    this.mockMvc
+        .perform(get("/retryable"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.msgId").value("scanExecutorSaturated"))
+        .andExpect(jsonPath("$.text").value("Vulnerability scanning is busy. Please retry later."));
+  }
+
+  @Test
+  @DisplayName("does not render a retryable failure when no servlet response is available")
+  void retryableFailureWithoutResponse() {
+    final var handler =
+        new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+
+    assertThat(
+            handler.handleException(
+                new RetryableException("scanExecutorSaturated"),
+                new MockHttpServletRequest(),
+                null))
+        .isNull();
+  }
+
   @RestController
   static class ThrowingController {
 
@@ -201,6 +227,11 @@ class ErrorHandlerTest {
     @GetMapping("/path-variable")
     String pathVariable(@PathVariable("id") final String id) {
       return id;
+    }
+
+    @GetMapping("/retryable")
+    String retryable() {
+      throw new RetryableException("scanExecutorSaturated");
     }
   }
 }

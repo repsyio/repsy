@@ -37,7 +37,7 @@ public class ScanTaskExecutorConfig {
     executor.setMaxPoolSize(MAX_POOL_SIZE);
     executor.setQueueCapacity(QUEUE_CAPACITY);
     executor.setThreadNamePrefix("vuln-scan-");
-    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
     executor.initialize();
 
     return executor;
