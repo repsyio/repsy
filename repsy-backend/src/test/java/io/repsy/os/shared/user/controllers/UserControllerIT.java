@@ -643,15 +643,10 @@ class UserControllerIT extends AbstractIntegrationTest {
     @DisplayName("treats usernames with different casing as distinct")
     void usernamesAreCaseSensitive() throws Exception {
       final var token = UserControllerIT.this.adminBearerToken();
+      // The panel only accepts lower-case names now (RPS-1037), so an older upper-case user is
+      // created straight in the database, like an upgraded instance would still hold one.
       final var username = uniqueUsername("Case");
-
-      expectSuccess(
-          UserControllerIT.this.perform(
-              post("/api/users")
-                  .header(AUTHORIZATION, token)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(createBody(username, VALID_PASSWORD, "USER"))),
-          "userCreated");
+      UserControllerIT.this.createUser(username, UserRole.USER);
 
       final var lowerCaseUsername = username.toLowerCase(Locale.ROOT);
       assertThat(lowerCaseUsername).isNotEqualTo(username);
@@ -727,6 +722,11 @@ class UserControllerIT extends AbstractIntegrationTest {
       return Stream.of(
           Arguments.of("username too short", createBody("ab", VALID_PASSWORD, "USER")),
           Arguments.of("username too long", createBody("a".repeat(26), VALID_PASSWORD, "USER")),
+          Arguments.of("username with a colon", createBody("a:b", VALID_PASSWORD, "USER")),
+          Arguments.of("username with a leading colon", createBody(":ab", VALID_PASSWORD, "USER")),
+          Arguments.of("username with upper case", createBody("Has-Upper", VALID_PASSWORD, "USER")),
+          Arguments.of("username with a space", createBody("has space", VALID_PASSWORD, "USER")),
+          Arguments.of("username with a dot", createBody("has.dot", VALID_PASSWORD, "USER")),
           Arguments.of("password too short", createBody(ok, "Ab1de", "USER")),
           Arguments.of("password too long", createBody(ok, "Aa1" + "x".repeat(48), "USER")),
           Arguments.of("password without uppercase", createBody(ok, "lowercase1", "USER")),
@@ -890,6 +890,29 @@ class UserControllerIT extends AbstractIntegrationTest {
       assertThat(UserControllerIT.this.reload(target.getId()).getRole()).isEqualTo(UserRole.ADMIN);
     }
 
+    /**
+     * RPS-1037: a user created before the rule (or straight in the database) can hold a name that
+     * can never authenticate over HTTP Basic. An admin fixes it by renaming to a valid name.
+     */
+    @Test
+    @DisplayName("lets an admin rename a user whose username contains a colon to a valid name")
+    void renamesLegacyColonUsername() throws Exception {
+      final var token = UserControllerIT.this.adminBearerToken();
+      final var target =
+          UserControllerIT.this.createUser(uniqueUsername("legacy") + ":x", UserRole.USER);
+      final var newUsername = uniqueUsername("fixed");
+
+      expectSuccess(
+          UserControllerIT.this.perform(
+              put("/api/users/" + target.getId())
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(updateBody(newUsername, "USER"))),
+          "userUpdated");
+
+      assertThat(UserControllerIT.this.reload(target.getId()).getUsername()).isEqualTo(newUsername);
+    }
+
     @Test
     @DisplayName("returns 404 userNotFound for an unknown user id")
     void unknownUser() throws Exception {
@@ -948,6 +971,11 @@ class UserControllerIT extends AbstractIntegrationTest {
       return Stream.of(
           Arguments.of("username too short", updateBody("ab", "ADMIN")),
           Arguments.of("username too long", updateBody("a".repeat(26), "ADMIN")),
+          Arguments.of("username with a colon", updateBody("a:b", "ADMIN")),
+          Arguments.of("username with a leading colon", updateBody(":ab", "ADMIN")),
+          Arguments.of("username with upper case", updateBody("Has-Upper", "ADMIN")),
+          Arguments.of("username with a space", updateBody("has space", "ADMIN")),
+          Arguments.of("username with a dot", updateBody("has.dot", "ADMIN")),
           Arguments.of("missing username", "{\"role\":\"ADMIN\"}"),
           Arguments.of("missing role", "{\"username\":\"validname\"}"),
           Arguments.of("null role", "{\"username\":\"validname\",\"role\":null}"),

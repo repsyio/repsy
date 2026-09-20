@@ -3308,6 +3308,7 @@ components:
           type: string
           maxLength: 25
           minLength: 3
+          pattern: "^[a-z0-9_\\-]+$"
         role:
           "$ref": "#/components/schemas/UserRole"
       required:
@@ -3480,6 +3481,7 @@ components:
           type: string
           maxLength: 25
           minLength: 3
+          pattern: "^[a-z0-9_\\-]+$"
         password:
           type: string
           maxLength: 50
