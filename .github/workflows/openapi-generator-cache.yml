@@ -8,13 +8,15 @@ name: OpenAPI generator cache
 permissions:
   contents: read
 
+# TEMPORARILY DISABLED for pushes to main while the backlog is worked through: restore the
+# commented push trigger below to turn it back on. The weekly run and manual dispatch are unchanged.
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - repsy-frontend/openapitools.json
-      - .github/workflows/openapi-generator-cache.yml
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - repsy-frontend/openapitools.json
+  #     - .github/workflows/openapi-generator-cache.yml
   schedule:
     - cron: "17 3 * * 1"
   workflow_dispatch:
