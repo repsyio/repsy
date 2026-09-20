@@ -29,6 +29,7 @@ import io.repsy.protocols.golang.shared.module.services.GoModuleService;
 import io.repsy.protocols.golang.shared.module.validators.GoModFileValidator;
 import io.repsy.protocols.golang.shared.storage.services.GoStorageService;
 import io.repsy.protocols.golang.shared.utils.GoModuleHashCalculator;
+import io.repsy.protocols.golang.shared.utils.GoModuleZipReader;
 import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -38,8 +39,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.stream.Collectors;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 import lombok.SneakyThrows;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -112,7 +111,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
 
     verifySha256(content, (String) context.getContextMap().get(CONTENT_SHA256_KEY));
 
-    final var modContent = extractGoMod(content, decodedPath, version);
+    final var modContent = GoModuleZipReader.extractGoMod(content, decodedPath, version);
     GoModFileValidator.validate(modContent);
 
     this.goModuleService.publishModule(
@@ -196,23 +195,6 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
       return this.goStorageService.writeInputStreamToPath(
           StoragePath.of(repoInfo.getStorageKey(), infoPath), infoStream, repoInfo.getName());
     }
-  }
-
-  @SneakyThrows
-  private static byte[] extractGoMod(
-      final byte[] zipContent, final String modulePath, final String version) {
-
-    final var entryName = modulePath + "@" + version + "/go.mod";
-    try (final var zis = new ZipInputStream(new ByteArrayInputStream(zipContent))) {
-      ZipEntry entry;
-      while ((entry = zis.getNextEntry()) != null) {
-        if (entryName.equals(entry.getName())) {
-          return zis.readAllBytes();
-        }
-        zis.closeEntry();
-      }
-    }
-    throw new BadRequestException("goModNotFoundInZip");
   }
 
   private static String decodePath(final String path) {
