@@ -96,6 +96,10 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * {@code @Transactional(propagation = Propagation.NOT_SUPPORTED)} and must track and delete only
  * the rows it created. Never empty a table other classes rely on, and don't assert on the absolute
  * size of one: measure it before the fixtures and compare against that.
+ *
+ * <p>The one exception to the shared database is {@code DefaultRepoSeedingIT}, which has to empty
+ * the {@code repo} table and re-publish {@code UserCreatedEvent}. It does not extend this class and
+ * owns a container of its own; nothing else should.
  */
 @AutoConfigureMockMvc
 @Transactional
