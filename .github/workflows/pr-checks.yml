@@ -143,6 +143,16 @@ jobs:
           java-version: "25"
           distribution: "temurin"
 
+      # openapi-generator-cli downloads the generator jar from Maven Central the first time it
+      # runs, so keep it in a cache and a Maven Central outage cannot fail this required check.
+      # openapitools.json pins the version and the storage directory. This cache is only
+      # readable from main and from this PR, so openapi-generator-cache.yml seeds it from main.
+      - name: Cache OpenAPI generator jar
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/openapi-generator-cli
+          key: openapi-generator-${{ runner.os }}-${{ hashFiles('repsy-frontend/openapitools.json') }}
+
       - name: Generate API client
         run: pnpm run gen:api
 
