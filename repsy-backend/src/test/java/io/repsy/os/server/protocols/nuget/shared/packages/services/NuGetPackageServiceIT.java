@@ -37,7 +37,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * Regression coverage for persisting NuGet version metadata on PostgreSQL.
@@ -59,7 +58,6 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
   @Autowired private NuGetPackageService<UUID> packageService;
   @Autowired private NuGetPackageRepository packageRepository;
   @Autowired private RepoTxService repoTxService;
-  @Autowired private JdbcTemplate jdbcTemplate;
 
   private RepoInfo seedNuGetRepo() {
     final var repo = this.seedRepo(RepoType.NUGET, uniqueRepoName("nuget"));
