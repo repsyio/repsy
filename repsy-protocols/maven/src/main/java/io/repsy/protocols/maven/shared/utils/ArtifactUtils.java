@@ -22,8 +22,10 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.shared.artifact.services.VersionComparator;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +47,8 @@ public class ArtifactUtils {
 
   private static final String METADATA_FILENAME = "maven-metadata.xml";
   private static final String MAVEN_PLUGIN = "maven-plugin";
+  private static final String POM_SUFFIX = ".pom";
+  private static final String SIGNED_POM_SUFFIX = ".asc";
   private static final Set<String> CHECKSUM_TYPES = Set.of(".md5", ".sha1", ".sha256", ".sha512");
 
   public static boolean containsIgnoreCase(final String str, final String subString) {
@@ -130,14 +134,44 @@ public class ArtifactUtils {
   @Nullable
   public static Model readModel(final Resource pomResource) {
 
+    try (final var inputStream = pomResource.getInputStream()) {
+      return readModel(inputStream);
+    } catch (final IOException e) {
+      log.warn("Malformed or unreadable POM file received: {}", e.getMessage());
+      throw new BadRequestException("malformedPomFile");
+    }
+  }
+
+  /**
+   * Parses a POM without closing the stream.
+   *
+   * @throws BadRequestException With the fixed {@code malformedPomFile} id if the POM cannot be
+   *     read or parsed
+   */
+  @Nullable
+  public static Model readModel(final InputStream pomStream) {
+
     final var reader = new MavenXpp3Reader();
 
-    try (final var streamReader = new InputStreamReader(pomResource.getInputStream(), UTF_8)) {
-      return reader.read(streamReader);
+    try {
+      return reader.read(new InputStreamReader(pomStream, UTF_8));
     } catch (final IOException | XmlPullParserException e) {
       log.warn("Malformed or unreadable POM file received: {}", e.getMessage());
       throw new BadRequestException("malformedPomFile");
     }
+  }
+
+  /**
+   * Tells whether the artifact service parses the uploaded file as a POM: a {@code .pom} path that
+   * is neither a checksum nor a {@code .asc} signature of the POM.
+   */
+  public static boolean isPomToParse(final StoragePath storagePath) {
+
+    final var relativePath = storagePath.getRelativePath();
+
+    return containsIgnoreCase(relativePath.getPath(), POM_SUFFIX)
+        && !isChecksumFile(Objects.requireNonNull(relativePath.getFileName()))
+        && !relativePath.getPath().endsWith(SIGNED_POM_SUFFIX);
   }
 
   public static void setReleaseAndLatest(final Metadata metadata) {
