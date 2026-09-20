@@ -439,13 +439,17 @@ docker exec repsy env | grep ADMIN
 
 **Can't login:**
 - Verify `ADMIN_INITIAL_PASSWORD` was set before the first startup
-- **Forgot admin password?** Reset it by setting hash to NULL in the database:
+- **Forgot admin password?** Reset it by setting the hash to an empty string in the database
+  (`hash` and `salt` are `NOT NULL`, so `NULL` is rejected):
   ```sql
   -- Connect to PostgreSQL
   docker exec -it repsy-postgres psql -U repsy -d repsy
 
-  -- Reset admin password hash
-  UPDATE users SET hash = NULL, salt = NULL WHERE role = 'ADMIN';
+  -- Reset the password of every admin
+  UPDATE users SET hash = '', salt = '' WHERE role = 'ADMIN';
+
+  -- Or of a single admin
+  UPDATE users SET hash = '', salt = '' WHERE role = 'ADMIN' AND username = 'admin';
 
   -- Exit and restart the application
   \q
@@ -454,7 +458,8 @@ docker exec repsy env | grep ADMIN
   -- Check logs for the new random password
   docker logs repsy | grep "Admin password"
   ```
-  The application will automatically generate a new random password on next startup.
+  On the next startup the application generates a new random password for every admin whose hash
+  is empty and logs it, one line per admin.
 
 **Vulnerability scans failing with 401/500:**
 - Check that `TRIVY_SCANNER_API_KEY` (repsy-backend) and `SCANNER_API_KEY` (`repsy-scanner-trivy`) are set to the exact same value — a mismatch causes the scanner to reject requests.

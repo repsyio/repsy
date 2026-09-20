@@ -52,25 +52,26 @@ public class AdminUserInitializer implements ApplicationRunner {
   @Override
   @Transactional
   public void run(final @NonNull ApplicationArguments args) {
-    final var adminUserOpt = this.userRepository.findFirstByRole(UserRole.ADMIN);
+    final var adminUsers = this.userRepository.findAllByRole(UserRole.ADMIN);
 
-    if (adminUserOpt.isPresent()) {
-      this.handleExistingAdmin(adminUserOpt.get());
-    } else {
+    if (adminUsers.isEmpty()) {
       this.createNewAdmin();
+      return;
     }
+
+    // users.hash is NOT NULL, so an empty hash is the marker an operator sets by hand to recover a
+    // lost password (see the README). It applies to every admin that carries it.
+    adminUsers.stream()
+        .filter(AdminUserInitializer::isPasswordReset)
+        .forEach(this::resetAdminPassword);
   }
 
-  private void handleExistingAdmin(final @NonNull User adminUser) {
-    if (adminUser.getHash() == null || adminUser.getHash().isEmpty()) {
-      this.resetAdminPassword(adminUser);
-    } else {
-      log.debug("Admin user already exists, skipping initialization");
-    }
+  private static boolean isPasswordReset(final @NonNull User adminUser) {
+    return adminUser.getHash() == null || adminUser.getHash().isEmpty();
   }
 
   private void resetAdminPassword(final @NonNull User adminUser) {
-    log.debug("Admin user password is null, resetting with random password...");
+    log.debug("Admin user {} has an empty password hash, resetting...", adminUser.getUsername());
 
     final var newPassword = PasswordGeneratorUtil.generatePassword();
     final var salt = PasswordGeneratorUtil.generateSalt();
@@ -80,7 +81,10 @@ public class AdminUserInitializer implements ApplicationRunner {
     adminUser.setSalt(salt);
     this.userRepository.save(adminUser);
 
-    log.warn("Admin password has been reset. New password: {}", newPassword);
+    log.warn(
+        "Admin password has been reset for user {}. New password: {}",
+        adminUser.getUsername(),
+        newPassword);
   }
 
   private void createNewAdmin() {
