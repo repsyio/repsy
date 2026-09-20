@@ -23,6 +23,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
+import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
+import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -43,7 +45,10 @@ class HelmAuthComponentTest {
 
   private final HelmAuthComponent authComponent =
       new HelmAuthComponent(
-          this.userTxService, this.jwtUtils, Mockito.mock(DeployTokenService.class));
+          this.userTxService,
+          this.jwtUtils,
+          Mockito.mock(DeployTokenService.class),
+          new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
 
   /** RPS-986: an anonymous token is minted by Docker; its username claim is only a label. */
   @Test

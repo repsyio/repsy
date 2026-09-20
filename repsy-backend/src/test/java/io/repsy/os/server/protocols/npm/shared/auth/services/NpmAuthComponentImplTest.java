@@ -22,6 +22,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
+import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
+import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.constants.ErrorConstants;
@@ -50,7 +52,10 @@ class NpmAuthComponentImplTest {
 
   private final NpmAuthComponentImpl authComponent =
       new NpmAuthComponentImpl(
-          this.userTxService, Mockito.mock(JwtUtils.class), Mockito.mock(DeployTokenService.class));
+          this.userTxService,
+          Mockito.mock(JwtUtils.class),
+          Mockito.mock(DeployTokenService.class),
+          new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
 
   private final BaseRepoInfo<UUID> repo =
       BaseRepoInfo.<UUID>builder().name("npm").storageKey(UUID.randomUUID()).build();

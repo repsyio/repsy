@@ -25,6 +25,7 @@ import static io.repsy.os.shared.auth.utils.AuthUtils.removeBasicPrefix;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
+import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -51,9 +52,10 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
   public DockerAuthComponent(
       final UserTxService userTxService,
       final JwtUtils jwtUtils,
-      final DeployTokenService deployTokenService) {
+      final DeployTokenService deployTokenService,
+      final VerifiedPasswordCache verifiedPasswordCache) {
 
-    super(userTxService, jwtUtils, deployTokenService);
+    super(userTxService, jwtUtils, deployTokenService, verifiedPasswordCache);
   }
 
   @Override

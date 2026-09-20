@@ -81,6 +81,12 @@ repsy:
       key-alias: ${REPO_SSL_KEY_ALIAS:repsy}
       key-password: ${REPO_SSL_KEY_PASSWORD:}
   security:
+    # Remembers successful HTTP Basic password checks so a client that sends its credentials on
+    # every request pays for one BCrypt verification, not one per request.
+    basic-auth-cache:
+      enabled: ${BASIC_AUTH_CACHE_ENABLED:true}
+      ttl-seconds: ${BASIC_AUTH_CACHE_TTL_SECONDS:300}
+      max-entries: ${BASIC_AUTH_CACHE_MAX_ENTRIES:10000}
     scanner: ${SECURITY_SCANNER:disabled}
     trivy:
       scanner-base-url: ${TRIVY_SCANNER_BASE_URL:http://localhost:8090}

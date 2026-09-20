@@ -53,6 +53,7 @@ public class ProtocolAuthService {
   protected final @NonNull UserTxService userTxService;
   protected final @NonNull JwtUtils jwtUtils;
   protected final @NonNull DeployTokenService deployTokenService;
+  protected final @NonNull VerifiedPasswordCache verifiedPasswordCache;
 
   public @Nullable String emulateAuthHeader(final @NonNull HttpServletRequest request) {
 
@@ -301,7 +302,10 @@ public class ProtocolAuthService {
 
     final var userInfo = userInfoOpt.get();
 
-    if (!PasswordHasher.matches(password, userInfo.getHash(), userInfo.getSalt())) {
+    // A client that sends Basic credentials on every request would otherwise pay one BCrypt check
+    // per request (RPS-1025). Only a successful check is remembered, so this path costs what it did
+    // before for a wrong password.
+    if (!this.verifiedPasswordCache.matches(userInfo, password)) {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 

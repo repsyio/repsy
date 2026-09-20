@@ -25,6 +25,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
+import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
+import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -60,7 +62,10 @@ class DockerAuthComponentTest {
 
   private final DockerAuthComponent authComponent =
       new DockerAuthComponent(
-          this.userTxService, Mockito.mock(JwtUtils.class), Mockito.mock(DeployTokenService.class));
+          this.userTxService,
+          Mockito.mock(JwtUtils.class),
+          Mockito.mock(DeployTokenService.class),
+          new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
 
   private static String basicAuth(final String username, final String password) {
     final var raw = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
@@ -101,7 +106,8 @@ class DockerAuthComponentTest {
             new UserTxService(
                 Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)),
             jwtUtils,
-            Mockito.mock(DeployTokenService.class));
+            Mockito.mock(DeployTokenService.class),
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
 
     assertUnauthorized(() -> component.authenticateUser("Bearer signed.jwt.token"));
   }
@@ -174,7 +180,8 @@ class DockerAuthComponentTest {
         new DockerAuthComponent(
             DockerAuthComponentTest.this.userTxService,
             this.jwtUtils,
-            Mockito.mock(DeployTokenService.class));
+            Mockito.mock(DeployTokenService.class),
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
 
     AnonymousToken() {
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))

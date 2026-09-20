@@ -24,6 +24,7 @@ import static io.repsy.protocols.shared.repo.dtos.RepoType.CARGO;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
+import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -42,9 +43,10 @@ public class CargoAuthComponent extends ProtocolAuthService {
   public CargoAuthComponent(
       final UserTxService userTxService,
       final JwtUtils jwtUtils,
-      final DeployTokenService deployTokenService) {
+      final DeployTokenService deployTokenService,
+      final VerifiedPasswordCache verifiedPasswordCache) {
 
-    super(userTxService, jwtUtils, deployTokenService);
+    super(userTxService, jwtUtils, deployTokenService, verifiedPasswordCache);
   }
 
   public String authenticateAndCreateToken(final String authHeader) {

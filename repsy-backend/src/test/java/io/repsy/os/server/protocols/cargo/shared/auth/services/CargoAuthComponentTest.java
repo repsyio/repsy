@@ -23,6 +23,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
+import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
+import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -59,7 +61,10 @@ class CargoAuthComponentTest {
 
   private final CargoAuthComponent authComponent =
       new CargoAuthComponent(
-          this.userTxService, Mockito.mock(JwtUtils.class), Mockito.mock(DeployTokenService.class));
+          this.userTxService,
+          Mockito.mock(JwtUtils.class),
+          Mockito.mock(DeployTokenService.class),
+          new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
 
   private static String basicAuth(final String username, final String password) {
     final var raw = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
@@ -109,7 +114,8 @@ class CargoAuthComponentTest {
             new UserTxService(
                 Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)),
             jwtUtils,
-            Mockito.mock(DeployTokenService.class));
+            Mockito.mock(DeployTokenService.class),
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
 
     assertUnauthorized(() -> component.authenticateAndCreateToken("Bearer signed.jwt.token"));
   }
@@ -128,7 +134,10 @@ class CargoAuthComponentTest {
         .thenReturn(USERNAME);
     final var component =
         new CargoAuthComponent(
-            this.userTxService, jwtUtils, Mockito.mock(DeployTokenService.class));
+            this.userTxService,
+            jwtUtils,
+            Mockito.mock(DeployTokenService.class),
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
 
     assertUnauthorized(() -> component.authenticateAndCreateToken("Bearer signed.jwt.token"));
     verify(this.userTxService, never()).getAuthenticatedUserByUsername(anyString());
