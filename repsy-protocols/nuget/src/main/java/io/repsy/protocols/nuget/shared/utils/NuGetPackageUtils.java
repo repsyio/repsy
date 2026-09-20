@@ -470,14 +470,30 @@ public final class NuGetPackageUtils {
     return OBJECT_MAPPER.writeValueAsString(dependencies);
   }
 
-  public static List<NuGetDependencyInfo> parseDependenciesJson(@Nullable final String json) {
+  /**
+   * Reads the dependencies stored for a package version. A {@code null} or blank value means the
+   * package declares none. A value that is there but cannot be read is a stored-data problem, not
+   * an absence of dependencies, so it is logged at {@code warn} with the package id and version.
+   * The value itself is left out of the log, and the caller still gets an empty list so one bad
+   * column does not fail the rest of the version.
+   */
+  public static List<NuGetDependencyInfo> parseDependenciesJson(
+      @Nullable final String json, final String packageId, final String version) {
+
     if (json == null || json.isBlank()) {
       return List.of();
     }
     try {
-      return OBJECT_MAPPER.readValue(json, new TypeReference<>() {});
+      final List<NuGetDependencyInfo> dependencies =
+          OBJECT_MAPPER.readValue(json, new TypeReference<>() {});
+      return dependencies == null ? List.of() : dependencies;
     } catch (final Exception e) {
-      log.debug("Failed to parse dependencies JSON", e);
+      log.warn(
+          "Ignoring unreadable dependencies of NuGet package {} {} ({} characters): {}",
+          packageId,
+          version,
+          json.length(),
+          e.getClass().getSimpleName());
       return List.of();
     }
   }
