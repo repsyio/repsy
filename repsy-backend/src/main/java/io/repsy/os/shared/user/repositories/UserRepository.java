@@ -17,6 +17,7 @@ package io.repsy.os.shared.user.repositories;
 
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -63,4 +64,16 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       @NonNull @Param("id") UUID id,
       @NonNull @Param("oldHash") String oldHash,
       @NonNull @Param("newHash") String newHash);
+
+  /**
+   * Records a login by writing the {@code last_login_at} column and nothing else. The login is
+   * recorded on another thread, so a full-row entity save could write back a stale password, role,
+   * username or token version over a change that committed after the row was read.
+   *
+   * @return 1 if the timestamp was written, 0 if no user has that username
+   */
+  @Modifying(flushAutomatically = true, clearAutomatically = true)
+  @Query("update User u set u.lastLoginAt = :at where u.username = :username")
+  int updateLastLoginAt(
+      @NonNull @Param("username") String username, @NonNull @Param("at") Instant at);
 }
