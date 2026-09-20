@@ -165,6 +165,91 @@ class DockerAuthComponentTest {
   }
 
   /**
+   * RPS-1027: a valid bearer token of a user who no longer exists is an authentication failure on
+   * every path, a public repo included. It is never downgraded to an anonymous caller, which is
+   * what the other protocols answer as well (RPS-962).
+   */
+  @Nested
+  @DisplayName("a valid bearer token of a deleted user is never treated as anonymous")
+  class DeletedUserToken {
+
+    private static final String BEARER = "Bearer signed.jwt.token";
+
+    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+
+    private final DockerAuthComponent component =
+        new DockerAuthComponent(
+            DockerAuthComponentTest.this.userTxService,
+            this.jwtUtils,
+            Mockito.mock(DeployTokenService.class),
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
+
+    DeletedUserToken() {
+      when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenReturn(AuthenticationType.USERNAME_PASSWORD);
+      when(this.jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
+          .thenReturn("ghost");
+      when(DockerAuthComponentTest.this.userTxService.getUserByUsernameOptional("ghost"))
+          .thenReturn(Optional.empty());
+    }
+
+    private BaseRepoInfo<UUID> repo(final boolean privateRepo) {
+      return BaseRepoInfo.<UUID>builder()
+          .name("images")
+          .storageKey(UUID.randomUUID())
+          .privateRepo(privateRepo)
+          .build();
+    }
+
+    @Test
+    @DisplayName("authorizeRequest answers unAuthorized for a public repo, read or write")
+    void authorizeRequestPublicRepo() {
+      assertUnauthorized(
+          () -> this.component.authorizeRequest(this.repo(false), BEARER, Permission.READ, false));
+      assertUnauthorized(
+          () -> this.component.authorizeRequest(this.repo(false), BEARER, Permission.WRITE, false));
+      assertUnauthorized(
+          () -> this.component.authorizeRequest(this.repo(false), BEARER, Permission.READ, true));
+    }
+
+    @Test
+    @DisplayName("authorizeRequest answers unAuthorized for a private repo")
+    void authorizeRequestPrivateRepo() {
+      assertUnauthorized(
+          () -> this.component.authorizeRequest(this.repo(true), BEARER, Permission.READ, false));
+      assertUnauthorized(
+          () -> this.component.authorizeRequest(this.repo(true), BEARER, Permission.WRITE, false));
+    }
+
+    @Test
+    @DisplayName("handleBearerAuth answers unAuthorized")
+    void handleBearerAuth() {
+      assertUnauthorized(
+          () -> this.component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
+      assertUnauthorized(
+          () -> this.component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.WRITE));
+    }
+
+    @Test
+    @DisplayName("authorizeRequest still lets the token of an existing user read a public repo")
+    void existingUserStillAuthorized() {
+      when(DockerAuthComponentTest.this.userTxService.getUserByUsernameOptional("ghost"))
+          .thenReturn(
+              Optional.of(
+                  UserInfo.builder()
+                      .id(UUID.randomUUID())
+                      .username("ghost")
+                      .role(UserRole.USER)
+                      .build()));
+
+      assertThatCode(
+              () ->
+                  this.component.authorizeRequest(this.repo(false), BEARER, Permission.READ, false))
+          .doesNotThrowAnyException();
+    }
+  }
+
+  /**
    * RPS-986: the token handed to a caller without credentials is labelled {@code anonymous}. It has
    * to be typed, so a user who happens to be named {@code anonymous} is never acted for by it.
    */

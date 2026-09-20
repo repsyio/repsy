@@ -194,7 +194,7 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
     }
 
     if (isBearerToken(authHeader)) {
-      return this.resolveBearerAuthUser(repoInfo, authHeader);
+      return this.resolveBearerAuthUser(authHeader);
     }
 
     if (repoInfo.isPrivateRepo()) {
@@ -221,18 +221,18 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
     return this.authenticateWithPassword(credentials);
   }
 
-  private @Nullable UserInfo resolveBearerAuthUser(
-      final BaseRepoInfo<UUID> repoInfo, final String authHeader) {
+  /**
+   * A valid token of a user who no longer exists is rejected on a public repo as well. It is never
+   * downgraded to an anonymous caller, so a revoked session is told to authenticate again (RPS-962,
+   * RPS-1027).
+   */
+  private UserInfo resolveBearerAuthUser(final String authHeader) {
 
     final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
 
-    final var userInfoOpt = this.userTxService.getUserByUsernameOptional(username);
-
-    if (userInfoOpt.isEmpty() && repoInfo.isPrivateRepo()) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    return userInfoOpt.orElse(null);
+    return this.userTxService
+        .getUserByUsernameOptional(username)
+        .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
   }
 
   private Credentials getBasicAuthCredentials(final String basicToken) {
