@@ -17,7 +17,6 @@ package io.repsy.os.server.protocols.ruby.ui.controllers;
 
 import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.PUBLISH_PATH;
 import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.gem;
-import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.protocolPort;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.nullValue;

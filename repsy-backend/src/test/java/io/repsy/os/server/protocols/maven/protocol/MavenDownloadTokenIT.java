@@ -39,7 +39,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
  * RPS-980: the Maven browser downloads a file by navigating to it, which cannot set an {@code
@@ -50,19 +49,9 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @DisplayName("Maven download token")
 class MavenDownloadTokenIT extends AbstractIntegrationTest {
 
-  private static final int PROTOCOL_PORT = 9090;
   private static final String JAR = "com/example/lib/1.0/lib-1.0.jar";
   private static final String OTHER_JAR = "com/example/lib/1.0/lib-1.0-sources.jar";
   private static final String JAR_CONTENT = "jar-bytes";
-
-  /** Serves the request the way the protocol port does: main port, servlet path = request URI. */
-  private static RequestPostProcessor protocolPort() {
-    return request -> {
-      request.setLocalPort(PROTOCOL_PORT);
-      request.setServletPath(request.getRequestURI());
-      return request;
-    };
-  }
 
   private MvcResult protocol(final AbstractMockHttpServletRequestBuilder<?> request)
       throws Exception {

@@ -39,7 +39,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
  * Pins that a bearer JWT only authenticates the entry point it was issued for: panel access tokens
@@ -51,17 +50,6 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  */
 @DisplayName("Token realms: panel vs protocol bearer tokens")
 class TokenRealmIT extends AbstractIntegrationTest {
-
-  private static final int PROTOCOL_PORT = 9090;
-
-  /** Serves the request the way the protocol port does: main port, servlet path = request URI. */
-  private static RequestPostProcessor protocolPort() {
-    return request -> {
-      request.setLocalPort(PROTOCOL_PORT);
-      request.setServletPath(request.getRequestURI());
-      return request;
-    };
-  }
 
   private MvcResult protocol(final AbstractMockHttpServletRequestBuilder<?> request)
       throws Exception {

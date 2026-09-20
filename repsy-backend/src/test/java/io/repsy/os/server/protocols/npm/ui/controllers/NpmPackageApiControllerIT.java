@@ -60,15 +60,12 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.PathContainer;
 import org.springframework.test.web.servlet.ResultActions;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 /** End-to-end coverage for every npm package-management API mapping. */
 @DisplayName("NpmPackageApiController /api/npm/packages/*")
 class NpmPackageApiControllerIT extends AbstractIntegrationTest {
-
-  private static final int REPOSITORY_PORT = 9090;
 
   @Autowired private RequestMappingHandlerMapping handlerMapping;
   @Autowired private RepoTxService repoTxService;
@@ -138,8 +135,7 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
     this.mockMvc
         .perform(
             put("/{repo}/{package}", this.repoName, packagePath)
-                .servletPath("/" + this.repoName + "/" + packagePath)
-                .with(repositoryPort())
+                .with(protocolPort())
                 .header(AUTHORIZATION, basicAuth())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(payload))
@@ -155,13 +151,6 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
   private String bearerToken(final User user, final Duration duration) {
     return AuthUtils.AUTH_BEARER
         + this.jwtUtils.createPanelAccessToken(user.getId(), user.getUsername(), duration);
-  }
-
-  private static RequestPostProcessor repositoryPort() {
-    return request -> {
-      request.setLocalPort(REPOSITORY_PORT);
-      return request;
-    };
   }
 
   @Nested

@@ -51,7 +51,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
  * RPS-979: the JWT Cargo hands a deploy token at {@code /me} carries the username the client typed
@@ -65,22 +64,12 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @DisplayName("Cargo deploy-token JWT is a deploy token, not the user its username names")
 class CargoDeployTokenAuthIT extends AbstractIntegrationTest {
 
-  private static final int PROTOCOL_PORT = 9090;
   private static final String CRATE = "deploy-crate";
   private static final String INDEX = "/de/pl/" + CRATE;
   private static final String PUBLISH = "/{repo}/api/v1/crates/new";
   private static final String PACKUMENT = "/{repo}/some-package";
 
   @Autowired private RepoDeployTokenRepository deployTokenRepository;
-
-  /** Serves the request the way the protocol port does: main port, servlet path = request URI. */
-  private static RequestPostProcessor protocolPort() {
-    return request -> {
-      request.setLocalPort(PROTOCOL_PORT);
-      request.setServletPath(request.getRequestURI());
-      return request;
-    };
-  }
 
   private MvcResult protocol(final AbstractMockHttpServletRequestBuilder<?> request)
       throws Exception {

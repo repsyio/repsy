@@ -83,7 +83,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
  * Full-stack Testcontainers coverage for the Helm chart-management API.
@@ -101,7 +100,6 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @DisplayName("HelmChartController /api/helm/charts/*")
 class HelmChartControllerIT extends AbstractIntegrationTest {
 
-  private static final int PROTOCOL_PORT = 9090;
   private static final String OCI_MANIFEST_TYPE = "application/vnd.oci.image.manifest.v1+json";
   private static final String OCI_CONFIG_TYPE = "application/vnd.cncf.helm.config.v1+json";
   private static final String OCI_LAYER_TYPE =
@@ -241,18 +239,6 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     } catch (final NoSuchAlgorithmException e) {
       throw new IllegalStateException(e);
     }
-  }
-
-  /**
-   * Protocol requests (uploads, OCI push, {@code index.yaml}) are served by the protocol router on
-   * the main port (9090), which resolves the repo from the servlet path.
-   */
-  private static RequestPostProcessor protocolPort() {
-    return request -> {
-      request.setLocalPort(PROTOCOL_PORT);
-      request.setServletPath(request.getRequestURI());
-      return request;
-    };
   }
 
   private ResultActions protocol(final AbstractMockHttpServletRequestBuilder<?> request)

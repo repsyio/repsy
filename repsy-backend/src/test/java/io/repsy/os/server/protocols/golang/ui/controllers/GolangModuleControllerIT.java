@@ -51,27 +51,17 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.ResultActions;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /** Full-stack integration tests for the Go module-management API. */
 @DisplayName("GolangModuleController /api/go/modules/*")
 class GolangModuleControllerIT extends AbstractIntegrationTest {
 
-  private static final int PROTOCOL_PORT = 9090;
   private static final String MODULE = "io.repsy/hello-world";
   private static final String V2_MODULE = "example.com/mod/v2";
   private static final String UPPERCASE_MODULE = "example.com/Upper/Module";
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private GolangApiFacade golangApiFacade;
-
-  private static RequestPostProcessor protocolPort() {
-    return request -> {
-      request.setLocalPort(PROTOCOL_PORT);
-      request.setServletPath(request.getRequestURI());
-      return request;
-    };
-  }
 
   private static String unique(final String prefix) {
     return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 10);

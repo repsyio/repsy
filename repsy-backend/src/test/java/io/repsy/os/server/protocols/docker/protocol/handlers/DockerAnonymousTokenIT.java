@@ -31,7 +31,6 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
  * RPS-986: the token {@code GET /v2/token} hands to a caller without credentials is labelled {@code
@@ -44,20 +43,11 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @DisplayName("Docker anonymous token")
 class DockerAnonymousTokenIT extends AbstractIntegrationTest {
 
-  private static final int PROTOCOL_PORT = 9090;
   private static final String IMAGE = "app";
 
   private String anonymousToken;
   private Repo publicRepo;
   private Repo privateRepo;
-
-  private static RequestPostProcessor protocolPort() {
-    return request -> {
-      request.setLocalPort(PROTOCOL_PORT);
-      request.setServletPath(request.getRequestURI());
-      return request;
-    };
-  }
 
   @BeforeEach
   void seed() throws Exception {

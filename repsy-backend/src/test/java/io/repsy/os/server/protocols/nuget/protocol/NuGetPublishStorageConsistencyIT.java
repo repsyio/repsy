@@ -59,7 +59,6 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -82,7 +81,6 @@ import org.springframework.transaction.annotation.Transactional;
 @DisplayName("NuGet push keeps storage and the database in agreement (RPS-999)")
 class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
 
-  private static final int PROTOCOL_PORT = 9090;
   private static final String PUSH_PATH = "/{repo}/v3/package";
 
   /**
@@ -191,14 +189,6 @@ class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
 
   private static String uniquePackageId() {
     return "Repsy.Consistency" + randomTag();
-  }
-
-  private static RequestPostProcessor protocolPort() {
-    return request -> {
-      request.setLocalPort(PROTOCOL_PORT);
-      request.setServletPath(request.getRequestURI());
-      return request;
-    };
   }
 
   private MockHttpServletResponse push(final Repo repo, final byte[] nupkg, final String token)
