@@ -16,6 +16,8 @@
 package io.repsy.os.shared.usage.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -78,47 +80,60 @@ class UsageUpdateServiceTest {
   @Test
   @DisplayName("skips the update without an error when the repo no longer exists")
   void skipsMissingRepo() {
-    when(this.repoTxService.updateDiskUsage(REPO_ID, 10)).thenReturn(false);
+    when(this.repoTxService.findDiskUsageForUpdate(REPO_ID)).thenReturn(Optional.empty());
 
     this.updateUsage(10);
 
-    verify(this.repoTxService, never()).findDiskUsage(REPO_ID);
+    verify(this.repoTxService, never()).updateDiskUsage(eq(REPO_ID), anyLong());
     assertThat(this.errorCount()).isZero();
   }
 
   @Test
-  @DisplayName("logs no error when the usage after the update is not negative")
-  void nonNegativeUsage() {
-    when(this.repoTxService.updateDiskUsage(REPO_ID, -5)).thenReturn(true);
-    when(this.repoTxService.findDiskUsage(REPO_ID)).thenReturn(Optional.of(0L));
+  @DisplayName("applies the diff as it is when the usage stays above zero")
+  void appliesPositiveUsage() {
+    when(this.repoTxService.findDiskUsageForUpdate(REPO_ID)).thenReturn(Optional.of(20L));
 
     this.updateUsage(-5);
 
+    verify(this.repoTxService).updateDiskUsage(REPO_ID, -5);
     assertThat(this.errorCount()).isZero();
   }
 
   @Test
-  @DisplayName("logs an error when the usage read after the update is negative")
-  void negativeUsage() {
-    when(this.repoTxService.updateDiskUsage(REPO_ID, -5)).thenReturn(true);
-    when(this.repoTxService.findDiskUsage(REPO_ID)).thenReturn(Optional.of(-3L));
+  @DisplayName("applies the diff as it is when the usage drops to exactly zero")
+  void appliesUsageThatReachesZero() {
+    when(this.repoTxService.findDiskUsageForUpdate(REPO_ID)).thenReturn(Optional.of(5L));
 
     this.updateUsage(-5);
 
+    verify(this.repoTxService).updateDiskUsage(REPO_ID, -5);
+    assertThat(this.errorCount()).isZero();
+  }
+
+  @Test
+  @DisplayName("clamps a diff that would make the usage negative and logs the repo and the diff")
+  void clampsNegativeUsage() {
+    when(this.repoTxService.findDiskUsageForUpdate(REPO_ID)).thenReturn(Optional.of(3L));
+
+    this.updateUsage(-5);
+
+    verify(this.repoTxService).updateDiskUsage(REPO_ID, -3);
     assertThat(this.logEvents.list)
         .filteredOn(event -> event.getLevel() == Level.ERROR)
         .extracting(ILoggingEvent::getFormattedMessage)
-        .containsExactly("Repo %s disk usage is negative: -3".formatted(REPO_ID));
+        .containsExactly(
+            "Repo %s disk usage would be negative: current 3, diff -5, clamping it to 0"
+                .formatted(REPO_ID));
   }
 
   @Test
-  @DisplayName("logs no error when the repo is deleted between the update and the read")
-  void repoDeletedAfterUpdate() {
-    when(this.repoTxService.updateDiskUsage(REPO_ID, 10)).thenReturn(true);
-    when(this.repoTxService.findDiskUsage(REPO_ID)).thenReturn(Optional.empty());
+  @DisplayName("clamps a negative diff on a repo that has no usage at all")
+  void clampsOnEmptyRepo() {
+    when(this.repoTxService.findDiskUsageForUpdate(REPO_ID)).thenReturn(Optional.of(0L));
 
-    this.updateUsage(10);
+    this.updateUsage(-1);
 
-    assertThat(this.errorCount()).isZero();
+    verify(this.repoTxService).updateDiskUsage(REPO_ID, 0);
+    assertThat(this.errorCount()).isEqualTo(1);
   }
 }

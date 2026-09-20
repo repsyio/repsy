@@ -38,18 +38,35 @@ public class UsageUpdateService {
     this.updateRepoUsage(info.repoId(), info.usages().getDiskUsage());
   }
 
+  /**
+   * Adds the diff to the repo's disk usage, never taking it below zero.
+   *
+   * <p>The usage can only go negative when the accounting has drifted (a delete recorded twice, or
+   * a size computed larger than what was added). {@code ch_repo__disk_usage} rejects a negative
+   * value, which would fail the whole update and lose the diff, so the diff is clamped to what is
+   * left and the drift is logged instead. The row is locked while it is read, so a concurrent
+   * update cannot change the usage between the read and the write.
+   */
   private void updateRepoUsage(final @NonNull UUID repoId, final long diskUsageDiff) {
-    if (!this.repoTxService.updateDiskUsage(repoId, diskUsageDiff)) {
+    final var currentDiskUsage = this.repoTxService.findDiskUsageForUpdate(repoId);
+
+    if (currentDiskUsage.isEmpty()) {
       // The repo was deleted after this update was submitted, so there is nothing to update.
       log.debug(
           "Repo {} no longer exists, skipping disk usage update of {}", repoId, diskUsageDiff);
       return;
     }
 
-    this.repoTxService
-        .findDiskUsage(repoId)
-        .filter(newDiskUsage -> newDiskUsage < 0)
-        .ifPresent(
-            newDiskUsage -> log.error("Repo {} disk usage is negative: {}", repoId, newDiskUsage));
+    long appliedDiff = diskUsageDiff;
+    if (currentDiskUsage.get() + diskUsageDiff < 0) {
+      appliedDiff = -currentDiskUsage.get();
+      log.error(
+          "Repo {} disk usage would be negative: current {}, diff {}, clamping it to 0",
+          repoId,
+          currentDiskUsage.get(),
+          diskUsageDiff);
+    }
+
+    this.repoTxService.updateDiskUsage(repoId, appliedDiff);
   }
 }
