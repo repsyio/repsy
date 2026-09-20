@@ -25,6 +25,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.MfaException;
 import io.repsy.core.error_handling.exceptions.RedirectToPathException;
@@ -34,16 +38,23 @@ import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.support.ResourceBundleMessageSource;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.UnsatisfiedServletRequestParameterException;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -57,6 +68,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
  * Drives {@link ErrorHandler} through real Spring MVC argument resolution, so each test shows which
@@ -65,6 +77,10 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 class ErrorHandlerTest {
 
   private MockMvc mockMvc;
+
+  private final ListAppender<ILoggingEvent> logEvents = new ListAppender<>();
+  private final Logger handlerLogger = (Logger) LoggerFactory.getLogger(ErrorHandler.class);
+  private Level originalLevel;
 
   @BeforeEach
   void setUp() {
@@ -75,6 +91,18 @@ class ErrorHandlerTest {
         MockMvcBuilders.standaloneSetup(new ThrowingController(), new PanelController())
             .setControllerAdvice(new ErrorHandler(new RestResponseFactory(messageSource)))
             .build();
+
+    this.originalLevel = this.handlerLogger.getLevel();
+    this.handlerLogger.setLevel(Level.DEBUG);
+    this.logEvents.start();
+    this.handlerLogger.addAppender(this.logEvents);
+  }
+
+  @AfterEach
+  void releaseLogs() {
+    this.handlerLogger.detachAppender(this.logEvents);
+    this.logEvents.stop();
+    this.handlerLogger.setLevel(this.originalLevel);
   }
 
   @Test
@@ -359,6 +387,36 @@ class ErrorHandlerTest {
                 new MockHttpServletRequest(),
                 null))
         .isNull();
+  }
+
+  @Test
+  @DisplayName(
+      "logs a debug message that names the exception when no servlet response is available")
+  void debugMessagesDescribeTheirException() throws Exception {
+    final var handler =
+        new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var request = new MockHttpServletRequest();
+    final var parameter = new MethodParameter(String.class.getMethod("length"), -1);
+
+    handler.handleException(
+        new MethodArgumentNotValidException(
+            parameter, new BeanPropertyBindingResult(new Object(), "target")),
+        request,
+        null);
+    handler.handleException(
+        new MissingServletRequestParameterException("page", "int"), request, null);
+    handler.handleException(new UnAuthorizedException("unAuthorized"), request, null);
+    handler.handleException(
+        new NoResourceFoundException(HttpMethod.GET, "/missing", "missing"), request, null);
+
+    assertThat(this.logEvents.list)
+        .filteredOn(event -> event.getLevel() == Level.DEBUG)
+        .extracting(ILoggingEvent::getFormattedMessage)
+        .containsExactly(
+            "Method argument not valid",
+            "Missing request parameter",
+            "Unauthorized request",
+            "Resource not found");
   }
 
   @RestController
