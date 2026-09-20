@@ -117,7 +117,7 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
 
       return crateUsage + indexUsage;
     } catch (final IOException e) {
-      throw new ErrorOccurredException("IOException Occurred! ", e);
+      throw new ErrorOccurredException(e);
     }
   }
 

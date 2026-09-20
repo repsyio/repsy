@@ -45,6 +45,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -56,6 +57,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+@Slf4j
 @NullMarked
 public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     implements ProtocolMethodHandler {
@@ -139,7 +141,8 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var existingManifest = this.helmFacade.checkManifest(context, name, reference);
     if (existingManifest.isPresent() && !repoInfo.isAllowOverride()) {
-      throw new ItemAlreadyExistException("chartAlreadyExists: " + name + ":" + reference);
+      log.info("Chart {}:{} already exists in repo {}", name, reference, repoInfo.getName());
+      throw new ItemAlreadyExistException("chartAlreadyExists");
     }
 
     final var contentBytes = request.getInputStream().readAllBytes();

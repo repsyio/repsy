@@ -25,6 +25,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
@@ -40,6 +41,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
@@ -147,6 +149,20 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
     assertThat(manifestForm.getValue().getName()).isEqualTo("payments");
     assertThat(manifestForm.getValue().getReference()).isEqualTo("1.0.0");
     verify(this.facade).pushManifest(eq(context), eq("payments"), eq("1.0.0"), any(byte[].class));
+  }
+
+  @Test
+  @DisplayName("rejects an existing version with a fixed msgId that carries no name or version")
+  void rejectsExistingVersionWithFixedMsgId() {
+    final var context = context("/payments/manifests/1.0.0");
+    when(this.facade.checkManifest(context, "payments", "1.0.0"))
+        .thenReturn(Optional.of(this.manifestInfo));
+
+    assertThatThrownBy(() -> this.push(context))
+        .isInstanceOf(ItemAlreadyExistException.class)
+        .hasMessage("chartAlreadyExists");
+
+    verifyNoMoreInteractions(this.facade);
   }
 
   @ParameterizedTest(name = "{0} -> {1}")

@@ -16,15 +16,18 @@
 package io.repsy.protocols.helm.protocol.facades;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
 import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
@@ -60,6 +63,7 @@ class AbstractHelmProtocolTxFacadeTest {
   @Mock private OciBlobService<UUID> ociBlobService;
   @Mock private OciManifestService<UUID> ociManifestService;
   @Mock private HelmOciBlobInfo blobInfo;
+  @Mock private HelmChartInfo chartInfo;
 
   private TestFacade facade;
   private ProtocolContext context;
@@ -205,6 +209,40 @@ class AbstractHelmProtocolTxFacadeTest {
           BLOB_SIZE);
 
       assertThat(AbstractHelmProtocolTxFacadeTest.this.reportedUsage()).isEqualTo(BLOB_SIZE);
+    }
+  }
+
+  @Nested
+  @DisplayName("pushChart()")
+  class PushChart {
+
+    @Test
+    @DisplayName("rejects an existing version with a fixed msgId that carries no name or version")
+    void rejectsExistingVersionWithFixedMsgId() {
+      when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.getChartRelativePath(
+              "payments", "1.0.0"))
+          .thenReturn("charts/payments-1.0.0.tgz");
+      when(AbstractHelmProtocolTxFacadeTest.this.chartService.findOptionalByNameAndVersion(
+              REPO_ID, "payments", "1.0.0"))
+          .thenReturn(Optional.of(AbstractHelmProtocolTxFacadeTest.this.chartInfo));
+
+      assertThatThrownBy(
+              () ->
+                  AbstractHelmProtocolTxFacadeTest.this.facade.pushChart(
+                      AbstractHelmProtocolTxFacadeTest.this.context,
+                      "payments",
+                      "1.0.0",
+                      "",
+                      "",
+                      null,
+                      DIGEST,
+                      body(),
+                      BLOB_SIZE))
+          .isInstanceOf(ItemAlreadyExistException.class)
+          .hasMessage("chartAlreadyExists");
+
+      verify(AbstractHelmProtocolTxFacadeTest.this.helmStorageService, never())
+          .saveChart(any(), any(), any());
     }
   }
 }
