@@ -20,6 +20,7 @@ import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.docker.shared.auth.services.DockerAuthComponent;
+import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -72,15 +73,25 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
+    try {
+      this.authenticate(request, repoInfo.getStorageKey(), properties);
+    } catch (final UnAuthorizedException ex) {
+      throw AuthChallenges.challenged(ex, DockerAuthChallenge.of(request));
+    }
+
+    return ProcessorResult.next();
+  }
+
+  private void authenticate(
+      final HttpServletRequest request, final UUID repoId, final Map<String, Object> properties) {
+
     final var authHeader = this.authComponent.emulateAuthHeader(request);
 
     if (authHeader == null) {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
-    this.authenticateRequest(authHeader, repoInfo.getStorageKey(), properties);
-
-    return ProcessorResult.next();
+    this.authenticateRequest(authHeader, repoId, properties);
   }
 
   private void authenticateRequest(

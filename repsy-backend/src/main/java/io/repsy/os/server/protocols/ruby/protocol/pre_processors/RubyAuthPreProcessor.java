@@ -23,6 +23,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.cargo.protocol.pre_processors.CargoAuthPreProcessor;
 import io.repsy.os.server.protocols.ruby.shared.auth.services.RubyAuthComponent;
+import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -44,6 +45,7 @@ public class RubyAuthPreProcessor extends ProtocolProcessor {
   private static final int PRIORITY = 100;
   private static final String AUTH_BASIC = "Basic ";
   private static final String AUTH_BEARER = "Bearer ";
+  private static final String CHALLENGE = "Basic realm=\"Repsy Managed Repository\"";
   private static final String SKIP_PRE_PROCESSOR_KEY = "skipPreProcessor";
   private static final String PERMISSION_KEY = "permission";
   private static final String WRITE_OPERATION_KEY = "writeOperation";
@@ -80,12 +82,17 @@ public class RubyAuthPreProcessor extends ProtocolProcessor {
     if (rawAuthHeader == null) {
       return ProcessorResult.of(
           org.springframework.http.ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"")
+              .header(WWW_AUTHENTICATE, CHALLENGE)
               .build());
     }
 
     final var authHeader = normalizeAuthHeader(rawAuthHeader);
-    this.authenticateRequest(authHeader, repoInfo.getId(), properties);
+
+    try {
+      this.authenticateRequest(authHeader, repoInfo.getId(), properties);
+    } catch (final UnAuthorizedException ex) {
+      throw AuthChallenges.challenged(ex, CHALLENGE);
+    }
 
     return ProcessorResult.next();
   }

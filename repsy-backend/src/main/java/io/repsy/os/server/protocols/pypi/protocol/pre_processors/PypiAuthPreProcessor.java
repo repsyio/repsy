@@ -23,6 +23,7 @@ import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.pypi.shared.auth.services.PypiAuthComponent;
+import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Component;
 public class PypiAuthPreProcessor extends ProtocolProcessor {
 
   private static final int PRIORITY = 100;
+  private static final String CHALLENGE = "Basic realm=\"Repsy Managed Repository\"";
   private static final String PERMISSION_KEY = "permission";
   private static final String WRITE_OPERATION_KEY = "writeOperation";
 
@@ -70,17 +72,27 @@ public class PypiAuthPreProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
+    final var permission = (Permission) properties.get(PERMISSION_KEY);
+
+    try {
+      this.authenticate(request, repoInfo.getStorageKey(), permission);
+    } catch (final UnAuthorizedException ex) {
+      throw AuthChallenges.challenged(ex, CHALLENGE);
+    }
+
+    return ProcessorResult.next();
+  }
+
+  private void authenticate(
+      final HttpServletRequest request, final UUID repoId, final Permission permission) {
+
     final var authHeader = this.authComponent.emulateAuthHeader(request);
 
     if (authHeader == null) {
       throw new UnAuthorizedException("unAuthorized");
     }
 
-    final var permission = (Permission) properties.get(PERMISSION_KEY);
-
-    this.authenticateRequest(authHeader, repoInfo.getStorageKey(), permission);
-
-    return ProcessorResult.next();
+    this.authenticateRequest(authHeader, repoId, permission);
   }
 
   private void authenticateRequest(
