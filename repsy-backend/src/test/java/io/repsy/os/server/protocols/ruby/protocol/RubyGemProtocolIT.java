@@ -15,10 +15,8 @@
  */
 package io.repsy.os.server.protocols.ruby.protocol;
 
-import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.PROTOCOL_PORT;
 import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.PUBLISH_PATH;
 import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.gem;
-import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.protocolPort;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;

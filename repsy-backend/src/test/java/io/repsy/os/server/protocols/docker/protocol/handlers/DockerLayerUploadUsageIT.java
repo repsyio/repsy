@@ -42,7 +42,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
  * Disk usage the Docker layer upload endpoints report, through the real wire protocol.
@@ -57,18 +56,9 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @DisplayName("Docker layer upload usage")
 class DockerLayerUploadUsageIT extends AbstractIntegrationTest {
 
-  private static final int PROTOCOL_PORT = 9090;
   private static final String IMAGE = "app";
 
   @MockitoBean private UsageUpdateService usageUpdateService;
-
-  private static RequestPostProcessor protocolPort() {
-    return request -> {
-      request.setLocalPort(PROTOCOL_PORT);
-      request.setServletPath(request.getRequestURI());
-      return request;
-    };
-  }
 
   private static byte[] layerBytes(final String content) {
     return content.getBytes(StandardCharsets.UTF_8);

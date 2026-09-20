@@ -83,6 +83,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
  *   <li>{@link #apiPort()}: {@code PortBasedRequestMappingHandlerMapping} buckets handlers by the
  *       request's local port and {@link MockMvc#perform} defaults it to 80, which matches nothing,
  *       so every request must fake the local port onto {@code multiport.ports.api} (8080);
+ *   <li>{@link #protocolPort()}: the same for wire-protocol requests, which the protocol router
+ *       serves on the main port (9090) and resolves from the servlet path (RPS-903);
  *   <li>user, JWT and repo seeding helpers plus assertions for the {@code RestResponse} envelope.
  * </ul>
  *
@@ -109,6 +111,10 @@ import org.testcontainers.containers.PostgreSQLContainer;
 public abstract class AbstractIntegrationTest {
 
   protected static final int API_PORT = 8080;
+
+  /** The main port, where the protocol router serves the package-manager wire protocols. */
+  protected static final int PROTOCOL_PORT = 9090;
+
   protected static final String VALID_PASSWORD = "Password1!";
   protected static final String SEEDED_ADMIN_USERNAME = "admin";
   protected static final String SEEDED_ADMIN_PASSWORD = "SeededAdmin1!";
@@ -213,6 +219,24 @@ public abstract class AbstractIntegrationTest {
   protected static RequestPostProcessor apiPort() {
     return request -> {
       request.setLocalPort(API_PORT);
+      return request;
+    };
+  }
+
+  /**
+   * Serves the request the way the protocol port does: main port ({@link #PROTOCOL_PORT}), servlet
+   * path = request URI.
+   *
+   * <p>The protocol path parsers resolve the repo from {@code request.getServletPath()}. MockMvc
+   * leaves that empty unless the test sets it, so a request that skips this post-processor never
+   * matches any handler and ends in {@code 404 unknownPath} even though the route is registered
+   * (RPS-903). Use it for every wire-protocol request (push, download, index, token exchange); use
+   * {@link #apiPort()} for the panel API.
+   */
+  protected static RequestPostProcessor protocolPort() {
+    return request -> {
+      request.setLocalPort(PROTOCOL_PORT);
+      request.setServletPath(request.getRequestURI());
       return request;
     };
   }

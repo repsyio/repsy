@@ -37,7 +37,6 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
  * Full-stack coverage for the NuGet V3 read endpoints on the protocol port: the package version
@@ -53,7 +52,6 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @ExtendWith(OutputCaptureExtension.class)
 class NuGetReadProtocolIT extends AbstractIntegrationTest {
 
-  private static final int PROTOCOL_PORT = 9090;
   private static final String PACKAGE_ID = "repsy.missing";
   private static final String VERSIONS_PATH = "/{repo}/v3/package/{id}/index.json";
   private static final String NUPKG_PATH = "/{repo}/v3/package/{id}/1.0.0/{id}.1.0.0.nupkg";
@@ -67,17 +65,6 @@ class NuGetReadProtocolIT extends AbstractIntegrationTest {
   @BeforeEach
   void seedNuGetRepo() {
     this.repo = this.seedRepo(RepoType.NUGET, uniqueRepoName("nuget-read"));
-  }
-
-  /**
-   * The protocol router serves the main port (9090) and resolves the repo from the servlet path.
-   */
-  private static RequestPostProcessor protocolPort() {
-    return request -> {
-      request.setLocalPort(PROTOCOL_PORT);
-      request.setServletPath(request.getRequestURI());
-      return request;
-    };
   }
 
   private ResultActions read(final String template) throws Exception {

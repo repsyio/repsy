@@ -21,34 +21,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.zip.GZIPOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
-/** What the Ruby integration tests share to push gems through the wire protocol. */
+/** What the Ruby integration tests share to build and push gems. */
 public final class RubyGemFixtures {
-
-  /** The main port, where the protocol router serves {@code gem push} and friends. */
-  public static final int PROTOCOL_PORT = 9090;
 
   /** {@code gem push} endpoint of a repo. */
   public static final String PUBLISH_PATH = "/{repo}/api/v1/gems";
 
   private RubyGemFixtures() {
     throw new UnsupportedOperationException("Utility class");
-  }
-
-  /**
-   * Serves the request the way the protocol port does: main port, servlet path = request URI.
-   *
-   * <p>The protocol path parser resolves the repo from {@code request.getServletPath()}. MockMvc
-   * leaves that empty unless the test sets it, so a request that skips this post-processor never
-   * matches any handler and ends in {@code 404 unknownPath} even though the route is registered.
-   */
-  public static RequestPostProcessor protocolPort() {
-    return request -> {
-      request.setLocalPort(PROTOCOL_PORT);
-      request.setServletPath(request.getRequestURI());
-      return request;
-    };
   }
 
   /** A pure-Ruby gem with the default description. */

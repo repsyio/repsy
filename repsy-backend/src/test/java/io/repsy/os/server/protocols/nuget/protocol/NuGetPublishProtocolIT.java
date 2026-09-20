@@ -73,7 +73,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -97,7 +96,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 @DisplayName("NuGet wire protocol PUT /{repo}/v3/package")
 class NuGetPublishProtocolIT extends AbstractIntegrationTest {
 
-  private static final int PROTOCOL_PORT = 9090;
   private static final String PUSH_PATH = "/{repo}/v3/package";
   private static final String PACKAGE_PART = "package";
   private static final String API_KEY_HEADER = "X-NuGet-ApiKey";
@@ -188,18 +186,6 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
 
   private static String uniquePackageId() {
     return "Repsy.Fixture" + randomTag();
-  }
-
-  /**
-   * Protocol requests are served by the protocol router on the main port (9090), which resolves the
-   * repo from the servlet path.
-   */
-  private static RequestPostProcessor protocolPort() {
-    return request -> {
-      request.setLocalPort(PROTOCOL_PORT);
-      request.setServletPath(request.getRequestURI());
-      return request;
-    };
   }
 
   private ResultActions protocol(final AbstractMockHttpServletRequestBuilder<?> request)

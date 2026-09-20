@@ -26,7 +26,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
  * RPS-994: a POM that cannot be parsed used to be echoed back whole as the {@code msgId}, {@code
@@ -36,17 +35,8 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @DisplayName("Maven POM upload")
 class MavenPomUploadIT extends AbstractIntegrationTest {
 
-  private static final int PROTOCOL_PORT = 9090;
   private static final String POM_PATH = "com/example/lib/1.0/lib-1.0.pom";
   private static final String MARKER = "reflected-marker-8f3a1c";
-
-  private static RequestPostProcessor protocolPort() {
-    return request -> {
-      request.setLocalPort(PROTOCOL_PORT);
-      request.setServletPath(request.getRequestURI());
-      return request;
-    };
-  }
 
   private MvcResult uploadPom(final String repoName, final String pom) throws Exception {
     return this.mockMvc
