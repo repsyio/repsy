@@ -45,6 +45,10 @@ export class MarkdownComponent implements OnInit, AfterViewInit {
   constructor(private readonly sanitizer: DomSanitizer) {
     this.mdConverter = new Converter({
       extensions: showdownHighlight({}),
+      // README files (RPS-1006) routinely use tables, strikethrough and links out of the panel.
+      tables: true,
+      strikethrough: true,
+      openLinksInNewWindow: true,
     });
   }
 

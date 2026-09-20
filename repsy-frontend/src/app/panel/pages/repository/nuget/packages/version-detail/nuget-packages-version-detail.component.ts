@@ -23,6 +23,7 @@ import { Subscription } from 'rxjs';
 import { environment } from '../../../../../../../environments/environment';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
+import { MarkdownComponent } from '../../../../../shared/components/markdown/markdown.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
@@ -42,6 +43,7 @@ import { NugetService } from '../../service/nuget.service';
     NgOptimizedImage,
     Highlight,
     SecurityScanSectionComponent,
+    MarkdownComponent,
   ],
   templateUrl: './nuget-packages-version-detail.component.html',
 })
