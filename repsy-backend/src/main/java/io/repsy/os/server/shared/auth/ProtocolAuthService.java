@@ -55,13 +55,14 @@ public class ProtocolAuthService {
   protected final @NonNull DeployTokenService deployTokenService;
   protected final @NonNull VerifiedPasswordCache verifiedPasswordCache;
 
+  /**
+   * The credential a protocol request carries, which is its {@code Authorization} header and
+   * nothing else. A {@code ?token=} query parameter is not read: a credential in a URL ends up in
+   * browser history, proxy and access logs and {@code Referer} headers (RPS-1044). No supported
+   * package manager sends one; a browser navigation that cannot set the header uses the single-path
+   * download token instead (RPS-980).
+   */
   public @Nullable String emulateAuthHeader(final @NonNull HttpServletRequest request) {
-
-    final var tokenParameter = request.getParameter("token");
-
-    if (tokenParameter != null) {
-      return AUTH_BEARER + tokenParameter;
-    }
 
     return request.getHeader(HttpHeaders.AUTHORIZATION);
   }

@@ -54,6 +54,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.http.HttpHeaders;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 @DisplayName("ProtocolAuthService")
@@ -723,6 +725,45 @@ class ProtocolAuthServiceTest {
       }
 
       verify(this.jwtUtils, never()).verifyDownloadToken(anyString(), any(), anyString());
+    }
+  }
+
+  /**
+   * RPS-1044: a credential in a URL ends up in history, access logs and {@code Referer} headers, so
+   * the protocol endpoints read the {@code Authorization} header and nothing else.
+   */
+  @Nested
+  @DisplayName("the credential of a protocol request")
+  class RequestCredential {
+
+    @Test
+    @DisplayName("is the Authorization header")
+    void isTheAuthorizationHeader() {
+      final var request = new MockHttpServletRequest();
+      request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer header-token");
+
+      assertThat(ProtocolAuthServiceTest.this.authService.emulateAuthHeader(request))
+          .isEqualTo("Bearer header-token");
+    }
+
+    @Test
+    @DisplayName("is absent when only a ?token= parameter is sent")
+    void queryTokenIsNotACredential() {
+      final var request = new MockHttpServletRequest();
+      request.setParameter("token", "query-token");
+
+      assertThat(ProtocolAuthServiceTest.this.authService.emulateAuthHeader(request)).isNull();
+    }
+
+    @Test
+    @DisplayName("stays the Authorization header when a ?token= parameter is sent as well")
+    void queryTokenDoesNotOverrideTheHeader() {
+      final var request = new MockHttpServletRequest();
+      request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer header-token");
+      request.setParameter("token", "query-token");
+
+      assertThat(ProtocolAuthServiceTest.this.authService.emulateAuthHeader(request))
+          .isEqualTo("Bearer header-token");
     }
   }
 }
