@@ -33,11 +33,14 @@ import java.io.UncheckedIOException;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Regression coverage for persisting NuGet version metadata on PostgreSQL.
@@ -55,6 +58,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class NuGetPackageServiceIT extends AbstractIntegrationTest {
 
   private static final String PACKAGE_ID = "fixture.package";
+  private static final String VERSION = "1.0.0";
+  private static final String NO_DEPENDENCIES = "";
 
   @Autowired private NuGetPackageService<UUID> packageService;
   @Autowired private NuGetPackageRepository packageRepository;
@@ -360,5 +365,283 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
     assertThat(info).isPresent();
     assertThat(info.get().repositoryUrl()).isNull();
     assertThat(info.get().readme()).isNull();
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Republishing an existing version (RPS-1013)
+  //
+  // An override deletes the old row and inserts a new one (RPS-948), so what these tests pin is
+  // that nothing of the first publish survives on the row. RPS-948's NuGetPublishProtocolIT test
+  // only checks that one row exists and that the stored .nupkg is the replacement's.
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * A nuspec in which every metadata value carries {@code label}, so two publishes never share a
+   * value and a row that kept anything of the first one shows up in an assertion.
+   */
+  private static String labelledNuspec(final String label, final String dependenciesXml) {
+    return """
+        <?xml version="1.0" encoding="utf-8"?>
+        <package>
+          <metadata>
+            <id>Fixture.Package</id>
+            <version>%1$s</version>
+            <title>Title %2$s</title>
+            <authors>Authors %2$s</authors>
+            <description>Description %2$s</description>
+            <tags>tags-%2$s</tags>
+            <iconUrl>https://example.test/%2$s/icon.png</iconUrl>
+            <licenseUrl>https://example.test/%2$s/license</licenseUrl>
+            <projectUrl>https://example.test/%2$s/project</projectUrl>
+            <repository type="git" url="https://github.com/repsyio/%2$s" />
+            %3$s
+          </metadata>
+        </package>
+        """
+        .formatted(VERSION, label, dependenciesXml);
+  }
+
+  private static String dependencyOn(final String id, final String range, final String framework) {
+    return """
+        <dependencies>
+          <group targetFramework="%s">
+            <dependency id="%s" version="%s" />
+          </group>
+        </dependencies>
+        """
+        .formatted(framework, id, range);
+  }
+
+  private static String readmeOf(final String label) {
+    return "# Readme " + label;
+  }
+
+  /** Publishes {@link #VERSION} with a nuspec and README that are all {@code label}'s. */
+  private void publishLabelled(
+      final RepoInfo repoInfo,
+      final UUID packageId,
+      final String label,
+      final String dependenciesXml) {
+    this.publish(
+        repoInfo, packageId, VERSION, labelledNuspec(label, dependenciesXml), readmeOf(label));
+  }
+
+  /** A NuGet repo that rejects a republish of an existing version. */
+  private RepoInfo seedNuGetRepoRejectingOverride() {
+    final var name = this.seedNuGetRepo().getName();
+    final var repo = this.repoRepository.findByName(name).orElseThrow();
+    repo.setAllowOverride(false);
+    this.repoRepository.saveAndFlush(repo);
+
+    final var repoInfo = this.repoTxService.getRepoByName(name);
+    assertThat(repoInfo.isAllowOverride()).isFalse();
+    return repoInfo;
+  }
+
+  private Integer versionRows(final UUID packageId, final String version) {
+    return this.jdbcTemplate.queryForObject(
+        """
+        select count(*) from "public"."nuget_package_version"
+        where "package_id" = ? and "version" = ?
+        """,
+        Integer.class,
+        packageId,
+        version);
+  }
+
+  private void assertMetadataOf(final RepoInfo repoInfo, final String label) {
+    final var info = this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, VERSION);
+
+    assertThat(info).isPresent();
+    final var version = info.get();
+    assertThat(version.title()).isEqualTo("Title " + label);
+    assertThat(version.authors()).isEqualTo("Authors " + label);
+    assertThat(version.description()).isEqualTo("Description " + label);
+    assertThat(version.tags()).isEqualTo("tags-" + label);
+    assertThat(version.iconUrl()).isEqualTo("https://example.test/" + label + "/icon.png");
+    assertThat(version.licenseUrl()).isEqualTo("https://example.test/" + label + "/license");
+    assertThat(version.projectUrl()).isEqualTo("https://example.test/" + label + "/project");
+    assertThat(version.repositoryUrl()).isEqualTo("https://github.com/repsyio/" + label);
+    assertThat(version.readme()).isEqualTo(readmeOf(label));
+  }
+
+  @Test
+  @DisplayName("replaces the metadata and the README with the override's")
+  void overrideReplacesMetadata() {
+    final var repoInfo = this.seedNuGetRepo();
+    final var packageId = this.createPackage(repoInfo);
+
+    this.publishLabelled(repoInfo, packageId, "first", NO_DEPENDENCIES);
+    this.assertMetadataOf(repoInfo, "first");
+
+    this.publishLabelled(repoInfo, packageId, "second", NO_DEPENDENCIES);
+
+    this.assertMetadataOf(repoInfo, "second");
+  }
+
+  @Test
+  @DisplayName("replaces the dependencies with the override's, in the column and on the read side")
+  void overrideReplacesDependencies() {
+    final var repoInfo = this.seedNuGetRepo();
+    final var packageId = this.createPackage(repoInfo);
+
+    this.publishLabelled(
+        repoInfo, packageId, "first", dependencyOn("Newtonsoft.Json", "[13.0.1, )", "net8.0"));
+    assertThat(this.dependenciesColumn(packageId, VERSION))
+        .containsEntry("json_type", "array")
+        .containsEntry("json_length", 1);
+
+    this.publishLabelled(
+        repoInfo, packageId, "second", dependencyOn("Serilog", "3.1.1", ".NETStandard2.0"));
+
+    final var column = this.dependenciesColumn(packageId, VERSION);
+    assertThat(column)
+        .containsEntry("json_type", "array")
+        .containsEntry("json_length", 1)
+        .extractingByKey("json_text")
+        .asString()
+        .contains("Serilog", "3.1.1", ".NETStandard2.0")
+        .doesNotContain("Newtonsoft.Json");
+
+    final var info = this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, VERSION);
+    assertThat(info).isPresent();
+    assertThat(info.get().dependencies())
+        .containsExactly(new NuGetDependencyInfo("Serilog", "3.1.1", ".NETStandard2.0"));
+  }
+
+  @Test
+  @DisplayName("turns the dependencies column into SQL NULL when the override declares none")
+  void overrideWithoutDependenciesClearsTheColumn() {
+    final var repoInfo = this.seedNuGetRepo();
+    final var packageId = this.createPackage(repoInfo);
+
+    this.publishLabelled(
+        repoInfo, packageId, "first", dependencyOn("Newtonsoft.Json", "[13.0.1, )", "net8.0"));
+    assertThat(this.dependenciesColumn(packageId, VERSION)).containsEntry("json_type", "array");
+
+    this.publishLabelled(repoInfo, packageId, "second", NO_DEPENDENCIES);
+
+    // json_type is null for a SQL NULL, but 'null' for a jsonb null scalar and 'array' for '[]'.
+    assertThat(this.dependenciesColumn(packageId, VERSION)).containsEntry("json_type", null);
+    final var info = this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, VERSION);
+    assertThat(info).isPresent();
+    assertThat(info.get().dependencies()).isNull();
+    this.assertMetadataOf(repoInfo, "second");
+  }
+
+  @Test
+  @DisplayName("leaves one row for the version, however often it is overridden, and no other")
+  void overrideLeavesOneRow() {
+    final var repoInfo = this.seedNuGetRepo();
+    final var packageId = this.createPackage(repoInfo);
+    this.publish(repoInfo, packageId, "2.0.0", nuspec("2.0.0", NO_DEPENDENCIES));
+
+    this.publishLabelled(repoInfo, packageId, "first", NO_DEPENDENCIES);
+    assertThat(this.versionRows(packageId, VERSION)).isEqualTo(1);
+
+    this.publishLabelled(repoInfo, packageId, "second", NO_DEPENDENCIES);
+    this.publishLabelled(repoInfo, packageId, "third", NO_DEPENDENCIES);
+
+    assertThat(this.versionRows(packageId, VERSION)).isEqualTo(1);
+    this.assertMetadataOf(repoInfo, "third");
+
+    // Another version of the same package is not touched by the override.
+    assertThat(this.versionRows(packageId, "2.0.0")).isEqualTo(1);
+    assertThat(this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, "2.0.0"))
+        .get()
+        .satisfies(v -> assertThat(v.title()).isEqualTo("Fixture Package"));
+  }
+
+  /**
+   * An override is a new publish of the version: the old row is deleted and a fresh one inserted,
+   * so it starts at zero downloads and is listed, even if the replaced one had been unlisted.
+   * Listed is the right start for a package a publisher has just pushed again, and a count carried
+   * over from different content would describe downloads of something that no longer exists. If
+   * either should survive an override, this is the test to change.
+   */
+  @Test
+  @DisplayName("starts the override at zero downloads and listed, as a new publish does")
+  void overrideResetsDownloadCountAndListing() {
+    final var repoInfo = this.seedNuGetRepo();
+    final var packageId = this.createPackage(repoInfo);
+
+    this.publishLabelled(repoInfo, packageId, "first", NO_DEPENDENCIES);
+    // Flush and clear between the calls: incrementDownloadCount is a bulk update, so an entity
+    // that unlistVersion still had in the persistence context would write the old count back.
+    this.packageService.unlistVersion(repoInfo, PACKAGE_ID, VERSION);
+    this.entityManager.flush();
+    this.entityManager.clear();
+    this.packageService.incrementDownloadCount(repoInfo, PACKAGE_ID, VERSION);
+    this.packageService.incrementDownloadCount(repoInfo, PACKAGE_ID, VERSION);
+    this.entityManager.flush();
+    this.entityManager.clear();
+
+    assertThat(this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, VERSION))
+        .get()
+        .satisfies(
+            v -> {
+              assertThat(v.downloadCount()).isEqualTo(2);
+              assertThat(v.listed()).isFalse();
+            });
+
+    this.publishLabelled(repoInfo, packageId, "second", NO_DEPENDENCIES);
+
+    assertThat(this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, VERSION))
+        .get()
+        .satisfies(
+            v -> {
+              assertThat(v.downloadCount()).isZero();
+              assertThat(v.listed()).isTrue();
+            });
+  }
+
+  @Test
+  @DisplayName(
+      "answers 409 to a republish when overrides are off and keeps the first publish's row")
+  void rejectedRepublishLeavesTheRowUnchanged() {
+    final var repoInfo = this.seedNuGetRepoRejectingOverride();
+    final var packageId = this.createPackage(repoInfo);
+    this.publishLabelled(
+        repoInfo, packageId, "first", dependencyOn("Newtonsoft.Json", "[13.0.1, )", "net8.0"));
+
+    // The second nuspec declares no dependencies, so a row that had been rewritten would lose them.
+    final var filesWritten = new AtomicBoolean();
+    assertThatThrownBy(
+            () ->
+                this.packageService.publishVersion(
+                    repoInfo,
+                    packageId,
+                    VERSION,
+                    labelledNuspec("second", NO_DEPENDENCIES),
+                    readmeOf("second"),
+                    replacesExisting -> {
+                      filesWritten.set(true);
+                      return BaseUsages.ofDisk(0);
+                    }))
+        .isInstanceOfSatisfying(
+            ResponseStatusException.class,
+            e -> {
+              assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+              assertThat(e.getReason())
+                  .isEqualTo("Version 1.0.0 of package fixture.package already exists.");
+            });
+
+    assertThat(filesWritten).isFalse();
+    this.entityManager.clear();
+    assertThat(this.versionRows(packageId, VERSION)).isEqualTo(1);
+    this.assertMetadataOf(repoInfo, "first");
+    assertThat(this.dependenciesColumn(packageId, VERSION))
+        .containsEntry("json_type", "array")
+        .containsEntry("json_length", 1)
+        .extractingByKey("json_text")
+        .asString()
+        .contains("Newtonsoft.Json");
+    assertThat(this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, VERSION))
+        .get()
+        .satisfies(
+            v ->
+                assertThat(v.dependencies())
+                    .containsExactly(
+                        new NuGetDependencyInfo("Newtonsoft.Json", "[13.0.1, )", "net8.0")));
   }
 }
