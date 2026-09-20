@@ -256,6 +256,26 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     return this.seedRepo(RepoType.HELM, uniqueRepoName("helm-priv"), true, null);
   }
 
+  /**
+   * Asserts the OCI distribution error body ({@code {"errors":[{"code","message","detail"}]}}) of
+   * an OCI endpoint (RPS-1039): exactly one error, and none of the panel envelope's keys.
+   */
+  private static void expectOciError(
+      final MockHttpServletResponse response,
+      final String code,
+      final String message,
+      final String detail)
+      throws Exception {
+    final var body = response.getContentAsString(StandardCharsets.UTF_8);
+
+    assertThat(response.getContentType()).startsWith(MediaType.APPLICATION_JSON_VALUE);
+    assertThat(JsonPath.<Map<String, Object>>read(body, "$")).containsOnlyKeys("errors");
+    assertThat(JsonPath.<List<Object>>read(body, "$.errors")).hasSize(1);
+    assertThat((String) JsonPath.read(body, "$.errors[0].code")).isEqualTo(code);
+    assertThat((String) JsonPath.read(body, "$.errors[0].message")).isEqualTo(message);
+    assertThat((String) JsonPath.read(body, "$.errors[0].detail")).isEqualTo(detail);
+  }
+
   private static void requireStatus(
       final MockHttpServletResponse response, final int expected, final String step)
       throws Exception {
@@ -2035,8 +2055,10 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
           it.putOciChart(repo, "payments", "1.0.0", bytes, it.adminProtocolBearerToken());
 
       requireStatus(push, 400, "OCI manifest push");
-      assertThat(push.getContentAsString(StandardCharsets.UTF_8))
-          .contains("\"msgId\":\"chartAppVersionInvalid\"");
+      final var body = push.getContentAsString(StandardCharsets.UTF_8);
+      assertThat(JsonPath.<String>read(body, "$.errors[0].code")).isEqualTo("MANIFEST_INVALID");
+      assertThat(JsonPath.<String>read(body, "$.errors[0].detail"))
+          .isEqualTo("chartAppVersionInvalid");
       assertThat(it.chartRowExists(repo, "payments")).isFalse();
     }
   }
@@ -2054,9 +2076,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
     private void expectMismatch(final MockHttpServletResponse push) throws Exception {
       requireStatus(push, 400, "OCI manifest push");
-      final var body = push.getContentAsString(StandardCharsets.UTF_8);
-      assertThat((String) JsonPath.read(body, "$.msgId")).isEqualTo("chartNameMismatch");
-      assertThat((String) JsonPath.read(body, "$.text")).isEqualTo(MISMATCH_TEXT);
+      expectOciError(push, "NAME_INVALID", MISMATCH_TEXT, "chartNameMismatch");
     }
 
     @Test
@@ -2199,9 +2219,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       final var push = this.putManifest(repo, manifest);
 
       requireStatus(push, 400, "OCI manifest push");
-      final var body = push.getContentAsString(StandardCharsets.UTF_8);
-      assertThat((String) JsonPath.read(body, "$.msgId")).isEqualTo(msgId);
-      assertThat((String) JsonPath.read(body, "$.text")).isEqualTo(text);
+      expectOciError(push, "MANIFEST_INVALID", text, msgId);
       assertThat(it.chartRowExists(repo, "payments")).isFalse();
       assertThat(it.ociManifestFile(repo, "payments", "1.0.0")).doesNotExist();
     }
@@ -2214,8 +2232,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       final var push = this.putManifest(repo, layer("\"" + DIGEST + "\"", "10"));
 
       requireStatus(push, 404, "OCI manifest push");
-      assertThat((String) JsonPath.read(push.getContentAsString(StandardCharsets.UTF_8), "$.msgId"))
-          .isEqualTo("blobNotFound");
+      expectOciError(push, "MANIFEST_BLOB_UNKNOWN", "blobNotFound", "blobNotFound");
     }
   }
 
