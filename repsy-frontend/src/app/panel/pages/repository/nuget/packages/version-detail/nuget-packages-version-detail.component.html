@@ -164,6 +164,13 @@
           </div>
         </div>
 
+        @if (versionInfo.readme?.trim()) {
+          <h2 class="mb-2 text-[16px] text-[#9FA0A0]">README</h2>
+          <div class="mb-8 overflow-x-auto rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4" data-testid="readme">
+            <app-markdown [markdown]="versionInfo.readme" />
+          </div>
+        }
+
         @if (activeRepo.canManage) {
           <button
             (click)="deleteVersion()"

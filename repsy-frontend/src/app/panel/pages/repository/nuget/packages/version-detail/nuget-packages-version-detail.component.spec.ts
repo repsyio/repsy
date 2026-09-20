@@ -1,0 +1,122 @@
+///
+/// Copyright 2026 the original author or authors.
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+///      https://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+///
+
+import { Component, Input } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
+import { BehaviorSubject } from 'rxjs';
+
+import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
+import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
+import { NugetVersionInfo } from '../../dto/nuget-version-info';
+import { NugetService } from '../../service/nuget.service';
+import { NugetPackagesVersionDetailComponent } from './nuget-packages-version-detail.component';
+
+@Component({ selector: 'app-security-scan-section', standalone: true, template: '' })
+class SecurityScanSectionStubComponent {
+  @Input() public repoType: string;
+  @Input() public repoName: string;
+  @Input() public artifactName: string;
+  @Input() public artifactVersion: string;
+  @Input() public canTriggerScan: boolean;
+}
+
+describe('NugetPackagesVersionDetailComponent README', () => {
+  let nugetService: jasmine.SpyObj<NugetService>;
+
+  async function render(readme: string | undefined): Promise<HTMLElement> {
+    const versionInfo = Object.assign(new NugetVersionInfo(), {
+      packageId: 'Acme.Lib',
+      version: '1.2.3',
+      listed: true,
+      downloadCount: 0,
+      readme,
+    });
+    nugetService.fetchPackageVersion.and.resolveTo(versionInfo);
+
+    const fixture: ComponentFixture<NugetPackagesVersionDetailComponent> = TestBed.createComponent(
+      NugetPackagesVersionDetailComponent,
+    );
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  beforeEach(() => {
+    const repoChanges = new BehaviorSubject<RepoPermissionInfo>(
+      Object.assign(new RepoPermissionInfo(), { repoName: 'nuget-repo' }),
+    );
+    nugetService = jasmine.createSpyObj<NugetService>('NugetService', ['fetchPackageVersion'], {
+      repoChanges,
+    });
+
+    TestBed.configureTestingModule({
+      imports: [NugetPackagesVersionDetailComponent],
+      providers: [
+        { provide: NugetService, useValue: nugetService },
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { paramMap: convertToParamMap({ packageId: 'Acme.Lib', version: '1.2.3' }) } },
+        },
+        { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+        {
+          provide: DangerModalService,
+          useValue: jasmine.createSpyObj<DangerModalService>('DangerModalService', ['show']),
+        },
+        { provide: Router, useValue: jasmine.createSpyObj<Router>('Router', ['navigate']) },
+      ],
+    });
+    TestBed.overrideComponent(NugetPackagesVersionDetailComponent, {
+      remove: { imports: [SecurityScanSectionComponent] },
+      add: { imports: [SecurityScanSectionStubComponent] },
+    });
+  });
+
+  it('renders the README markdown', async () => {
+    const el = await render('# Acme readme\n\nUse **Acme.Lib** like this.');
+
+    const readme = el.querySelector('[data-testid="readme"]');
+    expect(readme).not.toBeNull();
+    expect(readme?.querySelector('h1')?.textContent).toBe('Acme readme');
+    expect(readme?.querySelector('strong')?.textContent).toBe('Acme.Lib');
+  });
+
+  it('does not run scripts embedded in the README', async () => {
+    const el = await render(
+      'Hi\n\n<script>window.__pwned = true</script>\n\n<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" onerror="window.__pwned = true">',
+    );
+
+    expect(el.querySelector('[data-testid="readme"] script')).toBeNull();
+    expect(el.querySelector('[data-testid="readme"]')?.innerHTML).not.toContain('onerror');
+    expect((window as unknown as { __pwned?: boolean }).__pwned).toBeUndefined();
+  });
+
+  it('hides the section when the version has no README', async () => {
+    const el = await render(undefined);
+
+    expect(el.querySelector('[data-testid="readme"]')).toBeNull();
+    expect(el.textContent).not.toContain('README');
+  });
+
+  it('hides the section for a blank README', async () => {
+    const el = await render('  \n\n ');
+
+    expect(el.querySelector('[data-testid="readme"]')).toBeNull();
+  });
+});
