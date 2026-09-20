@@ -17,6 +17,10 @@ package io.repsy.os.shared.user.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
@@ -26,13 +30,15 @@ import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.mappers.UserConverter;
 import io.repsy.os.shared.user.repositories.UserRepository;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
-@DisplayName("UserTxService token principal lookups")
+@DisplayName("UserTxService")
 class UserTxServiceTest {
 
   private final UserRepository userRepository = Mockito.mock(UserRepository.class);
@@ -82,6 +88,31 @@ class UserTxServiceTest {
   @DisplayName("getUserByUsername keeps answering userNotFound for a plain lookup")
   void plainLookupStillNotFound() {
     assertThatThrownBy(() -> this.service.getUserByUsername("ghost"))
+        .isExactlyInstanceOf(ItemNotFoundException.class)
+        .hasMessage("userNotFound");
+  }
+
+  @Test
+  @DisplayName("updateLastLoginAt writes the timestamp through a single-column update")
+  void lastLoginIsWrittenWithoutLoadingTheUser() {
+    when(this.userRepository.updateLastLoginAt(eq("alice"), any(Instant.class))).thenReturn(1);
+    final var before = Instant.now();
+
+    this.service.updateLastLoginAt("alice");
+
+    final var written = ArgumentCaptor.forClass(Instant.class);
+    verify(this.userRepository).updateLastLoginAt(eq("alice"), written.capture());
+    assertThat(written.getValue()).isBetween(before, Instant.now());
+    verify(this.userRepository, never()).findByUsername(any());
+    verify(this.userRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("updateLastLoginAt answers userNotFound when no user has the username")
+  void lastLoginForUnknownUser() {
+    when(this.userRepository.updateLastLoginAt(eq("ghost"), any(Instant.class))).thenReturn(0);
+
+    assertThatThrownBy(() -> this.service.updateLastLoginAt("ghost"))
         .isExactlyInstanceOf(ItemNotFoundException.class)
         .hasMessage("userNotFound");
   }

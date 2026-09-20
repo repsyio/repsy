@@ -233,11 +233,18 @@ public class UserTxService {
     this.userRepository.replaceHash(user.getId(), user.getHash(), PasswordHasher.hash(password));
   }
 
+  /**
+   * Records a login. It writes only the {@code last_login_at} column (RPS-1032): it runs on the
+   * {@code @Async} login listener, and saving the whole entity could undo a password, role or
+   * username change that committed after the row was read.
+   *
+   * @throws ItemNotFoundException if no user has {@code username}
+   */
   @Transactional
   public void updateLastLoginAt(final @NonNull String username) {
-    final var user = this.findUserByUsername(username);
-    user.setLastLoginAt(Instant.now());
-    this.userRepository.save(user);
+    if (this.userRepository.updateLastLoginAt(username, Instant.now()) == 0) {
+      throw new ItemNotFoundException(ERR_USER_NOT_FOUND);
+    }
   }
 
   private @NonNull User findUserById(final @NonNull UUID id) {
