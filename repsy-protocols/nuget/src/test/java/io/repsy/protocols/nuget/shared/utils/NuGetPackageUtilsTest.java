@@ -19,17 +19,25 @@ import static io.repsy.protocols.nuget.NuGetTestContexts.context;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.repsy.protocols.nuget.shared.dtos.NuGetCatalogEntry;
 import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafItem;
+import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -37,6 +45,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -365,6 +374,78 @@ class NuGetPackageUtilsTest {
               assertThat(page.lower()).isEqualTo("1.0.0");
               assertThat(page.upper()).isEqualTo("1.0.0.10");
             });
+  }
+
+  @Nested
+  @DisplayName("stored dependencies (RPS-1015)")
+  class StoredDependencies {
+
+    private final ListAppender<ILoggingEvent> logEvents = new ListAppender<>();
+    private final Logger utilsLogger = (Logger) LoggerFactory.getLogger(NuGetPackageUtils.class);
+
+    @BeforeEach
+    void captureLogs() {
+      this.logEvents.start();
+      this.utilsLogger.addAppender(this.logEvents);
+    }
+
+    @AfterEach
+    void releaseLogs() {
+      this.utilsLogger.detachAppender(this.logEvents);
+      this.logEvents.stop();
+    }
+
+    private List<String> warnings() {
+      return this.logEvents.list.stream()
+          .filter(event -> event.getLevel() == Level.WARN)
+          .map(ILoggingEvent::getFormattedMessage)
+          .toList();
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+        strings = {
+          "<ArrayList><item><packageId>Legacy</packageId></item></ArrayList>",
+          "[{\"packageId\": \"Cut.Off\"",
+          "{\"packageId\": \"Not.An.Array\"}",
+          "not json"
+        })
+    @DisplayName(
+        "warns with the package id and version, not the value, and returns no dependencies")
+    void warnsForUnreadableValue(final String stored) {
+      assertThat(NuGetPackageUtils.parseDependenciesJson(stored, "Some.Package", "1.2.3"))
+          .isEmpty();
+
+      assertThat(this.warnings())
+          .singleElement()
+          .asString()
+          .contains("Some.Package", "1.2.3")
+          .doesNotContain(stored);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "  ", "null"})
+    @DisplayName("treats a missing, blank or JSON null value as no dependencies without a warning")
+    void treatsAbsentValueAsNoDependencies(final String stored) {
+      assertThat(NuGetPackageUtils.parseDependenciesJson(stored, "Some.Package", "1.2.3"))
+          .isEmpty();
+      assertThat(NuGetPackageUtils.parseDependenciesJson(null, "Some.Package", "1.2.3")).isEmpty();
+
+      assertThat(this.warnings()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("reads stored dependencies without a warning")
+    void readsValidValue() {
+      final var dependencies = List.of(new NuGetDependencyInfo("Serilog", "3.1.1", "net8.0"));
+
+      assertThat(
+              NuGetPackageUtils.parseDependenciesJson(
+                  NuGetPackageUtils.toDependenciesJson(dependencies), "Some.Package", "1.2.3"))
+          .isEqualTo(dependencies);
+
+      assertThat(this.warnings()).isEmpty();
+    }
   }
 
   private static NuGetRegistrationLeafItem leafItem(final String version) {

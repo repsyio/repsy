@@ -56,7 +56,8 @@ public interface NuGetPackageConverter {
   default NuGetVersionInfo toVersionDetail(final NuGetPackageVersion v, final String packageId) {
 
     final var base = this.toVersionInfo(v, packageId);
-    final var deps = NuGetPackageUtils.parseDependenciesJson(v.getDependencies());
+    final var deps =
+        NuGetPackageUtils.parseDependenciesJson(v.getDependencies(), packageId, v.getVersion());
     return new NuGetVersionInfo(
         base.packageId(),
         base.version(),
