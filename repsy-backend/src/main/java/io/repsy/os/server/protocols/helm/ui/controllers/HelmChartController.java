@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -80,9 +79,9 @@ public class HelmChartController {
       @PageableDefault(sort = "lastUpdatedAt", direction = Sort.Direction.DESC)
           final Pageable pageable) {
 
-    SortValidator.requireSortableBy(pageable, CHART_SORT_PATHS.keySet());
-
-    final var charts = this.helmApiFacade.search(repoInfo, query, withEntitySortPaths(pageable));
+    final var charts =
+        this.helmApiFacade.search(
+            repoInfo, query, SortValidator.resolveSortPaths(pageable, CHART_SORT_PATHS));
 
     return this.restResponseFactory.success("chartsFetched", new PagedModel<>(charts));
   }
@@ -140,15 +139,5 @@ public class HelmChartController {
     final var tags = this.helmApiFacade.getOciTags(repoInfo, name);
 
     return this.restResponseFactory.success("chartTagsFetched", tags);
-  }
-
-  private static Pageable withEntitySortPaths(final Pageable pageable) {
-    final var sort =
-        Sort.by(
-            pageable.getSort().stream()
-                .map(order -> order.withProperty(CHART_SORT_PATHS.get(order.getProperty())))
-                .toList());
-
-    return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
   }
 }

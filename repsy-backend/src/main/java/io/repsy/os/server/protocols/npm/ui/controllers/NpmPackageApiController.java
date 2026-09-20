@@ -34,6 +34,7 @@ import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapL
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -57,8 +58,17 @@ import org.springframework.web.bind.annotation.RestController;
 @SuppressWarnings("java:S6856")
 public class NpmPackageApiController {
 
-  private static final Set<String> PACKAGE_SORT_PROPERTIES =
-      Set.of("id", "name", "scope", "updatedAt");
+  /**
+   * The sort keys of the package lists, mapped to the paths the queries sort by. The list item's
+   * {@code latestVersion} is accepted although the queries project it as {@code latest}.
+   */
+  private static final Map<String, String> PACKAGE_SORT_PATHS =
+      Map.of(
+          "id", "id",
+          "name", "name",
+          "scope", "scope",
+          "latestVersion", "latest",
+          "updatedAt", "updatedAt");
 
   private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("id", "version", "createdAt");
 
@@ -113,10 +123,11 @@ public class NpmPackageApiController {
       @RequestParam(required = false) final @Nullable String scope,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
-    SortValidator.requireSortableBy(pageable, PACKAGE_SORT_PROPERTIES);
-
     final var packages =
-        this.npmPackageService.getPackagesContainsScope(repoInfo.getStorageKey(), scope, pageable);
+        this.npmPackageService.getPackagesContainsScope(
+            repoInfo.getStorageKey(),
+            scope,
+            SortValidator.resolveSortPaths(pageable, PACKAGE_SORT_PATHS));
 
     return this.restResponseFactory.success(PACKAGES_FETCHED, new PagedModel<>(packages));
   }
@@ -132,11 +143,12 @@ public class NpmPackageApiController {
       @RequestParam(required = false, defaultValue = "") final String name,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
-    SortValidator.requireSortableBy(pageable, PACKAGE_SORT_PROPERTIES);
-
     final var packages =
         this.npmPackageService.getPackagesByScopeContainsName(
-            repoInfo.getStorageKey(), scope, name, pageable);
+            repoInfo.getStorageKey(),
+            scope,
+            name,
+            SortValidator.resolveSortPaths(pageable, PACKAGE_SORT_PATHS));
 
     return this.restResponseFactory.success(PACKAGES_FETCHED, new PagedModel<>(packages));
   }
