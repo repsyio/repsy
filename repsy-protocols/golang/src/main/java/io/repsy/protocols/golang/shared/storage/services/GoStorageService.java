@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
-import lombok.SneakyThrows;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
@@ -34,10 +33,8 @@ public interface GoStorageService<ID> {
   BaseUsages getUsages(StoragePath storagePath, String repoName, long contentLength)
       throws IOException;
 
-  @SneakyThrows
   Resource getResource(String repoName, StoragePath storagePath);
 
-  @SneakyThrows
   BaseUsages writeInputStreamToPath(
       StoragePath storagePath, InputStream inputStream, String repoName);
 

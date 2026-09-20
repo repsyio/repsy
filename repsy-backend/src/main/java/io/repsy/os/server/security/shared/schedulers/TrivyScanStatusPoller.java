@@ -88,6 +88,8 @@ public class TrivyScanStatusPoller {
       case FAILED -> this.scanTxService.recordScanFailure(scan.getId(), status.errorMessage());
       case QUEUED -> this.applyQueued(scan);
       case RUNNING -> this.applyRunning(scan);
+      case null, default ->
+          throw new IllegalStateException("Unexpected scan job status: " + status.status());
     }
   }
 

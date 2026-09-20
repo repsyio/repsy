@@ -18,8 +18,10 @@ package io.repsy.os.shared.repo.dtos;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.UUID;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.experimental.SuperBuilder;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 @SuperBuilder
 public class RepoInfo extends BaseRepoInfo<UUID> {}
