@@ -19,11 +19,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.when;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -80,5 +85,40 @@ class AbstractHelmStorageServiceTest {
             .finalizeBlob(REPO_UUID, UPLOAD_ID, "sha256:abc");
 
     assertThat(usages).isSameAs(expected);
+  }
+
+  @Test
+  @DisplayName("listStaleBlobFiles() asks the storage strategy for the repo's oci/blobs directory")
+  void listStaleBlobFilesListsTheBlobsDirectory() {
+    final var threshold = Instant.parse("2026-01-01T00:00:00Z");
+    final var expected = List.of(new StaleFile(UPLOAD_ID.toString(), 10L));
+    when(this.storageStrategy.listStaleFiles(
+            argThat(path -> path != null && path.getPath().equals(REPO_UUID + "/oci/blobs")),
+            eq(threshold)))
+        .thenReturn(expected);
+
+    final var files =
+        new TestStorageService(this.storageStrategy).listStaleBlobFiles(REPO_UUID, threshold);
+
+    assertThat(files).isSameAs(expected);
+  }
+
+  @Test
+  @DisplayName("deleteBlobFile() answers the bytes the file held and deletes it")
+  void deleteBlobFileAnswersTheFileUsage() throws IOException {
+    when(this.storageStrategy.getFileUsage(
+            argThat(path -> path != null && path.getPath().equals(UPLOAD_PATH)), eq(REPO_NAME)))
+        .thenReturn(4096L);
+
+    final var freed =
+        new TestStorageService(this.storageStrategy)
+            .deleteBlobFile(REPO_UUID, REPO_NAME, UPLOAD_ID.toString());
+
+    assertThat(freed).isEqualTo(4096L);
+    final var order = inOrder(this.storageStrategy);
+    order
+        .verify(this.storageStrategy)
+        .getFileUsage(argThat(sp -> sp.getPath().equals(UPLOAD_PATH)), eq(REPO_NAME));
+    order.verify(this.storageStrategy).delete(argThat(sp -> sp.getPath().equals(UPLOAD_PATH)));
   }
 }

@@ -20,6 +20,7 @@ import static java.nio.file.StandardOpenOption.CREATE;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
@@ -95,6 +96,38 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     }
 
     return Optional.of(urlResource);
+  }
+
+  /**
+   * Answers the files that were last written before {@code notModifiedSince}. A file removed while
+   * the directory is walked (an upload finalized in the meantime) reads as a non-file and is left
+   * out instead of failing the listing.
+   */
+  @Override
+  @SneakyThrows
+  public @NonNull List<StaleFile> listStaleFiles(
+      final @NonNull StoragePath directory, final @NonNull Instant notModifiedSince) {
+    final Path path = this.toPhysicalPath(directory);
+
+    if (!Files.isDirectory(path)) {
+      return List.of();
+    }
+
+    final var staleFiles = new ArrayList<StaleFile>();
+
+    try (final Stream<Path> stream = Files.list(path)) {
+      for (final Path entry : (Iterable<Path>) stream::iterator) {
+        final File file = entry.toFile();
+        final long lastModified = file.lastModified();
+        final long size = file.length();
+
+        if (file.isFile() && Instant.ofEpochMilli(lastModified).isBefore(notModifiedSince)) {
+          staleFiles.add(new StaleFile(file.getName(), size));
+        }
+      }
+    }
+
+    return staleFiles;
   }
 
   @Override

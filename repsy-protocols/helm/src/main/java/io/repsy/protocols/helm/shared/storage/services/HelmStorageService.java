@@ -16,9 +16,12 @@
 package io.repsy.protocols.helm.shared.storage.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
@@ -52,6 +55,19 @@ public interface HelmStorageService<ID> {
   long getBlobSize(UUID repoUuid, UUID uploadId, String repoName) throws IOException;
 
   BaseUsages finalizeBlob(UUID repoUuid, UUID uploadId, String digest);
+
+  /**
+   * Lists the files under the repo's {@code oci/blobs} directory that were last written before
+   * {@code notModifiedSince}: finalized blobs (named by digest) and upload temp files (named by
+   * upload session) alike, so the caller has to tell them apart.
+   */
+  List<StaleFile> listStaleBlobFiles(UUID repoUuid, Instant notModifiedSince);
+
+  /**
+   * Deletes one file of the repo's {@code oci/blobs} directory and answers the bytes it held, so
+   * the caller can release them from the repo's disk usage.
+   */
+  long deleteBlobFile(UUID repoUuid, String repoName, String fileName) throws IOException;
 
   Optional<Resource> getBlob(UUID repoUuid, String digest, String repoName);
 
