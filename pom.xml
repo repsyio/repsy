@@ -50,6 +50,7 @@
     <module>repsy-backend</module>
     <module>libs</module>
     <module>repsy-protocols</module>
+    <module>repsy-frontend</module>
   </modules>
 
   <build>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.repsy.os</groupId>
+    <artifactId>repsy-os</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>repsy-frontend</artifactId>
+  <packaging>pom</packaging>
+
+  <!--
+    RPS-1022: this module builds nothing. The Angular app is built and tested with pnpm (see
+    package.json and the "Repsy frontend" job in .github/workflows/pr-checks.yml). It exists so
+    that the Maven-driven SonarCloud scan indexes src/ and reads the Karma coverage report: the
+    scanner only visits Maven modules, and sonar.* properties set on the root pom would be
+    inherited by every Java module.
+  -->
+  <properties>
+    <sonar.sources>src</sonar.sources>
+    <sonar.tests>src</sonar.tests>
+    <sonar.test.inclusions>**/*.spec.ts</sonar.test.inclusions>
+    <!--
+      Written by "ng test" with its code coverage flag on (lcovonly reporter in karma.conf.cjs),
+      relative to this directory. The scan does not run the tests: the "Repsy frontend" job produces the report and
+      the scan job downloads it into this path first. A missing report is only a warning, and the
+      files then show no coverage.
+    -->
+    <sonar.javascript.lcov.reportPaths>coverage/panel-frontend/lcov.info</sonar.javascript.lcov.reportPaths>
+  </properties>
+</project>
