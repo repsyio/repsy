@@ -60,7 +60,9 @@ public class AdminUserInitializer implements ApplicationRunner {
     }
 
     // users.hash is NOT NULL, so an empty hash is the marker an operator sets by hand to recover a
-    // lost password (see the README). It applies to every admin that carries it.
+    // lost password (see the README). Migration V0017 (RPS-1033) sets it on every account that
+    // still
+    // had a pre-BCrypt hash. It applies to every admin that carries it.
     adminUsers.stream()
         .filter(AdminUserInitializer::isPasswordReset)
         .forEach(this::resetAdminPassword);
@@ -74,11 +76,9 @@ public class AdminUserInitializer implements ApplicationRunner {
     log.debug("Admin user {} has an empty password hash, resetting...", adminUser.getUsername());
 
     final var newPassword = PasswordGeneratorUtil.generatePassword();
-    final var salt = PasswordGeneratorUtil.generateSalt();
     final var hash = PasswordHasher.hash(newPassword);
 
     adminUser.setHash(hash);
-    adminUser.setSalt(salt);
     this.userRepository.save(adminUser);
 
     log.warn(
@@ -100,10 +100,9 @@ public class AdminUserInitializer implements ApplicationRunner {
       password = this.adminInitialPassword;
     }
 
-    final var salt = PasswordGeneratorUtil.generateSalt();
     final var hash = PasswordHasher.hash(password);
 
-    final var userInfo = this.userTxService.create(ADMIN_USERNAME, UserRole.ADMIN, hash, salt);
+    final var userInfo = this.userTxService.create(ADMIN_USERNAME, UserRole.ADMIN, hash);
 
     this.eventPublisher.publishEvent(
         new UserCreatedEvent<>(userInfo.getId(), userInfo.getUsername()));

@@ -622,7 +622,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("changes the password and persists a new hash/salt")
+    @DisplayName("changes the password and persists a new hash")
     void updatesPassword() throws Exception {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("pwuser"), UserRole.USER);
       final var originalHash = user.getHash();
@@ -650,8 +650,7 @@ class ProfileControllerIT extends AbstractIntegrationTest {
       final var persisted =
           ProfileControllerIT.this.userRepository.findById(user.getId()).orElseThrow();
       assertThat(persisted.getHash()).isNotEqualTo(originalHash);
-      assertThat(PasswordHasher.matches(newPassword, persisted.getHash(), persisted.getSalt()))
-          .isTrue();
+      assertThat(PasswordHasher.matches(newPassword, persisted.getHash())).isTrue();
     }
 
     @Test

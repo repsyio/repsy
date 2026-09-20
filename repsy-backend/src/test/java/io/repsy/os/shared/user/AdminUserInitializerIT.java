@@ -50,11 +50,11 @@ class AdminUserInitializerIT extends AbstractIntegrationTest {
 
   /** The statement from the README, for every admin. */
   private static final String RESET_ALL_ADMINS_SQL =
-      "UPDATE users SET hash = '', salt = '' WHERE role = 'ADMIN'";
+      "UPDATE users SET hash = '' WHERE role = 'ADMIN'";
 
   /** The statement from the README, for a single admin. */
   private static final String RESET_ONE_ADMIN_SQL =
-      "UPDATE users SET hash = '', salt = '' WHERE role = 'ADMIN' AND username = ?";
+      "UPDATE users SET hash = '' WHERE role = 'ADMIN' AND username = ?";
 
   @Autowired private AdminUserInitializer adminUserInitializer;
 
@@ -101,17 +101,15 @@ class AdminUserInitializerIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("users.hash and users.salt are NOT NULL, so the recovery cannot use NULL")
+  @DisplayName("users.hash is NOT NULL, so the recovery cannot use NULL")
   void nullHashIsRejectedBySchema() {
     assertThatThrownBy(
-            () ->
-                this.jdbcTemplate.update(
-                    "UPDATE users SET hash = NULL, salt = NULL WHERE role = 'ADMIN'"))
+            () -> this.jdbcTemplate.update("UPDATE users SET hash = NULL WHERE role = 'ADMIN'"))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @Test
-  @DisplayName("an admin whose hash and salt were emptied gets a new working password")
+  @DisplayName("an admin whose hash was emptied gets a new working password")
   void emptiedAdminGetsNewPassword(final CapturedOutput output) throws Exception {
     final var admin = this.seededAdminAsLastAdmin();
     this.applyOperatorSql(RESET_ALL_ADMINS_SQL);
@@ -122,8 +120,7 @@ class AdminUserInitializerIT extends AbstractIntegrationTest {
     final var newPassword = loggedPasswordOf(admin, output);
     final var after = this.reload(admin.getId());
     assertThat(after.getHash()).isNotEmpty();
-    assertThat(after.getSalt()).isNotEmpty();
-    assertThat(PasswordHasher.matches(newPassword, after.getHash(), after.getSalt())).isTrue();
+    assertThat(PasswordHasher.matches(newPassword, after.getHash())).isTrue();
 
     this.login(admin.getUsername(), newPassword, 200);
     this.login(admin.getUsername(), SEEDED_ADMIN_PASSWORD, 401);

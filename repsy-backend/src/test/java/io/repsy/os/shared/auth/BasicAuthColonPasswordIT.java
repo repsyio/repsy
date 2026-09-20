@@ -23,7 +23,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.UserRole;
 import java.util.ArrayList;
@@ -67,11 +66,7 @@ class BasicAuthColonPasswordIT extends AbstractIntegrationTest {
   private String createAdminWithPassword(final String password) {
     final var username = uniqueUsername("colon");
     final var userInfo =
-        this.userTxService.create(
-            username,
-            UserRole.ADMIN,
-            PasswordHasher.hash(password),
-            PasswordGeneratorUtil.generateSalt());
+        this.userTxService.create(username, UserRole.ADMIN, PasswordHasher.hash(password));
     this.createdUserIds.add(userInfo.getId());
 
     return username;

@@ -23,7 +23,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -36,12 +35,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * RPS-961: a user whose password is still stored as a legacy salted SHA-256 hash can log in, and
- * the hash is replaced by BCrypt on the way, through the panel login and through HTTP Basic alike.
+ * RPS-961: a user whose password hash was made with an older BCrypt work factor can log in, and the
+ * hash is replaced by a current one on the way, through the panel login and through HTTP Basic
+ * alike. Since RPS-1033 a hash without an algorithm id, such as the salted SHA-256 of RPS-961 and
+ * before, no longer verifies at all.
  *
  * <p>The upgrade runs in its own transaction, and {@code UserLoginListener} is {@code @Async}, so
  * neither can see rows that are still uncommitted inside a test transaction. The class therefore
@@ -64,16 +66,13 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
     this.createdUserIds.clear();
   }
 
-  private User createLegacyUser(final String password) {
-    final var salt = PasswordGeneratorUtil.generateSalt();
-    final var legacyHash = DigestUtils.sha256Hex(password + salt);
-
-    return this.commitUser(legacyHash, salt);
+  /** A BCrypt hash at the lowest work factor, which the current one has left behind. */
+  private User createWeakUser(final String password) {
+    return this.commitUser("{bcrypt}" + new BCryptPasswordEncoder(4).encode(password));
   }
 
-  private User commitUser(final String hash, final String salt) {
-    final var userInfo =
-        this.userTxService.create(uniqueUsername("legacy"), UserRole.ADMIN, hash, salt);
+  private User commitUser(final String hash) {
+    final var userInfo = this.userTxService.create(uniqueUsername("legacy"), UserRole.ADMIN, hash);
     this.createdUserIds.add(userInfo.getId());
 
     return this.reload(userInfo.getId());
@@ -101,15 +100,15 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("panel login with a legacy hash succeeds and stores a BCrypt hash")
-  void panelLoginUpgradesLegacyHash() throws Exception {
-    final var user = this.createLegacyUser(VALID_PASSWORD);
+  @DisplayName("panel login with an outdated hash succeeds and stores a current hash")
+  void panelLoginUpgradesOutdatedHash() throws Exception {
+    final var user = this.createWeakUser(VALID_PASSWORD);
 
     this.panelLogin(user.getUsername(), VALID_PASSWORD, 200);
 
     final var after = this.reload(user.getId());
     assertThat(after.getHash()).startsWith(BCRYPT_PREFIX).isNotEqualTo(user.getHash());
-    assertThat(PasswordHasher.matches(VALID_PASSWORD, after.getHash(), after.getSalt())).isTrue();
+    assertThat(PasswordHasher.matches(VALID_PASSWORD, after.getHash())).isTrue();
     assertThat(after.getTokenVersion())
         .as("the password did not change, so the refresh tokens stay valid")
         .isEqualTo(user.getTokenVersion());
@@ -118,7 +117,7 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
   @Test
   @DisplayName("the upgraded user logs in again with the same password")
   void upgradedUserCanLogInAgain() throws Exception {
-    final var user = this.createLegacyUser(VALID_PASSWORD);
+    final var user = this.createWeakUser(VALID_PASSWORD);
 
     this.panelLogin(user.getUsername(), VALID_PASSWORD, 200);
     this.panelLogin(user.getUsername(), VALID_PASSWORD, 200);
@@ -128,7 +127,7 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
   @Test
   @DisplayName("the async lastLoginAt update after a login keeps the upgraded hash")
   void lastLoginUpdateKeepsTheUpgradedHash() throws Exception {
-    final var user = this.createLegacyUser(VALID_PASSWORD);
+    final var user = this.createWeakUser(VALID_PASSWORD);
 
     this.panelLogin(user.getUsername(), VALID_PASSWORD, 200);
 
@@ -140,23 +139,23 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("HTTP Basic with a legacy hash succeeds and stores a BCrypt hash")
-  void basicAuthUpgradesLegacyHash() throws Exception {
-    final var user = this.createLegacyUser(VALID_PASSWORD);
+  @DisplayName("HTTP Basic with an outdated hash succeeds and stores a current hash")
+  void basicAuthUpgradesOutdatedHash() throws Exception {
+    final var user = this.createWeakUser(VALID_PASSWORD);
 
     this.basicRequest(user.getUsername(), VALID_PASSWORD, 200);
 
     final var after = this.reload(user.getId());
     assertThat(after.getHash()).startsWith(BCRYPT_PREFIX);
-    assertThat(PasswordHasher.matches(VALID_PASSWORD, after.getHash(), after.getSalt())).isTrue();
+    assertThat(PasswordHasher.matches(VALID_PASSWORD, after.getHash())).isTrue();
 
     this.basicRequest(user.getUsername(), VALID_PASSWORD, 200);
   }
 
   @Test
-  @DisplayName("a wrong password leaves a legacy hash as it is")
+  @DisplayName("a wrong password leaves an outdated hash as it is")
   void wrongPasswordDoesNotUpgrade() throws Exception {
-    final var user = this.createLegacyUser(VALID_PASSWORD);
+    final var user = this.createWeakUser(VALID_PASSWORD);
 
     this.panelLogin(user.getUsername(), "Other1234!", 401);
     this.basicRequest(user.getUsername(), "Other1234!", 401);
@@ -165,9 +164,9 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("a BCrypt hash is not rewritten by a login")
+  @DisplayName("a current hash is not rewritten by a login")
   void bcryptHashIsLeftAlone() throws Exception {
-    final var user = this.commitUser(PasswordHasher.hash(VALID_PASSWORD), "unusedsalt000000");
+    final var user = this.commitUser(PasswordHasher.hash(VALID_PASSWORD));
 
     this.panelLogin(user.getUsername(), VALID_PASSWORD, 200);
     this.basicRequest(user.getUsername(), VALID_PASSWORD, 200);
@@ -176,32 +175,40 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("a legacy password over 72 bytes still logs in and stays on its legacy hash")
-  void overlongLegacyPasswordStaysLegacy() throws Exception {
-    final var password = "Aa1" + "x".repeat(100);
-    final var user = this.createLegacyUser(password);
+  @DisplayName("a salted SHA-256 hash no longer logs in, whatever the password")
+  void sha256HashIsRejected() throws Exception {
+    final var salt = "0123456789abcdef";
+    final var user = this.commitUser(DigestUtils.sha256Hex(VALID_PASSWORD + salt));
 
-    this.basicRequest(user.getUsername(), password, 200);
+    this.panelLogin(user.getUsername(), VALID_PASSWORD, 401);
+    this.basicRequest(user.getUsername(), VALID_PASSWORD, 401);
 
     assertThat(this.reload(user.getId()).getHash()).isEqualTo(user.getHash());
   }
 
   @Test
+  @DisplayName("an account with the empty hash of a password reset does not log in")
+  void emptyHashIsRejected() throws Exception {
+    final var user = this.commitUser("");
+
+    this.panelLogin(user.getUsername(), VALID_PASSWORD, 401);
+    this.basicRequest(user.getUsername(), VALID_PASSWORD, 401);
+  }
+
+  @Test
   @DisplayName("an upgrade that lost a race with a password change does not undo the change")
   void staleUpgradeDoesNotOverwriteANewPassword() {
-    final var user = this.createLegacyUser(VALID_PASSWORD);
+    final var user = this.createWeakUser(VALID_PASSWORD);
     final var staleView = this.userTxService.getUserById(user.getId());
 
     // The owner changes the password after the login read the row but before it wrote the upgrade.
-    this.userTxService.updatePassword(
-        user.getId(), PasswordHasher.hash("NewPassword2@"), PasswordGeneratorUtil.generateSalt());
+    this.userTxService.updatePassword(user.getId(), PasswordHasher.hash("NewPassword2@"));
     final var changed = this.reload(user.getId());
 
     this.userTxService.upgradePasswordHash(staleView, VALID_PASSWORD);
 
     assertThat(this.reload(user.getId()).getHash()).isEqualTo(changed.getHash());
-    assertThat(PasswordHasher.matches("NewPassword2@", changed.getHash(), changed.getSalt()))
-        .isTrue();
+    assertThat(PasswordHasher.matches("NewPassword2@", changed.getHash())).isTrue();
   }
 
   @Test

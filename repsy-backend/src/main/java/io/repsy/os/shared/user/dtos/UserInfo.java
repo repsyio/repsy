@@ -28,7 +28,6 @@ public class UserInfo {
   @JsonIgnore private UUID id;
   private String username;
   private String hash;
-  private String salt;
   private UserRole role;
   private Instant createdAt;
   private Instant lastLoginAt;

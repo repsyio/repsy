@@ -440,16 +440,16 @@ docker exec repsy env | grep ADMIN
 **Can't login:**
 - Verify `ADMIN_INITIAL_PASSWORD` was set before the first startup
 - **Forgot admin password?** Reset it by setting the hash to an empty string in the database
-  (`hash` and `salt` are `NOT NULL`, so `NULL` is rejected):
+  (`hash` is `NOT NULL`, so `NULL` is rejected):
   ```sql
   -- Connect to PostgreSQL
   docker exec -it repsy-postgres psql -U repsy -d repsy
 
   -- Reset the password of every admin
-  UPDATE users SET hash = '', salt = '' WHERE role = 'ADMIN';
+  UPDATE users SET hash = '' WHERE role = 'ADMIN';
 
   -- Or of a single admin
-  UPDATE users SET hash = '', salt = '' WHERE role = 'ADMIN' AND username = 'admin';
+  UPDATE users SET hash = '' WHERE role = 'ADMIN' AND username = 'admin';
 
   -- Exit and restart the application
   \q

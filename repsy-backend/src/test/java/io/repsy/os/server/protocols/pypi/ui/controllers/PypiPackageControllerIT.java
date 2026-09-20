@@ -35,7 +35,6 @@ import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacadeImpl;
 import io.repsy.os.server.protocols.pypi.ui.facades.PypiApiFacade;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -97,9 +96,8 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
   }
 
   private UserInfo createUser(final UserRole role) {
-    final var salt = PasswordGeneratorUtil.generateSalt();
     final var hash = PasswordHasher.hash(VALID_PASSWORD);
-    final var userInfo = this.userTxService.create(unique("pypi"), role, hash, salt);
+    final var userInfo = this.userTxService.create(unique("pypi"), role, hash);
     this.entityManager.flush();
     this.entityManager.clear();
     return this.userTxService.getUserById(userInfo.getId());
