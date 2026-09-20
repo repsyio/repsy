@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.npm.shared.auth.services;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
+import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -37,9 +38,10 @@ public class NpmAuthComponentImpl extends ProtocolAuthService implements NpmAuth
   public NpmAuthComponentImpl(
       final @NonNull UserTxService userTxService,
       final @NonNull JwtUtils jwtUtils,
-      final @NonNull DeployTokenService deployTokenService) {
+      final @NonNull DeployTokenService deployTokenService,
+      final @NonNull VerifiedPasswordCache verifiedPasswordCache) {
 
-    super(userTxService, jwtUtils, deployTokenService);
+    super(userTxService, jwtUtils, deployTokenService, verifiedPasswordCache);
   }
 
   @Override

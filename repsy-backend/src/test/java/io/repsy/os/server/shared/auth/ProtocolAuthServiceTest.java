@@ -67,7 +67,10 @@ class ProtocolAuthServiceTest {
 
   private final ProtocolAuthService authService =
       new ProtocolAuthService(
-          this.userTxService, Mockito.mock(JwtUtils.class), Mockito.mock(DeployTokenService.class));
+          this.userTxService,
+          Mockito.mock(JwtUtils.class),
+          Mockito.mock(DeployTokenService.class),
+          new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
 
   private static final UserInfo ALICE =
       UserInfo.builder()
@@ -289,6 +292,115 @@ class ProtocolAuthServiceTest {
   }
 
   /**
+   * RPS-1025: HTTP Basic sends the password on every request, so a successful check is remembered.
+   * Everything the request depends on besides the password is still read on every request.
+   */
+  @Nested
+  @DisplayName("remembered password checks")
+  class RememberedChecks {
+
+    private final UserTxService users = Mockito.mock(UserTxService.class);
+    private final VerifiedPasswordCache cache =
+        new VerifiedPasswordCache(new BasicAuthCacheProperties(true, 300, 100));
+    private final ProtocolAuthService service =
+        new ProtocolAuthService(
+            this.users,
+            Mockito.mock(JwtUtils.class),
+            Mockito.mock(DeployTokenService.class),
+            this.cache);
+
+    private final UserInfo carol =
+        UserInfo.builder()
+            .id(UUID.randomUUID())
+            .username("carol")
+            .salt(SALT)
+            .hash(PasswordHasher.hash(PASSWORD))
+            .role(UserRole.USER)
+            .build();
+
+    @BeforeEach
+    void seedCarol() {
+      when(this.users.getUserByUsernameOptional("carol")).thenReturn(Optional.of(this.carol));
+    }
+
+    @Test
+    @DisplayName("the second request with the same Basic credentials skips the hash check")
+    void secondRequestHits() {
+      assertThat(this.service.authenticateUser(basicAuth("carol", PASSWORD))).isSameAs(this.carol);
+      assertThat(this.service.authenticateUser(basicAuth("carol", PASSWORD))).isSameAs(this.carol);
+
+      assertThat(this.cache.hitCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("a wrong password stays unAuthorized after the right one was remembered")
+    void wrongPasswordStillFails() {
+      this.service.authenticateUser(basicAuth("carol", PASSWORD));
+
+      assertUnauthorized(() -> this.service.authenticateUser(basicAuth("carol", "wrong")));
+      assertThat(this.cache.hitCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("a changed password is unAuthorized for the old one at once")
+    void changedPasswordRejectsOldOne() {
+      this.service.authenticateUser(basicAuth("carol", PASSWORD));
+
+      final var changed =
+          UserInfo.builder()
+              .id(this.carol.getId())
+              .username("carol")
+              .salt(SALT)
+              .hash(PasswordHasher.hash("new-s3cret"))
+              .role(UserRole.USER)
+              .build();
+      when(this.users.getUserByUsernameOptional("carol")).thenReturn(Optional.of(changed));
+
+      assertUnauthorized(() -> this.service.authenticateUser(basicAuth("carol", PASSWORD)));
+      assertThat(this.service.authenticateUser(basicAuth("carol", "new-s3cret"))).isSameAs(changed);
+    }
+
+    @Test
+    @DisplayName("a deleted user is unAuthorized at once")
+    void deletedUserIsRejected() {
+      this.service.authenticateUser(basicAuth("carol", PASSWORD));
+
+      when(this.users.getUserByUsernameOptional("carol")).thenReturn(Optional.empty());
+
+      assertUnauthorized(() -> this.service.authenticateUser(basicAuth("carol", PASSWORD)));
+    }
+
+    @Test
+    @DisplayName("a changed role applies to a remembered check")
+    void roleIsReadOnEveryRequest() {
+      this.service.authenticateUser(basicAuth("carol", PASSWORD));
+
+      final var promoted =
+          UserInfo.builder()
+              .id(this.carol.getId())
+              .username("carol")
+              .salt(SALT)
+              .hash(this.carol.getHash())
+              .role(UserRole.ADMIN)
+              .build();
+      when(this.users.getUserByUsernameOptional("carol")).thenReturn(Optional.of(promoted));
+
+      assertThat(this.service.authenticateUser(basicAuth("carol", PASSWORD)).getRole())
+          .isEqualTo(UserRole.ADMIN);
+      assertThat(this.cache.hitCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("an unknown username is not remembered and stays unAuthorized")
+    void unknownUsernameIsNotRemembered() {
+      assertUnauthorized(() -> this.service.authenticateUser(basicAuth("ghost", PASSWORD)));
+      assertUnauthorized(() -> this.service.authenticateUser(basicAuth("ghost", PASSWORD)));
+
+      assertThat(this.cache.hitCount()).isZero();
+    }
+  }
+
+  /**
    * RPS-962: a correctly signed token whose user no longer exists is an authentication failure, so
    * the client re-authenticates, instead of a 404 that reads as a missing resource.
    */
@@ -306,7 +418,8 @@ class ProtocolAuthServiceTest {
             new UserTxService(
                 Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)),
             this.jwtUtils,
-            Mockito.mock(DeployTokenService.class));
+            Mockito.mock(DeployTokenService.class),
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
 
     TokenUserNoLongerExists() {
       when(this.jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
@@ -345,7 +458,10 @@ class ProtocolAuthServiceTest {
 
     private final ProtocolAuthService jwtAuthService =
         new ProtocolAuthService(
-            ProtocolAuthServiceTest.this.userTxService, this.jwtUtils, this.deployTokenService);
+            ProtocolAuthServiceTest.this.userTxService,
+            this.jwtUtils,
+            this.deployTokenService,
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
 
     DeployTokenJwt() {
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
@@ -559,7 +675,8 @@ class ProtocolAuthServiceTest {
         new ProtocolAuthService(
             ProtocolAuthServiceTest.this.userTxService,
             this.jwtUtils,
-            mock(DeployTokenService.class));
+            mock(DeployTokenService.class),
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
 
     @Test
     @DisplayName("a read is checked against the repo and path of the token")

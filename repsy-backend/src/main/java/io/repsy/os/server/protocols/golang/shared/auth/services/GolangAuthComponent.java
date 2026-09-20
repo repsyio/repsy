@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.golang.shared.auth.services;
 
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
+import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.user.services.UserTxService;
@@ -29,8 +30,9 @@ public class GolangAuthComponent extends ProtocolAuthService {
   public GolangAuthComponent(
       final UserTxService userTxService,
       final JwtUtils jwtUtils,
-      final DeployTokenService deployTokenService) {
+      final DeployTokenService deployTokenService,
+      final VerifiedPasswordCache verifiedPasswordCache) {
 
-    super(userTxService, jwtUtils, deployTokenService);
+    super(userTxService, jwtUtils, deployTokenService, verifiedPasswordCache);
   }
 }

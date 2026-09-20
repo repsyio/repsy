@@ -318,6 +318,9 @@ Access at:
 | `TRIVY_SCANNER_API_KEY` | Shared API key sent to the scanner service (must match its `SCANNER_API_KEY`) | *(empty)* |
 | `DOCKER_INTERNAL_REGISTRY_BASE_URL` | Base URL the scanner uses to pull Docker images from this instance's own registry | `http://localhost:9090` |
 | `TRIVY_GATE_ACQUIRE_TIMEOUT_SECONDS` | Scanner-side: max time a queued scan waits to acquire the single-Trivy-execution gate | `60` |
+| `BASIC_AUTH_CACHE_ENABLED` | Remember successful HTTP Basic password checks, so a client that sends its username and password on every request pays for one password verification instead of one per request. See [Authenticating from CI](#authenticating-from-ci). | `true` |
+| `BASIC_AUTH_CACHE_TTL_SECONDS` | How long a remembered password check stays valid | `300` |
+| `BASIC_AUTH_CACHE_MAX_ENTRIES` | How many remembered password checks are kept | `10000` |
 
 **Important Notes:**
 
@@ -380,6 +383,28 @@ Deploy tokens are scoped to a single repository, so use one to give a CI job or 
 access to that repository without a user account. Only create user accounts for people you trust
 with every repository on the instance; to keep repositories apart between teams, run one Repsy
 instance per team.
+
+### Authenticating from CI
+
+Prefer a [deploy token](#repository-access) for CI jobs, build servers and anything else that
+sends credentials on every request (a Maven build that resolves hundreds of dependencies, a
+`docker pull` of an image with many layers). A deploy token is checked with a single fast hash. A
+user password is stored with BCrypt, which is slow on purpose, so an HTTP Basic request with a
+username and password costs one BCrypt verification (tens of milliseconds of CPU) unless Repsy has
+already seen that password succeed.
+
+Repsy remembers successful Basic password checks for `BASIC_AUTH_CACHE_TTL_SECONDS` (5 minutes by
+default), which removes that cost for clients that send the same credentials repeatedly. In a
+local measurement of 300 authenticated API requests, this took a request from about 47 ms to under
+2 ms, and the throughput of 8 concurrent clients from about 120 to about 1,700 requests per second.
+The cache holds only a keyed digest, never a password. A changed password, a deleted user or a
+changed role takes effect on the next request, and a wrong password or an unknown username is
+never remembered, so it is checked and answered exactly as before. Set `BASIC_AUTH_CACHE_ENABLED`
+to `false` to turn the cache off.
+
+The cache does not make a *failed* login cheaper: a client that keeps sending wrong credentials
+still costs one BCrypt verification per request. If your instance is exposed to the internet, put
+a rate limit for failed authentication in front of it, for example in your reverse proxy.
 
 For detailed information on creating repositories, managing deploy tokens, and using different protocols (Golang, Cargo(Rust), Maven, npm, PyPI, Docker), see the [documentation](https://docs.repsy.io).
 
