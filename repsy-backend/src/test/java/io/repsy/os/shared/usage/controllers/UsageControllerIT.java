@@ -356,7 +356,8 @@ class UsageControllerIT extends AbstractIntegrationTest {
     @DisplayName("on a fresh installation reports the default repositories with zero usage")
     void freshInstallation() throws Exception {
       // The startup seeding has finished (AbstractIntegrationTest waits for it): one default
-      // repository per type, none of which has any usage.
+      // repository per type, none of which has any usage. The listeners' own behaviour is asserted
+      // against an empty database in DefaultRepoSeedingIT.
       final var seededTypes = new HashSet<RepoType>();
       for (final var repo : UsageControllerIT.this.repoRepository.findAll()) {
         seededTypes.add(repo.getType());
