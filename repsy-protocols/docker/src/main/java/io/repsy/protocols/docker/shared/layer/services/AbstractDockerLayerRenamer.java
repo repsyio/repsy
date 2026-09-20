@@ -16,6 +16,7 @@
 package io.repsy.protocols.docker.shared.layer.services;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
@@ -72,18 +73,34 @@ public abstract class AbstractDockerLayerRenamer<ID> {
     return storagePathMap;
   }
 
-  public void renameLayers(
+  /**
+   * Renames each layer still stored under its upload UUID to its digest.
+   *
+   * <p>A layer whose digest is already stored is dropped instead of renamed, and the bytes that
+   * frees were charged when the layer was uploaded, so they are handed back through the returned
+   * usage (zero or negative) for the caller to net against the request's own usage.
+   *
+   * @return the disk usage the renames changed, summed over every layer
+   */
+  public BaseUsages renameLayers(
       final BaseRepoInfo<ID> repoInfo, final Map<LayerInfo, StoragePath> storageMap) {
+
+    var diskUsage = 0L;
 
     for (final var entry : storageMap.entrySet()) {
       final var layer = entry.getKey();
       final var storagePath = entry.getValue();
 
       if (this.checkLayerExistsInStorage(repoInfo, storagePath.getRelativePath(), layer)) {
-        this.dockerStorageService.rename(
-            repoInfo.getStorageKey(), storagePath.getRelativePath(), layer.getDigest());
+        final var usages =
+            this.dockerStorageService.rename(
+                repoInfo.getStorageKey(), storagePath.getRelativePath(), layer.getDigest());
+
+        diskUsage += usages.getDiskUsage();
       }
     }
+
+    return BaseUsages.ofDisk(diskUsage);
   }
 
   private boolean checkLayerExistsInStorage(
