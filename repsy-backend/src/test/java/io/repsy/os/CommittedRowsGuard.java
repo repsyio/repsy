@@ -83,10 +83,10 @@ public final class CommittedRowsGuard implements BeforeAllCallback, AfterAllCall
   private static final String ROW_COUNTS_SQL =
       """
       select table_name,
-             (xpath('/row/c/text()',
-                    query_to_xml(format('select count(*) as c from %I.%I',
-                                        table_schema, table_name),
-                                 false, true, '')))[1]::text::bigint as row_count
+        (xpath('/row/c/text()',
+          query_to_xml(
+            format('select count(*) as c from %I.%I', table_schema, table_name),
+            false, true, '')))[1]::text::bigint as row_count
       from information_schema.tables
       where table_schema = current_schema()
         and table_type = 'BASE TABLE'
