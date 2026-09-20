@@ -72,7 +72,12 @@ public final class NuGetPackageUtils {
   private static final String ZERO_VERSION = "0.0.0";
   private static final int REGISTRATION_PAGE_SIZE = 64;
   private static final int MAX_README_BYTES = 256 * 1024;
-  private static final int MAX_REPOSITORY_URL_LENGTH = 512;
+  // The limits of the nuget_package_version columns. Where H2 and PostgreSQL differ (tags is text
+  // in PostgreSQL, varchar(1024) in H2) the smaller one applies.
+  private static final int MAX_VERSION_LENGTH = 64;
+  private static final int MAX_TITLE_LENGTH = 512;
+  private static final int MAX_TAGS_LENGTH = 1024;
+  private static final int MAX_URL_LENGTH = 512;
   private static final Pattern NUGET_ID_PATTERN =
       Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$");
   private static final Pattern NUGET_VERSION_PATTERN =
@@ -206,18 +211,57 @@ public final class NuGetPackageUtils {
   }
 
   /**
+   * Reads the title from the nuspec. A title longer than the {@code title} column is cut to fit: it
+   * is only shown, and its start still names the package.
+   */
+  public static @Nullable String extractTitle(final String nuspecXml) {
+    return truncate(extractXmlTag(nuspecXml, "title"), MAX_TITLE_LENGTH, "title");
+  }
+
+  /**
+   * Reads the tags from the nuspec. Tags longer than the {@code tags} column are cut to fit, which
+   * can leave a partial last tag.
+   */
+  public static @Nullable String extractTags(final String nuspecXml) {
+    return truncate(extractXmlTag(nuspecXml, "tags"), MAX_TAGS_LENGTH, "tags");
+  }
+
+  /**
+   * Reads a URL element such as {@code iconUrl} from the nuspec. A URL longer than its column is
+   * dropped rather than cut, because a cut URL links somewhere else. The nuspec is stored as sent,
+   * so the full value is not lost.
+   */
+  public static @Nullable String extractUrl(final String nuspecXml, final String tagName) {
+    return dropIfTooLong(extractXmlTag(nuspecXml, tagName), tagName);
+  }
+
+  /**
    * Reads the repository URL from the nuspec {@code <repository>} element. The standard form
    * carries it in the {@code url} attribute ({@code <repository type="git" url="..." />}); the
    * element text is used as a fallback for the plain-text form. A URL longer than the {@code
    * repository_url} column is dropped rather than failing the publish.
    */
   public static @Nullable String extractRepositoryUrl(final String nuspecXml) {
-    final var url = readRepositoryUrl(nuspecXml);
-    if (url != null && url.length() > MAX_REPOSITORY_URL_LENGTH) {
-      log.warn("Skipping repository URL: longer than {} characters", MAX_REPOSITORY_URL_LENGTH);
+    return dropIfTooLong(readRepositoryUrl(nuspecXml), "repository");
+  }
+
+  private static @Nullable String dropIfTooLong(final @Nullable String url, final String field) {
+    if (url != null && url.length() > MAX_URL_LENGTH) {
+      log.warn("Skipping {} URL: longer than {} characters", field, MAX_URL_LENGTH);
       return null;
     }
     return url;
+  }
+
+  private static @Nullable String truncate(
+      final @Nullable String value, final int maxLength, final String field) {
+
+    if (value == null || value.codePointCount(0, value.length()) <= maxLength) {
+      return value;
+    }
+
+    log.warn("Truncating {}: longer than {} characters", field, maxLength);
+    return value.substring(0, value.offsetByCodePoints(0, maxLength));
   }
 
   private static @Nullable String readRepositoryUrl(final String nuspecXml) {
@@ -498,8 +542,11 @@ public final class NuGetPackageUtils {
     validatePackageId(packageId);
     validatePackageVersion(version);
 
+    final var normalizedVersion = normalizeNuGetVersion(version);
+    validateVersionLength(normalizedVersion);
+
     return new NuspecMetadata(
-        packageId, normalizeNuGetVersion(version), nuspecXml, extractReadme(tempFile, nuspecXml));
+        packageId, normalizedVersion, nuspecXml, extractReadme(tempFile, nuspecXml));
   }
 
   private static void validatePackageId(final String id) {
@@ -511,6 +558,16 @@ public final class NuGetPackageUtils {
   private static void validatePackageVersion(final String version) {
     if (!NUGET_VERSION_PATTERN.matcher(version.strip()).matches()) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid NuGet version format.");
+    }
+  }
+
+  // The version is stored as it is, so unlike the metadata it cannot be cut or dropped. Rejecting
+  // it here, before any row is written, also leaves no package row behind.
+  private static void validateVersionLength(final String version) {
+    if (version.length() > MAX_VERSION_LENGTH) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST,
+          "NuGet version is longer than " + MAX_VERSION_LENGTH + " characters.");
     }
   }
 

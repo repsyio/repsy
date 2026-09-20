@@ -31,11 +31,13 @@ import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 class NuGetPackageUtilsTest {
@@ -145,6 +147,142 @@ class NuGetPackageUtilsTest {
     assertThatThrownBy(() -> NuGetPackageUtils.readNuspecMetadata(nupkg))
         .isInstanceOf(ResponseStatusException.class)
         .hasMessageContaining("Invalid NuGet version format.");
+  }
+
+  @Test
+  @DisplayName("rejects a version longer than the version column, naming the limit")
+  void rejectsOverLongVersion() throws IOException {
+    final var version = "1.0.0-" + "a".repeat(59);
+    final var nupkg = nupkg("Some.Package", version);
+
+    assertThat(version).hasSize(65);
+    assertThatThrownBy(() -> NuGetPackageUtils.readNuspecMetadata(nupkg))
+        .isInstanceOfSatisfying(
+            ResponseStatusException.class,
+            e -> {
+              assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+              assertThat(e.getReason()).isEqualTo("NuGet version is longer than 64 characters.");
+            });
+  }
+
+  @Test
+  @DisplayName("accepts a version exactly as long as the version column")
+  void acceptsVersionAtTheColumnLimit() throws IOException {
+    final var version = "1.0.0-" + "a".repeat(58);
+
+    final var metadata = NuGetPackageUtils.readNuspecMetadata(nupkg("Some.Package", version));
+
+    assertThat(version).hasSize(64);
+    assertThat(metadata.version()).isEqualTo(version);
+  }
+
+  @Test
+  @DisplayName("measures the version without its build metadata, which is not stored")
+  void ignoresBuildMetadataForTheVersionLength() throws IOException {
+    final var version = "1.0.0+" + "a".repeat(100);
+
+    final var metadata = NuGetPackageUtils.readNuspecMetadata(nupkg("Some.Package", version));
+
+    assertThat(metadata.version()).isEqualTo("1.0.0");
+  }
+
+  @Nested
+  @DisplayName("length-limited nuspec metadata (RPS-1005)")
+  class LengthLimitedMetadata {
+
+    private static String nuspec(final String metadataXml) {
+      return "<package><metadata><id>Some.Package</id><version>1.0.0</version>%s</metadata></package>"
+          .formatted(metadataXml);
+    }
+
+    @Test
+    @DisplayName("cuts a title longer than the title column to the column length")
+    void truncatesLongTitle() {
+      final var xml = nuspec("<title>" + "t".repeat(600) + "</title>");
+
+      assertThat(NuGetPackageUtils.extractTitle(xml)).isEqualTo("t".repeat(512));
+    }
+
+    @Test
+    @DisplayName("keeps a title exactly at the column length")
+    void keepsTitleAtLimit() {
+      final var title = "t".repeat(512);
+
+      assertThat(NuGetPackageUtils.extractTitle(nuspec("<title>" + title + "</title>")))
+          .isEqualTo(title);
+    }
+
+    @Test
+    @DisplayName("does not split a surrogate pair when it cuts a title")
+    void truncatesOnACodePointBoundary() {
+      final var emoji = "😀";
+      final var xml = nuspec("<title>" + emoji.repeat(600) + "</title>");
+
+      final var title = NuGetPackageUtils.extractTitle(xml);
+
+      assertThat(title).isEqualTo(emoji.repeat(512));
+      assertThat(title.codePointCount(0, title.length())).isEqualTo(512);
+    }
+
+    @Test
+    @DisplayName("counts characters, not UTF-16 units, so a title that fits is kept whole")
+    void keepsAnAstralTitleThatFits() {
+      final var title = "😀".repeat(512);
+
+      assertThat(NuGetPackageUtils.extractTitle(nuspec("<title>" + title + "</title>")))
+          .isEqualTo(title);
+    }
+
+    @Test
+    @DisplayName("cuts tags longer than the tags column to the column length")
+    void truncatesLongTags() {
+      final var xml = nuspec("<tags>" + "g".repeat(1100) + "</tags>");
+
+      assertThat(NuGetPackageUtils.extractTags(xml)).isEqualTo("g".repeat(1024));
+    }
+
+    @Test
+    @DisplayName("keeps tags exactly at the column length")
+    void keepsTagsAtLimit() {
+      final var tags = "g".repeat(1024);
+
+      assertThat(NuGetPackageUtils.extractTags(nuspec("<tags>" + tags + "</tags>")))
+          .isEqualTo(tags);
+    }
+
+    @Test
+    @DisplayName("returns null for a title and tags the nuspec does not declare")
+    void missingTitleAndTags() {
+      assertThat(NuGetPackageUtils.extractTitle(nuspec(""))).isNull();
+      assertThat(NuGetPackageUtils.extractTags(nuspec(""))).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"iconUrl", "licenseUrl", "projectUrl"})
+    @DisplayName("drops a URL longer than its column instead of cutting it")
+    void dropsLongUrl(final String tag) {
+      final var xml =
+          nuspec("<%s>https://example.test/%s</%s>".formatted(tag, "a".repeat(600), tag));
+
+      assertThat(NuGetPackageUtils.extractUrl(xml, tag)).isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"iconUrl", "licenseUrl", "projectUrl"})
+    @DisplayName("keeps a URL exactly at the column length")
+    void keepsUrlAtLimit(final String tag) {
+      final var url = "https://example.test/" + "a".repeat(512 - 21);
+      final var xml = nuspec("<%s>%s</%s>".formatted(tag, url, tag));
+
+      assertThat(url).hasSize(512);
+      assertThat(NuGetPackageUtils.extractUrl(xml, tag)).isEqualTo(url);
+    }
+
+    @Test
+    @DisplayName("returns null for a URL the nuspec does not declare")
+    void missingUrl() {
+      assertThat(NuGetPackageUtils.extractUrl(nuspec(""), "projectUrl")).isNull();
+    }
   }
 
   @ParameterizedTest
