@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.docker.shared.layer.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.os.config.async.MaintenanceTaskExecutorConfig;
 import io.repsy.os.server.protocols.docker.shared.layer.dtos.OrphanLayerInfo;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
@@ -34,7 +35,7 @@ public class OrphanLayerCleanupService {
   private final @NonNull DockerStorageService dockerStorageService;
   private final @NonNull UsageUpdateService usageUpdateService;
 
-  @Async
+  @Async(MaintenanceTaskExecutorConfig.BEAN_NAME)
   public void cleanupBlobs(
       final @NonNull UUID repoId, final @NonNull List<OrphanLayerInfo> orphans) {
 

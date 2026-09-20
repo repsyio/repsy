@@ -264,8 +264,13 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     this.deleteDirectory(storagePath);
   }
 
+  /**
+   * Runs on the application's {@code maintenanceTaskExecutor} bean: walking and deleting the trash
+   * can take minutes and must not hold up the default {@code @Async} pool. An application that
+   * enables {@code @Async} has to define a bean of that name.
+   */
   @SneakyThrows
-  @Async
+  @Async("maintenanceTaskExecutor")
   @Override
   public void clearTrash() {
     if (!Files.exists(this.trashPath) || !Files.isDirectory(this.trashPath)) {
