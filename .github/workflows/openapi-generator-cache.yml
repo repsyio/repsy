@@ -1,0 +1,59 @@
+name: OpenAPI generator cache
+
+# The `Repsy frontend` job in pr-checks.yml caches the openapi-generator jar. A cache is only
+# readable from the ref that saved it and from main, so PRs and merge queue entries can reuse
+# the jar only if a run on main saved it. This workflow does that. The weekly run also keeps the
+# entry from being evicted after 7 days without an access.
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - repsy-frontend/openapitools.json
+      - .github/workflows/openapi-generator-cache.yml
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+jobs:
+  seed:
+    name: Seed generator jar cache
+    runs-on: warp-ubuntu-latest-x64-2x
+    defaults:
+      run:
+        working-directory: ./repsy-frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "24"
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install --ignore-scripts
+
+      - name: Set up JRE
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          java-version: "21"
+          java-package: "jre"
+          distribution: "temurin"
+
+      # Same path and key as pr-checks.yml. On a hit this only refreshes the entry's access time.
+      - name: Cache OpenAPI generator jar
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/openapi-generator-cli
+          key: openapi-generator-${{ runner.os }}-${{ hashFiles('repsy-frontend/openapitools.json') }}
+
+      # Downloads the jar on a miss. The generated client itself is thrown away.
+      - name: Generate API client
+        run: pnpm run gen:api
