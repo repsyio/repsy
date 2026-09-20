@@ -32,8 +32,10 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
+import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.AfterEach;
@@ -519,6 +521,128 @@ class NuGetPackageUtilsTest {
             null);
     return new NuGetRegistrationLeafItem(
         "id", "type", entry, true, "content", Instant.EPOCH, "registration");
+  }
+
+  /**
+   * RPS-1053: {@code extractNuspec} used to read the whole inflated {@code .nuspec}, so a small
+   * package could make the server buffer gigabytes. The read is bounded now.
+   */
+  @Nested
+  @DisplayName("the size of the nuspec (RPS-1053)")
+  class NuspecSize {
+
+    private static final String LIMIT_MESSAGE = "The .nuspec in the package must be at most 1 MiB.";
+
+    /** A valid nuspec padded with trailing whitespace to exactly {@code size} bytes. */
+    private byte[] nuspecOfSize(final long size) {
+      final var xml =
+          "<package><metadata><id>Big.Package</id><version>1.0.0</version></metadata></package>";
+      final var padding = " ".repeat((int) size - xml.length());
+
+      return (xml + padding).getBytes(StandardCharsets.UTF_8);
+    }
+
+    private Path deflatedNupkg(final String entryName, final byte[] content) throws IOException {
+      final var file = Files.createTempFile(tempDir, "pkg", ".nupkg");
+
+      try (final var zip = new ZipOutputStream(Files.newOutputStream(file))) {
+        zip.putNextEntry(new ZipEntry(entryName));
+        zip.write(content);
+        zip.closeEntry();
+      }
+      return file;
+    }
+
+    /** A stored entry, whose local header states its size, unlike a deflated one. */
+    private Path storedNupkg(final String entryName, final byte[] content) throws IOException {
+      final var file = Files.createTempFile(tempDir, "pkg", ".nupkg");
+      final var crc = new CRC32();
+      crc.update(content);
+
+      try (final var zip = new ZipOutputStream(Files.newOutputStream(file))) {
+        final var entry = new ZipEntry(entryName);
+        entry.setMethod(ZipEntry.STORED);
+        entry.setSize(content.length);
+        entry.setCompressedSize(content.length);
+        entry.setCrc(crc.getValue());
+        zip.putNextEntry(entry);
+        zip.write(content);
+        zip.closeEntry();
+      }
+      return file;
+    }
+
+    @Test
+    @DisplayName("reads a nuspec of exactly the limit")
+    void readsNuspecAtLimit() throws IOException {
+      final var nupkg =
+          deflatedNupkg("Big.Package.nuspec", nuspecOfSize(NuGetPackageUtils.MAX_NUSPEC_BYTES));
+
+      final var metadata = NuGetPackageUtils.readNuspecMetadata(nupkg);
+
+      assertThat(metadata.packageId()).isEqualTo("Big.Package");
+      assertThat(metadata.nuspecXml()).hasSize((int) NuGetPackageUtils.MAX_NUSPEC_BYTES);
+    }
+
+    @Test
+    @DisplayName("refuses a deflated nuspec one byte over the limit, whose header carries no size")
+    void refusesDeflatedNuspecOverLimit() throws IOException {
+      final var nupkg =
+          deflatedNupkg("Big.Package.nuspec", nuspecOfSize(NuGetPackageUtils.MAX_NUSPEC_BYTES + 1));
+
+      assertThatThrownBy(() -> NuGetPackageUtils.readNuspecMetadata(nupkg))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage(LIMIT_MESSAGE);
+    }
+
+    @Test
+    @DisplayName("refuses a stored nuspec over the limit from its header size")
+    void refusesStoredNuspecOverLimit() throws IOException {
+      final var nupkg =
+          storedNupkg("Big.Package.nuspec", nuspecOfSize(NuGetPackageUtils.MAX_NUSPEC_BYTES + 1));
+
+      assertThatThrownBy(() -> NuGetPackageUtils.readNuspecMetadata(nupkg))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage(LIMIT_MESSAGE);
+    }
+
+    @Test
+    @DisplayName("refuses a nuspec that inflates far past the limit without buffering it")
+    void refusesDecompressionBomb() throws IOException {
+      final var file = Files.createTempFile(tempDir, "bomb", ".nupkg");
+      final var chunk = new byte[1024 * 1024];
+      Arrays.fill(chunk, (byte) ' ');
+
+      try (final var zip = new ZipOutputStream(Files.newOutputStream(file))) {
+        zip.putNextEntry(new ZipEntry("Bomb.nuspec"));
+        for (int i = 0; i < 64; i++) {
+          zip.write(chunk);
+        }
+        zip.closeEntry();
+      }
+
+      assertThat(Files.size(file)).isLessThan(NuGetPackageUtils.MAX_NUSPEC_BYTES);
+      assertThatThrownBy(() -> NuGetPackageUtils.readNuspecMetadata(file))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage(LIMIT_MESSAGE);
+    }
+
+    @Test
+    @DisplayName("does not count a large entry that is not the nuspec against the limit")
+    void ignoresLargeEntryThatIsNotTheNuspec() throws IOException {
+      final var file = Files.createTempFile(tempDir, "pkg", ".nupkg");
+
+      try (final var zip = new ZipOutputStream(Files.newOutputStream(file))) {
+        zip.putNextEntry(new ZipEntry("lib/net8.0/Big.dll"));
+        zip.write(new byte[(int) NuGetPackageUtils.MAX_NUSPEC_BYTES * 2]);
+        zip.closeEntry();
+        zip.putNextEntry(new ZipEntry("Big.Package.nuspec"));
+        zip.write(nuspecOfSize(200));
+        zip.closeEntry();
+      }
+
+      assertThat(NuGetPackageUtils.readNuspecMetadata(file).packageId()).isEqualTo("Big.Package");
+    }
   }
 
   private Path nupkg(final String id, final String version) throws IOException {

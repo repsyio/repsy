@@ -809,6 +809,57 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
   }
 
   /**
+   * RPS-1053: the nuspec was read whole out of the uploaded package, so a package a few kilobytes
+   * long whose nuspec inflates to gigabytes exhausted the heap of the instance. A nuspec over the
+   * limit is now refused with a 400 before anything is stored.
+   */
+  @Nested
+  @DisplayName("the size of the nuspec (RPS-1053)")
+  class NuspecSize {
+
+    /** A nuspec of exactly {@code size} bytes, padded with trailing whitespace. */
+    private static Entry nuspecOfSize(final String id, final long size) {
+      final var xml =
+          "<package><metadata><id>%s</id><version>1.0.0</version></metadata></package>"
+              .formatted(id);
+
+      return entry(id + ".nuspec", xml + " ".repeat((int) size - xml.length()));
+    }
+
+    @Test
+    @DisplayName("rejects a nuspec over the limit with a 400 and stores nothing")
+    void rejectsOversizedNuspec() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var id = uniquePackageId();
+      final var bomb = zip(nuspecOfSize(id, NuGetPackageUtils.MAX_NUSPEC_BYTES + 1));
+
+      NuGetPublishProtocolIT.this
+          .protocol(push(repo, bomb, NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
+          .andExpect(status().isBadRequest())
+          .andExpect(
+              jsonPath("$.errors[0].message")
+                  .value("The .nuspec in the package must be at most 1 MiB."));
+
+      NuGetPublishProtocolIT.this.assertNothingStored(repo, id);
+    }
+
+    @Test
+    @DisplayName("still publishes a nuspec of exactly the limit")
+    void publishesNuspecAtLimit() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var id = uniquePackageId();
+      final var nupkg = zip(nuspecOfSize(id, NuGetPackageUtils.MAX_NUSPEC_BYTES));
+
+      final var response =
+          NuGetPublishProtocolIT.this.pushAs(
+              repo, nupkg, NuGetPublishProtocolIT.this.adminProtocolBearerToken());
+
+      assertStatus(response, 201);
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, id)).hasSize(1);
+    }
+  }
+
+  /**
    * RPS-1005: a nuspec value longer than its {@code nuget_package_version} column used to fail the
    * row insert, which the facade reported as a 409 while the files stayed in storage. Now a title
    * and tags are cut, a URL is dropped and a version is rejected, all before anything is written.
