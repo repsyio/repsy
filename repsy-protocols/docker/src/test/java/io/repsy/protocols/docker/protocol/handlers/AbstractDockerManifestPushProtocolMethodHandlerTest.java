@@ -16,12 +16,15 @@
 package io.repsy.protocols.docker.protocol.handlers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
@@ -37,6 +40,7 @@ import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.utils.BaseParsedPath;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -56,7 +60,12 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   private static final String REPO_NAME = "images";
   private static final String MANIFEST_TYPE = "application/vnd.oci.image.manifest.v1+json";
   private static final String INDEX_TYPE = "application/vnd.oci.image.index.v1+json";
-  private static final String MANIFEST_JSON = "{\"schemaVersion\":2}";
+  private static final String MANIFEST_JSON =
+      "{\"schemaVersion\":2,\"config\":{\"digest\":\"sha256:c\"},"
+          + "\"layers\":[{\"digest\":\"sha256:l\"}]}";
+  private static final String INDEX_JSON =
+      "{\"schemaVersion\":2,\"manifests\":[{\"digest\":\"sha256:m\",\"size\":9,"
+          + "\"platform\":{\"architecture\":\"amd64\",\"os\":\"linux\"}}]}";
 
   @Mock private PathParser basePathParser;
   @Mock private DockerProtocolFacade<UUID> dockerFacade;
@@ -101,6 +110,10 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   }
 
   private static ProtocolContext context() {
+    return context(MANIFEST_JSON);
+  }
+
+  private static ProtocolContext context(final String manifestJson) {
     final var repoInfo = new BaseRepoInfo<UUID>();
     repoInfo.setId(REPO_ID);
     repoInfo.setStorageKey(REPO_ID);
@@ -114,7 +127,7 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
             .relativePath(new RelativePath("/app/manifests/latest"))
             .repoInfo(repoInfo)
             .build());
-    context.addProperty("manifestJson", MANIFEST_JSON);
+    context.addProperty("manifestJson", manifestJson);
     return context;
   }
 
@@ -195,7 +208,7 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   @Test
   @DisplayName("does not rename layers for an image index, which references manifests only")
   void indexDoesNotRenameLayers() throws Exception {
-    final var context = context();
+    final var context = context(INDEX_JSON);
     this.stubImageAndSave(context, BaseUsages.ofDisk(400));
 
     final var response =
@@ -204,5 +217,34 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     assertThat(this.usageOf(context)).isEqualTo(400);
     verify(this.layerRenamer, never()).renameLayers(any(), any());
+  }
+
+  @Test
+  @DisplayName("refuses a malformed manifest before the image is created or anything is stored")
+  void refusesMalformedManifestBeforeStoringAnything() {
+    final var context = context("{}");
+
+    assertThatThrownBy(
+            () ->
+                this.handler()
+                    .handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse()))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("manifestConfigMissing");
+
+    verifyNoInteractions(this.imageService, this.dockerFacade, this.layerRenamer);
+  }
+
+  @Test
+  @DisplayName("reads the manifest from the request body when the context has none")
+  void refusesMalformedManifestReadFromTheBody() {
+    final var context = context("");
+    final var request = request(INDEX_TYPE);
+    request.setContent("not json".getBytes(StandardCharsets.UTF_8));
+
+    assertThatThrownBy(() -> this.handler().handle(context, request, new MockHttpServletResponse()))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("manifestInvalidJson");
+
+    verifyNoInteractions(this.imageService, this.dockerFacade, this.layerRenamer);
   }
 }

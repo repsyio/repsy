@@ -32,6 +32,7 @@ import io.repsy.protocols.docker.shared.image.services.ImageService;
 import io.repsy.protocols.docker.shared.layer.services.AbstractDockerLayerRenamer;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
+import io.repsy.protocols.docker.shared.utils.DockerManifestValidator;
 import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -123,13 +124,16 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
       return ResponseEntity.badRequest().build();
     }
 
+    final var manifestJson = this.getManifestJsonStr(context, request);
+
+    // Before the image is created: a manifest that cannot be stored must leave nothing behind.
+    DockerManifestValidator.validate(contentType, manifestJson);
+
     final var imageInfo = this.findOrCreateImage(repoInfo.getId(), imageName, 1);
 
     final var fileName =
         ManifestNameGenerator.generate(repoInfo.getStorageKey(), imageName, reference);
     final var parsedManifestPath = this.parseForManifest(request.getServletPath(), fileName);
-
-    final var manifestJson = this.getManifestJsonStr(context, request);
 
     final var manifestBytes = manifestJson.getBytes(StandardCharsets.UTF_8);
     final var digest = DockerDigestCalculator.calculateDigest(manifestBytes);
