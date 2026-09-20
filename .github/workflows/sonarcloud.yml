@@ -26,8 +26,10 @@ jobs:
         with:
           node-version: "24"
 
+      # Pinned (and without lifecycle scripts) to satisfy SonarCloud's githubactions:S6505 and S8543.
+      # This is the pnpm version "Repsy frontend" in pr-checks.yml resolves to today.
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g --ignore-scripts pnpm@12.5.1
 
       - name: Install dependencies
         run: pnpm install --ignore-scripts
