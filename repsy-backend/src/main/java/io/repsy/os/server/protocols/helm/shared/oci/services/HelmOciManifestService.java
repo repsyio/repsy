@@ -25,6 +25,7 @@ import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -91,6 +92,11 @@ public class HelmOciManifestService implements OciManifestService<UUID> {
   @Override
   public List<String> listTagsByName(final UUID repoId, final String name) {
     return this.helmOciManifestRepository.findReferencesByRepoIdAndName(repoId, name);
+  }
+
+  @Override
+  public Stream<String> streamContentByRepoId(final UUID repoId) {
+    return this.helmOciManifestRepository.streamContentByRepoId(repoId);
   }
 
   private HelmOciManifest buildEntity(final HelmOciManifestForm form, final UUID repoId) {
