@@ -27,7 +27,6 @@ import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
-import java.io.IOException;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -58,7 +57,7 @@ public class NuGetApiFacade implements ProtocolApiFacade {
 
   @Override
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public void deleteRepo(final RepoInfo repoInfo) throws IOException {
+  public void deleteRepo(final RepoInfo repoInfo) {
     this.nugetStorageService.deleteRepo(repoInfo.getId());
   }
 

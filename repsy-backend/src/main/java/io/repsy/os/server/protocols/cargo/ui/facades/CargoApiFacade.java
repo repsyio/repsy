@@ -60,7 +60,7 @@ public class CargoApiFacade implements ProtocolApiFacade {
 
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
   @Override
-  public void deleteRepo(final RepoInfo repoInfo) throws IOException {
+  public void deleteRepo(final RepoInfo repoInfo) {
 
     this.cargoStorageService.deleteRepo(repoInfo.getId());
   }

@@ -191,9 +191,4 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
     final var checksum = CompactIndexFormatter.md5Hex(CompactIndexFormatter.formatGemInfo(entries));
     this.gemService.saveVersionsChecksum(repoInfo, gemName, checksum);
   }
-
-  public void deleteRepo(final ProtocolContext context) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    this.storageService.deleteRepo(repoInfo.getStorageKey());
-  }
 }
