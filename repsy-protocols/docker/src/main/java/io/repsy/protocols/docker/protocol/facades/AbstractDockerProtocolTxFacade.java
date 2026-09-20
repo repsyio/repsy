@@ -47,6 +47,7 @@ import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
 import io.repsy.protocols.docker.shared.utils.DockerConstants;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -85,15 +86,32 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
       final ProtocolContext context,
       final RelativePath relativePath,
       final InputStream inputStream,
-      final long contentLength) {
+      final long contentLength)
+      throws IOException {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var storagePath = StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath());
 
-    final var afterUploadUsage = this.writeFileAndUpdateUsage(inputStream, repoInfo, relativePath);
+    final var chunkUsages =
+        this.dockerStorageService.appendInputStreamToPath(
+            repoInfo.getName(), storagePath, inputStream);
 
-    context.addProperty(USAGES_PROPERTY, afterUploadUsage);
+    ProtocolContextUtils.addUsages(context, chunkUsages);
 
-    return afterUploadUsage.getDiskUsage();
+    return this.getResource(repoInfo, relativePath).contentLength();
+  }
+
+  @Override
+  public void verifyLayerDigest(
+      final ProtocolContext context, final RelativePath relativePath, final String digest)
+      throws IOException {
+
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var resource = this.getResource(repoInfo, relativePath);
+
+    if (!BlobDigests.matches(digest, resource.getInputStream())) {
+      throw new BadRequestException("digestMismatch");
+    }
   }
 
   @Override

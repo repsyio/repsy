@@ -109,7 +109,7 @@ public abstract class AbstractHelmOciBlobUploadChunkProtocolMethodHandler<ID>
 
     final var uploadId = UUID.fromString(matcher.group(2));
 
-    final var currentSize =
+    final var uploadSize =
         this.helmFacade.uploadBlobChunk(
             context, uploadId, request.getInputStream(), request.getContentLengthLong());
 
@@ -121,7 +121,7 @@ public abstract class AbstractHelmOciBlobUploadChunkProtocolMethodHandler<ID>
 
     return ResponseEntity.accepted()
         .header(LOCATION, location)
-        .header(RANGE, "0-" + (currentSize - 1))
+        .header(RANGE, "0-" + Math.max(uploadSize - 1, 0))
         .header(DOCKER_UPLOAD_UUID, uploadId.toString())
         .build();
   }

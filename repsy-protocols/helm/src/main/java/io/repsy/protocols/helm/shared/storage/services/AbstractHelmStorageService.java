@@ -119,7 +119,7 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   public BaseUsages saveBlobChunk(
       final UUID repoUuid, final UUID uploadId, final InputStream chunk, final String repoName) {
     final var storagePath = StoragePath.of(repoUuid, "oci/blobs/" + uploadId);
-    return this.storageStrategy.write(repoName, storagePath, chunk);
+    return this.storageStrategy.appendStream(repoName, storagePath, chunk);
   }
 
   @Override

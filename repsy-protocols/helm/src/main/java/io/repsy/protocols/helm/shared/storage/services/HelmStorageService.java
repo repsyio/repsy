@@ -54,6 +54,10 @@ public interface HelmStorageService<ID> {
 
   String getChartRelativePath(String name, String version);
 
+  /**
+   * Appends a chunk to the upload's temp file, so a blob sent in several {@code PATCH} requests is
+   * stored whole. Answers the appended bytes as the disk usage change.
+   */
   BaseUsages saveBlobChunk(UUID repoUuid, UUID uploadId, InputStream chunk, String repoName);
 
   long getBlobSize(UUID repoUuid, UUID uploadId, String repoName) throws IOException;

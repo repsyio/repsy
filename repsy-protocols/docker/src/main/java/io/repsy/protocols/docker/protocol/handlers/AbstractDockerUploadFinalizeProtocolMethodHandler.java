@@ -130,6 +130,17 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
       return ResponseEntity.badRequest().build();
     }
 
+    final var uploadPath = new RelativePath("/blobs/" + sessionId);
+
+    if (request.getContentLength() > 0) {
+      this.dockerFacade.uploadLayerChunk(
+          context, uploadPath, request.getInputStream(), request.getContentLengthLong());
+    }
+
+    // The upload is only a blob once it is known to hold what the client claims: check it before
+    // the layer row that names the digest is created.
+    this.dockerFacade.verifyLayerDigest(context, uploadPath, digest);
+
     final var layerForm =
         LayerForm.builder()
             .imageName(imageName)
@@ -139,13 +150,6 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
             .build();
 
     final var layerInfo = this.findOrCreateLayer(repoInfo.getId(), layerForm, 1);
-
-    final var uploadPath = new RelativePath("/blobs/" + sessionId);
-
-    if (request.getContentLength() > 0) {
-      this.dockerFacade.uploadLayerChunk(
-          context, uploadPath, request.getInputStream(), request.getContentLengthLong());
-    }
 
     this.dockerFacade.finalizeLayerUpload(context, uploadPath, layerInfo);
 

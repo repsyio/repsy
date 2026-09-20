@@ -33,11 +33,25 @@ import org.springframework.data.util.Pair;
 @NullMarked
 public interface DockerProtocolFacade<ID> {
 
+  /**
+   * Appends a chunk to the layer upload, so a layer sent in several {@code PATCH} requests is
+   * stored whole.
+   *
+   * @return The size of the whole upload so far, which is what the {@code Range} header reports
+   */
   long uploadLayerChunk(
       ProtocolContext context,
       RelativePath relativePath,
       InputStream inputStream,
       long contentLength)
+      throws IOException;
+
+  /**
+   * Checks that the finished upload hashes to the digest the client claims for it.
+   *
+   * @throws io.repsy.core.error_handling.exceptions.BadRequestException When it does not
+   */
+  void verifyLayerDigest(ProtocolContext context, RelativePath relativePath, String digest)
       throws IOException;
 
   void finalizeLayerUpload(ProtocolContext context, RelativePath relativePath, LayerInfo layerInfo)

@@ -72,9 +72,23 @@ public class DockerProtocolTxFacade extends AbstractDockerProtocolTxFacade<UUID>
       final ProtocolContext context,
       final RelativePath relativePath,
       final InputStream inputStream,
-      final long contentLength) {
+      final long contentLength)
+      throws IOException {
 
     return super.uploadLayerChunk(context, relativePath, inputStream, contentLength);
+  }
+
+  /**
+   * Hashes the whole upload, which takes as long as the layer is big, so it does not hold a
+   * database transaction (and its connection) open meanwhile.
+   */
+  @Override
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
+  public void verifyLayerDigest(
+      final ProtocolContext context, final RelativePath relativePath, final String digest)
+      throws IOException {
+
+    super.verifyLayerDigest(context, relativePath, digest);
   }
 
   @Override

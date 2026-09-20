@@ -60,10 +60,10 @@ class AbstractHelmStorageServiceTest {
   }
 
   @Test
-  @DisplayName("saveBlobChunk() answers the usage the chunk added to the upload file")
+  @DisplayName("saveBlobChunk() appends the chunk and answers the usage it added to the upload")
   void saveBlobChunkAnswersTheWrittenUsage() {
     final var expected = BaseUsages.ofDisk(2048);
-    when(this.storageStrategy.write(
+    when(this.storageStrategy.appendStream(
             eq(REPO_NAME),
             argThat(path -> path != null && path.getPath().equals(UPLOAD_PATH)),
             any()))

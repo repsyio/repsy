@@ -115,7 +115,7 @@ public abstract class AbstractDockerUploadChunkProtocolMethodHandler<ID>
 
     final var uploadPath = new RelativePath("/blobs/" + sessionId);
 
-    final var currentSize =
+    final var uploadSize =
         this.dockerFacade.uploadLayerChunk(
             context, uploadPath, request.getInputStream(), request.getContentLengthLong());
 
@@ -123,7 +123,7 @@ public abstract class AbstractDockerUploadChunkProtocolMethodHandler<ID>
 
     return ResponseEntity.accepted()
         .header(LOCATION, location)
-        .header(RANGE, "0-" + (currentSize - 1))
+        .header(RANGE, "0-" + Math.max(uploadSize - 1, 0))
         .header(DOCKER_UPLOAD_UUID, this.getUploadUUID().toString())
         .build();
   }
