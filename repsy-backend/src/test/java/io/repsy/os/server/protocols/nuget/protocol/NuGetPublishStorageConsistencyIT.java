@@ -55,7 +55,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -100,7 +99,6 @@ class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
   @Autowired private NuGetPackageRepository nugetPackageRepository;
   @Autowired private NuGetPackageVersionRepository nugetPackageVersionRepository;
   @Autowired private RepoTxService repoTxService;
-  @Autowired private JdbcTemplate jdbcTemplate;
 
   private final List<UUID> createdRepoIds = new ArrayList<>();
   private final List<UUID> createdUserIds = new ArrayList<>();

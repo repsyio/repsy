@@ -15,18 +15,13 @@
  */
 package io.repsy.os.server.protocols.maven.shared.artifact.repositories;
 
-import io.repsy.os.server.protocols.maven.shared.artifact.dtos.VersionLicenseInfo;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.VersionLicense;
-import java.util.List;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public interface VersionLicenseRepository extends JpaRepository<VersionLicense, UUID> {
-
-  @NonNull List<VersionLicenseInfo> findAllByArtifactVersionId(UUID versionId);
 
   void deleteAllByArtifactVersionId(UUID versionId);
 }

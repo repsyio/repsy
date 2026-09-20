@@ -42,6 +42,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -445,7 +446,8 @@ class AuthControllerIT extends AbstractIntegrationTest {
                         .isNotNull()
                         .isBetween(before, Instant.now()));
       } finally {
-        AuthControllerIT.this.userRepository.deleteById(userId);
+        // The successful login registered a refresh token, which outlives the user.
+        AuthControllerIT.this.deleteCommittedUsers(List.of(userId));
       }
     }
 

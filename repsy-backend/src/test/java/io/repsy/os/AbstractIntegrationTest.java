@@ -45,10 +45,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.TemporalAmount;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -56,6 +57,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -99,12 +101,17 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * the rows it created. Never empty a table other classes rely on, and don't assert on the absolute
  * size of one: measure it before the fixtures and compare against that.
  *
+ * <p>{@link CommittedRowsGuard} enforces that: it waits for the startup seeding of the default
+ * repos before the first test, snapshots the tables, and fails the class that ends with different
+ * row counts (removing the rows it added, so the next class is not affected).
+ *
  * <p>The one exception to the shared database is {@code DefaultRepoSeedingIT}, which has to empty
  * the {@code repo} table and re-publish {@code UserCreatedEvent}. It does not extend this class and
  * owns a container of its own; nothing else should.
  */
 @AutoConfigureMockMvc
 @Transactional
+@ExtendWith(CommittedRowsGuard.class)
 @SpringBootTest(
     classes = RepsyApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.MOCK)
@@ -151,17 +158,13 @@ public abstract class AbstractIntegrationTest {
     registry.add("admin.initial-password", () -> SEEDED_ADMIN_PASSWORD);
   }
 
-  private static final Duration SEEDING_TIMEOUT = Duration.ofSeconds(30);
-  private static final long SEEDING_POLL_MILLIS = 50;
-
-  private static volatile boolean defaultReposSeeded;
-
   @Autowired protected MockMvc mockMvc;
   @Autowired protected JwtUtils jwtUtils;
   @Autowired protected RefreshTokenService refreshTokenService;
   @Autowired protected UserTxService userTxService;
   @Autowired protected UserRepository userRepository;
   @Autowired protected RepoRepository repoRepository;
+  @Autowired protected JdbcTemplate jdbcTemplate;
   @PersistenceContext protected EntityManager entityManager;
 
   protected void registerRefreshToken(final String token) {
@@ -174,37 +177,9 @@ public abstract class AbstractIntegrationTest {
   }
 
   /**
-   * Blocks until the application's asynchronous startup seeding has committed its default repos.
-   *
-   * <p>{@code AdminUserInitializer} publishes a {@code UserCreatedEvent} and the {@code @Async}
-   * per-protocol {@code *AuthListener}s then create one default repo per {@link RepoType} (named
-   * {@code maven}, {@code npm}, ..., {@code go}, ...) in their own committed transactions. Without
-   * this barrier the first test of a JVM would race that seeding, and anything that counts or lists
-   * repos would see a different number depending on timing.
-   */
-  @BeforeEach
-  protected void awaitDefaultRepos() throws InterruptedException {
-    if (defaultReposSeeded) {
-      return;
-    }
-
-    final var deadline = System.nanoTime() + SEEDING_TIMEOUT.toNanos();
-
-    while (this.repoRepository.count() < RepoType.values().length) {
-      if (System.nanoTime() > deadline) {
-        throw new IllegalStateException("Default repos were not seeded within " + SEEDING_TIMEOUT);
-      }
-
-      Thread.sleep(SEEDING_POLL_MILLIS);
-    }
-
-    defaultReposSeeded = true;
-  }
-
-  /**
-   * Removes the startup-seeded default repos (see {@link #awaitDefaultRepos()}) so a test can
-   * assert against a repo table it fully controls. The delete happens inside the test transaction,
-   * so the rollback restores them for the next test.
+   * Removes the startup-seeded default repos (see {@link CommittedRowsGuard}) so a test can assert
+   * against a repo table it fully controls. The delete happens inside the test transaction, so the
+   * rollback restores them for the next test.
    */
   protected void deleteDefaultRepos() {
     this.repoRepository.deleteAllInBatch();
@@ -350,6 +325,19 @@ public abstract class AbstractIntegrationTest {
   /** Creates a fresh plain USER and returns a valid bearer token for it. */
   protected String userBearerToken() {
     return this.bearerTokenFor(this.createUser(uniqueUsername("user"), UserRole.USER));
+  }
+
+  /**
+   * Deletes users a test committed, together with the refresh tokens their logins registered:
+   * {@code refresh_tokens} has no foreign key to {@code users}, so deleting the user alone leaves
+   * the session rows behind. For classes that run with {@code Propagation.NOT_SUPPORTED}.
+   */
+  protected void deleteCommittedUsers(final Collection<UUID> userIds) {
+    for (final var userId : userIds) {
+      this.jdbcTemplate.update("delete from refresh_tokens where user_id = ?", userId);
+    }
+
+    this.userRepository.deleteAllById(userIds);
   }
 
   protected User seededAdmin() {
