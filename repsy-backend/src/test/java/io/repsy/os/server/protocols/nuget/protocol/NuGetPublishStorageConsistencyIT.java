@@ -86,8 +86,13 @@ class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
   private static final int PROTOCOL_PORT = 9090;
   private static final String PUSH_PATH = "/{repo}/v3/package";
 
-  /** The {@code title} column is {@code varchar(512)}: the row insert fails, nothing else does. */
-  private static final String TITLE_TOO_LONG_FOR_THE_COLUMN = "x".repeat(600);
+  /**
+   * A title the database refuses through {@link #rejectTitleAtTheDatabase()}. An over-long title no
+   * longer does it (RPS-1005 cuts it), so the row rejection these tests need is made explicit.
+   */
+  private static final String REJECTED_TITLE = "reject-me";
+
+  private static final String REJECT_TITLE_CONSTRAINT = "ch_nuget_package_version__it_rejected";
 
   @MockitoBean private UsageUpdateService usageUpdateService;
 
@@ -110,6 +115,21 @@ class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
     this.createdRepoIds.clear();
     this.userRepository.deleteAllById(this.createdUserIds);
     this.createdUserIds.clear();
+    this.jdbcTemplate.execute(
+        "alter table nuget_package_version drop constraint if exists " + REJECT_TITLE_CONSTRAINT);
+  }
+
+  /**
+   * Makes the database refuse a version row with {@link #REJECTED_TITLE}: a check violation, which
+   * is a {@code DataIntegrityViolationException} but not the unique index on (package, version).
+   */
+  private void rejectTitleAtTheDatabase() {
+    this.jdbcTemplate.execute(
+        "alter table nuget_package_version add constraint "
+            + REJECT_TITLE_CONSTRAINT
+            + " check (title is distinct from '"
+            + REJECTED_TITLE
+            + "')");
   }
 
   private Repo nugetRepo(final boolean allowOverride) {
@@ -232,16 +252,14 @@ class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
   void rejectedRowLeavesNoFiles() throws Exception {
     final var repo = this.nugetRepo(false);
     final var id = uniquePackageId();
+    this.rejectTitleAtTheDatabase();
 
     final var response =
-        this.push(
-            repo,
-            nupkg(id, "1.0.0", TITLE_TOO_LONG_FOR_THE_COLUMN, "never stored"),
-            this.adminToken());
+        this.push(repo, nupkg(id, "1.0.0", REJECTED_TITLE, "never stored"), this.adminToken());
 
     assertThat(response.getStatus())
-        .as("a push the database rejects must not succeed")
-        .isNotEqualTo(201);
+        .as("a rejection that is not a duplicate version is a server error, not a 409 (RPS-1005)")
+        .isEqualTo(500);
     assertThat(this.storedVersionCount(repo, id)).isZero();
     assertThat(versionDir(repo, id, "1.0.0")).doesNotExist();
     verifyNoInteractions(this.usageUpdateService);
@@ -256,12 +274,12 @@ class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
     final var original = nupkg(id, "1.0.0", "original", "the first push");
 
     assertThat(this.push(repo, original, token).getStatus()).isEqualTo(201);
+    this.rejectTitleAtTheDatabase();
 
     final var response =
-        this.push(
-            repo, nupkg(id, "1.0.0", TITLE_TOO_LONG_FOR_THE_COLUMN, "the second push"), token);
+        this.push(repo, nupkg(id, "1.0.0", REJECTED_TITLE, "the second push"), token);
 
-    assertThat(response.getStatus()).isNotEqualTo(201);
+    assertThat(response.getStatus()).isEqualTo(500);
     assertThat(Files.readAllBytes(nupkgFile(repo, id, "1.0.0"))).isEqualTo(original);
     assertThat(this.storedVersionCount(repo, id)).isEqualTo(1);
     assertThat(

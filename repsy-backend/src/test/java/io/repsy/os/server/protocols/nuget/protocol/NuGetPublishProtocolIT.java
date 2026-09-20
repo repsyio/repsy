@@ -820,6 +820,170 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
     }
   }
 
+  /**
+   * RPS-1005: a nuspec value longer than its {@code nuget_package_version} column used to fail the
+   * row insert, which the facade reported as a 409 while the files stayed in storage. Now a title
+   * and tags are cut, a URL is dropped and a version is rejected, all before anything is written.
+   *
+   * <p>None of these reaches the database with an over-long value, so they run in this class's test
+   * transaction. The unrelated-failure case, which does reach it, is in {@link
+   * NuGetPublishStorageConsistencyIT}.
+   */
+  @Nested
+  @DisplayName("over-long nuspec metadata (RPS-1005)")
+  class OverLongMetadata {
+
+    private static final int URL_COLUMN_LENGTH = 512;
+
+    private static byte[] nupkgWith(final String id, final String metadataXml) {
+      final var nuspec =
+          """
+          <?xml version="1.0" encoding="utf-8"?>
+          <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+            <metadata>
+              <id>%s</id>
+              <version>1.0.0</version>
+              <authors>Repsy</authors>
+              <description>over-long metadata fixture</description>
+              %s
+            </metadata>
+          </package>
+          """
+              .formatted(id, metadataXml);
+
+      return zip(
+          entry("[Content_Types].xml", "<Types/>"),
+          entry("_rels/.rels", "<Relationships/>"),
+          entry(id + ".nuspec", nuspec),
+          entry("lib/net8.0/" + id + ".dll", "MZ fixture assembly for " + id));
+    }
+
+    private static String urlElements(final String url) {
+      return "<iconUrl>%1$s</iconUrl><licenseUrl>%1$s</licenseUrl><projectUrl>%1$s</projectUrl>"
+              .formatted(url)
+          + "<repository type=\"git\" url=\"%s\" />".formatted(url);
+    }
+
+    @Test
+    @DisplayName("cuts an over-long title and keeps the nuspec as sent")
+    void cutsTitle() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var id = uniquePackageId();
+      final var nupkg = nupkgWith(id, "<title>" + "t".repeat(600) + "</title>");
+
+      assertStatus(
+          NuGetPublishProtocolIT.this.pushAs(
+              repo, nupkg, NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
+          201);
+
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, id))
+          .singleElement()
+          .satisfies(v -> assertThat(v.getTitle()).isEqualTo("t".repeat(512)));
+      assertThat(
+              Files.readString(
+                  java.nio.file.Path.of(
+                      packageDir(repo, id, "1.0.0"), id.toLowerCase() + ".1.0.0.nuspec")))
+          .contains("t".repeat(600));
+    }
+
+    @Test
+    @DisplayName("cuts over-long tags")
+    void cutsTags() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var id = uniquePackageId();
+      final var nupkg = nupkgWith(id, "<tags>" + "g".repeat(1100) + "</tags>");
+
+      assertStatus(
+          NuGetPublishProtocolIT.this.pushAs(
+              repo, nupkg, NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
+          201);
+
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, id))
+          .singleElement()
+          .satisfies(v -> assertThat(v.getTags()).isEqualTo("g".repeat(1024)));
+    }
+
+    @Test
+    @DisplayName("drops an over-long icon, license, project and repository URL")
+    void dropsUrls() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var id = uniquePackageId();
+      final var nupkg =
+          nupkgWith(
+              id, "<title>kept</title>" + urlElements("https://example.test/" + "a".repeat(600)));
+
+      assertStatus(
+          NuGetPublishProtocolIT.this.pushAs(
+              repo, nupkg, NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
+          201);
+
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, id))
+          .singleElement()
+          .satisfies(
+              v -> {
+                assertThat(v.getTitle()).isEqualTo("kept");
+                assertThat(v.getIconUrl()).isNull();
+                assertThat(v.getLicenseUrl()).isNull();
+                assertThat(v.getProjectUrl()).isNull();
+                assertThat(v.getRepositoryUrl()).isNull();
+              });
+    }
+
+    @Test
+    @DisplayName("keeps every value that is exactly as long as its column")
+    void keepsValuesAtTheLimit() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var id = uniquePackageId();
+      final var url = "https://example.test/" + "a".repeat(URL_COLUMN_LENGTH - 21);
+      final var nupkg =
+          nupkgWith(
+              id,
+              "<title>"
+                  + "t".repeat(512)
+                  + "</title><tags>"
+                  + "g".repeat(1024)
+                  + "</tags>"
+                  + urlElements(url));
+
+      assertStatus(
+          NuGetPublishProtocolIT.this.pushAs(
+              repo, nupkg, NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
+          201);
+
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, id))
+          .singleElement()
+          .satisfies(
+              v -> {
+                assertThat(v.getTitle()).isEqualTo("t".repeat(512));
+                assertThat(v.getTags()).isEqualTo("g".repeat(1024));
+                assertThat(v.getIconUrl()).isEqualTo(url);
+                assertThat(v.getLicenseUrl()).isEqualTo(url);
+                assertThat(v.getProjectUrl()).isEqualTo(url);
+                assertThat(v.getRepositoryUrl()).isEqualTo(url);
+              });
+    }
+
+    @Test
+    @DisplayName("rejects an over-long version with a 400 and stores nothing")
+    void rejectsVersion() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var pkg = new Pkg(uniquePackageId(), "1.0.0-" + "a".repeat(59));
+
+      NuGetPublishProtocolIT.this
+          .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
+          .andExpect(status().isBadRequest())
+          .andExpect(
+              jsonPath("$.errors[0].message").value("NuGet version is longer than 64 characters."));
+
+      NuGetPublishProtocolIT.this.assertNothingStored(repo, pkg.id());
+      // Rejected before the package row is created, so it leaves no empty package behind either.
+      assertThat(
+              NuGetPublishProtocolIT.this.nugetPackageRepository.findByRepoIdAndPackageIdIgnoreCase(
+                  repo.getId(), pkg.id()))
+          .isEmpty();
+    }
+  }
+
   @Nested
   @DisplayName("repo rules")
   class RepoRules {

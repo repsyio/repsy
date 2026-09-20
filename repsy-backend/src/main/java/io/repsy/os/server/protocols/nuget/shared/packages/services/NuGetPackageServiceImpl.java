@@ -62,6 +62,8 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   private static final String ERR_PACKAGE_NOT_FOUND = "packageNotFound";
   private static final String ERR_VERSION_NOT_FOUND = "versionNotFound";
   private static final String PACKAGE_UNIQUE_CONSTRAINT = "ux_nuget_package__repo_id_package_id";
+  private static final String VERSION_UNIQUE_CONSTRAINT =
+      "ux_nuget_package_version__package_id_version";
   private static final String UNIQUE_VIOLATION_SQL_STATE = "23505";
 
   private final RepoRepository repoRepository;
@@ -131,7 +133,19 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     // Flush so a unique-index conflict (a concurrent push of the same version) fails here, before
     // any file is written. The transaction, and the row lock it holds, stays open while the files
     // are written, so a losing push waits for the winner instead of replacing its files.
-    this.packageVersionRepository.saveAndFlush(pkgVersion);
+    try {
+      this.packageVersionRepository.saveAndFlush(pkgVersion);
+    } catch (final DataIntegrityViolationException e) {
+      // Only that index means the version exists. Any other violation is not the client's
+      // conflict, so it is left to surface as the server error it is.
+      if (!this.isUniqueConstraintViolation(e, VERSION_UNIQUE_CONSTRAINT)) {
+        throw e;
+      }
+
+      throw new ResponseStatusException(
+          HttpStatus.CONFLICT,
+          "Version " + version + " of package " + pkg.getPackageId() + " already exists.");
+    }
 
     return filesWriter.write(existingVersion.isPresent());
   }
@@ -441,7 +455,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     }
 
     final var message = sqlException.getMessage();
-    return message != null && message.contains(constraintName);
+    return message != null && message.toLowerCase(Locale.ROOT).contains(constraintName);
   }
 
   private NuGetPackageVersion createNuGetPackageVersion(
@@ -458,13 +472,13 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     pkgVersion.setPublishedAt(Instant.now());
     pkgVersion.setDownloadCount(0);
     pkgVersion.setCreatedAt(Instant.now());
-    pkgVersion.setTitle(NuGetPackageUtils.extractXmlTag(nuspecXml, "title"));
+    pkgVersion.setTitle(NuGetPackageUtils.extractTitle(nuspecXml));
     pkgVersion.setDescription(NuGetPackageUtils.extractXmlTag(nuspecXml, "description"));
     pkgVersion.setAuthors(NuGetPackageUtils.extractXmlTag(nuspecXml, "authors"));
-    pkgVersion.setTags(NuGetPackageUtils.extractXmlTag(nuspecXml, "tags"));
-    pkgVersion.setIconUrl(NuGetPackageUtils.extractXmlTag(nuspecXml, "iconUrl"));
-    pkgVersion.setLicenseUrl(NuGetPackageUtils.extractXmlTag(nuspecXml, "licenseUrl"));
-    pkgVersion.setProjectUrl(NuGetPackageUtils.extractXmlTag(nuspecXml, "projectUrl"));
+    pkgVersion.setTags(NuGetPackageUtils.extractTags(nuspecXml));
+    pkgVersion.setIconUrl(NuGetPackageUtils.extractUrl(nuspecXml, "iconUrl"));
+    pkgVersion.setLicenseUrl(NuGetPackageUtils.extractUrl(nuspecXml, "licenseUrl"));
+    pkgVersion.setProjectUrl(NuGetPackageUtils.extractUrl(nuspecXml, "projectUrl"));
     pkgVersion.setRepositoryUrl(NuGetPackageUtils.extractRepositoryUrl(nuspecXml));
     pkgVersion.setReadme(readme);
 
