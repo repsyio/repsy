@@ -72,6 +72,10 @@ multiport:
     9443: ""
 
 repsy:
+  ruby:
+    # Largest gem a `gem push` may carry. The gem is the raw request body, which the multipart
+    # limits above do not apply to, so a larger one is answered with 413 payloadTooLarge.
+    max-gem-size: ${RUBY_MAX_GEM_SIZE:500MB}
   ssl:
     api:
       enabled: ${API_SSL_ENABLED:false}

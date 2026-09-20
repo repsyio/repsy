@@ -16,6 +16,7 @@
 package io.repsy.protocols.ruby.shared.storage.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import java.io.InputStream;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
@@ -24,7 +25,12 @@ import org.springframework.core.io.Resource;
 public interface RubyStorageService {
 
   BaseUsages writeGem(
-      UUID repoId, String repoName, String gemName, String version, String platform, byte[] bytes);
+      UUID repoId,
+      String repoName,
+      String gemName,
+      String version,
+      String platform,
+      InputStream gem);
 
   Resource getGem(UUID repoId, String repoName, String filename);
 

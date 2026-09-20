@@ -19,8 +19,8 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -46,13 +46,13 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
       final String gemName,
       final String version,
       final String platform,
-      final byte[] bytes) {
+      final InputStream gem) {
 
     final var filename = buildFilename(gemName, version, platform);
     final var gemPath = Paths.get(GEMS_PATH, gemName, filename);
     final var storagePath = StoragePath.of(repoId, gemPath.toString());
 
-    return this.storageStrategy.write(repoName, storagePath, new ByteArrayInputStream(bytes));
+    return this.storageStrategy.write(repoName, storagePath, gem);
   }
 
   @Override

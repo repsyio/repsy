@@ -88,11 +88,6 @@ public class CompactIndexFormatter {
     return buildInfoBody(entries);
   }
 
-  /** Computes SHA256 hex of gem file bytes — stored in RubyGemVersion.checksum. */
-  public static String sha256Hex(final byte[] gemBytes) {
-    return DigestUtils.sha256Hex(gemBytes);
-  }
-
   private static String buildInfoBody(final List<GemCompactEntry> entries) {
     final var lastModified =
         entries.stream()
