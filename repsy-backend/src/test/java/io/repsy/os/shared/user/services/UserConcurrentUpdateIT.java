@@ -23,7 +23,6 @@ import static org.awaitility.Awaitility.await;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.generated.model.UserUpdateForm;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.User;
@@ -85,10 +84,7 @@ class UserConcurrentUpdateIT extends AbstractIntegrationTest {
   private UserInfo commitUser() {
     final var user =
         this.userTxService.create(
-            uniqueUsername("race"),
-            UserRole.USER,
-            PasswordHasher.hash(VALID_PASSWORD),
-            PasswordGeneratorUtil.generateSalt());
+            uniqueUsername("race"), UserRole.USER, PasswordHasher.hash(VALID_PASSWORD));
     this.createdUserIds.add(user.getId());
 
     return user;
@@ -144,17 +140,15 @@ class UserConcurrentUpdateIT extends AbstractIntegrationTest {
   void loginUpdateKeepsANewPassword() {
     final var user = this.commitUser();
     final var newHash = PasswordHasher.hash("NewPassword2@");
-    final var newSalt = PasswordGeneratorUtil.generateSalt();
 
     final var pending =
         this.interleave(
-            () -> this.userTxService.updatePassword(user.getId(), newHash, newSalt),
+            () -> this.userTxService.updatePassword(user.getId(), newHash),
             () -> this.userTxService.updateLastLoginAt(user.getUsername()));
     finishes(pending);
 
     final var after = this.reload(user.getId());
     assertThat(after.getHash()).isEqualTo(newHash);
-    assertThat(after.getSalt()).isEqualTo(newSalt);
     assertThat(after.getTokenVersion())
         .as("the change revoked the refresh tokens, and the login update must not revive them")
         .isEqualTo(user.getTokenVersion() + 1);
@@ -207,12 +201,11 @@ class UserConcurrentUpdateIT extends AbstractIntegrationTest {
   void passwordChangeKeepsTheLoginTime() {
     final var user = this.commitUser();
     final var newHash = PasswordHasher.hash("NewPassword2@");
-    final var newSalt = PasswordGeneratorUtil.generateSalt();
 
     final var pending =
         this.interleave(
             () -> this.userTxService.updateLastLoginAt(user.getUsername()),
-            () -> this.userTxService.updatePassword(user.getId(), newHash, newSalt));
+            () -> this.userTxService.updatePassword(user.getId(), newHash));
     finishes(pending);
 
     final var after = this.reload(user.getId());
