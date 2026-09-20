@@ -17,6 +17,7 @@ package io.repsy.protocols.helm.protocol.handlers.oci;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -40,6 +41,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -48,6 +50,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -144,10 +149,54 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
     verify(this.facade).pushManifest(eq(context), eq("payments"), eq("1.0.0"), any(byte[].class));
   }
 
+  @ParameterizedTest(name = "{0} -> {1}")
+  @MethodSource("malformedManifests")
+  @DisplayName("rejects a malformed manifest with a 400 and touches nothing")
+  void rejectsMalformedManifest(final String manifest, final String msgId) throws Exception {
+    final var context = context("/payments/manifests/1.0.0");
+
+    assertThatThrownBy(() -> this.push(context, manifest))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage(msgId);
+
+    verify(this.facade).checkManifest(context, "payments", "1.0.0");
+    verifyNoMoreInteractions(this.facade);
+  }
+
+  static Stream<Arguments> malformedManifests() {
+    return Stream.of(
+        arguments("not json", "manifestInvalidJson"),
+        arguments("", "manifestInvalidJson"),
+        arguments("[]", "manifestInvalidJson"),
+        arguments("\"layers\"", "manifestInvalidJson"),
+        arguments("{}", "manifestLayersMissing"),
+        arguments("{\"layers\":null}", "manifestLayersMissing"),
+        arguments("{\"layers\":{}}", "manifestLayersMissing"),
+        arguments("{\"layers\":[]}", "manifestLayersMissing"),
+        arguments("{\"layers\":[null]}", "manifestLayerInvalid"),
+        arguments("{\"layers\":[{}]}", "manifestLayerInvalid"),
+        arguments("{\"layers\":[{\"size\":10}]}", "manifestLayerInvalid"),
+        arguments("{\"layers\":[{\"digest\":\"" + LAYER_DIGEST + "\"}]}", "manifestLayerInvalid"),
+        arguments(layer("\"" + LAYER_DIGEST + "\"", "\"10\""), "manifestLayerInvalid"),
+        arguments(layer("\"" + LAYER_DIGEST + "\"", "1.5"), "manifestLayerInvalid"),
+        arguments(layer("\"" + LAYER_DIGEST + "\"", "-1"), "manifestLayerInvalid"),
+        arguments(layer("\"" + LAYER_DIGEST + "\"", "null"), "manifestLayerInvalid"),
+        arguments(layer("42", "10"), "manifestLayerInvalid"),
+        arguments(layer("null", "10"), "manifestLayerInvalid"),
+        arguments(layer("\"sha256:abc\"", "10"), "manifestLayerInvalid"),
+        arguments(layer("\"../../etc/passwd\"", "10"), "manifestLayerInvalid"));
+  }
+
+  private static String layer(final String digest, final String size) {
+    return "{\"layers\":[{\"digest\":%s,\"size\":%s}]}".formatted(digest, size);
+  }
+
   private ResponseEntity<Object> push(final ProtocolContext context) throws Exception {
-    final var manifest =
-        ("{\"schemaVersion\":2,\"layers\":[{\"digest\":\"%s\",\"size\":10}]}")
-            .formatted(LAYER_DIGEST);
+    return this.push(context, layer("\"" + LAYER_DIGEST + "\"", "10"));
+  }
+
+  private ResponseEntity<Object> push(final ProtocolContext context, final String manifest)
+      throws Exception {
     final var request = new MockHttpServletRequest("PUT", "/v2/repo/payments/manifests/1.0.0");
     request.setContentType(MANIFEST_TYPE);
     request.setContent(manifest.getBytes(StandardCharsets.UTF_8));
