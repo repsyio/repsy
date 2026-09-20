@@ -31,6 +31,7 @@ import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -52,8 +53,22 @@ import org.springframework.web.bind.annotation.RestController;
 @SuppressWarnings("java:S6856")
 public class CargoCrateController {
 
-  private static final Set<String> CRATE_SORT_PROPERTIES =
-      Set.of("id", "name", "maxVersion", "lastUpdatedAt");
+  /**
+   * The sort keys of the crate list, mapped to the {@code CargoCrate} properties the query sorts
+   * by. The list item's own JSON names ({@code name}, {@code max_version}, {@code downloads},
+   * {@code updated_at}) are accepted next to the entity property names the endpoint took before,
+   * which stay for existing clients.
+   */
+  private static final Map<String, String> CRATE_SORT_PATHS =
+      Map.of(
+          "id", "id",
+          "name", "name",
+          "max_version", "maxVersion",
+          "downloads", "totalDownloads",
+          "updated_at", "lastUpdatedAt",
+          "maxVersion", "maxVersion",
+          "totalDownloads", "totalDownloads",
+          "lastUpdatedAt", "lastUpdatedAt");
 
   private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("version", "createdAt");
 
@@ -68,9 +83,9 @@ public class CargoCrateController {
       @RequestParam(defaultValue = "") final String query,
       final Pageable pageable) {
 
-    SortValidator.requireSortableBy(pageable, CRATE_SORT_PROPERTIES);
-
-    final var crates = this.cargoApiFacade.search(repoInfo, query, pageable);
+    final var crates =
+        this.cargoApiFacade.search(
+            repoInfo, query, SortValidator.resolveSortPaths(pageable, CRATE_SORT_PATHS));
 
     return this.responseFactory.success("cratesFetched", new PagedModel<>(crates));
   }

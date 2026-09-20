@@ -52,9 +52,11 @@ import org.junit.jupiter.api.Test;
  *
  * <p>What it recognises: an identifier-like string literal or an {@code UPPER_SNAKE} constant that
  * is the first argument of {@code success}/{@code warning}/{@code error} on the response factory,
- * or of a msgId-carrying exception constructor. Ids held in variables are not seen. A string
- * literal that starts an exception's msgId but is free text or continued by a concatenation cannot
- * have a bundle entry, so {@link #msgIdsAreFixedIdentifiers()} fails on it (RPS-992).
+ * or of a msgId-carrying exception constructor, plus the {@code ERR_*} constant {@code
+ * ErrorHandler} falls back to when an exception carries no message. Ids held in other variables are
+ * not seen. A string literal that starts an exception's msgId but is free text or continued by a
+ * concatenation cannot have a bundle entry, so {@link #msgIdsAreFixedIdentifiers()} fails on it
+ * (RPS-992).
  *
  * <p>Bundle keys that no code uses are not flagged: most of them are leftovers tracked by RPS-959.
  */
@@ -95,6 +97,15 @@ class MessageKeysTest {
       Pattern.compile(MSG_ID_EXCEPTION + "\"(?<text>[^\"\\\\]*)\"\\s*(?<next>[,)+])");
 
   /**
+   * The {@code ERR_*} constant an {@code ErrorHandler} handler falls back to, as in {@code
+   * exceptionMessage != null ? exceptionMessage : ERR_UNAUTHORIZED}, when the exception carries no
+   * message. It reaches {@code resp.error} through a variable, so {@link #RESPONSE_MSG_ID} misses
+   * it.
+   */
+  private static final Pattern FALLBACK_MSG_ID =
+      Pattern.compile("\\?\\s*\\w+\\s*:\\s*(?<constant>ERR_[A-Z0-9_]+)\\s*;");
+
+  /**
    * Helpers that pass their last argument on as the msgId of an exception, so the literal never
    * sits next to a {@code new ...Exception(}.
    */
@@ -106,12 +117,6 @@ class MessageKeysTest {
   private static final Pattern CONSTANT_DEFINITION =
       Pattern.compile(
           "static\\s+final\\s+(?:@\\w+\\s+)?String\\s+([A-Z][A-Z0-9_]*)\\s*=\\s*\"([^\"\\\\]*)\"");
-
-  /**
-   * Success msgIds with no bundle entry yet. RPS-940 adds the entries; delete each id here in that
-   * change. {@link #allowlistsHoldOnlyIdsThatAreStillMissing()} fails if one is left behind.
-   */
-  private static final Set<String> PENDING_RPS_940 = Set.of("movedToPath");
 
   /**
    * Error msgIds thrown from exceptions with no bundle entry yet. RPS-958 adds the entries or drops
@@ -164,6 +169,7 @@ class MessageKeysTest {
         (file, source) -> {
           collect(RESPONSE_MSG_ID, source, file, constants);
           collect(EXCEPTION_MSG_ID, source, file, constants);
+          collect(FALLBACK_MSG_ID, source, file, constants);
           collect(FORWARDED_MSG_ID, source, file, constants);
           collectNonIdentifiers(source, file);
         });
@@ -175,7 +181,6 @@ class MessageKeysTest {
     final var missing = new TreeMap<>(usedMsgIds);
 
     missing.keySet().removeAll(messages.stringPropertyNames());
-    missing.keySet().removeAll(PENDING_RPS_940);
     missing.keySet().removeAll(PENDING_RPS_958);
 
     assertThat(missing)
@@ -225,7 +230,6 @@ class MessageKeysTest {
   void allowlistsHoldOnlyIdsThatAreStillMissing() {
     final var pending = new TreeSet<String>();
 
-    pending.addAll(PENDING_RPS_940);
     pending.addAll(PENDING_RPS_958);
 
     final var nowHaveEntries =
@@ -256,6 +260,8 @@ class MessageKeysTest {
             "repoNotFound", // literal in an exception
             "unAuthorized", // ErrorConstants constant in an exception
             "validationError", // constant in ErrorHandler
+            "movedToPath", // constant passed straight to resp.error in ErrorHandler
+            "unauthorizedRequest", // ErrorHandler fallback when the exception has no message
             "chartNameMissing", // BadRequestException in a protocol module
             "gemNameMissing"); // forwarded through a helper
     assertThat(usedMsgIds).hasSizeGreaterThan(100);
@@ -269,7 +275,7 @@ class MessageKeysTest {
     final Matcher matcher = pattern.matcher(source);
 
     while (matcher.find()) {
-      final var literal = matcher.group("literal");
+      final var literal = groupOrNull(matcher, "literal");
       final var constant = groupOrNull(matcher, "constant");
 
       if (literal != null) {

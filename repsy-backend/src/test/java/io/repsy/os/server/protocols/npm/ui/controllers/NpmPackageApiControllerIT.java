@@ -592,7 +592,7 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
           Stream.of(PACKAGES, UNSCOPED, SCOPED)
               .flatMap(
                   path ->
-                      Stream.of("id", "name", "scope", "updatedAt")
+                      Stream.of("id", "name", "scope", "latestVersion", "updatedAt")
                           .map(property -> Arguments.of(path, property)));
       final var versionSorts =
           Stream.of(VERSIONS, SCOPED_VERSIONS)
@@ -635,6 +635,27 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
       this.list(VERSIONS, "sort", "version,desc")
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].version").value("2.0.0-next.1"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {PACKAGES, UNSCOPED})
+    @DisplayName("orders the packages by the response's latestVersion")
+    void ordersPackagesByLatestVersion(final String path) throws Exception {
+      NpmPackageApiControllerIT.this.publish(null, "newest-package", "3.0.0", "latest");
+
+      this.list(path, "sort", "latestVersion,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("newest-package"))
+          .andExpect(jsonPath("$.data.content[0].latestVersion").value("3.0.0"));
+      this.list(path, "sort", "latestVersion,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].latestVersion").value("1.0.0"));
+    }
+
+    @Test
+    @DisplayName("rejects latest, the query's name for latestVersion, as an unknown sort property")
+    void rejectsQueryProjectionName() throws Exception {
+      PagingAssertions.expectInvalidParameter(this.list(PACKAGES, "sort", "latest"), "sort");
     }
 
     @ParameterizedTest(name = "{0}")

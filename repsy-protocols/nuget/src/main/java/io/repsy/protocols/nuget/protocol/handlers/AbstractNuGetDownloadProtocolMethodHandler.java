@@ -19,6 +19,7 @@ import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 import static org.springframework.http.MediaType.APPLICATION_XML;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
@@ -104,9 +105,12 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
 
       final var resource = this.facade.downloadNuspec(context);
       return ResponseEntity.ok().header(CONTENT_TYPE, APPLICATION_XML.toString()).body(resource);
-    } catch (final Exception e) {
-      log.debug("NuGet download failed: {}", e.getMessage());
+    } catch (final ItemNotFoundException e) {
+      log.debug("NuGet download not found: {}", e.getMessage());
       return ResponseEntity.notFound().build();
+    } catch (final Exception e) {
+      log.error("NuGet download failed", e);
+      return ResponseEntity.internalServerError().build();
     }
   }
 }

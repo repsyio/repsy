@@ -73,15 +73,24 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   private static final List<String> REGISTRATION_INDEX_TYPES =
       List.of("catalog:CatalogRoot", "PackageRegistration", "catalog:Permalink");
 
-  protected void doPublish(
+  /**
+   * Records the version and stores its files, in that order and as one unit: see {@link
+   * NuGetPackageService#publishVersion}.
+   */
+  protected BaseUsages doPublish(
       final BaseRepoInfo<ID> repoInfo,
       final ID pkgId,
-      final String version,
-      final String nuspecXml,
-      final @Nullable String readme)
+      final NuspecMetadata metadata,
+      final Path tempFile)
       throws IOException {
 
-    this.packageService.publishVersion(repoInfo, pkgId, version, nuspecXml, readme);
+    return this.packageService.publishVersion(
+        repoInfo,
+        pkgId,
+        metadata.version(),
+        metadata.nuspecXml(),
+        metadata.readme(),
+        replacesExisting -> this.storePackage(repoInfo, metadata, tempFile, replacesExisting));
   }
 
   @Override
@@ -118,8 +127,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
       }
 
       final var pkgId = this.packageService.findOrCreatePackage(repoInfo, metadata.packageId());
-      final var usages = this.storePackage(repoInfo, metadata, tempFile);
-      this.doPublish(repoInfo, pkgId, metadata.version(), metadata.nuspecXml(), metadata.readme());
+      final var usages = this.doPublish(repoInfo, pkgId, metadata, tempFile);
 
       log.info(
           "Successfully published and stored NuGet package {} {}",
@@ -311,7 +319,10 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   }
 
   private BaseUsages storePackage(
-      final BaseRepoInfo<ID> repoInfo, final NuspecMetadata metadata, final Path tempFile)
+      final BaseRepoInfo<ID> repoInfo,
+      final NuspecMetadata metadata,
+      final Path tempFile,
+      final boolean replacesExisting)
       throws IOException {
 
     final var nuspecBytes = metadata.nuspecXml().getBytes(StandardCharsets.UTF_8);
@@ -324,6 +335,30 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
           metadata.version(),
           nuPkgStream,
           nuspecBytes);
+    } catch (final IOException | RuntimeException e) {
+      // The row is rolled back with this failure, so a half-written new version would be
+      // orphaned files. A version being replaced keeps its row, so its files are left alone.
+      if (!replacesExisting) {
+        this.discardPartialFiles(repoInfo, metadata, e);
+      }
+      throw e;
+    }
+  }
+
+  private void discardPartialFiles(
+      final BaseRepoInfo<ID> repoInfo, final NuspecMetadata metadata, final Exception cause) {
+
+    try {
+      this.storageService.deletePackageVersion(
+          repoInfo.getStorageKey(), metadata.packageId(), metadata.version());
+    } catch (final IOException | RuntimeException e) {
+      // Nothing to delete when the failure came before the first file was created.
+      log.debug(
+          "No partial files removed for NuGet package {} {}: {}",
+          metadata.packageId(),
+          metadata.version(),
+          e.getMessage());
+      cause.addSuppressed(e);
     }
   }
 }

@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.nuget.shared.packages.services;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.NuGetDeletedItem;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
@@ -29,6 +30,7 @@ import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.io.IOException;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
@@ -42,6 +44,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -93,13 +96,15 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   }
 
   @Override
-  @Transactional
-  public void publishVersion(
+  @Transactional(rollbackFor = IOException.class)
+  public BaseUsages publishVersion(
       final BaseRepoInfo<UUID> repoInfo,
       final UUID pkgId,
       final String version,
       final String nuspecXml,
-      final @Nullable String readme) {
+      final @Nullable String readme,
+      final PackageFilesWriter filesWriter)
+      throws IOException {
 
     final var pkg =
         this.packageRepository
@@ -123,7 +128,12 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
     final var pkgVersion = this.createNuGetPackageVersion(pkg, nuspecXml, version, readme);
 
-    this.packageVersionRepository.save(pkgVersion);
+    // Flush so a unique-index conflict (a concurrent push of the same version) fails here, before
+    // any file is written. The transaction, and the row lock it holds, stays open while the files
+    // are written, so a losing push waits for the winner instead of replacing its files.
+    this.packageVersionRepository.saveAndFlush(pkgVersion);
+
+    return filesWriter.write(existingVersion.isPresent());
   }
 
   @Override
@@ -170,8 +180,15 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
 
+    final var sortedPageable =
+        PageRequest.of(
+            pageable.getPageNumber(),
+            pageable.getPageSize(),
+            withTiebreaker(
+                pageable.getSort(), Sort.by(Sort.Direction.DESC, "publishedAt"), "version"));
+
     return this.packageVersionRepository
-        .findByNugetPackageIdOrderByPublishedAtDesc(pkg.getId(), pageable)
+        .findByNugetPackageId(pkg.getId(), sortedPageable)
         .map(v -> this.converter.toVersionInfo(v, packageId));
   }
 
@@ -200,12 +217,28 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       return new org.springframework.data.domain.PageImpl<>(List.of());
     }
 
-    final var page = skip / take;
-    final var pageable = PageRequest.of(page, take);
+    return this.searchPage(repoInfo, query, PageRequest.of(skip / take, take), prerelease);
+  }
+
+  @Override
+  public Page<NuGetPackageSearchResult> searchPage(
+      final BaseRepoInfo<UUID> repoInfo,
+      final String query,
+      final Pageable pageable,
+      final boolean prerelease) {
+
+    // package_id is unique per repo, so it alone gives every page a stable order.
+    final var sortedPageable =
+        PageRequest.of(
+            pageable.getPageNumber(),
+            pageable.getPageSize(),
+            pageable.getSort().isSorted()
+                ? pageable.getSort()
+                : Sort.by(Sort.Direction.ASC, "packageId"));
 
     final var pkgPage =
         this.packageRepository.findByRepoIdAndPackageIdContainingIgnoreCase(
-            repoInfo.getId(), query, pageable);
+            repoInfo.getId(), query, sortedPageable);
 
     return pkgPage.map(pkg -> this.toSearchResult(pkg, prerelease));
   }
@@ -430,6 +463,20 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     }
 
     return pkgVersion;
+  }
+
+  /**
+   * Returns the requested sort, or {@code defaultSort} when there is none, followed by {@code
+   * tiebreaker} ascending so rows with equal sort values keep a stable order across pages.
+   */
+  private static Sort withTiebreaker(
+      final Sort requested, final Sort defaultSort, final String tiebreaker) {
+
+    final var sort = requested.isSorted() ? requested : defaultSort;
+
+    return sort.getOrderFor(tiebreaker) == null
+        ? sort.and(Sort.by(Sort.Direction.ASC, tiebreaker))
+        : sort;
   }
 
   private NuGetPackageSearchResult toSearchResult(

@@ -16,8 +16,10 @@
 package io.repsy.os.shared.utils;
 
 import io.repsy.os.shared.error_handling.exceptions.InvalidPagingParameterException;
+import java.util.Map;
 import java.util.Set;
 import org.jspecify.annotations.NonNull;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
@@ -53,5 +55,31 @@ public final class SortValidator {
     if (!supported) {
       throw new InvalidPagingParameterException(SORT_PARAMETER);
     }
+  }
+
+  /**
+   * Rejects the request when {@code pageable} sorts by a key outside {@code sortPaths}, and
+   * otherwise returns it sorted by the paths those keys stand for.
+   *
+   * <p>Lets an endpoint accept the field names its response carries as sort keys while the query
+   * sorts by the entity or projection path behind each one.
+   *
+   * @param pageable Resolved paging of the request
+   * @param sortPaths Sort keys the endpoint accepts, mapped to the paths the query sorts by
+   * @return The same page and size, sorted by the mapped paths in the requested directions
+   * @throws InvalidPagingParameterException when any sort key is not a key of {@code sortPaths}
+   */
+  public static @NonNull Pageable resolveSortPaths(
+      final @NonNull Pageable pageable, final @NonNull Map<String, String> sortPaths) {
+
+    requireSortableBy(pageable, sortPaths.keySet());
+
+    final var sort =
+        Sort.by(
+            pageable.getSort().stream()
+                .map(order -> order.withProperty(sortPaths.get(order.getProperty())))
+                .toList());
+
+    return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
   }
 }

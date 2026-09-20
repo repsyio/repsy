@@ -17,6 +17,7 @@ package io.repsy.protocols.nuget.protocol.handlers;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
@@ -95,9 +96,12 @@ public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
       final var versions = this.facade.getPackageVersions(context);
       return ResponseEntity.ok().contentType(APPLICATION_JSON).body(Map.of("versions", versions));
 
-    } catch (final Exception e) {
-      log.debug("NuGet package versions failed: {}", e.getMessage());
+    } catch (final ItemNotFoundException e) {
+      log.debug("NuGet package versions not found: {}", e.getMessage());
       return ResponseEntity.notFound().build();
+    } catch (final Exception e) {
+      log.error("NuGet package versions failed", e);
+      return ResponseEntity.internalServerError().build();
     }
   }
 }

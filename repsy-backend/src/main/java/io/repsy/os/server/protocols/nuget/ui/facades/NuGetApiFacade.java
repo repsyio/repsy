@@ -67,7 +67,7 @@ public class NuGetApiFacade implements ProtocolApiFacade {
       final RepoInfo repoInfo, final String query, final Pageable pageable) {
 
     return this.nugetPackageService
-        .search(repoInfo, query, 0, pageable.getPageSize(), false)
+        .searchPage(repoInfo, query, pageable, false)
         .map(this::toPackageListItem);
   }
 

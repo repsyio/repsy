@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.nuget.shared.packages.services;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
@@ -27,6 +28,8 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -96,7 +99,12 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
       final String version,
       final String nuspec,
       final String readme) {
-    this.packageService.publishVersion(repoInfo, packageId, version, nuspec, readme);
+    try {
+      this.packageService.publishVersion(
+          repoInfo, packageId, version, nuspec, readme, replacesExisting -> BaseUsages.ofDisk(0));
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
     this.entityManager.flush();
     this.entityManager.clear();
   }

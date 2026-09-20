@@ -48,6 +48,50 @@ class HelmChartParserTest {
     return new ByteArrayInputStream(bytes.toByteArray());
   }
 
+  /**
+   * A chart whose Chart.yaml is exactly {@code size} bytes: the {@link #BASE} mapping padded with
+   * comment lines. The padding compresses to almost nothing, so a decompression bomb costs a few
+   * kilobytes here and is built without holding the entry in memory.
+   */
+  private static ByteArrayInputStream chartOfSize(final long size) throws IOException {
+    final var base = BASE.getBytes(StandardCharsets.UTF_8);
+    final var line = ("#" + "x".repeat(78) + "\n").getBytes(StandardCharsets.UTF_8);
+    final var bytes = new ByteArrayOutputStream();
+    try (final var gzip = new GZIPOutputStream(bytes);
+        final var tar = new TarArchiveOutputStream(gzip)) {
+      final var entry = new TarArchiveEntry("payments/Chart.yaml");
+      entry.setSize(size);
+      tar.putArchiveEntry(entry);
+      tar.write(base);
+      var remaining = size - base.length;
+      while (remaining > 0) {
+        final var chunk = (int) Math.min(remaining, line.length);
+        tar.write(line, 0, chunk);
+        remaining -= chunk;
+      }
+      tar.closeArchiveEntry();
+    }
+    return new ByteArrayInputStream(bytes.toByteArray());
+  }
+
+  @Test
+  void readsAChartYamlOfExactlyTheSizeLimit() throws IOException {
+    final var metadata =
+        HelmChartParser.parseChartYaml(chartOfSize(HelmConstants.MAX_CHART_YAML_BYTES));
+
+    assertThat(metadata.getName()).isEqualTo("payments");
+    assertThat(metadata.getVersion()).isEqualTo("1.0.0");
+  }
+
+  @Test
+  void rejectsAChartYamlOverTheSizeLimitWithoutReadingIt() throws IOException {
+    final var archive = chartOfSize(HelmConstants.MAX_CHART_YAML_BYTES + 1);
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(archive))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("chartYamlTooLarge");
+  }
+
   @Test
   void readsQuotedStringScalars() throws IOException {
     final var metadata =
