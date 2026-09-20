@@ -16,6 +16,7 @@
 package io.repsy.protocols.maven.protocol.facades;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.protocol.facades.contracts.MavenProtocolFacade;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType;
@@ -24,6 +25,7 @@ import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactServi
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,6 +35,7 @@ import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.maven.index.artifact.Gav;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
 @RequiredArgsConstructor
@@ -88,11 +91,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
     this.artifactService.checkDeploymentRules(repoInfo, artifactPair, storagePath);
 
-    final var afterUploadUsage =
-        this.mavenStorageService.writeInputStreamToPath(
-            storagePath,
-            content == null ? inputStream : new ByteArrayInputStream(content),
-            repoInfo.getName());
+    final var afterUploadUsage = this.store(repoInfo.getName(), storagePath, inputStream, content);
 
     final var resource = this.mavenStorageService.getResource(repoInfo.getName(), storagePath);
 
@@ -106,6 +105,47 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     }
 
     context.addProperty(USAGES, afterUploadUsage);
+  }
+
+  /** Stores what the client sent, from the buffer if the facade already had to read it whole. */
+  private BaseUsages store(
+      final String repoName,
+      final StoragePath storagePath,
+      final InputStream inputStream,
+      final byte @Nullable [] content)
+      throws IOException {
+
+    if (content != null) {
+      return this.mavenStorageService.writeInputStreamToPath(
+          storagePath, new ByteArrayInputStream(content), repoName);
+    }
+
+    if (ArtifactUtils.isPomToParse(storagePath)) {
+      return this.writeValidatedPom(repoName, storagePath, inputStream);
+    }
+
+    return this.mavenStorageService.writeInputStreamToPath(storagePath, inputStream, repoName);
+  }
+
+  /**
+   * Parses the POM before anything is stored. {@code createOrUpdateArtifact} reads it back from
+   * storage, so a malformed POM used to be written first and stay in the repo (and off the usage
+   * counter) when the parse then failed. A POM is spooled to a temporary file, parsed, and only
+   * then copied to storage, so a rejected one never reaches it.
+   */
+  private BaseUsages writeValidatedPom(
+      final String repoName, final StoragePath storagePath, final InputStream inputStream)
+      throws IOException {
+
+    try (final var pom = SpooledUpload.spool(inputStream)) {
+      try (final var pomStream = pom.openStream()) {
+        ArtifactUtils.readModel(pomStream);
+      }
+
+      try (final var pomStream = pom.openStream()) {
+        return this.mavenStorageService.writeInputStreamToPath(storagePath, pomStream, repoName);
+      }
+    }
   }
 
   private static String resolveLogicalVersion(final Gav gav) {

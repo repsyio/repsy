@@ -20,10 +20,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.libs.storage.core.dtos.StoragePath;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.InputStreamResource;
 
@@ -79,5 +84,52 @@ class ArtifactUtilsTest {
     assertThatThrownBy(() -> ArtifactUtils.readModel(unreadable))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("malformedPomFile");
+  }
+
+  @Test
+  @DisplayName("reads a well-formed POM from a stream and leaves the stream open")
+  void readsAWellFormedPomFromAStream() {
+    final var closed = new boolean[1];
+    final var stream =
+        new ByteArrayInputStream(VALID_POM.getBytes(UTF_8)) {
+          @Override
+          public void close() throws IOException {
+            closed[0] = true;
+            super.close();
+          }
+        };
+
+    final var model = ArtifactUtils.readModel(stream);
+
+    assertThat(model).isNotNull();
+    assertThat(model.getArtifactId()).isEqualTo("lib");
+    assertThat(closed[0]).isFalse();
+  }
+
+  @Test
+  @DisplayName("answers a malformed POM read from a stream with the fixed msgId")
+  void malformedPomStreamYieldsFixedMessageId() {
+    final var malformed = new ByteArrayInputStream("<project><groupId>".getBytes(UTF_8));
+
+    assertThatThrownBy(() -> ArtifactUtils.readModel(malformed))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("malformedPomFile");
+  }
+
+  @ParameterizedTest(name = "{0} is parsed as a POM: {1}")
+  @CsvSource({
+    "com/example/lib/1.0/lib-1.0.pom, true",
+    "com/example/lib/1.0/LIB-1.0.POM, true",
+    "com/example/lib/1.0/lib-1.0.pom.asc, false",
+    "com/example/lib/1.0/lib-1.0.pom.sha1, false",
+    "com/example/lib/1.0/lib-1.0.pom.md5, false",
+    "com/example/lib/1.0/lib-1.0.jar, false",
+    "com/example/lib/maven-metadata.xml, false"
+  })
+  @DisplayName("tells the POMs the artifact service parses from the files stored beside them")
+  void recognisesThePomsToParse(final String path, final boolean expected) {
+    final var storagePath = StoragePath.of(UUID.randomUUID(), path);
+
+    assertThat(ArtifactUtils.isPomToParse(storagePath)).isEqualTo(expected);
   }
 }
