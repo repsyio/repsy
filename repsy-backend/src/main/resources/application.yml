@@ -30,6 +30,15 @@ spring:
     schemas: public
     default-schema: public
 
+  servlet:
+    multipart:
+      # Spring Boot's defaults are 1 MB per file and 10 MB per request, which rejects most PyPI
+      # wheels and sdists, Helm charts and NuGet packages. Both limits are per request, and a
+      # request carries one package, so they are set to the same value. A larger upload is answered
+      # with 413 payloadTooLarge (see ErrorHandler).
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:500MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:500MB}
+
   task:
     execution:
       # `scanTaskExecutor` makes Spring Boot skip the default executor unless it is forced, and
