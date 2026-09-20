@@ -21,6 +21,7 @@ import { map, tap } from 'rxjs/operators';
 import {
   NpmPackageApiControllerService,
   NpmPackageListItem,
+  NpmScopeApiControllerService,
   PackageDistributionTagMapListItem,
   PackageVersionDetail,
   PackageVersionListItem,
@@ -41,6 +42,7 @@ export class NpmService {
   constructor(
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly npmPackageApiControllerService: NpmPackageApiControllerService,
+    private readonly npmScopeApiControllerService: NpmScopeApiControllerService,
   ) {
     this.repoChanges = this.repoSubject.asObservable();
   }
@@ -92,7 +94,7 @@ export class NpmService {
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<NpmPackageListItem>> {
-    return this.npmPackageApiControllerService
+    return this.npmScopeApiControllerService
       .listNpmPackagesByScope(
         scope,
         { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
@@ -112,8 +114,8 @@ export class NpmService {
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<NpmPackageListItem>> {
-    return this.npmPackageApiControllerService
-      .listFilterByScope(
+    return this.npmScopeApiControllerService
+      .listUnscopedNpmPackages(
         { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
         this.repoName,
         name || undefined,

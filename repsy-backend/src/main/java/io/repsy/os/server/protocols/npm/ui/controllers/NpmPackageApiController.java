@@ -62,7 +62,7 @@ public class NpmPackageApiController {
    * The sort keys of the package lists, mapped to the paths the queries sort by. The list item's
    * {@code latestVersion} is accepted although the queries project it as {@code latest}.
    */
-  private static final Map<String, String> PACKAGE_SORT_PATHS =
+  static final Map<String, String> PACKAGE_SORT_PATHS =
       Map.of(
           "id", "id",
           "name", "name",
@@ -72,7 +72,7 @@ public class NpmPackageApiController {
 
   private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("id", "version", "createdAt");
 
-  private static final String PACKAGES_FETCHED = "packagesFetched";
+  static final String PACKAGES_FETCHED = "packagesFetched";
 
   private final UsageUpdateService usageUpdateService;
   private final NpmPackageServiceImpl npmPackageService;
@@ -127,27 +127,6 @@ public class NpmPackageApiController {
         this.npmPackageService.getPackagesContainsScope(
             repoInfo.getStorageKey(),
             scope,
-            SortValidator.resolveSortPaths(pageable, PACKAGE_SORT_PATHS));
-
-    return this.restResponseFactory.success(PACKAGES_FETCHED, new PagedModel<>(packages));
-  }
-
-  @GetMapping({
-    "/{repoName}/scope",
-    "/{repoName}/scope/{scope}",
-  })
-  @RepoOperation
-  public RestResponse<PagedModel<NpmPackageListItem>> listFilterByScope(
-      final RepoInfo repoInfo,
-      @PathVariable(required = false) final @Nullable String scope,
-      @RequestParam(required = false, defaultValue = "") final String name,
-      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
-
-    final var packages =
-        this.npmPackageService.getPackagesByScopeContainsName(
-            repoInfo.getStorageKey(),
-            scope,
-            name,
             SortValidator.resolveSortPaths(pageable, PACKAGE_SORT_PATHS));
 
     return this.restResponseFactory.success(PACKAGES_FETCHED, new PagedModel<>(packages));

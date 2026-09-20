@@ -44,6 +44,7 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -188,15 +189,20 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
           .andExpect(jsonPath("$.data.content[0].scope").value("tools"));
       NpmPackageApiControllerIT.this
           .perform(
-              get("/api/npm/packages/{repo}/scope/{scope}", repoName, "tools")
+              get("/api/npm/scopes/{repo}/{scope}/packages", repoName, "tools")
                   .param("name", "scoped"))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content", hasSize(1)))
           .andExpect(jsonPath("$.data.content[0].scope").value("tools"));
       NpmPackageApiControllerIT.this
-          .perform(get("/api/npm/packages/{repo}/scope/{scope}", repoName, "tools"))
+          .perform(get("/api/npm/scopes/{repo}/{scope}/packages", repoName, "tools"))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content", hasSize(1)));
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/scopes/{repo}/packages", repoName))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(2)))
+          .andExpect(jsonPath("$.data.content[*].scope").doesNotExist());
       NpmPackageApiControllerIT.this
           .perform(get("/api/npm/packages/{repo}", repoName).param("page", "1").param("size", "1"))
           .andExpect(status().isOk())
@@ -230,6 +236,51 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
           .andExpect(jsonPath("$.data.packageName").value("scope"));
+    }
+
+    @Test
+    void returnsTheLatestVersionDetailOfAnUnscopedPackageNamedScope() throws Exception {
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/packages/{repo}/{package}", repoName, "scope"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
+          .andExpect(jsonPath("$.data.packageName").value("scope"))
+          .andExpect(jsonPath("$.data.scopeName").doesNotExist())
+          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
+          .andExpect(jsonPath("$.data.content").doesNotExist());
+    }
+
+    @Test
+    void returnsTheLatestVersionDetailOfAPackageInAScopeNamedScope() throws Exception {
+      NpmPackageApiControllerIT.this.publish("scope", "foo", "1.0.0", "latest");
+
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/packages/{repo}/{scope}/{package}", repoName, "scope", "foo"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
+          .andExpect(jsonPath("$.data.scopeName").value("scope"))
+          .andExpect(jsonPath("$.data.packageName").value("foo"))
+          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
+          .andExpect(jsonPath("$.data.content").doesNotExist());
+    }
+
+    @Test
+    void listsThePackagesOfAScopeNamedScopeAndTheUnscopedPackageNamedScope() throws Exception {
+      NpmPackageApiControllerIT.this.publish("scope", "foo", "1.0.0", "latest");
+
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/scopes/{repo}/{scope}/packages", repoName, "scope"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("packagesFetched"))
+          .andExpect(jsonPath("$.data.content", hasSize(1)))
+          .andExpect(jsonPath("$.data.content[0].scope").value("scope"))
+          .andExpect(jsonPath("$.data.content[0].name").value("foo"));
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/scopes/{repo}/packages", repoName).param("name", "scope"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(1)))
+          .andExpect(jsonPath("$.data.content[0].name").value("scope"))
+          .andExpect(jsonPath("$.data.content[0].scope").doesNotExist());
     }
 
     @Test
@@ -454,22 +505,45 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
     void routesTwoSegmentGetPathsOnlyToTheVersionHandler() {
       // Two handlers once matched /api/npm/packages/{repo}/{x}, so which one answered depended on
       // registration order: a listing of every package, a 404, or an ambiguous-handler 500.
-      final var matching =
-          handlerMapping.getHandlerMethods().entrySet().stream()
-              .filter(
-                  entry ->
-                      entry.getKey().getMethodsCondition().getMethods().contains(RequestMethod.GET))
-              .filter(
-                  entry ->
-                      entry.getKey().getPathPatternsCondition().getPatterns().stream()
-                          .anyMatch(
-                              pattern ->
-                                  pattern.matches(
-                                      PathContainer.parsePath("/api/npm/packages/repo/missing"))))
-              .map(entry -> entry.getValue().getMethod().getName())
-              .toList();
+      assertThat(getHandlersMatching("/api/npm/packages/repo/missing"))
+          .containsExactly("getVersion");
+    }
 
-      assertThat(matching).containsExactly("getVersion");
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+        strings = {
+          "/api/npm/packages/repo/scope",
+          "/api/npm/packages/repo/scope/foo",
+          "/api/npm/packages/repo/scope/foo/versions/1.0.0",
+        })
+    @DisplayName("routes a package or scope named scope only to the version handler (RPS-1010)")
+    void routesTheLiteralScopeNameOnlyToTheVersionHandler(final String path) {
+      assertThat(getHandlersMatching(path)).containsExactly("getVersion");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+        strings = {
+          "/api/npm/scopes/repo/packages",
+          "/api/npm/scopes/repo/scope/packages",
+          "/api/npm/scopes/repo/package/packages",
+        })
+    @DisplayName("routes the list paths only to the scope list handler")
+    void routesTheListPathsOnlyToTheScopeListHandler(final String path) {
+      assertThat(getHandlersMatching(path)).containsExactly("listByScope");
+    }
+
+    private List<String> getHandlersMatching(final String path) {
+      return handlerMapping.getHandlerMethods().entrySet().stream()
+          .filter(
+              entry ->
+                  entry.getKey().getMethodsCondition().getMethods().contains(RequestMethod.GET))
+          .filter(
+              entry ->
+                  entry.getKey().getPathPatternsCondition().getPatterns().stream()
+                      .anyMatch(pattern -> pattern.matches(PathContainer.parsePath(path))))
+          .map(entry -> entry.getValue().getMethod().getName())
+          .toList();
     }
 
     @Test
@@ -576,8 +650,8 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
   class PagingAndSorting {
 
     private static final String PACKAGES = "/api/npm/packages/{repo}";
-    private static final String UNSCOPED = "/api/npm/packages/{repo}/scope";
-    private static final String SCOPED = "/api/npm/packages/{repo}/scope/tools";
+    private static final String UNSCOPED = "/api/npm/scopes/{repo}/packages";
+    private static final String SCOPED = "/api/npm/scopes/{repo}/tools/packages";
     private static final String VERSIONS =
         "/api/npm/packages/{repo}/package/plain-package/versions";
     private static final String SCOPED_VERSIONS =

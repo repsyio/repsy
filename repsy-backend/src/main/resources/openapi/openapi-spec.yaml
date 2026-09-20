@@ -1134,11 +1134,11 @@ paths:
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/scope":
+  "/api/npm/scopes/{repoName}/packages":
     get:
       tags:
-        - npm-package-api-controller
-      operationId: listFilterByScope
+        - npm-scope-api-controller
+      operationId: listUnscopedNpmPackages
       parameters:
         - name: name
           in: query
@@ -1158,17 +1158,17 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
-      summary: List npm scopes in a repository
+      summary: List the unscoped npm packages in a repository
     parameters:
       - name: repoName
         in: path
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/scope/{scope}":
+  "/api/npm/scopes/{repoName}/{scope}/packages":
     get:
       tags:
-        - npm-package-api-controller
+        - npm-scope-api-controller
       operationId: listNpmPackagesByScope
       parameters:
         - name: scope
@@ -1194,7 +1194,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelNpmPackageListItem"
-      summary: Get npm packages in a scope
+      summary: List the npm packages in a scope
     parameters:
       - name: repoName
         in: path
