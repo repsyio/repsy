@@ -21,4 +21,8 @@ public interface ArtifactScanSummary {
   Integer getSeverityRank();
 
   Long getFindingCount();
+
+  Long getRescanInProgressCount();
+
+  Long getRescanFailedCount();
 }

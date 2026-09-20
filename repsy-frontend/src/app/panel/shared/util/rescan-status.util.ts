@@ -55,3 +55,30 @@ export function recentScanNote(status: ScanStatus | null | undefined, hasComplet
 
   return isRescanInProgress(status) ? 'Rescanning...' : 'Last rescan failed';
 }
+
+/**
+ * Tooltip for a badge that rolls up several versions (a package or a repository). The severity it
+ * shows is built from each version's last completed scan, so it names how many of those versions
+ * have a newer scan that is unfinished or failed. Empty when there is nothing to flag.
+ */
+export function rescanCountsTitle(inProgress: number | null | undefined, failed: number | null | undefined): string {
+  const parts: string[] = [];
+
+  if (inProgress && inProgress > 0) {
+    parts.push(`${versions(inProgress)} being rescanned`);
+  }
+
+  if (failed && failed > 0) {
+    parts.push(`the last rescan of ${versions(failed)} failed`);
+  }
+
+  return parts.length ? `${capitalize(parts.join(' and '))}. Showing the last completed scans.` : '';
+}
+
+function versions(count: number): string {
+  return count === 1 ? '1 version' : `${count} versions`;
+}
+
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}

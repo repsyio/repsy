@@ -261,6 +261,8 @@
                     [repoType]="repo.repoType"
                     [severity]="securitySummary[repo.name]?.severity ?? null"
                     [scanned]="securitySummary[repo.name]?.scanned ?? false"
+                    [rescanInProgressCount]="securitySummary[repo.name]?.rescanInProgressCount ?? 0"
+                    [rescanFailedCount]="securitySummary[repo.name]?.rescanFailedCount ?? 0"
                   />
                 </div>
 
@@ -562,6 +564,8 @@
                     [repoType]="repo.repoType"
                     [severity]="securitySummary[repo.name]?.severity ?? null"
                     [scanned]="securitySummary[repo.name]?.scanned ?? false"
+                    [rescanInProgressCount]="securitySummary[repo.name]?.rescanInProgressCount ?? 0"
+                    [rescanFailedCount]="securitySummary[repo.name]?.rescanFailedCount ?? 0"
                   />
               </div>
 

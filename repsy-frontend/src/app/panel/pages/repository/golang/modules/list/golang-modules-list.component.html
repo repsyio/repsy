@@ -98,6 +98,8 @@
                   [packageQueryParams]="{ modulePath: mod.modulePath }"
                   [severity]="securitySummary[mod.modulePath]?.severity ?? null"
                   [scanned]="securitySummary[mod.modulePath]?.scanned ?? false"
+                  [rescanInProgressCount]="securitySummary[mod.modulePath]?.rescanInProgressCount ?? 0"
+                  [rescanFailedCount]="securitySummary[mod.modulePath]?.rescanFailedCount ?? 0"
                 />
 
                 <app-tooltip
@@ -165,6 +167,8 @@
                     [packageQueryParams]="{ modulePath: mod.modulePath }"
                     [severity]="securitySummary[mod.modulePath]?.severity ?? null"
                     [scanned]="securitySummary[mod.modulePath]?.scanned ?? false"
+                    [rescanInProgressCount]="securitySummary[mod.modulePath]?.rescanInProgressCount ?? 0"
+                    [rescanFailedCount]="securitySummary[mod.modulePath]?.rescanFailedCount ?? 0"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

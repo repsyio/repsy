@@ -19,4 +19,8 @@ public interface RepoSeverityRank {
   String getRepoName();
 
   Integer getSeverityRank();
+
+  Long getRescanInProgressCount();
+
+  Long getRescanFailedCount();
 }
