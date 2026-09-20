@@ -256,7 +256,7 @@
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>3.1.0</version>
+            <version>3.1.1</version>
         </dependency>
 
         <dependency>
@@ -370,7 +370,7 @@
             <plugin>
                 <groupId>org.openapitools</groupId>
                 <artifactId>openapi-generator-maven-plugin</artifactId>
-                <version>7.24.0</version>
+                <version>7.25.0</version>
                 <executions>
                     <execution>
                         <id>open-api</id>
@@ -400,6 +400,10 @@
                                 <openApiNullable>false</openApiNullable>
                                 <useOptional>false</useOptional>
                                 <useBeanValidation>true</useBeanValidation>
+                                <!-- Since 7.25.0 these are opt-in and default to off; the DTOs rely on them
+                                     to omit null optional properties from the JSON, as 7.24.x did. -->
+                                <generateJsonIncludeAnnotations>true</generateJsonIncludeAnnotations>
+                                <generateJsonSetterNullsAnnotations>true</generateJsonSetterNullsAnnotations>
                                 <generatedConstructorWithRequiredArgs>false</generatedConstructorWithRequiredArgs>
                                 <additionalModelTypeAnnotations>
                                     @lombok.Builder
