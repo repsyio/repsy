@@ -16,6 +16,8 @@
 package io.repsy.protocols.helm.shared.chart.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -167,7 +169,8 @@ class AbstractHelmChartFilesServiceTest {
       // The deleted chart's "latest" tag was pushed again for another chart, whose archive it
       // names.
       final var tags = List.of(manifest("latest", manifestJson(CONFIG, retagged)));
-      when(chartService.existsByRepoIdAndDigest(REPO_ID, retagged)).thenReturn(true);
+      when(chartService.existsByRepoIdAndDigest(eq(REPO_ID), anyString()))
+          .thenAnswer(invocation -> retagged.equals(invocation.getArgument(1)));
       remainingManifests();
       when(helmStorageService.deleteBlob(REPO_ID, CONFIG, REPO_NAME)).thenReturn(2L);
 
