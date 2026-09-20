@@ -28,6 +28,7 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigInteger;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -68,6 +69,7 @@ public final class NuGetPackageUtils {
           "comment", "http://www.w3.org/2000/01/rdf-schema#comment");
   private static final int THREE = 3;
   private static final int FOUR = 4;
+  private static final String ZERO_VERSION = "0.0.0";
   private static final int REGISTRATION_PAGE_SIZE = 64;
   private static final int MAX_README_BYTES = 256 * 1024;
   private static final int MAX_REPOSITORY_URL_LENGTH = 512;
@@ -79,15 +81,56 @@ public final class NuGetPackageUtils {
               + "(?:\\+[a-zA-Z0-9][a-zA-Z0-9.-]*)?$");
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private static final Comparator<String> VERSION_COMPARATOR =
-      (v1, v2) -> {
-        try {
-          return Objects.requireNonNull(Semver.coerce(v1))
-              .compareTo(Objects.requireNonNull(Semver.coerce(v2)));
-        } catch (final Exception e) {
-          return v1.compareToIgnoreCase(v2);
-        }
-      };
+  private static final Comparator<String> VERSION_COMPARATOR = NuGetPackageUtils::compareVersions;
+
+  /**
+   * Orders two NuGet versions the way NuGet does: by major, minor, patch and revision (the optional
+   * fourth part, numerically, a missing part counting as 0), then by pre-release label, where a
+   * release sorts after its own pre-releases. Build metadata is ignored. A value that cannot be
+   * parsed falls back to a case-insensitive string comparison.
+   */
+  static int compareVersions(final String v1, final String v2) {
+    try {
+      final var first = v1.strip().toLowerCase(Locale.ROOT);
+      final var second = v2.strip().toLowerCase(Locale.ROOT);
+
+      final var numeric = compareNumericParts(numericParts(first), numericParts(second));
+      if (numeric != 0) {
+        return numeric;
+      }
+      return Objects.requireNonNull(Semver.parse(ZERO_VERSION + preRelease(first)))
+          .compareTo(Objects.requireNonNull(Semver.parse(ZERO_VERSION + preRelease(second))));
+    } catch (final Exception e) {
+      return v1.compareToIgnoreCase(v2);
+    }
+  }
+
+  private static String[] numericParts(final String version) {
+    final var parts = substringBefore(substringBefore(version, '+'), '-').split("\\.");
+    if (parts.length > FOUR) {
+      throw new IllegalArgumentException("More than four version parts: " + version);
+    }
+    return parts;
+  }
+
+  private static int compareNumericParts(final String[] first, final String[] second) {
+    for (int i = 0; i < FOUR; i++) {
+      final var result = numericPart(first, i).compareTo(numericPart(second, i));
+      if (result != 0) {
+        return result;
+      }
+    }
+    return 0;
+  }
+
+  private static BigInteger numericPart(final String[] parts, final int index) {
+    return index < parts.length ? new BigInteger(parts[index]) : BigInteger.ZERO;
+  }
+
+  private static String preRelease(final String version) {
+    final var withoutBuild = substringBefore(version, '+');
+    return withoutBuild.substring(substringBefore(withoutBuild, '-').length());
+  }
 
   /**
    * Normalizes a NuGet version string to its canonical form: - Lowercased - Trailing zero

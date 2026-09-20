@@ -19,11 +19,15 @@ import static io.repsy.protocols.nuget.NuGetTestContexts.context;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.repsy.protocols.nuget.shared.dtos.NuGetCatalogEntry;
+import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafItem;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.DisplayName;
@@ -160,6 +164,90 @@ class NuGetPackageUtilsTest {
     final var idAndVersion = NuGetPackageUtils.extractPackageIdAndVersion(ctx);
     assertThat(idAndVersion.id()).isEqualTo(expectedId);
     assertThat(idAndVersion.version()).isEqualTo(expectedVersion);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "1.0.0.5, 1.0.0.6",
+    "1.0.0.5, 1.0.0.10",
+    "1.0.0, 1.0.0.1",
+    "1.0.0.1, 1.0.1",
+    "1.9.9.9, 2.0.0",
+    "1.0.0.5-beta, 1.0.0.5",
+    "1.0.0-beta, 1.0.0.1-alpha",
+    "1.0.0.5-alpha, 1.0.0.5-beta",
+    "1.0.0-alpha, 1.0.0",
+    "1.0.0-beta.2, 1.0.0-beta.11",
+    "1.0.0-Alpha, 1.0.0-beta",
+    "1.2, 1.10",
+    "2, 10.0.0",
+  })
+  @DisplayName("orders the first version before the second")
+  void ordersVersions(final String lower, final String higher) {
+    assertThat(NuGetPackageUtils.compareVersions(lower, higher)).isNegative();
+    assertThat(NuGetPackageUtils.compareVersions(higher, lower)).isPositive();
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "1.0, 1.0.0",
+    "1.0.0.0, 1.0.0",
+    "1.0.0+a, 1.0.0+b",
+    "1.0.0.5, 1.0.0.5+build",
+    "1.0.0-Beta, 1.0.0-beta",
+  })
+  @DisplayName("treats versions NuGet considers the same as equal")
+  void comparesEqualVersions(final String first, final String second) {
+    assertThat(NuGetPackageUtils.compareVersions(first, second)).isZero();
+    assertThat(NuGetPackageUtils.compareVersions(second, first)).isZero();
+  }
+
+  @ParameterizedTest
+  @CsvSource({"a.b.c, 1.0.0", "1.0.0, a.b.c", "1.2.3.4.5, 1.2.3.4", ".1, 1.0.0", "'', 1.0.0"})
+  @DisplayName("falls back to a case-insensitive string comparison for an unparseable version")
+  void fallsBackForUnparseableVersion(final String first, final String second) {
+    assertThat(NuGetPackageUtils.compareVersions(first, second))
+        .isEqualTo(first.compareToIgnoreCase(second));
+  }
+
+  @Test
+  @DisplayName("bounds a registration page by its lowest and highest four-part versions")
+  void boundsRegistrationPageByFourPartVersions() {
+    final var leaves =
+        Stream.of("1.0.0.10", "1.0.0.5", "1.0.0.6", "1.0.0")
+            .map(NuGetPackageUtilsTest::leafItem)
+            .toList();
+
+    final var pages = NuGetPackageUtils.buildRegistrationPages(leaves, "https://x/index.json");
+
+    assertThat(pages)
+        .singleElement()
+        .satisfies(
+            page -> {
+              assertThat(page.lower()).isEqualTo("1.0.0");
+              assertThat(page.upper()).isEqualTo("1.0.0.10");
+            });
+  }
+
+  private static NuGetRegistrationLeafItem leafItem(final String version) {
+    final var entry =
+        new NuGetCatalogEntry(
+            "id",
+            "type",
+            "Some.Package",
+            version,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true,
+            Instant.EPOCH,
+            null);
+    return new NuGetRegistrationLeafItem(
+        "id", "type", entry, true, "content", Instant.EPOCH, "registration");
   }
 
   private Path nupkg(final String id, final String version) throws IOException {
