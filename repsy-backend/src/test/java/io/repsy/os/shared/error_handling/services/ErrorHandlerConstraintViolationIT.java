@@ -19,7 +19,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 import io.repsy.os.AbstractIntegrationTest;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -84,7 +83,6 @@ class ErrorHandlerConstraintViolationIT extends AbstractIntegrationTest {
     final var user = new User();
     user.setUsername(username);
     user.setHash(PasswordHasher.hash(VALID_PASSWORD));
-    user.setSalt(PasswordGeneratorUtil.generateSalt());
     user.setRole(UserRole.USER);
     return user;
   }

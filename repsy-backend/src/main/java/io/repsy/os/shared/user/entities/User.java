@@ -27,9 +27,17 @@ import java.util.UUID;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.DynamicUpdate;
 
+/**
+ * {@code @DynamicUpdate} keeps an UPDATE to the columns that changed. The default writes every
+ * column, so two transactions that changed different columns of one row (a password change and the
+ * async last-login update, RPS-1032) would each write the other's column back with the value they
+ * read.
+ */
 @Data
 @Entity
+@DynamicUpdate
 @Table(name = "users")
 @RequiredArgsConstructor
 public class User {
@@ -43,9 +51,6 @@ public class User {
 
   @Column(name = "hash", nullable = false, length = 128)
   private String hash;
-
-  @Column(name = "salt", nullable = false, length = 16)
-  private String salt;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "role", nullable = false, length = 20)

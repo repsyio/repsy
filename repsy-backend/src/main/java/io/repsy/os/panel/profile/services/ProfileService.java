@@ -22,7 +22,6 @@ import io.repsy.os.generated.model.ProfileInfo;
 import io.repsy.os.generated.model.UserRole;
 import io.repsy.os.panel.profile.repositories.ReservedUsernameRepository;
 import io.repsy.os.shared.auth.services.LoginInfoFactory;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.services.UserTxService;
 import java.time.Instant;
@@ -78,11 +77,7 @@ public class ProfileService {
 
     final var user = this.userTxService.getAuthenticatedUserById(userId);
 
-    final var salt = PasswordGeneratorUtil.generateSalt();
-
-    user.setSalt(salt);
-    user.setHash(PasswordHasher.hash(form.getPassword()));
-    this.userTxService.updatePassword(user.getId(), user.getHash(), salt);
+    this.userTxService.updatePassword(user.getId(), PasswordHasher.hash(form.getPassword()));
 
     // Re-read so the returned tokens carry the incremented token version.
     return this.loginInfoFactory.create(this.userTxService.getUserById(userId), sessionStart);

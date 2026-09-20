@@ -43,12 +43,12 @@ import org.springframework.stereotype.Component;
  * session:
  *
  * <ul>
- *   <li>The key is an HMAC of the username, the password and the stored hash and salt, under a
- *       random key made for this process. No password sits in memory, and a client cannot craft a
- *       key. Because the stored hash and salt are part of it, a changed password, a re-hash and a
- *       new algorithm all miss the cache at once, with no invalidation to forget. The caller still
- *       reads the user from the database on every request, so a deleted user or a changed role
- *       takes effect immediately too.
+ *   <li>The key is an HMAC of the username, the password and the stored hash, under a random key
+ *       made for this process. No password sits in memory, and a client cannot craft a key. Because
+ *       the stored hash is part of it, a changed password, a re-hash and a new algorithm all miss
+ *       the cache at once, with no invalidation to forget. The caller still reads the user from the
+ *       database on every request, so a deleted user or a changed role takes effect immediately
+ *       too.
  *   <li>Only a successful check is stored. A wrong password, an unknown username and a missing user
  *       never reach the cache, so those requests cost what they did before (RPS-906), and a client
  *       without a valid password cannot fill it.
@@ -98,7 +98,7 @@ public class VerifiedPasswordCache {
   public boolean matches(final @NonNull UserInfo user, final @NonNull String password) {
 
     if (this.verified == null || user.getHash() == null) {
-      return PasswordHasher.matches(password, user.getHash(), user.getSalt());
+      return PasswordHasher.matches(password, user.getHash());
     }
 
     final var key = this.keyOf(user, password);
@@ -107,7 +107,7 @@ public class VerifiedPasswordCache {
       return true;
     }
 
-    final var matches = PasswordHasher.matches(password, user.getHash(), user.getSalt());
+    final var matches = PasswordHasher.matches(password, user.getHash());
 
     if (matches) {
       this.verified.put(key, Boolean.TRUE);
@@ -129,7 +129,6 @@ public class VerifiedPasswordCache {
     update(mac, user.getUsername());
     update(mac, password);
     update(mac, user.getHash());
-    update(mac, user.getSalt());
 
     return Base64.getEncoder().encodeToString(mac.doFinal());
   }

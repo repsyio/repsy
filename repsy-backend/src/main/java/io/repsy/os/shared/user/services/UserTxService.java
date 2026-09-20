@@ -58,10 +58,7 @@ public class UserTxService {
 
   @Transactional
   public @NonNull UserInfo create(
-      final @NonNull String username,
-      final @NonNull UserRole role,
-      final @Nullable String hash,
-      final @NonNull String salt) {
+      final @NonNull String username, final @NonNull UserRole role, final @Nullable String hash) {
 
     if (this.userRepository.existsByUsername(username)) {
       throw new BadRequestException(ERR_USERNAME_IN_USE);
@@ -71,7 +68,6 @@ public class UserTxService {
     user.setUsername(username);
     user.setRole(role);
     user.setHash(hash);
-    user.setSalt(salt);
 
     // The id is application-generated, so save() defers the INSERT; flush it so the
     // @CreationTimestamp value is populated before the entity is mapped to the result.
@@ -123,12 +119,10 @@ public class UserTxService {
   }
 
   @Transactional
-  public void updatePassword(
-      final @NonNull UUID userId, final @NonNull String newHash, final @NonNull String newSalt) {
+  public void updatePassword(final @NonNull UUID userId, final @NonNull String newHash) {
 
     final var user = this.findUserById(userId);
     user.setHash(newHash);
-    user.setSalt(newSalt);
     user.revokeRefreshTokens();
     this.userRepository.save(user);
   }
@@ -147,13 +141,11 @@ public class UserTxService {
       throw new BadRequestException(ERR_USERNAME_IN_USE);
     }
 
-    final var salt = PasswordGeneratorUtil.generateSalt();
     final var hash = PasswordHasher.hash(dto.getPassword());
 
     final var user = new User();
     user.setUsername(dto.getUsername());
     user.setHash(hash);
-    user.setSalt(salt);
     user.setRole(UserRole.valueOf(dto.getRole().name()));
 
     // The id is application-generated, so save() defers the INSERT; flush it so the
@@ -193,10 +185,8 @@ public class UserTxService {
   public @NonNull String resetUserPassword(final @NonNull UUID userId) {
     final var user = this.findUserById(userId);
     final var newPassword = PasswordGeneratorUtil.generatePassword();
-    final var salt = PasswordGeneratorUtil.generateSalt();
 
     user.setHash(PasswordHasher.hash(newPassword));
-    user.setSalt(salt);
     user.revokeRefreshTokens();
 
     this.userRepository.save(user);
@@ -233,11 +223,18 @@ public class UserTxService {
     this.userRepository.replaceHash(user.getId(), user.getHash(), PasswordHasher.hash(password));
   }
 
+  /**
+   * Records a login. It writes only the {@code last_login_at} column (RPS-1032): it runs on the
+   * {@code @Async} login listener, and saving the whole entity could undo a password, role or
+   * username change that committed after the row was read.
+   *
+   * @throws ItemNotFoundException if no user has {@code username}
+   */
   @Transactional
   public void updateLastLoginAt(final @NonNull String username) {
-    final var user = this.findUserByUsername(username);
-    user.setLastLoginAt(Instant.now());
-    this.userRepository.save(user);
+    if (this.userRepository.updateLastLoginAt(username, Instant.now()) == 0) {
+      throw new ItemNotFoundException(ERR_USER_NOT_FOUND);
+    }
   }
 
   private @NonNull User findUserById(final @NonNull UUID id) {
