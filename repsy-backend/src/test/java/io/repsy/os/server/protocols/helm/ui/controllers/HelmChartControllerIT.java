@@ -34,6 +34,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepository;
 import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
+import io.repsy.os.server.protocols.helm.shared.oci.services.HelmOciManifestNameRepairService;
 import io.repsy.os.server.protocols.helm.shared.oci.services.HelmOciManifestService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
@@ -133,6 +134,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   @Autowired private HelmChartService helmChartService;
   @Autowired private HelmChartRepository helmChartRepository;
   @Autowired private HelmOciManifestService helmOciManifestService;
+  @Autowired private HelmOciManifestNameRepairService helmOciManifestNameRepairService;
 
   // ---------------------------------------------------------------------------------------------
   // Fixtures: real chart archives, uploaded through the real Helm protocol handlers
@@ -1297,19 +1299,26 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     }
 
     /**
-     * A push under a name other than the {@code Chart.yaml} name is rejected (RPS-978), but
-     * manifests stored before that check can carry such a name. They are still listed rather than
-     * answered 404.
+     * A push under a name other than the {@code Chart.yaml} name is rejected (RPS-978). Manifests
+     * stored before that check can carry such a name; the repair (RPS-1038) re-keys them to the
+     * chart name, after which the tags are listed under the chart and the path name is unknown.
      */
     @Test
-    @DisplayName("tags stored under a name that differs from the chart name are listed")
-    void listsTagsOfNameDifferingFromChartName() throws Exception {
+    @DisplayName("tags stored under a name that differs from the chart name move to the chart")
+    void tagsOfNameDifferingFromChartNameMoveToTheChart() throws Exception {
       final var it = HelmChartControllerIT.this;
       final var token = it.adminBearerToken();
       final var repo = it.helmRepo();
       it.seedOciManifestUnderOtherName(repo, "alias", "1.0.0", ChartSpec.of("real-name", "1.0.0"));
 
-      assertThat(stringList(it.tags(repo, "alias", token))).containsExactly("1.0.0");
+      expectChartNotFound(it.tagsRequest(repo, "alias", token));
+      assertThat(stringList(it.tags(repo, "real-name", token))).isEmpty();
+
+      it.helmOciManifestNameRepairService.repair();
+      it.entityManager.clear();
+
+      assertThat(stringList(it.tags(repo, "real-name", token))).containsExactly("1.0.0");
+      expectChartNotFound(it.tagsRequest(repo, "alias", token));
     }
 
     /**

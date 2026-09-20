@@ -47,4 +47,20 @@ public interface HelmOciManifestRepository extends JpaRepository<HelmOciManifest
       order by m.createdAt desc
       """)
   List<String> findReferencesByRepoIdAndName(UUID repoId, String name);
+
+  /**
+   * The manifests stored under a name other than the name of their chart. The oldest come first, so
+   * that when several of them would take the same name the earliest push is the one that keeps it.
+   */
+  @Query(
+      """
+      select new io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifestMismatch(
+          m.id, m.repo.id, m.repo.name, m.name, m.reference, m.digest, c.name)
+      from HelmOciManifest m
+        join m.chartVersion v
+        join v.chart c
+      where m.name <> c.name
+      order by m.createdAt, m.id
+      """)
+  List<HelmOciManifestMismatch> findAllNamedDifferentlyFromChart();
 }
