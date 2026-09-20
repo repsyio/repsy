@@ -36,6 +36,7 @@ import io.repsy.protocols.golang.shared.exceptions.GoVersionGoneException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ValidationException;
+import java.sql.SQLException;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.convert.ConversionFailedException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -94,6 +96,12 @@ public class ErrorHandler {
   private static final @NonNull String ERR_SIGNATURE_NOT_VERIFIED = "artifactSignatureNotVerified";
   private static final @NonNull String ERR_MISSING_REQUEST_HEADER = "missingRequestHeader";
   private static final @NonNull String ERR_SCAN_EXECUTOR_SATURATED = "scanExecutorSaturated";
+
+  /** SQL state of a value longer than its column (PostgreSQL and H2 alike). */
+  private static final @NonNull String SQL_STATE_VALUE_TOO_LONG = "22001";
+
+  /** SQL state of a unique constraint or unique index violation (PostgreSQL and H2 alike). */
+  private static final @NonNull String SQL_STATE_UNIQUE_VIOLATION = "23505";
 
   private final @NonNull RestResponseFactory resp;
 
@@ -726,6 +734,54 @@ public class ErrorHandler {
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(messageText, ex.getMessage()));
+  }
+
+  /**
+   * Handles a database constraint violation that reached the controller layer. Two kinds are
+   * something the client can correct, so they answer 4xx: a value longer than its column (400
+   * {@code validationError}) and a duplicate key (409 {@code itemAlreadyExists}), for example the
+   * loser of a race that an up-front existence check could not close. Every other violation
+   * (not-null, foreign key, check) means the server wrote something it should not have, so it stays
+   * a 500 through {@link #defaultExceptionHandler}, which logs it as an error.
+   *
+   * <p>A mapped violation still means an up-front check missed a case, so it is logged as a warning
+   * with the SQL state. The constraint name and offending value stay out of the response.
+   *
+   * @param ex Thrown exception
+   * @return REST response
+   */
+  @ExceptionHandler(DataIntegrityViolationException.class)
+  @Nullable ResponseEntity<RestResponse<Object>> handleException(
+      final @NonNull DataIntegrityViolationException ex,
+      final @NonNull HttpServletRequest request,
+      final @Nullable HttpServletResponse response) {
+
+    if (response == null) {
+      log.debug("Data integrity violation", ex);
+      return null;
+    }
+
+    final var sqlState =
+        ex.getMostSpecificCause() instanceof final SQLException e ? e.getSQLState() : null;
+
+    final HttpStatus status;
+    final String msgId;
+
+    if (SQL_STATE_VALUE_TOO_LONG.equals(sqlState)) {
+      status = HttpStatus.BAD_REQUEST;
+      msgId = ERR_VALIDATION;
+    } else if (SQL_STATE_UNIQUE_VIOLATION.equals(sqlState)) {
+      status = HttpStatus.CONFLICT;
+      msgId = ERR_ITEM_ALREADY_EXISTS;
+    } else {
+      return this.defaultExceptionHandler(ex, request, response);
+    }
+
+    log.warn("Constraint violation (SQL state {}): {}", sqlState, exceptionToString(ex, request));
+
+    return ResponseEntity.status(status)
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(this.resp.error(msgId));
   }
 
   @ExceptionHandler(RetryableException.class)
