@@ -25,6 +25,7 @@ import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPack
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.utils.OffsetPageRequest;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
@@ -228,7 +229,10 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       return new org.springframework.data.domain.PageImpl<>(List.of());
     }
 
-    return this.searchPage(repoInfo, query, PageRequest.of(skip / take, take), prerelease);
+    // skip is the client's exact offset. A PageRequest can only start at a multiple of take, so it
+    // would serve the window that starts at the previous multiple instead.
+    return this.searchPage(
+        repoInfo, query, OffsetPageRequest.of(Math.max(skip, 0), take), prerelease);
   }
 
   @Override
@@ -240,8 +244,8 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
     // package_id is unique per repo, so it alone gives every page a stable order.
     final var sortedPageable =
-        PageRequest.of(
-            pageable.getPageNumber(),
+        new OffsetPageRequest(
+            pageable.getOffset(),
             pageable.getPageSize(),
             pageable.getSort().isSorted()
                 ? pageable.getSort()
