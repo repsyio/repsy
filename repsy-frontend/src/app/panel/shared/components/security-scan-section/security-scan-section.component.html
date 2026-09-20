@@ -20,9 +20,10 @@
           <span class="text-[13px] text-[#9C9C9D]">
             {{ overview?.totalCount ?? 0 }} finding{{ (overview?.totalCount ?? 0) === 1 ? '' : 's' }}
           </span>
-        } @else if (overview?.status === ScanStatus.Completed) {
+        } @else if (overview?.lastCompletedAt) {
           <span class="text-[13px] text-success-400">Clean</span>
         }
+        <app-rescan-note [status]="overview?.status" [hasCompletedScan]="!!overview?.lastCompletedAt" />
       }
     </div>
 

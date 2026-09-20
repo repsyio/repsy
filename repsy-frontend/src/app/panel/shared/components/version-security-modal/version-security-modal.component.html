@@ -37,6 +37,13 @@
     @if (loading) {
       <app-spinner />
     } @else if (overview) {
+      <!-- The counters describe the newest completed scan; the note flags a newer unfinished one. -->
+      @if (hasRescanNote) {
+        <div class="mb-4">
+          <app-rescan-note [status]="overview.status" [hasCompletedScan]="!!overview.lastCompletedAt" />
+        </div>
+      }
+
       <app-severity-breakdown [counts]="overview" />
 
       @if (isDetailClickable) {

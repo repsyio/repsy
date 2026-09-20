@@ -2769,7 +2769,12 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseScanOverview"
-      summary: Get the severity breakdown of the latest scan for an artifact version
+      summary: Get the severity breakdown of an artifact version
+      description: >-
+        The scanId, status and scannedAt describe the version's newest scan, whatever its status.
+        The counters describe its newest COMPLETED scan (see lastCompletedAt), so they stay the last
+        known values while a rescan is pending, queued, running or failed, and are all zero only
+        when the version has no completed scan or its completed scan found nothing.
     parameters:
       - name: repoName
         in: path
@@ -5343,11 +5348,22 @@ components:
       type: object
       properties:
         scanId:
+          description: Id of the version's newest scan, of any status.
           type: string
           format: uuid
         status:
+          description: Status of the version's newest scan.
           "$ref": "#/components/schemas/ScanStatus"
         scannedAt:
+          description: >-
+            When the version's newest scan finished; null while it is pending, queued or running.
+          type: string
+          format: date-time
+          nullable: true
+        lastCompletedAt:
+          description: >-
+            When the version's newest COMPLETED scan finished, the scan the counters are built
+            from; null when no scan of the version has completed yet.
           type: string
           format: date-time
           nullable: true

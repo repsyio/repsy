@@ -21,13 +21,15 @@ import { finalize } from 'rxjs/operators';
 
 import { RepoType, ScanOverview, VulnerabilityScanControllerService } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
+import { recentScanNote } from '../../util/rescan-status.util';
 import { buildArtifactDetailRoute } from '../../util/security-detail-route.util';
+import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
 import { SeverityBreakdownComponent } from '../severity-breakdown/severity-breakdown.component';
 
 @Component({
   selector: 'app-version-security-modal',
   standalone: true,
-  imports: [CommonModule, SpinnerComponent, SeverityBreakdownComponent],
+  imports: [CommonModule, SpinnerComponent, SeverityBreakdownComponent, RescanNoteComponent],
   templateUrl: './version-security-modal.component.html',
 })
 export class VersionSecurityModalComponent implements OnChanges {
@@ -54,6 +56,11 @@ export class VersionSecurityModalComponent implements OnChanges {
 
   public closeModal(): void {
     this.openChange.emit(false);
+  }
+
+  /** Whether the newest scan is unfinished, so the counters below are the last known ones. */
+  public get hasRescanNote(): boolean {
+    return !!this.overview && recentScanNote(this.overview.status, !!this.overview.lastCompletedAt) !== '';
   }
 
   public get isDetailClickable(): boolean {
