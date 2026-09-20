@@ -118,13 +118,11 @@ jobs:
         run: pnpm run lint
 
       # The specs import the generated API client (src/generated/api, git-ignored), and the
-      # generator is a Java tool. It only needs a JRE (the Dockerfile builds the same client on
-      # a Java 21 JRE), not the JDK 25 that the Maven build uses.
-      - name: Set up JRE
+      # generator is a Java tool that openapi-generator-cli downloads on first use.
+      - name: Set up JDK
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
-          java-version: "21"
-          java-package: "jre"
+          java-version: "25"
           distribution: "temurin"
 
       # openapi-generator-cli downloads the generator jar from Maven Central the first time it

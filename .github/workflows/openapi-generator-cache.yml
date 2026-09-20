@@ -41,11 +41,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --ignore-scripts
 
-      - name: Set up JRE
+      - name: Set up JDK
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
-          java-version: "21"
-          java-package: "jre"
+          java-version: "25"
           distribution: "temurin"
 
       # Same path and key as pr-checks.yml. On a hit this only refreshes the entry's access time.
