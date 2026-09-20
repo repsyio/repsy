@@ -30,6 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.channels.FileChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -238,6 +239,51 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     }
 
     return BaseUsages.builder().diskUsage(data.length).build();
+  }
+
+  @Override
+  @SneakyThrows
+  public @NonNull BaseUsages appendStream(
+      final @NonNull String repoName,
+      final @NonNull StoragePath storagePath,
+      final @NonNull InputStream inputStream) {
+
+    final Path physicalPath = this.toPhysicalPath(storagePath);
+    final Path directory = physicalPath.getParent();
+
+    if (!Files.exists(directory)) {
+      Files.createDirectories(directory);
+    }
+
+    final long lengthBefore = Files.exists(physicalPath) ? Files.size(physicalPath) : 0;
+    final long bytesAppended;
+
+    try (final InputStream is = inputStream;
+        final OutputStream os = Files.newOutputStream(physicalPath, CREATE, APPEND)) {
+
+      bytesAppended = is.transferTo(os);
+    } catch (final IOException | RuntimeException e) {
+      this.truncate(physicalPath, lengthBefore, e);
+      throw e;
+    }
+
+    return BaseUsages.ofDisk(bytesAppended);
+  }
+
+  /** Cuts a partly appended file back to its length before the append. */
+  private void truncate(final Path physicalPath, final long length, final Exception cause) {
+    try {
+      if (length == 0) {
+        Files.deleteIfExists(physicalPath);
+        return;
+      }
+
+      try (final FileChannel channel = FileChannel.open(physicalPath, StandardOpenOption.WRITE)) {
+        channel.truncate(length);
+      }
+    } catch (final IOException e) {
+      cause.addSuppressed(e);
+    }
   }
 
   @Override

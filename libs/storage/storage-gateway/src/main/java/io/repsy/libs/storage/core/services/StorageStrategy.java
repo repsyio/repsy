@@ -55,6 +55,16 @@ public interface StorageStrategy {
   BaseUsages append(String repoName, StoragePath path, byte[] data);
 
   /**
+   * Appends the bytes of {@code inputStream} to the object, creating it when it does not exist yet.
+   * The stream is copied as it is read, so a chunk of any size is appended without being held in
+   * memory. Answers the appended bytes as the disk usage change, so the usage of a chunked upload
+   * adds up to the size of the object. A copy that fails halfway leaves the object as it was before
+   * the call, so a client can send the chunk again.
+   */
+  @NonNull BaseUsages appendStream(
+      @NonNull String repoName, @NonNull StoragePath storagePath, @NonNull InputStream inputStream);
+
+  /**
    * Lists the regular files directly under {@code directory} whose last modification is before
    * {@code notModifiedSince}. Subdirectories are skipped, and a directory that does not exist has
    * no stale files.

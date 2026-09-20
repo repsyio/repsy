@@ -31,6 +31,7 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
@@ -113,6 +114,13 @@ class DockerLayerUploadUsageIT extends AbstractIntegrationTest {
   private void patchChunk(
       final Repo repo, final String uploadId, final byte[] bytes, final String token)
       throws Exception {
+    this.patchChunkForRange(repo, uploadId, bytes, token);
+  }
+
+  /** {@code PATCH}es one chunk and answers the {@code Range} header of the 202 response. */
+  private String patchChunkForRange(
+      final Repo repo, final String uploadId, final byte[] bytes, final String token)
+      throws Exception {
     final var response =
         this.mockMvc
             .perform(
@@ -124,6 +132,7 @@ class DockerLayerUploadUsageIT extends AbstractIntegrationTest {
             .andReturn()
             .getResponse();
     requireStatus(response, 202, "layer chunk upload");
+    return response.getHeader("Range");
   }
 
   /** Finalizes the upload; {@code body} is empty when the bytes went up in earlier chunks. */
@@ -134,18 +143,27 @@ class DockerLayerUploadUsageIT extends AbstractIntegrationTest {
       final byte[] body,
       final String token)
       throws Exception {
-    final var response =
-        this.mockMvc
-            .perform(
-                put("/v2/{repo}/{image}/blobs/uploads/{id}", repo.getName(), IMAGE, uploadId)
-                    .param("digest", digest)
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .content(body)
-                    .header(AUTHORIZATION, token)
-                    .with(protocolPort()))
-            .andReturn()
-            .getResponse();
-    requireStatus(response, 201, "layer upload finalize");
+    requireStatus(
+        this.tryFinalizeUpload(repo, uploadId, digest, body, token), 201, "layer upload finalize");
+  }
+
+  private MockHttpServletResponse tryFinalizeUpload(
+      final Repo repo,
+      final String uploadId,
+      final String digest,
+      final byte[] body,
+      final String token)
+      throws Exception {
+    return this.mockMvc
+        .perform(
+            put("/v2/{repo}/{image}/blobs/uploads/{id}", repo.getName(), IMAGE, uploadId)
+                .param("digest", digest)
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .content(body)
+                .header(AUTHORIZATION, token)
+                .with(protocolPort()))
+        .andReturn()
+        .getResponse();
   }
 
   /** Pushes a layer the way {@code docker push} does: start, one chunk, empty finalize. */
@@ -339,5 +357,113 @@ class DockerLayerUploadUsageIT extends AbstractIntegrationTest {
     assertThat(blobs.resolve(layerLegacyName)).doesNotExist();
     assertThat(blobs.resolve(sha256(layer))).hasBinaryContent(layer);
     assertThat(this.blobFilesIn(repo)).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("a layer sent in several chunks is stored whole and answers the running range")
+  void layerSentInSeveralChunksIsStoredWhole() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+    final var repo = this.dockerRepo();
+    final var chunks =
+        List.of(layerBytes("aaaa".repeat(25)), layerBytes("bbbb".repeat(40)), layerBytes("cc"));
+    final var layer = concat(chunks);
+    final var uploadId = this.startUpload(repo, token);
+
+    long sent = 0;
+    for (final var chunk : chunks) {
+      sent += chunk.length;
+      assertThat(this.patchChunkForRange(repo, uploadId, chunk, token))
+          .isEqualTo("0-" + (sent - 1));
+    }
+    this.finalizeUpload(repo, uploadId, sha256(layer), new byte[0], token);
+
+    assertThat(storageDirOf(repo).resolve("blobs").resolve(sha256(layer))).hasBinaryContent(layer);
+    assertThat(this.blobFilesIn(repo)).isEqualTo(1);
+    assertThat(this.netUsage(repo)).isEqualTo(layer.length);
+    assertThat(this.layerRepository.findByRepoIdAndDigest(repo.getId(), sha256(layer)))
+        .hasValueSatisfying(stored -> assertThat(stored.getSize()).isEqualTo(layer.length));
+  }
+
+  @Test
+  @DisplayName("the chunk that closes the upload in the finalize request is appended to the rest")
+  void closingChunkIsAppended() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+    final var repo = this.dockerRepo();
+    final var head = layerBytes("head-".repeat(30));
+    final var tail = layerBytes("tail-".repeat(20));
+    final var layer = concat(List.of(head, tail));
+    final var uploadId = this.startUpload(repo, token);
+    this.patchChunk(repo, uploadId, head, token);
+
+    this.finalizeUpload(repo, uploadId, sha256(layer), tail, token);
+
+    assertThat(storageDirOf(repo).resolve("blobs").resolve(sha256(layer))).hasBinaryContent(layer);
+    assertThat(this.netUsage(repo)).isEqualTo(layer.length);
+  }
+
+  @Test
+  @DisplayName("a layer pushed again in several chunks is refunded down to the one stored copy")
+  void duplicateMultiChunkLayerIsRefunded() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+    final var repo = this.dockerRepo();
+    final var chunks = List.of(layerBytes("one-".repeat(30)), layerBytes("two-".repeat(30)));
+    final var layer = concat(chunks);
+    for (int push = 0; push < 2; push++) {
+      final var uploadId = this.startUpload(repo, token);
+      for (final var chunk : chunks) {
+        this.patchChunk(repo, uploadId, chunk, token);
+      }
+      this.finalizeUpload(repo, uploadId, sha256(layer), new byte[0], token);
+    }
+
+    assertThat(this.netUsage(repo)).isEqualTo(layer.length);
+    assertThat(this.blobFilesIn(repo)).isEqualTo(1);
+    assertThat(storageDirOf(repo).resolve("blobs").resolve(sha256(layer))).hasBinaryContent(layer);
+  }
+
+  @Test
+  @DisplayName("a finalize whose digest does not match what was uploaded is refused")
+  void digestMismatchIsRefused() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+    final var repo = this.dockerRepo();
+    final var first = layerBytes("first-half-".repeat(20));
+    final var second = layerBytes("second-half-".repeat(20));
+    final var claimed = sha256(layerBytes("what the client believes it sent"));
+    final var uploadId = this.startUpload(repo, token);
+    this.patchChunk(repo, uploadId, first, token);
+    this.patchChunk(repo, uploadId, second, token);
+
+    final var response = this.tryFinalizeUpload(repo, uploadId, claimed, new byte[0], token);
+
+    assertThat(response.getStatus()).isEqualTo(400);
+    assertThat(response.getContentAsString()).contains("DIGEST_INVALID");
+    assertThat(this.layerRepository.findByRepoIdAndDigest(repo.getId(), claimed)).isEmpty();
+    assertThat(storageDirOf(repo).resolve("blobs").resolve(claimed)).doesNotExist();
+    // The upload is still what the client sent, and it stays charged until it is cleaned up.
+    assertThat(storageDirOf(repo).resolve("blobs").resolve(uploadId))
+        .hasBinaryContent(concat(List.of(first, second)));
+    assertThat(this.netUsage(repo)).isEqualTo(first.length + second.length);
+  }
+
+  @Test
+  @DisplayName("a chunk sent twice makes the digest check refuse the finalize")
+  void resentChunkFailsTheDigestCheck() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+    final var repo = this.dockerRepo();
+    final var layer = layerBytes("resent-layer-".repeat(30));
+    final var uploadId = this.startUpload(repo, token);
+    this.patchChunk(repo, uploadId, layer, token);
+    this.patchChunk(repo, uploadId, layer, token);
+
+    final var response = this.tryFinalizeUpload(repo, uploadId, sha256(layer), new byte[0], token);
+
+    assertThat(response.getStatus()).isEqualTo(400);
+    assertThat(storageDirOf(repo).resolve("blobs").resolve(sha256(layer))).doesNotExist();
+  }
+
+  private static byte[] concat(final List<byte[]> chunks) {
+    final var out = new ByteArrayOutputStream();
+    chunks.forEach(out::writeBytes);
+    return out.toByteArray();
   }
 }

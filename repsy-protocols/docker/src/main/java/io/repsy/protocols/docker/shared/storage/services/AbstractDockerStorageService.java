@@ -95,6 +95,13 @@ public abstract class AbstractDockerStorageService<ID> implements DockerStorageS
   }
 
   @Override
+  public BaseUsages appendInputStreamToPath(
+      final String repoName, final StoragePath storagePath, final InputStream inputStream) {
+
+    return this.storageStrategy.appendStream(repoName, storagePath, inputStream);
+  }
+
+  @Override
   public long deleteManifests(
       final BaseRepoInfo<ID> repoInfo, final Collection<String> manifestsToDeleteFileNames) {
 

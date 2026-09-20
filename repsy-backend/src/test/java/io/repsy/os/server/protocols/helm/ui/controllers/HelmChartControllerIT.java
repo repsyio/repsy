@@ -1689,6 +1689,188 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   }
 
   @Nested
+  @DisplayName("OCI blob upload in several chunks")
+  class OciBlobChunks {
+
+    private String startBlobUpload(final Repo repo, final String token) throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var start =
+          it.protocol(
+                  post("/v2/{repo}/{name}/blobs/uploads/", repo.getName(), "payments")
+                      .header(AUTHORIZATION, token))
+              .andReturn()
+              .getResponse();
+      requireStatus(start, 202, "OCI blob upload start");
+      final var location = start.getHeader("Location");
+      return location.substring(location.lastIndexOf('/') + 1);
+    }
+
+    /** Sends one chunk and answers the {@code Range} header of the response. */
+    private String patchBlobChunk(
+        final Repo repo, final String uploadId, final byte[] chunk, final String token)
+        throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var response =
+          it.protocol(
+                  patch(
+                          "/v2/{repo}/{name}/blobs/uploads/{id}",
+                          repo.getName(),
+                          "payments",
+                          uploadId)
+                      .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                      .content(chunk)
+                      .header(AUTHORIZATION, token))
+              .andReturn()
+              .getResponse();
+      requireStatus(response, 202, "OCI blob chunk upload");
+      return response.getHeader("Range");
+    }
+
+    private MockHttpServletResponse finalizeBlobUpload(
+        final Repo repo,
+        final String uploadId,
+        final String digest,
+        final byte[] body,
+        final String token)
+        throws Exception {
+      final var it = HelmChartControllerIT.this;
+      return it.protocol(
+              put("/v2/{repo}/{name}/blobs/uploads/{id}", repo.getName(), "payments", uploadId)
+                  .param("digest", digest)
+                  .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                  .content(body)
+                  .header(AUTHORIZATION, token))
+          .andReturn()
+          .getResponse();
+    }
+
+    private byte[] concat(final byte[]... chunks) {
+      final var out = new ByteArrayOutputStream();
+      for (final var chunk : chunks) {
+        out.writeBytes(chunk);
+      }
+      return out.toByteArray();
+    }
+
+    @Test
+    @DisplayName("a blob sent in several chunks is stored whole and answers the running range")
+    void blobSentInSeveralChunksIsStoredWhole() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.asProtocolBearer(it.adminBearerToken());
+      final var repo = it.helmRepo();
+      final var first = "first chunk ".repeat(20).getBytes(StandardCharsets.UTF_8);
+      final var second = "second chunk ".repeat(30).getBytes(StandardCharsets.UTF_8);
+      final var third = "third".getBytes(StandardCharsets.UTF_8);
+      final var blob = this.concat(first, second, third);
+      final var uploadId = this.startBlobUpload(repo, token);
+
+      assertThat(this.patchBlobChunk(repo, uploadId, first, token))
+          .isEqualTo("0-" + (first.length - 1));
+      assertThat(this.patchBlobChunk(repo, uploadId, second, token))
+          .isEqualTo("0-" + (first.length + second.length - 1));
+      assertThat(this.patchBlobChunk(repo, uploadId, third, token))
+          .isEqualTo("0-" + (blob.length - 1));
+      final var finalize =
+          this.finalizeBlobUpload(repo, uploadId, sha256(blob), new byte[0], token);
+
+      requireStatus(finalize, 201, "OCI blob finalize");
+      assertThat(storageDirOf(repo).resolve("oci").resolve("blobs").resolve(sha256(blob)))
+          .hasBinaryContent(blob);
+      assertThat(it.storedBlobs(repo)).containsExactly(sha256(blob));
+      assertThat(it.blobRowExists(repo, blob)).isTrue();
+      assertThat(it.netUsage(repo)).isEqualTo(blob.length);
+    }
+
+    @Test
+    @DisplayName("the chunk that closes the upload in the finalize request is appended to the rest")
+    void closingChunkIsAppended() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.asProtocolBearer(it.adminBearerToken());
+      final var repo = it.helmRepo();
+      final var head = "head ".repeat(40).getBytes(StandardCharsets.UTF_8);
+      final var tail = "tail ".repeat(25).getBytes(StandardCharsets.UTF_8);
+      final var blob = this.concat(head, tail);
+      final var uploadId = this.startBlobUpload(repo, token);
+      this.patchBlobChunk(repo, uploadId, head, token);
+
+      final var finalize = this.finalizeBlobUpload(repo, uploadId, sha256(blob), tail, token);
+
+      requireStatus(finalize, 201, "OCI blob finalize");
+      assertThat(storageDirOf(repo).resolve("oci").resolve("blobs").resolve(sha256(blob)))
+          .hasBinaryContent(blob);
+      assertThat(it.netUsage(repo)).isEqualTo(blob.length);
+    }
+
+    @Test
+    @DisplayName("a blob pushed again in several chunks is refunded down to the one stored copy")
+    void duplicateMultiChunkBlobIsRefunded() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.asProtocolBearer(it.adminBearerToken());
+      final var repo = it.helmRepo();
+      final var first = "one ".repeat(50).getBytes(StandardCharsets.UTF_8);
+      final var second = "two ".repeat(50).getBytes(StandardCharsets.UTF_8);
+      final var blob = this.concat(first, second);
+
+      for (int push = 0; push < 2; push++) {
+        final var uploadId = this.startBlobUpload(repo, token);
+        this.patchBlobChunk(repo, uploadId, first, token);
+        this.patchBlobChunk(repo, uploadId, second, token);
+        requireStatus(
+            this.finalizeBlobUpload(repo, uploadId, sha256(blob), new byte[0], token),
+            201,
+            "OCI blob finalize");
+      }
+
+      assertThat(it.netUsage(repo)).isEqualTo(blob.length);
+      assertThat(it.storedBlobs(repo)).containsExactly(sha256(blob));
+    }
+
+    @Test
+    @DisplayName("a finalize whose digest does not match what was uploaded is refused")
+    void digestMismatchIsRefused() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.asProtocolBearer(it.adminBearerToken());
+      final var repo = it.helmRepo();
+      final var first = "first half ".repeat(20).getBytes(StandardCharsets.UTF_8);
+      final var second = "second half ".repeat(20).getBytes(StandardCharsets.UTF_8);
+      final var claimed =
+          sha256("what the client believes it sent".getBytes(StandardCharsets.UTF_8));
+      final var uploadId = this.startBlobUpload(repo, token);
+      this.patchBlobChunk(repo, uploadId, first, token);
+      this.patchBlobChunk(repo, uploadId, second, token);
+
+      final var response = this.finalizeBlobUpload(repo, uploadId, claimed, new byte[0], token);
+
+      assertThat(response.getStatus()).isEqualTo(400);
+      assertThat(
+              (String)
+                  JsonPath.read(
+                      response.getContentAsString(StandardCharsets.UTF_8), "$.errors[0].code"))
+          .isEqualTo("DIGEST_INVALID");
+      assertThat(it.storedBlobs(repo)).containsExactly(uploadId);
+      assertThat(it.helmOciBlobService.findByDigest(repo.getId(), claimed)).isEmpty();
+      assertThat(it.netUsage(repo)).isEqualTo(first.length + second.length);
+    }
+
+    @Test
+    @DisplayName("a finalize with a malformed digest is refused")
+    void malformedDigestIsRefused() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.asProtocolBearer(it.adminBearerToken());
+      final var repo = it.helmRepo();
+      final var blob = "some blob ".repeat(10).getBytes(StandardCharsets.UTF_8);
+      final var uploadId = this.startBlobUpload(repo, token);
+      this.patchBlobChunk(repo, uploadId, blob, token);
+
+      final var response =
+          this.finalizeBlobUpload(repo, uploadId, "sha256:abc", new byte[0], token);
+
+      assertThat(response.getStatus()).isEqualTo(400);
+      assertThat(it.storedBlobs(repo)).containsExactly(uploadId);
+    }
+  }
+
+  @Nested
   @DisplayName("OCI blob upload usage")
   class OciBlobUsage {
 

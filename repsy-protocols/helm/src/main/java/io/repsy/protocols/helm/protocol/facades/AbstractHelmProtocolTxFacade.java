@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.helm.protocol.facades;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -36,6 +37,8 @@ import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
 import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.protocols.helm.shared.utils.HelmConstants;
+import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.IOException;
 import java.io.InputStream;
@@ -232,6 +235,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
               repoInfo.getStorageKey(), uploadId, stream, repoInfo.getName());
       ProtocolContextUtils.addUsages(context, chunkUsages);
     }
+    this.verifyUploadDigest(repoInfo, uploadId, digest);
     // The upload was charged as it was written; a blob whose digest is already stored is dropped
     // here, so the bytes it freed are refunded.
     final var finalizeUsages =
@@ -248,6 +252,20 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
             .mediaType(mediaType)
             .build();
     return this.ociBlobService.findOrCreate(form, repoInfo.getId());
+  }
+
+  /** Refuses an upload that does not hash to the digest the client claims for it. */
+  private void verifyUploadDigest(
+      final BaseRepoInfo<ID> repoInfo, final UUID uploadId, final String digest)
+      throws IOException {
+    final var upload =
+        this.helmStorageService
+            .getBlob(repoInfo.getStorageKey(), uploadId.toString(), repoInfo.getName())
+            .orElseThrow(() -> new ItemNotFoundException("blobNotFound"));
+
+    if (!BlobDigests.matches(digest, upload.getInputStream())) {
+      throw new BadRequestException("digestMismatch");
+    }
   }
 
   @Override

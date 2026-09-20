@@ -26,6 +26,8 @@ import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import io.repsy.libs.storage.core.exceptions.IsADirectoryException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.SequenceInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -153,6 +155,111 @@ class FileSystemStorageStrategyIT {
 
       assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/a/b/c/file.txt"))
           .exists();
+    }
+  }
+
+  @Nested
+  @DisplayName("appendStream()")
+  class AppendStream {
+
+    private InputStream failingAfter(final byte[] head) {
+      return new SequenceInputStream(
+          new ByteArrayInputStream(head),
+          new InputStream() {
+            @Override
+            public int read() throws IOException {
+              throw new IOException("connection reset");
+            }
+          });
+    }
+
+    @Test
+    @DisplayName("creates the file, and its directories, when it does not exist")
+    void createsTheFile() throws Exception {
+      final var key = UUID.randomUUID();
+      final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "oci/blobs/upload");
+
+      final var usages =
+          FileSystemStorageStrategyIT.this.strategy.appendStream(
+              "repo", sp, new ByteArrayInputStream("first".getBytes(StandardCharsets.UTF_8)));
+
+      final var file = FileSystemStorageStrategyIT.this.basePath.resolve(key + "/oci/blobs/upload");
+      assertThat(Files.readString(file)).isEqualTo("first");
+      assertThat(usages.getDiskUsage()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("adds each chunk after the earlier ones and reports the bytes it added")
+    void appendsChunksInOrder() throws Exception {
+      final var key = UUID.randomUUID();
+      final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "upload");
+      final var strategy = FileSystemStorageStrategyIT.this.strategy;
+
+      final var first = strategy.appendStream("repo", sp, chunk("first-"));
+      final var second = strategy.appendStream("repo", sp, chunk("second-"));
+      final var third = strategy.appendStream("repo", sp, chunk("third"));
+
+      final var file = FileSystemStorageStrategyIT.this.basePath.resolve(key + "/upload");
+      assertThat(Files.readString(file)).isEqualTo("first-second-third");
+      assertThat(first.getDiskUsage() + second.getDiskUsage() + third.getDiskUsage())
+          .isEqualTo(Files.size(file));
+      assertThat(strategy.getFileUsage(sp, "repo")).isEqualTo(Files.size(file));
+    }
+
+    @Test
+    @DisplayName("appends an empty chunk without changing the file")
+    void appendsAnEmptyChunk() throws Exception {
+      final var key = UUID.randomUUID();
+      FileSystemStorageStrategyIT.this.seedFile(key + "/upload", "kept");
+      final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "upload");
+
+      final var usages =
+          FileSystemStorageStrategyIT.this.strategy.appendStream("repo", sp, chunk(""));
+
+      assertThat(usages.getDiskUsage()).isZero();
+      assertThat(
+              Files.readString(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/upload")))
+          .isEqualTo("kept");
+    }
+
+    @Test
+    @DisplayName("leaves the file as it was when the chunk fails halfway")
+    void restoresTheFileWhenTheCopyFails() throws Exception {
+      final var key = UUID.randomUUID();
+      FileSystemStorageStrategyIT.this.seedFile(key + "/upload", "kept");
+      final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "upload");
+      final var head = "partial".getBytes(StandardCharsets.UTF_8);
+
+      assertThatThrownBy(
+              () ->
+                  FileSystemStorageStrategyIT.this.strategy.appendStream(
+                      "repo", sp, this.failingAfter(head)))
+          .isInstanceOf(IOException.class)
+          .hasMessage("connection reset");
+
+      assertThat(
+              Files.readString(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/upload")))
+          .isEqualTo("kept");
+    }
+
+    @Test
+    @DisplayName("leaves no file behind when the first chunk fails halfway")
+    void removesTheFileWhenTheFirstChunkFails() {
+      final var key = UUID.randomUUID();
+      final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "upload");
+      final var head = "partial".getBytes(StandardCharsets.UTF_8);
+
+      assertThatThrownBy(
+              () ->
+                  FileSystemStorageStrategyIT.this.strategy.appendStream(
+                      "repo", sp, this.failingAfter(head)))
+          .isInstanceOf(IOException.class);
+
+      assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/upload")).doesNotExist();
+    }
+
+    private ByteArrayInputStream chunk(final String content) {
+      return new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
     }
   }
 

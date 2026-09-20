@@ -49,6 +49,13 @@ public interface DockerStorageService<ID> {
   BaseUsages writeInputStreamToPath(
       String repoName, StoragePath storagePath, InputStream inputStream);
 
+  /**
+   * Appends the stream to the file, creating it when needed. Answers the appended bytes as the disk
+   * usage change, which is what a chunk of a blob upload adds to the repo.
+   */
+  BaseUsages appendInputStreamToPath(
+      String repoName, StoragePath storagePath, InputStream inputStream);
+
   long deleteManifests(BaseRepoInfo<ID> repoInfo, Collection<String> manifestsToDeleteFileNames);
 
   long deleteManifest(BaseRepoInfo<ID> repoInfo, String manifestName);

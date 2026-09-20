@@ -25,7 +25,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
@@ -43,6 +45,9 @@ import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -62,8 +67,8 @@ class AbstractHelmProtocolTxFacadeTest {
   private static final UUID REPO_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
   private static final UUID UPLOAD_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
   private static final String REPO_NAME = "charts";
-  private static final String DIGEST = "sha256:abc";
   private static final int BLOB_SIZE = 300;
+  private static final String DIGEST = sha256Of(new byte[BLOB_SIZE]);
 
   @Mock private HelmStorageService<UUID> helmStorageService;
   @Mock private ChartService<UUID> chartService;
@@ -118,7 +123,22 @@ class AbstractHelmProtocolTxFacadeTest {
     return this.context.<BaseUsages>getProperty("usages").getDiskUsage();
   }
 
+  private static String sha256Of(final byte[] bytes) {
+    try {
+      return "sha256:"
+          + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+    } catch (final NoSuchAlgorithmException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
+  private void uploadHolds(final byte[] bytes) {
+    when(this.helmStorageService.getBlob(REPO_ID, UPLOAD_ID.toString(), REPO_NAME))
+        .thenReturn(Optional.of(new ByteArrayResource(bytes)));
+  }
+
   private void blobIsStoredUnderDigest() {
+    this.uploadHolds(new byte[BLOB_SIZE]);
     when(this.helmStorageService.getBlob(REPO_ID, DIGEST, REPO_NAME))
         .thenReturn(Optional.of(new ByteArrayResource(new byte[BLOB_SIZE])));
     when(this.ociBlobService.findOrCreate(any(), eq(REPO_ID))).thenReturn(this.blobInfo);
@@ -220,6 +240,71 @@ class AbstractHelmProtocolTxFacadeTest {
           BLOB_SIZE);
 
       assertThat(AbstractHelmProtocolTxFacadeTest.this.reportedUsage()).isEqualTo(BLOB_SIZE);
+    }
+
+    @Test
+    @DisplayName("refuses an upload that does not hash to the claimed digest")
+    void refusesDigestMismatch() {
+      AbstractHelmProtocolTxFacadeTest.this.uploadHolds(new byte[BLOB_SIZE - 1]);
+      when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.saveBlobChunk(
+              eq(REPO_ID), eq(UPLOAD_ID), any(), eq(REPO_NAME)))
+          .thenReturn(BaseUsages.ofDisk(BLOB_SIZE - 1));
+
+      assertThatThrownBy(
+              () ->
+                  AbstractHelmProtocolTxFacadeTest.this.facade.finalizeBlob(
+                      AbstractHelmProtocolTxFacadeTest.this.context,
+                      UPLOAD_ID,
+                      DIGEST,
+                      "application/octet-stream",
+                      new ByteArrayInputStream(new byte[BLOB_SIZE - 1]),
+                      BLOB_SIZE - 1))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("digestMismatch");
+
+      verify(AbstractHelmProtocolTxFacadeTest.this.helmStorageService, never())
+          .finalizeBlob(any(), any(), any());
+      verify(AbstractHelmProtocolTxFacadeTest.this.ociBlobService, never())
+          .findOrCreate(any(), any());
+    }
+
+    @Test
+    @DisplayName("refuses a digest that is not a well formed sha256 or sha512 digest")
+    void refusesMalformedDigest() {
+      AbstractHelmProtocolTxFacadeTest.this.uploadHolds(new byte[BLOB_SIZE]);
+
+      assertThatThrownBy(
+              () ->
+                  AbstractHelmProtocolTxFacadeTest.this.facade.finalizeBlob(
+                      AbstractHelmProtocolTxFacadeTest.this.context,
+                      UPLOAD_ID,
+                      "sha256:abc",
+                      "application/octet-stream",
+                      body(),
+                      0))
+          .isInstanceOf(BadRequestException.class);
+
+      verify(AbstractHelmProtocolTxFacadeTest.this.helmStorageService, never())
+          .finalizeBlob(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("answers not found for an upload that holds no data")
+    void refusesUnknownUpload() {
+      when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.getBlob(
+              REPO_ID, UPLOAD_ID.toString(), REPO_NAME))
+          .thenReturn(Optional.empty());
+
+      assertThatThrownBy(
+              () ->
+                  AbstractHelmProtocolTxFacadeTest.this.facade.finalizeBlob(
+                      AbstractHelmProtocolTxFacadeTest.this.context,
+                      UPLOAD_ID,
+                      DIGEST,
+                      "application/octet-stream",
+                      body(),
+                      0))
+          .isInstanceOf(ItemNotFoundException.class);
     }
   }
 

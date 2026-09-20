@@ -16,15 +16,20 @@
 package io.repsy.protocols.docker.shared.storage.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StaleFile;
+import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -65,6 +70,22 @@ class AbstractDockerStorageServiceTest {
             .rename(REPO_UUID, new RelativePath("/blobs/upload-id"), DIGEST);
 
     assertThat(usages).isSameAs(expected);
+  }
+
+  @Test
+  @DisplayName("appendInputStreamToPath() appends through the storage strategy")
+  void appendInputStreamToPathAppendsThroughTheStrategy() {
+    final var expected = BaseUsages.ofDisk(2048);
+    final var chunk = new ByteArrayInputStream(new byte[2048]);
+    final var storagePath = StoragePath.of(REPO_UUID, "blobs/upload-id");
+    when(this.storageStrategy.appendStream("repo", storagePath, chunk)).thenReturn(expected);
+
+    final var usages =
+        new TestStorageService(this.storageStrategy)
+            .appendInputStreamToPath("repo", storagePath, chunk);
+
+    assertThat(usages).isSameAs(expected);
+    verify(this.storageStrategy, never()).write(any(), any(), any());
   }
 
   @Test
