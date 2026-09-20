@@ -15,7 +15,7 @@
 ///
 
 import { ScanStatus } from '../../../../generated/api';
-import { hasRescanFailed, isRescanInProgress, recentScanNote, rescanTitle } from './rescan-status.util';
+import { hasRescanFailed, isRescanInProgress, recentScanNote, rescanCountsTitle, rescanTitle } from './rescan-status.util';
 
 const IN_PROGRESS = [ScanStatus.Pending, ScanStatus.Queued, ScanStatus.Running];
 
@@ -61,5 +61,28 @@ describe('rescan status', () => {
     expect(recentScanNote(ScanStatus.Queued, false)).toBe('Queued...');
     expect(recentScanNote(ScanStatus.Running, false)).toBe('Scanning...');
     expect(recentScanNote(ScanStatus.Failed, false)).toBe('Failed');
+  });
+
+  describe('rescanCountsTitle', () => {
+    it('flags nothing when no version is being rescanned or failed', () => {
+      expect(rescanCountsTitle(0, 0)).toBe('');
+      expect(rescanCountsTitle(null, undefined)).toBe('');
+    });
+
+    it('names the versions being rescanned', () => {
+      expect(rescanCountsTitle(1, 0)).toBe('1 version being rescanned. Showing the last completed scans.');
+      expect(rescanCountsTitle(3, null)).toBe('3 versions being rescanned. Showing the last completed scans.');
+    });
+
+    it('names the versions whose last rescan failed', () => {
+      expect(rescanCountsTitle(0, 1)).toBe('The last rescan of 1 version failed. Showing the last completed scans.');
+      expect(rescanCountsTitle(undefined, 2)).toBe('The last rescan of 2 versions failed. Showing the last completed scans.');
+    });
+
+    it('names both when some are rescanned and some failed', () => {
+      expect(rescanCountsTitle(2, 1)).toBe(
+        '2 versions being rescanned and the last rescan of 1 version failed. Showing the last completed scans.',
+      );
+    });
   });
 });

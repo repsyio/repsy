@@ -5377,6 +5377,20 @@ components:
           nullable: true
         scanned:
           type: boolean
+        rescanInProgressCount:
+          description: >-
+            Number of versions in the repository whose newest scan is pending, queued or running
+            while an earlier scan of the same version completed, so the severity above still
+            includes that version's last known result.
+          type: integer
+          format: int32
+        rescanFailedCount:
+          description: >-
+            Number of versions in the repository whose newest scan failed while an earlier scan
+            of the same version completed, so the severity above still includes that version's
+            last known result.
+          type: integer
+          format: int32
     SecuritySummary:
       type: object
       additionalProperties:
@@ -5414,6 +5428,22 @@ components:
             several versions.
           "$ref": "#/components/schemas/ScanStatus"
           nullable: true
+        rescanInProgressCount:
+          description: >-
+            Number of versions of the artifact whose newest scan is pending, queued or running
+            while an earlier scan of the same version completed, so severity and findingCount
+            still include that version's last known result. Only set on the per-artifact summary;
+            absent on the per-version summary, which has latestScanStatus instead.
+          type: integer
+          format: int32
+        rescanFailedCount:
+          description: >-
+            Number of versions of the artifact whose newest scan failed while an earlier scan of
+            the same version completed, so severity and findingCount still include that version's
+            last known result. Only set on the per-artifact summary; absent on the per-version
+            summary, which has latestScanStatus instead.
+          type: integer
+          format: int32
     VersionSecuritySummaryMap:
       type: object
       additionalProperties:

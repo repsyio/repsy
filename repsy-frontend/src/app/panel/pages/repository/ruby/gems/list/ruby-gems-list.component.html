@@ -75,6 +75,8 @@
                   [packageRoute]="packageRoute(gem)"
                   [severity]="securitySummary[gem.name]?.severity ?? null"
                   [scanned]="securitySummary[gem.name]?.scanned ?? false"
+                  [rescanInProgressCount]="securitySummary[gem.name]?.rescanInProgressCount ?? 0"
+                  [rescanFailedCount]="securitySummary[gem.name]?.rescanFailedCount ?? 0"
                 />
                 <a
                   class="group text-secondary-500 flex w-max gap-2 text-[14px]"
@@ -167,6 +169,8 @@
                     [packageRoute]="packageRoute(gem)"
                     [severity]="securitySummary[gem.name]?.severity ?? null"
                     [scanned]="securitySummary[gem.name]?.scanned ?? false"
+                    [rescanInProgressCount]="securitySummary[gem.name]?.rescanInProgressCount ?? 0"
+                    [rescanFailedCount]="securitySummary[gem.name]?.rescanFailedCount ?? 0"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

@@ -34,6 +34,8 @@ export class RepoSecurityBadgeComponent implements OnInit {
   @Input({ required: true }) public repoType: string;
   @Input() public severity: Severity | null = null;
   @Input() public scanned = false;
+  @Input() public rescanInProgressCount: number | null = null;
+  @Input() public rescanFailedCount: number | null = null;
 
   public isSupported$: Observable<boolean>;
   public showModal = false;

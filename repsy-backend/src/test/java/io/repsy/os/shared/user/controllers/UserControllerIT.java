@@ -685,6 +685,29 @@ class UserControllerIT extends AbstractIntegrationTest {
           USERNAME_IN_USE_TEXT);
     }
 
+    /** RPS-986: "anonymous" labels the token Docker hands to callers without credentials. */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"anonymous", "docker", "repsy"})
+    @DisplayName("returns 400 usernameInUse and creates nothing for a reserved username")
+    void reservedUsername(final String username) throws Exception {
+      final var token = UserControllerIT.this.adminBearerToken();
+      final var countBefore = UserControllerIT.this.userRepository.count();
+
+      expectError(
+          UserControllerIT.this.perform(
+              post("/api/users")
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(createBody(username, VALID_PASSWORD, "USER"))),
+          HttpStatus.BAD_REQUEST,
+          "usernameInUse",
+          "usernameInUse",
+          USERNAME_IN_USE_TEXT);
+
+      assertThat(UserControllerIT.this.userRepository.count()).isEqualTo(countBefore);
+      assertThat(UserControllerIT.this.userRepository.existsByUsername(username)).isFalse();
+    }
+
     @ParameterizedTest(name = "{0}")
     @MethodSource("invalidBodies")
     @DisplayName("returns 400 validationError and creates nothing for an invalid body")
@@ -830,6 +853,46 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var after = UserControllerIT.this.reload(target.getId());
       assertThat(after.getUsername()).isEqualTo(originalUsername);
       assertThat(after.getRole()).isEqualTo(UserRole.USER);
+    }
+
+    @Test
+    @DisplayName("returns 400 usernameInUse when the new username is reserved")
+    void reservedNewUsername() throws Exception {
+      final var token = UserControllerIT.this.adminBearerToken();
+      final var target = UserControllerIT.this.createUser(uniqueUsername("mine"), UserRole.USER);
+      final var originalUsername = target.getUsername();
+
+      expectError(
+          UserControllerIT.this.perform(
+              put("/api/users/" + target.getId())
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(updateBody("anonymous", "USER"))),
+          HttpStatus.BAD_REQUEST,
+          "usernameInUse",
+          "usernameInUse",
+          USERNAME_IN_USE_TEXT);
+
+      assertThat(UserControllerIT.this.reload(target.getId()).getUsername())
+          .isEqualTo(originalUsername);
+    }
+
+    @Test
+    @DisplayName("lets a user who already holds a reserved username keep it")
+    void existingReservedUsernameIsKept() throws Exception {
+      final var token = UserControllerIT.this.adminBearerToken();
+      // Created before the name was reserved, so it bypasses the check like an upgraded instance.
+      final var target = UserControllerIT.this.createUser("anonymous", UserRole.USER);
+
+      expectSuccess(
+          UserControllerIT.this.perform(
+              put("/api/users/" + target.getId())
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(updateBody("anonymous", "ADMIN"))),
+          "userUpdated");
+
+      assertThat(UserControllerIT.this.reload(target.getId()).getRole()).isEqualTo(UserRole.ADMIN);
     }
 
     @Test

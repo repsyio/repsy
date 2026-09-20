@@ -3,6 +3,8 @@
     <app-severity-badge
       [severity]="severity"
       [scanned]="scanned"
+      [rescanInProgressCount]="rescanInProgressCount"
+      [rescanFailedCount]="rescanFailedCount"
       [compact]="true"
       [attr.aria-label]="artifactName + ' security status'"
     />

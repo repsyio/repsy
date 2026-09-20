@@ -91,15 +91,36 @@ public final class NuGetPackageUtils {
 
   /**
    * Normalizes a NuGet version string to its canonical form: - Lowercased - Trailing zero
-   * components stripped (min 3: major.minor.patch) - 1.0 → 1.0.0, 1.0.0.0 → 1.0.0, 1.0.0-Alpha →
-   * 1.0.0-alpha. The pre-release and build suffix is kept as is.
+   * components stripped (min 3: major.minor.patch) - Build metadata ({@code +...}) dropped, since
+   * NuGet ignores it when it compares versions - 1.0 → 1.0.0, 1.0.0.0 → 1.0.0, 1.0.0-Alpha →
+   * 1.0.0-alpha, 1.0.0+Build → 1.0.0. The pre-release suffix is kept as is.
    */
   public static String normalizeNuGetVersion(final String rawVersion) {
+    return normalize(rawVersion, false);
+  }
+
+  /**
+   * Answers the form {@link #normalizeNuGetVersion} produced before it dropped build metadata,
+   * {@code 1.0.0+Build → 1.0.0+build}. Versions published before then were stored, and their files
+   * written, under this form, so it is still how they are found.
+   */
+  public static String legacyNuGetVersion(final String rawVersion) {
+    return normalize(rawVersion, true);
+  }
+
+  /** Whether the version carries a {@code +...} build metadata suffix. */
+  public static boolean hasBuildMetadata(final String version) {
+    return version.indexOf('+') >= 0;
+  }
+
+  private static String normalize(final String rawVersion, final boolean keepBuildMetadata) {
 
     final var lower = rawVersion.strip().toLowerCase(Locale.ROOT);
-    final var suffixIdx = indexOfSuffix(lower);
-    final var core = suffixIdx >= 0 ? lower.substring(0, suffixIdx) : lower;
-    final var preRelease = suffixIdx >= 0 ? lower.substring(suffixIdx) : "";
+    final var withoutBuild = substringBefore(lower, '+');
+    final var build = keepBuildMetadata ? lower.substring(withoutBuild.length()) : "";
+
+    final var core = substringBefore(withoutBuild, '-');
+    final var preRelease = withoutBuild.substring(core.length());
 
     final var components = core.split("\\.");
 
@@ -108,16 +129,12 @@ public final class NuGetPackageUtils {
       end--;
     }
 
-    return buildVersionString(components, end) + preRelease;
+    return buildVersionString(components, end) + preRelease + build;
   }
 
-  private static int indexOfSuffix(final String version) {
-    final var dashIdx = version.indexOf('-');
-    final var plusIdx = version.indexOf('+');
-    if (dashIdx < 0 || plusIdx < 0) {
-      return Math.max(dashIdx, plusIdx);
-    }
-    return Math.min(dashIdx, plusIdx);
+  private static String substringBefore(final String value, final char separator) {
+    final var idx = value.indexOf(separator);
+    return idx >= 0 ? value.substring(0, idx) : value;
   }
 
   private static String buildVersionString(final String[] components, final int end) {

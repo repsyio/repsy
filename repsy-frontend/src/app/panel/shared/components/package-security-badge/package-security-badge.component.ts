@@ -37,6 +37,8 @@ export class PackageSecurityBadgeComponent implements OnInit {
   @Input() public packageQueryParams?: Record<string, string>;
   @Input() public severity: Severity | null = null;
   @Input() public scanned = false;
+  @Input() public rescanInProgressCount: number | null = null;
+  @Input() public rescanFailedCount: number | null = null;
 
   public isSupported$: Observable<boolean>;
   public showModal = false;

@@ -49,14 +49,45 @@ class NuGetPackageUtilsTest {
     "1.0.0.5, 1.0.0.5",
     "1.0-Alpha, 1.0.0-alpha",
     "1.0.0-Alpha.1, 1.0.0-alpha.1",
+    "1.0+Build, 1.0.0",
+    "1.0.0.0+Build, 1.0.0",
+    "1.2.3.4+Build, 1.2.3.4",
+    "1.0-beta+Build, 1.0.0-beta",
+    "1.0.0-rc.1+build.5, 1.0.0-rc.1",
+    "1.0.0-beta+build-1, 1.0.0-beta",
+    "1.0.0+a-b, 1.0.0",
+    "1.0.0+a, 1.0.0",
+    "1.0.0+b, 1.0.0",
+  })
+  @DisplayName("normalizes a version to its canonical three-part form, without build metadata")
+  void normalizesVersion(final String raw, final String expected) {
+    assertThat(NuGetPackageUtils.normalizeNuGetVersion(raw)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "1.0.0, 1.0.0",
+    "1.0-Alpha, 1.0.0-alpha",
     "1.0+Build, 1.0.0+build",
     "1.0.0.0+Build, 1.0.0+build",
     "1.0-beta+Build, 1.0.0-beta+build",
     "1.0.0+a-b, 1.0.0+a-b",
   })
-  @DisplayName("normalizes a version to its canonical three-part form")
-  void normalizesVersion(final String raw, final String expected) {
-    assertThat(NuGetPackageUtils.normalizeNuGetVersion(raw)).isEqualTo(expected);
+  @DisplayName("keeps the build metadata in the legacy form versions were stored under")
+  void legacyVersionKeepsBuildMetadata(final String raw, final String expected) {
+    assertThat(NuGetPackageUtils.legacyNuGetVersion(raw)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "1.0.0, false",
+    "1.0.0-beta.1, false",
+    "1.0.0+build, true",
+    "1.0.0-beta+build, true",
+  })
+  @DisplayName("tells whether a version carries build metadata")
+  void detectsBuildMetadata(final String version, final boolean expected) {
+    assertThat(NuGetPackageUtils.hasBuildMetadata(version)).isEqualTo(expected);
   }
 
   @ParameterizedTest
@@ -70,6 +101,15 @@ class NuGetPackageUtilsTest {
 
     assertThat(metadata.packageId()).isEqualTo("Some.Package");
     assertThat(metadata.version()).isEqualTo(NuGetPackageUtils.normalizeNuGetVersion(version));
+  }
+
+  @Test
+  @DisplayName("drops the build metadata from a version read from a nuspec")
+  void dropsBuildMetadataFromNuspecVersion() throws IOException {
+    final var metadata =
+        NuGetPackageUtils.readNuspecMetadata(nupkg("Some.Package", "1.0.0-rc.1+Build.5"));
+
+    assertThat(metadata.version()).isEqualTo("1.0.0-rc.1");
   }
 
   @Test
