@@ -46,6 +46,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -419,6 +421,38 @@ class ProfileControllerIT extends AbstractIntegrationTest {
           .andExpect(jsonPath("$.msgId").value("usernameInUse"))
           .andExpect(jsonPath("$.data").value("usernameInUse"))
           .andExpect(jsonPath("$.text").value("Username is in use. Please try another one."));
+    }
+
+    /**
+     * RPS-1050: the panel username pattern is lower case only, so a reserved name in another case
+     * is refused as an invalid username before the reserved lookup; the lookup itself ignores case
+     * (see ReservedUsernameServiceIT).
+     */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"Anonymous", "REPSY", "Docker"})
+    @DisplayName("returns 400 validationError for a reserved username in another case")
+    void reservedUsernameInAnotherCase(final String username) throws Exception {
+      final var user = ProfileControllerIT.this.createUser(uniqueUsername("rcase"), UserRole.USER);
+      final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
+
+      ProfileControllerIT.this
+          .mockMvc
+          .perform(
+              put("/api/profile/username")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body(username)))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.msgId").value("validationError"));
+
+      assertThat(
+              ProfileControllerIT.this
+                  .userRepository
+                  .findById(user.getId())
+                  .orElseThrow()
+                  .getUsername())
+          .isEqualTo(user.getUsername());
     }
 
     @Test

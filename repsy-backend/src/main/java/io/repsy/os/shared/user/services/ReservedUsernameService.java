@@ -33,10 +33,19 @@ public class ReservedUsernameService {
   /**
    * Rejects a reserved username with the same {@code usernameInUse} error a taken one gets, so the
    * response does not tell the two apart.
+   *
+   * <p>The comparison ignores case: reserved names are stored in lower case, and {@code Repsy} or
+   * {@code Docker} would otherwise pass while {@code repsy} and {@code docker} are refused, which
+   * invites impersonation. This is the single place that decides "reserved", for admin create,
+   * admin rename and self-rename alike.
+   *
+   * <p>Callers apply it to a new name only. A user who already holds a name that was reserved later
+   * keeps it: their account is not renamed or blocked, and they are only refused when they rename
+   * themselves to another reserved name.
    */
   public void requireNotReserved(final @NonNull String username) {
 
-    if (this.reservedUsernameRepository.existsByUsername(username)) {
+    if (this.reservedUsernameRepository.existsByUsernameIgnoreCase(username)) {
       throw new BadRequestException("usernameInUse");
     }
   }

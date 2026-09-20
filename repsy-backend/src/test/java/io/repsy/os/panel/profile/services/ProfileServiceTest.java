@@ -19,11 +19,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.generated.model.PasswordForm;
-import io.repsy.os.panel.profile.repositories.ReservedUsernameRepository;
 import io.repsy.os.shared.auth.services.LoginInfoFactory;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.mappers.UserConverter;
 import io.repsy.os.shared.user.repositories.UserRepository;
+import io.repsy.os.shared.user.services.ReservedUsernameService;
 import io.repsy.os.shared.user.services.UserTxService;
 import java.time.Instant;
 import java.util.UUID;
@@ -43,7 +43,7 @@ class ProfileServiceTest {
   private final ProfileService service =
       new ProfileService(
           Mockito.mock(LoginInfoFactory.class),
-          Mockito.mock(ReservedUsernameRepository.class),
+          Mockito.mock(ReservedUsernameService.class),
           new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)));
 
   private final UUID ghostId = UUID.randomUUID();

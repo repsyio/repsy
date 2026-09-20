@@ -20,9 +20,9 @@ import io.repsy.os.generated.model.LoginInfo;
 import io.repsy.os.generated.model.PasswordForm;
 import io.repsy.os.generated.model.ProfileInfo;
 import io.repsy.os.generated.model.UserRole;
-import io.repsy.os.panel.profile.repositories.ReservedUsernameRepository;
 import io.repsy.os.shared.auth.services.LoginInfoFactory;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
+import io.repsy.os.shared.user.services.ReservedUsernameService;
 import io.repsy.os.shared.user.services.UserTxService;
 import java.time.Instant;
 import java.util.UUID;
@@ -37,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProfileService {
 
   private final @NonNull LoginInfoFactory loginInfoFactory;
-  private final @NonNull ReservedUsernameRepository reservedUsernameRepository;
+  private final @NonNull ReservedUsernameService reservedUsernameService;
   private final @NonNull UserTxService userTxService;
 
   @Transactional
@@ -83,17 +83,11 @@ public class ProfileService {
     return this.loginInfoFactory.create(this.userTxService.getUserById(userId), sessionStart);
   }
 
-  private boolean isUsernameReserved(final @NonNull String username) {
-
-    return this.reservedUsernameRepository.existsByUsername(username);
-  }
-
   private void validateUsernameAvailability(final @NonNull String newUsername) {
 
-    final var isUsernameReserved = this.isUsernameReserved(newUsername);
-    final var isUsernameInUse = this.userTxService.existsByUsername(newUsername);
+    this.reservedUsernameService.requireNotReserved(newUsername);
 
-    if (isUsernameInUse || isUsernameReserved) {
+    if (this.userTxService.existsByUsername(newUsername)) {
       throw new BadRequestException("usernameInUse");
     }
   }

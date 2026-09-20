@@ -725,6 +725,11 @@ class UserControllerIT extends AbstractIntegrationTest {
           Arguments.of("username with a colon", createBody("a:b", VALID_PASSWORD, "USER")),
           Arguments.of("username with a leading colon", createBody(":ab", VALID_PASSWORD, "USER")),
           Arguments.of("username with upper case", createBody("Has-Upper", VALID_PASSWORD, "USER")),
+          // RPS-1050: a reserved name in another case is refused by the pattern, before the lookup.
+          Arguments.of(
+              "reserved username in title case", createBody("Anonymous", VALID_PASSWORD, "USER")),
+          Arguments.of(
+              "reserved username in upper case", createBody("REPSY", VALID_PASSWORD, "USER")),
           Arguments.of("username with a space", createBody("has space", VALID_PASSWORD, "USER")),
           Arguments.of("username with a dot", createBody("has.dot", VALID_PASSWORD, "USER")),
           Arguments.of("password too short", createBody(ok, "Ab1de", "USER")),
@@ -974,6 +979,9 @@ class UserControllerIT extends AbstractIntegrationTest {
           Arguments.of("username with a colon", updateBody("a:b", "ADMIN")),
           Arguments.of("username with a leading colon", updateBody(":ab", "ADMIN")),
           Arguments.of("username with upper case", updateBody("Has-Upper", "ADMIN")),
+          // RPS-1050: a reserved name in another case is refused by the pattern, before the lookup.
+          Arguments.of("reserved username in title case", updateBody("Anonymous", "ADMIN")),
+          Arguments.of("reserved username in upper case", updateBody("REPSY", "ADMIN")),
           Arguments.of("username with a space", updateBody("has space", "ADMIN")),
           Arguments.of("username with a dot", updateBody("has.dot", "ADMIN")),
           Arguments.of("missing username", "{\"role\":\"ADMIN\"}"),

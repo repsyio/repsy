@@ -24,5 +24,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ReservedUsernameRepository extends JpaRepository<ReservedUsername, UUID> {
 
-  boolean existsByUsername(@NonNull String username);
+  /**
+   * Matches regardless of case, so {@code Repsy} and {@code REPSY} hit the seeded {@code repsy}.
+   */
+  boolean existsByUsernameIgnoreCase(@NonNull String username);
 }
