@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -39,16 +40,21 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Disk usage the Docker layer upload endpoints report, through the real wire protocol.
  *
  * <p>A chunk is charged as it is written and a layer whose digest is already stored is dropped at
  * finalize, so a duplicate push has to hand its bytes back: the repo holds one copy of the layer
- * and must be charged for one.
+ * and must be charged for one. A layer stored before finalize renamed it can still be under its
+ * layer UUID, and the manifest push drops it the same way and refunds it.
  *
  * <p>{@link UsageUpdateService} is mocked: it is {@code @Async}, so it cannot see this test's
  * uncommitted data. The mock records the disk-usage deltas the upload post-processor requests.
@@ -57,7 +63,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 class DockerLayerUploadUsageIT extends AbstractIntegrationTest {
 
   private static final String IMAGE = "app";
+  private static final String OCI_MANIFEST = "application/vnd.oci.image.manifest.v1+json";
 
+  @Autowired private WebApplicationContext webApplicationContext;
+  @Autowired private LayerRepository layerRepository;
   @MockitoBean private UsageUpdateService usageUpdateService;
 
   private static byte[] layerBytes(final String content) {
@@ -145,6 +154,49 @@ class DockerLayerUploadUsageIT extends AbstractIntegrationTest {
     final var uploadId = this.startUpload(repo, token);
     this.patchChunk(repo, uploadId, layer, token);
     this.finalizeUpload(repo, uploadId, sha256(layer), new byte[0], token);
+  }
+
+  private static String manifestJson(final byte[] config, final byte[] layer) {
+    return """
+        {"schemaVersion":2,"mediaType":"%s",\
+        "config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"%s","size":%d},\
+        "layers":[{"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip","digest":"%s","size":%d}]}"""
+        .formatted(OCI_MANIFEST, sha256(config), config.length, sha256(layer), layer.length);
+  }
+
+  /**
+   * Pushes a manifest through a {@link MockMvc} without the servlet filters: the manifest handler
+   * matches the {@code Content-Type} header exactly, and the character-encoding filter would append
+   * {@code ;charset=UTF-8} to it, which a real client (and Tomcat) never sends.
+   */
+  private void pushManifest(final Repo repo, final String manifest, final String token)
+      throws Exception {
+    final var response =
+        MockMvcBuilders.webAppContextSetup(this.webApplicationContext)
+            .build()
+            .perform(
+                put("/v2/{repo}/{image}/manifests/{reference}", repo.getName(), IMAGE, "latest")
+                    .contentType(OCI_MANIFEST)
+                    .content(manifest.getBytes(StandardCharsets.UTF_8))
+                    .header(AUTHORIZATION, token)
+                    .with(protocolPort()))
+            .andReturn()
+            .getResponse();
+    requireStatus(response, 201, "manifest push");
+  }
+
+  /**
+   * Stores {@code content} under the layer's UUID, the name a layer pushed before layers were
+   * renamed at finalize still has on disk, and returns that file's name.
+   */
+  private String writeLegacyLayerFile(final Repo repo, final byte[] content) throws Exception {
+    final var uuid =
+        this.layerRepository
+            .findByRepoIdAndDigest(repo.getId(), sha256(content))
+            .orElseThrow()
+            .getId();
+    Files.write(storageDirOf(repo).resolve("blobs").resolve(uuid.toString()), content);
+    return uuid.toString();
   }
 
   /** Pushes a layer in one request: start, then a finalize that carries the bytes. */
@@ -236,6 +288,56 @@ class DockerLayerUploadUsageIT extends AbstractIntegrationTest {
     }
 
     assertThat(this.netUsage(repo)).isEqualTo(layers.stream().mapToLong(l -> l.length).sum());
+    assertThat(this.blobFilesIn(repo)).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("a manifest push refunds the legacy UUID layer files it drops as duplicates")
+  void manifestPushRefundsDroppedLegacyLayers() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+    final var repo = this.dockerRepo();
+    final var config = layerBytes("{\"architecture\":\"amd64\",\"os\":\"linux\"}");
+    final var layer = layerBytes("legacy-layer-".repeat(60));
+    this.pushChunked(repo, config, token);
+    this.pushChunked(repo, layer, token);
+    // Both blobs also sit under their layer UUID, as they did before finalize renamed them.
+    final var configLegacyName = this.writeLegacyLayerFile(repo, config);
+    final var layerLegacyName = this.writeLegacyLayerFile(repo, layer);
+    final var manifest = manifestJson(config, layer);
+    clearInvocations(this.usageUpdateService);
+
+    this.pushManifest(repo, manifest, token);
+
+    // The manifest is charged, and both dropped legacy copies (charged when they were uploaded)
+    // are handed back in the same request.
+    assertThat(this.netUsage(repo)).isEqualTo(manifest.length() - layer.length - config.length);
+    assertThat(storageDirOf(repo).resolve("blobs").resolve(configLegacyName)).doesNotExist();
+    assertThat(storageDirOf(repo).resolve("blobs").resolve(layerLegacyName)).doesNotExist();
+    assertThat(storageDirOf(repo).resolve("blobs").resolve(sha256(layer))).hasBinaryContent(layer);
+    assertThat(this.blobFilesIn(repo)).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("a manifest push that only renames a legacy layer charges just the manifest")
+  void manifestPushRenamingLegacyLayerRefundsNothing() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+    final var repo = this.dockerRepo();
+    final var config = layerBytes("{\"architecture\":\"arm64\",\"os\":\"linux\"}");
+    final var layer = layerBytes("renamed-layer-".repeat(45));
+    this.pushChunked(repo, config, token);
+    this.pushChunked(repo, layer, token);
+    final var blobs = storageDirOf(repo).resolve("blobs");
+    // A layer stored before the rename at finalize: only the UUID file exists.
+    final var layerLegacyName = this.writeLegacyLayerFile(repo, layer);
+    Files.delete(blobs.resolve(sha256(layer)));
+    final var manifest = manifestJson(config, layer);
+    clearInvocations(this.usageUpdateService);
+
+    this.pushManifest(repo, manifest, token);
+
+    assertThat(this.netUsage(repo)).isEqualTo(manifest.length());
+    assertThat(blobs.resolve(layerLegacyName)).doesNotExist();
+    assertThat(blobs.resolve(sha256(layer))).hasBinaryContent(layer);
     assertThat(this.blobFilesIn(repo)).isEqualTo(2);
   }
 }

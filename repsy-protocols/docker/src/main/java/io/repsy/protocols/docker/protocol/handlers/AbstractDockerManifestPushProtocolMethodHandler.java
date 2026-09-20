@@ -153,7 +153,11 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
 
     if (!contentType.equals(OCI_IMAGE_INDEX) && !contentType.equals(DOCKER_MANIFEST_LIST)) {
       final var storagePathMap = this.layerRenamer.findLayersToRename(repoInfo, manifestJson);
-      this.layerRenamer.renameLayers(repoInfo, storagePathMap);
+      // A legacy layer still stored under its upload UUID is dropped when its digest already
+      // exists, so the bytes it freed are refunded, netted against the manifest's own usage.
+      final var renameUsages = this.layerRenamer.renameLayers(repoInfo, storagePathMap);
+
+      ProtocolContextUtils.addUsages(context, renameUsages);
     } else {
       this.imageTxService.updateImageSize(repoInfo.getId(), imageInfo.getId(), manifestDigest);
     }
