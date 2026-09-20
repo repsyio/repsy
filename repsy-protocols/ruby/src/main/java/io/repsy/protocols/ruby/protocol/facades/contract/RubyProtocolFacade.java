@@ -16,6 +16,7 @@
 package io.repsy.protocols.ruby.protocol.facades.contract;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
+import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.IOException;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
@@ -33,7 +34,7 @@ public interface RubyProtocolFacade {
 
   byte[] getGemspec(ProtocolContext context, String name, String version);
 
-  void publishGem(ProtocolContext context, byte[] gemBytes) throws IOException;
+  void publishGem(ProtocolContext context, SpooledUpload gem) throws IOException;
 
   void yankGem(ProtocolContext context, String gemName, String version, String platform);
 

@@ -21,7 +21,9 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
 import io.repsy.protocols.ruby.protocol.facades.contract.RubyProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.utils.SpooledUpload;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -32,6 +34,7 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @NullMarked
 public abstract class AbstractRubyGemPublishHandler implements ProtocolMethodHandler {
@@ -42,13 +45,20 @@ public abstract class AbstractRubyGemPublishHandler implements ProtocolMethodHan
 
   private final PathParser basePathParser;
   private final RubyProtocolFacade facade;
+  private final long maxGemBytes;
 
+  /**
+   * @param maxGemBytes The largest gem a push may carry. The body is a raw request body, which no
+   *     multipart limit applies to, so a larger one is refused with 413 instead of being read.
+   */
   protected AbstractRubyGemPublishHandler(
       final PathParser basePathParser,
       final RubyProtocolFacade facade,
-      final RubyProtocolProvider provider) {
+      final RubyProtocolProvider provider,
+      final long maxGemBytes) {
     this.basePathParser = basePathParser;
     this.facade = facade;
+    this.maxGemBytes = maxGemBytes;
     provider.registerMethodHandler(this);
   }
 
@@ -82,14 +92,23 @@ public abstract class AbstractRubyGemPublishHandler implements ProtocolMethodHan
       final ProtocolContext context,
       final HttpServletRequest request,
       final HttpServletResponse response) {
-    try {
-      final var gemBytes = request.getInputStream().readAllBytes();
-      this.facade.publishGem(context, gemBytes);
+    // A client that declares an oversized body is refused before any of it is read.
+    if (request.getContentLengthLong() > this.maxGemBytes) {
+      throw new MaxUploadSizeExceededException(this.maxGemBytes);
+    }
+
+    // The gem is spooled to a temporary file, hashing it on the way, instead of being held in
+    // memory: the metadata is read from the file and then the file is streamed into storage.
+    try (final var gem = SpooledUpload.spool(request.getInputStream(), this.maxGemBytes)) {
+      this.facade.publishGem(context, gem);
       final var gemName = (String) context.getProperty(GEM_NAME);
       final var gemVersion = (String) context.getProperty(GEM_VERSION);
       return ResponseEntity.ok()
           .contentType(MediaType.TEXT_PLAIN)
           .body("Successfully registered gem: " + gemName + " (" + gemVersion + ")");
+    } catch (final EntryTooLargeException e) {
+      // The body was chunked or understated its length, and outgrew the limit while it was read.
+      throw new MaxUploadSizeExceededException(this.maxGemBytes, e);
     } catch (final IOException e) {
       return ResponseEntity.badRequest().contentType(MediaType.TEXT_PLAIN).body("invalidGemFile");
     }

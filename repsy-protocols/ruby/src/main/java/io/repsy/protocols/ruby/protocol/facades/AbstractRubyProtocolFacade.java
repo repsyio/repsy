@@ -17,7 +17,9 @@ package io.repsy.protocols.ruby.protocol.facades;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.ruby.protocol.facades.contract.RubyProtocolFacade;
+import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
 import io.repsy.protocols.ruby.shared.gem.services.RubyGemProtocolService;
 import io.repsy.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
@@ -26,6 +28,8 @@ import io.repsy.protocols.ruby.shared.utils.RubyGemspecMarshalWriter;
 import io.repsy.protocols.ruby.shared.utils.RubySpecsIndexWriter;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.utils.SpooledUpload;
+import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -132,21 +136,28 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
   }
 
   @Override
-  public void publishGem(final ProtocolContext context, final byte[] gemBytes) {
+  public void publishGem(final ProtocolContext context, final SpooledUpload gem)
+      throws IOException {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var metadata = GemspecParser.parse(gemBytes);
-    final var checksum = CompactIndexFormatter.sha256Hex(gemBytes);
 
-    final var usages =
-        this.storageService.writeGem(
-            repoInfo.getStorageKey(),
-            repoInfo.getName(),
-            metadata.getName(),
-            metadata.getVersion(),
-            metadata.getPlatform(),
-            gemBytes);
+    final GemMetadata metadata;
+    try (final var in = gem.openStream()) {
+      metadata = GemspecParser.parse(in);
+    }
 
-    this.gemService.publishGem(repoInfo, metadata, checksum);
+    final BaseUsages usages;
+    try (final var in = gem.openStream()) {
+      usages =
+          this.storageService.writeGem(
+              repoInfo.getStorageKey(),
+              repoInfo.getName(),
+              metadata.getName(),
+              metadata.getVersion(),
+              metadata.getPlatform(),
+              in);
+    }
+
+    this.gemService.publishGem(repoInfo, metadata, gem.sha256Hex());
     this.refreshVersionsChecksum(repoInfo, metadata.getName());
 
     context.addProperty(USAGES, usages);

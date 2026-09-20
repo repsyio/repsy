@@ -20,6 +20,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
+import io.repsy.protocols.shared.utils.BoundedEntryReader;
+import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import lombok.experimental.UtilityClass;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -57,16 +60,25 @@ import org.yaml.snakeyaml.resolver.Resolver;
 public class GemspecParser {
 
   private static final String METADATA_ENTRY = "metadata.gz";
+
+  /** The largest compressed {@code metadata.gz} a gem may carry; real ones are a few KiB. */
+  static final long MAX_METADATA_GZ_BYTES = 10L * 1024 * 1024;
+
   private static final String RUNTIME_DEP = "runtime";
   private static final String DEFAULT_PLATFORM = "ruby";
   private static final String RUBY_TAG_PREFIX = "!ruby/";
 
-  public static GemMetadata parse(final byte[] gemBytes) {
-    try (final var tar = new TarArchiveInputStream(new ByteArrayInputStream(gemBytes))) {
+  /**
+   * Reads the metadata of a gem from its stream, which is read once and closed. Only the {@code
+   * metadata.gz} entry is buffered, at most {@link #MAX_METADATA_GZ_BYTES} of it; the rest of the
+   * gem is skipped over, so a gem of any size is read in constant memory.
+   */
+  public static GemMetadata parse(final InputStream gem) {
+    try (final var tar = new TarArchiveInputStream(gem)) {
       var entry = tar.getNextEntry();
       while (entry != null) {
         if (!entry.isDirectory() && METADATA_ENTRY.equals(entry.getName())) {
-          return parseMetadataGz(tar.readAllBytes());
+          return parseMetadataGz(readMetadataGz(tar, entry));
         }
         entry = tar.getNextEntry();
       }
@@ -74,6 +86,15 @@ public class GemspecParser {
       throw new BadRequestException("invalidGemFile");
     }
     throw new BadRequestException("invalidGemFile");
+  }
+
+  private static byte[] readMetadataGz(final InputStream tar, final TarArchiveEntry entry)
+      throws IOException {
+    try {
+      return BoundedEntryReader.readAllBytes(tar, entry.getSize(), MAX_METADATA_GZ_BYTES);
+    } catch (final EntryTooLargeException e) {
+      throw new BadRequestException("gemMetadataTooLarge");
+    }
   }
 
   private static GemMetadata parseMetadataGz(final byte[] gzBytes) {

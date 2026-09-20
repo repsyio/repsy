@@ -21,7 +21,9 @@ import io.repsy.protocols.ruby.protocol.facades.contract.RubyProtocolFacade;
 import io.repsy.protocols.ruby.protocol.handlers.AbstractRubyGemPublishHandler;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.util.unit.DataSize;
 
 @Component
 @NullMarked
@@ -30,7 +32,8 @@ public class RubyGemPublishHandler extends AbstractRubyGemPublishHandler {
   public RubyGemPublishHandler(
       @Qualifier("osRubyPathParser") final PathParser basePathParser,
       final RubyProtocolFacade facade,
-      final RubyProtocolProvider provider) {
-    super(basePathParser, facade, provider);
+      final RubyProtocolProvider provider,
+      @Value("${repsy.ruby.max-gem-size:500MB}") final DataSize maxGemSize) {
+    super(basePathParser, facade, provider, maxGemSize.toBytes());
   }
 }

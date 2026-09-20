@@ -20,14 +20,14 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmFacade;
+import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
 import io.repsy.protocols.helm.shared.utils.HelmChartParser;
 import io.repsy.protocols.helm.shared.utils.HelmConstants;
-import io.repsy.protocols.helm.shared.utils.HelmDigestCalculator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.utils.SpooledUpload;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -102,20 +102,29 @@ public abstract class AbstractHelmChartPushProtocolMethodHandler<ID>
       return ResponseEntity.badRequest().body("Missing 'chart' part");
     }
 
-    final var chartBytes = chartPart.getInputStream().readAllBytes();
-    final var metadata = HelmChartParser.parseChartYaml(new ByteArrayInputStream(chartBytes));
-    final var digest = HelmDigestCalculator.calculate(new ByteArrayInputStream(chartBytes));
+    // The chart is copied to a temporary file once, hashing it on the way, so it is never held in
+    // memory: the metadata is read from the file and then the file is streamed into storage.
+    try (final var chartStream = chartPart.getInputStream();
+        final var chart = SpooledUpload.spool(chartStream)) {
 
-    this.helmFacade.pushChart(
-        context,
-        metadata.getName(),
-        metadata.getVersion(),
-        metadata.getDescription() != null ? metadata.getDescription() : "",
-        metadata.getAppVersion() != null ? metadata.getAppVersion() : "",
-        metadata.getType(),
-        digest,
-        new ByteArrayInputStream(chartBytes),
-        chartBytes.length);
+      final HelmChartMetadata metadata;
+      try (final var in = chart.openStream()) {
+        metadata = HelmChartParser.parseChartYaml(in);
+      }
+
+      try (final var in = chart.openStream()) {
+        this.helmFacade.pushChart(
+            context,
+            metadata.getName(),
+            metadata.getVersion(),
+            metadata.getDescription() != null ? metadata.getDescription() : "",
+            metadata.getAppVersion() != null ? metadata.getAppVersion() : "",
+            metadata.getType(),
+            HelmConstants.SHA256_PREFIX + chart.sha256Hex(),
+            in,
+            chart.size());
+      }
+    }
 
     return ResponseEntity.status(HttpStatus.CREATED).build();
   }

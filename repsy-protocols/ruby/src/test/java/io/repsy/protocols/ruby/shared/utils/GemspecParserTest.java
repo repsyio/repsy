@@ -20,9 +20,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
+import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.zip.GZIPOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -64,6 +67,22 @@ class GemspecParserTest {
     return tarBytes.toByteArray();
   }
 
+  private static GemMetadata parse(final byte[] gem) {
+    return GemspecParser.parse(new ByteArrayInputStream(gem));
+  }
+
+  private static byte[] tarOf(final String entryName, final byte[] content) throws IOException {
+    final var tarBytes = new ByteArrayOutputStream();
+    try (final var tar = new TarArchiveOutputStream(tarBytes)) {
+      final var entry = new TarArchiveEntry(entryName);
+      entry.setSize(content.length);
+      tar.putArchiveEntry(entry);
+      tar.write(content);
+      tar.closeArchiveEntry();
+    }
+    return tarBytes.toByteArray();
+  }
+
   private static GemDependency dependency(
       final String name, final String requirements, final String type) {
     return GemDependency.builder().name(name).requirements(requirements).type(type).build();
@@ -97,7 +116,7 @@ class GemspecParserTest {
               type: :development
             """;
 
-    final var metadata = GemspecParser.parse(gem(yaml));
+    final var metadata = parse(gem(yaml));
 
     assertThat(metadata.getName()).isEqualTo("demo");
     assertThat(metadata.getVersion()).isEqualTo("1.2.3");
@@ -122,7 +141,7 @@ class GemspecParserTest {
             - name: thor
             """;
 
-    final var metadata = GemspecParser.parse(gem(yaml));
+    final var metadata = parse(gem(yaml));
 
     assertThat(metadata.getRuntimeDependencies())
         .containsExactly(dependency("thor", ">= 0", "runtime"));
@@ -132,7 +151,7 @@ class GemspecParserTest {
   @Test
   @DisplayName("parse() returns no dependencies when the gemspec has none")
   void handlesMissingDependencies() throws IOException {
-    final var metadata = GemspecParser.parse(gem(HEADER));
+    final var metadata = parse(gem(HEADER));
 
     assertThat(metadata.getRuntimeDependencies()).isEmpty();
     assertThat(metadata.getDevelopmentDependencies()).isEmpty();
@@ -149,7 +168,65 @@ class GemspecParserTest {
   void rejectsGlobalTags(final String extensions) throws IOException {
     final var gem = gem(HEADER + extensions);
 
-    assertThatThrownBy(() -> GemspecParser.parse(gem))
+    assertThatThrownBy(() -> parse(gem))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("invalidGemFile");
+  }
+
+  @Test
+  @DisplayName("parse() finds metadata.gz after an entry it has to skip over, as in a real gem")
+  void skipsEntriesBeforeMetadata() throws IOException {
+    final var gzipped = new ByteArrayOutputStream();
+    try (final var out = new GZIPOutputStream(gzipped)) {
+      out.write(HEADER.getBytes(StandardCharsets.UTF_8));
+    }
+
+    final var tarBytes = new ByteArrayOutputStream();
+    try (final var tar = new TarArchiveOutputStream(tarBytes)) {
+      final var data = new byte[100_000];
+      final var dataEntry = new TarArchiveEntry("data.tar.gz");
+      dataEntry.setSize(data.length);
+      tar.putArchiveEntry(dataEntry);
+      tar.write(data);
+      tar.closeArchiveEntry();
+
+      final var metadataEntry = new TarArchiveEntry("metadata.gz");
+      metadataEntry.setSize(gzipped.size());
+      tar.putArchiveEntry(metadataEntry);
+      tar.write(gzipped.toByteArray());
+      tar.closeArchiveEntry();
+    }
+
+    assertThat(parse(tarBytes.toByteArray()).getName()).isEqualTo("demo");
+  }
+
+  @Test
+  @DisplayName("parse() refuses a metadata.gz larger than the cap without reading it")
+  void rejectsOversizedMetadata() throws IOException {
+    final var gem = tarOf("metadata.gz", new byte[(int) GemspecParser.MAX_METADATA_GZ_BYTES + 1]);
+
+    assertThatThrownBy(() -> parse(gem))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("gemMetadataTooLarge");
+  }
+
+  @Test
+  @DisplayName("parse() rejects a gem without a metadata.gz entry")
+  void rejectsGemWithoutMetadata() throws IOException {
+    final var gem = tarOf("data.tar.gz", new byte[10]);
+
+    assertThatThrownBy(() -> parse(gem))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("invalidGemFile");
+  }
+
+  @Test
+  @DisplayName("parse() rejects something that is not a tar archive")
+  void rejectsNonTar() {
+    final var notAGem = new byte[2048];
+    Arrays.fill(notAGem, (byte) 'x');
+
+    assertThatThrownBy(() -> parse(notAGem))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("invalidGemFile");
   }
