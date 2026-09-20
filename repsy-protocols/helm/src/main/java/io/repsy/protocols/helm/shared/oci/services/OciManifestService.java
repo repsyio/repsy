@@ -20,6 +20,7 @@ import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked
@@ -38,4 +39,10 @@ public interface OciManifestService<ID> {
   List<HelmOciManifestInfo> findAllByChartId(UUID chartId);
 
   List<String> listTagsByName(ID repoId, String name);
+
+  /**
+   * The JSON of every manifest of the repo. The stream reads from the database as it is consumed,
+   * so it has to be closed, and it needs an active transaction.
+   */
+  Stream<String> streamContentByRepoId(ID repoId);
 }

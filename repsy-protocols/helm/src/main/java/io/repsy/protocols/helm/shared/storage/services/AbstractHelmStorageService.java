@@ -93,7 +93,7 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   }
 
   @Override
-  public void deleteManifestFile(
+  public long deleteManifestFile(
       final UUID repoUuid, final String name, final String reference, final String repoName)
       throws IOException {
     final var path = StoragePath.of(repoUuid, "oci/manifests/" + name + "/" + reference);
@@ -102,6 +102,7 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
       log.debug("Deleting OCI manifest file at {} ({} bytes)", path, usage);
       this.storageStrategy.delete(path);
     }
+    return usage;
   }
 
   @Override
@@ -150,6 +151,20 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   }
 
   @Override
+  public long deleteBlob(final UUID repoUuid, final String digest, final String repoName)
+      throws IOException {
+    final var storagePath = StoragePath.of(repoUuid, OCI_BLOBS_PATH + "/" + digest);
+    final var blob = this.storageStrategy.get(storagePath, repoName);
+    if (blob.isEmpty()) {
+      return 0;
+    }
+    final var usage = blob.get().contentLength();
+    log.debug("Deleting OCI blob at {} ({} bytes)", storagePath, usage);
+    this.storageStrategy.delete(storagePath);
+    return usage;
+  }
+
+  @Override
   public Optional<Resource> getBlob(
       final UUID repoUuid, final String digest, final String repoName) {
     final var storagePath = StoragePath.of(repoUuid, "oci/blobs/" + digest);
@@ -163,7 +178,7 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   }
 
   @Override
-  public void saveManifest(
+  public BaseUsages saveManifest(
       final UUID repoUuid,
       final String name,
       final String reference,
@@ -171,7 +186,7 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
       final String repoName) {
     final var storagePath = StoragePath.of(repoUuid, "oci/manifests/" + name + "/" + reference);
     try (final var inputStream = new ByteArrayInputStream(content)) {
-      this.storageStrategy.write(repoName, storagePath, inputStream);
+      return this.storageStrategy.write(repoName, storagePath, inputStream);
     } catch (final IOException e) {
       throw new RuntimeException("Failed to save OCI manifest", e);
     }

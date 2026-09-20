@@ -43,7 +43,11 @@ public interface HelmStorageService<ID> {
   long deleteChartFile(UUID repoUuid, String filename, String digest, String repoName)
       throws IOException;
 
-  void deleteManifestFile(UUID repoUuid, String name, String reference, String repoName)
+  /**
+   * Deletes the stored manifest file and answers the bytes it held (zero when there was none), so
+   * the caller can release them from the repo's disk usage.
+   */
+  long deleteManifestFile(UUID repoUuid, String name, String reference, String repoName)
       throws IOException;
 
   void clearTrash();
@@ -69,11 +73,22 @@ public interface HelmStorageService<ID> {
    */
   long deleteBlobFile(UUID repoUuid, String repoName, String fileName) throws IOException;
 
+  /**
+   * Deletes the finalized blob stored under {@code digest} and answers the bytes it held, or zero
+   * when there is no such blob.
+   */
+  long deleteBlob(UUID repoUuid, String digest, String repoName) throws IOException;
+
   Optional<Resource> getBlob(UUID repoUuid, String digest, String repoName);
 
   boolean blobExists(UUID repoUuid, String digest, String repoName);
 
-  void saveManifest(UUID repoUuid, String name, String reference, byte[] content, String repoName);
+  /**
+   * Writes the manifest file and answers the disk usage it changed: its size for a new file, the
+   * difference when a manifest of the same reference is replaced.
+   */
+  BaseUsages saveManifest(
+      UUID repoUuid, String name, String reference, byte[] content, String repoName);
 
   Optional<Resource> getManifest(UUID repoUuid, String name, String reference, String repoName);
 

@@ -34,6 +34,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepository;
 import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
+import io.repsy.os.server.protocols.helm.shared.oci.services.HelmOciBlobService;
 import io.repsy.os.server.protocols.helm.shared.oci.services.HelmOciManifestNameRepairService;
 import io.repsy.os.server.protocols.helm.shared.oci.services.HelmOciManifestService;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -105,6 +106,8 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   private static final String OCI_CONFIG_TYPE = "application/vnd.cncf.helm.config.v1+json";
   private static final String OCI_LAYER_TYPE =
       "application/vnd.cncf.helm.chart.content.v1.tar+gzip";
+  private static final String OCI_PROVENANCE_TYPE =
+      "application/vnd.cncf.helm.chart.provenance.v1.prov";
   private static final String NO_PERMISSION_TEXT = "The user has logged in but has no permissions.";
   private static final Map<String, String> SUCCESS_TEXTS =
       Map.of(
@@ -134,6 +137,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   @Autowired private HelmChartService helmChartService;
   @Autowired private HelmChartRepository helmChartRepository;
   @Autowired private HelmOciManifestService helmOciManifestService;
+  @Autowired private HelmOciBlobService helmOciBlobService;
   @Autowired private HelmOciManifestNameRepairService helmOciManifestNameRepairService;
 
   // ---------------------------------------------------------------------------------------------
@@ -345,23 +349,44 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       final byte[] bytes,
       final String token)
       throws Exception {
+    return this.putOciChart(repo, ociName, tag, bytes, null, List.of(), token);
+  }
+
+  /**
+   * Pushes {@code bytes} as the chart layer and answers the manifest {@code PUT}. A non-null {@code
+   * configBytes} is uploaded as the config blob the way {@code helm push} does (without it the
+   * manifest names an empty config that is never uploaded), and every entry of {@code
+   * provenanceLayers} is uploaded and listed after the chart layer.
+   */
+  private MockHttpServletResponse putOciChart(
+      final Repo repo,
+      final String ociName,
+      final String tag,
+      final byte[] bytes,
+      final byte[] configBytes,
+      final List<byte[]> provenanceLayers,
+      final String token)
+      throws Exception {
     final var layerDigest = sha256(bytes);
-    final var configBytes = "{}".getBytes(StandardCharsets.UTF_8);
+    final var config = configBytes == null ? "{}".getBytes(StandardCharsets.UTF_8) : configBytes;
 
     this.uploadOciBlob(repo, ociName, bytes, layerDigest, token);
+    if (configBytes != null) {
+      this.uploadOciBlob(repo, ociName, configBytes, sha256(configBytes), token);
+    }
+    final var layers = new StringBuilder();
+    layers.append(layerJson(OCI_LAYER_TYPE, layerDigest, bytes.length));
+    for (final var provenance : provenanceLayers) {
+      this.uploadOciBlob(repo, ociName, provenance, sha256(provenance), token);
+      layers
+          .append(',')
+          .append(layerJson(OCI_PROVENANCE_TYPE, sha256(provenance), provenance.length));
+    }
 
     final var manifest =
         ("{\"schemaVersion\":2,\"mediaType\":\"%s\",\"config\":{\"mediaType\":\"%s\","
-                + "\"digest\":\"%s\",\"size\":%d},\"layers\":[{\"mediaType\":\"%s\","
-                + "\"digest\":\"%s\",\"size\":%d}]}")
-            .formatted(
-                OCI_MANIFEST_TYPE,
-                OCI_CONFIG_TYPE,
-                sha256(configBytes),
-                configBytes.length,
-                OCI_LAYER_TYPE,
-                layerDigest,
-                bytes.length);
+                + "\"digest\":\"%s\",\"size\":%d},\"layers\":[%s]}")
+            .formatted(OCI_MANIFEST_TYPE, OCI_CONFIG_TYPE, sha256(config), config.length, layers);
     return this.protocol(
             put("/v2/{repo}/{name}/manifests/{tag}", repo.getName(), ociName, tag)
                 .contentType(OCI_MANIFEST_TYPE)
@@ -369,6 +394,11 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
                 .header(AUTHORIZATION, token))
         .andReturn()
         .getResponse();
+  }
+
+  private static String layerJson(final String mediaType, final String digest, final long size) {
+    return "{\"mediaType\":\"%s\",\"digest\":\"%s\",\"size\":%d}"
+        .formatted(mediaType, digest, size);
   }
 
   private void uploadOciBlob(
@@ -503,6 +533,28 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
 
   private Path ociManifestFile(final Repo repo, final String name, final String reference) {
     return storageDirOf(repo).resolve("oci").resolve("manifests").resolve(name).resolve(reference);
+  }
+
+  /** The digests of the blobs stored under the repo's {@code oci/blobs} directory. */
+  private List<String> storedBlobs(final Repo repo) throws IOException {
+    final var blobs = storageDirOf(repo).resolve("oci").resolve("blobs");
+    if (!Files.isDirectory(blobs)) {
+      return List.of();
+    }
+    try (final var files = Files.list(blobs)) {
+      return files.map(file -> file.getFileName().toString()).sorted().toList();
+    }
+  }
+
+  private long ociManifestFileSize(final Repo repo, final String name, final String reference)
+      throws IOException {
+    return Files.size(this.ociManifestFile(repo, name, reference));
+  }
+
+  private boolean blobRowExists(final Repo repo, final byte[] blob) {
+    this.entityManager.flush();
+    this.entityManager.clear();
+    return this.helmOciBlobService.findByDigest(repo.getId(), sha256(blob)).isPresent();
   }
 
   /** The {@code index.yaml} an anonymous Helm client gets from a public repo. */
@@ -1691,11 +1743,137 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
         requireStatus(it.putOciChart(repo, "payments", tag, chart, token), 201, "manifest " + tag);
       }
 
-      assertThat(it.netUsage(repo)).isEqualTo(chart.length);
+      // The archive is stored once whatever the tags; each tag adds its own manifest file.
+      var manifests = 0L;
+      for (final var tag : List.of("1.0.0", "stable", "latest")) {
+        manifests += it.ociManifestFileSize(repo, "payments", tag);
+      }
+      assertThat(it.netUsage(repo)).isEqualTo(chart.length + manifests);
 
       expectDeleted(it.deleteAllRequest(repo, "payments", panelToken));
 
       assertThat(it.netUsage(repo)).isZero();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(DeleteRoute.class)
+    @DisplayName("deleting a chart deletes its config and provenance blobs and releases every byte")
+    void deletingAChartReleasesItsBlobsAndManifests(final DeleteRoute route) throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var panelToken = it.adminBearerToken();
+      final var token = it.asProtocolBearer(panelToken);
+      final var repo = it.helmRepo();
+      final var chart = archive(ChartSpec.of("payments", "1.0.0"));
+      final var config =
+          "{\"name\":\"payments\",\"version\":\"1.0.0\"}".getBytes(StandardCharsets.UTF_8);
+      final var provenance =
+          "-----BEGIN PGP SIGNED MESSAGE-----".repeat(4).getBytes(StandardCharsets.UTF_8);
+      for (final var tag : List.of("1.0.0", "stable")) {
+        requireStatus(
+            it.putOciChart(repo, "payments", tag, chart, config, List.of(provenance), token),
+            201,
+            "manifest " + tag);
+      }
+      final var manifests =
+          it.ociManifestFileSize(repo, "payments", "1.0.0")
+              + it.ociManifestFileSize(repo, "payments", "stable");
+      assertThat(it.storedBlobs(repo))
+          .containsExactlyInAnyOrder(sha256(chart), sha256(config), sha256(provenance));
+      assertThat(it.netUsage(repo))
+          .isEqualTo(chart.length + config.length + provenance.length + manifests);
+
+      route.perform(it, repo, panelToken);
+
+      assertThat(it.storedBlobs(repo)).isEmpty();
+      assertThat(it.ociManifestFile(repo, "payments", "1.0.0")).doesNotExist();
+      assertThat(it.ociManifestFile(repo, "payments", "stable")).doesNotExist();
+      assertThat(it.blobRowExists(repo, chart)).isFalse();
+      assertThat(it.blobRowExists(repo, config)).isFalse();
+      assertThat(it.blobRowExists(repo, provenance)).isFalse();
+      assertThat(it.netUsage(repo)).isZero();
+    }
+
+    @Test
+    @DisplayName("a config blob two charts share stays until the last of them is deleted")
+    void sharedConfigBlobOutlivesTheFirstChart() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var panelToken = it.adminBearerToken();
+      final var token = it.asProtocolBearer(panelToken);
+      final var repo = it.helmRepo();
+      final var first = archive(ChartSpec.of("payments", "1.0.0"));
+      final var second = archive(ChartSpec.of("payments", "1.1.0"));
+      final var config = "{\"name\":\"payments\"}".getBytes(StandardCharsets.UTF_8);
+      requireStatus(
+          it.putOciChart(repo, "payments", "1.0.0", first, config, List.of(), token), 201, "1.0.0");
+      requireStatus(
+          it.putOciChart(repo, "payments", "1.1.0", second, config, List.of(), token),
+          201,
+          "1.1.0");
+      final var secondManifest = it.ociManifestFileSize(repo, "payments", "1.1.0");
+
+      expectDeleted(it.deleteVersionRequest(repo, "payments", "1.0.0", panelToken));
+
+      assertThat(it.storedBlobs(repo)).containsExactlyInAnyOrder(sha256(second), sha256(config));
+      assertThat(it.blobRowExists(repo, config)).isTrue();
+      assertThat(it.netUsage(repo)).isEqualTo(second.length + config.length + secondManifest);
+
+      expectDeleted(it.deleteVersionRequest(repo, "payments", "1.1.0", panelToken));
+
+      assertThat(it.storedBlobs(repo)).isEmpty();
+      assertThat(it.blobRowExists(repo, config)).isFalse();
+      assertThat(it.netUsage(repo)).isZero();
+    }
+
+    @Test
+    @DisplayName("a config blob another chart's manifest still names is not deleted with the first")
+    void configBlobOfAnotherChartSurvives() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var panelToken = it.adminBearerToken();
+      final var token = it.asProtocolBearer(panelToken);
+      final var repo = it.helmRepo();
+      final var payments = archive(ChartSpec.of("payments", "1.0.0"));
+      final var orders = archive(ChartSpec.of("orders", "1.0.0"));
+      final var config = "{}".repeat(8).getBytes(StandardCharsets.UTF_8);
+      requireStatus(
+          it.putOciChart(repo, "payments", "1.0.0", payments, config, List.of(), token),
+          201,
+          "payments");
+      requireStatus(
+          it.putOciChart(repo, "orders", "1.0.0", orders, config, List.of(), token), 201, "orders");
+
+      expectDeleted(it.deleteAllRequest(repo, "payments", panelToken));
+
+      assertThat(it.storedBlobs(repo)).containsExactlyInAnyOrder(sha256(orders), sha256(config));
+      assertThat(it.ociManifestFile(repo, "orders", "1.0.0")).exists();
+    }
+  }
+
+  /** The three ways a chart version leaves a Helm repo. */
+  private enum DeleteRoute {
+    PANEL_VERSION,
+    PANEL_ALL_VERSIONS,
+    PROTOCOL_DELETE;
+
+    void perform(final HelmChartControllerIT it, final Repo repo, final String panelToken)
+        throws Exception {
+      switch (this) {
+        case PANEL_VERSION ->
+            expectDeleted(it.deleteVersionRequest(repo, "payments", "1.0.0", panelToken));
+        case PANEL_ALL_VERSIONS -> expectDeleted(it.deleteAllRequest(repo, "payments", panelToken));
+        case PROTOCOL_DELETE ->
+            requireStatus(
+                it.protocol(
+                        delete(
+                                "/{repo}/api/charts/{name}/{version}",
+                                repo.getName(),
+                                "payments",
+                                "1.0.0")
+                            .header(AUTHORIZATION, it.asProtocolBearer(panelToken)))
+                    .andReturn()
+                    .getResponse(),
+                200,
+                "protocol chart delete");
+      }
     }
   }
 

@@ -19,6 +19,7 @@ import io.repsy.os.server.protocols.helm.shared.oci.entities.HelmOciManifest;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -34,6 +35,13 @@ public interface HelmOciManifestRepository extends JpaRepository<HelmOciManifest
       UUID repoId, String name, String reference);
 
   List<HelmOciManifest> findAllByChartVersionId(UUID chartVersionId);
+
+  /**
+   * The JSON of every manifest of the repo. The content is a {@code @Lob}: PostgreSQL keeps it as a
+   * large object, so it cannot be searched with {@code like} in SQL and is read here instead.
+   */
+  @Query("select m.content from HelmOciManifest m where m.repo.id = :repoId")
+  Stream<String> streamContentByRepoId(UUID repoId);
 
   @Modifying
   @Query("delete from HelmOciManifest m where m.chartVersion.id = :chartVersionId")

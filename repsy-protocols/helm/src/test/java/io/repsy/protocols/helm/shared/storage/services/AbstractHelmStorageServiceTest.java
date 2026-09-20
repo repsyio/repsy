@@ -20,6 +20,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
@@ -27,17 +29,20 @@ import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.ByteArrayResource;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AbstractHelmStorageService blob uploads")
+@DisplayName("AbstractHelmStorageService")
 class AbstractHelmStorageServiceTest {
 
   private static final UUID REPO_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -120,5 +125,82 @@ class AbstractHelmStorageServiceTest {
         .verify(this.storageStrategy)
         .getFileUsage(argThat(sp -> sp.getPath().equals(UPLOAD_PATH)), eq(REPO_NAME));
     order.verify(this.storageStrategy).delete(argThat(sp -> sp.getPath().equals(UPLOAD_PATH)));
+  }
+
+  @Test
+  @DisplayName("saveManifest() answers the usage the manifest file changed")
+  void saveManifestAnswersTheWrittenUsage() {
+    final var expected = BaseUsages.ofDisk(512);
+    when(this.storageStrategy.write(
+            eq(REPO_NAME),
+            argThat(
+                path ->
+                    path != null
+                        && path.getPath().equals(REPO_UUID + "/oci/manifests/payments/1.0.0")),
+            any()))
+        .thenReturn(expected);
+
+    final var usages =
+        new TestStorageService(this.storageStrategy)
+            .saveManifest(
+                REPO_UUID, "payments", "1.0.0", "{}".getBytes(StandardCharsets.UTF_8), REPO_NAME);
+
+    assertThat(usages).isSameAs(expected);
+  }
+
+  @Test
+  @DisplayName("deleteManifestFile() answers the bytes the file held and deletes it")
+  void deleteManifestFileAnswersTheFileUsage() throws IOException {
+    final var path = REPO_UUID + "/oci/manifests/payments/1.0.0";
+    when(this.storageStrategy.getFileUsage(
+            argThat(sp -> sp != null && sp.getPath().equals(path)), eq(REPO_NAME)))
+        .thenReturn(700L);
+
+    final var freed =
+        new TestStorageService(this.storageStrategy)
+            .deleteManifestFile(REPO_UUID, "payments", "1.0.0", REPO_NAME);
+
+    assertThat(freed).isEqualTo(700L);
+    verify(this.storageStrategy).delete(argThat(sp -> sp.getPath().equals(path)));
+  }
+
+  @Test
+  @DisplayName("deleteManifestFile() answers zero and deletes nothing when there is no file")
+  void deleteManifestFileWithoutFileFreesNothing() throws IOException {
+    when(this.storageStrategy.getFileUsage(any(), eq(REPO_NAME))).thenReturn(0L);
+
+    final var freed =
+        new TestStorageService(this.storageStrategy)
+            .deleteManifestFile(REPO_UUID, "payments", "1.0.0", REPO_NAME);
+
+    assertThat(freed).isZero();
+    verify(this.storageStrategy, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName("deleteBlob() answers the bytes the blob held and deletes it")
+  void deleteBlobAnswersTheBlobSize() throws IOException {
+    final var path = REPO_UUID + "/oci/blobs/sha256:abc";
+    when(this.storageStrategy.get(
+            argThat(sp -> sp != null && sp.getPath().equals(path)), eq(REPO_NAME)))
+        .thenReturn(Optional.of(new ByteArrayResource(new byte[64])));
+
+    final var freed =
+        new TestStorageService(this.storageStrategy).deleteBlob(REPO_UUID, "sha256:abc", REPO_NAME);
+
+    assertThat(freed).isEqualTo(64L);
+    verify(this.storageStrategy).delete(argThat(sp -> sp.getPath().equals(path)));
+  }
+
+  @Test
+  @DisplayName("deleteBlob() answers zero and deletes nothing when the blob is not stored")
+  void deleteBlobWithoutFileFreesNothing() throws IOException {
+    when(this.storageStrategy.get(any(), eq(REPO_NAME))).thenReturn(Optional.empty());
+
+    final var freed =
+        new TestStorageService(this.storageStrategy).deleteBlob(REPO_UUID, "sha256:abc", REPO_NAME);
+
+    assertThat(freed).isZero();
+    verify(this.storageStrategy, never()).delete(any());
   }
 }

@@ -22,6 +22,8 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
+import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService;
+import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService.DeletedChart;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
 import io.repsy.protocols.helm.shared.index.dtos.HelmIndexDto;
 import io.repsy.protocols.helm.shared.index.dtos.HelmIndexEntryDto;
@@ -64,6 +66,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
   protected final ChartService<ID> chartService;
   protected final OciBlobService<ID> ociBlobService;
   protected final OciManifestService<ID> ociManifestService;
+  protected final AbstractHelmChartFilesService<ID> chartFilesService;
 
   @Override
   public HelmIndexDto generateIndex(final ProtocolContext context) {
@@ -181,20 +184,12 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
 
     this.chartService.delete(repoInfo.getId(), name, version);
 
-    final var filename = name + "-" + version + HelmConstants.TGZ_EXTENSION;
     final var freed =
-        this.helmStorageService.deleteChartFile(
-            repoInfo.getStorageKey(), filename, chartInfo.digest(), repoInfo.getName());
-
-    for (final var manifest : manifests) {
-      this.helmStorageService.deleteManifestFile(
-          repoInfo.getStorageKey(), manifest.name(), manifest.reference(), repoInfo.getName());
-    }
-
-    if (!manifests.isEmpty()
-        && !this.chartService.existsByRepoIdAndDigest(repoInfo.getId(), chartInfo.digest())) {
-      this.ociBlobService.deleteByRepoIdAndDigest(repoInfo.getId(), chartInfo.digest());
-    }
+        this.chartFilesService.deleteFiles(
+            repoInfo.getId(),
+            repoInfo.getStorageKey(),
+            repoInfo.getName(),
+            List.of(new DeletedChart(name, version, chartInfo.digest(), manifests)));
 
     context.addProperty("usages", BaseUsages.ofDisk(-freed));
   }
@@ -315,8 +310,10 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
       final byte[] contentBytes)
       throws IOException {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    this.helmStorageService.saveManifest(
-        repoInfo.getStorageKey(), name, reference, contentBytes, repoInfo.getName());
+    final var usages =
+        this.helmStorageService.saveManifest(
+            repoInfo.getStorageKey(), name, reference, contentBytes, repoInfo.getName());
+    ProtocolContextUtils.addUsages(context, usages);
   }
 
   @Override

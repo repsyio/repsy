@@ -19,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -28,8 +30,11 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
+import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService;
+import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService.DeletedChart;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
 import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
 import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
@@ -37,6 +42,8 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,6 +69,7 @@ class AbstractHelmProtocolTxFacadeTest {
   @Mock private ChartService<UUID> chartService;
   @Mock private OciBlobService<UUID> ociBlobService;
   @Mock private OciManifestService<UUID> ociManifestService;
+  @Mock private AbstractHelmChartFilesService<UUID> chartFilesService;
   @Mock private HelmOciBlobInfo blobInfo;
   @Mock private HelmChartInfo chartInfo;
 
@@ -74,8 +82,10 @@ class AbstractHelmProtocolTxFacadeTest {
         final HelmStorageService<UUID> helmStorageService,
         final ChartService<UUID> chartService,
         final OciBlobService<UUID> ociBlobService,
-        final OciManifestService<UUID> ociManifestService) {
-      super(helmStorageService, chartService, ociBlobService, ociManifestService);
+        final OciManifestService<UUID> ociManifestService,
+        final AbstractHelmChartFilesService<UUID> chartFilesService) {
+      super(
+          helmStorageService, chartService, ociBlobService, ociManifestService, chartFilesService);
     }
   }
 
@@ -86,7 +96,8 @@ class AbstractHelmProtocolTxFacadeTest {
             this.helmStorageService,
             this.chartService,
             this.ociBlobService,
-            this.ociManifestService);
+            this.ociManifestService,
+            this.chartFilesService);
 
     final var repoInfo = new BaseRepoInfo<UUID>();
     repoInfo.setId(REPO_ID);
@@ -243,6 +254,83 @@ class AbstractHelmProtocolTxFacadeTest {
 
       verify(AbstractHelmProtocolTxFacadeTest.this.helmStorageService, never())
           .saveChart(any(), any(), any());
+    }
+  }
+
+  @Nested
+  @DisplayName("pushManifest()")
+  class PushManifest {
+
+    @Test
+    @DisplayName("reports the bytes the manifest file added, so the manifest is charged")
+    void chargesTheManifestFile() throws Exception {
+      final var content = "{}".getBytes(StandardCharsets.UTF_8);
+      when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.saveManifest(
+              REPO_ID, "payments", "1.0.0", content, REPO_NAME))
+          .thenReturn(BaseUsages.ofDisk(content.length));
+
+      AbstractHelmProtocolTxFacadeTest.this.facade.pushManifest(
+          AbstractHelmProtocolTxFacadeTest.this.context, "payments", "1.0.0", content);
+
+      assertThat(AbstractHelmProtocolTxFacadeTest.this.reportedUsage()).isEqualTo(content.length);
+    }
+
+    @Test
+    @DisplayName("reports only the difference when a manifest of the same reference is replaced")
+    void chargesOnlyTheDifferenceOnOverwrite() throws Exception {
+      final var content = "{\"a\":1}".getBytes(StandardCharsets.UTF_8);
+      when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.saveManifest(
+              REPO_ID, "payments", "latest", content, REPO_NAME))
+          .thenReturn(BaseUsages.ofDisk(3));
+
+      AbstractHelmProtocolTxFacadeTest.this.facade.pushManifest(
+          AbstractHelmProtocolTxFacadeTest.this.context, "payments", "latest", content);
+
+      assertThat(AbstractHelmProtocolTxFacadeTest.this.reportedUsage()).isEqualTo(3);
+    }
+  }
+
+  @Nested
+  @DisplayName("deleteChart()")
+  class DeleteChart {
+
+    @Test
+    @DisplayName("deletes the rows first, then the files, and releases everything they held")
+    void releasesTheBytesOfEveryDeletedFile() throws Exception {
+      final var manifest = mock(HelmOciManifestInfo.class);
+      final var chartId = UUID.fromString("00000000-0000-0000-0000-000000000003");
+      when(AbstractHelmProtocolTxFacadeTest.this.chartInfo.id()).thenReturn(chartId);
+      when(AbstractHelmProtocolTxFacadeTest.this.chartInfo.digest()).thenReturn(DIGEST);
+      when(AbstractHelmProtocolTxFacadeTest.this.chartService.findByRepoIdAndNameAndVersion(
+              REPO_ID, "payments", "1.0.0"))
+          .thenReturn(AbstractHelmProtocolTxFacadeTest.this.chartInfo);
+      when(AbstractHelmProtocolTxFacadeTest.this.ociManifestService.findAllByChartId(chartId))
+          .thenReturn(List.of(manifest));
+      when(AbstractHelmProtocolTxFacadeTest.this.chartFilesService.deleteFiles(
+              eq(REPO_ID),
+              eq(REPO_ID),
+              eq(REPO_NAME),
+              eq(List.of(new DeletedChart("payments", "1.0.0", DIGEST, List.of(manifest))))))
+          .thenReturn(1234L);
+
+      AbstractHelmProtocolTxFacadeTest.this.facade.deleteChart(
+          AbstractHelmProtocolTxFacadeTest.this.context, "payments", "1.0.0");
+
+      final var order =
+          inOrder(
+              AbstractHelmProtocolTxFacadeTest.this.ociManifestService,
+              AbstractHelmProtocolTxFacadeTest.this.chartService,
+              AbstractHelmProtocolTxFacadeTest.this.chartFilesService);
+      order
+          .verify(AbstractHelmProtocolTxFacadeTest.this.ociManifestService)
+          .deleteAllByChartId(chartId);
+      order
+          .verify(AbstractHelmProtocolTxFacadeTest.this.chartService)
+          .delete(REPO_ID, "payments", "1.0.0");
+      order
+          .verify(AbstractHelmProtocolTxFacadeTest.this.chartFilesService)
+          .deleteFiles(eq(REPO_ID), eq(REPO_ID), eq(REPO_NAME), any());
+      assertThat(AbstractHelmProtocolTxFacadeTest.this.reportedUsage()).isEqualTo(-1234L);
     }
   }
 }

@@ -20,6 +20,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.helm.protocol.facades.AbstractHelmProtocolTxFacade;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
+import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
 import io.repsy.protocols.helm.shared.index.dtos.HelmIndexDto;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobForm;
@@ -48,8 +49,14 @@ public class HelmProtocolTxFacade extends AbstractHelmProtocolTxFacade<UUID> {
       final HelmStorageService<UUID> helmStorageServiceImpl,
       final ChartService<UUID> helmChartService,
       final OciBlobService<UUID> helmOciBlobService,
-      final OciManifestService<UUID> helmOciManifestService) {
-    super(helmStorageServiceImpl, helmChartService, helmOciBlobService, helmOciManifestService);
+      final OciManifestService<UUID> helmOciManifestService,
+      final AbstractHelmChartFilesService<UUID> helmChartFilesService) {
+    super(
+        helmStorageServiceImpl,
+        helmChartService,
+        helmOciBlobService,
+        helmOciManifestService,
+        helmChartFilesService);
   }
 
   @Override

@@ -21,14 +21,14 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.HelmChartDetail;
 import io.repsy.os.generated.model.HelmChartListItem;
 import io.repsy.os.generated.model.HelmChartVersionItem;
+import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartFilesService;
 import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
-import io.repsy.os.server.protocols.helm.shared.oci.services.HelmOciBlobService;
 import io.repsy.os.server.protocols.helm.shared.oci.services.HelmOciManifestService;
 import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.os.server.protocols.helm.ui.mappers.HelmChartMapper;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.protocols.helm.shared.utils.HelmConstants;
+import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService.DeletedChart;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
@@ -50,7 +50,7 @@ public class HelmApiFacade implements ProtocolApiFacade {
   private final HelmStorageService helmStorageService;
   private final HelmChartService helmChartService;
   private final HelmOciManifestService helmOciManifestService;
-  private final HelmOciBlobService helmOciBlobService;
+  private final HelmChartFilesService helmChartFilesService;
   private final HelmChartMapper helmChartMapper;
   private final ApplicationEventPublisher eventPublisher;
 
@@ -105,9 +105,15 @@ public class HelmApiFacade implements ProtocolApiFacade {
       throw new ItemNotFoundException("chartNotFound");
     }
 
-    final var allManifests =
+    final var deleted =
         versions.stream()
-            .flatMap(v -> this.helmOciManifestService.findAllByChartId(v.id()).stream())
+            .map(
+                v ->
+                    new DeletedChart(
+                        name,
+                        v.version(),
+                        v.digest(),
+                        this.helmOciManifestService.findAllByChartId(v.id())))
             .toList();
 
     for (final var version : versions) {
@@ -116,18 +122,9 @@ public class HelmApiFacade implements ProtocolApiFacade {
 
     this.helmChartService.deleteChart(repoInfo.getStorageKey(), name);
 
-    var freed = 0L;
-    for (final var version : versions) {
-      final var filename = name + "-" + version.version() + HelmConstants.TGZ_EXTENSION;
-      freed +=
-          this.helmStorageService.deleteChartFile(
-              repoInfo.getStorageKey(), filename, version.digest(), repoInfo.getName());
-    }
-
-    for (final var manifest : allManifests) {
-      this.helmStorageService.deleteManifestFile(
-          repoInfo.getStorageKey(), manifest.name(), manifest.reference(), repoInfo.getName());
-    }
+    final var freed =
+        this.helmChartFilesService.deleteFiles(
+            repoInfo.getStorageKey(), repoInfo.getStorageKey(), repoInfo.getName(), deleted);
 
     return BaseUsages.ofDisk(-freed);
   }
@@ -150,21 +147,12 @@ public class HelmApiFacade implements ProtocolApiFacade {
             name,
             version));
 
-    final var filename = name + "-" + version + HelmConstants.TGZ_EXTENSION;
     final var freed =
-        this.helmStorageService.deleteChartFile(
-            repoInfo.getStorageKey(), filename, chartInfo.digest(), repoInfo.getName());
-
-    for (final var manifest : manifests) {
-      this.helmStorageService.deleteManifestFile(
-          repoInfo.getStorageKey(), manifest.name(), manifest.reference(), repoInfo.getName());
-    }
-
-    if (!manifests.isEmpty()
-        && !this.helmChartService.existsByRepoIdAndDigest(
-            repoInfo.getStorageKey(), chartInfo.digest())) {
-      this.helmOciBlobService.deleteByRepoIdAndDigest(repoInfo.getStorageKey(), chartInfo.digest());
-    }
+        this.helmChartFilesService.deleteFiles(
+            repoInfo.getStorageKey(),
+            repoInfo.getStorageKey(),
+            repoInfo.getName(),
+            List.of(new DeletedChart(name, version, chartInfo.digest(), manifests)));
 
     return BaseUsages.ofDisk(-freed);
   }
