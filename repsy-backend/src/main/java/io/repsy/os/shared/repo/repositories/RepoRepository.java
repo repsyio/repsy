@@ -17,11 +17,13 @@ package io.repsy.os.shared.repo.repositories;
 
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -44,8 +46,13 @@ public interface RepoRepository extends JpaRepository<Repo, UUID> {
       where r.id = :repoId""")
   int updateDiskUsage(@NonNull UUID repoId, long diskUsageDiff);
 
+  /**
+   * Reads the disk usage and locks the row until the surrounding transaction ends, so a concurrent
+   * {@link #updateDiskUsage} on the same repo waits and the value read here stays current.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select r.diskUsage from Repo r where r.id = :repoId")
-  @NonNull Optional<Long> findDiskUsageById(@NonNull UUID repoId);
+  @NonNull Optional<Long> findDiskUsageByIdForUpdate(@NonNull UUID repoId);
 
   @NonNull Optional<Repo> findByNameAndType(@NonNull String name, @NonNull RepoType type);
 

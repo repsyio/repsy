@@ -172,8 +172,13 @@ public class RepoTxService {
     return this.repoRepository.updateDiskUsage(repoId, diskUsageDiff) > 0;
   }
 
-  public @NonNull Optional<Long> findDiskUsage(final @NonNull UUID repoId) {
-    return this.repoRepository.findDiskUsageById(repoId);
+  /**
+   * Reads the repo's disk usage and locks its row until the surrounding transaction ends.
+   *
+   * @return the usage, empty when the repo no longer exists
+   */
+  public @NonNull Optional<Long> findDiskUsageForUpdate(final @NonNull UUID repoId) {
+    return this.repoRepository.findDiskUsageByIdForUpdate(repoId);
   }
 
   private @NonNull Repo findRepoOrThrowException(final @NonNull Optional<Repo> repoOptional) {
