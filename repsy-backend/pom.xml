@@ -400,6 +400,10 @@
                                 <openApiNullable>false</openApiNullable>
                                 <useOptional>false</useOptional>
                                 <useBeanValidation>true</useBeanValidation>
+                                <!-- Since 7.25.0 these are opt-in and default to off; the DTOs rely on them
+                                     to omit null optional properties from the JSON, as 7.24.x did. -->
+                                <generateJsonIncludeAnnotations>true</generateJsonIncludeAnnotations>
+                                <generateJsonSetterNullsAnnotations>true</generateJsonSetterNullsAnnotations>
                                 <generatedConstructorWithRequiredArgs>false</generatedConstructorWithRequiredArgs>
                                 <additionalModelTypeAnnotations>
                                     @lombok.Builder
