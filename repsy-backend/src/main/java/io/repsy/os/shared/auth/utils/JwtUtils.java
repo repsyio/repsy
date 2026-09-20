@@ -125,7 +125,7 @@ public class JwtUtils {
       }
       case PANEL -> throw new UnAuthorizedException("sessionExpired");
       case DOWNLOAD -> throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
-      default -> throw new IllegalStateException("Unexpected token realm: " + realm);
+      case null, default -> throw new IllegalStateException("Unexpected token realm: " + realm);
     }
   }
 

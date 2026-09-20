@@ -16,6 +16,7 @@
 package io.repsy.os.shared.auth.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.auth0.jwt.JWT;
@@ -250,6 +251,32 @@ class JwtUtilsTest {
     assertThatThrownBy(() -> this.jwtUtils.getUserId(token, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("claim-less token is accepted on the protocol side only")
+  void claimlessTokenIsAcceptedOnTheProtocolSideOnly() {
+    final var token = this.signedToken(UUID.randomUUID().toString(), null, null);
+
+    assertThatCode(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + token, TokenRealm.PROTOCOL))
+        .doesNotThrowAnyException();
+    assertThatThrownBy(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + token, TokenRealm.PANEL))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining("sessionExpired");
+    assertThatThrownBy(
+            () -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + token, TokenRealm.DOWNLOAD))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+  }
+
+  @Test
+  @DisplayName("claim-less token is not accepted for an unknown realm")
+  void claimlessTokenIsNotAcceptedForAnUnknownRealm() {
+    final var token = this.signedToken(UUID.randomUUID().toString(), null, null);
+
+    assertThatThrownBy(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + token, null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("Unexpected token realm");
   }
 
   private String signedToken(final String subject, final String tokenType, final String audience) {
