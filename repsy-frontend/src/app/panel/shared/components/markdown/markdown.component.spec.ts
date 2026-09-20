@@ -71,8 +71,7 @@ describe('MarkdownComponent', () => {
     const el = render('[click me](javascript:alert(1))');
 
     // Angular prefixes an unsafe scheme with "unsafe:", which browsers do not execute.
-    const href = el.querySelector('a')?.getAttribute('href') ?? '';
-    expect(href.startsWith('javascript:')).toBeFalse();
+    expect(el.querySelector('a')?.getAttribute('href')).toMatch(/^unsafe:/);
   });
 
   it('strips iframes and forms', () => {
