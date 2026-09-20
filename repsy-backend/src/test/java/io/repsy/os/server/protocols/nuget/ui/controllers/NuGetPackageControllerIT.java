@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.nuget.ui.controllers;
 
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.nullValue;
@@ -35,9 +36,13 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.sql.Timestamp;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
+import org.hamcrest.Matcher;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -71,6 +76,11 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
   }
 
   private void publish(final String repoName, final String id, final String version) {
+    this.publish(repoName, id, version, null);
+  }
+
+  private void publish(
+      final String repoName, final String id, final String version, final Instant publishedAt) {
     final var repo = this.repoTxService.getRepoByName(repoName);
     final var packageEntity =
         this.nugetPackageRepository
@@ -92,12 +102,13 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
           ("id", "package_id", "version", "is_prerelease", "is_listed", "published_at",
           "download_count", "title", "description", "authors", "tags", "license_url",
           "project_url", "repository_url", "readme", "dependencies", "created_at")
-        values (?, ?, ?, ?, true, current_timestamp, 0, ?, ?, ?, ?, ?, ?, ?, ?, cast(? as jsonb), current_timestamp)
+        values (?, ?, ?, ?, true, coalesce(?, current_timestamp), 0, ?, ?, ?, ?, ?, ?, ?, ?, cast(? as jsonb), current_timestamp)
         """,
         UUID.randomUUID(),
         packageId,
         version,
         version.contains("-"),
+        publishedAt == null ? null : Timestamp.from(publishedAt),
         "NuGet fixture",
         "integration fixture",
         "Repsy",
@@ -409,6 +420,133 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
 
       this.list(seed, path, "sort", property + ",asc").andExpect(status().isOk());
       this.list(seed, path, "sort", property + ",desc").andExpect(status().isOk());
+    }
+
+    private static Matcher<Iterable<? extends String>> inOrder(final List<String> values) {
+      return contains(values.toArray(String[]::new));
+    }
+
+    private static final Instant EPOCH = Instant.parse("2026-01-01T00:00:00Z");
+
+    private Seed seedPackages(final String... packageIds) {
+      final var it = NuGetPackageControllerIT.this;
+      final var user = it.createUser(uniqueUsername("nuget"), UserRole.USER);
+      final var repo = it.createRepo(RepoType.NUGET, true);
+
+      for (final var packageId : packageIds) {
+        it.publish(repo.getName(), packageId, "1.0.0");
+      }
+
+      return new Seed(repo, it.bearerTokenFor(user));
+    }
+
+    /** Publishes 1.0.0, 2.0.0 and 3.0.0 of one package, oldest first, one day apart. */
+    private Seed seedDatedVersions() {
+      final var it = NuGetPackageControllerIT.this;
+      final var user = it.createUser(uniqueUsername("nuget"), UserRole.USER);
+      final var repo = it.createRepo(RepoType.NUGET, true);
+
+      it.publish(repo.getName(), "Fixture.Package", "2.0.0", EPOCH.plus(Duration.ofDays(1)));
+      it.publish(repo.getName(), "Fixture.Package", "3.0.0", EPOCH.plus(Duration.ofDays(2)));
+      it.publish(repo.getName(), "Fixture.Package", "1.0.0", EPOCH);
+
+      return new Seed(repo, it.bearerTokenFor(user));
+    }
+
+    private ResultActions listPage(
+        final Seed seed, final String path, final String page, final String size, final String sort)
+        throws Exception {
+      final var request =
+          get(path, seed.repo().getName())
+              .param("page", page)
+              .param("size", size)
+              .with(apiPort())
+              .header(AUTHORIZATION, seed.token());
+
+      return NuGetPackageControllerIT.this.mockMvc.perform(
+          sort == null ? request : request.param("sort", sort));
+    }
+
+    @Test
+    @DisplayName("pages through the package list instead of returning the first page again")
+    void packageListHonoursPage() throws Exception {
+      final var seed = this.seedPackages("pkg.c", "pkg.a", "pkg.b");
+
+      this.listPage(seed, PACKAGES, "0", "2", null)
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[*].packageId", inOrder(List.of("pkg.a", "pkg.b"))))
+          .andExpect(jsonPath("$.data.page.number").value(0))
+          .andExpect(jsonPath("$.data.page.totalElements").value(3));
+
+      this.listPage(seed, PACKAGES, "1", "2", null)
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[*].packageId", inOrder(List.of("pkg.c"))))
+          .andExpect(jsonPath("$.data.page.number").value(1));
+
+      this.listPage(seed, PACKAGES, "2", "2", null)
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(0)));
+    }
+
+    @ParameterizedTest(name = "sort={0}")
+    @MethodSource("packageSortOrders")
+    @DisplayName("orders the package list by packageId in the requested direction")
+    void packageListHonoursSort(final String sort, final List<String> expected) throws Exception {
+      final var seed = this.seedPackages("pkg.b", "pkg.c", "pkg.a");
+
+      this.listPage(seed, PACKAGES, "0", "10", sort)
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[*].packageId", inOrder(expected)));
+    }
+
+    static Stream<Arguments> packageSortOrders() {
+      return Stream.of(
+          Arguments.of(null, List.of("pkg.a", "pkg.b", "pkg.c")),
+          Arguments.of("packageId,asc", List.of("pkg.a", "pkg.b", "pkg.c")),
+          Arguments.of("packageId,desc", List.of("pkg.c", "pkg.b", "pkg.a")));
+    }
+
+    @Test
+    @DisplayName("sorts the package list by packageId across pages")
+    void packageListSortsAcrossPages() throws Exception {
+      final var seed = this.seedPackages("pkg.b", "pkg.c", "pkg.a");
+
+      this.listPage(seed, PACKAGES, "0", "2", "packageId,desc")
+          .andExpect(jsonPath("$.data.content[*].packageId", inOrder(List.of("pkg.c", "pkg.b"))));
+      this.listPage(seed, PACKAGES, "1", "2", "packageId,desc")
+          .andExpect(jsonPath("$.data.content[*].packageId", inOrder(List.of("pkg.a"))));
+    }
+
+    @ParameterizedTest(name = "sort={0}")
+    @MethodSource("versionSortOrders")
+    @DisplayName("orders the version list by publishedAt in the requested direction")
+    void versionListHonoursSort(final String sort, final List<String> expected) throws Exception {
+      final var seed = this.seedDatedVersions();
+
+      this.listPage(seed, VERSIONS, "0", "10", sort)
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[*].version", inOrder(expected)));
+    }
+
+    static Stream<Arguments> versionSortOrders() {
+      return Stream.of(
+          Arguments.of(null, List.of("3.0.0", "2.0.0", "1.0.0")),
+          Arguments.of("publishedAt,desc", List.of("3.0.0", "2.0.0", "1.0.0")),
+          Arguments.of("publishedAt,asc", List.of("1.0.0", "2.0.0", "3.0.0")),
+          Arguments.of("version,desc", List.of("3.0.0", "2.0.0", "1.0.0")),
+          Arguments.of("version,asc", List.of("1.0.0", "2.0.0", "3.0.0")));
+    }
+
+    @Test
+    @DisplayName("pages through the version list in the requested order")
+    void versionListHonoursPageAndSort() throws Exception {
+      final var seed = this.seedDatedVersions();
+
+      this.listPage(seed, VERSIONS, "0", "2", "publishedAt,asc")
+          .andExpect(jsonPath("$.data.content[*].version", inOrder(List.of("1.0.0", "2.0.0"))))
+          .andExpect(jsonPath("$.data.page.totalElements").value(3));
+      this.listPage(seed, VERSIONS, "1", "2", "publishedAt,asc")
+          .andExpect(jsonPath("$.data.content[*].version", inOrder(List.of("3.0.0"))));
     }
 
     @ParameterizedTest(name = "{0}")
