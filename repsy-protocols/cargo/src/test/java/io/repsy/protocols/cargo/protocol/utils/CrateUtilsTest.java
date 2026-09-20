@@ -16,6 +16,7 @@
 package io.repsy.protocols.cargo.protocol.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -87,6 +88,56 @@ class CrateUtilsTest {
   @DisplayName("isLib() is false for an empty crate")
   void rejectsEmptyCrate() throws IOException {
     assertThat(CrateUtils.isLib(crate(Map.of()))).isFalse();
+  }
+
+  @Test
+  @DisplayName("isLib() reads a Cargo.toml of exactly the size limit")
+  void readsCargoTomlAtLimit() throws IOException {
+    final var files = new LinkedHashMap<String, String>();
+    files.put("demo-1.0.0/Cargo.toml", cargoTomlOfSize(CrateUtils.MAX_CARGO_TOML_BYTES));
+
+    assertThat(CrateUtils.isLib(crate(files))).isTrue();
+  }
+
+  @Test
+  @DisplayName("isLib() refuses a Cargo.toml larger than the size limit, naming the limit")
+  void refusesOversizedCargoToml() throws IOException {
+    final var files = new LinkedHashMap<String, String>();
+    files.put("demo-1.0.0/Cargo.toml", cargoTomlOfSize(CrateUtils.MAX_CARGO_TOML_BYTES + 1));
+
+    final var crate = crate(files);
+
+    assertThatThrownBy(() -> CrateUtils.isLib(crate))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Cargo.toml in the crate must be at most 10 MiB");
+  }
+
+  @Test
+  @DisplayName("isLib() refuses an oversized Cargo.toml of a nested package too")
+  void refusesOversizedNestedCargoToml() throws IOException {
+    final var files = new LinkedHashMap<String, String>();
+    files.put("demo-1.0.0/Cargo.toml", "[package]\nname = \"demo\"\n");
+    files.put("demo-1.0.0/sub/Cargo.toml", cargoTomlOfSize(CrateUtils.MAX_CARGO_TOML_BYTES + 1));
+
+    final var crate = crate(files);
+
+    assertThatThrownBy(() -> CrateUtils.isLib(crate)).isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  @DisplayName("isLib() does not inflate an oversized Cargo.toml it has no need to read")
+  void skipsOversizedEntryThatIsNotCargoToml() throws IOException {
+    final var files = new LinkedHashMap<String, String>();
+    files.put("demo-1.0.0/Cargo.toml", "[package]\nname = \"demo\"\n");
+    files.put("demo-1.0.0/README.md", "#".repeat((int) CrateUtils.MAX_CARGO_TOML_BYTES + 1));
+
+    assertThat(CrateUtils.isLib(crate(files))).isFalse();
+  }
+
+  private static String cargoTomlOfSize(final long size) {
+    final var head = "[package]\nname = \"demo\"\n\n[lib]\n#";
+
+    return head + "#".repeat((int) size - head.length());
   }
 
   @ParameterizedTest
