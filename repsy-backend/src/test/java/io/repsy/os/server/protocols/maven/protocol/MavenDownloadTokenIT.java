@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.maven.protocol;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -325,7 +326,7 @@ class MavenDownloadTokenIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("a panel access token in ?token= is refused by the Maven endpoints")
+    @DisplayName("a panel access token in ?token= is not a credential, so Maven asks for one")
     void panelTokenInQueryIsRefused() throws Exception {
       final var user = createUser(uniqueUsername("panel"), UserRole.USER);
       final var repo = seedMavenWithFiles(true);
@@ -335,7 +336,8 @@ class MavenDownloadTokenIT extends AbstractIntegrationTest {
           protocol(get("/{repo}/{path}", repo.getName(), JAR).param("token", panelToken));
 
       assertThat(result.getResponse().getStatus()).isEqualTo(401);
-      assertThat(result.getResponse().getContentAsString()).contains("accessNotAllowed");
+      assertThat(result.getResponse().getHeader(WWW_AUTHENTICATE))
+          .isEqualTo("Basic realm=\"Repsy Managed Repository\"");
     }
   }
 }
