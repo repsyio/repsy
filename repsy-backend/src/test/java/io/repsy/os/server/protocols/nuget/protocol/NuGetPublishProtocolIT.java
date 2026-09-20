@@ -1005,7 +1005,8 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
           packageId,
           LEGACY,
           new Pkg(id, LEGACY).nuspec(),
-          null);
+          null,
+          replacesExisting -> BaseUsages.ofDisk(0));
 
       return new Seeded(repo, id, legacy, canonical);
     }
