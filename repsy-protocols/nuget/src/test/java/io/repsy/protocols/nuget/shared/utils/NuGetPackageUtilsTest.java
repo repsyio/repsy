@@ -448,6 +448,58 @@ class NuGetPackageUtilsTest {
     }
   }
 
+  @Nested
+  @DisplayName("nuspec dependency extraction")
+  class NuspecDependencies {
+
+    @Test
+    @DisplayName("reads grouped dependencies")
+    void readsGroupedDependencies() {
+      final var nuspec =
+          """
+          <package><metadata><dependencies>
+            <group targetFramework="net8.0"><dependency id="Serilog" version="3.1.1"/></group>
+          </dependencies></metadata></package>
+          """;
+
+      assertThat(NuGetPackageUtils.extractDependenciesFromNuspec(nuspec))
+          .containsExactly(new NuGetDependencyInfo("Serilog", "3.1.1", "net8.0"));
+    }
+
+    @Test
+    @DisplayName("rejects a nuspec with an inline DOCTYPE entity declaration")
+    void rejectsInlineDoctype() {
+      final var nuspec =
+          """
+          <?xml version="1.0"?>
+          <!DOCTYPE package [<!ENTITY ver "9.9.9">]>
+          <package><metadata><dependencies>
+            <dependency id="Serilog" version="&ver;"/>
+          </dependencies></metadata></package>
+          """;
+
+      assertThat(NuGetPackageUtils.extractDependenciesFromNuspec(nuspec)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("does not load an external DTD referenced by the nuspec")
+    void doesNotLoadExternalDtd(@TempDir final Path dir) throws IOException {
+      final var dtd = dir.resolve("entities.dtd");
+      Files.writeString(dtd, "<!ENTITY ver \"9.9.9\">");
+      final var nuspec =
+          """
+          <?xml version="1.0"?>
+          <!DOCTYPE package SYSTEM "%s">
+          <package><metadata><dependencies>
+            <dependency id="Serilog" version="&ver;"/>
+          </dependencies></metadata></package>
+          """
+              .formatted(dtd.toUri());
+
+      assertThat(NuGetPackageUtils.extractDependenciesFromNuspec(nuspec)).isEmpty();
+    }
+  }
+
   private static NuGetRegistrationLeafItem leafItem(final String version) {
     final var entry =
         new NuGetCatalogEntry(

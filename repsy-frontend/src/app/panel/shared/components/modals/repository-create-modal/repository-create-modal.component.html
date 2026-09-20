@@ -57,7 +57,7 @@
             } @else if (form.get('name').errors?.['maxlength'] && form.get('name').touched) {
               <p animate.enter="fade-in-up">• Should be maximum 25 characters</p>
             } @else if (form.get('name').errors?.['pattern'] && form.get('name').touched) {
-              <p animate.enter="fade-in-up">• Should contain only letters, numbers, - and _</p>
+              <p animate.enter="fade-in-up">• Should contain only letters, numbers, - and _, and not start with -</p>
             }
           </div>
         </div>

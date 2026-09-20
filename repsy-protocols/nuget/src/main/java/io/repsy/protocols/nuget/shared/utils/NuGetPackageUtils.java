@@ -358,6 +358,10 @@ public final class NuGetPackageUtils {
     factory.setNamespaceAware(false);
     factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
     factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+    factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+    factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+    factory.setXIncludeAware(false);
+    factory.setExpandEntityReferences(false);
 
     return factory
         .newDocumentBuilder()
@@ -396,12 +400,7 @@ public final class NuGetPackageUtils {
     final var result = new ArrayList<NuGetDependencyInfo>();
 
     try {
-      final var factory = DocumentBuilderFactory.newInstance();
-      factory.setNamespaceAware(false);
-
-      final var builder = factory.newDocumentBuilder();
-      final var doc =
-          builder.parse(new ByteArrayInputStream(nuspecXml.getBytes(StandardCharsets.UTF_8)));
+      final var doc = parseNuspec(nuspecXml);
 
       doc.getDocumentElement().normalize();
 

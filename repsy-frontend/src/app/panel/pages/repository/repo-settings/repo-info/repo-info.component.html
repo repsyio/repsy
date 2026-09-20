@@ -35,7 +35,7 @@
           } @else if (renameForm.get('name').errors?.['pattern'] && renameForm.get('name').touched) {
             <p animate.enter="fade-in-up">• Should be maximum 25 characters</p>
           } @else if (renameForm.get('name').errors?.['maxlength'] && renameForm.get('name').touched) {
-            <p animate.enter="fade-in-up">• Should contain only letters, numbers, - and _</p>
+            <p animate.enter="fade-in-up">• Should contain only letters, numbers, - and _, and not start with -</p>
           }
         </div>
       </form>

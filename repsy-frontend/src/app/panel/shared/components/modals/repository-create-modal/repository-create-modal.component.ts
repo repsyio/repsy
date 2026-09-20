@@ -71,7 +71,7 @@ export class RepositoryCreateModalComponent implements OnInit {
     }
 
     this.form = this.fb.group({
-      name: ['', [Validators.required, Validators.maxLength(25), Validators.pattern(/^[a-zA-Z0-9_\-]+$/)]],
+      name: ['', [Validators.required, Validators.maxLength(25), Validators.pattern(/^[a-zA-Z0-9_][a-zA-Z0-9_\-]*$/)]],
       privateRepo: [true],
       description: ['', [Validators.maxLength(500)]],
     });
