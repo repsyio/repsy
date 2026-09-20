@@ -48,20 +48,22 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 @DisplayName("ProtocolAuthService")
 class ProtocolAuthServiceTest {
 
   private static final String USERNAME = "alice";
   private static final String PASSWORD = "s3cret";
-  private static final String SALT = "salt";
+
+  /** BCrypt is slow on purpose, so the hash is made once for the whole class. */
+  private static final String PASSWORD_HASH = PasswordHasher.hash(PASSWORD);
 
   private final UserTxService userTxService = Mockito.mock(UserTxService.class);
 
@@ -76,8 +78,7 @@ class ProtocolAuthServiceTest {
       UserInfo.builder()
           .id(UUID.randomUUID())
           .username(USERNAME)
-          .salt(SALT)
-          .hash(DigestUtils.sha256Hex(PASSWORD + SALT))
+          .hash(PASSWORD_HASH)
           .role(UserRole.USER)
           .build();
 
@@ -213,27 +214,39 @@ class ProtocolAuthServiceTest {
     }
   }
 
-  /** RPS-961: a legacy SHA-256 hash is replaced by BCrypt once its owner authenticates. */
+  /** RPS-961: an outdated hash is replaced by a current one once its owner authenticates. */
   @Nested
   @DisplayName("password hash upgrade")
   class HashUpgrade {
+
+    /** A BCrypt hash at the lowest work factor, which the current one has left behind. */
+    private final UserInfo weakUser =
+        UserInfo.builder()
+            .id(UUID.randomUUID())
+            .username("dave")
+            .hash("{bcrypt}" + new BCryptPasswordEncoder(4).encode(PASSWORD))
+            .role(UserRole.USER)
+            .build();
 
     private final UserInfo bcryptUser =
         UserInfo.builder()
             .id(UUID.randomUUID())
             .username("carol")
-            .salt(SALT)
             .hash(PasswordHasher.hash(PASSWORD))
             .role(UserRole.USER)
             .build();
 
     @Test
-    @DisplayName("authenticateWithPassword upgrades a legacy hash after a correct password")
-    void upgradesLegacyHash() {
-      ProtocolAuthServiceTest.this.authService.authenticateWithPassword(
-          credentials(USERNAME, PASSWORD));
+    @DisplayName("authenticateWithPassword upgrades an outdated hash after a correct password")
+    void upgradesOutdatedHash() {
+      when(ProtocolAuthServiceTest.this.userTxService.getUserByUsernameOptional("dave"))
+          .thenReturn(Optional.of(this.weakUser));
 
-      verify(ProtocolAuthServiceTest.this.userTxService).upgradePasswordHash(ALICE, PASSWORD);
+      ProtocolAuthServiceTest.this.authService.authenticateWithPassword(
+          credentials("dave", PASSWORD));
+
+      verify(ProtocolAuthServiceTest.this.userTxService)
+          .upgradePasswordHash(this.weakUser, PASSWORD);
     }
 
     @Test
@@ -254,10 +267,13 @@ class ProtocolAuthServiceTest {
     @Test
     @DisplayName("authenticateWithPassword does not upgrade after a wrong password")
     void doesNotUpgradeOnWrongPassword() {
+      when(ProtocolAuthServiceTest.this.userTxService.getUserByUsernameOptional("dave"))
+          .thenReturn(Optional.of(this.weakUser));
+
       assertUnauthorized(
           () ->
               ProtocolAuthServiceTest.this.authService.authenticateWithPassword(
-                  credentials(USERNAME, "wrong")));
+                  credentials("dave", "wrong")));
 
       verify(ProtocolAuthServiceTest.this.userTxService, never())
           .upgradePasswordHash(any(), anyString());
@@ -313,7 +329,6 @@ class ProtocolAuthServiceTest {
         UserInfo.builder()
             .id(UUID.randomUUID())
             .username("carol")
-            .salt(SALT)
             .hash(PasswordHasher.hash(PASSWORD))
             .role(UserRole.USER)
             .build();
@@ -350,7 +365,6 @@ class ProtocolAuthServiceTest {
           UserInfo.builder()
               .id(this.carol.getId())
               .username("carol")
-              .salt(SALT)
               .hash(PasswordHasher.hash("new-s3cret"))
               .role(UserRole.USER)
               .build();
@@ -379,7 +393,6 @@ class ProtocolAuthServiceTest {
           UserInfo.builder()
               .id(this.carol.getId())
               .username("carol")
-              .salt(SALT)
               .hash(this.carol.getHash())
               .role(UserRole.ADMIN)
               .build();
@@ -594,8 +607,7 @@ class ProtocolAuthServiceTest {
         UserInfo.builder()
             .id(UUID.randomUUID())
             .username("root")
-            .salt(SALT)
-            .hash(DigestUtils.sha256Hex(PASSWORD + SALT))
+            .hash(PASSWORD_HASH)
             .role(UserRole.ADMIN)
             .build();
 

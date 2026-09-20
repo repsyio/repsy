@@ -32,7 +32,6 @@ import com.jayway.jsonpath.JsonPath;
 import io.repsy.core.events.UserLoginEvent;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.auth.utils.AuthUtils;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.user.entities.User;
@@ -404,12 +403,11 @@ class AuthControllerIT extends AbstractIntegrationTest {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void updatesLastLoginAt() throws Exception {
       // Committed for real: the async listener runs on another thread and must be able to see it.
-      final var salt = PasswordGeneratorUtil.generateSalt();
       final var hash = PasswordHasher.hash(VALID_PASSWORD);
       final var userId =
           AuthControllerIT.this
               .userTxService
-              .create(uniqueUsername("lastlogin"), UserRole.USER, hash, salt)
+              .create(uniqueUsername("lastlogin"), UserRole.USER, hash)
               .getId();
       final var username =
           AuthControllerIT.this.userRepository.findById(userId).orElseThrow().getUsername();
@@ -893,7 +891,7 @@ class AuthControllerIT extends AbstractIntegrationTest {
     void rejectsATokenFromAnOlderVersion() throws Exception {
       final var user = AuthControllerIT.this.createUser(uniqueUsername("revoked"), UserRole.USER);
       final var refreshToken = AuthControllerIT.this.refreshTokenFor(user);
-      AuthControllerIT.this.userTxService.updatePassword(user.getId(), "newhash", "newsalt");
+      AuthControllerIT.this.userTxService.updatePassword(user.getId(), "newhash");
       AuthControllerIT.this.entityManager.flush();
 
       expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(refreshToken));

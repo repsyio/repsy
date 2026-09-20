@@ -17,7 +17,6 @@ package io.repsy.os.shared.auth.utils;
 
 import java.util.List;
 import lombok.experimental.UtilityClass;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.jspecify.annotations.NonNull;
 import org.passay.data.CharacterData;
 import org.passay.data.EnglishCharacterData;
@@ -28,7 +27,6 @@ import org.passay.rule.CharacterRule;
 public class PasswordGeneratorUtil {
 
   private static final int DEFAULT_PASSWORD_LENGTH = 12;
-  private static final int SALT_LENGTH = 16;
   private static final String SPECIAL_CHARS = "!@#$%^&*";
 
   private static final List<CharacterRule> RULES =
@@ -55,13 +53,5 @@ public class PasswordGeneratorUtil {
 
   public @NonNull String generatePassword() {
     return PASSWORD_GENERATOR.generate().toString();
-  }
-
-  /**
-   * Generates a salt for the user row. BCrypt puts its own salt inside the hash, so only legacy
-   * SHA-256 hashes read this value; it is still stored because {@code users.salt} is not nullable.
-   */
-  public @NonNull String generateSalt() {
-    return RandomStringUtils.secure().nextAlphanumeric(SALT_LENGTH);
   }
 }

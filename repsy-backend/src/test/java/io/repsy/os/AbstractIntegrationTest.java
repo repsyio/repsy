@@ -25,7 +25,6 @@ import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.shared.auth.services.RefreshTokenService;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
@@ -248,9 +247,8 @@ public abstract class AbstractIntegrationTest {
    * generator that only assigns a value once the INSERT is flushed, so flush before re-reading.
    */
   protected User createUser(final String username, final UserRole role) {
-    final var salt = PasswordGeneratorUtil.generateSalt();
     final var hash = PasswordHasher.hash(VALID_PASSWORD);
-    final var userInfo = this.userTxService.create(username, role, hash, salt);
+    final var userInfo = this.userTxService.create(username, role, hash);
     this.entityManager.flush();
     return this.userRepository.findById(userInfo.getId()).orElseThrow();
   }

@@ -52,9 +52,6 @@ public class User {
   @Column(name = "hash", nullable = false, length = 128)
   private String hash;
 
-  @Column(name = "salt", nullable = false, length = 16)
-  private String salt;
-
   @Enumerated(EnumType.STRING)
   @Column(name = "role", nullable = false, length = 20)
   private UserRole role;

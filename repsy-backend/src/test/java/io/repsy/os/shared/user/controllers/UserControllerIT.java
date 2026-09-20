@@ -288,7 +288,6 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var username = targetBefore.getUsername();
       final var role = targetBefore.getRole();
       final var hash = targetBefore.getHash();
-      final var salt = targetBefore.getSalt();
 
       expectError(
           UserControllerIT.this.perform(
@@ -303,7 +302,6 @@ class UserControllerIT extends AbstractIntegrationTest {
       assertThat(targetAfter.getUsername()).isEqualTo(username);
       assertThat(targetAfter.getRole()).isEqualTo(role);
       assertThat(targetAfter.getHash()).isEqualTo(hash);
-      assertThat(targetAfter.getSalt()).isEqualTo(salt);
     }
   }
 
@@ -580,10 +578,9 @@ class UserControllerIT extends AbstractIntegrationTest {
       // The response must carry the same createdAt that was persisted (RPS-846).
       assertThat(data.get("createdAt")).isNotNull();
       assertThat(instantOrNull(data.get("createdAt"))).isEqualTo(persisted.getCreatedAt());
-      // The password is stored salted+hashed, never verbatim, and must verify against the input.
+      // The password is stored hashed, never verbatim, and must verify against the input.
       assertThat(persisted.getHash()).isNotEqualTo(password);
-      assertThat(PasswordHasher.matches(password, persisted.getHash(), persisted.getSalt()))
-          .isTrue();
+      assertThat(PasswordHasher.matches(password, persisted.getHash())).isTrue();
     }
 
     static Stream<UserRole> validRoles() {
@@ -781,7 +778,6 @@ class UserControllerIT extends AbstractIntegrationTest {
       UserControllerIT.this.userTxService.updateLastLoginAt(target.getUsername());
       final var before = UserControllerIT.this.reload(target.getId());
       final var hash = before.getHash();
-      final var salt = before.getSalt();
       final var createdAt = before.getCreatedAt();
       final var lastLoginAt = before.getLastLoginAt();
       final var newUsername = uniqueUsername("after");
@@ -799,7 +795,6 @@ class UserControllerIT extends AbstractIntegrationTest {
       assertThat(after.getUsername()).isEqualTo(newUsername);
       assertThat(after.getRole()).isEqualTo(UserRole.ADMIN);
       assertThat(after.getHash()).isEqualTo(hash);
-      assertThat(after.getSalt()).isEqualTo(salt);
       assertThat(after.getCreatedAt()).isEqualTo(createdAt);
       assertThat(after.getLastLoginAt()).isEqualTo(lastLoginAt);
 
@@ -1149,12 +1144,11 @@ class UserControllerIT extends AbstractIntegrationTest {
   class ResetPassword {
 
     @Test
-    @DisplayName("returns a generated password and stores its new salted hash")
+    @DisplayName("returns a generated password and stores its new hash")
     void resetsPassword() throws Exception {
       final var token = UserControllerIT.this.adminBearerToken();
       final var target = UserControllerIT.this.createUser(uniqueUsername("resetme"), UserRole.USER);
       final var oldHash = target.getHash();
-      final var oldSalt = target.getSalt();
 
       final var body =
           expectSuccess(
@@ -1171,11 +1165,10 @@ class UserControllerIT extends AbstractIntegrationTest {
 
       final var after = UserControllerIT.this.reload(target.getId());
       assertThat(after.getHash()).isNotEqualTo(oldHash);
-      assertThat(after.getSalt()).isNotEqualTo(oldSalt);
       assertThat(after.getUsername()).isEqualTo(target.getUsername());
       assertThat(after.getRole()).isEqualTo(UserRole.USER);
-      assertThat(PasswordHasher.matches(newPassword, after.getHash(), after.getSalt())).isTrue();
-      assertThat(PasswordHasher.matches(VALID_PASSWORD, after.getHash(), after.getSalt()))
+      assertThat(PasswordHasher.matches(newPassword, after.getHash())).isTrue();
+      assertThat(PasswordHasher.matches(VALID_PASSWORD, after.getHash()))
           .as("the previous password must no longer work")
           .isFalse();
     }

@@ -28,6 +28,7 @@ import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
@@ -40,7 +41,6 @@ import java.time.temporal.TemporalAmount;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -55,7 +55,9 @@ class CargoAuthComponentTest {
 
   private static final String USERNAME = "alice";
   private static final String PASSWORD = "s3cret";
-  private static final String SALT = "salt";
+
+  /** BCrypt is slow on purpose, so the hash is made once for the whole class. */
+  private static final String PASSWORD_HASH = PasswordHasher.hash(PASSWORD);
 
   private final UserTxService userTxService = Mockito.mock(UserTxService.class);
 
@@ -83,8 +85,7 @@ class CargoAuthComponentTest {
         UserInfo.builder()
             .id(UUID.randomUUID())
             .username(USERNAME)
-            .salt(SALT)
-            .hash(DigestUtils.sha256Hex(PASSWORD + SALT))
+            .hash(PASSWORD_HASH)
             .role(UserRole.USER)
             .build();
     when(this.userTxService.getUserByUsernameOptional(USERNAME)).thenReturn(Optional.of(alice));

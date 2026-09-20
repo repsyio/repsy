@@ -18,11 +18,9 @@ package io.repsy.os.shared.auth.utils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
-import java.security.MessageDigest;
 import java.util.Map;
 import java.util.Objects;
 import lombok.experimental.UtilityClass;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -33,14 +31,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 /**
  * Hashes and verifies user passwords.
  *
- * <p>New hashes are BCrypt, stored as {@code "{bcrypt}$2a$..."}. The id in braces names the
- * algorithm, so a later change of algorithm or work factor stays verifiable, and {@link
- * #needsUpgrade} tells the caller to re-hash on the next successful login.
+ * <p>Hashes are BCrypt, stored as {@code "{bcrypt}$2a$..."}. The id in braces names the algorithm,
+ * so a later change of algorithm or work factor stays verifiable, and {@link #needsUpgrade} tells
+ * the caller to re-hash on the next successful login.
  *
- * <p>Hashes written before RPS-961 are a single salted SHA-256, {@code sha256Hex(password + salt)},
- * with no prefix. They still verify, and {@link #needsUpgrade} flags them, so they turn into BCrypt
- * the next time their owner logs in. A legacy hash is bare hex, so it never starts with an opening
- * brace.
+ * <p>A hash without an id never verifies. That covers the empty hash an operator sets to recover a
+ * lost password, and the salted SHA-256 hashes that RPS-961 replaced, which migration V0017
+ * (RPS-1033) blanked out.
  *
  * <p>BCrypt reads at most 72 bytes of the password. {@link #hash} rejects longer ones instead of
  * silently ignoring the tail.
@@ -52,7 +49,6 @@ public class PasswordHasher {
   public static final int MAX_PASSWORD_BYTES = 72;
 
   private static final String BCRYPT_ID = "bcrypt";
-  private static final String ID_PREFIX = "{";
   private static final String PASSWORD_TOO_LONG = "passwordTooLong";
   private static final int DUMMY_PASSWORD_LENGTH = 32;
 
@@ -63,8 +59,8 @@ public class PasswordHasher {
   /**
    * A real hash of a random password, made at the current work factor and checked when there is no
    * real hash to check. The password is generated per process, so no credential lives in the
-   * source. It makes the failing paths (unknown user, wrong password on a legacy hash) cost about
-   * one BCrypt, like a wrong password on a BCrypt hash.
+   * source. It makes the failing paths (unknown user, a hash that cannot verify) cost about one
+   * BCrypt, like a wrong password on a BCrypt hash.
    */
   private static final String DUMMY_HASH =
       encode(RandomStringUtils.secure().nextAlphanumeric(DUMMY_PASSWORD_LENGTH));
@@ -88,41 +84,27 @@ public class PasswordHasher {
    * matched.
    *
    * @param password the password to check
-   * @param hash the stored hash, BCrypt or legacy SHA-256
-   * @param salt the stored salt, used by legacy hashes only
+   * @param hash the stored hash
    * @return whether the password is the one the hash was made from
    */
-  public static boolean matches(
-      final @NonNull String password, final @Nullable String hash, final @Nullable String salt) {
+  public static boolean matches(final @NonNull String password, final @Nullable String hash) {
 
     if (hash == null) {
       verifyDummy(password);
       return false;
     }
 
-    if (!isLegacy(hash)) {
-      return matchesPrefixed(password, hash);
-    }
-
-    final var legacyHash = DigestUtils.sha256Hex(password + salt);
-    final var matches = MessageDigest.isEqual(legacyHash.getBytes(UTF_8), hash.getBytes(UTF_8));
-
-    if (!matches) {
+    try {
+      return ENCODER.matches(password, hash);
+    } catch (final IllegalArgumentException _) {
+      // No algorithm id, or one this build does not know. Spend the time of a real check anyway.
       verifyDummy(password);
+      return false;
     }
-
-    return matches;
   }
 
-  /**
-   * Whether the hash should be replaced, given the password that was just verified against it.
-   * False for a legacy hash whose password BCrypt cannot take, since that one cannot be upgraded.
-   */
-  public static boolean needsUpgrade(final @NonNull String hash, final @NonNull String password) {
-
-    if (isLegacy(hash)) {
-      return fitsBcrypt(password);
-    }
+  /** Whether the hash was made with an older algorithm or work factor and should be replaced. */
+  public static boolean needsUpgrade(final @NonNull String hash) {
 
     return ENCODER.upgradeEncoding(hash);
   }
@@ -140,22 +122,6 @@ public class PasswordHasher {
   private static @NonNull String encode(final @NonNull String password) {
 
     return Objects.requireNonNull(ENCODER.encode(password), "the encoder returned no hash");
-  }
-
-  private static boolean matchesPrefixed(
-      final @NonNull String password, final @NonNull String hash) {
-
-    try {
-      return ENCODER.matches(password, hash);
-    } catch (final IllegalArgumentException _) {
-      // An algorithm id this build does not know.
-      return false;
-    }
-  }
-
-  private static boolean isLegacy(final @NonNull String hash) {
-
-    return !hash.startsWith(ID_PREFIX);
   }
 
   private static boolean fitsBcrypt(final @NonNull String password) {
