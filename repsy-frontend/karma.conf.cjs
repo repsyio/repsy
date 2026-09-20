@@ -37,7 +37,9 @@ module.exports = function (config) {
     coverageReporter: {
       dir: require('path').join(__dirname, './coverage/panel-frontend'),
       subdir: '.',
-      reporters: [{ type: 'html' }, { type: 'text-summary' }],
+      // lcovonly writes coverage/panel-frontend/lcov.info, which SonarCloud reads through
+      // sonar.javascript.lcov.reportPaths (see pom.xml in this directory).
+      reporters: [{ type: 'html' }, { type: 'text-summary' }, { type: 'lcovonly' }],
     },
     reporters: ['progress', 'kjhtml'],
     browsers: ['Chrome'],

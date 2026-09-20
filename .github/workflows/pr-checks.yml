@@ -41,6 +41,10 @@ jobs:
   java-checks:
     name: Repsy check
     runs-on: warp-ubuntu-latest-x64-2x
+    # The SonarCloud scan below reads the frontend coverage report the frontend job produces (there
+    # is one analysis per project, so the scan cannot be split per language). This starts the Java
+    # build after the frontend job, and skips it when the frontend job fails. That PR is red anyway.
+    needs: repsy-frontend
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -67,6 +71,18 @@ jobs:
       - name: Build and Verify
         run: mvn -B -ntp verify
 
+      # Where repsy-frontend/pom.xml tells the scan to look for the lcov report. It is downloaded
+      # after "Build and Verify" so that the Apache RAT check does not see it.
+      - name: Download frontend coverage
+        if: >-
+          github.actor != 'dependabot[bot]'
+          && github.event_name != 'merge_group'
+          && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: frontend-coverage
+          path: repsy-frontend/coverage/panel-frontend
+
       - name: Analyze with SonarCloud
         # Dependabot-triggered and fork runs don't receive regular repo secrets, so SONAR_TOKEN is
         # empty and the scanner is rejected. Merge queue runs would analyse a gh-readonly-queue/*
@@ -78,12 +94,14 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
+        # **/*.spec.ts keeps the frontend specs out of the main sources: repsy-frontend/pom.xml
+        # lists src as both sources and tests, so the two sets must be disjoint.
         run: >-
           mvn -B -ntp
           org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
           -Dsonar.projectKey=repsyio_repsy
           -Dsonar.organization=repsy
-          -Dsonar.exclusions=core/**
+          -Dsonar.exclusions=core/**,**/*.spec.ts
           -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
 
       - name: Upload JaCoCo reports
@@ -129,8 +147,16 @@ jobs:
         run: pnpm run gen:api
 
       # Karma needs a Chrome binary; the runner image ships google-chrome. The CI launcher in
-      # karma.conf.cjs adds --no-sandbox. A failing spec makes ng test exit non-zero.
+      # karma.conf.cjs adds --no-sandbox. A failing spec makes ng test exit non-zero. The coverage
+      # report (lcov.info) is what the SonarCloud scan in the "Repsy check" job reads.
       - name: Unit tests
         run: |
           google-chrome --version
-          pnpm test --watch=false --browsers=ChromeHeadlessCI
+          pnpm test --watch=false --browsers=ChromeHeadlessCI --code-coverage
+
+      - name: Upload frontend coverage
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: frontend-coverage
+          path: repsy-frontend/coverage/panel-frontend/lcov.info
+          if-no-files-found: error
