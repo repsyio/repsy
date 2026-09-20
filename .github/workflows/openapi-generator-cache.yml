@@ -34,8 +34,9 @@ jobs:
         with:
           node-version: "24"
 
+      # Pinned, with lifecycle scripts off, so a new pnpm release cannot change this job.
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g --ignore-scripts pnpm@10.16.0
 
       - name: Install dependencies
         run: pnpm install --ignore-scripts
