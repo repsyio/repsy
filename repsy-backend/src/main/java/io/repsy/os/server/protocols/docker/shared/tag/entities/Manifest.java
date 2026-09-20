@@ -29,11 +29,11 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
@@ -48,7 +48,6 @@ import org.jspecify.annotations.NonNull;
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString(exclude = {"layers", "tagPlatform"})
-@EqualsAndHashCode(exclude = {"layers", "tagPlatform"})
 public class Manifest {
 
   @Id
@@ -103,4 +102,32 @@ public class Manifest {
   @JoinColumn(name = "tag_platform_id")
   @OnDelete(action = OnDeleteAction.CASCADE)
   private TagPlatform tagPlatform;
+
+  /**
+   * Identifier-based equality: two manifests are equal when they are the same instance or carry the
+   * same non-null id. A manifest that has not been persisted yet has no id and equals only itself.
+   * {@code getId()} is used on both sides so a Hibernate proxy is compared by its real id.
+   */
+  @Override
+  public boolean equals(final Object o) {
+    if (this == o) {
+      return true;
+    }
+
+    if (!(o instanceof final Manifest other)) {
+      return false;
+    }
+
+    return this.getId() != null && Objects.equals(this.getId(), other.getId());
+  }
+
+  /**
+   * Constant on purpose: the id is assigned on persist and the version and timestamps change on
+   * flush, so a hash derived from them would move a manifest added to a {@code HashSet} into the
+   * wrong bucket. It also keeps the lazy associations out of the hash.
+   */
+  @Override
+  public int hashCode() {
+    return Manifest.class.hashCode();
+  }
 }

@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
@@ -43,6 +44,7 @@ import org.jspecify.annotations.NonNull;
 @Entity
 @Table(name = "docker_layer")
 @NoArgsConstructor
+@ToString(exclude = {"repo", "manifests"})
 public class Layer {
   @Id
   @UuidV7

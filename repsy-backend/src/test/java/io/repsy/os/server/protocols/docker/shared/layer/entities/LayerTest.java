@@ -101,4 +101,21 @@ class LayerTest {
 
     assertThat(layers).hasSize(2);
   }
+
+  @Test
+  @DisplayName("Printing a layer never touches its lazy manifests or repo")
+  void toStringSkipsAssociations() {
+    final var layer = layer(UUID.randomUUID(), DIGEST);
+    layer.setManifests(
+        new HashSet<>() {
+          private static final long serialVersionUID = 1L;
+
+          @Override
+          public String toString() {
+            throw new IllegalStateException("lazy collection was printed");
+          }
+        });
+
+    assertThat(layer.toString()).contains(DIGEST).doesNotContain("manifests=", "repo=");
+  }
 }
