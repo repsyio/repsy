@@ -17,6 +17,7 @@ package io.repsy.os.shared.user.repositories;
 
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
@@ -35,7 +36,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
   boolean existsByUsername(@NonNull String username);
 
-  @NonNull Optional<User> findFirstByRole(@NonNull UserRole role);
+  @NonNull List<User> findAllByRole(@NonNull UserRole role);
 
   @Query(
       """
