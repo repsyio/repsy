@@ -56,6 +56,19 @@ for SonarCloud.
 - Integration tests use Testcontainers with **PostgreSQL 18** (`postgres:18`), wired in through
   `@ServiceConnection`. Keep it on the same major version as the images documented in
   `README.md`.
+- Every `*IT` extends `AbstractIntegrationTest` and shares that one PostgreSQL container. Most tests
+  run in a transaction that is rolled back. A class that must commit (an `@Async` listener cannot
+  see an open transaction) uses `@Transactional(propagation = Propagation.NOT_SUPPORTED)`, tracks
+  the rows it creates and deletes exactly those in an `@AfterEach`. It never empties a table, and
+  it measures a baseline instead of asserting the absolute size of a table that other classes
+  fill. `DefaultRepoSeedingIT` and the H2 suites own their database and are the exceptions.
+- `CommittedRowsGuard` (registered on `AbstractIntegrationTest`) enforces that. It snapshots the row
+  count of every table once the default repos are seeded, and after each class it fails the class
+  whose counts differ, naming the class and the tables. It also deletes the `users` and `repo` rows
+  the class added, so the next class starts clean and the failure stays with the class that
+  caused it. When it fails a class, add the missing cleanup to that class; do not loosen the guard.
+- The order of the IT classes is deliberately not fixed. The guard makes it irrelevant for leaked
+  rows, so don't write a test that only passes because another class ran (or didn't run) before it.
 - Do not declare versions for `org.testcontainers:*` artifacts: they are managed by `core-parent`
   (`testcontainers-bom`). The same goes for any other dependency `repsy-core` already manages,
   so only add a `<version>` for something it does not.

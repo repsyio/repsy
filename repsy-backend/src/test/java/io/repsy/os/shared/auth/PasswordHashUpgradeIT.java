@@ -60,7 +60,7 @@ class PasswordHashUpgradeIT extends AbstractIntegrationTest {
 
   @AfterEach
   void deleteCreatedUsers() {
-    this.userRepository.deleteAllById(this.createdUserIds);
+    this.deleteCommittedUsers(this.createdUserIds);
     this.createdUserIds.clear();
   }
 
