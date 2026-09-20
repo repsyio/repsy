@@ -19,7 +19,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -33,7 +36,10 @@ import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.core.events.ArtifactPushedEvent;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
+import io.repsy.os.server.security.scanner.VulnerabilityScanner;
 import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
+import io.repsy.os.server.security.scanner.dtos.ScanRequest;
+import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import java.util.Map;
 import java.util.Optional;
@@ -45,6 +51,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
@@ -62,6 +69,7 @@ class ArtifactScanListenerTest {
   @Mock private RepoTxService repoTxService;
   @Mock private DockerScanTokenIssuer dockerScanTokenIssuer;
   @Mock private Executor scanTaskExecutor;
+  @Mock private VulnerabilityScanner scanner;
 
   private ArtifactScanListener listener;
   private Logger listenerLogger;
@@ -133,6 +141,81 @@ class ArtifactScanListenerTest {
         .hasMessage("scanExecutorSaturated");
 
     verify(this.scanTxService).recordScanFailure(SCAN_ID, SATURATED_MESSAGE);
+  }
+
+  @Test
+  @DisplayName("skips a Docker scan without an error when the repo was deleted after it was queued")
+  void skipsDockerScanWhenRepoIsDeletedAfterQueueing() {
+    this.givenDockerScanIsQueued();
+    when(this.repoTxService.getRepo(REPO_ID)).thenThrow(new ItemNotFoundException("repoNotFound"));
+
+    assertThatCode(() -> this.listener.handleArtifactPushed(this.dockerEvent()))
+        .doesNotThrowAnyException();
+
+    verify(this.scanner, never()).scan(any());
+    verify(this.scanTxService, never()).recordScanFailure(any(), any());
+    assertThat(this.logAppender.list)
+        .noneMatch(logEvent -> logEvent.getLevel().isGreaterOrEqual(Level.WARN))
+        .anyMatch(logEvent -> logEvent.getFormattedMessage().contains("repo was deleted"));
+  }
+
+  @Test
+  @DisplayName("scans a public Docker repo without a registry token")
+  void scansPublicDockerRepoWithoutToken() {
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(false);
+
+    this.listener.handleArtifactPushed(this.dockerEvent());
+
+    final var request = this.capturedScanRequest();
+    assertThat(request.dockerRegistryReference()).isEqualTo("repo/image:1.0");
+    assertThat(request.registryAuthToken()).isNull();
+    verifyNoInteractions(this.dockerScanTokenIssuer);
+  }
+
+  @Test
+  @DisplayName("scans a private Docker repo with a read-only pull token")
+  void scansPrivateDockerRepoWithPullToken() {
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(true);
+    when(this.dockerScanTokenIssuer.mintReadOnlyPullToken(REPO_ID, "repo")).thenReturn("token");
+
+    this.listener.handleArtifactPushed(this.dockerEvent());
+
+    final var request = this.capturedScanRequest();
+    assertThat(request.dockerRegistryReference()).isEqualTo("repo/image:1.0");
+    assertThat(request.registryAuthToken()).isEqualTo("token");
+  }
+
+  private void givenDockerScanIsQueued() {
+    when(this.scanner.getName()).thenReturn("trivy");
+    when(this.scannerRegistry.findScanner("DOCKER")).thenReturn(Optional.of(this.scanner));
+    when(this.scanTxService.createPendingScan(REPO_ID, "image", "1.0", "trivy"))
+        .thenReturn(SCAN_ID);
+    doAnswer(
+            invocation -> {
+              invocation.<Runnable>getArgument(0).run();
+              return null;
+            })
+        .when(this.scanTaskExecutor)
+        .execute(any());
+  }
+
+  private void givenDockerRepo(final boolean privateRepo) {
+    final var repoInfo = mock(RepoInfo.class);
+    when(repoInfo.isPrivateRepo()).thenReturn(privateRepo);
+    when(this.repoTxService.getRepo(REPO_ID)).thenReturn(repoInfo);
+  }
+
+  private ScanRequest capturedScanRequest() {
+    final var captor = ArgumentCaptor.forClass(ScanRequest.class);
+    verify(this.scanner).scan(captor.capture());
+    return captor.getValue();
+  }
+
+  private ArtifactPushedEvent dockerEvent() {
+    return new ArtifactPushedEvent(
+        REPO_ID, "DOCKER", "repo", "manifests/1.0", "image", "1.0", false, false);
   }
 
   private ArtifactPushedEvent event() {

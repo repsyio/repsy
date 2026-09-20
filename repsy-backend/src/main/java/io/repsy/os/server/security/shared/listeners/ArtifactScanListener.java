@@ -28,6 +28,7 @@ import io.repsy.os.server.security.scanner.ResourceArtifactContent;
 import io.repsy.os.server.security.scanner.VulnerabilityScanner;
 import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.server.security.scanner.dtos.ScanRequest;
+import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.docker.shared.utils.DockerConstants;
 import java.util.Map;
@@ -179,22 +180,35 @@ public class ArtifactScanListener {
     return new ScanInputs(artifactContent, null, null);
   }
 
-  private @NonNull ScanInputs resolveDockerScanInputs(final @NonNull ArtifactPushedEvent event) {
-    final var reference = buildDockerRegistryReference(event);
-    final var authToken = this.resolveRegistryAuthToken(event);
+  private @Nullable ScanInputs resolveDockerScanInputs(final @NonNull ArtifactPushedEvent event) {
+    final var repoInfo = this.findRepoOrNull(event);
 
-    return new ScanInputs(null, reference, authToken);
-  }
-
-  private @Nullable String resolveRegistryAuthToken(final @NonNull ArtifactPushedEvent event) {
-
-    final var repoInfo = this.repoTxService.getRepo(event.repoId());
-
-    if (!repoInfo.isPrivateRepo()) {
+    if (repoInfo == null) {
       return null;
     }
 
-    return this.dockerScanTokenIssuer.mintReadOnlyPullToken(event.repoId(), event.repoName());
+    final var authToken =
+        repoInfo.isPrivateRepo()
+            ? this.dockerScanTokenIssuer.mintReadOnlyPullToken(event.repoId(), event.repoName())
+            : null;
+
+    return new ScanInputs(null, buildDockerRegistryReference(event), authToken);
+  }
+
+  private @Nullable RepoInfo findRepoOrNull(final @NonNull ArtifactPushedEvent event) {
+    try {
+      return this.repoTxService.getRepo(event.repoId());
+    } catch (final ItemNotFoundException _) {
+      // The repo was deleted after the scan was queued. Its scan rows cascade with it, so there is
+      // nothing left to fail or report.
+      log.info(
+          "Skipping vulnerability scan for {}@{} (repo={}): the repo was deleted before the scan"
+              + " started",
+          event.artifactName(),
+          event.artifactVersion(),
+          event.repoName());
+      return null;
+    }
   }
 
   private record ScanInputs(
