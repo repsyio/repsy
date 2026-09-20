@@ -325,6 +325,8 @@ Access at:
 | `ABANDONED_UPLOAD_TTL` | How long an upload can go without receiving data before it counts as abandoned (ISO-8601 duration) | `PT24H` |
 | `ABANDONED_UPLOAD_CLEANUP_INTERVAL` | How often the cleanup runs (ISO-8601 duration) | `PT1H` |
 | `ABANDONED_UPLOAD_CLEANUP_INITIAL_DELAY` | How long after startup the first cleanup runs (ISO-8601 duration) | `PT10M` |
+| `MULTIPART_MAX_FILE_SIZE` | Largest single file a multipart upload may carry: the package archive of a PyPI (`twine upload`), Helm (`POST /{repo}/api/charts`) or NuGet push. A larger upload is answered with `413`. Accepts a size such as `100MB` or `1GB`. A Helm chart is read into memory while it is stored, so lower this on a small heap | `500MB` |
+| `MULTIPART_MAX_REQUEST_SIZE` | Largest total size of a multipart request, all parts included. Keep it at least as large as `MULTIPART_MAX_FILE_SIZE` | `500MB` |
 
 **Important Notes:**
 
