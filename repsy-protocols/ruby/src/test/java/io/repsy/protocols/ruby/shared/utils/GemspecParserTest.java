@@ -16,7 +16,9 @@
 package io.repsy.protocols.ruby.shared.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -26,6 +28,8 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @DisplayName("GemspecParser")
 class GemspecParserTest {
@@ -132,5 +136,21 @@ class GemspecParserTest {
 
     assertThat(metadata.getRuntimeDependencies()).isEmpty();
     assertThat(metadata.getDevelopmentDependencies()).isEmpty();
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(
+      strings = {
+        "extensions: !!javax.script.ScriptEngineManager\n  key: value\n",
+        "extensions: !!java.net.URL [\"http://localhost/\"]\n",
+        "extensions: !<tag:yaml.org,2002:javax.script.ScriptEngineManager>\n  key: value\n"
+      })
+  @DisplayName("parse() rejects a global tag that would instantiate an arbitrary class")
+  void rejectsGlobalTags(final String extensions) throws IOException {
+    final var gem = gem(HEADER + extensions);
+
+    assertThatThrownBy(() -> GemspecParser.parse(gem))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessageContaining("invalidGemFile");
   }
 }
