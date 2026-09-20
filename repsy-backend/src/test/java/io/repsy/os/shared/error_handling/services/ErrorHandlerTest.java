@@ -36,15 +36,20 @@ import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.core.MethodParameter;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -265,6 +270,86 @@ class ErrorHandlerTest {
         .perform(get("/web-client"))
         .andExpect(status().isInternalServerError())
         .andExpect(jsonPath("$.msgId").value("errorOccurred"));
+  }
+
+  @Test
+  @DisplayName("answers 400 validationError for a value longer than its column")
+  void valueTooLongForColumn() throws Exception {
+    this.mockMvc
+        .perform(get("/db/22001"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.msgId").value("validationError"))
+        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(jsonPath("$.text").value("Incoming data couldn't be validated."))
+        .andExpect(jsonPath("$.data").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("answers 409 itemAlreadyExists for a unique constraint violation")
+  void uniqueViolation() throws Exception {
+    this.mockMvc
+        .perform(get("/db/23505"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.msgId").value("itemAlreadyExists"))
+        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(jsonPath("$.text").value("The item already exists."))
+        .andExpect(jsonPath("$.data").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("answers 409 itemAlreadyExists for the DuplicateKeyException Spring translates to")
+  void duplicateKey() throws Exception {
+    this.mockMvc
+        .perform(get("/db/duplicate-key"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.msgId").value("itemAlreadyExists"));
+  }
+
+  @ParameterizedTest(name = "SQL state {0}")
+  @ValueSource(strings = {"23502", "23503", "23513", "23514", "22003", "40001"})
+  @DisplayName("keeps 500 errorOccurred for a violation the client cannot correct")
+  void otherViolationsStayServerErrors(final String sqlState) throws Exception {
+    // Not-null, foreign key and check violations mean the server wrote a row it should not have.
+    this.mockMvc
+        .perform(get("/db/" + sqlState))
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.msgId").value("errorOccurred"));
+  }
+
+  @Test
+  @DisplayName("keeps 500 errorOccurred for a violation that carries no SQL state")
+  void violationWithoutSqlState() throws Exception {
+    this.mockMvc
+        .perform(get("/db/no-cause"))
+        .andExpect(status().isInternalServerError())
+        .andExpect(jsonPath("$.msgId").value("errorOccurred"));
+  }
+
+  @Test
+  @DisplayName("logs a mapped constraint violation as a warning with its SQL state")
+  void mappedViolationIsLoggedAsWarning() throws Exception {
+    this.mockMvc.perform(get("/db/23505")).andExpect(status().isConflict());
+
+    assertThat(this.logEvents.list)
+        .filteredOn(event -> event.getLevel() == Level.WARN)
+        .extracting(ILoggingEvent::getFormattedMessage)
+        .singleElement()
+        .asString()
+        .startsWith("Constraint violation (SQL state 23505)");
+  }
+
+  @Test
+  @DisplayName("does not render a constraint violation when no servlet response is available")
+  void violationWithoutResponse() {
+    final var handler =
+        new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+
+    assertThat(
+            handler.handleException(
+                new DataIntegrityViolationException("boom", new SQLException("boom", "23505")),
+                new MockHttpServletRequest(),
+                null))
+        .isNull();
   }
 
   @Test
@@ -496,6 +581,22 @@ class ErrorHandlerTest {
     @GetMapping("/mfa/no-message")
     String mfaWithoutMessage() {
       throw new MfaException(null);
+    }
+
+    @GetMapping("/db/duplicate-key")
+    String duplicateKey() {
+      throw new DuplicateKeyException("duplicate key", new SQLException("duplicate", "23505"));
+    }
+
+    @GetMapping("/db/no-cause")
+    String noCause() {
+      throw new DataIntegrityViolationException("no cause");
+    }
+
+    @GetMapping("/db/{sqlState}")
+    String constraintViolation(@PathVariable("sqlState") final String sqlState) {
+      throw new DataIntegrityViolationException(
+          "could not execute statement", new SQLException("violation", sqlState));
     }
 
     @GetMapping("/moved")
