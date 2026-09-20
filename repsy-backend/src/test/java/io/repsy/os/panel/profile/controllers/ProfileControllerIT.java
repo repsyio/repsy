@@ -656,6 +656,42 @@ class ProfileControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("rejects an access token issued before a password change and keeps the password")
+    void rejectsAStaleTokenAndKeepsThePassword() throws Exception {
+      final var user =
+          ProfileControllerIT.this.createUser(uniqueUsername("pwstale"), UserRole.USER);
+      final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
+
+      ProfileControllerIT.this
+          .mockMvc
+          .perform(
+              put("/api/profile/password")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body("NewPassword2@")))
+          .andExpect(status().isOk());
+      final var hashAfterChange =
+          ProfileControllerIT.this.userRepository.findById(user.getId()).orElseThrow().getHash();
+
+      ProfileControllerIT.this
+          .mockMvc
+          .perform(
+              put("/api/profile/password")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body("Attacker3Password@")))
+          .andExpect(status().isUnauthorized())
+          .andExpect(jsonPath("$.msgId").value("sessionExpired"));
+
+      final var persisted =
+          ProfileControllerIT.this.userRepository.findById(user.getId()).orElseThrow();
+      assertThat(persisted.getHash()).isEqualTo(hashAfterChange);
+      assertThat(PasswordHasher.matches("NewPassword2@", persisted.getHash())).isTrue();
+    }
+
+    @Test
     @DisplayName("changes the password and persists a new hash")
     void updatesPassword() throws Exception {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("pwuser"), UserRole.USER);

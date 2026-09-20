@@ -26,8 +26,6 @@ import io.repsy.os.generated.model.ProfileInfo;
 import io.repsy.os.generated.model.UpdateUsernameForm;
 import io.repsy.os.panel.profile.services.ProfileService;
 import io.repsy.os.shared.auth.PanelAuthHelper;
-import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import jakarta.validation.Valid;
@@ -47,7 +45,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/profile")
 class ProfileController {
 
-  private final @NonNull JwtUtils jwtUtils;
   private final @NonNull PanelAuthHelper panelAuthHelper;
   private final @NonNull ProfileService profileService;
   private final @NonNull UserTxService userTxService;
@@ -83,11 +80,10 @@ class ProfileController {
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
       @RequestBody @Valid final @NonNull PasswordForm form) {
 
+    final var session = this.panelAuthHelper.authenticateSession(authHeader);
+
     final var loginInfo =
-        this.profileService.updatePassword(
-            this.jwtUtils.extractUserId(authHeader, TokenRealm.PANEL),
-            form,
-            this.jwtUtils.extractSessionStart(authHeader));
+        this.profileService.updatePassword(session.user().getId(), form, session.sessionStart());
 
     return this.resp.success("passwordChanged", loginInfo);
   }

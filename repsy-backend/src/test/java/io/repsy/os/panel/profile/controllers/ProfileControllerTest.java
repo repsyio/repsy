@@ -19,11 +19,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.services.RestResponseFactory;
+import io.repsy.os.generated.model.PasswordForm;
 import io.repsy.os.generated.model.UpdateUsernameForm;
 import io.repsy.os.panel.profile.services.ProfileService;
 import io.repsy.os.shared.auth.PanelAuthHelper;
@@ -59,7 +61,6 @@ class ProfileControllerTest {
   // A real UserTxService over an empty repository: the lookup itself is under test.
   private final ProfileController controller =
       new ProfileController(
-          this.jwtUtils,
           this.panelAuthHelper,
           this.profileService,
           this.userTxService,
@@ -84,6 +85,45 @@ class ProfileControllerTest {
     verify(this.profileService).updateUsername(userId, "alice2", sessionStart);
     verify(this.jwtUtils).extractPanelClaims(AUTH_HEADER);
     verifyNoMoreInteractions(this.jwtUtils);
+  }
+
+  /** RPS-1056: the password endpoint checks the token version, decodes once and keeps the start. */
+  @Test
+  @DisplayName("updatePassword decodes the bearer token once and keeps the session start")
+  void updatePasswordDecodesTheTokenOnce() {
+    final var sessionStart = Instant.parse("2026-09-01T10:00:00Z");
+    final var userId = UUID.randomUUID();
+    final var user = new User();
+    final var userInfo = UserInfo.builder().id(userId).username("alice").tokenVersion(3).build();
+    final var form = new PasswordForm().password("NewPassword2@");
+    when(this.jwtUtils.extractPanelClaims(AUTH_HEADER))
+        .thenReturn(new PanelTokenClaims("alice", 3, sessionStart));
+    when(this.userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+    when(this.userConverter.toUserInfo(user)).thenReturn(userInfo);
+
+    this.controller.updatePassword(AUTH_HEADER, form);
+
+    verify(this.profileService).updatePassword(userId, form, sessionStart);
+    verify(this.jwtUtils).extractPanelClaims(AUTH_HEADER);
+    verifyNoMoreInteractions(this.jwtUtils);
+  }
+
+  @Test
+  @DisplayName("updatePassword rejects a token issued before the last token-version bump")
+  void updatePasswordRejectsAStaleTokenVersion() {
+    final var user = new User();
+    final var userInfo =
+        UserInfo.builder().id(UUID.randomUUID()).username("alice").tokenVersion(4).build();
+    final var form = new PasswordForm().password("NewPassword2@");
+    when(this.jwtUtils.extractPanelClaims(AUTH_HEADER))
+        .thenReturn(new PanelTokenClaims("alice", 3, Instant.now()));
+    when(this.userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+    when(this.userConverter.toUserInfo(user)).thenReturn(userInfo);
+
+    assertThatThrownBy(() -> this.controller.updatePassword(AUTH_HEADER, form))
+        .isExactlyInstanceOf(UnAuthorizedException.class)
+        .hasMessage("sessionExpired");
+    verifyNoInteractions(this.profileService);
   }
 
   /** RPS-962: a valid token whose user is gone is an authentication failure, not a 404. */
