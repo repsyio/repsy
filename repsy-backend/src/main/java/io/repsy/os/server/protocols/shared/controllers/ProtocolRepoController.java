@@ -42,7 +42,6 @@ import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.RepoScope;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.validation.Valid;
-import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
@@ -92,8 +91,7 @@ public class ProtocolRepoController {
 
   @DeleteMapping("/{repoName}")
   @RepoOperation(permission = MANAGE)
-  public RestResponse<Void> delete(final RepoInfo repoInfo, final ProtocolApiFacade facade)
-      throws IOException {
+  public RestResponse<Void> delete(final RepoInfo repoInfo, final ProtocolApiFacade facade) {
 
     // No usage update for the freed bytes: the usage lives on the repo row, which goes with it.
     // An async update would also race the delete and fail with repoNotFound (RPS-908).
