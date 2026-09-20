@@ -18,7 +18,7 @@ import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
 
 import { ScanStatus, Severity } from '../../../../../generated/api';
-import { isRescanInProgress, rescanTitle } from '../../util/rescan-status.util';
+import { isRescanInProgress, rescanCountsTitle, rescanTitle } from '../../util/rescan-status.util';
 
 
 const SEVERITY_CLASSES: Record<string, string> = {
@@ -52,15 +52,19 @@ export class SeverityBadgeComponent {
   @Input() public compact = false;
   /** Status of the newest scan; anything but completed marks the severity as the last known one. */
   @Input() public scanStatus: ScanStatus | null = null;
+  /** For a badge that rolls up several versions: how many of them have an unfinished newest scan. */
+  @Input() public rescanInProgressCount: number | null = null;
+  /** For a badge that rolls up several versions: how many of them have a failed newest scan. */
+  @Input() public rescanFailedCount: number | null = null;
 
   protected readonly Severity = Severity;
 
   public get rescanTitle(): string {
-    return rescanTitle(this.scanStatus);
+    return rescanTitle(this.scanStatus) || rescanCountsTitle(this.rescanInProgressCount, this.rescanFailedCount);
   }
 
   public get rescanInProgress(): boolean {
-    return isRescanInProgress(this.scanStatus);
+    return isRescanInProgress(this.scanStatus) || (this.rescanInProgressCount ?? 0) > 0;
   }
 
   public get isClean(): boolean {

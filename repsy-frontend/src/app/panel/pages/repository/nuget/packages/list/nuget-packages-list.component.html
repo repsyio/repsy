@@ -75,6 +75,8 @@
                   [packageRoute]="packageRoute(pkg)"
                   [severity]="securitySummary[pkg.packageId]?.severity ?? null"
                   [scanned]="securitySummary[pkg.packageId]?.scanned ?? false"
+                  [rescanInProgressCount]="securitySummary[pkg.packageId]?.rescanInProgressCount ?? 0"
+                  [rescanFailedCount]="securitySummary[pkg.packageId]?.rescanFailedCount ?? 0"
                 />
                 <app-tooltip
                   class="text-[#FDFDFD]"
@@ -143,6 +145,8 @@
                     [packageRoute]="packageRoute(pkg)"
                     [severity]="securitySummary[pkg.packageId]?.severity ?? null"
                     [scanned]="securitySummary[pkg.packageId]?.scanned ?? false"
+                    [rescanInProgressCount]="securitySummary[pkg.packageId]?.rescanInProgressCount ?? 0"
+                    [rescanFailedCount]="securitySummary[pkg.packageId]?.rescanFailedCount ?? 0"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

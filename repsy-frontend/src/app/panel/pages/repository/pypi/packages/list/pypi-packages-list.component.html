@@ -118,6 +118,8 @@
                   [packageRoute]="packageRoute(pkg)"
                   [severity]="securitySummary[pkg.name]?.severity ?? null"
                   [scanned]="securitySummary[pkg.name]?.scanned ?? false"
+                  [rescanInProgressCount]="securitySummary[pkg.name]?.rescanInProgressCount ?? 0"
+                  [rescanFailedCount]="securitySummary[pkg.name]?.rescanFailedCount ?? 0"
                 />
 
                 <a
@@ -252,6 +254,8 @@
                     [packageRoute]="packageRoute(pkg)"
                     [severity]="securitySummary[pkg.name]?.severity ?? null"
                     [scanned]="securitySummary[pkg.name]?.scanned ?? false"
+                    [rescanInProgressCount]="securitySummary[pkg.name]?.rescanInProgressCount ?? 0"
+                    [rescanFailedCount]="securitySummary[pkg.name]?.rescanFailedCount ?? 0"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

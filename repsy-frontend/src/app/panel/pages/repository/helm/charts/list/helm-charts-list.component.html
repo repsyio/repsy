@@ -77,6 +77,8 @@
                   [packageRoute]="packageRoute(chart)"
                   [severity]="securitySummary[chart.name]?.severity ?? null"
                   [scanned]="securitySummary[chart.name]?.scanned ?? false"
+                  [rescanInProgressCount]="securitySummary[chart.name]?.rescanInProgressCount ?? 0"
+                  [rescanFailedCount]="securitySummary[chart.name]?.rescanFailedCount ?? 0"
                 />
                 <a
                   class="group text-secondary-500 flex w-max gap-2 text-[14px]"
@@ -171,6 +173,8 @@
                     [packageRoute]="packageRoute(chart)"
                     [severity]="securitySummary[chart.name]?.severity ?? null"
                     [scanned]="securitySummary[chart.name]?.scanned ?? false"
+                    [rescanInProgressCount]="securitySummary[chart.name]?.rescanInProgressCount ?? 0"
+                    [rescanFailedCount]="securitySummary[chart.name]?.rescanFailedCount ?? 0"
                   />
                 </div>
                 <div class="flex justify-between gap-2">
