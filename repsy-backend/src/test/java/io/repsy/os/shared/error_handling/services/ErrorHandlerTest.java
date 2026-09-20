@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -28,10 +29,14 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
+import io.repsy.core.error_handling.exceptions.MfaException;
+import io.repsy.core.error_handling.exceptions.RedirectToPathException;
 import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,8 +52,10 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.UnsatisfiedServletRequestParameterException;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -58,6 +65,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -180,6 +188,67 @@ class ErrorHandlerTest {
   }
 
   @Test
+  @DisplayName("answers 406 notAcceptable as JSON for an Accept header the endpoint cannot satisfy")
+  void mediaTypeNotAcceptable() throws Exception {
+    final var result =
+        this.mockMvc
+            .perform(get("/json-only").accept(MediaType.TEXT_XML))
+            .andExpect(status().isNotAcceptable())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.msgId").value("notAcceptable"))
+            .andExpect(jsonPath("$.type").value("ERROR"))
+            .andExpect(
+                jsonPath("$.text").value("None of the requested media types can be produced."))
+            .andReturn();
+
+    assertThat(result.getResponse().getHeader(HttpHeaders.ACCEPT))
+        .contains(MediaType.APPLICATION_JSON_VALUE);
+  }
+
+  @Test
+  @DisplayName("answers 413 payloadTooLarge for an upload over the size limit")
+  void uploadTooLarge() throws Exception {
+    this.mockMvc
+        .perform(get("/too-large"))
+        .andExpect(status().isPayloadTooLarge())
+        .andExpect(jsonPath("$.msgId").value("payloadTooLarge"))
+        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(jsonPath("$.text").value("The uploaded content is too large."));
+  }
+
+  @Test
+  @DisplayName("answers 400 badRequest when the request parameters a mapping requires are missing")
+  void unsatisfiedRequestParameter() throws Exception {
+    this.mockMvc
+        .perform(get("/needs-param"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.msgId").value("badRequest"));
+  }
+
+  @Test
+  @DisplayName("does not render 4xx failures of the request when no servlet response is available")
+  void clientFailuresWithoutResponse() {
+    final var handler =
+        new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var request = new MockHttpServletRequest();
+
+    assertThat(handler.handleException(new MaxUploadSizeExceededException(1024), request, null))
+        .isNull();
+    assertThat(
+            handler.handleException(
+                new HttpMediaTypeNotAcceptableException(List.of(MediaType.APPLICATION_JSON)),
+                request,
+                null))
+        .isNull();
+    assertThat(
+            handler.handleException(
+                new UnsatisfiedServletRequestParameterException(new String[] {"name"}, Map.of()),
+                request,
+                null))
+        .isNull();
+  }
+
+  @Test
   @DisplayName("keeps 400 validationError for a body that cannot be read")
   void malformedBody() throws Exception {
     this.mockMvc
@@ -206,6 +275,47 @@ class ErrorHandlerTest {
         .andExpect(status().isServiceUnavailable())
         .andExpect(jsonPath("$.msgId").value("scanExecutorSaturated"))
         .andExpect(jsonPath("$.text").value("Vulnerability scanning is busy. Please retry later."));
+  }
+
+  @Test
+  @DisplayName("answers 301 movedToPath with a readable text and the Location header")
+  void movedToPath() throws Exception {
+    this.mockMvc
+        .perform(get("/moved"))
+        .andExpect(status().isMovedPermanently())
+        .andExpect(header().string(HttpHeaders.LOCATION, "/new/path"))
+        .andExpect(jsonPath("$.msgId").value("movedToPath"))
+        .andExpect(jsonPath("$.text").value("The requested resource has moved permanently."));
+  }
+
+  @Test
+  @DisplayName("falls back to a readable unauthorizedRequest when the exception has no message")
+  void unauthorizedWithoutMessage() throws Exception {
+    this.mockMvc
+        .perform(get("/unauthorized/no-message"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.msgId").value("unauthorizedRequest"))
+        .andExpect(jsonPath("$.text").value("Authentication is required to access this resource."));
+  }
+
+  @Test
+  @DisplayName("falls back to a readable itemAlreadyExists when the exception has no message")
+  void itemAlreadyExistsWithoutMessage() throws Exception {
+    this.mockMvc
+        .perform(get("/conflict/no-message"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.msgId").value("itemAlreadyExists"))
+        .andExpect(jsonPath("$.text").value("The item already exists."));
+  }
+
+  @Test
+  @DisplayName("falls back to a readable mfaException when the exception has no message")
+  void mfaWithoutMessage() throws Exception {
+    this.mockMvc
+        .perform(get("/mfa/no-message"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.msgId").value("mfaException"))
+        .andExpect(jsonPath("$.text").value("Multi-factor authentication failed."));
   }
 
   @Test
@@ -348,6 +458,21 @@ class ErrorHandlerTest {
       return id;
     }
 
+    @GetMapping(value = "/json-only", produces = MediaType.APPLICATION_JSON_VALUE)
+    String jsonOnly() {
+      return "{}";
+    }
+
+    @GetMapping("/too-large")
+    String tooLarge() {
+      throw new MaxUploadSizeExceededException(1024);
+    }
+
+    @GetMapping(value = "/needs-param", params = "name")
+    String needsParam() {
+      return "ok";
+    }
+
     @GetMapping("/retryable")
     String retryable() {
       throw new RetryableException("scanExecutorSaturated");
@@ -356,6 +481,26 @@ class ErrorHandlerTest {
     @GetMapping("/unauthorized")
     String unauthorized() {
       throw new UnAuthorizedException("accessNotAllowed");
+    }
+
+    @GetMapping("/unauthorized/no-message")
+    String unauthorizedWithoutMessage() {
+      throw new UnAuthorizedException(null);
+    }
+
+    @GetMapping("/conflict/no-message")
+    String conflictWithoutMessage() {
+      throw new ItemAlreadyExistException(null);
+    }
+
+    @GetMapping("/mfa/no-message")
+    String mfaWithoutMessage() {
+      throw new MfaException(null);
+    }
+
+    @GetMapping("/moved")
+    String moved() {
+      throw new RedirectToPathException("/new/path");
     }
   }
 

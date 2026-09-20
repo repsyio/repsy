@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.H2IntegrationTest;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrateIndex;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateIndexRepository;
@@ -31,6 +32,7 @@ import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -52,7 +54,7 @@ class H2JsonPersistenceIT extends H2IntegrationTest {
 
   @Test
   @DisplayName("publishes and reads NuGet dependency JSON")
-  void publishesNuGetDependenciesOnH2() {
+  void publishesNuGetDependenciesOnH2() throws IOException {
     final var repo = this.repo(RepoType.NUGET, "h2nuget");
     final var nugetPackage = new NuGetPackage();
     nugetPackage.setRepo(repo);
@@ -69,7 +71,8 @@ class H2JsonPersistenceIT extends H2IntegrationTest {
         <dependency id="Newtonsoft.Json" version="13.0.3" />
         </group></dependencies></metadata></package>
         """,
-        null);
+        null,
+        replacesExisting -> BaseUsages.ofDisk(0));
 
     this.nuGetPackageVersionRepository.flush();
     final NuGetPackageVersion stored =

@@ -17,14 +17,16 @@ package io.repsy.os.server.protocols.nuget.protocol.facades;
 
 import static org.springframework.http.HttpStatus.CONFLICT;
 
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.nuget.protocol.facades.AbstractNuGetProtocolFacade;
+import io.repsy.protocols.nuget.protocol.facades.dtos.NuspecMetadata;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -41,18 +43,18 @@ public class NuGetProtocolFacade extends AbstractNuGetProtocolFacade<UUID> {
   }
 
   @Override
-  protected void doPublish(
+  protected BaseUsages doPublish(
       final BaseRepoInfo<UUID> repoInfo,
       final UUID pkgId,
-      final String version,
-      final String nuspecXml,
-      final @Nullable String readme)
+      final NuspecMetadata metadata,
+      final Path tempFile)
       throws IOException {
 
     try {
-      super.doPublish(repoInfo, pkgId, version, nuspecXml, readme);
+      return super.doPublish(repoInfo, pkgId, metadata, tempFile);
     } catch (final DataIntegrityViolationException e) {
-      throw new ResponseStatusException(CONFLICT, "Version %s already exists.".formatted(version));
+      throw new ResponseStatusException(
+          CONFLICT, "Version %s already exists.".formatted(metadata.version()));
     }
   }
 }
