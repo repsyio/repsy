@@ -42,6 +42,8 @@ import org.junit.jupiter.api.Test;
 @DisplayName("V0014 convert NuGet dependencies to JSON (H2)")
 class V0014ConvertNuGetDependenciesToJsonTest {
 
+  private static final String PACKAGE_ID = "Some.Package";
+  private static final String VERSION = "1.0.0";
   private static final List<NuGetDependencyInfo> DEPENDENCIES =
       List.of(
           new NuGetDependencyInfo("Newtonsoft.Json", "[13.0.1, )", "net6.0"),
@@ -66,13 +68,14 @@ class V0014ConvertNuGetDependenciesToJsonTest {
     insert(id, xml);
 
     assertThat(xml).startsWith("<ArrayList>");
-    assertThat(NuGetPackageUtils.parseDependenciesJson(xml)).isEmpty();
+    assertThat(NuGetPackageUtils.parseDependenciesJson(xml, PACKAGE_ID, VERSION)).isEmpty();
 
     migrateTo("14");
 
     final var stored = dependenciesOf(id);
     assertThat(stored).startsWith("[");
-    assertThat(NuGetPackageUtils.parseDependenciesJson(stored)).isEqualTo(DEPENDENCIES);
+    assertThat(NuGetPackageUtils.parseDependenciesJson(stored, PACKAGE_ID, VERSION))
+        .isEqualTo(DEPENDENCIES);
     assertThat(stored).isEqualTo(NuGetPackageUtils.toDependenciesJson(DEPENDENCIES));
   }
 
@@ -111,9 +114,9 @@ class V0014ConvertNuGetDependenciesToJsonTest {
 
     migrateTo("14");
 
-    assertThat(NuGetPackageUtils.parseDependenciesJson(dependenciesOf(first)))
+    assertThat(NuGetPackageUtils.parseDependenciesJson(dependenciesOf(first), PACKAGE_ID, VERSION))
         .isEqualTo(DEPENDENCIES.subList(0, 1));
-    assertThat(NuGetPackageUtils.parseDependenciesJson(dependenciesOf(second)))
+    assertThat(NuGetPackageUtils.parseDependenciesJson(dependenciesOf(second), PACKAGE_ID, VERSION))
         .isEqualTo(DEPENDENCIES.subList(1, 3));
   }
 

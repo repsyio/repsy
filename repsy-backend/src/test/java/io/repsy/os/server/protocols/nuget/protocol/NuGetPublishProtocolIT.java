@@ -456,7 +456,9 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
           .satisfies(
               v -> {
                 assertThat(v.getDependencies()).startsWith("[");
-                assertThat(NuGetPackageUtils.parseDependenciesJson(v.getDependencies()))
+                assertThat(
+                        NuGetPackageUtils.parseDependenciesJson(
+                            v.getDependencies(), pkg.id(), v.getVersion()))
                     .containsExactly(
                         new NuGetDependencyInfo("Newtonsoft.Json", "13.0.3", "net8.0"));
               });
