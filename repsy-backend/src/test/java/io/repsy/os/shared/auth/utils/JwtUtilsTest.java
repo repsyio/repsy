@@ -418,6 +418,63 @@ class JwtUtilsTest {
   }
 
   @Test
+  @DisplayName("extractPanelClaims reads username, token version and session start of one token")
+  void extractPanelClaimsReadsEveryClaim() {
+    final var accessToken =
+        this.jwtUtils.createSessionAccessToken(
+            UUID.randomUUID(), "testuser", Duration.ofMinutes(15), SESSION_START, TOKEN_VERSION);
+
+    final var result = this.jwtUtils.extractPanelClaims(AuthUtils.AUTH_BEARER + accessToken);
+
+    assertThat(result.username()).isEqualTo("testuser");
+    assertThat(result.tokenVersion()).isEqualTo(TOKEN_VERSION);
+    assertThat(result.sessionStart()).isEqualTo(SESSION_START);
+  }
+
+  @Test
+  @DisplayName("extractPanelClaims defaults a legacy token to version 0 and a new session")
+  void extractPanelClaimsDefaultsMissingClaims() {
+    final var accessToken =
+        JWT.create()
+            .withSubject(UUID.randomUUID().toString())
+            .withAudience("panel")
+            .withClaim("username", "testuser")
+            .withExpiresAt(Instant.now().plus(Duration.ofMinutes(15)))
+            .sign(Algorithm.HMAC512(TEST_SECRET));
+
+    final var before = Instant.now().minusSeconds(1);
+    final var result = this.jwtUtils.extractPanelClaims(AuthUtils.AUTH_BEARER + accessToken);
+
+    assertThat(result.username()).isEqualTo("testuser");
+    assertThat(result.tokenVersion()).isZero();
+    assertThat(result.sessionStart()).isBetween(before, Instant.now().plusSeconds(1));
+  }
+
+  @Test
+  @DisplayName("extractPanelClaims rejects a refresh token, a protocol token and an expired token")
+  void extractPanelClaimsRejectsWhatIsNotAFreshPanelAccessToken() {
+    final var refreshToken =
+        this.jwtUtils.createRefreshToken(
+            UUID.randomUUID(), "testuser", Duration.ofMinutes(30), SESSION_START, TOKEN_VERSION);
+    final var protocolToken =
+        this.jwtUtils.createProtocolToken(UUID.randomUUID(), "testuser", Duration.ofMinutes(15));
+    final var expiredToken =
+        this.jwtUtils.createSessionAccessToken(
+            UUID.randomUUID(), "testuser", Duration.ofSeconds(-1), SESSION_START, TOKEN_VERSION);
+
+    assertThatThrownBy(() -> this.jwtUtils.extractPanelClaims(AuthUtils.AUTH_BEARER + refreshToken))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+    assertThatThrownBy(
+            () -> this.jwtUtils.extractPanelClaims(AuthUtils.AUTH_BEARER + protocolToken))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+    assertThatThrownBy(() -> this.jwtUtils.extractPanelClaims(AuthUtils.AUTH_BEARER + expiredToken))
+        .isInstanceOf(UnAuthorizedException.class)
+        .hasMessageContaining("sessionExpired");
+  }
+
+  @Test
   @DisplayName("panel access token is accepted on the panel side and rejected on the protocol side")
   void panelAccessTokenIsScopedToThePanel() {
     final var userId = UUID.randomUUID();

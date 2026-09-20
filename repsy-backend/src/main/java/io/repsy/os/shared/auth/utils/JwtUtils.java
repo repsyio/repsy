@@ -22,6 +22,7 @@ import com.auth0.jwt.exceptions.TokenExpiredException;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
+import io.repsy.os.shared.auth.dtos.PanelTokenClaims;
 import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.constants.ErrorConstants;
 import jakarta.annotation.PostConstruct;
@@ -330,19 +331,35 @@ public class JwtUtils {
    * within {@link AuthUtils#TIMEOUT_ACCESS_TOKEN}.
    */
   public @NonNull Instant extractSessionStart(final @NonNull String authHeader) {
-    final var sessionStart =
-        this.verifyAndDecode(this.getToken(authHeader), TokenRealm.PANEL)
-            .getClaim(CLAIM_SESSION_START)
-            .asInstant();
+    return sessionStart(this.verifyAndDecode(this.getToken(authHeader), TokenRealm.PANEL));
+  }
+
+  public int extractTokenVersion(final @NonNull String authHeader) {
+    return tokenVersion(this.verifyAndDecode(this.getToken(authHeader), TokenRealm.PANEL));
+  }
+
+  /**
+   * Verifies a panel access token once and reads every claim a panel endpoint needs from that one
+   * decode, with the same defaults as {@link #extractSessionStart} and {@link
+   * #extractTokenVersion}.
+   */
+  public @NonNull PanelTokenClaims extractPanelClaims(final @NonNull String authHeader) {
+    final var decodedJWT = this.verifyAndDecode(this.getToken(authHeader), TokenRealm.PANEL);
+
+    return new PanelTokenClaims(
+        decodedJWT.getClaim(CLAIM_USERNAME).asString(),
+        tokenVersion(decodedJWT),
+        sessionStart(decodedJWT));
+  }
+
+  private static @NonNull Instant sessionStart(final @NonNull DecodedJWT decodedJWT) {
+    final var sessionStart = decodedJWT.getClaim(CLAIM_SESSION_START).asInstant();
 
     return sessionStart != null ? sessionStart : Instant.now();
   }
 
-  public int extractTokenVersion(final @NonNull String authHeader) {
-    final var tokenVersion =
-        this.verifyAndDecode(this.getToken(authHeader), TokenRealm.PANEL)
-            .getClaim(CLAIM_TOKEN_VERSION)
-            .asInt();
+  private static int tokenVersion(final @NonNull DecodedJWT decodedJWT) {
+    final var tokenVersion = decodedJWT.getClaim(CLAIM_TOKEN_VERSION).asInt();
 
     return tokenVersion != null ? tokenVersion : 0;
   }

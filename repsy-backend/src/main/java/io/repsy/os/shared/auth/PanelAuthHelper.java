@@ -17,8 +17,8 @@ package io.repsy.os.shared.auth;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
+import io.repsy.os.shared.auth.dtos.PanelSession;
 import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
@@ -36,14 +36,22 @@ public final class PanelAuthHelper {
   private final @NonNull UserTxService userTxService;
 
   public @NonNull UserInfo authenticate(final @NonNull String authHeader) {
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PANEL);
-    final var user = this.userTxService.getAuthenticatedUserByUsername(username);
+    return this.authenticateSession(authHeader).user();
+  }
 
-    if (this.jwtUtils.extractTokenVersion(authHeader) != user.getTokenVersion()) {
+  /**
+   * Authenticates like {@link #authenticate} and also returns the session start of the token, for
+   * endpoints that mint new tokens. The token is verified and decoded once.
+   */
+  public @NonNull PanelSession authenticateSession(final @NonNull String authHeader) {
+    final var claims = this.jwtUtils.extractPanelClaims(authHeader);
+    final var user = this.userTxService.getAuthenticatedUserByUsername(claims.username());
+
+    if (claims.tokenVersion() != user.getTokenVersion()) {
       throw new UnAuthorizedException("sessionExpired");
     }
 
-    return user;
+    return new PanelSession(user, claims.sessionStart());
   }
 
   public void requireAdmin(final @NonNull UserInfo userInfo) {
