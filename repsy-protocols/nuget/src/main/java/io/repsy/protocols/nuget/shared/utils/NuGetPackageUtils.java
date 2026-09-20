@@ -24,6 +24,8 @@ import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafItem;
 import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationPageItem;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.utils.BoundedEntryReader;
+import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -72,6 +74,16 @@ public final class NuGetPackageUtils {
   private static final String ZERO_VERSION = "0.0.0";
   private static final int REGISTRATION_PAGE_SIZE = 64;
   private static final int MAX_README_BYTES = 256 * 1024;
+  private static final long MEBIBYTE = 1024L * 1024L;
+
+  /**
+   * The largest {@code .nuspec} a package may carry, in bytes. A real nuspec is a few kilobytes;
+   * even one that lists hundreds of dependency groups and long release notes stays well below 1
+   * MiB, which is also four times the README cap. The limit only has to stop a decompression bomb:
+   * the read is bounded, so no more than this is ever inflated into memory.
+   */
+  public static final long MAX_NUSPEC_BYTES = MEBIBYTE;
+
   // The limits of the nuget_package_version columns. Where H2 and PostgreSQL differ (tags is text
   // in PostgreSQL, varchar(1024) in H2) the smaller one applies.
   private static final int MAX_VERSION_LENGTH = 64;
@@ -374,12 +386,27 @@ public final class NuGetPackageUtils {
       ZipEntry entry;
       while ((entry = zipIn.getNextEntry()) != null) {
         if (!entry.isDirectory() && entry.getName().toLowerCase(Locale.ROOT).endsWith(".nuspec")) {
-          return new String(zipIn.readAllBytes(), StandardCharsets.UTF_8);
+          return new String(readNuspecBytes(zipIn, entry), StandardCharsets.UTF_8);
         }
       }
     }
     throw new IllegalArgumentException(
         "The uploaded file is not a valid NuGet package (.nuspec not found).");
+  }
+
+  // A zip entry does not always carry its size in the header (a data descriptor leaves it unknown),
+  // so BoundedEntryReader bounds the read itself and uses the header only as a shortcut.
+  private static byte[] readNuspecBytes(final InputStream zipIn, final ZipEntry entry)
+      throws IOException {
+
+    try {
+      return BoundedEntryReader.readAllBytes(zipIn, entry.getSize(), MAX_NUSPEC_BYTES);
+    } catch (final EntryTooLargeException e) {
+      throw new IllegalArgumentException(
+          "The .nuspec in the package must be at most %d MiB."
+              .formatted(MAX_NUSPEC_BYTES / MEBIBYTE),
+          e);
+    }
   }
 
   public static String extractPackageId(final ProtocolContext context) {
