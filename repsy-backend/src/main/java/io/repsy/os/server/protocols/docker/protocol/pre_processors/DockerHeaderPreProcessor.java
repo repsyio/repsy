@@ -21,7 +21,6 @@ import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
-import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
 import io.repsy.os.shared.error_handling.utils.OciErrors;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import jakarta.annotation.PostConstruct;
@@ -67,11 +66,8 @@ public class DockerHeaderPreProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
-    final var responseRealm =
-        "Bearer realm=\"%s/v2/token\",service=\"repsy\",scope=\"repository:*:pull\""
-            .formatted(RequestBaseUrlUtils.resolveBaseUrl(request));
-
-    return ProcessorResult.of(OciErrors.challenge(request, responseRealm, this.resp));
+    return ProcessorResult.of(
+        OciErrors.challenge(request, DockerAuthChallenge.of(request), this.resp));
   }
 
   private boolean isPreProcessorNotEnabled(

@@ -24,6 +24,7 @@ import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.helm.shared.auth.HelmAuthComponent;
+import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.shared.error_handling.utils.OciErrors;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -82,7 +83,11 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
       return ProcessorResult.of(OciErrors.challenge(request, WWW_AUTHENTICATE_VALUE, this.resp));
     }
 
-    this.authenticateRequest(authHeader, repoInfo.getId(), properties);
+    try {
+      this.authenticateRequest(authHeader, repoInfo.getId(), properties);
+    } catch (final UnAuthorizedException ex) {
+      throw AuthChallenges.challenged(ex, WWW_AUTHENTICATE_VALUE);
+    }
 
     return ProcessorResult.next();
   }

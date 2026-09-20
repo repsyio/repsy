@@ -22,6 +22,7 @@ import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.cargo.shared.auth.services.CargoAuthComponent;
+import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
@@ -45,6 +46,7 @@ public class CargoAuthPreProcessor extends ProtocolProcessor {
   private static final int PRIORITY = 100;
   private static final String AUTH_BASIC = "Basic ";
   private static final String AUTH_BEARER = "Bearer ";
+  private static final String CHALLENGE = "Basic realm=\"Repsy Managed Repository\"";
   private static final String SKIP_PRE_PROCESSOR_KEY = "skipPreProcessor";
   private static final String PERMISSION_KEY = "permission";
   private static final String WRITE_OPERATION_KEY = "writeOperation";
@@ -81,14 +83,18 @@ public class CargoAuthPreProcessor extends ProtocolProcessor {
     if (rawAuthHeader == null) {
       return ProcessorResult.of(
           ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"")
+              .header(WWW_AUTHENTICATE, CHALLENGE)
               .build());
     }
 
     // Cargo CLI sends the token as a raw value with no prefix — normalize to Bearer
     final var authHeader = this.normalizeAuthHeader(rawAuthHeader);
 
-    this.authenticateRequest(authHeader, repoInfo.getId(), properties);
+    try {
+      this.authenticateRequest(authHeader, repoInfo.getId(), properties);
+    } catch (final UnAuthorizedException ex) {
+      throw AuthChallenges.challenged(ex, CHALLENGE);
+    }
 
     return ProcessorResult.next();
   }

@@ -22,6 +22,7 @@ import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.maven.shared.auth.services.MavenAuthComponent;
+import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
@@ -48,6 +49,7 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
 
   private static final String AUTH_BEARER = "Bearer ";
   private static final String AUTH_BASIC = "Basic ";
+  private static final String CHALLENGE = "Basic realm=\"Repsy Managed Repository\"";
   private static final @NonNull String PERMISSION_KEY = "permission";
   private static final @NonNull String WRITE_OPERATION_KEY = "writeOperation";
 
@@ -80,6 +82,20 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
     }
 
     final var permission = (Permission) properties.get(PERMISSION_KEY);
+
+    try {
+      return this.authenticate(context, request, repoInfo, permission);
+    } catch (final UnAuthorizedException ex) {
+      throw AuthChallenges.challenged(ex, CHALLENGE);
+    }
+  }
+
+  private ProcessorResult authenticate(
+      final @NonNull ProtocolContext context,
+      final @NonNull HttpServletRequest request,
+      final @NonNull RepoInfo repoInfo,
+      final @NonNull Permission permission) {
+
     final var downloadToken = request.getParameter(DOWNLOAD_TOKEN_PARAMETER);
 
     if (downloadToken != null) {
@@ -97,7 +113,7 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
     if (authHeader == null) {
       return ProcessorResult.of(
           ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Managed Repository\"")
+              .header(WWW_AUTHENTICATE, CHALLENGE)
               .build());
     }
 

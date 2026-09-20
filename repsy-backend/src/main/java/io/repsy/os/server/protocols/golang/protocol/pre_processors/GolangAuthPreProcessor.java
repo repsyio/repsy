@@ -22,6 +22,7 @@ import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.golang.shared.auth.services.GolangAuthComponent;
+import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
@@ -42,6 +43,7 @@ public class GolangAuthPreProcessor extends ProtocolProcessor {
 
   private static final String AUTH_BEARER = "Bearer ";
   private static final String AUTH_BASIC = "Basic ";
+  private static final String CHALLENGE = "Basic realm=\"Repsy Go Module Proxy\"";
   private static final @NonNull String PERMISSION_KEY = "permission";
   private static final @NonNull String WRITE_OPERATION_KEY = "writeOperation";
 
@@ -78,13 +80,17 @@ public class GolangAuthPreProcessor extends ProtocolProcessor {
     if (authHeader == null) {
       return ProcessorResult.of(
           ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, "Basic realm=\"Repsy Go Module Proxy\"")
+              .header(WWW_AUTHENTICATE, CHALLENGE)
               .build());
     }
 
     final var permission = (Permission) properties.get(PERMISSION_KEY);
 
-    this.authenticateRequest(authHeader, repoInfo.getStorageKey(), permission);
+    try {
+      this.authenticateRequest(authHeader, repoInfo.getStorageKey(), permission);
+    } catch (final UnAuthorizedException ex) {
+      throw AuthChallenges.challenged(ex, CHALLENGE);
+    }
 
     return ProcessorResult.next();
   }

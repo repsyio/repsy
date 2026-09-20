@@ -210,7 +210,8 @@ class TokenRealmIT extends AbstractIntegrationTest {
 
       assertThat(result.getResponse().getStatus()).isEqualTo(401);
       assertThat(result.getResponse().getContentAsString()).contains("accessNotAllowed");
-      assertThat(result.getResponse().getHeader(WWW_AUTHENTICATE)).isNull();
+      assertThat(result.getResponse().getHeader(WWW_AUTHENTICATE))
+          .isEqualTo("Basic realm=\"Repsy Managed Registry\"");
     }
 
     @Test
@@ -271,7 +272,8 @@ class TokenRealmIT extends AbstractIntegrationTest {
                   .header(AUTHORIZATION, bearerTokenFor(user)));
 
       assertThat(result.getResponse().getStatus()).isEqualTo(401);
-      assertThat(result.getResponse().getHeader(WWW_AUTHENTICATE)).isNull();
+      assertThat(result.getResponse().getHeader(WWW_AUTHENTICATE))
+          .isEqualTo("Basic realm=\"Repsy Managed Repository\"");
     }
 
     @Test
