@@ -68,6 +68,7 @@ public class ProtocolEndpointDispatcher implements WebMvcConfigurer {
         .addInterceptor(this.authInterceptor)
         .addPathPatterns("/api/repos/**")
         .addPathPatterns("/api/npm/packages/**")
+        .addPathPatterns("/api/npm/scopes/**")
         .addPathPatterns("/api/pypi/packages/**")
         .addPathPatterns("/api/mvn/artifacts/**")
         .addPathPatterns("/api/mvn/key-stores/**")
