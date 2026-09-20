@@ -16,12 +16,13 @@
 package io.repsy.os.server.protocols.docker.protocol.pre_processors;
 
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
-import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 
+import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
+import io.repsy.os.shared.error_handling.utils.OciErrors;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,8 +30,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -43,6 +42,7 @@ public class DockerHeaderPreProcessor extends ProtocolProcessor {
   private static final String SKIP_HEADER_PRE_PROCESSOR_KEY = "skipHeaderPreProcessor";
 
   private final DockerProtocolProvider provider;
+  private final RestResponseFactory resp;
 
   @PostConstruct
   public void register() {
@@ -71,12 +71,7 @@ public class DockerHeaderPreProcessor extends ProtocolProcessor {
         "Bearer realm=\"%s/v2/token\",service=\"repsy\",scope=\"repository:*:pull\""
             .formatted(RequestBaseUrlUtils.resolveBaseUrl(request));
 
-    final var result =
-        ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-            .header(WWW_AUTHENTICATE, responseRealm)
-            .build();
-
-    return ProcessorResult.of(result);
+    return ProcessorResult.of(OciErrors.challenge(request, responseRealm, this.resp));
   }
 
   private boolean isPreProcessorNotEnabled(

@@ -17,14 +17,15 @@ package io.repsy.os.server.protocols.helm.protocol.pre_processors;
 
 import static io.repsy.os.shared.auth.utils.AuthUtils.AUTH_BASIC;
 import static io.repsy.os.shared.auth.utils.AuthUtils.AUTH_BEARER;
-import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
+import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.helm.shared.auth.HelmAuthComponent;
 import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.os.shared.error_handling.utils.OciErrors;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -35,8 +36,6 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -51,6 +50,7 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
   private static final String WWW_AUTHENTICATE_VALUE = "Basic realm=\"Repsy\"";
 
   private final HelmProtocolProvider provider;
+  private final RestResponseFactory resp;
   private final HelmAuthComponent authComponent;
 
   @PostConstruct
@@ -79,10 +79,7 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
     final var authHeader = this.authComponent.emulateAuthHeader(request);
 
     if (authHeader == null) {
-      return ProcessorResult.of(
-          ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, WWW_AUTHENTICATE_VALUE)
-              .build());
+      return ProcessorResult.of(OciErrors.challenge(request, WWW_AUTHENTICATE_VALUE, this.resp));
     }
 
     this.authenticateRequest(authHeader, repoInfo.getId(), properties);
