@@ -63,11 +63,11 @@ public class MultiPortProperties {
     }
   }
 
-  private void checkPort(final @NonNull String name, final int port, final int mainPort) {
+  private void checkPort(final @NonNull String name, final int port, final int mainPortNumber) {
 
-    if (port == Integer.parseInt(this.mainPort)) {
+    if (port == mainPortNumber) {
       throw new IllegalStateException(
-          "Port %s (%d) cannot equal main-port (%d)".formatted(name, port, mainPort));
+          "Port %s (%d) cannot equal main-port (%d)".formatted(name, port, mainPortNumber));
     }
   }
 

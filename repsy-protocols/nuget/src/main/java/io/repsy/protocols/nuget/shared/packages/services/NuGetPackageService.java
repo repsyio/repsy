@@ -90,6 +90,8 @@ public interface NuGetPackageService<ID> {
   interface PackageFilesWriter {
 
     /**
+     * Writes the files of the version.
+     *
      * @param replacesExisting whether the version already had a row and files, which are being
      *     replaced. A writer that fails must not delete files it did not create.
      */

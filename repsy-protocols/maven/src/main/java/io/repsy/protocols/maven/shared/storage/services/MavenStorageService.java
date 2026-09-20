@@ -24,7 +24,6 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
-import lombok.SneakyThrows;
 import org.apache.maven.artifact.repository.metadata.Versioning;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
@@ -41,10 +40,8 @@ public interface MavenStorageService<ID> {
 
   List<StorageItemInfo> getItems(StoragePath storagePath);
 
-  @SneakyThrows
   Resource getResource(String repoName, StoragePath storagePath);
 
-  @SneakyThrows
   BaseUsages writeInputStreamToPath(
       StoragePath storagePath, InputStream inputStream, String repoName);
 
