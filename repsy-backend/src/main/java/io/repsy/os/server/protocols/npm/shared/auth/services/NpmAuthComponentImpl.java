@@ -20,6 +20,7 @@ import io.repsy.os.server.shared.auth.ProtocolAuthService;
 import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
+import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.npm.shared.auth.services.NpmAuthComponent;
@@ -54,7 +55,7 @@ public class NpmAuthComponentImpl extends ProtocolAuthService implements NpmAuth
         this.deployTokenService.findByRepoIdAndToken(repoInfo.getStorageKey(), password);
 
     return deployTokenInfoOpt
-        .map(this::authenticateWithDeployToken)
+        .map(deployTokenInfo -> this.authenticateWithDeployToken(deployTokenInfo, username))
         .orElseGet(() -> this.authenticateWithUserCredentials(username, password));
   }
 
@@ -69,8 +70,16 @@ public class NpmAuthComponentImpl extends ProtocolAuthService implements NpmAuth
         userInfo.getId(), username, Period.ofDays(TOKEN_EXPIRATION_DAYS));
   }
 
+  /**
+   * Answers a deploy-token login with a {@link AuthenticationType#DEPLOY_TOKEN} JWT, which {@code
+   * ProtocolAuthService.handleBearerAuth} authorizes as that deploy token: bound to its repo,
+   * read-only and expiry checked on every request, and gone once the token is revoked. The stored
+   * SHA-256 hash of the secret must never be returned (RPS-1045): it is not a credential, so the
+   * registry rejects it, and it should not leave the server. The {@code username} claim is whatever
+   * the client typed, so it never identifies a user (RPS-979).
+   */
   private @NonNull String authenticateWithDeployToken(
-      final @NonNull DeployTokenInfo deployTokenInfo) {
+      final @NonNull DeployTokenInfo deployTokenInfo, final @NonNull String username) {
 
     if (deployTokenInfo.isExpired()) {
       throw new UnAuthorizedException("unAuthorized");
@@ -78,6 +87,10 @@ public class NpmAuthComponentImpl extends ProtocolAuthService implements NpmAuth
 
     this.deployTokenService.updateLastUsedTime(deployTokenInfo.getId());
 
-    return deployTokenInfo.getToken();
+    return super.jwtUtils.createProtocolToken(
+        deployTokenInfo.getId(),
+        username,
+        Period.ofDays(TOKEN_EXPIRATION_DAYS),
+        AuthenticationType.DEPLOY_TOKEN);
   }
 }
