@@ -15,6 +15,8 @@
  */
 package io.repsy.os.server.protocols.docker.shared.auth.services;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -24,6 +26,7 @@ import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
+import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
@@ -35,6 +38,7 @@ import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.nio.charset.StandardCharsets;
+import java.time.temporal.TemporalAmount;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
@@ -151,6 +155,101 @@ class DockerAuthComponentTest {
               component.authorizeRequest(
                   repo, basicAuth(USERNAME, "wrong"), Permission.READ, true));
       verify(DockerAuthComponentTest.this.userTxService, never()).getUserByUsername(anyString());
+    }
+  }
+
+  /**
+   * RPS-986: the token handed to a caller without credentials is labelled {@code anonymous}. It has
+   * to be typed, so a user who happens to be named {@code anonymous} is never acted for by it.
+   */
+  @Nested
+  @DisplayName("an anonymous token is never resolved to the user its username claim names")
+  class AnonymousToken {
+
+    private static final String BEARER = "Bearer signed.jwt.token";
+
+    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+
+    private final DockerAuthComponent component =
+        new DockerAuthComponent(
+            DockerAuthComponentTest.this.userTxService,
+            this.jwtUtils,
+            Mockito.mock(DeployTokenService.class));
+
+    AnonymousToken() {
+      when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenReturn(AuthenticationType.ANONYMOUS);
+      // The claim names a real admin; it must not be looked at.
+      when(this.jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
+          .thenReturn("anonymous");
+      when(DockerAuthComponentTest.this.userTxService.getUserByUsernameOptional("anonymous"))
+          .thenReturn(
+              Optional.of(
+                  UserInfo.builder()
+                      .id(UUID.randomUUID())
+                      .username("anonymous")
+                      .role(UserRole.ADMIN)
+                      .build()));
+    }
+
+    private BaseRepoInfo<UUID> repo(final boolean privateRepo) {
+      return BaseRepoInfo.<UUID>builder()
+          .name("images")
+          .storageKey(UUID.randomUUID())
+          .privateRepo(privateRepo)
+          .build();
+    }
+
+    @Test
+    @DisplayName("createAnonymousUser mints a token typed as anonymous")
+    void createAnonymousUserIsTyped() {
+      when(this.jwtUtils.createProtocolToken(
+              any(UUID.class),
+              anyString(),
+              any(TemporalAmount.class),
+              any(AuthenticationType.class)))
+          .thenReturn("typed.jwt.token");
+
+      assertThat(this.component.createAnonymousUser()).isEqualTo("typed.jwt.token");
+      verify(this.jwtUtils)
+          .createProtocolToken(
+              any(UUID.class),
+              Mockito.eq("anonymous"),
+              any(TemporalAmount.class),
+              Mockito.eq(AuthenticationType.ANONYMOUS));
+    }
+
+    @Test
+    @DisplayName("handleBearerAuth refuses it, as a write or a private read is all that reaches it")
+    void handleBearerAuthRefuses() {
+      assertUnauthorized(
+          () -> this.component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
+      assertUnauthorized(
+          () -> this.component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.WRITE));
+      verify(DockerAuthComponentTest.this.userTxService, never())
+          .getUserByUsernameOptional(anyString());
+    }
+
+    @Test
+    @DisplayName("authorizeRequest lets it read a public repo")
+    void readsPublicRepo() {
+      assertThatCode(
+              () ->
+                  this.component.authorizeRequest(this.repo(false), BEARER, Permission.READ, false))
+          .doesNotThrowAnyException();
+      verify(DockerAuthComponentTest.this.userTxService, never())
+          .getUserByUsernameOptional(anyString());
+    }
+
+    @Test
+    @DisplayName("authorizeRequest refuses it a write, and any access to a private repo")
+    void refusedBeyondPublicRead() {
+      assertUnauthorized(
+          () -> this.component.authorizeRequest(this.repo(false), BEARER, Permission.WRITE, false));
+      assertUnauthorized(
+          () -> this.component.authorizeRequest(this.repo(true), BEARER, Permission.READ, false));
+      verify(DockerAuthComponentTest.this.userTxService, never())
+          .getUserByUsernameOptional(anyString());
     }
   }
 }

@@ -51,6 +51,11 @@ public class HelmAuthComponent extends ProtocolAuthService {
       return;
     }
 
+    // An anonymous token has no user, its username claim is only a label (RPS-986).
+    if (authType == AuthenticationType.ANONYMOUS) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
     final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
     final var userInfo = this.userTxService.getUserByUsernameOptional(username).orElse(null);
 
