@@ -35,6 +35,7 @@ import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.maven.index.artifact.Gav;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
 @RequiredArgsConstructor
@@ -90,13 +91,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
     this.artifactService.checkDeploymentRules(repoInfo, artifactPair, storagePath);
 
-    final var afterUploadUsage =
-        content == null && ArtifactUtils.isPomToParse(storagePath)
-            ? this.writeValidatedPom(repoInfo.getName(), storagePath, inputStream)
-            : this.mavenStorageService.writeInputStreamToPath(
-                storagePath,
-                content == null ? inputStream : new ByteArrayInputStream(content),
-                repoInfo.getName());
+    final var afterUploadUsage = this.store(repoInfo.getName(), storagePath, inputStream, content);
 
     final var resource = this.mavenStorageService.getResource(repoInfo.getName(), storagePath);
 
@@ -110,6 +105,26 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     }
 
     context.addProperty(USAGES, afterUploadUsage);
+  }
+
+  /** Stores what the client sent, from the buffer if the facade already had to read it whole. */
+  private BaseUsages store(
+      final String repoName,
+      final StoragePath storagePath,
+      final InputStream inputStream,
+      final byte @Nullable [] content)
+      throws IOException {
+
+    if (content != null) {
+      return this.mavenStorageService.writeInputStreamToPath(
+          storagePath, new ByteArrayInputStream(content), repoName);
+    }
+
+    if (ArtifactUtils.isPomToParse(storagePath)) {
+      return this.writeValidatedPom(repoName, storagePath, inputStream);
+    }
+
+    return this.mavenStorageService.writeInputStreamToPath(storagePath, inputStream, repoName);
   }
 
   /**
