@@ -22,6 +22,8 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.cargo.shared.crate.services.SemverComparator;
+import io.repsy.protocols.shared.utils.BoundedEntryReader;
+import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -48,6 +50,16 @@ import tools.jackson.databind.ObjectMapper;
 
 @UtilityClass
 public class CrateUtils {
+
+  private static final long MEBIBYTE = 1024L * 1024L;
+
+  /**
+   * The largest {@code Cargo.toml} a crate may carry, in bytes. A real manifest is a few kilobytes,
+   * and even one that lists thousands of features stays far below this; the limit only has to stop
+   * a decompression bomb, which the tar header size lets {@link #isLib(byte[])} refuse before it
+   * inflates any of it.
+   */
+  public static final long MAX_CARGO_TOML_BYTES = 10 * MEBIBYTE;
 
   private static final int TWO = 2;
   private static final int THREE = 3;
@@ -284,13 +296,26 @@ public class CrateUtils {
         }
 
         if (entryName.endsWith("/Cargo.toml")) {
-          final var toml = new String(tar.readAllBytes(), StandardCharsets.UTF_8);
+          final var toml = new String(readCargoToml(tar, entry), StandardCharsets.UTF_8);
           if (toml.lines().anyMatch(line -> line.trim().equals("[lib]"))) {
             return true;
           }
         }
       }
       return false;
+    }
+  }
+
+  private static byte[] readCargoToml(final InputStream tar, final TarArchiveEntry entry)
+      throws IOException {
+
+    try {
+      return BoundedEntryReader.readAllBytes(tar, entry.getSize(), MAX_CARGO_TOML_BYTES);
+    } catch (final EntryTooLargeException e) {
+      throw new IllegalArgumentException(
+          "Cargo.toml in the crate must be at most %d MiB"
+              .formatted(MAX_CARGO_TOML_BYTES / MEBIBYTE),
+          e);
     }
   }
 }
