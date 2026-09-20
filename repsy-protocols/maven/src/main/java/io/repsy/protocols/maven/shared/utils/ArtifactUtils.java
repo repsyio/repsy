@@ -18,16 +18,13 @@ package io.repsy.protocols.maven.shared.utils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
-import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.shared.artifact.services.VersionComparator;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Locale;
 import java.util.Set;
-import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.maven.artifact.repository.metadata.Metadata;
@@ -130,7 +127,6 @@ public class ArtifactUtils {
     }
   }
 
-  @SneakyThrows
   @Nullable
   public static Model readModel(final Resource pomResource) {
 
@@ -139,19 +135,8 @@ public class ArtifactUtils {
     try (final var streamReader = new InputStreamReader(pomResource.getInputStream(), UTF_8)) {
       return reader.read(streamReader);
     } catch (final IOException | XmlPullParserException e) {
-
-      String pomContent = "Failed to read POM content: ";
-
-      try (final InputStream is = pomResource.getInputStream()) {
-        pomContent = "\n========POM CONTENT========\n";
-        pomContent += new String(is.readAllBytes(), UTF_8);
-        pomContent += "===========================";
-      } catch (final IOException ioException) {
-
-        pomContent += ioException.getMessage();
-      }
-
-      throw new ErrorOccurredException(pomContent, e);
+      log.warn("Malformed or unreadable POM file received: {}", e.getMessage());
+      throw new BadRequestException("malformedPomFile");
     }
   }
 
