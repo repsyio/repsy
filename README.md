@@ -321,6 +321,10 @@ Access at:
 | `BASIC_AUTH_CACHE_ENABLED` | Remember successful HTTP Basic password checks, so a client that sends its username and password on every request pays for one password verification instead of one per request. See [Authenticating from CI](#authenticating-from-ci). | `true` |
 | `BASIC_AUTH_CACHE_TTL_SECONDS` | How long a remembered password check stays valid | `300` |
 | `BASIC_AUTH_CACHE_MAX_ENTRIES` | How many remembered password checks are kept | `10000` |
+| `ABANDONED_UPLOAD_CLEANUP_ENABLED` | Periodically delete Docker and Helm OCI blob uploads that were started and never finished (aborted pushes), and release the disk usage they were charged for | `true` |
+| `ABANDONED_UPLOAD_TTL` | How long an upload can go without receiving data before it counts as abandoned (ISO-8601 duration) | `PT24H` |
+| `ABANDONED_UPLOAD_CLEANUP_INTERVAL` | How often the cleanup runs (ISO-8601 duration) | `PT1H` |
+| `ABANDONED_UPLOAD_CLEANUP_INITIAL_DELAY` | How long after startup the first cleanup runs (ISO-8601 duration) | `PT10M` |
 
 **Important Notes:**
 

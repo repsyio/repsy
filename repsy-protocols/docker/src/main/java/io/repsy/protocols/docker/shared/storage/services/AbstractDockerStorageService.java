@@ -17,6 +17,7 @@ package io.repsy.protocols.docker.shared.storage.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
@@ -24,6 +25,7 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -130,6 +132,26 @@ public abstract class AbstractDockerStorageService<ID> implements DockerStorageS
     final var storagePath = StoragePath.of(repoUuid, Paths.get(BLOBS_PATH, digest).toString());
 
     this.storageStrategy.delete(storagePath);
+  }
+
+  @Override
+  public List<StaleFile> listStaleBlobFiles(final UUID repoUuid, final Instant notModifiedSince) {
+
+    return this.storageStrategy.listStaleFiles(
+        StoragePath.of(repoUuid, BLOBS_PATH), notModifiedSince);
+  }
+
+  @Override
+  public long deleteBlobFile(final UUID repoUuid, final String repoName, final String fileName)
+      throws IOException {
+
+    final var storagePath = StoragePath.of(repoUuid, Paths.get(BLOBS_PATH, fileName).toString());
+
+    final var usage = this.storageStrategy.getFileUsage(storagePath, repoName);
+
+    this.storageStrategy.delete(storagePath);
+
+    return usage;
   }
 
   @Override

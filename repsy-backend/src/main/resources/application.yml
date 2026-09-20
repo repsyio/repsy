@@ -97,6 +97,16 @@ repsy:
     docker:
       internal-registry-base-url: ${DOCKER_INTERNAL_REGISTRY_BASE_URL:http://localhost:9090}
 
+  storage:
+    # Deletes the Docker layer and Helm OCI blob uploads that were started and never finalized, and
+    # releases the disk usage they were charged for. An upload counts as abandoned once its temp
+    # file has not been written to for `ttl`. Durations are ISO-8601 (PT24H = 24 hours).
+    abandoned-upload-cleanup:
+      enabled: ${ABANDONED_UPLOAD_CLEANUP_ENABLED:true}
+      ttl: ${ABANDONED_UPLOAD_TTL:PT24H}
+      initial-delay: ${ABANDONED_UPLOAD_CLEANUP_INITIAL_DELAY:PT10M}
+      interval: ${ABANDONED_UPLOAD_CLEANUP_INTERVAL:PT1H}
+
 logging:
   level:
     root: WARN

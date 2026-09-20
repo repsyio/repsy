@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
@@ -28,7 +29,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.UUID;
@@ -561,6 +564,75 @@ class FileSystemStorageStrategyIT {
       localStrategy.clearTrash();
 
       assertThat(yesterdayDir).doesNotExist();
+    }
+  }
+
+  @Nested
+  @DisplayName("listStaleFiles()")
+  class ListStaleFiles {
+
+    private static final Instant NOW = Instant.parse("2026-06-01T12:00:00Z");
+
+    @Test
+    @DisplayName("lists only the files written before the threshold, with their sizes")
+    void listOnlyFilesNotModifiedSinceThreshold() throws Exception {
+      final var key = UUID.randomUUID();
+      FileSystemStorageStrategyIT.this.seedFile(key + "/blobs/old", "12345");
+      FileSystemStorageStrategyIT.this.seedFile(key + "/blobs/fresh", "abc");
+      this.setLastModified(key + "/blobs/old", NOW.minus(Duration.ofHours(30)));
+      this.setLastModified(key + "/blobs/fresh", NOW.minus(Duration.ofHours(1)));
+
+      final var result =
+          FileSystemStorageStrategyIT.this.strategy.listStaleFiles(
+              FileSystemStorageStrategyIT.this.storagePath(key, "blobs"),
+              NOW.minus(Duration.ofHours(24)));
+
+      assertThat(result).containsExactly(new StaleFile("old", 5L));
+    }
+
+    @Test
+    @DisplayName("treats a file last written exactly at the threshold as still in progress")
+    void keepFileWrittenExactlyAtThreshold() throws Exception {
+      final var key = UUID.randomUUID();
+      FileSystemStorageStrategyIT.this.seedFile(key + "/blobs/edge", "x");
+      this.setLastModified(key + "/blobs/edge", NOW);
+
+      final var result =
+          FileSystemStorageStrategyIT.this.strategy.listStaleFiles(
+              FileSystemStorageStrategyIT.this.storagePath(key, "blobs"), NOW);
+
+      assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("skips subdirectories and files nested below the directory")
+    void skipSubdirectories() throws Exception {
+      final var key = UUID.randomUUID();
+      FileSystemStorageStrategyIT.this.seedFile(key + "/blobs/nested/deep.bin", "deep");
+      this.setLastModified(key + "/blobs/nested/deep.bin", NOW.minus(Duration.ofDays(2)));
+      this.setLastModified(key + "/blobs/nested", NOW.minus(Duration.ofDays(2)));
+
+      final var result =
+          FileSystemStorageStrategyIT.this.strategy.listStaleFiles(
+              FileSystemStorageStrategyIT.this.storagePath(key, "blobs"), NOW);
+
+      assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("answers an empty list when the directory does not exist")
+    void answerEmptyWhenDirectoryMissing() {
+      final var result =
+          FileSystemStorageStrategyIT.this.strategy.listStaleFiles(
+              FileSystemStorageStrategyIT.this.storagePath(UUID.randomUUID(), "blobs"), NOW);
+
+      assertThat(result).isEmpty();
+    }
+
+    private void setLastModified(final String relativePath, final Instant instant)
+        throws IOException {
+      Files.setLastModifiedTime(
+          FileSystemStorageStrategyIT.this.basePath.resolve(relativePath), FileTime.from(instant));
     }
   }
 

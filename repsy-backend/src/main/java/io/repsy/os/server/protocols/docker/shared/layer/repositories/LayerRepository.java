@@ -43,6 +43,8 @@ public interface LayerRepository extends JpaRepository<Layer, UUID> {
       """)
   Optional<Layer> findByRepoIdAndDigest(UUID repoId, String digest);
 
+  boolean existsByIdAndRepoId(UUID id, UUID repoId);
+
   long countByRepoIdAndDigestIn(UUID repoId, List<String> digests);
 
   @Query(

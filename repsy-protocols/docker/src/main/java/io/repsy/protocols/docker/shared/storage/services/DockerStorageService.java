@@ -17,11 +17,13 @@ package io.repsy.protocols.docker.shared.storage.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -52,6 +54,19 @@ public interface DockerStorageService<ID> {
   long deleteManifest(BaseRepoInfo<ID> repoInfo, String manifestName);
 
   void deleteBlob(UUID repoUuid, String digest);
+
+  /**
+   * Lists the files under the repo's {@code blobs} directory that were last written before {@code
+   * notModifiedSince}: finalized blobs (named by digest) and upload temp files (named by upload
+   * session) alike, so the caller has to tell them apart.
+   */
+  List<StaleFile> listStaleBlobFiles(UUID repoUuid, Instant notModifiedSince);
+
+  /**
+   * Deletes one file of the repo's {@code blobs} directory and answers the bytes it held, so the
+   * caller can release them from the repo's disk usage.
+   */
+  long deleteBlobFile(UUID repoUuid, String repoName, String fileName) throws IOException;
 
   BaseUsages rename(UUID repoUuid, RelativePath relativePath, String digest);
 

@@ -16,11 +16,13 @@
 package io.repsy.libs.storage.core.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.exceptions.IsADirectoryException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.NonNull;
@@ -51,6 +53,14 @@ public interface StorageStrategy {
       @NonNull String repoName, @NonNull StoragePath storagePath, @NonNull InputStream inputStream);
 
   BaseUsages append(String repoName, StoragePath path, byte[] data);
+
+  /**
+   * Lists the regular files directly under {@code directory} whose last modification is before
+   * {@code notModifiedSince}. Subdirectories are skipped, and a directory that does not exist has
+   * no stale files.
+   */
+  @NonNull List<StaleFile> listStaleFiles(
+      @NonNull StoragePath directory, @NonNull Instant notModifiedSince);
 
   @NonNull Optional<Resource> get(@NonNull StoragePath path, @NonNull String repoName)
       throws IsADirectoryException;

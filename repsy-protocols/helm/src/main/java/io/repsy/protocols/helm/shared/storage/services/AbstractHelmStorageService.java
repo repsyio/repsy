@@ -16,12 +16,15 @@
 package io.repsy.protocols.helm.shared.storage.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +36,8 @@ import org.springframework.core.io.Resource;
 @RequiredArgsConstructor
 @NullMarked
 public abstract class AbstractHelmStorageService<ID> implements HelmStorageService<ID> {
+
+  private static final String OCI_BLOBS_PATH = "oci/blobs";
 
   private final StorageStrategy storageStrategy;
 
@@ -127,6 +132,21 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   public BaseUsages finalizeBlob(final UUID repoUuid, final UUID uploadId, final String digest) {
     final var storagePath = StoragePath.of(repoUuid, "oci/blobs/" + uploadId);
     return this.storageStrategy.renameObject(storagePath, digest);
+  }
+
+  @Override
+  public List<StaleFile> listStaleBlobFiles(final UUID repoUuid, final Instant notModifiedSince) {
+    return this.storageStrategy.listStaleFiles(
+        StoragePath.of(repoUuid, OCI_BLOBS_PATH), notModifiedSince);
+  }
+
+  @Override
+  public long deleteBlobFile(final UUID repoUuid, final String repoName, final String fileName)
+      throws IOException {
+    final var storagePath = StoragePath.of(repoUuid, OCI_BLOBS_PATH + "/" + fileName);
+    final var usage = this.storageStrategy.getFileUsage(storagePath, repoName);
+    this.storageStrategy.delete(storagePath);
+    return usage;
   }
 
   @Override
