@@ -89,6 +89,7 @@ class AbstractNuGetProtocolFacadeTest {
     final var packageId = UUID.randomUUID();
     when(packageService.versionExists(repoInfo, "Some.Package", "1.0.0")).thenReturn(false);
     when(packageService.findOrCreatePackage(repoInfo, "Some.Package")).thenReturn(packageId);
+    publishRunsFilesWriter(false);
     when(storageService.writePackage(
             eq(repoInfo.getStorageKey()),
             eq("Some.Package"),
@@ -104,7 +105,90 @@ class AbstractNuGetProtocolFacadeTest {
     assertThat(ctx.<String>getProperty("storagePath"))
         .isEqualTo("packages/some.package/1.0.0/some.package.1.0.0.nupkg");
     assertThat(ctx.<BaseUsages>getProperty("usages")).isSameAs(usages);
-    verify(packageService).publishVersion(eq(repoInfo), eq(packageId), eq("1.0.0"), any(), any());
+    verify(packageService)
+        .publishVersion(eq(repoInfo), eq(packageId), eq("1.0.0"), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("does not touch storage when the package row cannot be written")
+  void leavesStorageAloneWhenRowFails() throws IOException {
+    final BaseRepoInfo<UUID> repoInfo = repoInfo();
+    final var packageId = UUID.randomUUID();
+    when(packageService.findOrCreatePackage(repoInfo, "Some.Package")).thenReturn(packageId);
+    when(packageService.publishVersion(any(), any(), any(), any(), any(), any()))
+        .thenThrow(new IllegalStateException("row rejected"));
+
+    assertThatThrownBy(
+            () -> facade.publish(context("/v3/package", repoInfo), nupkg("Some.Package", "1.0.0")))
+        .isInstanceOf(IllegalStateException.class);
+
+    verify(storageService, never()).writePackage(any(), any(), any(), any(), any());
+    verify(storageService, never()).deletePackageVersion(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("removes the partly written files of a new version when storing fails")
+  void discardsPartialFilesOfNewVersion() throws IOException {
+    final BaseRepoInfo<UUID> repoInfo = repoInfo();
+    final var failure = new IOException("disk full");
+    when(packageService.findOrCreatePackage(repoInfo, "Some.Package"))
+        .thenReturn(UUID.randomUUID());
+    publishRunsFilesWriter(false);
+    when(storageService.writePackage(any(), any(), any(), any(InputStream.class), any()))
+        .thenThrow(failure);
+
+    assertThatThrownBy(
+            () -> facade.publish(context("/v3/package", repoInfo), nupkg("Some.Package", "1.0.0")))
+        .isSameAs(failure);
+
+    verify(storageService).deletePackageVersion(repoInfo.getStorageKey(), "Some.Package", "1.0.0");
+  }
+
+  @Test
+  @DisplayName("keeps the files of the version being replaced when storing fails")
+  void keepsFilesOfReplacedVersion() throws IOException {
+    final BaseRepoInfo<UUID> repoInfo = repoInfo();
+    final var failure = new IOException("disk full");
+    when(packageService.findOrCreatePackage(repoInfo, "Some.Package"))
+        .thenReturn(UUID.randomUUID());
+    publishRunsFilesWriter(true);
+    when(storageService.writePackage(any(), any(), any(), any(InputStream.class), any()))
+        .thenThrow(failure);
+
+    assertThatThrownBy(
+            () -> facade.publish(context("/v3/package", repoInfo), nupkg("Some.Package", "1.0.0")))
+        .isSameAs(failure);
+
+    verify(storageService, never()).deletePackageVersion(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("still reports the storing failure when removing the partial files fails too")
+  void reportsStoringFailureWhenCleanupFails() throws IOException {
+    final BaseRepoInfo<UUID> repoInfo = repoInfo();
+    final var failure = new IOException("disk full");
+    final var cleanupFailure = new IOException("nothing to delete");
+    when(packageService.findOrCreatePackage(repoInfo, "Some.Package"))
+        .thenReturn(UUID.randomUUID());
+    publishRunsFilesWriter(false);
+    when(storageService.writePackage(any(), any(), any(), any(InputStream.class), any()))
+        .thenThrow(failure);
+    when(storageService.deletePackageVersion(any(), any(), any())).thenThrow(cleanupFailure);
+
+    assertThatThrownBy(
+            () -> facade.publish(context("/v3/package", repoInfo), nupkg("Some.Package", "1.0.0")))
+        .isSameAs(failure)
+        .hasSuppressedException(cleanupFailure);
+  }
+
+  /** The real service runs the writer inside its transaction; the mock runs it in place. */
+  private void publishRunsFilesWriter(final boolean replacesExisting) throws IOException {
+    when(packageService.publishVersion(any(), any(), any(), any(), any(), any()))
+        .thenAnswer(
+            invocation ->
+                invocation
+                    .<NuGetPackageService.PackageFilesWriter>getArgument(5)
+                    .write(replacesExisting));
   }
 
   @Test
