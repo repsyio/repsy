@@ -35,6 +35,7 @@ import { pollUntilTerminal } from '../../util/poll-until-terminal.util';
 import { scanStatusLabel } from '../../util/scan-status-label.util';
 import { EllipsisPipe } from '../ellipsis/ellipsis.pipe';
 import { PaginationComponent } from '../pagination/pagination.component';
+import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
 import { SeverityBadgeComponent } from '../severity-badge/severity-badge.component';
 import { StatusPollingIndicatorComponent } from '../status-polling-indicator/status-polling-indicator.component';
 import { ToastService } from '../toast/toast.service';
@@ -60,6 +61,7 @@ const SCROLL_RETRY_DELAYS_MS = [0, 300, 800];
     TooltipComponent,
     EllipsisPipe,
     StatusPollingIndicatorComponent,
+    RescanNoteComponent,
   ],
   templateUrl: './security-scan-section.component.html',
 })
@@ -186,7 +188,9 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     lowCount: number;
     unknownCount: number;
   } {
-    if (this.overview && this.selectedScan?.id === this.overview.scanId) {
+    // The overview counters describe its newest completed scan, which is the selected scan only
+    // once that scan has completed; an unfinished one has no findings of its own to count.
+    if (this.overview?.status === ScanStatus.Completed && this.selectedScan?.id === this.overview.scanId) {
       return {
         criticalCount: this.overview.criticalCount ?? 0,
         highCount: this.overview.highCount ?? 0,
