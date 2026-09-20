@@ -3341,6 +3341,8 @@ components:
         lastLoginAt:
           type: string
           format: date-time
+          # null until the first login; keep it in the JSON as an explicit null
+          x-jackson-json-include-policy: NONE
       required:
         - id
         - username
@@ -4154,12 +4156,16 @@ components:
         diskUsage:
           type: integer
           format: int64
+          # ProfileService.getProfile() does not populate it yet; keep the explicit null
+          x-jackson-json-include-policy: NONE
         createdAt:
           type: string
           format: date-time
         lastLoginAt:
           type: string
           format: date-time
+          # null until the first login; keep it in the JSON as an explicit null
+          x-jackson-json-include-policy: NONE
       required:
         - id
         - username
