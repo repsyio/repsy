@@ -512,6 +512,31 @@ docker exec repsy env | grep ADMIN
   On the next startup the application generates a new random password for every admin whose hash
   is empty and logs it, one line per admin.
 
+  **On the embedded H2 database** there is no `psql`, and the database file is locked while the
+  application runs, so stop it first and run the H2 shell once against the database file of your
+  `DB_URL` (`/app/data/repsy` for the default URL in the
+  [environment variables](#environment-variables)) with the `DB_USERNAME` and `DB_PASSWORD` the
+  application uses (`repsy` / `repsy123` by default):
+  ```bash
+  docker stop repsy
+
+  docker run --rm -v repsy-data:/app/data --entrypoint java repo.repsy.io/repsy/os/repsy:latest \
+    -Dloader.main=org.h2.tools.Shell -cp /app/app.jar \
+    org.springframework.boot.loader.launch.PropertiesLauncher \
+    -url "jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE" \
+    -user repsy -password repsy123 \
+    -sql "UPDATE users SET hash = '' WHERE role = 'ADMIN'"
+
+  docker start repsy
+
+  # Check logs for the new random password
+  docker logs repsy | grep "Admin password"
+  ```
+  Keep `MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE` in that URL even if your `DB_URL` differs: the tables
+  have lower-case names, and without `DATABASE_TO_LOWER=TRUE` the statement fails with
+  `Table "USERS" not found`. To reset a single admin, append `AND username = 'admin'` to the
+  statement.
+
 **Vulnerability scans failing with 401/500:**
 - Check that `TRIVY_SCANNER_API_KEY` (repsy-backend) and `SCANNER_API_KEY` (`repsy-scanner-trivy`) are set to the exact same value — a mismatch causes the scanner to reject requests.
 

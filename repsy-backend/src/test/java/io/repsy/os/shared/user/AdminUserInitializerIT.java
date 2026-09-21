@@ -15,6 +15,10 @@
  */
 package io.repsy.os.shared.user;
 
+import static io.repsy.os.shared.user.AdminPasswordResetChecks.NULL_HASH_SQL;
+import static io.repsy.os.shared.user.AdminPasswordResetChecks.RESET_ALL_ADMINS_SQL;
+import static io.repsy.os.shared.user.AdminPasswordResetChecks.RESET_ONE_ADMIN_SQL;
+import static io.repsy.os.shared.user.AdminPasswordResetChecks.loggedPasswordOf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -25,7 +29,6 @@ import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,7 +42,8 @@ import org.springframework.http.MediaType;
 /**
  * RPS-1026: the "Forgot admin password?" recovery in the README. It runs the very statements the
  * README gives, then starts the initializer the way the application does at startup and checks that
- * the admin can log in with the password it logs.
+ * the admin can log in with the password it logs. {@link H2AdminUserInitializerIT} checks the same
+ * recovery on the embedded H2 database (RPS-1099).
  *
  * <p>{@code AdminUserInitializer.run} is {@code @Transactional}, so it joins the test transaction
  * and sees the rows the test changed, and the rollback undoes everything.
@@ -47,14 +51,6 @@ import org.springframework.http.MediaType;
 @ExtendWith(OutputCaptureExtension.class)
 @DisplayName("AdminUserInitializer password reset")
 class AdminUserInitializerIT extends AbstractIntegrationTest {
-
-  /** The statement from the README, for every admin. */
-  private static final String RESET_ALL_ADMINS_SQL =
-      "UPDATE users SET hash = '' WHERE role = 'ADMIN'";
-
-  /** The statement from the README, for a single admin. */
-  private static final String RESET_ONE_ADMIN_SQL =
-      "UPDATE users SET hash = '' WHERE role = 'ADMIN' AND username = ?";
 
   @Autowired private AdminUserInitializer adminUserInitializer;
 
@@ -75,21 +71,6 @@ class AdminUserInitializerIT extends AbstractIntegrationTest {
     return this.userRepository.findById(id).orElseThrow();
   }
 
-  private static String loggedPasswordOf(final User admin, final CapturedOutput output) {
-    final var pattern =
-        Pattern.compile(
-            "Admin password has been reset for user "
-                + Pattern.quote(admin.getUsername())
-                + "\\. New password: (\\S+)");
-    final var matcher = pattern.matcher(output.getAll());
-
-    assertThat(matcher.find())
-        .as("the reset of %s is logged with its new password", admin.getUsername())
-        .isTrue();
-
-    return matcher.group(1);
-  }
-
   private void login(final String username, final String password, final int expectedStatus)
       throws Exception {
 
@@ -103,8 +84,7 @@ class AdminUserInitializerIT extends AbstractIntegrationTest {
   @Test
   @DisplayName("users.hash is NOT NULL, so the recovery cannot use NULL")
   void nullHashIsRejectedBySchema() {
-    assertThatThrownBy(
-            () -> this.jdbcTemplate.update("UPDATE users SET hash = NULL WHERE role = 'ADMIN'"))
+    assertThatThrownBy(() -> this.jdbcTemplate.update(NULL_HASH_SQL))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
