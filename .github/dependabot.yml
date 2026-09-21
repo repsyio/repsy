@@ -28,6 +28,17 @@ updates:
       # own Dependabot maven updates in the repsyio/repsy-core repository.
       - dependency-name: "io.repsy.core:*"
 
+  # repsy-scanner-trivy is not in the root reactor and has its own parent
+  # (spring-boot-starter-parent), so the "/" entry above never reads its pom.xml.
+  - package-ecosystem: "maven"
+    directory: "/repsy-scanner-trivy"
+    schedule:
+      interval: "weekly"
+    groups:
+      scanner-maven-dependencies:
+        patterns:
+          - "*"
+
   - package-ecosystem: "npm"
     directory: "/repsy-frontend"
     schedule:
