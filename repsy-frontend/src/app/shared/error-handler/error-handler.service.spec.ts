@@ -76,4 +76,55 @@ describe('ErrorHandlerService', () => {
     expect(clearStorage).not.toHaveBeenCalled();
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
+
+  describe('when the error response has no usable body', () => {
+    const bodies: [string, unknown][] = [
+      ['a null body', null],
+      ['a string body', 'Bad Gateway'],
+      ['a number body', 42],
+      ['an array body', ['Bad Gateway']],
+    ];
+
+    bodies.forEach(([name, body]) => {
+      [500, 502, 403].forEach((status) => {
+        it(`falls back to a generic text on a ${status} with ${name}`, () => {
+          expect(() => service.handle(error(status, body))).not.toThrow();
+          expect(service.handle(error(status, body))).toBe('Error Occurred');
+          expect(clearStorage).not.toHaveBeenCalled();
+          expect(router.navigateByUrl).not.toHaveBeenCalled();
+        });
+      });
+
+      it(`falls back to a generic text and keeps the user signed in on a 401 with ${name}`, () => {
+        expect(() => service.handle(error(401, body))).not.toThrow();
+        expect(service.handle(error(401, body))).toBe('Error Occurred');
+        expect(clearStorage).not.toHaveBeenCalled();
+        expect(router.navigateByUrl).not.toHaveBeenCalled();
+      });
+    });
+
+    it('logs the raw null body', () => {
+      service.handle(new HttpErrorResponse({ status: 500 }));
+
+      expect(console.error).toHaveBeenCalledOnceWith(null);
+    });
+
+    it('logs the raw string body', () => {
+      service.handle(error(401, 'Unauthorized'));
+
+      expect(console.error).toHaveBeenCalledOnceWith('Unauthorized');
+    });
+
+    it('answers a bodiless 500 with the generic text', () => {
+      expect(service.handle(new HttpErrorResponse({ status: 500 }))).toBe('Error Occurred');
+    });
+
+    it('answers a bodiless 401 with the generic text', () => {
+      expect(service.handle(new HttpErrorResponse({ status: 401 }))).toBe('Error Occurred');
+    });
+
+    it('still reports the service as unavailable for a bodiless status 0', () => {
+      expect(service.handle(new HttpErrorResponse({ status: 0 }))).toBe('Service unavailable');
+    });
+  });
 });

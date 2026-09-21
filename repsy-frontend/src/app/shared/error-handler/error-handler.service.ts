@@ -29,10 +29,13 @@ export class ErrorHandlerService {
       return 'Service unavailable';
     }
 
+    const body = this.errorBody(res);
+
     if (
       res.status === 401 &&
-      'msgId' in res.error &&
-      (res.error.msgId === 'sessionExpired' || res.error.msgId === 'refreshTokenExpired')
+      body !== null &&
+      'msgId' in body &&
+      (body['msgId'] === 'sessionExpired' || body['msgId'] === 'refreshTokenExpired')
     ) {
       localStorage.clear();
       this.router.navigateByUrl('/');
@@ -42,10 +45,19 @@ export class ErrorHandlerService {
 
     let errorText = 'Error Occurred';
 
-    if (Object.prototype.hasOwnProperty.call(res.error, 'text')) {
-      errorText = res.error.text;
+    if (body !== null && Object.prototype.hasOwnProperty.call(body, 'text')) {
+      errorText = body['text'] as string;
     }
 
     return errorText;
+  }
+
+  /**
+   * Angular sets `HttpErrorResponse.error` to `null` when the server answers without a body, and to a plain string
+   * when the body is not JSON (for example a `502 Bad Gateway` page from a proxy). Only an object can carry a `msgId`
+   * or `text`.
+   */
+  private errorBody(res: HttpErrorResponse): Record<string, unknown> | null {
+    return typeof res.error === 'object' && res.error !== null ? (res.error as Record<string, unknown>) : null;
   }
 }
