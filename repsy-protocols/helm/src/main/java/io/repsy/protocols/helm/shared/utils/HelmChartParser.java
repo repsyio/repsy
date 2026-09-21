@@ -69,17 +69,44 @@ public class HelmChartParser {
         || entryName.endsWith("/" + HelmConstants.CHART_YAML);
   }
 
+  /**
+   * Turns the parsed {@code Chart.yaml} into the metadata that is stored. It is the one place the
+   * values of a push are known before any row or file is written, for the chart upload and the OCI
+   * manifest push alike, so the column limits are applied here (RPS-1072). Every one is rejected
+   * with a 400 that names the field, because none can be cut or dropped: the name and version
+   * identify the chart and are part of its file name, and the app version and type are what a
+   * client selects charts by.
+   */
   private static HelmChartMetadata parseYaml(final byte[] bytes) {
     final var parsed = loadYaml(bytes);
     final var name = validateName(stringField(parsed, "name", "chartNameInvalid"));
     final var version = validateVersion(stringField(parsed, "version", "chartVersionInvalid"));
+    final var description = stringField(parsed, "description", "chartDescriptionInvalid");
+    final var appVersion = stringField(parsed, "appVersion", "chartAppVersionInvalid");
+    final var type = stringField(parsed, "type", "chartTypeInvalid");
+
+    rejectOverLongOptionals(appVersion, type);
+
     return HelmChartMetadata.builder()
         .name(name)
         .version(version)
-        .description(stringField(parsed, "description", "chartDescriptionInvalid"))
-        .appVersion(stringField(parsed, "appVersion", "chartAppVersionInvalid"))
-        .type(stringField(parsed, "type", "chartTypeInvalid"))
+        .description(description)
+        .appVersion(appVersion)
+        .type(type)
         .build();
+  }
+
+  private static void rejectOverLongOptionals(
+      final @Nullable String appVersion, final @Nullable String type) {
+
+    if (appVersion != null && appVersion.length() > HelmConstants.MAX_CHART_APP_VERSION_LENGTH) {
+      throw new BadRequestException("chartAppVersionTooLong");
+    }
+    // Only the length is checked: Helm defines the type as application or library, but a chart of
+    // any other type has always been accepted.
+    if (type != null && type.length() > HelmConstants.MAX_CHART_TYPE_LENGTH) {
+      throw new BadRequestException("chartTypeInvalid");
+    }
   }
 
   private static Map<?, ?> loadYaml(final byte[] bytes) {
@@ -117,6 +144,10 @@ public class HelmChartParser {
     if (name == null || name.isBlank()) {
       throw new BadRequestException("chartNameMissing");
     }
+    // Before the pattern, which would otherwise scan a value of any length.
+    if (name.length() > HelmConstants.MAX_CHART_NAME_LENGTH) {
+      throw new BadRequestException("chartNameTooLong");
+    }
     if (!CHART_NAME_PATTERN.matcher(name).matches()) {
       throw new BadRequestException("chartNameInvalid");
     }
@@ -126,6 +157,10 @@ public class HelmChartParser {
   private static String validateVersion(final @Nullable String version) {
     if (version == null || version.isBlank()) {
       throw new BadRequestException("chartVersionMissing");
+    }
+    // Before the pattern, which has no bound of its own and would scan a value of any length.
+    if (version.length() > HelmConstants.MAX_CHART_VERSION_LENGTH) {
+      throw new BadRequestException("chartVersionTooLong");
     }
     if (!SEMVER_PATTERN.matcher(version).matches()) {
       throw new BadRequestException("chartVersionInvalid");

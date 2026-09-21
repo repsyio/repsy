@@ -20,12 +20,36 @@ import java.util.Comparator;
 import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+@Slf4j
 @UtilityClass
 @NullMarked
 public class GoVersionUtils {
+
+  // The limits of the varchar columns a module upload is stored in (RPS-1072). PostgreSQL and H2
+  // create them with exactly these lengths (V0002__Golang_Protocol, V0009__Init_Vulnerability_
+  // Scanning). They are counted in UTF-16 units, the stricter of the two ways either database might
+  // count a character, so a value that passes is never refused by the column.
+
+  /**
+   * The longest module path an upload may name. {@code go_module.module_path} is {@code
+   * varchar(1024)}, but a push to a repo with security scanning on, which is the default, also
+   * records a {@code vulnerability_scan} row whose {@code artifact_name} is the module path in a
+   * {@code varchar(512)}. A longer path failed that insert and with it the whole upload, so 512 is
+   * what a registry could always store. The path stored is the decoded, lower-cased one, so that is
+   * the one to measure. The {@code GoModule} entity states the column's own length, 1024, and does
+   * not take it from here.
+   */
+  public static final int MAX_MODULE_PATH_LENGTH = 512;
+
+  /** {@code go_module_version.version}. */
+  public static final int MAX_VERSION_LENGTH = 100;
+
+  /** {@code go_module_version.go_version}. */
+  public static final int MAX_GO_VERSION_LENGTH = 20;
 
   // Captures: major, minor, patch, pre-release (before '+'), build metadata (ignored)
   private static final Pattern SEMVER_PATTERN =
@@ -97,12 +121,27 @@ public class GoVersionUtils {
    * Parses the "go X.Y" directive from a go.mod file's raw bytes. Returns null if the directive is
    * absent. Trailing tokens on the same line (e.g. comments) are ignored so that valid go.mod files
    * with inline annotations are handled correctly.
+   *
+   * <p>A directive longer than {@link #MAX_GO_VERSION_LENGTH}, the width of {@code
+   * go_module_version.go_version}, is treated as absent (RPS-1072). The column is only shown, and
+   * the go.mod itself is stored whole and is what the toolchain reads, so the upload goes through
+   * rather than being refused for it. It is dropped, not cut, because a cut version number names
+   * another release.
    */
   public static @Nullable String extractGoVersionFromMod(final byte[] content) {
     final var text = new String(content, StandardCharsets.UTF_8);
     final var pattern = Pattern.compile("^go\\s+(\\S+)", Pattern.MULTILINE);
     final var matcher = pattern.matcher(text);
-    return matcher.find() ? matcher.group(1) : null;
+    if (!matcher.find()) {
+      return null;
+    }
+
+    final var goVersion = matcher.group(1);
+    if (goVersion.length() > MAX_GO_VERSION_LENGTH) {
+      log.warn("Skipping the go directive: longer than {} characters", MAX_GO_VERSION_LENGTH);
+      return null;
+    }
+    return goVersion;
   }
 
   /**

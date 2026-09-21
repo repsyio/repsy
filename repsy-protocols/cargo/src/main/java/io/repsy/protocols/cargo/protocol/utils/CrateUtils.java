@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
@@ -48,6 +49,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.util.Pair;
 import tools.jackson.databind.ObjectMapper;
 
+@Slf4j
 @UtilityClass
 public class CrateUtils {
 
@@ -66,9 +68,65 @@ public class CrateUtils {
 
   private static final Pattern CRATE_NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9_-]*$");
 
-  private static final int MAX_NAME_LENGTH = 64;
+  // The limits of the columns the published metadata is stored in (RPS-1072). Every one is a
+  // varchar of exactly this length in PostgreSQL and H2, except where its Javadoc says the two
+  // differ. They are counted in UTF-16 units, the stricter of the two ways either database might
+  // count a character, so a value that passes is never refused by the column. The entities take
+  // their @Column lengths from here, where the length is the same in both databases.
+
+  /** {@code cargo_crate.name} and {@code cargo_crate.original_name}. */
+  public static final int MAX_NAME_LENGTH = 64;
+
+  /**
+   * {@code cargo_crate.max_version}, {@code cargo_crate_index.vers} and {@code
+   * cargo_crate_meta.version}.
+   */
+  public static final int MAX_VERSION_LENGTH = 64;
+
+  /** {@code cargo_crate_index.rust_version} and {@code cargo_crate_meta.rust_version}. */
+  public static final int MAX_RUST_VERSION_LENGTH = 20;
+
+  /** {@code cargo_crate.homepage}. */
+  public static final int MAX_HOMEPAGE_LENGTH = 255;
+
+  /** {@code cargo_crate.repository}. */
+  public static final int MAX_REPOSITORY_LENGTH = 255;
+
+  /** {@code cargo_crate_meta.license}. */
+  public static final int MAX_LICENSE_LENGTH = 255;
+
+  /** {@code cargo_crate_meta.license_file}. */
+  public static final int MAX_LICENSE_FILE_LENGTH = 255;
+
+  /** {@code cargo_crate_meta.documentation}. */
+  public static final int MAX_DOCUMENTATION_LENGTH = 255;
+
+  /**
+   * {@code cargo_crate_index.links}. The column is {@code varchar(255)} in H2 and {@code text} in
+   * PostgreSQL; the limit applies to both, so a registry behaves the same on either.
+   */
+  public static final int MAX_LINKS_LENGTH = 255;
+
+  /**
+   * {@code cargo_author.author}: {@code varchar(255)} in H2, {@code text} in PostgreSQL, where the
+   * unique index on it refuses a value of a few kilobytes. The limit applies to both.
+   */
+  public static final int MAX_AUTHOR_LENGTH = 255;
+
+  /**
+   * {@code cargo_category.category}: {@code varchar(255)} in H2, {@code text} in PostgreSQL, where
+   * the unique index on it refuses a value of a few kilobytes. The limit applies to both.
+   */
+  public static final int MAX_CATEGORY_LENGTH = 255;
+
+  /**
+   * {@code cargo_keyword.keyword}: {@code varchar(100)} in H2, {@code text} in PostgreSQL. Cargo
+   * itself allows 20 characters, which is what a publish is held to, so the column is never the
+   * limit.
+   */
+  public static final int MAX_KEYWORD_LENGTH = 20;
+
   private static final int MAX_KEYWORDS = 5;
-  private static final int MAX_KEYWORD_LENGTH = 20;
 
   public static Pair<String, String> extractCrateNameAndVersion(final ProtocolContext context) {
 
@@ -104,10 +162,83 @@ public class CrateUtils {
     return name.toLowerCase(Locale.ROOT).replace('-', '_');
   }
 
+  /**
+   * Refuses a publish whose metadata cannot be stored. It runs before the crate or its index entry
+   * is written, so a refused publish leaves nothing behind. A value is rejected when cutting or
+   * dropping it would change what the registry serves: the name and version identify the crate, the
+   * rust-version says which compilers may use it, and {@code links} is what the index resolves the
+   * native library a crate links to by. The descriptive fields that can be dropped instead are
+   * handled by {@link #dropOverLongMetadata(CratePublishRequest)}.
+   */
   public static void validatePublishRequest(final CratePublishRequest request) {
     validateCrateName(request.name());
     validateVersion(request.vers());
     validateKeywords(request.keywords());
+    validateRustVersion(request.rustVersion());
+    validateLinks(request.links());
+  }
+
+  /**
+   * Returns the request without the descriptive metadata that does not fit its column (RPS-1072):
+   * the homepage, repository, documentation, license and license file are dropped, and so is any
+   * author or category that is too long. Cutting a URL would make it point somewhere else and
+   * cutting a name or an SPDX expression would make it say something it does not, so a value is
+   * dropped whole. The publish itself goes through: none of these is needed to fetch the crate, and
+   * the {@code .crate} file, which carries its own Cargo.toml, is stored untouched.
+   */
+  public static CratePublishRequest dropOverLongMetadata(final CratePublishRequest request) {
+
+    return new CratePublishRequest(
+        request.name(),
+        request.vers(),
+        request.hasLib(),
+        request.deps(),
+        request.features(),
+        dropEntriesIfTooLong(request.authors(), MAX_AUTHOR_LENGTH, "author"),
+        request.description(),
+        dropIfTooLong(request.documentation(), MAX_DOCUMENTATION_LENGTH, "documentation"),
+        dropIfTooLong(request.homepage(), MAX_HOMEPAGE_LENGTH, "homepage"),
+        request.readme(),
+        request.readmeFile(),
+        request.keywords(),
+        dropEntriesIfTooLong(request.categories(), MAX_CATEGORY_LENGTH, "category"),
+        dropIfTooLong(request.license(), MAX_LICENSE_LENGTH, "license"),
+        dropIfTooLong(request.licenseFile(), MAX_LICENSE_FILE_LENGTH, "license_file"),
+        dropIfTooLong(request.repository(), MAX_REPOSITORY_LENGTH, "repository"),
+        request.links(),
+        request.rustVersion(),
+        request.cksum(),
+        request.features2());
+  }
+
+  private static @Nullable String dropIfTooLong(
+      final @Nullable String value, final int maxLength, final String field) {
+
+    if (value != null && value.length() > maxLength) {
+      log.warn("Skipping {}: longer than {} characters", field, maxLength);
+      return null;
+    }
+
+    return value;
+  }
+
+  private static @Nullable List<String> dropEntriesIfTooLong(
+      final @Nullable List<String> values, final int maxLength, final String field) {
+
+    if (values == null) {
+      return null;
+    }
+
+    return values.stream()
+        .filter(
+            value -> {
+              final var fits = value == null || value.length() <= maxLength;
+              if (!fits) {
+                log.warn("Skipping a {}: longer than {} characters", field, maxLength);
+              }
+              return fits;
+            })
+        .toList();
   }
 
   private static void validateCrateName(final @Nullable String name) {
@@ -134,11 +265,32 @@ public class CrateUtils {
       throw new IllegalArgumentException("version cannot be empty");
     }
 
+    if (vers.length() > MAX_VERSION_LENGTH) {
+      throw new IllegalArgumentException(
+          "version must be at most %d characters".formatted(MAX_VERSION_LENGTH));
+    }
+
     try {
       new Semver(vers);
     } catch (final SemverException ex) {
       throw new IllegalArgumentException(
           "version `%s` is not a valid semver format (expected MAJOR.MINOR.PATCH)".formatted(vers));
+    }
+  }
+
+  private static void validateRustVersion(final @Nullable String rustVersion) {
+
+    if (rustVersion != null && rustVersion.length() > MAX_RUST_VERSION_LENGTH) {
+      throw new IllegalArgumentException(
+          "rust-version must be at most %d characters".formatted(MAX_RUST_VERSION_LENGTH));
+    }
+  }
+
+  private static void validateLinks(final @Nullable String links) {
+
+    if (links != null && links.length() > MAX_LINKS_LENGTH) {
+      throw new IllegalArgumentException(
+          "links must be at most %d characters".formatted(MAX_LINKS_LENGTH));
     }
   }
 

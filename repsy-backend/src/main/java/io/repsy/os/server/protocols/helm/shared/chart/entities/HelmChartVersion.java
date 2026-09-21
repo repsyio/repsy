@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.helm.shared.chart.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -64,19 +65,19 @@ public class HelmChartVersion {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private HelmChart chart;
 
-  @Column(name = "version", nullable = false)
+  @Column(name = "version", nullable = false, length = HelmConstants.MAX_CHART_VERSION_LENGTH)
   private String version;
 
   @Column(name = "description")
   private @Nullable String description;
 
-  @Column(name = "app_version")
+  @Column(name = "app_version", length = HelmConstants.MAX_CHART_APP_VERSION_LENGTH)
   private @Nullable String appVersion;
 
-  @Column(name = "type")
+  @Column(name = "type", length = HelmConstants.MAX_CHART_TYPE_LENGTH)
   private @Nullable String type;
 
-  @Column(name = "digest", nullable = false)
+  @Column(name = "digest", nullable = false, length = HelmConstants.MAX_DIGEST_LENGTH)
   private String digest;
 
   @Column(name = "size", nullable = false)

@@ -19,12 +19,15 @@ import static io.repsy.protocols.helm.shared.utils.HelmOciHttpValues.DOCKER_CONT
 import static io.repsy.protocols.helm.shared.utils.HelmOciHttpValues.DOCKER_UPLOAD_UUID;
 import static org.springframework.http.HttpHeaders.LOCATION;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmFacade;
+import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,6 +37,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -46,6 +50,8 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
 
   private static final Pattern UPLOAD_FINALIZE_PATTERN =
       Pattern.compile("^/([^/]+)/blobs/uploads/([0-9a-fA-F-]{36})/?$");
+
+  private static final String DEFAULT_BLOB_MEDIA_TYPE = "application/octet-stream";
 
   private final PathParser basePathParser;
   private final HelmFacade<ID> helmFacade;
@@ -93,6 +99,19 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
     };
   }
 
+  /**
+   * The media type recorded for the blob. A blob is addressed by its digest and a chart is found
+   * through its manifest, so the type is only informational: a client that names none, or one that
+   * does not fit the 255 characters of helm_oci_blob.media_type, gets the generic one and the push
+   * goes through (RPS-1072).
+   */
+  private static String blobMediaType(final @Nullable String contentType) {
+    if (contentType == null || contentType.length() > HelmConstants.MAX_OCI_MEDIA_TYPE_LENGTH) {
+      return DEFAULT_BLOB_MEDIA_TYPE;
+    }
+    return contentType;
+  }
+
   @Override
   public ResponseEntity<Object> handle(
       final ProtocolContext context,
@@ -115,13 +134,19 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
       return ResponseEntity.badRequest().build();
     }
 
+    // helm_oci_blob.digest holds "sha256:" and 64 hex characters, but BlobDigests also admits a
+    // sha512 one, which is 135 characters and would fail the row insert after the blob was stored.
+    if (BlobDigests.isSupported(digest) && !digest.startsWith(HelmConstants.SHA256_PREFIX)) {
+      throw new BadRequestException("blobDigestUnsupported");
+    }
+
     final var contentLength = request.getContentLengthLong();
     final var blobInfo =
         this.helmFacade.finalizeBlob(
             context,
             uploadId,
             digest,
-            mediaType != null ? mediaType : "application/octet-stream",
+            blobMediaType(mediaType),
             request.getInputStream(),
             contentLength);
 

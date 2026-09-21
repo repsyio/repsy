@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.cargo.shared.crate.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -54,7 +55,7 @@ public class CargoCrateIndex {
   @Column(name = "name", nullable = false)
   private String name;
 
-  @Column(name = "vers", nullable = false, length = 64)
+  @Column(name = "vers", nullable = false, length = CrateUtils.MAX_VERSION_LENGTH)
   private String vers;
 
   @JdbcTypeCode(SqlTypes.JSON)
@@ -75,12 +76,13 @@ public class CargoCrateIndex {
   @Column(name = "yanked", nullable = false)
   private boolean yanked;
 
+  // text in PostgreSQL, varchar(255) in H2: no length is stated, see CrateUtils.MAX_LINKS_LENGTH.
   @Column(name = "links")
   private String links;
 
   @Column(name = "v", nullable = false)
   private int v = 1;
 
-  @Column(name = "rust_version", length = 20)
+  @Column(name = "rust_version", length = CrateUtils.MAX_RUST_VERSION_LENGTH)
   private String rustVersion;
 }

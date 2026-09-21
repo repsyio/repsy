@@ -43,16 +43,18 @@ public final class OciErrors {
 
   /** The failures the registry names itself, by the message id of the exception. */
   private static final Map<String, OciErrorCode> CODE_BY_MSG_ID =
-      Map.of(
-          "chartNameMismatch", OciErrorCode.NAME_INVALID,
-          "manifestInvalidJson", OciErrorCode.MANIFEST_INVALID,
-          "manifestLayersMissing", OciErrorCode.MANIFEST_INVALID,
-          "manifestLayerInvalid", OciErrorCode.MANIFEST_INVALID,
-          "digestMismatch", OciErrorCode.DIGEST_INVALID,
-          "manifestNotFound", OciErrorCode.MANIFEST_UNKNOWN,
-          "tagNotFound", OciErrorCode.MANIFEST_UNKNOWN,
-          "imageNotFound", OciErrorCode.NAME_UNKNOWN,
-          "unknownPath", OciErrorCode.NAME_UNKNOWN);
+      Map.ofEntries(
+          Map.entry("chartNameMismatch", OciErrorCode.NAME_INVALID),
+          Map.entry("manifestNameTooLong", OciErrorCode.NAME_INVALID),
+          Map.entry("manifestInvalidJson", OciErrorCode.MANIFEST_INVALID),
+          Map.entry("manifestLayersMissing", OciErrorCode.MANIFEST_INVALID),
+          Map.entry("manifestLayerInvalid", OciErrorCode.MANIFEST_INVALID),
+          Map.entry("digestMismatch", OciErrorCode.DIGEST_INVALID),
+          Map.entry("blobDigestUnsupported", OciErrorCode.DIGEST_INVALID),
+          Map.entry("manifestNotFound", OciErrorCode.MANIFEST_UNKNOWN),
+          Map.entry("tagNotFound", OciErrorCode.MANIFEST_UNKNOWN),
+          Map.entry("imageNotFound", OciErrorCode.NAME_UNKNOWN),
+          Map.entry("unknownPath", OciErrorCode.NAME_UNKNOWN));
 
   private static final Set<String> MISSING_BLOB_MSG_IDS = Set.of("blobNotFound", "layerNotFound");
 

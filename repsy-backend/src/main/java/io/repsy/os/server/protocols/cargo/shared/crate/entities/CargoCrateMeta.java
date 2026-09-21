@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.cargo.shared.crate.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -50,25 +51,25 @@ public class CargoCrateMeta {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private CargoCrate crate;
 
-  @Column(name = "version", nullable = false, length = 64)
+  @Column(name = "version", nullable = false, length = CrateUtils.MAX_VERSION_LENGTH)
   private String version;
 
   @Column(name = "readme", columnDefinition = "text")
   private String readme;
 
-  @Column(name = "license", length = 255)
+  @Column(name = "license", length = CrateUtils.MAX_LICENSE_LENGTH)
   private String license;
 
-  @Column(name = "license_file", length = 255)
+  @Column(name = "license_file", length = CrateUtils.MAX_LICENSE_FILE_LENGTH)
   private String licenseFile;
 
-  @Column(name = "documentation", length = 255)
+  @Column(name = "documentation", length = CrateUtils.MAX_DOCUMENTATION_LENGTH)
   private String documentation;
 
   @Column(name = "edition", length = 10)
   private String edition;
 
-  @Column(name = "rust_version", length = 20)
+  @Column(name = "rust_version", length = CrateUtils.MAX_RUST_VERSION_LENGTH)
   private String rustVersion;
 
   @Column(name = "downloads", nullable = false)

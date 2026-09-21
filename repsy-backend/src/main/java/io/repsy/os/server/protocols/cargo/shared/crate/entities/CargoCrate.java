@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.cargo.shared.crate.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -60,13 +61,13 @@ public class CargoCrate {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private Repo repo;
 
-  @Column(name = "name", nullable = false, length = 64)
+  @Column(name = "name", nullable = false, length = CrateUtils.MAX_NAME_LENGTH)
   private String name;
 
-  @Column(name = "original_name", nullable = false, length = 64)
+  @Column(name = "original_name", nullable = false, length = CrateUtils.MAX_NAME_LENGTH)
   private String originalName;
 
-  @Column(name = "max_version", nullable = false, length = 64)
+  @Column(name = "max_version", nullable = false, length = CrateUtils.MAX_VERSION_LENGTH)
   private String maxVersion;
 
   @Column(name = "total_downloads", nullable = false)
@@ -80,11 +81,11 @@ public class CargoCrate {
   private String description;
 
   @Nullable
-  @Column(name = "homepage", length = 255)
+  @Column(name = "homepage", length = CrateUtils.MAX_HOMEPAGE_LENGTH)
   private String homepage;
 
   @Nullable
-  @Column(name = "repository", length = 255)
+  @Column(name = "repository", length = CrateUtils.MAX_REPOSITORY_LENGTH)
   private String repository;
 
   @Column(name = "created_at", nullable = false)

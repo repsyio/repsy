@@ -138,6 +138,8 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
       return ResponseEntity.badRequest().build();
     }
 
+    rejectOverLongIdentifiers(name, reference, mediaType);
+
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var existingManifest = this.helmFacade.checkManifest(context, name, reference);
     if (existingManifest.isPresent() && !repoInfo.isAllowOverride()) {
@@ -202,6 +204,26 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
         .header(DOCKER_CONTENT_DIGEST, manifestInfo.digest())
         .header(CONTENT_TYPE, mediaType)
         .build();
+  }
+
+  /**
+   * The name, reference and media type of a push are stored in helm_oci_manifest columns of 255
+   * characters, and the client chooses all three, so a longer one is refused before anything is
+   * looked up or written (RPS-1072). None of them can be cut or dropped: the name and reference are
+   * how the manifest is found again, and the media type is echoed back to the client.
+   */
+  private static void rejectOverLongIdentifiers(
+      final String name, final String reference, final String mediaType) {
+
+    if (name.length() > HelmConstants.MAX_OCI_MANIFEST_NAME_LENGTH) {
+      throw new BadRequestException("manifestNameTooLong");
+    }
+    if (reference.length() > HelmConstants.MAX_OCI_MANIFEST_REFERENCE_LENGTH) {
+      throw new BadRequestException("manifestReferenceTooLong");
+    }
+    if (mediaType.length() > HelmConstants.MAX_OCI_MEDIA_TYPE_LENGTH) {
+      throw new BadRequestException("manifestMediaTypeTooLong");
+    }
   }
 
   /**

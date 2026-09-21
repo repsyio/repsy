@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.helm.shared.chart.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -59,7 +60,7 @@ public class HelmChart {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private Repo repo;
 
-  @Column(name = "name", nullable = false)
+  @Column(name = "name", nullable = false, length = HelmConstants.MAX_CHART_NAME_LENGTH)
   private String name;
 
   @Column(name = "created_at", nullable = false)
