@@ -16,10 +16,13 @@
 package io.repsy.os.shared.error_handling.services;
 
 import static io.repsy.os.shared.error_handling.services.ConstraintViolationChecks.USERNAME_LENGTH;
+import static io.repsy.os.shared.error_handling.services.ConstraintViolationChecks.expectError;
+import static io.repsy.os.shared.error_handling.services.ConstraintViolationChecks.uniqueUsername;
 import static io.repsy.os.shared.error_handling.services.ConstraintViolationChecks.user;
 import static io.repsy.os.shared.error_handling.services.ConstraintViolationChecks.violationOf;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.H2IntegrationTest;
+import io.repsy.os.shared.user.repositories.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,14 +30,18 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Feeds {@link ErrorHandler} the exceptions a real PostgreSQL constraint violation turns into after
- * Hibernate and Spring have translated it, so the SQL state it reads is the one the driver reports
- * and not one a unit test made up. The {@code users} table is the fixture: a {@code varchar(25)}
- * username, a unique username index and a check on the role.
+ * The H2 counterpart of {@link ErrorHandlerConstraintViolationIT} (RPS-1079). {@link ErrorHandler}
+ * maps a constraint violation by the SQL state of the driver exception at the bottom of the cause
+ * chain, and H2 is a supported database, so this feeds it the exceptions a real H2 violation turns
+ * into after Hibernate and Spring have translated them. If H2 reported another state, or hid it
+ * behind a wrapper, the 4xx answers would silently be 500s on an H2 install. The test rolls back
+ * with the rest of {@link H2IntegrationTest}, so it commits no rows.
  */
-class ErrorHandlerConstraintViolationIT extends AbstractIntegrationTest {
+@DisplayName("ErrorHandler maps constraint violations on the embedded H2 database (RPS-1079)")
+class H2ErrorHandlerConstraintViolationIT extends H2IntegrationTest {
 
   @Autowired private ErrorHandler errorHandler;
+  @Autowired private UserRepository userRepository;
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Test
@@ -44,8 +51,7 @@ class ErrorHandlerConstraintViolationIT extends AbstractIntegrationTest {
 
     final var violation = violationOf(() -> this.userRepository.saveAndFlush(user(tooLong)));
 
-    ConstraintViolationChecks.expectError(
-        this.errorHandler, violation, HttpStatus.BAD_REQUEST, "validationError");
+    expectError(this.errorHandler, violation, HttpStatus.BAD_REQUEST, "validationError");
   }
 
   @Test
@@ -56,8 +62,7 @@ class ErrorHandlerConstraintViolationIT extends AbstractIntegrationTest {
 
     final var violation = violationOf(() -> this.userRepository.saveAndFlush(user(taken)));
 
-    ConstraintViolationChecks.expectError(
-        this.errorHandler, violation, HttpStatus.CONFLICT, "itemAlreadyExists");
+    expectError(this.errorHandler, violation, HttpStatus.CONFLICT, "itemAlreadyExists");
   }
 
   @Test
@@ -71,7 +76,20 @@ class ErrorHandlerConstraintViolationIT extends AbstractIntegrationTest {
                 this.jdbcTemplate.update(
                     "update users set role = 'NOT_A_ROLE' where id = ?", stored.getId()));
 
-    ConstraintViolationChecks.expectError(
-        this.errorHandler, violation, HttpStatus.INTERNAL_SERVER_ERROR, "errorOccurred");
+    expectError(this.errorHandler, violation, HttpStatus.INTERNAL_SERVER_ERROR, "errorOccurred");
+  }
+
+  @Test
+  @DisplayName("keeps 500 errorOccurred for a not-null violation, which the client did not cause")
+  void notNullViolation() {
+    final var stored = this.userRepository.saveAndFlush(user(uniqueUsername("nn")));
+
+    final var violation =
+        violationOf(
+            () ->
+                this.jdbcTemplate.update(
+                    "update users set username = null where id = ?", stored.getId()));
+
+    expectError(this.errorHandler, violation, HttpStatus.INTERNAL_SERVER_ERROR, "errorOccurred");
   }
 }
