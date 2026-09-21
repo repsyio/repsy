@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -27,6 +28,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
@@ -48,6 +50,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
@@ -56,6 +59,10 @@ import org.springframework.core.io.Resource;
 /**
  * RPS-1058: the facade wrote a POM to storage and only then let the artifact service parse it, so a
  * rejected POM stayed in the repo and the usage counter never saw it. The POM is parsed first now.
+ *
+ * <p>RPS-1186: the same for a POM signature. It was stored and only then verified, and a refused
+ * one was rolled back by deleting the whole version (and the artifact, and the group, when it was
+ * the last one). It is verified before it is stored now, so a refused one changes nothing.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractMavenProtocolFacade upload")
@@ -208,6 +215,88 @@ class AbstractMavenProtocolFacadeTest {
     assertThat(this.stored)
         .singleElement()
         .isEqualTo("-----BEGIN PGP SIGNATURE-----".getBytes(UTF_8));
+  }
+
+  @Test
+  @DisplayName("verifies a POM signature against the stored POM before it stores the signature")
+  void verifiesAPomSignatureBeforeStoringIt() throws Exception {
+    final var signature = "-----BEGIN PGP SIGNATURE-----\nabc\n-----END PGP SIGNATURE-----\n";
+    requestFor(POM_PATH + ".asc");
+    deployIsAllowed();
+    storageReportsUsage(signature.length());
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(signature.getBytes(UTF_8)));
+
+    upload(signature);
+
+    final var verified = ArgumentCaptor.forClass(Resource.class);
+    final var order = inOrder(this.storageService, this.artifactService);
+    order
+        .verify(this.artifactService)
+        .checkDeploymentRules(any(), any(MutablePair.class), any(StoragePath.class));
+    order
+        .verify(this.artifactService)
+        .verifySignature(any(), any(StoragePath.class), verified.capture());
+    order
+        .verify(this.storageService)
+        .writeInputStreamToPath(any(StoragePath.class), any(), anyString());
+    order
+        .verify(this.artifactService)
+        .createOrUpdateArtifact(any(), any(StoragePath.class), any(Resource.class));
+
+    assertThat(verified.getValue().getContentAsByteArray()).isEqualTo(signature.getBytes(UTF_8));
+    assertThat(this.stored).singleElement().isEqualTo(signature.getBytes(UTF_8));
+    assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage())
+        .isEqualTo(signature.length());
+  }
+
+  @Test
+  @DisplayName("stores nothing and reports no usage for a refused POM signature")
+  void storesNothingWhenThePomSignatureIsRefused() {
+    requestFor(POM_PATH + ".asc");
+    deployIsAllowed();
+    doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
+        .when(this.artifactService)
+        .verifySignature(any(), any(StoragePath.class), any(Resource.class));
+
+    assertThatThrownBy(() -> upload("not a signature"))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage("artifactSignatureNotVerified");
+
+    verifyNoInteractions(this.storageService);
+    verify(this.artifactService, never()).createOrUpdateArtifact(any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+  }
+
+  @Test
+  @DisplayName(
+      "pins the current behaviour: only a POM signature is verified, a jar signature is not")
+  void doesNotVerifyAJarSignature() throws Exception {
+    requestFor("com/example/lib/1.0/lib-1.0.jar.asc");
+    deployIsAllowed();
+    storageReportsUsage(3);
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(new byte[0]));
+
+    upload("sig");
+
+    verify(this.artifactService, never()).verifySignature(any(), any(), any());
+    assertThat(this.stored).singleElement().isEqualTo("sig".getBytes(UTF_8));
+  }
+
+  @Test
+  @DisplayName("does not verify the checksum of a POM signature")
+  void doesNotVerifyTheChecksumOfAPomSignature() throws Exception {
+    requestFor(POM_PATH + ".asc.sha1");
+    deployIsAllowed();
+    storageReportsUsage(40);
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(new byte[0]));
+
+    upload("da39a3ee5e6b4b0d3255bfef95601890afd80709");
+
+    verify(this.artifactService, never()).verifySignature(any(), any(), any());
+    assertThat(this.stored).hasSize(1);
   }
 
   @Test

@@ -23,11 +23,18 @@ import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
@@ -40,10 +47,12 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionLi
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
@@ -59,6 +68,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 
 /**
  * The {@code releases} / {@code snapshots} repo settings refuse a version of that kind, whether it
@@ -420,5 +430,115 @@ class ArtifactServiceImplTest {
           .isEqualTo(pair(null, null));
     }
     verifyNoInteractions(this.artifactRepository, this.artifactVersionRepository);
+  }
+
+  private static StoragePath pathOf(final String relativePath) {
+    return argThat(path -> path.getRelativePath().getPath().equals(relativePath));
+  }
+
+  @Test
+  @DisplayName("marks the version signed without verifying the signature again (RPS-1186)")
+  void markSignedWithoutVerifyingAgain() {
+    final var id = UUID.randomUUID();
+    final var repo = new Repo();
+    repo.setId(id);
+    repo.setName("mvn");
+    when(this.repoRepository.findByNameAndType("mvn", RepoType.MAVEN))
+        .thenReturn(Optional.of(repo));
+    final var artifact = this.stubArtifact(id);
+    final var version = new ArtifactVersion();
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(version));
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
+        new ByteArrayResource(new byte[0]));
+
+    assertThat(version.isSigned()).isTrue();
+    verify(this.artifactVersionRepository).save(version);
+    verifyNoInteractions(this.pgpVerifierService, this.keyStoreService);
+  }
+
+  @Test
+  @DisplayName("answers itemNotFound for a POM signature whose version is not registered")
+  void markSignedAnswersItemNotFoundForANonLayoutPath() {
+    final var id = UUID.randomUUID();
+    final var repo = new Repo();
+    repo.setId(id);
+    repo.setName("mvn");
+    when(this.repoRepository.findByNameAndType("mvn", RepoType.MAVEN))
+        .thenReturn(Optional.of(repo));
+
+    assertThatThrownBy(
+            () ->
+                this.artifactService.createOrUpdateArtifact(
+                    repo(id, true, true, true),
+                    StoragePath.of(id, "io/stray.pom.asc"),
+                    new ByteArrayResource(new byte[0])))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("itemNotFound");
+
+    verifyNoInteractions(this.pgpVerifierService);
+  }
+
+  @Test
+  @DisplayName("verifies a signature against the stored POM with the hosts of the repo key store")
+  void verifiesTheSignatureAgainstTheStoredPom() {
+    final var id = UUID.randomUUID();
+    final var pom = new ByteArrayResource("<project/>".getBytes(StandardCharsets.UTF_8));
+    final var signature = new ByteArrayResource("signature".getBytes(StandardCharsets.UTF_8));
+    when(this.storageStrategy.get(pathOf("com/acme/lib/1.0/lib-1.0.pom"), eq("mvn")))
+        .thenReturn(Optional.of(pom));
+    when(this.keyStoreService.findHostsByRepoId(id)).thenReturn(List.of("keys.acme.com"));
+
+    this.artifactService.verifySignature(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
+        signature);
+
+    verify(this.pgpVerifierService).verify(pom, signature, List.of("keys.acme.com"));
+  }
+
+  @Test
+  @DisplayName("lets a refused signature through as a SignatureNotVerifiedException, unchanged")
+  void aRefusedSignatureIsNotSwallowed() {
+    final var id = UUID.randomUUID();
+    final Resource pom = new ByteArrayResource(new byte[0]);
+    final Resource signature = new ByteArrayResource(new byte[0]);
+    when(this.storageStrategy.get(pathOf("com/acme/lib/1.0/lib-1.0.pom"), eq("mvn")))
+        .thenReturn(Optional.of(pom));
+    when(this.keyStoreService.findHostsByRepoId(id)).thenReturn(List.of());
+    doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
+        .when(this.pgpVerifierService)
+        .verify(pom, signature, List.of());
+
+    assertThatThrownBy(
+            () ->
+                this.artifactService.verifySignature(
+                    repo(id, true, true, true),
+                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
+                    signature))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage("artifactSignatureNotVerified");
+  }
+
+  @Test
+  @DisplayName("answers itemNotFound when the POM a signature belongs to is not stored (RPS-1186)")
+  void verifySignatureAnswersItemNotFoundWhenThePomIsNotStored() {
+    final var id = UUID.randomUUID();
+    when(this.storageStrategy.get(any(StoragePath.class), any(String.class)))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                this.artifactService.verifySignature(
+                    repo(id, true, true, true),
+                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
+                    new ByteArrayResource(new byte[0])))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("itemNotFound");
+
+    verifyNoInteractions(this.pgpVerifierService, this.keyStoreService);
   }
 }

@@ -98,8 +98,10 @@ public class PGPVerifierService {
         throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
       }
     } catch (final PGPException exception) {
+      // The BouncyCastle text ("PGPSignature is not found", ...) is for the log, not for the
+      // client.
       log.warn("signature verification failed. Cause: {}", exception.getMessage());
-      throw new SignatureNotVerifiedException(exception.getMessage());
+      throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
     }
   }
 
