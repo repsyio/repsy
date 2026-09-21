@@ -41,6 +41,11 @@
  *    metadata is removed, and the `.asc` itself is not stored (RPS-1186). It used to be stored
  *    first and the whole version, the artifact and the group deleted on a refusal. Only a `.pom.asc`
  *    is verified; a `.jar.asc` is stored as sent.
+ *  - The same holds for an `.asc` that is not a signature at all (invalid armor, a bad CRC, binary
+ *    garbage): 422 `artifactSignatureNotVerified`, where it used to be a 500 (RPS-1191). And an
+ *    `.asc` of a stored POM that has no registered version (its `<groupId>` is not its directory's,
+ *    so it was stored but never registered) is refused with 404 `artifactVersionNotFound` before it
+ *    is stored, not stored and then refused (RPS-1191).
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import {
@@ -68,6 +73,9 @@ const TEXT = 'text/plain';
  * server, so this test needs neither a network nor a key pair.
  */
 const NO_SIGNATURE = '';
+
+/** The armor lines of a signature with no packet in them: BouncyCastle rejects it as invalid armor. */
+const ARMOR_ONLY = '-----BEGIN PGP SIGNATURE-----\n\n-----END PGP SIGNATURE-----\n';
 
 const ARTIFACT_ID = 'raw';
 const SNAPSHOT = '1.0-SNAPSHOT';
@@ -406,6 +414,62 @@ test.describe('maven upload rules (raw HTTP)', () => {
       expectPut(await layout.put(`${pom}.asc`, NO_SIGNATURE, OCTET), 404, 'itemNotFound', pom);
 
       expect(await repoTree(layout.repoName)).toEqual({});
+    },
+  );
+
+  test(
+    'a .pom.asc with invalid PGP armor answers 422, not 500 (RPS-1191)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder);
+      await seedBothKinds(layout);
+      const before = await repoTree(layout.repoName);
+      const [snapshotPom] = snapshotDeployFiles(layout, FIRST_BUILD);
+      const releasePom = `${versionDir(layout.groupId, ARTIFACT_ID, RELEASE)}/${ARTIFACT_ID}-${RELEASE}.pom`;
+      const admin = adminCredential();
+
+      for (const pom of [releasePom, snapshotPom[0]]) {
+        expectPut(
+          await layout.put(`${pom}.asc`, ARMOR_ONLY, OCTET),
+          422,
+          'artifactSignatureNotVerified',
+          `${pom}.asc`,
+        );
+        const res = await rawGet(layout.repoName, admin, `${pom}.asc`);
+        expect(res.status, `GET ${pom}.asc answered ${res.status}`).toBe(404);
+      }
+
+      expect(await repoTree(layout.repoName)).toEqual(before);
+    },
+  );
+
+  test(
+    'a .pom.asc for a POM the server did not register answers 404 and stores nothing (RPS-1191)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder);
+      const pom = `${versionDir(layout.groupId, ARTIFACT_ID, RELEASE)}/${ARTIFACT_ID}-${RELEASE}.pom`;
+      const admin = adminCredential();
+
+      // A POM that declares another groupId than its directory's is stored but not registered.
+      expectPut(
+        await layout.put(pom, minimalPom('org.other', ARTIFACT_ID, RELEASE), OCTET),
+        200,
+        undefined,
+        pom,
+      );
+      const before = await repoTree(layout.repoName);
+
+      expectPut(
+        await layout.put(`${pom}.asc`, NO_SIGNATURE, OCTET),
+        404,
+        'artifactVersionNotFound',
+        `${pom}.asc`,
+      );
+      const res = await rawGet(layout.repoName, admin, `${pom}.asc`);
+      expect(res.status, `GET ${pom}.asc answered ${res.status}`).toBe(404);
+
+      expect(await repoTree(layout.repoName)).toEqual(before);
     },
   );
 

@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -490,6 +491,7 @@ class ArtifactServiceImplTest {
     final var signature = new ByteArrayResource("signature".getBytes(StandardCharsets.UTF_8));
     when(this.storageStrategy.get(pathOf("com/acme/lib/1.0/lib-1.0.pom"), eq("mvn")))
         .thenReturn(Optional.of(pom));
+    this.stubVersion(this.stubArtifact(id), "1.0", true);
     when(this.keyStoreService.findHostsByRepoId(id)).thenReturn(List.of("keys.acme.com"));
 
     this.artifactService.verifySignature(
@@ -508,6 +510,7 @@ class ArtifactServiceImplTest {
     final Resource signature = new ByteArrayResource(new byte[0]);
     when(this.storageStrategy.get(pathOf("com/acme/lib/1.0/lib-1.0.pom"), eq("mvn")))
         .thenReturn(Optional.of(pom));
+    this.stubVersion(this.stubArtifact(id), "1.0", true);
     when(this.keyStoreService.findHostsByRepoId(id)).thenReturn(List.of());
     doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
         .when(this.pgpVerifierService)
@@ -540,5 +543,91 @@ class ArtifactServiceImplTest {
         .hasMessage("itemNotFound");
 
     verifyNoInteractions(this.pgpVerifierService, this.keyStoreService);
+  }
+
+  @Test
+  @DisplayName("refuses a signature of a stored POM whose artifact is not registered (RPS-1191)")
+  void verifySignatureAnswersArtifactVersionNotFoundWhenTheArtifactIsNotRegistered() {
+    final var id = UUID.randomUUID();
+    this.stubStoredPom("com/acme/lib/1.0/lib-1.0.pom");
+    when(this.artifactRepository.findByRepoIdAndGroupNameAndArtifactName(id, "com.acme", "lib"))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                this.artifactService.verifySignature(
+                    repo(id, true, true, true),
+                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
+                    new ByteArrayResource(new byte[0])))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("artifactVersionNotFound");
+
+    verifyNoInteractions(this.pgpVerifierService, this.keyStoreService);
+  }
+
+  @Test
+  @DisplayName("refuses a signature of a stored POM whose version is not registered (RPS-1191)")
+  void verifySignatureAnswersArtifactVersionNotFoundWhenTheVersionIsNotRegistered() {
+    final var id = UUID.randomUUID();
+    this.stubStoredPom("com/acme/lib/1.0/lib-1.0.pom");
+    this.stubVersion(this.stubArtifact(id), "1.0", false);
+
+    assertThatThrownBy(
+            () ->
+                this.artifactService.verifySignature(
+                    repo(id, true, true, true),
+                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
+                    new ByteArrayResource(new byte[0])))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("artifactVersionNotFound");
+
+    verifyNoInteractions(this.pgpVerifierService, this.keyStoreService);
+  }
+
+  @Test
+  @DisplayName("looks up the version of a snapshot POM signature under its base version")
+  void verifySignatureLooksUpASnapshotUnderItsBaseVersion() {
+    final var id = UUID.randomUUID();
+    final var pom = this.stubStoredPom("com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.pom");
+    final var signature = new ByteArrayResource(new byte[0]);
+    this.stubVersion(this.stubArtifact(id), "1.0-SNAPSHOT", true);
+    when(this.keyStoreService.findHostsByRepoId(id)).thenReturn(List.of());
+
+    this.artifactService.verifySignature(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.pom.asc"),
+        signature);
+
+    verify(this.pgpVerifierService).verify(pom, signature, List.of());
+  }
+
+  @Test
+  @DisplayName("stores no signature mark for a version that is not registered (RPS-1191)")
+  void markSignedAnswersArtifactVersionNotFoundWhenTheVersionIsNotRegistered() {
+    final var id = UUID.randomUUID();
+    final var repo = new Repo();
+    repo.setId(id);
+    repo.setName("mvn");
+    when(this.repoRepository.findByNameAndType("mvn", RepoType.MAVEN))
+        .thenReturn(Optional.of(repo));
+    this.stubVersion(this.stubArtifact(id), "1.0", false);
+
+    assertThatThrownBy(
+            () ->
+                this.artifactService.createOrUpdateArtifact(
+                    repo(id, true, true, true),
+                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
+                    new ByteArrayResource(new byte[0])))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("artifactVersionNotFound");
+
+    verify(this.artifactVersionRepository, never()).save(any());
+  }
+
+  private Resource stubStoredPom(final String relativePath) {
+    final Resource pom = new ByteArrayResource("<project/>".getBytes(StandardCharsets.UTF_8));
+    when(this.storageStrategy.get(pathOf(relativePath), eq("mvn"))).thenReturn(Optional.of(pom));
+
+    return pom;
   }
 }

@@ -56,7 +56,9 @@ import reactor.core.publisher.Mono;
 
 /**
  * RPS-1186: the signature of a POM ({@code .pom.asc}) is verified before it is stored, so a refused
- * one changes nothing.
+ * one changes nothing. RPS-1191: that holds for a body that is not a signature at all (invalid
+ * armor answers 422, it was a 500) and for a signature that verifies but whose POM has no
+ * registered version (404 {@code artifactVersionNotFound}, it used to be stored first).
  *
  * <p>It used to be stored first and verified second, and a refusal was rolled back by deleting the
  * version the signature belongs to: the artifact too when that was its only version, the group too
@@ -74,7 +76,7 @@ import reactor.core.publisher.Mono;
  * upload reported.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@DisplayName("Maven POM signature is verified before it is stored (RPS-1186)")
+@DisplayName("Maven POM signature is verified before it is stored (RPS-1186, RPS-1191)")
 class MavenPomSignatureIT extends AbstractIntegrationTest {
 
   private static final PgpTestKeys KEYS = PgpTestKeys.generate();
@@ -179,15 +181,19 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
   }
 
   private static byte[] pom(final String version) {
+    return pomOfGroup("com.acme", version);
+  }
+
+  private static byte[] pomOfGroup(final String groupId, final String version) {
     return """
         <project>
           <modelVersion>4.0.0</modelVersion>
-          <groupId>com.acme</groupId>
+          <groupId>%s</groupId>
           <artifactId>lib</artifactId>
           <version>%s</version>
         </project>
         """
-        .formatted(version)
+        .formatted(groupId, version)
         .getBytes(UTF_8);
   }
 
@@ -400,5 +406,51 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
     assertThat(stored(repo, GROUP_DIR)).doesNotExist();
     assertThat(this.artifactCount(repo)).isZero();
     assertThat(this.reportedUsage()).isEmpty();
+  }
+
+  @Test
+  @DisplayName(
+      "an .asc with invalid armor answers 422 (it was a 500) and stores nothing (RPS-1191)")
+  void anAscWithInvalidArmorIs422AndStoresNothing() throws Exception {
+    final var repo = this.mavenRepo(false);
+    final var admin = this.admin();
+    final var pom = pom("1.0");
+    final var jar = jar("1.0");
+    this.uploadOk(repo, admin, RELEASE_POM, pom);
+    this.uploadOk(repo, admin, RELEASE_JAR, jar);
+    final var armorOnly =
+        "-----BEGIN PGP SIGNATURE-----\n\n-----END PGP SIGNATURE-----\n".getBytes(UTF_8);
+
+    expectSignatureRefused(this.upload(repo, admin, RELEASE_ASC, armorOnly));
+
+    assertThat(Files.readAllBytes(stored(repo, RELEASE_POM))).isEqualTo(pom);
+    assertThat(Files.readAllBytes(stored(repo, RELEASE_JAR))).isEqualTo(jar);
+    assertThat(stored(repo, RELEASE_ASC)).doesNotExist();
+    assertThat(this.signedOf(repo, "lib", "1.0")).containsExactly(false);
+    assertThat(this.reportedUsage()).containsExactly(usageOf(repo, pom), usageOf(repo, jar));
+  }
+
+  @Test
+  @DisplayName("a verified signature of a POM without a version row answers 404 and stores nothing")
+  void aVerifiedSignatureOfAnUnregisteredPomIs404AndStoresNothing() throws Exception {
+    final var repo = this.mavenRepo(false);
+    final var admin = this.admin();
+    // The POM declares a groupId other than its directory's, so it is stored but not registered.
+    final var pom = pomOfGroup("org.other", "1.0");
+    this.uploadOk(repo, admin, RELEASE_POM, pom);
+    assertThat(this.artifactCount(repo)).isZero();
+    assertThat(this.signedOf(repo, "lib", "1.0")).isEmpty();
+
+    expectError(
+        this.upload(repo, admin, RELEASE_ASC, goodSignatureOf(pom)),
+        HttpStatus.NOT_FOUND,
+        "artifactVersionNotFound",
+        "artifactVersionNotFound",
+        "Artifact version is not found.");
+
+    assertThat(stored(repo, RELEASE_ASC)).doesNotExist();
+    assertThat(Files.readAllBytes(stored(repo, RELEASE_POM))).isEqualTo(pom);
+    assertThat(this.artifactCount(repo)).isZero();
+    assertThat(this.reportedUsage()).containsExactly(usageOf(repo, pom));
   }
 }

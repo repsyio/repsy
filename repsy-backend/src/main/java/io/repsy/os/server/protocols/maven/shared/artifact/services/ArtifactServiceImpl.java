@@ -565,14 +565,10 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
 
   private void markArtifactSigned(final Repo repo, final Gav gav) {
 
-    final var artifact = this.getArtifact(repo.getId(), gav.getArtifactId(), gav.getGroupId());
+    final var artifactVersion = this.findArtifactVersion(repo.getId(), gav);
 
-    if (artifact == null) {
-      throw new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND);
-    }
-
-    final var artifactVersion = this.getArtifactVersionByGav(artifact.getId(), gav);
-
+    // verifySignature refuses a signature without a registered version before it is stored, so
+    // this is a defensive check for a version that vanished in between.
     if (artifactVersion == null) {
       throw new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND);
     }
@@ -583,11 +579,28 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   }
 
   /**
+   * The registered version a file of {@code gav} belongs to (a snapshot file belongs to its base
+   * version), or {@code null} when the artifact or the version is not registered.
+   */
+  private @Nullable ArtifactVersion findArtifactVersion(final UUID repoId, final Gav gav) {
+
+    final var artifact = this.getArtifact(repoId, gav.getArtifactId(), gav.getGroupId());
+
+    if (artifact == null) {
+      return null;
+    }
+
+    return this.getArtifactVersionByGav(artifact.getId(), gav);
+  }
+
+  /**
    * Verifies the signature of a stored file before the signature itself is stored, so a refused
    * signature leaves no trace: nothing is written and no row or file is deleted (RPS-1186). It used
    * to run after the signature was stored, and the facade then rolled the whole version back.
    *
    * @throws ItemNotFoundException {@code itemNotFound} when the signed file is not stored
+   * @throws ItemNotFoundException {@code artifactVersionNotFound} when the POM is stored but its
+   *     version is not registered (RPS-1191)
    */
   @Override
   public void verifySignature(
@@ -601,6 +614,16 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
         this.storageStrategy
             .get(nonSignedStoragePath, repoInfo.getName())
             .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
+
+    // A POM is stored without a registered version when its declared groupId is not its path's
+    // (checkExtractedInfos skips it). A signature could then not be recorded, so it is refused
+    // here, before the key lookup and before anything is stored (RPS-1191).
+    final var gav =
+        ArtifactUtils.convertPathToGav(nonSignedStoragePath.getRelativePath().getPath());
+
+    if (gav == null || this.findArtifactVersion(repoInfo.getStorageKey(), gav) == null) {
+      throw new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND);
+    }
 
     final var customKeys = this.keyStoreService.findHostsByRepoId(repoInfo.getStorageKey());
 
