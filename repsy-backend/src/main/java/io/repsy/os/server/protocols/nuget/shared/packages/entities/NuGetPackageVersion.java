@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.nuget.shared.packages.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -53,7 +54,7 @@ public class NuGetPackageVersion {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private NuGetPackage nugetPackage;
 
-  @Column(name = "version", nullable = false, length = 64)
+  @Column(name = "version", nullable = false, length = NuGetPackageUtils.MAX_VERSION_LENGTH)
   private String version;
 
   @Column(name = "is_prerelease", nullable = false)
@@ -69,35 +70,36 @@ public class NuGetPackageVersion {
   private long downloadCount;
 
   @Nullable
-  @Column(name = "title", length = 256)
+  @Column(name = "title", length = NuGetPackageUtils.MAX_TITLE_LENGTH)
   private String title;
 
   @Nullable
   @Column(name = "description", columnDefinition = "clob")
   private String description;
 
+  // text in PostgreSQL and clob in H2: unbounded, and nothing cuts it before it is stored.
   @Nullable
-  @Column(name = "authors", length = 1024)
+  @Column(name = "authors", columnDefinition = "text")
   private String authors;
 
   @Nullable
-  @Column(name = "tags", length = 512)
+  @Column(name = "tags", length = NuGetPackageUtils.MAX_TAGS_LENGTH)
   private String tags;
 
   @Nullable
-  @Column(name = "icon_url", length = 512)
+  @Column(name = "icon_url", length = NuGetPackageUtils.MAX_URL_LENGTH)
   private String iconUrl;
 
   @Nullable
-  @Column(name = "license_url", length = 512)
+  @Column(name = "license_url", length = NuGetPackageUtils.MAX_URL_LENGTH)
   private String licenseUrl;
 
   @Nullable
-  @Column(name = "project_url", length = 512)
+  @Column(name = "project_url", length = NuGetPackageUtils.MAX_URL_LENGTH)
   private String projectUrl;
 
   @Nullable
-  @Column(name = "repository_url", length = 512)
+  @Column(name = "repository_url", length = NuGetPackageUtils.MAX_URL_LENGTH)
   private String repositoryUrl;
 
   @Nullable

@@ -84,12 +84,27 @@ public final class NuGetPackageUtils {
    */
   public static final long MAX_NUSPEC_BYTES = MEBIBYTE;
 
-  // The limits of the nuget_package_version columns. Where H2 and PostgreSQL differ (tags is text
-  // in PostgreSQL, varchar(1024) in H2) the smaller one applies.
-  private static final int MAX_VERSION_LENGTH = 64;
-  private static final int MAX_TITLE_LENGTH = 512;
-  private static final int MAX_TAGS_LENGTH = 1024;
-  private static final int MAX_URL_LENGTH = 512;
+  // The limits of the nuget_package and nuget_package_version varchar columns (V0005 migration).
+  // They are the single place for these numbers: the guards below cut, drop or reject a value at
+  // the limit, and the NuGetPackage and NuGetPackageVersion entities give the same value to
+  // @Column(length). Where H2 and PostgreSQL differ (tags is text in PostgreSQL, varchar(1024) in
+  // H2) the smaller one applies. NuGetSchemaAnnotationIT fails when one drifts from the schema.
+
+  /** The {@code nuget_package.package_id} column. The id pattern accepts at most 100 characters. */
+  public static final int MAX_PACKAGE_ID_LENGTH = 256;
+
+  /** The {@code nuget_package_version.version} column. */
+  public static final int MAX_VERSION_LENGTH = 64;
+
+  /** The {@code nuget_package_version.title} column. */
+  public static final int MAX_TITLE_LENGTH = 512;
+
+  /** The {@code nuget_package_version.tags} column (PostgreSQL: text, H2: varchar(1024)). */
+  public static final int MAX_TAGS_LENGTH = 1024;
+
+  /** The {@code icon_url}, {@code license_url}, {@code project_url} and {@code repository_url}. */
+  public static final int MAX_URL_LENGTH = 512;
+
   private static final Pattern NUGET_ID_PATTERN =
       Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$");
   private static final Pattern NUGET_VERSION_PATTERN =
