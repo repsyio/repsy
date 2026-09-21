@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.nuget.shared.packages.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -58,7 +59,7 @@ public class NuGetPackage {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private Repo repo;
 
-  @Column(name = "package_id", nullable = false, length = 128)
+  @Column(name = "package_id", nullable = false, length = NuGetPackageUtils.MAX_PACKAGE_ID_LENGTH)
   private String packageId;
 
   @CreationTimestamp
