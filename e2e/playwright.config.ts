@@ -32,12 +32,19 @@ export default defineConfig({
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['junit', { outputFile: 'test-results/junit.xml' }],
   ],
-  timeout: 30_000,
+  // A real `mvn deploy`/`dependency:get` (network round trips, cold JVM/plugin startup) is slower
+  // than the skeleton's plain HTTP calls; 30s (this file's default before maven existed) was too
+  // tight for it.
+  timeout: 120_000,
   expect: { timeout: 10_000 },
   projects: [
     {
       name: 'skeleton',
       testMatch: 'skeleton/**/*.spec.ts',
+    },
+    {
+      name: 'maven',
+      testMatch: 'maven/**/*.spec.ts',
     },
   ],
 });

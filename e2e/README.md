@@ -2,10 +2,13 @@
 
 An end-to-end protocol-test harness (Playwright + TypeScript), outside the Maven reactor, that
 drives real client flows (`mvn deploy`, `npm publish`, ...) against a real Repsy instance, with all
-data seeded through the panel API. This is **step 1 ("skeleton")** of the harness: tooling, config,
-the panel API client, a seeder with cleanup, a sweep script and the stack/runner containers. It
-proves the mechanism with one test suite (`tests/skeleton`); the scenario matrix and the protocol
-client adapters are later steps.
+data seeded through the panel API. Step 1 ("skeleton") built the tooling, config, the panel API
+client, a seeder with cleanup, a sweep script and the stack/runner containers, proven by one test
+suite (`tests/skeleton`). This is **step 2 ("scenario engine + maven")**: the scenario model
+(`src/scenarios/`) and its catalog, the maven client adapter and runner, and the full catalog
+running green against a local stack. Every other protocol (npm, cargo, nuget, docker, helm, pypi,
+golang, ruby) replicates the same model in later steps; nothing about the model itself is
+maven-specific.
 
 ## Rules
 
@@ -27,11 +30,12 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 ```
 e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example
-  playwright.config.ts        # one project so far: "skeleton"
+  playwright.config.ts        # one project per protocol: "skeleton", "maven"
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres:18 + Repsy, started/stopped by `run.sh local up|down`
-  docker-compose.runners.yml   # one runner service per protocol; "skeleton" for now
-  runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; every runner FROMs this
+  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven"
+  runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
+  runners/maven.Dockerfile     # + pinned Temurin/Maven; see "Adding a protocol adapter" below
   runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
   src/
     env.ts                     # typed config from env/.env
@@ -44,9 +48,21 @@ e2e/
       seeder.ts                 # createUser/createRepo/setSettings/createToken + cleanup()
       sweep.ts                  # deletes e2e-* leftovers older than N hours (or --all)
     scenarios/
-      fixtures.ts                # the base Playwright fixture: seeder with automatic cleanup
+      types.ts                  # Scenario/Outcome model, outcomeForStatus()
+      catalog.ts                # the scenario matrix -- see "Scenario model" below
+      world.ts                  # World/Coordinates types, the seed-publisher registry
+      fixtures.ts                # Playwright fixtures: panelApi, seeder, world(scenario, protocol)
+      remote-throttle.ts        # RemoteAuthBudget/withBackoff429 -- see "Remote hardening" below
+    clients/
+      exec.ts                   # execa wrapper: isolated work dir/HOME, redacted logs, attach-on-fail
+      maven.ts                  # the maven adapter: publish()/resolve(), raw-HTTP status pinning
+    packages/
+      maven/                    # mustache templates of the tiny jar project + settings.xml
   tests/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe
+    maven/
+      publish-consume.spec.ts   # the scenario loop for maven
+      remote-throttle.spec.ts   # sanity check of RemoteAuthBudget/withBackoff429, no server needed
 ```
 
 ## Setup
@@ -78,21 +94,162 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 - **remote** — an already-running instance the harness does not own or reset. Throttle cannot be
   tuned and nothing global is touched; later steps add a failure budget and a preflight check.
 
+## Scenario model
+
+A scenario (`src/scenarios/types.ts`) is data, not a test file: an id, tags, the repo settings it
+needs, which credential it uses, and the `Outcome` (`'ok' | 'unauthorized' | 'forbidden' |
+'conflict' | 'rejected'`) expected for a publish and a consume attempt. `src/scenarios/catalog.ts`
+holds the one shared catalog every protocol draws from; `scenariosFor(catalog, protocol)` filters it
+to the scenarios that protocol applies to (a scenario can restrict itself to specific protocols via
+its `protocols` field — see `maven-releases-off`/`maven-snapshots-off`, maven-only).
+
+`fixtures.ts`'s `world(scenario, protocol)` fixture turns a scenario into a ready-to-test `World`
+(`src/scenarios/world.ts`): a fresh repo with the scenario's settings applied, the credential
+materialised through the panel API (expired = past `expiration_date`, revoked = create then revoke,
+rotated-old = create, rotate, and deliberately keep the _old_ value, other-repo = a token from a
+second seeded repo, user-password = a seeded `USER`-role user, wrong-password = a real username with
+a wrong password, anonymous = no credential at all), and, for a scenario whose own credential cannot
+publish but is still expected to consume successfully, a package pre-published with the admin
+credential first. Everything created is tracked by the `Seeder` and removed in test teardown.
+
+A spec is then a loop over `scenariosFor(SCENARIOS, protocol)` (see
+`tests/maven/publish-consume.spec.ts`): for each scenario, seed the `World`, publish with it,
+assert the expected `Outcome`, then consume with it and assert that `Outcome` too.
+
+### Two coordinates, not one
+
+`World` carries `publishTarget` and `consumeTarget` (both `{ packageName, version }`), not a single
+package: for most scenarios they are the same coordinate, but a scenario whose own publish is
+expected to fail needs `consumeTarget` to be a _separate_ one an admin already pre-published.
+Reusing the exact coordinate the scenario's own (doomed) publish attempt targets would make that
+attempt a **redeploy** of something that already exists rather than a fresh push — and Repsy's own
+`handleDeployTypeRules` skips the release/snapshot check entirely for a redeploy (only the
+allow-override check still applies), which would silently turn `maven-releases-off`/
+`maven-snapshots-off`'s "publish a prohibited version type" test into a no-op "redeploy an existing
+artifact" test instead, passing for the wrong reason. `no-override`/`override` are the deliberate
+exception: reusing the same coordinate for both is the whole point of those two (a second write to
+existing coordinates is exactly what `allowOverride` gates).
+
+### Scenario outcomes pinned against a running instance
+
+Every `expect` in `catalog.ts` was pinned by probing `./run.sh local up` with `curl`, not assumed
+from the plan's table (see that file's header comment for the full detail and reasoning):
+
+| scenario                            | publish (real)           | consume (real)           | plan guessed instead                    |
+| ----------------------------------- | ------------------------ | ------------------------ | --------------------------------------- |
+| token-ro                            | `401 unauthorized`       | `200 ok`                 | publish: forbidden (403)                |
+| no-override (2nd publish)           | `403 forbidden`          | `200 ok`                 | publish: conflict (409)                 |
+| maven-releases-off (RELEASE push)   | `403 forbidden`          | `200 ok`                 | publish: "rejected", unspecified status |
+| maven-snapshots-off (SNAPSHOT push) | `403 forbidden`          | `200 ok`                 | publish: "rejected", unspecified status |
+| everything else                     | matches the plan's table | matches the plan's table | —                                       |
+
+In short: `ProtocolAuthService.authorizeDeployToken` (a read-only token attempting a write) throws
+the same plain `UnAuthorizedException` it throws for "no credentials at all", so `token-ro`'s publish
+gets a 401, not a distinct "forbidden" status — Repsy has no separate "authenticated but
+insufficient permission" status for a deploy token. Rejecting an override, a release version or a
+snapshot version throws `AccessNotAllowedException`, which `ErrorHandler` maps to 403 — not the
+plan's 409/"conflict".
+
+### Adding a scenario
+
+Add an entry to `SCENARIOS` in `catalog.ts` with a unique `id`, the repo settings and credential it
+needs, and the pinned `Outcome`s — pin them by probing a running instance the way the header comment
+of that file describes, don't guess. Restrict it to specific protocols via `protocols` if it only
+makes sense for some (like the maven-only settings scenarios). It is picked up automatically by
+every protocol spec that calls `scenariosFor(SCENARIOS, protocol)`.
+
+### Adding a protocol adapter
+
+1. `src/clients/<protocol>.ts`: `publish(world)`/`resolve(world)` (or that protocol's equivalent
+   verbs) returning an `AdapterResult` (`{ outcome, httpStatus, clientExitCode, command }`), derived
+   from a **raw HTTP request with the same credential**, not from the client's exit code (see
+   `clients/maven.ts`'s file header: a real client hides the HTTP status behind its own exit code).
+   Register a seed publisher at module load: `registerSeedPublisher('<protocol>', async (world) =>
+{...})` (see `scenarios/world.ts`).
+2. `src/packages/<protocol>/`: mustache templates of a tiny publishable project.
+3. `runners/<protocol>.Dockerfile`: the toolchain that protocol's client needs, pinned versions as
+   build args. See `runners/maven.Dockerfile`'s header comment for why it repeats
+   `runners/base.Dockerfile`'s early layers instead of `FROM`ing it as a separately built image.
+4. A service in `docker-compose.runners.yml` (copy the `maven` service: same `x-runner-common`/
+   `x-runner-environment` anchors, its own named volume for third-party downloads if the client
+   caches those).
+5. A project in `playwright.config.ts` (`testMatch: '<protocol>/**/*.spec.ts'`).
+6. `tests/<protocol>/publish-consume.spec.ts`: the scenario loop (copy
+   `tests/maven/publish-consume.spec.ts`).
+7. Restrict any scenario your adapter cannot express (or add one only it needs) via the catalog
+   entry's `protocols` field.
+
+## Maven runner
+
+`runners/maven.Dockerfile` adds a pinned Eclipse Temurin JDK and Apache Maven (build args
+`TEMURIN_VERSION`, `MAVEN_VERSION`) to the harness image. `clients/maven.ts` renders
+`src/packages/maven/{pom,settings}.template.xml` into a per-invocation isolated work directory
+(`clients/exec.ts`) and runs the real `mvn` binary:
+
+- **`publish`**: `mvn -B -ntp deploy -s settings.xml` with a fresh, empty
+  `-Dmaven.repo.local` and `-Dmaven.repo.local.tail` pointed at a shared cache (below).
+- **`resolve`**: `mvn -B -ntp dependency:get -Dartifact=<g>:<a>:<v>:jar
+-DremoteRepositories=repsy::default::<repoUrl>` in a separate, also-fresh `-Dmaven.repo.local` —
+  never the one `publish` used. `mvn deploy` also runs `install`, which copies the artifact into
+  whatever local repo that invocation used, so reusing one repo between a test's own publish and
+  resolve would let resolution succeed from that local copy without ever asking the Repsy server.
+
+Third-party downloads (Maven's own core plugins and their dependencies from Maven Central) are kept
+separate from that per-test local repo: `MAVEN_SHARED_REPO_DIR` (a named Docker volume,
+`docker-compose.runners.yml`) is passed to every `mvn` invocation as `-Dmaven.repo.local.tail`, a
+read-only fallback repo Maven consults before going to Central. A tail repo is never written to by a
+fresh download (only read from), so `clients/maven.ts`'s `ensureSharedCacheWarm` primes it once —
+guarded by an exclusive-create of a marker file, so it happens at most once per volume, not once per
+test or per worker — with a throwaway `mvn package` (compiler/jar/install/deploy plugins) and a
+throwaway `dependency:get` (the dependency plugin itself). This harness's own test artifacts never
+end up in that shared cache: they always live under the unique `io.repsy.e2e.<runid>` groupId, which
+a tail lookup can never already hold.
+
+Because `mvn` hides the HTTP status behind its own exit code, `clients/maven.ts` also does a raw
+HTTP PUT (publish) or GET (consume, of the repo root — see that file's comment on why the repo root
+rather than the artifact's own resolved path) with the same credential, and derives the `Outcome`
+from that raw status, not from `mvn`'s exit code.
+
+```bash
+./run.sh test --protocol maven
+```
+
+## Remote hardening
+
+On a `remote` target (`target.isRemote`, see `src/target.ts`), `AUTH_THROTTLE_MAX_FAILURES` cannot
+be raised the way `docker-compose.stack.yml` does for `local`/`ci`, so a `@negative` scenario's
+failed-auth attempts have to stay under the server's own budget (20 failures / 60s per client) or
+trip it for every client behind the same address, admin login included. `@negative`-tagged scenarios
+run serially on a remote target instead of in parallel (`tests/maven/publish-consume.spec.ts`'s
+`test.describe.configure({ mode: target.isRemote ? 'serial' : 'parallel' })`), and each reserves a
+slot from `RemoteAuthBudget` (`src/scenarios/remote-throttle.ts`) first, waiting out the window
+rather than firing the request and finding out from a 429; a protocol adapter's raw-HTTP checks back
+off once and retry on an actual 429 via `withBackoff429`. `@local-only`-tagged scenarios (none exist
+in the catalog yet — nothing in it needs a server restart or special env) are skipped on remote.
+`tests/maven/remote-throttle.spec.ts` is a small, server-free sanity check of this accounting logic,
+with an injected fake clock/sleep so it runs in milliseconds instead of really waiting.
+
+Untested by this step (no remote instance to test against): a preflight check that verifies admin
+login and refuses to run if the run prefix already exists, and never touching anything global on a
+real shared remote. Both are called out in the plan as later, "remote hardening" work.
+
 ## Running
 
 ```bash
 ./run.sh local up            # starts postgres:18 + Repsy (built from the repo root Dockerfile;
                               # set REPSY_IMAGE to test a published image instead)
 ./run.sh test                # runs the "skeleton" runner container against it
+./run.sh test --protocol maven
+./run.sh test --protocol skeleton,maven
 ./run.sh test --grep '@smoke'
-./run.sh test -b             # rebuild the runner image first (Dockerfile/lockfile changed)
+./run.sh test -b             # rebuild the runner image(s) first (Dockerfile/lockfile changed)
 ./run.sh local down
 ./run.sh sweep               # deletes e2e-* leftovers older than 24h; --hours N or --all
 ```
 
 `run.sh test` accepts `--target local|remote|ci` and `--protocol a,b` (a comma-separated list of
-runner services; only `skeleton` exists today). Reports land under `e2e/test-results/` (JUnit XML)
-and `e2e/playwright-report/` (HTML).
+runner services: `skeleton`, `maven`). Reports land under `e2e/test-results/` (JUnit XML) and
+`e2e/playwright-report/` (HTML).
 
 Editing a test, a file under `src/`, or the openapi spec needs no image rebuild: both are
 bind-mounted into the runner container, which regenerates the API client on every start. Only a
@@ -142,7 +299,13 @@ pnpm exec prettier --check .
 
 ```bash
 ./run.sh local up
-./run.sh test
-./run.sh test        # again, without resetting the stack — proves run isolation
+./run.sh test --protocol maven
+./run.sh test --protocol maven   # again, without resetting the stack — proves run isolation
+./run.sh test                    # the skeleton project
 ./run.sh local down
 ```
+
+After a run, confirm no `e2e-*` repos or users remain: `GET /api/repos/{repoType}/info` for every
+`RepoType` and `GET /api/users` should list none. A meaningfulness check for the maven catalog:
+temporarily flip one scenario's expectation in `catalog.ts` (e.g. `token-expired`'s publish to
+`'ok'`), confirm `./run.sh test --protocol maven --grep token-expired` fails, then restore it.

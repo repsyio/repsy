@@ -19,25 +19,34 @@
 # containers as "orphans" of this one merely because both files would otherwise share a name.
 name: repsy-e2e-runners
 
+# Shared by every service below (YAML merge key, `<<: *runner-common`): only mappings (`user`,
+# `environment`) merge this way, not lists, so each service still spells out its own `volumes:` in
+# full rather than aliasing this block's (there is no shared list here to alias).
+x-runner-common: &runner-common
+  network_mode: host
+  # Runs as the invoking host user (run.sh exports HOST_UID/HOST_GID), not the image's default
+  # root, so files this writes into the bind-mounted directories below (the regenerated API
+  # client, test reports) are owned by that user on the host, not root.
+  user: '${HOST_UID:-1000}:${HOST_GID:-1000}'
+
+x-runner-environment: &runner-environment
+  HOME: /tmp
+  REPSY_API_BASE_URL: ${REPSY_API_BASE_URL:-http://localhost:8080}
+  REPSY_REPO_BASE_URL: ${REPSY_REPO_BASE_URL:-http://localhost:9090}
+  REPSY_ADMIN_USERNAME: ${REPSY_ADMIN_USERNAME:-admin}
+  REPSY_ADMIN_PASSWORD: ${REPSY_ADMIN_PASSWORD:?Set REPSY_ADMIN_PASSWORD in e2e/.env}
+  REPSY_TARGET: ${REPSY_TARGET:-local}
+  REPSY_E2E_RUN_ID: ${REPSY_E2E_RUN_ID:-}
+  REPSY_E2E_INSECURE_REGISTRY: ${REPSY_E2E_INSECURE_REGISTRY:-}
+
 services:
   skeleton:
+    <<: *runner-common
     build:
       context: .
       dockerfile: runners/base.Dockerfile
-    network_mode: host
-    # Runs as the invoking host user (run.sh exports HOST_UID/HOST_GID), not the image's default
-    # root, so files this writes into the bind-mounted directories below (the regenerated API
-    # client, test reports) are owned by that user on the host, not root.
-    user: '${HOST_UID:-1000}:${HOST_GID:-1000}'
     environment:
-      HOME: /tmp
-      REPSY_API_BASE_URL: ${REPSY_API_BASE_URL:-http://localhost:8080}
-      REPSY_REPO_BASE_URL: ${REPSY_REPO_BASE_URL:-http://localhost:9090}
-      REPSY_ADMIN_USERNAME: ${REPSY_ADMIN_USERNAME:-admin}
-      REPSY_ADMIN_PASSWORD: ${REPSY_ADMIN_PASSWORD:?Set REPSY_ADMIN_PASSWORD in e2e/.env}
-      REPSY_TARGET: ${REPSY_TARGET:-local}
-      REPSY_E2E_RUN_ID: ${REPSY_E2E_RUN_ID:-}
-      REPSY_E2E_INSECURE_REGISTRY: ${REPSY_E2E_INSECURE_REGISTRY:-}
+      <<: *runner-environment
     volumes:
       # The openapi spec, at the same path relative to /app that gen:api's "../repsy-backend/..."
       # resolves to, so it (and any edit to it) reaches the container without a rebuild.
@@ -46,3 +55,29 @@ services:
       - ./tests:/app/tests:ro
       - ./test-results:/app/test-results
       - ./playwright-report:/app/playwright-report
+
+  maven:
+    <<: *runner-common
+    build:
+      context: .
+      dockerfile: runners/maven.Dockerfile
+      args:
+        TEMURIN_VERSION: '21'
+        MAVEN_VERSION: '3.9.9'
+    environment:
+      <<: *runner-environment
+      # Read by clients/maven.ts: Maven's shared, third-party-only "local repository tail" (see that
+      # file's header comment) -- never this harness's own test artifacts.
+      MAVEN_SHARED_REPO_DIR: /app/.maven-shared-m2
+    volumes:
+      - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
+      - ./src:/app/src
+      - ./tests:/app/tests:ro
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+      - maven_m2_shared:/app/.maven-shared-m2
+
+volumes:
+  # Named (not bind-mounted): holds only downloaded third-party Maven plugins/dependencies, so it
+  # persists across `run.sh test` invocations without leaving anything in the working tree.
+  maven_m2_shared: {}

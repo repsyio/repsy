@@ -61,20 +61,34 @@ export function isRunPrefixed(name: string): boolean {
   return name.startsWith(`${RUN_PREFIX}-`);
 }
 
-const SALT_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
-const SALT_LENGTH = 2;
+/**
+ * Base-36, lower-case only (so it stays within the username pattern `^[a-z0-9_\-]+$`), left-padded
+ * to `width`. Used to keep `perTestRunId`'s suffix both compact and deterministic.
+ */
+function toBase36(value: number, width: number): string {
+  return value.toString(36).padStart(width, '0');
+}
 
 /**
- * A per-test variant of a run id: the same id with a couple of random characters appended. Two
- * tests that share one `REPSY_E2E_RUN_ID` (every test in one `run.sh test` invocation does, so a
- * sweep can find them all by the shared `e2e-` prefix) each get their own `Seeder`, and each
- * `Seeder`'s sequence numbers for repos/users/tokens start at 1 — without this, two tests running
- * in parallel workers would both try to create `e2e-<runid>-maven-1` and the second would 409.
+ * A per-test variant of a run id: the same id with a worker index and a per-worker test counter
+ * appended, instead of step 1's random 2-char salt. Two tests that share one `REPSY_E2E_RUN_ID`
+ * (every test in one `run.sh test` invocation does, so a sweep can find them all by the shared
+ * `e2e-` prefix) each get their own `Seeder`, and each `Seeder`'s sequence numbers for
+ * repos/users/tokens start at 1 — without a per-test variant, two tests running in parallel workers
+ * would both try to create `e2e-<runid>-maven-1` and the second would 409.
+ *
+ * `parallelIndex` (Playwright's `TestInfo.parallelIndex`) is stable per worker slot and distinct
+ * across every worker running at once, so pairing it with a counter that a worker increments once
+ * per test it runs is collision-free without coordinating across processes or relying on chance,
+ * unlike a random salt: two workers can never share a `(parallelIndex, testSeq)` pair, and one
+ * worker never reuses its own. `testSeq` must be provided by a counter the caller owns (a
+ * module-level counter in `fixtures.ts`, one per worker process) since Playwright gives no
+ * built-in "test index within this worker".
+ *
+ * One worker-index digit supports 36 concurrent workers; three counter digits support 46655 tests
+ * in one worker before it would repeat — both are exhausted long before `e2e-<runid>-<protocol>-<n>`
+ * (25-char limit) would be, so the total format stays `e2e-<runid(6)><worker(1)><seq(3)>-...`.
  */
-export function perTestRunId(runId: string): string {
-  let salt = '';
-  for (let i = 0; i < SALT_LENGTH; i += 1) {
-    salt += SALT_ALPHABET[Math.floor(Math.random() * SALT_ALPHABET.length)];
-  }
-  return `${runId}${salt}`;
+export function perTestRunId(runId: string, parallelIndex: number, testSeq: number): string {
+  return `${runId}${toBase36(parallelIndex, 1)}${toBase36(testSeq, 3)}`;
 }
