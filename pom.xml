@@ -72,6 +72,32 @@
         </configuration>
       </plugin>
 
+      <!--
+        e2e/ is outside the Maven reactor (not in <modules>) but still under this pom's basedir, so
+        core-parent's RAT execution (bound to the "verify" phase) still scans it. Its own dotfiles
+        (.dockerignore, .env.example, .prettierignore) have no counterpart in core-parent's default
+        excludes, and node_modules/, src/api/generated/, test-results/ and playwright-report/ are
+        generated or third-party content (all git-ignored, see e2e/.gitignore) that was never meant
+        to carry a licence header. Everything else under e2e/ (*.ts, Dockerfiles, run.sh, ...) is a
+        source file and does carry one. combine.children="append" adds these to core-parent's list
+        instead of replacing it, which is what a same-named <excludes> block does by default.
+      -->
+      <plugin>
+        <groupId>org.apache.rat</groupId>
+        <artifactId>apache-rat-plugin</artifactId>
+        <configuration>
+          <excludes combine.children="append">
+            <exclude>e2e/.dockerignore</exclude>
+            <exclude>e2e/.env.example</exclude>
+            <exclude>e2e/.prettierignore</exclude>
+            <exclude>e2e/node_modules/**</exclude>
+            <exclude>e2e/src/api/generated/**</exclude>
+            <exclude>e2e/test-results/**</exclude>
+            <exclude>e2e/playwright-report/**</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
