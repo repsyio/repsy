@@ -37,6 +37,23 @@ public interface NuGetPackageVersionRepository extends JpaRepository<NuGetPackag
   Optional<NuGetPackageVersion> findByNugetPackageIdAndVersionIgnoreCase(
       UUID packageId, String version);
 
+  boolean existsByNugetPackageIdAndVersionIgnoreCase(UUID packageId, String version);
+
+  /**
+   * The versions stored with build metadata. The newest come first, so that when several of them
+   * canonicalize to the same version the latest push is the one that keeps it.
+   */
+  @Query(
+      """
+      select new io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetBuildMetadataVersion(
+          v.id, p.id, p.repo.id, p.repo.name, p.packageId, v.version)
+      from NuGetPackageVersion v
+        join v.nugetPackage p
+      where v.version like '%+%'
+      order by v.publishedAt desc, v.id
+      """)
+  List<NuGetBuildMetadataVersion> findAllWithBuildMetadata();
+
   @Modifying
   @Query("UPDATE NuGetPackageVersion v SET v.downloadCount = v.downloadCount + 1 WHERE v.id = :id")
   void incrementDownloadCount(@Param("id") UUID id);
