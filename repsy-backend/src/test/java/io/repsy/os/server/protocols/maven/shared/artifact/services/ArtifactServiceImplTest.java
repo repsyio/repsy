@@ -358,9 +358,13 @@ class ArtifactServiceImplTest {
         "com/acme/lib/1.0/lib-1.0",
         "com/acme/lib/1.0/jars/lib.jar",
         "com/acme/lib/1.0-SNAPSHOT/stray.txt",
-        "com/acme/lib/1.0-SNAPSHOT/b-1.0-SNAPSHOT.jar"
+        "com/acme/lib/1.0-SNAPSHOT/b-1.0-SNAPSHOT.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-2.0-SNAPSHOT.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-2.0-20260921.101010-1.pom",
+        "com/acme/lib/1.0-SNAPSHOT/lob-1.0-SNAPSHOT.jar"
       })
-  @DisplayName("a path outside the artifact layout is refused before any query (RPS-1182)")
+  @DisplayName(
+      "a path outside the artifact layout is refused before any query (RPS-1182, RPS-1184)")
   void refusesAPathOutsideTheArtifactLayoutBeforeAnyQuery(final String path) {
     final var id = UUID.randomUUID();
 
@@ -388,7 +392,9 @@ class ArtifactServiceImplTest {
     "com/acme/lib_2.13/1.0/lib_2.13-1.0.jar, RELEASE",
     "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.jar, SNAPSHOT",
     "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1-sources.jar, SNAPSHOT",
-    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar, SNAPSHOT"
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar, SNAPSHOT",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT-sources.jar, SNAPSHOT",
+    "com/acme/lib/1.0-beta-SNAPSHOT/lib-1.0-beta-20260921.101010-1.jar, SNAPSHOT"
   })
   @DisplayName("the files real Maven, Gradle and sbt clients send are classified (RPS-1182)")
   void classifiesTheFilesRealClientsSend(final String path, final ArtifactVersionType versionType) {

@@ -60,12 +60,15 @@ import org.springframework.transaction.annotation.Transactional;
  * snapshots, the artifact rows, the scanner) is keyed on the GAV and a file without one would
  * bypass them. Sonatype Nexus refuses the same paths with 400 under its strict layout policy.
  *
+ * <p>A file in a {@code SNAPSHOT} directory must also carry that directory's artifactId and base
+ * version, literal or timestamped (RPS-1184); the GAV parser only checks where the marker sits.
+ *
  * <p>The files that real Maven, Gradle and sbt clients send all parse to a GAV and keep being
  * stored. Runs without a test transaction, like {@link MavenMetadataUploadIT}, and deletes the
  * repos and users it commits.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@DisplayName("Maven refuses a path outside the artifact layout (RPS-1182)")
+@DisplayName("Maven refuses a path outside the artifact layout (RPS-1182, RPS-1184)")
 class MavenArtifactPathIT extends AbstractIntegrationTest {
 
   private static final String LIB_DIR = "com/acme/lib/";
@@ -74,6 +77,15 @@ class MavenArtifactPathIT extends AbstractIntegrationTest {
   private static final String INVALID_PATH_TEXT =
       "The path is not a valid Maven artifact path. Expected"
           + " <group>/<artifactId>/<version>/<artifactId>-<version>[-<classifier>].<extension>.";
+  private static final String SNAPSHOT_POM =
+      """
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.acme</groupId>
+        <artifactId>lib</artifactId>
+        <version>1.0-SNAPSHOT</version>
+      </project>
+      """;
   private static final String MALFORMED_POM =
       "<project><modelVersion>4.0.0</modelVersion><groupId>";
 
@@ -113,7 +125,11 @@ class MavenArtifactPathIT extends AbstractIntegrationTest {
           RELEASE_DIR + "lib-1.0.module.sha512",
           "com/acme/lib_2.13/1.0/lib_2.13-1.0.jar",
           SNAPSHOT_DIR + "lib-1.0-20260921.101010-1.jar",
-          SNAPSHOT_DIR + "lib-1.0-SNAPSHOT.jar");
+          SNAPSHOT_DIR + "lib-1.0-SNAPSHOT.jar",
+          SNAPSHOT_DIR + "lib-1.0-20260921.101010-1-sources.jar",
+          SNAPSHOT_DIR + "lib-1.0-20260921.101010-1.module",
+          SNAPSHOT_DIR + "lib-1.0-SNAPSHOT-sources.jar",
+          SNAPSHOT_DIR + "lib-1.0-20260921.101010-1.jar.sha1");
 
   @MockitoBean private UsageUpdateService usageUpdateService;
 
@@ -242,7 +258,12 @@ class MavenArtifactPathIT extends AbstractIntegrationTest {
         "com/acme/lib/1.0/lib-1.0",
         "com/acme/lib/1.0-SNAPSHOT/stray.txt",
         // M2GavCalculator throws IndexOutOfBoundsException for this one instead of answering null.
-        "com/acme/lib/1.0-SNAPSHOT/b-1.0-SNAPSHOT.jar"
+        "com/acme/lib/1.0-SNAPSHOT/b-1.0-SNAPSHOT.jar",
+        // RPS-1184: a file of a SNAPSHOT directory named for another artifactId or version.
+        "com/acme/lib/1.0-SNAPSHOT/lib-2.0-SNAPSHOT.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-2.0-20260921.101010-1.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lob-1.0-SNAPSHOT.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOTX.jar"
       })
   @DisplayName("a path outside the artifact layout is refused with 400 and nothing is stored")
   void pathsOutsideTheLayoutAreRefusedAndNothingIsStored(final String path) throws Exception {
@@ -259,6 +280,38 @@ class MavenArtifactPathIT extends AbstractIntegrationTest {
     assertThat(stored(repo, path)).doesNotExist();
     assertThat(this.downloadStatus(repo, admin, path)).isEqualTo(404);
     verifyNoInteractions(this.usageUpdateService);
+  }
+
+  @Test
+  @DisplayName(
+      "a file of another version is refused even when the snapshot version exists (RPS-1184)")
+  void aFileOfAnotherVersionIsRefusedEvenWhenTheSnapshotVersionExists() throws Exception {
+    final var repo = this.mavenRepo();
+    final var admin = this.admin();
+    this.settings(repo, admin);
+
+    final var seeded =
+        this.upload(
+            repo,
+            admin,
+            SNAPSHOT_DIR + "lib-1.0-20260921.101010-1.pom",
+            SNAPSHOT_POM,
+            MediaType.APPLICATION_XML);
+    assertThat(seeded.andReturn().getResponse().getStatus()).isEqualTo(200);
+    assertThat(this.artifactRows(repo)).isOne();
+
+    final var other = SNAPSHOT_DIR + "lib-2.0-SNAPSHOT.jar";
+
+    expectError(
+        this.upload(repo, admin, other, "hello", MediaType.APPLICATION_OCTET_STREAM),
+        HttpStatus.BAD_REQUEST,
+        "invalidArtifactPath",
+        "invalidArtifactPath",
+        INVALID_PATH_TEXT);
+
+    assertThat(stored(repo, other)).doesNotExist();
+    assertThat(this.downloadStatus(repo, admin, other)).isEqualTo(404);
+    assertThat(this.artifactRows(repo)).isOne();
   }
 
   @Test

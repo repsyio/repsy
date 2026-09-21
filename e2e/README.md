@@ -202,6 +202,11 @@ What the server does, per rule (all pinned above or in `tests/maven/upload-rules
   new timestamped files and re-uploads the metadata, so it **succeeds** under `allowOverride: false`
   (`snapshot-redeploy-no-override`: real client exit 0, consumer resolves buildNumber 2). Only a name
   that already exists is an override, and a real client never sends one twice.
+- **A snapshot-directory file named for another artifact or version** (`lib-2.0-SNAPSHOT.jar`,
+  `other-1.0-SNAPSHOT.jar`, `lib-1.0-SNAPSHOTX.jar` in `g/lib/1.0-SNAPSHOT/`) is refused with
+  `400 invalidArtifactPath` and stores nothing: the file name must start with the directory's
+  artifactId and base version, literal or timestamped (RPS-1184). The GAV parser only checks where
+  the `SNAPSHOT` marker sits, so the server compares the rest itself.
 - A raw PUT must send an explicit `Content-Type`, or the body is consumed as form data and the
   server answers 400 (see the comment in `clients/maven.ts`).
 

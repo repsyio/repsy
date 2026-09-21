@@ -215,7 +215,27 @@ class ArtifactUtilsTest {
         "com/acme/lib_2.13/1.0/lib_2.13-1.0.jar, com.acme, lib_2.13, 1.0, NULL, jar",
         "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1-sources.jar, com.acme, lib,"
             + " 1.0-20260921.101010-1, sources, jar",
-        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar, com.acme, lib, 1.0-SNAPSHOT, NULL, jar"
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar, com.acme, lib, 1.0-SNAPSHOT, NULL, jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT-sources.jar, com.acme, lib, 1.0-SNAPSHOT,"
+            + " sources, jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.module, com.acme, lib, 1.0-SNAPSHOT, NULL,"
+            + " module",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar.sha1, com.acme, lib, 1.0-SNAPSHOT, NULL,"
+            + " jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.pom.asc, com.acme, lib,"
+            + " 1.0-20260921.101010-1, NULL, pom",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-12-kotlin-tooling-metadata.json,"
+            + " com.acme, lib, 1.0-20260921.101010-12, kotlin-tooling-metadata, json",
+        "com/acme/lib/1.0-beta-SNAPSHOT/lib-1.0-beta-20260921.101010-1.jar, com.acme, lib,"
+            + " 1.0-beta-20260921.101010-1, NULL, jar",
+        "com/acme/lib/2.0.0-rc.1-SNAPSHOT/lib-2.0.0-rc.1-SNAPSHOT.jar, com.acme, lib,"
+            + " 2.0.0-rc.1-SNAPSHOT, NULL, jar",
+        "com/acme/lib/SNAPSHOT/lib-20260921.101010-1.jar, com.acme, lib, 20260921.101010-1,"
+            + " NULL, jar",
+        "com/acme/lib_2.13/1.0-SNAPSHOT/lib_2.13-1.0-20260921.101010-1.jar, com.acme, lib_2.13,"
+            + " 1.0-20260921.101010-1, NULL, jar",
+        "com/acme/lib-core/1.0-SNAPSHOT/lib-core-1.0-SNAPSHOT.jar, com.acme, lib-core,"
+            + " 1.0-SNAPSHOT, NULL, jar"
       })
   @DisplayName(
       "calculates the GAV of the files real Maven, Gradle and sbt clients send, with the signature"
@@ -235,6 +255,29 @@ class ArtifactUtilsTest {
     assertThat(gav.getVersion()).isEqualTo(version);
     assertThat(gav.getClassifier()).isEqualTo(classifier);
     assertThat(gav.getExtension()).isEqualTo(extension);
+  }
+
+  @ParameterizedTest(name = "{0} has no GAV")
+  @ValueSource(
+      strings = {
+        "com/acme/lib/1.0-SNAPSHOT/lib-2.0-SNAPSHOT.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.1-SNAPSHOT.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-2.0-20260921.101010-1.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lob-1.0-SNAPSHOT.jar",
+        "com/acme/lib/1.0-SNAPSHOT/Lib-1.0-SNAPSHOT.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-core-1.0-SNAPSHOT.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOTX.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921-101010-1.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-2026092.1010101-1.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-2.0-SNAPSHOT.jar.sha1",
+        "com/acme/lib/1.0-SNAPSHOT/lib-2.0-SNAPSHOT.pom.asc",
+        "com/acme/lib/1.0-beta-SNAPSHOT/lib-1.0-20260921.101010-1.jar"
+      })
+  @DisplayName(
+      "a file in a SNAPSHOT directory must carry that directory's artifactId and base version"
+          + " (RPS-1184)")
+  void noGavForASnapshotFileOfAnotherArtifactOrVersion(final String path) {
+    assertThat(ArtifactUtils.getGavByFile(StoragePath.of(UUID.randomUUID(), path))).isNull();
   }
 
   @ParameterizedTest(name = "{0} has no GAV")
