@@ -98,7 +98,11 @@ public final class NuGetPackageUtils {
               + "(?:\\+[a-zA-Z0-9][a-zA-Z0-9.-]*)?$");
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private static final Comparator<String> VERSION_COMPARATOR = NuGetPackageUtils::compareVersions;
+  /**
+   * Orders NuGet versions the way NuGet does (see {@link #compareVersions}), lowest first. Reverse
+   * it, or take the {@code max}, to get the latest version.
+   */
+  public static final Comparator<String> VERSION_COMPARATOR = NuGetPackageUtils::compareVersions;
 
   /**
    * Orders two NuGet versions the way NuGet does: by major, minor, patch and revision (the optional
