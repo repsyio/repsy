@@ -441,7 +441,15 @@ public final class NuGetPackageUtils {
         parts.length > THREE ? parts[THREE] : "", parts.length > FOUR ? parts[FOUR] : "");
   }
 
-  public static List<NuGetDependencyInfo> extractDependenciesFromNuspec(final String nuspecXml) {
+  /**
+   * Reads the dependencies the nuspec declares. A nuspec without a {@code <dependencies>} element
+   * declares none, so that is an empty list without a warning. A nuspec the XML parser rejects also
+   * yields an empty list, but with a warning naming the package: {@link #readNuspecMetadata(Path)}
+   * refuses such a nuspec before a publish gets here, so this only guards other callers. The
+   * warning carries no nuspec content.
+   */
+  public static List<NuGetDependencyInfo> extractDependenciesFromNuspec(
+      final String nuspecXml, final String packageId, final String version) {
 
     final var result = new ArrayList<NuGetDependencyInfo>();
 
@@ -467,7 +475,11 @@ public final class NuGetPackageUtils {
         addOldFlatFormats(result, dependenciesEl);
       }
     } catch (final Exception e) {
-      log.debug("Failed to extract dependencies from nuspec", e);
+      log.warn(
+          "Ignoring unreadable dependencies of NuGet package {} {}: {}",
+          packageId,
+          version,
+          e.getClass().getSimpleName());
     }
     return result;
   }
@@ -602,12 +614,26 @@ public final class NuGetPackageUtils {
     }
     validatePackageId(packageId);
     validatePackageVersion(version);
+    validateWellFormed(nuspecXml);
 
     final var normalizedVersion = normalizeNuGetVersion(version);
     validateVersionLength(normalizedVersion);
 
     return new NuspecMetadata(
         packageId, normalizedVersion, nuspecXml, extractReadme(tempFile, nuspecXml));
+  }
+
+  // The id and version are read with a regular expression, so a nuspec that is not well-formed XML
+  // still gets past the checks above. Its dependencies (and its repository URL) are read with an
+  // XML
+  // parser, and a package published anyway would list no dependencies without any sign of why.
+  private static void validateWellFormed(final String nuspecXml) {
+    try {
+      parseNuspec(nuspecXml);
+    } catch (final Exception e) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "The .nuspec in the package is not well-formed XML.", e);
+    }
   }
 
   private static void validatePackageId(final String id) {

@@ -806,6 +806,35 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
 
       NuGetPublishProtocolIT.this.assertNothingStored(repo, pkg.id());
     }
+
+    /**
+     * RPS-1075: the id and version are read with a regular expression, so a nuspec that is not
+     * well-formed XML got past those checks and was published with no dependencies at all, without
+     * a trace at the default log level.
+     */
+    @Test
+    @DisplayName("rejects a nuspec that is not well-formed XML and stores nothing")
+    void rejectsMalformedNuspec() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var id = uniquePackageId();
+      final var malformed =
+          zip(
+              entry(
+                  id + ".nuspec",
+                  "<package><metadata><id>%s</id><version>1.0.0</version><dependencies>"
+                          .formatted(id)
+                      + "<dependency id=\"Serilog\" version=\"3.1.1\"/>"));
+
+      NuGetPublishProtocolIT.this
+          .protocol(push(repo, malformed, NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
+          .andExpect(status().isBadRequest())
+          .andExpect(
+              jsonPath("$.errors[0].message")
+                  .value("The .nuspec in the package is not well-formed XML."));
+
+      verifyNoInteractions(NuGetPublishProtocolIT.this.usageUpdateService);
+      NuGetPublishProtocolIT.this.assertNothingStored(repo, id);
+    }
   }
 
   /**
