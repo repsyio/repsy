@@ -43,6 +43,8 @@ public class CargoCategory {
   @Column(name = "id", columnDefinition = "uuid", nullable = false)
   private UUID id;
 
+  // text in PostgreSQL, varchar(255) in H2: no length is stated, see
+  // CrateUtils.MAX_CATEGORY_LENGTH.
   @Column(name = "category", nullable = false, unique = true)
   private String category;
 

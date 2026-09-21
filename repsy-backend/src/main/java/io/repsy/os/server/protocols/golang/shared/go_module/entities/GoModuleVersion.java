@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.golang.shared.go_module.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -52,11 +53,11 @@ public class GoModuleVersion {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private GoModule goModule;
 
-  @Column(name = "version", nullable = false)
+  @Column(name = "version", nullable = false, length = GoVersionUtils.MAX_VERSION_LENGTH)
   private String version;
 
   /** The Go toolchain version declared in go.mod (e.g. "1.21"). Null until .mod is uploaded. */
-  @Column(name = "go_version")
+  @Column(name = "go_version", length = GoVersionUtils.MAX_GO_VERSION_LENGTH)
   private @Nullable String goVersion;
 
   /** h1: hash of the uploaded go.mod file. Null until .mod is uploaded. */

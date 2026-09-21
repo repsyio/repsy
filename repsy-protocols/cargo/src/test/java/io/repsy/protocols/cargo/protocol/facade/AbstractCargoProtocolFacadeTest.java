@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -229,6 +230,60 @@ class AbstractCargoProtocolFacadeTest {
       final var captor = ArgumentCaptor.forClass(CratePublishRequest.class);
       verify(crateService).publish(eq(repoInfo), captor.capture());
       assertThat(captor.getValue().cksum()).isEqualTo(expectedCksum);
+    }
+
+    @Test
+    @DisplayName("passes the crate service a request without the metadata that is over its column")
+    void dropsOverLongMetadataBeforeTheCrateServiceSeesIt() throws Exception {
+      final var request =
+          new CratePublishRequest(
+              "my_crate",
+              "1.0.0",
+              true,
+              null,
+              null,
+              List.of("Alice"),
+              null,
+              null,
+              "h".repeat(256),
+              null,
+              null,
+              List.of(),
+              List.of(),
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null);
+      when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
+          .thenReturn(request);
+
+      facade.publish(
+          context("/api/v1/crates/new"), stream(publishPayload("{}", minimalCrateBytes())));
+
+      final var captor = ArgumentCaptor.forClass(CratePublishRequest.class);
+      verify(crateService).publish(eq(repoInfo), captor.capture());
+      assertThat(captor.getValue().homepage()).isNull();
+      assertThat(captor.getValue().authors()).containsExactly("Alice");
+    }
+
+    @Test
+    @DisplayName("refuses an over-long version before the crate or its index entry is written")
+    void refusesOverLongVersionBeforeWriting() throws Exception {
+      when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
+          .thenReturn(minimalRequest("my_crate", "1.0.0-" + "a".repeat(64)));
+
+      assertThatThrownBy(
+              () ->
+                  facade.publish(
+                      context("/api/v1/crates/new"),
+                      stream(publishPayload("{}", minimalCrateBytes()))))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("version must be at most 64 characters");
+
+      verifyNoInteractions(storageService, crateService);
     }
 
     @Test

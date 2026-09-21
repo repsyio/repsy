@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.helm.shared.oci.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -60,13 +61,13 @@ public class HelmOciBlob {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private Repo repo;
 
-  @Column(name = "digest", nullable = false)
+  @Column(name = "digest", nullable = false, length = HelmConstants.MAX_DIGEST_LENGTH)
   private String digest;
 
   @Column(name = "size", nullable = false)
   private long size;
 
-  @Column(name = "media_type", nullable = false)
+  @Column(name = "media_type", nullable = false, length = HelmConstants.MAX_OCI_MEDIA_TYPE_LENGTH)
   private String mediaType;
 
   @Column(name = "created_at", nullable = false)

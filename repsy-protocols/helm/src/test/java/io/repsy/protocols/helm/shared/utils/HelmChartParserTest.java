@@ -164,4 +164,79 @@ class HelmChartParserTest {
         .isInstanceOf(BadRequestException.class)
         .hasMessage("chartYamlInvalid");
   }
+
+  // RPS-1072: the length limits of the columns Chart.yaml is stored in. Each is accepted at the
+  // limit and rejected one character over it, with a 400 that names the field.
+
+  private static String ofLength(final int length) {
+    return "a".repeat(length);
+  }
+
+  /** A SemVer version of exactly {@code length} characters. */
+  private static String versionOfLength(final int length) {
+    final var prefix = "1.0.0-";
+    return prefix + ofLength(length - prefix.length());
+  }
+
+  @Test
+  void readsEveryLengthLimitedFieldAtItsLimit() throws IOException {
+    final var name = ofLength(HelmConstants.MAX_CHART_NAME_LENGTH);
+    final var version = versionOfLength(HelmConstants.MAX_CHART_VERSION_LENGTH);
+    final var appVersion = ofLength(HelmConstants.MAX_CHART_APP_VERSION_LENGTH);
+    final var type = ofLength(HelmConstants.MAX_CHART_TYPE_LENGTH);
+
+    final var metadata =
+        HelmChartParser.parseChartYaml(
+            chart(
+                "name: %s\nversion: %s\nappVersion: \"%s\"\ntype: %s\n"
+                    .formatted(name, version, appVersion, type)));
+
+    assertThat(metadata.getName()).isEqualTo(name);
+    assertThat(metadata.getVersion()).isEqualTo(version);
+    assertThat(metadata.getAppVersion()).isEqualTo(appVersion);
+    assertThat(metadata.getType()).isEqualTo(type);
+  }
+
+  @Test
+  void rejectsANameOverTheLimit() {
+    final var yaml = "name: %s\nversion: 1.0.0\n".formatted(ofLength(256));
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(yaml)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("chartNameTooLong");
+  }
+
+  @Test
+  void rejectsAVersionOverTheLimit() {
+    final var yaml = "name: payments\nversion: %s\n".formatted(versionOfLength(65));
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(yaml)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("chartVersionTooLong");
+  }
+
+  @Test
+  void rejectsAnAppVersionOverTheLimit() {
+    final var yaml = BASE + "appVersion: \"%s\"\n".formatted(ofLength(65));
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(yaml)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("chartAppVersionTooLong");
+  }
+
+  @Test
+  void rejectsATypeOverTheLimitAsAnInvalidType() {
+    final var yaml = BASE + "type: %s\n".formatted(ofLength(33));
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(yaml)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("chartTypeInvalid");
+  }
+
+  @Test
+  void acceptsATypeThatIsNeitherApplicationNorLibrary() throws IOException {
+    final var metadata = HelmChartParser.parseChartYaml(chart(BASE + "type: operator\n"));
+
+    assertThat(metadata.getType()).isEqualTo("operator");
+  }
 }

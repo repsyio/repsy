@@ -107,6 +107,9 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     final var decodedPath = GoVersionUtils.decodeModulePath(modulePath);
 
     final var normalizedPath = decodedPath.toLowerCase(Locale.ROOT);
+
+    rejectOverLongIdentifiers(normalizedPath, version);
+
     final var content = inputStream.readAllBytes();
 
     verifySha256(content, (String) context.getContextMap().get(CONTENT_SHA256_KEY));
@@ -139,6 +142,21 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     context.addProperty(ARTIFACT_NAME, normalizedPath);
     context.addProperty(ARTIFACT_VERSION, version);
     context.addProperty(USAGES, BaseUsages.ofDisk(totalDiskUsage));
+  }
+
+  /**
+   * The module path and version are taken from the URL and stored in varchar columns, so a longer
+   * one is refused with a 400 that names it before the upload is read (RPS-1072). Neither can be
+   * cut: they are what the module is fetched by. The path is measured as it is stored, decoded and
+   * lower-cased.
+   */
+  private static void rejectOverLongIdentifiers(final String normalizedPath, final String version) {
+    if (normalizedPath.length() > GoVersionUtils.MAX_MODULE_PATH_LENGTH) {
+      throw new BadRequestException("modulePathTooLong");
+    }
+    if (version.length() > GoVersionUtils.MAX_VERSION_LENGTH) {
+      throw new BadRequestException("moduleVersionTooLong");
+    }
   }
 
   private Resource handleVersionList(final BaseRepoInfo<I> repoInfo, final String path) {

@@ -2325,7 +2325,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
               "integer type",
               BASE + "type: 3\n",
               "chartTypeInvalid",
-              "Invalid chart type: it must be a string."),
+              "Invalid chart type: it must be a string of at most 32 characters."),
           rejected(
               "integer name",
               "name: 5\nversion: 1.0.0\n",

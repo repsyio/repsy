@@ -21,6 +21,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
@@ -35,6 +36,7 @@ import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
+import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.ByteArrayOutputStream;
@@ -152,6 +154,72 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
   }
 
   @Test
+  @DisplayName("rejects a name over 255 characters before anything is looked up (RPS-1072)")
+  void rejectsOverLongName() {
+    final var name = "a".repeat(HelmConstants.MAX_OCI_MANIFEST_NAME_LENGTH + 1);
+    final var context = context("/" + name + "/manifests/1.0.0");
+
+    assertThatThrownBy(() -> this.push(context))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("manifestNameTooLong");
+
+    verifyNoInteractions(this.facade);
+  }
+
+  @Test
+  @DisplayName("rejects a reference over 255 characters before anything is looked up (RPS-1072)")
+  void rejectsOverLongReference() {
+    final var reference = "1".repeat(HelmConstants.MAX_OCI_MANIFEST_REFERENCE_LENGTH + 1);
+    final var context = context("/payments/manifests/" + reference);
+
+    assertThatThrownBy(() -> this.push(context))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("manifestReferenceTooLong");
+
+    verifyNoInteractions(this.facade);
+  }
+
+  @Test
+  @DisplayName("rejects a Content-Type over 255 characters before anything is looked up (RPS-1072)")
+  void rejectsOverLongMediaType() {
+    final var mediaType = "application/" + "x".repeat(HelmConstants.MAX_OCI_MEDIA_TYPE_LENGTH);
+    final var context = context("/payments/manifests/1.0.0");
+
+    assertThatThrownBy(() -> this.push(context, layer("\"" + LAYER_DIGEST + "\"", "10"), mediaType))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("manifestMediaTypeTooLong");
+
+    verifyNoInteractions(this.facade);
+  }
+
+  @Test
+  @DisplayName("accepts a name, reference and Content-Type of exactly 255 characters (RPS-1072)")
+  void acceptsValuesAtTheLimit() throws Exception {
+    final var name = "a".repeat(HelmConstants.MAX_OCI_MANIFEST_NAME_LENGTH);
+    final var reference = "1".repeat(HelmConstants.MAX_OCI_MANIFEST_REFERENCE_LENGTH);
+    final var mediaType =
+        "application/"
+            + "x".repeat(HelmConstants.MAX_OCI_MEDIA_TYPE_LENGTH - "application/".length());
+    final var context = context("/" + name + "/manifests/" + reference);
+    this.stubChartLayer(name, "1.0.0");
+    when(this.chartInfo.id()).thenReturn(UUID.randomUUID());
+    when(this.manifestInfo.digest()).thenReturn("sha256:" + "b".repeat(64));
+    when(this.facade.findOrCreateChart(any(HelmChartForm.class), eq(REPO_ID)))
+        .thenReturn(this.chartInfo);
+    when(this.facade.findOrCreateManifest(any(HelmOciManifestForm.class), eq(REPO_ID)))
+        .thenReturn(this.manifestInfo);
+
+    final var response = this.push(context, layer("\"" + LAYER_DIGEST + "\"", "10"), mediaType);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    final var manifestForm = ArgumentCaptor.forClass(HelmOciManifestForm.class);
+    verify(this.facade).findOrCreateManifest(manifestForm.capture(), eq(REPO_ID));
+    assertThat(manifestForm.getValue().getName()).isEqualTo(name);
+    assertThat(manifestForm.getValue().getReference()).isEqualTo(reference);
+    assertThat(manifestForm.getValue().getMediaType()).isEqualTo(mediaType);
+  }
+
+  @Test
   @DisplayName("rejects an existing version with a fixed msgId that carries no name or version")
   void rejectsExistingVersionWithFixedMsgId() {
     final var context = context("/payments/manifests/1.0.0");
@@ -213,8 +281,14 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
 
   private ResponseEntity<Object> push(final ProtocolContext context, final String manifest)
       throws Exception {
+    return this.push(context, manifest, MANIFEST_TYPE);
+  }
+
+  private ResponseEntity<Object> push(
+      final ProtocolContext context, final String manifest, final String mediaType)
+      throws Exception {
     final var request = new MockHttpServletRequest("PUT", "/v2/repo/payments/manifests/1.0.0");
-    request.setContentType(MANIFEST_TYPE);
+    request.setContentType(mediaType);
     request.setContent(manifest.getBytes(StandardCharsets.UTF_8));
     RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
     return this.handler.handle(context, request, new MockHttpServletResponse());
@@ -246,7 +320,7 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
       try (final var gzip = new GZIPOutputStream(bytes);
           final var tar = new TarArchiveOutputStream(gzip)) {
         final var data = chartYaml.getBytes(StandardCharsets.UTF_8);
-        final var entry = new TarArchiveEntry(chartName + "/Chart.yaml");
+        final var entry = new TarArchiveEntry("chart/Chart.yaml");
         entry.setSize(data.length);
         tar.putArchiveEntry(entry);
         tar.write(data);

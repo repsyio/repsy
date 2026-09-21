@@ -80,9 +80,11 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
       throws IOException {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var request = CrateUtils.getPublishRequest(inputStream, this.objectMapper);
+    final var published = CrateUtils.getPublishRequest(inputStream, this.objectMapper);
 
-    CrateUtils.validatePublishRequest(request);
+    CrateUtils.validatePublishRequest(published);
+
+    final var request = CrateUtils.dropOverLongMetadata(published);
 
     final var crateBytes = CrateUtils.getCrateBytes(inputStream);
     final var checksum = CargoDigestCalculator.computeDigest(crateBytes);
