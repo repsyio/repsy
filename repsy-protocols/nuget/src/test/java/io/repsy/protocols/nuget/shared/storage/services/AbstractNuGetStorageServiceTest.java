@@ -20,8 +20,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
@@ -190,6 +192,68 @@ class AbstractNuGetStorageServiceTest {
     final var deleted = ArgumentCaptor.forClass(StoragePath.class);
     verify(this.storageStrategy).deleteDirectory(deleted.capture());
     assertThat(relativePath(deleted.getValue())).isEqualTo("packages/some.package/1.0.0");
+  }
+
+  @Test
+  @DisplayName("copies the files of a version with build metadata to its canonical directory")
+  void copiesLegacyFilesToCanonicalDirectory() throws IOException {
+    when(this.storageStrategy.get(any(StoragePath.class), eq(REPO_ID.toString())))
+        .thenAnswer(
+            invocation ->
+                Optional.of(
+                    new ByteArrayResource(relativePath(invocation.getArgument(0)).getBytes())));
+
+    assertThat(this.service.copyToCanonicalVersion(REPO_ID, "Some.Package", "1.0.0+Build"))
+        .isTrue();
+
+    final var read = ArgumentCaptor.forClass(StoragePath.class);
+    verify(this.storageStrategy, times(2)).get(read.capture(), eq(REPO_ID.toString()));
+    assertThat(read.getAllValues())
+        .extracting(AbstractNuGetStorageServiceTest::relativePath)
+        .containsExactly(LEGACY_NUPKG, LEGACY_NUPKG.replace(".nupkg", ".nuspec"));
+
+    final var written = ArgumentCaptor.forClass(StoragePath.class);
+    verify(this.storageStrategy, times(2)).write(eq(REPO_ID.toString()), written.capture(), any());
+    assertThat(written.getAllValues())
+        .extracting(AbstractNuGetStorageServiceTest::relativePath)
+        .containsExactly(CANONICAL_NUPKG, CANONICAL_NUSPEC);
+    verify(this.storageStrategy, never()).deleteDirectory(any(StoragePath.class));
+  }
+
+  @Test
+  @DisplayName("copies the content of the legacy file as it is")
+  void copiesContent() throws IOException {
+    when(this.storageStrategy.get(any(StoragePath.class), anyString()))
+        .thenReturn(Optional.of(new ByteArrayResource(new byte[] {4, 2})));
+
+    this.service.copyToCanonicalVersion(REPO_ID, "Some.Package", "1.0.0+Build");
+
+    final var content = ArgumentCaptor.forClass(java.io.InputStream.class);
+    verify(this.storageStrategy, times(2))
+        .write(anyString(), any(StoragePath.class), content.capture());
+    for (final var stream : content.getAllValues()) {
+      assertThat(stream).hasBinaryContent(new byte[] {4, 2});
+    }
+  }
+
+  @Test
+  @DisplayName("reports that nothing was copied when the legacy directory holds no nupkg")
+  void copiesNothingWhenLegacyFilesAreMissing() throws IOException {
+    when(this.storageStrategy.get(any(StoragePath.class), anyString()))
+        .thenReturn(Optional.empty());
+
+    assertThat(this.service.copyToCanonicalVersion(REPO_ID, "Some.Package", "1.0.0+Build"))
+        .isFalse();
+
+    verify(this.storageStrategy, never()).write(anyString(), any(StoragePath.class), any());
+  }
+
+  @Test
+  @DisplayName("has nothing to copy for a version without build metadata")
+  void copiesNothingForCanonicalVersion() throws IOException {
+    assertThat(this.service.copyToCanonicalVersion(REPO_ID, "Some.Package", "1.0")).isFalse();
+
+    verifyNoInteractions(this.storageStrategy);
   }
 
   @Test

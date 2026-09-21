@@ -35,6 +35,16 @@ public interface NuGetStorageService {
 
   void createRepo(UUID repoId);
 
+  /**
+   * Copies the files of a version that was stored with build metadata (RPS-1059) to the directory
+   * of its canonical version, under the file names of that version, and leaves the originals where
+   * they are. A file that is already in place is overwritten, so the copy can be repeated after an
+   * interrupted run.
+   *
+   * @return whether the {@code .nupkg} of the version was found and copied
+   */
+  boolean copyToCanonicalVersion(UUID repoId, String packageId, String version) throws IOException;
+
   long deletePackageVersion(UUID repoId, String packageId, String version) throws IOException;
 
   long deletePackage(UUID repoId, String packageId) throws IOException;

@@ -98,6 +98,47 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
   }
 
   @Override
+  public boolean copyToCanonicalVersion(
+      final UUID repoId, final String packageId, final String version) throws IOException {
+
+    final var normalizedId = packageId.toLowerCase(Locale.ROOT);
+    final var source = storedVersion(version);
+    final var target = normalizeNuGetVersion(version);
+
+    if (source.equals(target)) {
+      return false;
+    }
+
+    final var nupkgCopied = this.copyFile(repoId, normalizedId, source, target, NUPKG_EXTENSION);
+    this.copyFile(repoId, normalizedId, source, target, NUSPEC_EXTENSION);
+    return nupkgCopied;
+  }
+
+  private boolean copyFile(
+      final UUID repoId,
+      final String normalizedId,
+      final String sourceVersion,
+      final String targetVersion,
+      final String extension)
+      throws IOException {
+
+    final var repoName = repoId.toString();
+    final var resource =
+        this.storageStrategy.get(
+            StoragePath.of(repoId, filePath(normalizedId, sourceVersion, extension)), repoName);
+
+    if (resource.isEmpty()) {
+      return false;
+    }
+
+    try (final var in = resource.get().getInputStream()) {
+      this.storageStrategy.write(
+          repoName, StoragePath.of(repoId, filePath(normalizedId, targetVersion, extension)), in);
+    }
+    return true;
+  }
+
+  @Override
   public long deletePackageVersion(final UUID repoId, final String packageId, final String version)
       throws IOException {
 
