@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.docker.shared.auth.services;
 
 import static io.repsy.os.shared.auth.utils.AuthUtils.TIMEOUT_ACCESS_TOKEN;
-import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromAuthHeader;
 import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBearerToken;
@@ -95,87 +94,16 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
         .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
   }
 
+  /**
+   * The only public read a caller without credentials gets is on a public repo. A private repo is
+   * answered as if it did not exist, so the token endpoint neither hands out an anonymous token for
+   * it nor reveals that it is there.
+   */
   @Override
-  public void authorizeRequest(
-      final BaseRepoInfo<UUID> repoInfo,
-      final @Nullable String authHeader,
-      final Permission permission,
-      final boolean requireAuthForPublicRepo) {
-
-    final var authRequired = repoInfo.isPrivateRepo() || requireAuthForPublicRepo;
-
-    if (authRequired) {
-      this.handleRequiredAuthentication(authHeader, repoInfo, permission);
-      return;
-    }
-
-    this.handleOptionalAuthentication(authHeader, repoInfo, permission);
-  }
-
-  private void handleRequiredAuthentication(
-      final @Nullable String authHeader,
-      final BaseRepoInfo<UUID> repoInfo,
-      final Permission permission) {
-
-    if (authHeader == null) {
-      this.throwAuthenticationError(repoInfo);
-      return;
-    }
-
-    this.processAuthRequest(repoInfo, authHeader, permission);
-  }
-
-  private void throwAuthenticationError(final BaseRepoInfo<UUID> repoInfo) {
+  public void authorizePublicRead(final BaseRepoInfo<UUID> repoInfo) {
 
     if (repoInfo.isPrivateRepo()) {
       throw new ItemNotFoundException("repoNotFound");
-    }
-
-    throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-  }
-
-  private void handleOptionalAuthentication(
-      final @Nullable String authHeader,
-      final BaseRepoInfo<UUID> repoInfo,
-      final Permission permission) {
-
-    if (authHeader == null) {
-      return;
-    }
-
-    this.processAuthRequest(repoInfo, authHeader, permission);
-  }
-
-  private void processAuthRequest(
-      final BaseRepoInfo<UUID> repoInfo, final String authHeader, final Permission permission) {
-
-    final var authType = this.extractAuthenticationTypeSafely(authHeader);
-
-    if (authType == AuthenticationType.DEPLOY_TOKEN) {
-      final var tokenId = this.jwtUtils.extractUserId(authHeader, TokenRealm.PROTOCOL);
-
-      this.authorizeTokenRequestTokenId(repoInfo.getStorageKey(), tokenId, permission);
-
-      return;
-    }
-
-    if (authType == AuthenticationType.ANONYMOUS) {
-      this.authorizeAnonymousToken(repoInfo, permission);
-
-      return;
-    }
-
-    final var userInfo = this.resolveUserInfo(repoInfo, authHeader);
-
-    this.authorizeUser(userInfo, permission);
-  }
-
-  /** An anonymous token reads public repos and nothing else. */
-  private void authorizeAnonymousToken(
-      final BaseRepoInfo<UUID> repoInfo, final Permission permission) {
-
-    if (repoInfo.isPrivateRepo() || permission != Permission.READ) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
   }
 
@@ -186,55 +114,6 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
     } catch (final IllegalArgumentException _) {
       return null;
     }
-  }
-
-  private @Nullable UserInfo resolveUserInfo(
-      final BaseRepoInfo<UUID> repoInfo, final String authHeader) {
-
-    if (isBasicToken(authHeader)) {
-      return this.resolveBasicAuthUser(repoInfo, authHeader);
-    }
-
-    if (isBearerToken(authHeader)) {
-      return this.resolveBearerAuthUser(authHeader);
-    }
-
-    if (repoInfo.isPrivateRepo()) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    return null;
-  }
-
-  private @Nullable UserInfo resolveBasicAuthUser(
-      final BaseRepoInfo<UUID> repoInfo, final String authHeader) {
-
-    final var credentials = extractCredentialsFromAuthHeader(authHeader);
-
-    if (credentials == null) {
-
-      if (repoInfo.isPrivateRepo()) {
-        throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-      }
-
-      return null;
-    }
-
-    return this.authenticateWithPassword(credentials);
-  }
-
-  /**
-   * A valid token of a user who no longer exists is rejected on a public repo as well. It is never
-   * downgraded to an anonymous caller, so a revoked session is told to authenticate again (RPS-962,
-   * RPS-1027).
-   */
-  private UserInfo resolveBearerAuthUser(final String authHeader) {
-
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
-
-    return this.userTxService
-        .getUserByUsernameOptional(username)
-        .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
   }
 
   private Credentials getBasicAuthCredentials(final String basicToken) {
@@ -309,6 +188,8 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
     final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
     final var userInfo = this.userTxService.getUserByUsernameOptional(username).orElse(null);
 
+    // A valid token of a user who no longer exists is an authentication failure, never a downgrade
+    // to an anonymous caller (RPS-962, RPS-1027).
     if (userInfo == null) {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }

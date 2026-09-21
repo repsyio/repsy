@@ -157,7 +157,7 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
 
     final var repoInfo = repoInfoOpt.get();
 
-    this.authService.authorizeRequest(repoInfo, null, Permission.READ, false);
+    this.authService.authorizePublicRead(repoInfo);
 
     final var sessionToken = this.authService.createAnonymousUser();
 

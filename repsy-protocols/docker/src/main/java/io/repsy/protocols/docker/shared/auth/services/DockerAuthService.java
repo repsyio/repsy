@@ -16,18 +16,17 @@
 package io.repsy.protocols.docker.shared.auth.services;
 
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
-import io.repsy.protocols.shared.repo.dtos.Permission;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 @NullMarked
 public interface DockerAuthService<ID> {
 
-  void authorizeRequest(
-      BaseRepoInfo<ID> repoInfo,
-      @Nullable String authHeader,
-      Permission permission,
-      boolean requireAuthForPublicRepo);
+  /**
+   * Checks that a caller without credentials may read the repo, which is what {@code /v2/token}
+   * asks before it hands out an anonymous token. Only a public repo passes; a private one is
+   * answered as if it did not exist.
+   */
+  void authorizePublicRead(BaseRepoInfo<ID> repoInfo);
 
   String createAnonymousUser();
 

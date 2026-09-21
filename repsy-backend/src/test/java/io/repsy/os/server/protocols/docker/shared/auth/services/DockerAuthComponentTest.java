@@ -24,6 +24,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.server.shared.auth.AuthThrottleProperties;
@@ -75,6 +76,14 @@ class DockerAuthComponentTest {
   private static String basicAuth(final String username, final String password) {
     final var raw = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
     return "Basic " + Base64.getEncoder().encodeToString(raw);
+  }
+
+  private static BaseRepoInfo<UUID> repo(final boolean privateRepo) {
+    return BaseRepoInfo.<UUID>builder()
+        .name("images")
+        .storageKey(UUID.randomUUID())
+        .privateRepo(privateRepo)
+        .build();
   }
 
   private static void assertUnauthorized(final ThrowingCallable call) {
@@ -149,30 +158,47 @@ class DockerAuthComponentTest {
     }
 
     @Test
-    @DisplayName("authorizeRequest answers unAuthorized for an unknown user and a wrong password")
-    void authorizeRequest() {
+    @DisplayName(
+        "authenticateUserDockerCli answers unAuthorized for Basic credentials with no password")
+    void dockerLoginWithoutPassword() {
       final var component = DockerAuthComponentTest.this.authComponent;
-      final var repo =
-          BaseRepoInfo.<UUID>builder()
-              .name("images")
-              .storageKey(UUID.randomUUID())
-              .privateRepo(true)
-              .build();
+      final var noSeparator =
+          "Basic " + Base64.getEncoder().encodeToString("ghost".getBytes(StandardCharsets.UTF_8));
 
-      assertUnauthorized(
-          () -> component.authorizeRequest(repo, basicAuth("ghost", "x"), Permission.READ, true));
-      assertUnauthorized(
-          () ->
-              component.authorizeRequest(
-                  repo, basicAuth(USERNAME, "wrong"), Permission.READ, true));
+      assertUnauthorized(() -> component.authenticateUserDockerCli(noSeparator));
+      assertUnauthorized(() -> component.authenticateUserDockerCli(basicAuth("", "x")));
+      assertUnauthorized(() -> component.authenticateUserDockerCli("Bearer signed.jwt.token"));
       verify(DockerAuthComponentTest.this.userTxService, never()).getUserByUsername(anyString());
+      verify(DockerAuthComponentTest.this.userTxService, never())
+          .getUserByUsernameOptional(anyString());
     }
   }
 
   /**
-   * RPS-1027: a valid bearer token of a user who no longer exists is an authentication failure on
-   * every path, a public repo included. It is never downgraded to an anonymous caller, which is
-   * what the other protocols answer as well (RPS-962).
+   * What {@code /v2/token} asks before it hands an anonymous token to a caller without credentials.
+   * A private repo must not get one, and is answered as if it did not exist.
+   */
+  @Test
+  @DisplayName("authorizePublicRead lets a caller without credentials read a public repo")
+  void authorizePublicReadAllowsPublicRepo() {
+    assertThatCode(() -> this.authComponent.authorizePublicRead(repo(false)))
+        .doesNotThrowAnyException();
+    verify(this.userTxService, never()).getUserByUsernameOptional(anyString());
+  }
+
+  @Test
+  @DisplayName("authorizePublicRead answers repoNotFound for a private repo")
+  void authorizePublicReadRefusesPrivateRepo() {
+    assertThatThrownBy(() -> this.authComponent.authorizePublicRead(repo(true)))
+        .isExactlyInstanceOf(ItemNotFoundException.class)
+        .hasMessage("repoNotFound");
+  }
+
+  /**
+   * RPS-1027: a valid bearer token of a user who no longer exists is an authentication failure, on
+   * a read and on a write. It is never downgraded to an anonymous caller, which is what the other
+   * protocols answer as well (RPS-962). A public read skips authentication in {@code
+   * DockerAuthPreProcessor}, so this path only sees a write or a private repo.
    */
   @Nested
   @DisplayName("a valid bearer token of a deleted user is never treated as anonymous")
@@ -199,34 +225,6 @@ class DockerAuthComponentTest {
           .thenReturn(Optional.empty());
     }
 
-    private BaseRepoInfo<UUID> repo(final boolean privateRepo) {
-      return BaseRepoInfo.<UUID>builder()
-          .name("images")
-          .storageKey(UUID.randomUUID())
-          .privateRepo(privateRepo)
-          .build();
-    }
-
-    @Test
-    @DisplayName("authorizeRequest answers unAuthorized for a public repo, read or write")
-    void authorizeRequestPublicRepo() {
-      assertUnauthorized(
-          () -> this.component.authorizeRequest(this.repo(false), BEARER, Permission.READ, false));
-      assertUnauthorized(
-          () -> this.component.authorizeRequest(this.repo(false), BEARER, Permission.WRITE, false));
-      assertUnauthorized(
-          () -> this.component.authorizeRequest(this.repo(false), BEARER, Permission.READ, true));
-    }
-
-    @Test
-    @DisplayName("authorizeRequest answers unAuthorized for a private repo")
-    void authorizeRequestPrivateRepo() {
-      assertUnauthorized(
-          () -> this.component.authorizeRequest(this.repo(true), BEARER, Permission.READ, false));
-      assertUnauthorized(
-          () -> this.component.authorizeRequest(this.repo(true), BEARER, Permission.WRITE, false));
-    }
-
     @Test
     @DisplayName("handleBearerAuth answers unAuthorized")
     void handleBearerAuth() {
@@ -237,7 +235,7 @@ class DockerAuthComponentTest {
     }
 
     @Test
-    @DisplayName("authorizeRequest still lets the token of an existing user read a public repo")
+    @DisplayName("handleBearerAuth still lets the token of an existing user through")
     void existingUserStillAuthorized() {
       when(DockerAuthComponentTest.this.userTxService.getUserByUsernameOptional("ghost"))
           .thenReturn(
@@ -249,8 +247,10 @@ class DockerAuthComponentTest {
                       .build()));
 
       assertThatCode(
-              () ->
-                  this.component.authorizeRequest(this.repo(false), BEARER, Permission.READ, false))
+              () -> this.component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ))
+          .doesNotThrowAnyException();
+      assertThatCode(
+              () -> this.component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.WRITE))
           .doesNotThrowAnyException();
     }
   }
@@ -291,14 +291,6 @@ class DockerAuthComponentTest {
                       .build()));
     }
 
-    private BaseRepoInfo<UUID> repo(final boolean privateRepo) {
-      return BaseRepoInfo.<UUID>builder()
-          .name("images")
-          .storageKey(UUID.randomUUID())
-          .privateRepo(privateRepo)
-          .build();
-    }
-
     @Test
     @DisplayName("createAnonymousUser mints a token typed as anonymous")
     void createAnonymousUserIsTyped() {
@@ -325,28 +317,6 @@ class DockerAuthComponentTest {
           () -> this.component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
       assertUnauthorized(
           () -> this.component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.WRITE));
-      verify(DockerAuthComponentTest.this.userTxService, never())
-          .getUserByUsernameOptional(anyString());
-    }
-
-    @Test
-    @DisplayName("authorizeRequest lets it read a public repo")
-    void readsPublicRepo() {
-      assertThatCode(
-              () ->
-                  this.component.authorizeRequest(this.repo(false), BEARER, Permission.READ, false))
-          .doesNotThrowAnyException();
-      verify(DockerAuthComponentTest.this.userTxService, never())
-          .getUserByUsernameOptional(anyString());
-    }
-
-    @Test
-    @DisplayName("authorizeRequest refuses it a write, and any access to a private repo")
-    void refusedBeyondPublicRead() {
-      assertUnauthorized(
-          () -> this.component.authorizeRequest(this.repo(false), BEARER, Permission.WRITE, false));
-      assertUnauthorized(
-          () -> this.component.authorizeRequest(this.repo(true), BEARER, Permission.READ, false));
       verify(DockerAuthComponentTest.this.userTxService, never())
           .getUserByUsernameOptional(anyString());
     }
