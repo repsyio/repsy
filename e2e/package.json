@@ -1,0 +1,39 @@
+{
+  "name": "repsy-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0 <25.0.0"
+  },
+  "scripts": {
+    "gen:api": "rm -rf src/api/generated && openapi --input ../repsy-backend/src/main/resources/openapi/openapi-spec.yaml --client axios --name PanelClient --output src/api/generated --useOptions --indent 2",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "playwright test",
+    "sweep": "tsx src/seed/sweep.ts"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "dotenv": "^17.2.3",
+    "execa": "^9.6.0",
+    "form-data": "^4.0.6",
+    "mustache": "^4.2.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.56.1",
+    "@types/mustache": "^4.2.6",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-playwright": "^2.5.1",
+    "openapi-typescript-codegen": "^0.30.0",
+    "prettier": "^3.9.8",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.53.1"
+  }
+}

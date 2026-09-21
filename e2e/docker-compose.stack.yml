@@ -1,0 +1,62 @@
+# Copyright 2026 the original author or authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# The stack this harness starts and owns for the "local" and "ci" targets: postgres:18 (see
+# README.md "Option 3: Docker Compose with PostgreSQL" for the DB_* variable names) plus Repsy
+# built from the repo root Dockerfile. Set REPSY_IMAGE to test a published image instead of
+# building. Started and stopped by `./run.sh local up|down`; REPSY_ADMIN_PASSWORD must be set
+# (e2e/.env, copied from .env.example).
+name: repsy-e2e
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: repsy
+      POSTGRES_USER: repsy
+      POSTGRES_PASSWORD: repsy123
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U repsy -d repsy']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  repsy:
+    image: ${REPSY_IMAGE:-repsy-os-e2e:local}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - '8080:8080'
+      - '9090:9090'
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/repsy
+      DB_USERNAME: repsy
+      DB_PASSWORD: repsy123
+      ADMIN_INITIAL_PASSWORD: ${REPSY_ADMIN_PASSWORD:?Set REPSY_ADMIN_PASSWORD in e2e/.env}
+      # Negative-auth scenarios (wrong password, revoked/expired token) authenticate wrong on
+      # purpose; a stack this harness owns can raise the limit far above anything a run could trip
+      # (see target.ts: canTuneThrottle is false for a "remote" target, which cannot do this).
+      AUTH_THROTTLE_MAX_FAILURES: '100000'
+      AUTH_THROTTLE_WINDOW_SECONDS: '60'
+    healthcheck:
+      # No actuator in this image; the SPA's static root is served once the app is fully up.
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://localhost:8080/']
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 15s
