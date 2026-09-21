@@ -85,6 +85,44 @@ describe('ToastService', () => {
     expect(service.toasts).toEqual([]);
   }));
 
+  it('evicts the oldest toasts and keeps the three newest, in order, when a burst of five arrives', fakeAsync(() => {
+    ['a', 'b', 'c', 'd', 'e'].forEach((message) => service.show(message));
+
+    expect(service.toasts.map((t) => t.message)).toEqual(['c', 'd', 'e']);
+
+    tick(3000);
+    expect(service.toasts).toEqual([]);
+  }));
+
+  it('keeps all three toasts, in order, while the limit is not exceeded', fakeAsync(() => {
+    ['a', 'b', 'c'].forEach((message) => service.show(message));
+
+    expect(service.toasts.map((t) => t.message)).toEqual(['a', 'b', 'c']);
+
+    tick(3000);
+    expect(service.toasts).toEqual([]);
+  }));
+
+  it('leaves the surviving toasts untouched when the timer of an evicted toast fires', fakeAsync(() => {
+    service.show('a', 'success', 1000);
+    ['b', 'c', 'd', 'e'].forEach((message, i) => service.show(message, 'success', 2000 + i * 1000));
+    expect(service.toasts.map((t) => t.message)).toEqual(['c', 'd', 'e']);
+
+    // 'a' and 'b' were evicted; their timers fire at 1000ms and 2000ms and must not remove anything else.
+    tick(1000);
+    expect(service.toasts.map((t) => t.message)).toEqual(['c', 'd', 'e']);
+    tick(1000);
+    expect(service.toasts.map((t) => t.message)).toEqual(['c', 'd', 'e']);
+
+    // The survivors expire on their own timers: c at 3000ms, d at 4000ms, e at 5000ms.
+    tick(1000);
+    expect(service.toasts.map((t) => t.message)).toEqual(['d', 'e']);
+    tick(1000);
+    expect(service.toasts.map((t) => t.message)).toEqual(['e']);
+    tick(1000);
+    expect(service.toasts).toEqual([]);
+  }));
+
   it('removes a toast by id, and ignores an unknown id', fakeAsync(() => {
     service.show('first');
     service.show('second');
