@@ -21,7 +21,6 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.H2IntegrationTest;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrateIndex;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateIndexRepository;
-import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
@@ -56,14 +55,10 @@ class H2JsonPersistenceIT extends H2IntegrationTest {
   @DisplayName("publishes and reads NuGet dependency JSON")
   void publishesNuGetDependenciesOnH2() throws IOException {
     final var repo = this.repo(RepoType.NUGET, "h2nuget");
-    final var nugetPackage = new NuGetPackage();
-    nugetPackage.setRepo(repo);
-    nugetPackage.setPackageId("h2.fixture");
-    final var packageId = this.nuGetPackageRepository.save(nugetPackage).getId();
 
     this.nuGetPackageService.publishVersion(
         this.repoInfo(repo),
-        packageId,
+        "h2.fixture",
         "1.0.0",
         """
         <package><metadata><id>h2.fixture</id><version>1.0.0</version>
@@ -75,6 +70,11 @@ class H2JsonPersistenceIT extends H2IntegrationTest {
         replacesExisting -> BaseUsages.ofDisk(0));
 
     this.nuGetPackageVersionRepository.flush();
+    final var packageId =
+        this.nuGetPackageRepository
+            .findByRepoIdAndPackageIdIgnoreCase(repo.getId(), "h2.fixture")
+            .orElseThrow()
+            .getId();
     final NuGetPackageVersion stored =
         this.nuGetPackageVersionRepository
             .findByNugetPackageIdAndVersion(packageId, "1.0.0")

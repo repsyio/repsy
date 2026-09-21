@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.nuget.shared.packages.services;
 
+import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.NuGetDeletedItem;
@@ -23,8 +24,6 @@ import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageV
 import io.repsy.os.server.protocols.nuget.shared.packages.mappers.NuGetPackageConverter;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
-import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.utils.OffsetPageRequest;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
@@ -48,10 +47,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
@@ -62,57 +58,38 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
   private static final String ERR_PACKAGE_NOT_FOUND = "packageNotFound";
   private static final String ERR_VERSION_NOT_FOUND = "versionNotFound";
-  private static final String PACKAGE_UNIQUE_CONSTRAINT = "ux_nuget_package__repo_id_package_id";
   private static final String VERSION_UNIQUE_CONSTRAINT =
       "ux_nuget_package_version__package_id_version";
   private static final String UNIQUE_VIOLATION_SQL_STATE = "23505";
 
-  private final RepoRepository repoRepository;
   private final NuGetPackageRepository packageRepository;
   private final NuGetPackageVersionRepository packageVersionRepository;
   private final NuGetPackageConverter converter;
 
-  // Using for escape from spring proxy problem in same class.
-  private final TransactionTemplate requiresNewTx;
-
   public NuGetPackageServiceImpl(
-      final RepoRepository repoRepository,
       final NuGetPackageRepository packageRepository,
       final NuGetPackageVersionRepository packageVersionRepository,
-      final NuGetPackageConverter converter,
-      final PlatformTransactionManager txManager) {
+      final NuGetPackageConverter converter) {
 
-    this.repoRepository = repoRepository;
     this.packageRepository = packageRepository;
     this.packageVersionRepository = packageVersionRepository;
     this.converter = converter;
-    this.requiresNewTx = new TransactionTemplate(txManager);
-    this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-  }
-
-  @Override
-  @Transactional
-  public UUID findOrCreatePackage(final BaseRepoInfo<UUID> repoInfo, final String packageId) {
-
-    final var repo = this.findRepoById(repoInfo.getId());
-    return this.findPackageByRepoIdAndPackageId(repo, packageId.toLowerCase(Locale.ROOT)).getId();
   }
 
   @Override
   @Transactional(rollbackFor = IOException.class)
   public BaseUsages publishVersion(
       final BaseRepoInfo<UUID> repoInfo,
-      final UUID pkgId,
+      final String packageId,
       final String version,
       final String nuspecXml,
       final @Nullable String readme,
       final PackageFilesWriter filesWriter)
       throws IOException {
 
-    final var pkg =
-        this.packageRepository
-            .findById(pkgId)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
+    // The package row is created in this transaction too, so a first push that fails leaves no
+    // package without versions behind (RPS-1061).
+    final var pkg = this.findOrCreatePackage(repoInfo.getId(), packageId);
 
     final var existingVersion =
         this.packageVersionRepository.findByNugetPackageIdAndVersion(pkg.getId(), version);
@@ -409,40 +386,30 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
         .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
   }
 
-  private Repo findRepoById(final UUID id) {
-    return this.repoRepository
-        .findById(id)
-        .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
-  }
-
-  private NuGetPackage findPackageByRepoIdAndPackageId(final Repo repo, final String packageId) {
+  /**
+   * Returns the package row, inserting it when this is the first version of the package.
+   *
+   * <p>The insert skips a row that already exists instead of failing on the unique index: on
+   * PostgreSQL a failed statement aborts the transaction, which now also holds the version row and
+   * the file write. When a concurrent first push has inserted the package but not committed yet,
+   * the statement waits for it, and then finds the committed row.
+   */
+  private NuGetPackage findOrCreatePackage(final UUID repoId, final String packageId) {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
+    final var existing =
+        this.packageRepository.findByRepoIdAndPackageIdIgnoreCase(repoId, normalizedId);
+
+    if (existing.isPresent()) {
+      return existing.get();
+    }
+
+    this.packageRepository.insertIfAbsent(
+        UuidCreator.getTimeOrderedEpoch(), repoId, normalizedId, Instant.now());
 
     return this.packageRepository
-        .findByRepoIdAndPackageIdIgnoreCase(repo.getId(), normalizedId)
-        .orElseGet(() -> this.createOrFindPackage(repo, normalizedId));
-  }
-
-  private NuGetPackage createOrFindPackage(final Repo repo, final String packageId) {
-
-    try {
-      return this.requiresNewTx.execute(
-          _ -> {
-            final var pkg = new NuGetPackage();
-            pkg.setRepo(repo);
-            pkg.setPackageId(packageId);
-            return this.packageRepository.save(pkg);
-          });
-    } catch (final DataIntegrityViolationException e) {
-      if (!this.isUniqueConstraintViolation(e, PACKAGE_UNIQUE_CONSTRAINT)) {
-        throw e;
-      }
-
-      return this.packageRepository
-          .findByRepoIdAndPackageIdIgnoreCase(repo.getId(), packageId)
-          .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
-    }
+        .findByRepoIdAndPackageIdIgnoreCase(repoId, normalizedId)
+        .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
   }
 
   private boolean isUniqueConstraintViolation(

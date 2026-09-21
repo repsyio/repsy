@@ -78,15 +78,12 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
    * NuGetPackageService#publishVersion}.
    */
   protected BaseUsages doPublish(
-      final BaseRepoInfo<ID> repoInfo,
-      final ID pkgId,
-      final NuspecMetadata metadata,
-      final Path tempFile)
+      final BaseRepoInfo<ID> repoInfo, final NuspecMetadata metadata, final Path tempFile)
       throws IOException {
 
     return this.packageService.publishVersion(
         repoInfo,
-        pkgId,
+        metadata.packageId(),
         metadata.version(),
         metadata.nuspecXml(),
         metadata.readme(),
@@ -126,8 +123,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
                 + " already exists.");
       }
 
-      final var pkgId = this.packageService.findOrCreatePackage(repoInfo, metadata.packageId());
-      final var usages = this.doPublish(repoInfo, pkgId, metadata, tempFile);
+      final var usages = this.doPublish(repoInfo, metadata, tempFile);
 
       log.info(
           "Successfully published and stored NuGet package {} {}",
