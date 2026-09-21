@@ -27,6 +27,22 @@
  *  - Rejecting an override, a release version or a snapshot version
  *    (`no-override`/`maven-releases-off`/`maven-snapshots-off` publish) throws
  *    `AccessNotAllowedException`, which `ErrorHandler` maps to 403, not the plan's 409/"conflict".
+ *  - The releases/snapshots switches judge a REdeploy of an existing version exactly like a first
+ *    deploy (RPS-1174), so `redeploy-releases-off`/`redeploy-snapshots-off` (a version deployed once
+ *    while its kind was still allowed, the kind then switched off, the same coordinate deployed
+ *    again) are refused with the same 403 (`releaseVersionsAreProhibited`/
+ *    `snapshotVersionsAreProhibited`) on the first file of the deploy, and what was already
+ *    published stays consumable. Before RPS-1174 that redeploy went through with 200.
+ *  - A normal SNAPSHOT redeploy is not an override, even with `allowOverride: false`: Maven writes
+ *    new timestamped files (buildNumber + 1) on every deploy and re-uploads the two metadata files,
+ *    and the server neither counts a new timestamped file as an existing one nor ever judges
+ *    metadata for override (`snapshot-redeploy-no-override`: publish and consume both succeed).
+ *    Only re-uploading a file that already exists (the same timestamped name) is an override; that
+ *    is pinned at the protocol level in `tests/maven/upload-rules.spec.ts`, since a real client
+ *    never does it.
+ *  - `reuseCoordinates` marks the scenarios about a redeploy: the fixture pre-publishes (admin,
+ *    permissive defaults) the same coordinate the scenario's own publish targets, and only then
+ *    applies the scenario's `repo` settings. Every other pre-publish lands on a separate coordinate.
  *
  * `versionType` matters only to the maven adapter today; other protocols ignore it once they exist.
  */
@@ -116,6 +132,7 @@ export const SCENARIOS: readonly Scenario[] = [
     tags: ['@settings', '@negative'],
     repo: { privateRepo: true, allowOverride: false },
     credential: 'token-rw',
+    reuseCoordinates: true,
     // Pinned: 403 ("artifactOverrideIsProhibited"), not the plan's "conflict" (409) -- see the
     // file-level comment.
     expect: { publish: 'forbidden', consume: 'ok' },
@@ -125,6 +142,7 @@ export const SCENARIOS: readonly Scenario[] = [
     tags: ['@settings'],
     repo: { privateRepo: true, allowOverride: true },
     credential: 'token-rw',
+    reuseCoordinates: true,
     expect: { publish: 'ok', consume: 'ok' },
   },
   {
@@ -134,7 +152,8 @@ export const SCENARIOS: readonly Scenario[] = [
     credential: 'token-rw',
     versionType: 'release',
     protocols: ['maven'],
-    // Pinned: 403 ("releaseVersionsAreProhibited").
+    // Pinned: 403 ("releaseVersionsAreProhibited") for a first deploy of a version that does not
+    // exist yet (`redeploy-releases-off` covers an existing one).
     expect: { publish: 'forbidden', consume: 'ok' },
   },
   {
@@ -144,7 +163,66 @@ export const SCENARIOS: readonly Scenario[] = [
     credential: 'token-rw',
     versionType: 'snapshot',
     protocols: ['maven'],
-    // Pinned: 403 ("snapshotVersionsAreProhibited").
+    // Pinned: 403 ("snapshotVersionsAreProhibited") for a first deploy of a version that does not
+    // exist yet (`redeploy-snapshots-off` covers an existing one).
+    expect: { publish: 'forbidden', consume: 'ok' },
+  },
+  {
+    id: 'snapshot-deploy',
+    tags: ['@snapshot'],
+    repo: { privateRepo: true },
+    credential: 'token-rw',
+    versionType: 'snapshot',
+    protocols: ['maven'],
+    // The client deploys timestamped files plus the two metadata files; the consumer resolves the
+    // SNAPSHOT through the version-level metadata to the timestamped jar that was deployed.
+    expect: { publish: 'ok', consume: 'ok' },
+  },
+  {
+    id: 'snapshot-redeploy',
+    tags: ['@snapshot'],
+    repo: { privateRepo: true },
+    credential: 'token-rw',
+    versionType: 'snapshot',
+    reuseCoordinates: true,
+    protocols: ['maven'],
+    // The everyday CI flow: the same SNAPSHOT deployed a second time (buildNumber 2), which the
+    // consumer then resolves to the second deploy's jar, not the first.
+    expect: { publish: 'ok', consume: 'ok' },
+  },
+  {
+    id: 'snapshot-redeploy-no-override',
+    tags: ['@snapshot', '@settings'],
+    repo: { privateRepo: true, allowOverride: false },
+    credential: 'token-rw',
+    versionType: 'snapshot',
+    reuseCoordinates: true,
+    protocols: ['maven'],
+    // Pinned: succeeds. Maven writes new timestamped files, so nothing existing is overridden, and
+    // metadata is never judged for override -- see the file-level comment.
+    expect: { publish: 'ok', consume: 'ok' },
+  },
+  {
+    id: 'redeploy-snapshots-off',
+    tags: ['@settings', '@negative', '@snapshot'],
+    repo: { privateRepo: true, allowOverride: true, snapshots: false },
+    credential: 'token-rw',
+    versionType: 'snapshot',
+    reuseCoordinates: true,
+    protocols: ['maven'],
+    // Pinned (RPS-1174): 403 ("snapshotVersionsAreProhibited") on the first file of the redeploy.
+    // The version published while snapshots were still on stays consumable.
+    expect: { publish: 'forbidden', consume: 'ok' },
+  },
+  {
+    id: 'redeploy-releases-off',
+    tags: ['@settings', '@negative'],
+    repo: { privateRepo: true, allowOverride: true, releases: false },
+    credential: 'token-rw',
+    versionType: 'release',
+    reuseCoordinates: true,
+    protocols: ['maven'],
+    // Pinned (RPS-1174): 403 ("releaseVersionsAreProhibited"), as above.
     expect: { publish: 'forbidden', consume: 'ok' },
   },
 ];

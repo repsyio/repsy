@@ -21,8 +21,19 @@
  *
  * `mvn` hides the HTTP status behind its own exit code (0/1), so the `Outcome` this module returns
  * is derived from a raw HTTP request this adapter also makes with the same credential (see
- * `rawPublishCheck`/`rawConsumeCheck`), not from that exit code; `clientExitCode` is only
- * corroborating evidence, attached to the test on failure by `clients/exec.ts`.
+ * `rawPublishCheck`/`rawConsumeCheck`), not from that exit code; `clientExitCode` is corroborating
+ * evidence (the spec asserts the two agree: a refused deploy must fail the real client, an accepted
+ * one must not) and is attached to the test on failure by `clients/exec.ts`.
+ *
+ * What the server judges on a deploy (`ArtifactServiceImpl.checkDeploymentRules`, RPS-1174/RPS-1176),
+ * which the raw probe below and the catalog's pinned statuses depend on: the release/snapshot
+ * switches (`releases`/`snapshots`) refuse an upload of that version kind with 403 whether the
+ * version is new or already exists; `allowOverride: false` refuses re-uploading an existing file
+ * (403), never metadata; a checksum file and the artifact-level/group-level `maven-metadata.xml`
+ * carry no version kind and are not judged, while the version-level snapshot metadata is judged by
+ * its own `<version>`. A real `mvn deploy` PUTs all artifact files first (pom, jar, each followed by
+ * its checksums), then all metadata, and stops at the first refusal, so a refused deploy is refused
+ * on its first file and leaves nothing behind.
  *
  * Two local Maven repositories are kept apart everywhere in this file:
  *  - `maven.repo.local` (primary, writable): a fresh, empty directory per `publish`/`resolve` call.
@@ -39,6 +50,7 @@
  *    container's lifetime needs it (guarded by a marker file so concurrent workers and future runs
  *    against the same volume don't redo it).
  */
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -52,6 +64,16 @@ import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, World } from '../scenarios/world.js';
 import { registerSeedPublisher } from '../scenarios/world.js';
 import { isolatedWorkDir, run } from './exec.js';
+import {
+  authHeader,
+  baseVersion,
+  groupPath,
+  isSnapshotVersion,
+  rawPut,
+  sha256Hex,
+  snapshotTimestamp,
+  splitPackageName,
+} from './maven-raw.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = path.resolve(__dirname, '../packages/maven');
@@ -70,24 +92,15 @@ export interface AdapterResult {
   clientExitCode: number;
   /** The (redacted) command line `mvn` ran, useful in assertion failure messages. */
   command: string;
-}
-
-function splitPackageName(packageName: string): [string, string] {
-  const parts = packageName.split(':');
-  if (parts.length !== 2) {
-    throw new Error(`maven adapter: expected "groupId:artifactId", got "${packageName}"`);
-  }
-  return [parts[0], parts[1]];
-}
-
-function authHeader(credential: MaterializedCredential): Record<string, string> {
-  if (credential.transport !== 'basic') {
-    return {};
-  }
-  const basic = Buffer.from(`${credential.username ?? ''}:${credential.password ?? ''}`).toString(
-    'base64',
-  );
-  return { Authorization: `Basic ${basic}` };
+  /**
+   * sha256 of the jar this call handled: for `publish`, the jar `mvn` built and deployed (every
+   * deploy packs a fresh random marker, so two deploys never share a digest); for `resolve`, the
+   * jar that landed in the clean local repository. Comparing the two proves the consumer got the
+   * very bytes that were deployed, not merely "some jar". `undefined` when there was no such file.
+   */
+  contentSha256?: string;
+  /** `resolve` only: the file name of that jar (a timestamped name for a SNAPSHOT). */
+  resolvedFile?: string;
 }
 
 function credentialView(credential: MaterializedCredential): Record<string, unknown> {
@@ -109,32 +122,54 @@ async function renderTemplate(
 
 /** Standard Maven layout path of the artifact's POM, used only for the raw-HTTP publish check. */
 function pomPath(groupId: string, artifactId: string, version: string): string {
-  return `${groupId.replace(/\./g, '/')}/${artifactId}/${version}/${artifactId}-${version}.pom`;
+  return `${groupPath(groupId)}/${artifactId}/${version}/${artifactId}-${version}.pom`;
+}
+
+let probeSeq = 0;
+
+/**
+ * The path of a POM a SNAPSHOT deploy could have uploaded, `g/a/<base>-SNAPSHOT/a-<base>-<ts>-<n>.pom`
+ * with a timestamp of "now" and a build number no real deploy reaches (a deploy counts 1, 2, 3, ...
+ * per version; this counts from 900001), so it is a *new* file every time: `allowOverride: false`
+ * never sees it as an override, and only the release/snapshot rules can refuse it. A real client
+ * never PUTs the literal `a-<base>-SNAPSHOT.pom` name, and that name is judged differently (see
+ * `README.md`, "SNAPSHOT and redeploy behaviour, as probed"), so it is no stand-in for what a
+ * client sends.
+ */
+function snapshotProbePomPath(groupId: string, artifactId: string, version: string): string {
+  probeSeq += 1;
+  const name = `${artifactId}-${baseVersion(version)}-${snapshotTimestamp()}-${900_000 + probeSeq}`;
+  return `${groupPath(groupId)}/${artifactId}/${version}/${name}.pom`;
 }
 
 /**
- * A raw PUT of `pomBytes` to the exact path a RELEASE deploy of these coordinates would use (and,
- * for a SNAPSHOT scenario, the literal `-SNAPSHOT`-suffixed path rather than a resolved timestamped
- * one -- `checkDeploymentRules` classifies release vs. snapshot from the filename it is given, the
- * same either way, so this pins the exact status without replicating Maven's own snapshot timestamp
- * negotiation). `Content-Type: application/octet-stream` is required: Repsy's POM parser reads the
- * body as a stream, and a PUT with no content type (curl's default for a raw body is
+ * A raw PUT of `pomBytes` to the path a deploy of these coordinates would start with: the release
+ * POM for a RELEASE, a fresh timestamped POM (see `snapshotProbePomPath`) for a SNAPSHOT. Both are
+ * the first file of a real deploy, and `checkDeploymentRules` classifies release vs. snapshot from
+ * the filename it is given, so this pins the exact status the refusing rule answers with, without
+ * replicating Maven's own snapshot timestamp negotiation. When the deploy was accepted this PUT is
+ * accepted too and stores one harmless extra POM (it never touches metadata, so it changes nothing
+ * a consumer resolves); when the deploy was refused, so is this, and nothing is written.
+ * `Content-Type: application/octet-stream` is required: Repsy's POM parser reads the body as a
+ * stream, and a PUT with no content type (curl's default for a raw body is
  * `application/x-www-form-urlencoded`) gets it consumed as form data first, which this harness found
  * out the hard way surfaces as an unrelated `malformedPomFile` 400 instead of the real status.
  */
 async function rawPublishCheck(world: World, pomBytes: Buffer): Promise<number> {
   const [groupId, artifactId] = splitPackageName(world.publishTarget.packageName);
-  const url = `${env.repoBaseUrl}/${world.repoName}/${pomPath(groupId, artifactId, world.publishTarget.version)}`;
+  const version = world.publishTarget.version;
+  const relPath = isSnapshotVersion(version)
+    ? snapshotProbePomPath(groupId, artifactId, version)
+    : pomPath(groupId, artifactId, version);
 
-  return withBackoff429(async () => {
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: { ...authHeader(world.credential), 'Content-Type': 'application/octet-stream' },
-      body: new Uint8Array(pomBytes),
-    });
-    await res.arrayBuffer().catch(() => undefined);
-    return res.status;
-  });
+  const res = await rawPut(
+    world.repoName,
+    world.credential,
+    relPath,
+    pomBytes,
+    'application/octet-stream',
+  );
+  return res.status;
 }
 
 /**
@@ -218,7 +253,22 @@ async function ensureSharedCacheWarm(): Promise<void> {
   return warmPromise;
 }
 
-export async function publish(world: World): Promise<AdapterResult> {
+interface DeployRun {
+  exitCode: number;
+  command: string;
+  /** sha256 of the jar `mvn` built (see `AdapterResult.contentSha256`). */
+  contentSha256?: string;
+  /** The POM the deploy was built from, which the raw probe re-sends. */
+  pomBytes: Buffer;
+}
+
+/**
+ * Runs the real `mvn deploy` of `world.publishTarget` with `world.credential` and nothing else. The
+ * built jar carries a per-deploy random marker (a resource file), so the jar's digest identifies
+ * exactly this deploy: without it two deploys of the same coordinate would usually build identical
+ * bytes and "the consumer got the latest deploy" could not be told from "the consumer got the first".
+ */
+async function deploy(world: World): Promise<DeployRun> {
   await ensureSharedCacheWarm();
 
   const { home, work } = await isolatedWorkDir(`mvn-pub-${world.scenario.id}`);
@@ -238,6 +288,10 @@ export async function publish(world: World): Promise<AdapterResult> {
     path.join(work, 'settings.xml'),
     credentialView(world.credential),
   );
+
+  const resourcesDir = path.join(work, 'src', 'main', 'resources');
+  await fs.mkdir(resourcesDir, { recursive: true });
+  await fs.writeFile(path.join(resourcesDir, 'e2e-deploy-marker.txt'), randomUUID(), 'utf8');
 
   const localRepo = path.join(home, 'repo-local');
   await fs.mkdir(localRepo, { recursive: true });
@@ -264,14 +318,33 @@ export async function publish(world: World): Promise<AdapterResult> {
     },
   );
 
-  const pomBytes = await fs.readFile(path.join(work, 'pom.xml'));
-  const httpStatus = await rawPublishCheck(world, pomBytes);
+  return {
+    exitCode: execResult.exitCode,
+    command: execResult.command,
+    contentSha256: await digestOf(path.join(work, 'target', `${artifactId}-${version}.jar`)),
+    pomBytes: await fs.readFile(path.join(work, 'pom.xml')),
+  };
+}
+
+/** sha256 of a file's content, or `undefined` when it does not exist. */
+async function digestOf(file: string): Promise<string | undefined> {
+  try {
+    return sha256Hex(await fs.readFile(file));
+  } catch {
+    return undefined;
+  }
+}
+
+export async function publish(world: World): Promise<AdapterResult> {
+  const deployed = await deploy(world);
+  const httpStatus = await rawPublishCheck(world, deployed.pomBytes);
 
   return {
     outcome: outcomeForStatus(httpStatus),
     httpStatus,
-    clientExitCode: execResult.exitCode,
-    command: execResult.command,
+    clientExitCode: deployed.exitCode,
+    command: deployed.command,
+    contentSha256: deployed.contentSha256,
   };
 }
 
@@ -326,22 +399,69 @@ export async function resolve(world: World): Promise<AdapterResult> {
   );
 
   const httpStatus = await rawConsumeCheck(world);
+  const resolved = await findResolvedJar(localRepo, groupId, artifactId, version);
 
   return {
     outcome: outcomeForStatus(httpStatus),
     httpStatus,
     clientExitCode: execResult.exitCode,
     command: execResult.command,
+    contentSha256: resolved?.sha256,
+    resolvedFile: resolved?.file,
   };
 }
 
+/**
+ * The jar `dependency:get` left in the clean local repository. A SNAPSHOT is resolved through the
+ * version-level `maven-metadata.xml` to a timestamped file (`a-1.0-20260921.101010-2.jar`), which
+ * Maven also copies to the literal `a-1.0-SNAPSHOT.jar`; only the timestamped one proves the
+ * metadata was followed, so that is the one reported. Nothing is reported when none is there.
+ */
+async function findResolvedJar(
+  localRepo: string,
+  groupId: string,
+  artifactId: string,
+  version: string,
+): Promise<{ file: string; sha256: string } | undefined> {
+  const dir = path.join(localRepo, groupPath(groupId), artifactId, version);
+  let names: string[];
+  try {
+    names = await fs.readdir(dir);
+  } catch {
+    return undefined;
+  }
+
+  const wanted = isSnapshotVersion(version)
+    ? new RegExp(
+        `^${escapeRegExp(`${artifactId}-${baseVersion(version)}`)}-\\d{8}\\.\\d{6}-\\d+\\.jar$`,
+      )
+    : new RegExp(`^${escapeRegExp(`${artifactId}-${version}`)}\\.jar$`);
+  const file = names.find((name) => wanted.test(name));
+  if (!file) {
+    return undefined;
+  }
+  const sha256 = await digestOf(path.join(dir, file));
+  return sha256 ? { file, sha256 } : undefined;
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * The pre-publish for a scenario whose own credential cannot publish, or that redeploys a coordinate
+ * (`reuseCoordinates`). Only the real client runs: the raw probe of `publish` would leave an extra POM
+ * behind that a later "nothing changed" comparison has no use for. The client exiting 0 means every
+ * PUT of the deploy was accepted.
+ */
 registerSeedPublisher('maven', async (world: World) => {
-  const result = await publish(world);
-  if (result.outcome !== 'ok') {
+  const deployed = await deploy(world);
+  if (deployed.exitCode !== 0) {
     throw new Error(
       `maven adapter: pre-publish for scenario "${world.scenario.id}" failed unexpectedly ` +
-        `(http ${result.httpStatus}, mvn exit ${result.clientExitCode}); its "consume: ok" ` +
-        'expectation depends on this artifact actually existing.',
+        `(mvn exit ${deployed.exitCode}); its "consume: ok" expectation depends on this artifact ` +
+        'actually existing.',
     );
   }
+  return { contentSha256: deployed.contentSha256 };
 });

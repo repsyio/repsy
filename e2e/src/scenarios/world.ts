@@ -53,24 +53,35 @@ export interface World {
   /**
    * What this test's own `resolve()`/consume call targets. Equal to `publishTarget` unless the
    * scenario's own publish is expected to fail (see `fixtures.ts`'s `world` fixture): then this is
-   * a *separate* coordinate an admin pre-published, deliberately distinct from `publishTarget` so
-   * the scenario's own (doomed) attempt is a genuine first deploy rather than a redeploy of
-   * something that already exists -- see `clients/maven.ts`'s note on `handleDeployTypeRules`
-   * skipping the release/snapshot check entirely for a redeploy, which a naive shared coordinate
-   * would silently launder a "releases: false"/"snapshots: false" rejection through.
-   * "no-override"/"override" are the deliberate exception: reusing the same coordinate for both is
-   * the whole point of those two scenarios, so `consumeTarget === publishTarget` for them.
+   * a *separate* coordinate an admin pre-published, so the scenario's own (doomed) attempt is a
+   * genuine first deploy of a version that does not exist yet -- the case `maven-releases-off`/
+   * `maven-snapshots-off` are about. A scenario with `reuseCoordinates` is the deliberate exception:
+   * `consumeTarget === publishTarget`, and the pre-publish put the very coordinate the scenario's
+   * own publish then redeploys (`no-override`/`override`, the `redeploy-*` and `snapshot-redeploy*`
+   * scenarios).
    */
   consumeTarget: Coordinates;
+  /**
+   * What the pre-publish stored, when the scenario had one: lets a spec assert that a refused
+   * redeploy left the pre-published content in place (`consumeTarget`'s content is still this).
+   */
+  seeded?: SeedResult;
+}
+
+/** What a seed publisher reports about the artifact it stored. */
+export interface SeedResult {
+  /** sha256 of the primary artifact file, when the adapter can tell (see `AdapterResult`). */
+  contentSha256?: string;
 }
 
 /**
  * Publishes `world`'s package with an already-authorized (normally admin) credential, for a
- * scenario whose own credential cannot publish but is still expected to consume successfully (see
- * `fixtures.ts`'s `world` fixture: "pre-publish" scenarios). A protocol adapter registers its own
+ * scenario whose own credential cannot publish but is still expected to consume successfully, or
+ * that redeploys a coordinate (`reuseCoordinates`) -- see `fixtures.ts`'s `world` fixture:
+ * "pre-publish" scenarios. A protocol adapter registers its own
  * implementation via `registerSeedPublisher` when its module loads.
  */
-export type SeedPublisher = (world: World) => Promise<void>;
+export type SeedPublisher = (world: World) => Promise<SeedResult>;
 
 const seedPublishers = new Map<string, SeedPublisher>();
 

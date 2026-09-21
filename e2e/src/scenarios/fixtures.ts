@@ -190,13 +190,12 @@ export const test = base.extend<Fixtures>({
 
       // A scenario whose own credential cannot publish but is still expected to consume
       // successfully (token-ro, anonymous-public, maven-releases-off/snapshots-off) needs something
-      // already published first. "no-override"/"override" also pre-publish, even though for
-      // "override" the scenario's own publish is expected to succeed: without an existing artifact
-      // there, its attempt is just an ordinary first publish and never exercises the
-      // allowOverride=true rule it is meant to test.
+      // already published first. A `reuseCoordinates` scenario is about a redeploy, so it always
+      // pre-publishes: without an existing artifact its own publish would be an ordinary first
+      // deploy and never exercise the rule it is meant to test (allowOverride, a switched-off kind).
       const needsPrePublish =
-        scenario.expect.consume === 'ok' &&
-        (scenario.expect.publish !== 'ok' || scenario.id === 'override');
+        scenario.reuseCoordinates === true ||
+        (scenario.expect.consume === 'ok' && scenario.expect.publish !== 'ok');
 
       if (needsPrePublish) {
         const publish = seedPublisherFor(protocol);
@@ -208,15 +207,15 @@ export const test = base.extend<Fixtures>({
           );
         }
 
-        // "no-override"/"override" deliberately redeploy the SAME coordinate the pre-publish used
-        // (that redeploy, allowed or not, is what each of them tests). Every other pre-publish
-        // scenario pre-publishes at a SEPARATE coordinate instead, so the scenario's own (doomed)
-        // publish attempt lands on a fresh, never-before-seen coordinate: a redeploy of an existing
-        // one skips the release/snapshot check entirely (see clients/maven.ts's note on
-        // handleDeployTypeRules), which would silently make maven-releases-off/snapshots-off's own
-        // publish attempt succeed instead of being rejected the way it is for a genuinely new push.
-        const reuseCoordinates = scenario.id === 'no-override' || scenario.id === 'override';
-        const seedTarget: Coordinates = reuseCoordinates
+        // A `reuseCoordinates` scenario pre-publishes the SAME coordinate its own publish targets
+        // (that redeploy, allowed or refused, is what it tests). Every other pre-publish scenario
+        // pre-publishes at a SEPARATE coordinate, so the scenario's own (doomed) publish lands on a
+        // fresh, never-before-seen version. Since RPS-1174 a redeploy of an existing version is
+        // judged by the releases/snapshots switches exactly like a first deploy, so the separate
+        // coordinate no longer decides which rule refuses (the redeploy-* scenarios cover that
+        // case); it keeps maven-releases-off/snapshots-off about a genuinely new version, and gives
+        // their "nothing was stored" check a coordinate that must not exist at all.
+        const seedTarget: Coordinates = scenario.reuseCoordinates
           ? publishTarget
           : { packageName, version: uniqueVersion(versionType) };
 
@@ -224,9 +223,14 @@ export const test = base.extend<Fixtures>({
 
         // Pre-published with a repo that still has its default, permissive settings: releases and
         // snapshots off are a repo-wide write rule, not a permission check, so even admin could not
-        // publish here once maven-releases-off/snapshots-off's real settings (applied right below)
-        // are in effect. The artifact has to land in storage before that restriction exists.
-        await publish({ ...world, credential: ADMIN_CREDENTIAL, publishTarget: seedTarget });
+        // publish here once the scenario's real settings (applied right below) are in effect. The
+        // artifact has to land in storage before that restriction exists.
+        const seeded = await publish({
+          ...world,
+          credential: ADMIN_CREDENTIAL,
+          publishTarget: seedTarget,
+        });
+        world = { ...world, seeded };
       }
 
       await seeder.setSettings(repo.name, {
