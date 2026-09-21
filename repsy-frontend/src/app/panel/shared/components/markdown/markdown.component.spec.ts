@@ -82,6 +82,232 @@ describe('MarkdownComponent', () => {
     expect(el.querySelector('input')).toBeNull();
   });
 
+  describe('remote content (RPS-1067)', () => {
+    const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+
+    /** Every attribute outside an anchor that could make the browser request a remote URL. */
+    function remoteReferences(el: HTMLElement): string[] {
+      const found: string[] = [];
+      el.querySelectorAll('*').forEach((element) => {
+        Array.from(element.attributes).forEach((attr) => {
+          if (/^\s*(https?:)?\/\//i.test(attr.value) || /https?:/i.test(attr.value) || /url\(/i.test(attr.value)) {
+            if (element.tagName !== 'A') {
+              found.push(`${element.tagName.toLowerCase()}[${attr.name}]=${attr.value}`);
+            }
+          }
+        });
+      });
+      return found;
+    }
+
+    function expectNoImageRequest(el: HTMLElement): void {
+      expect(el.querySelectorAll('img').length).toBe(0);
+      expect(remoteReferences(el)).toEqual([]);
+    }
+
+    it('replaces an external https image by its alt text and a link', () => {
+      const el = render('![Build status](https://tracker.example/pixel.png)');
+
+      expectNoImageRequest(el);
+      expect(el.querySelector('.blocked-image')?.textContent).toBe('Build status');
+      const link = el.querySelector('a');
+      expect(link?.getAttribute('href')).toBe('https://tracker.example/pixel.png');
+      expect(link?.getAttribute('target')).toBe('_blank');
+      expect(link?.getAttribute('rel')).toBe('noopener noreferrer nofollow');
+    });
+
+    it('blocks an http image written as HTML', () => {
+      const el = render('<img src="http://tracker.example/p.gif" alt="hi" width="1" height="1">');
+
+      expectNoImageRequest(el);
+      expect(el.textContent).toContain('hi');
+    });
+
+    it('blocks a protocol-relative image', () => {
+      const el = render('<img src="//tracker.example/x.png" alt="x">');
+
+      expectNoImageRequest(el);
+      expect(el.querySelector('a')?.getAttribute('href')).toBe('//tracker.example/x.png');
+    });
+
+    it('blocks an image whose remote URL hides in srcset', () => {
+      const el = render(
+        `<img src="${PIXEL}" srcset="https://tracker.example/a.png 1x, https://tracker.example/b.png 2x">`,
+      );
+
+      expect(el.querySelectorAll('img').length).toBe(1);
+      expect(el.querySelector('img')?.hasAttribute('srcset')).toBeFalse();
+      expect(remoteReferences(el)).toEqual([]);
+    });
+
+    it('blocks an image with only a srcset', () => {
+      const el = render('<img srcset="https://tracker.example/a.png 1x" alt="a">');
+
+      expectNoImageRequest(el);
+    });
+
+    it('blocks an upper-case scheme', () => {
+      const el = render('<img src="HTTPS://tracker.example/p.png" alt="x">');
+
+      expectNoImageRequest(el);
+    });
+
+    it('blocks a URL with leading whitespace or an embedded tab', () => {
+      const el = render(
+        '<img src=" https://tracker.example/p.png" alt="a">\n\n<img src="ht&#9;tps://tracker.example/q.png" alt="b">',
+      );
+
+      expectNoImageRequest(el);
+    });
+
+    it('blocks an entity-obfuscated scheme', () => {
+      const el = render(
+        '<img src="&#104;ttps&colon;//tracker.example/p.png" alt="x"><img src="&#x68;&#x74;tp://tracker.example/q.png">',
+      );
+
+      expectNoImageRequest(el);
+    });
+
+    it('reads a backslash as a slash', () => {
+      const el = render('<img src="/\\tracker.example/p.png" alt="a"><img src="\\\\tracker.example/q.png" alt="b">');
+
+      expectNoImageRequest(el);
+    });
+
+    it('blocks an image with another scheme', () => {
+      const el = render(
+        '<img src="ftp://tracker.example/p.png" alt="ftp"><img src="blob:https://tracker.example/1" alt="blob">',
+      );
+
+      expectNoImageRequest(el);
+      expect(el.querySelector('a')).toBeNull();
+    });
+
+    it('shows the alt text of a relative image instead of resolving it against the panel', () => {
+      const el = render('![Logo](images/logo.png)');
+
+      expectNoImageRequest(el);
+      expect(el.querySelector('.blocked-image')?.textContent).toBe('Logo');
+      expect(el.querySelector('a')).toBeNull();
+    });
+
+    it('drops a relative image without alt text', () => {
+      const el = render('Before <img src="/static/logo.png"> after');
+
+      expectNoImageRequest(el);
+      expect(el.textContent?.trim()).toBe('Before  after');
+    });
+
+    it('keeps an inline data:image picture', () => {
+      const el = render(`<img src="${PIXEL}" alt="dot">`);
+
+      expect(el.querySelectorAll('img').length).toBe(1);
+      expect(el.querySelector('img')?.getAttribute('src')).toBe(PIXEL);
+    });
+
+    it('does not nest a second link into a badge that is already a link', () => {
+      const el = render('[![CI](https://ci.example/badge.svg)](https://ci.example/run)');
+
+      expectNoImageRequest(el);
+      expect(el.querySelectorAll('a').length).toBe(1);
+      expect(el.querySelector('a')?.getAttribute('href')).toBe('https://ci.example/run');
+      expect(el.querySelector('a .blocked-image')?.textContent).toBe('CI');
+    });
+
+    it('unwraps a picture element and blocks its sources', () => {
+      const el = render(
+        '<picture><source srcset="https://tracker.example/dark.png" media="(prefers-color-scheme: dark)">' +
+          '<img src="https://tracker.example/light.png" alt="logo"></picture>',
+      );
+
+      expectNoImageRequest(el);
+      expect(el.querySelector('picture')).toBeNull();
+      expect(el.querySelector('source')).toBeNull();
+      expect(el.textContent).toContain('logo');
+    });
+
+    it('removes video, audio and other elements that fetch remote content', () => {
+      const el = render(
+        '<video src="https://tracker.example/v.mp4" poster="https://tracker.example/p.png" controls></video>\n\n' +
+          '<audio src="https://tracker.example/a.mp3"></audio>\n\n' +
+          '<object data="https://tracker.example/o.swf"></object><embed src="https://tracker.example/e.swf">' +
+          '<map name="m"><area href="https://tracker.example/" shape="rect" coords="0,0,1,1"></map>' +
+          '<noscript><img src="https://tracker.example/n.png"></noscript>',
+      );
+
+      ['video', 'audio', 'track', 'object', 'embed', 'area', 'noscript', 'img'].forEach((tag) => {
+        expect(el.querySelector(tag)).withContext(tag).toBeNull();
+      });
+      expect(remoteReferences(el)).toEqual([]);
+    });
+
+    it('removes style attributes that could load a background image', () => {
+      const el = render('<p style="background:url(https://tracker.example/bg.png)">text</p>');
+
+      expect(el.querySelector('p')?.textContent).toBe('text');
+      expect(el.querySelector('[style]')).toBeNull();
+      expect(el.innerHTML).not.toContain('tracker.example');
+    });
+
+    it('removes the legacy background attribute of table cells', () => {
+      const el = render(
+        '<table background="https://tracker.example/t.png"><tr><td background="https://tracker.example/c.png">x</td></tr></table>',
+      );
+
+      expect(el.querySelector('td')?.textContent).toBe('x');
+      expect(remoteReferences(el)).toEqual([]);
+    });
+
+    it('turns a relative link into plain text', () => {
+      const el = render('See the [usage guide](docs/usage.md), [root](/admin) and [parent](../x.md).');
+
+      expect(el.querySelector('a')).toBeNull();
+      expect(el.textContent).toContain('See the usage guide, root and parent.');
+    });
+
+    it('turns a fragment link into plain text', () => {
+      const el = render('Jump to [install](#install) or <a href="">empty</a>.');
+
+      expect(el.querySelector('a')).toBeNull();
+      expect(el.textContent).toContain('Jump to install or empty.');
+    });
+
+    it('keeps the formatting inside a relative link', () => {
+      const el = render('[**bold** text](docs/usage.md)');
+
+      expect(el.querySelector('a')).toBeNull();
+      expect(el.querySelector('strong')?.textContent).toBe('bold');
+    });
+
+    it('opens absolute links in a new tab without opener, referrer or search-engine credit', () => {
+      const el = render(
+        '<a href="https://repsy.io" target="_self" rel="opener">a</a> [b](//example.com/x) [c](HTTP://example.com)',
+      );
+
+      const links = Array.from(el.querySelectorAll('a'));
+      expect(links.length).toBe(3);
+      links.forEach((link) => {
+        expect(link.getAttribute('target')).toBe('_blank');
+        expect(link.getAttribute('rel')).toBe('noopener noreferrer nofollow');
+      });
+    });
+
+    it('leaves mailto links alone', () => {
+      const el = render('[mail](mailto:team@example.com)');
+
+      expect(el.querySelector('a')?.getAttribute('href')).toBe('mailto:team@example.com');
+    });
+
+    it('does not change ordinary README content', () => {
+      const el = render('# Title\n\nText with `code` and a [link](https://repsy.io).\n\n- one\n- two\n');
+
+      expect(el.querySelector('h1')?.textContent).toBe('Title');
+      expect(el.querySelector('code')?.textContent).toBe('code');
+      expect(el.querySelectorAll('li').length).toBe(2);
+      expect(el.querySelector('.blocked-image')).toBeNull();
+    });
+  });
+
   it('renders nothing for an empty README', () => {
     const el = render('');
 
