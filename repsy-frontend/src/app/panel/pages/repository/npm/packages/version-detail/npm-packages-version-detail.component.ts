@@ -23,6 +23,7 @@ import { finalize } from 'rxjs/operators';
 import { PackageVersionDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
+import { MarkdownComponent } from '../../../../../shared/components/markdown/markdown.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
@@ -33,7 +34,14 @@ import { NpmService } from '../../service/npm.service';
 @Component({
   selector: 'app-npm-packages-version-detail',
   standalone: true,
-  imports: [CommonModule, CopyClipboardComponent, NgOptimizedImage, SpinnerComponent, SecurityScanSectionComponent],
+  imports: [
+    CommonModule,
+    CopyClipboardComponent,
+    NgOptimizedImage,
+    SpinnerComponent,
+    SecurityScanSectionComponent,
+    MarkdownComponent,
+  ],
   templateUrl: './npm-packages-version-detail.component.html',
 })
 export class NpmPackagesVersionDetailComponent implements OnDestroy {
