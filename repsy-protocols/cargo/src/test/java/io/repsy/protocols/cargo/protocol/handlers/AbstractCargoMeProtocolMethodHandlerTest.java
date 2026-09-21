@@ -17,6 +17,7 @@ package io.repsy.protocols.cargo.protocol.handlers;
 
 import static io.repsy.protocols.cargo.protocol.handlers.CargoHandlerTestSupport.errorDetail;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -25,6 +26,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.handlers.AbstractCargoMeProtocolMethodHandler.CargoAuthenticator;
+import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.Map;
 import java.util.Optional;
@@ -159,6 +161,21 @@ class AbstractCargoMeProtocolMethodHandlerTest {
       assertThat(result.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE))
           .isEqualTo(WWW_AUTHENTICATE_VALUE);
       assertThat(errorDetail(result)).isEqualTo("badCredentials");
+    }
+
+    @Test
+    @DisplayName(
+        "lets a client that is over the failed-login limit through as an exception, not 401")
+    void rethrowsTooManyRequests() {
+      final var request = new MockHttpServletRequest();
+      request.addHeader(HttpHeaders.AUTHORIZATION, AUTH_HEADER);
+      when(authenticator.authenticateAndCreateToken(AUTH_HEADER))
+          .thenThrow(new TooManyRequestsException(42));
+
+      assertThatThrownBy(() -> handler.handle(meContext, request, new MockHttpServletResponse()))
+          .isInstanceOfSatisfying(
+              TooManyRequestsException.class,
+              ex -> assertThat(ex.getRetryAfterSeconds()).isEqualTo(42));
     }
   }
 }

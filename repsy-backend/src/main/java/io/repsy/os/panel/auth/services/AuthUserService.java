@@ -20,6 +20,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.events.UserLoginEvent;
 import io.repsy.os.generated.model.LoginForm;
 import io.repsy.os.generated.model.LoginInfo;
+import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.auth.services.LoginInfoFactory;
 import io.repsy.os.shared.auth.services.RefreshTokenService;
@@ -47,9 +48,14 @@ public class AuthUserService {
   private final @NonNull LoginInfoFactory loginInfoFactory;
   private final @NonNull RefreshTokenService refreshTokenService;
   private final @NonNull ApplicationEventPublisher eventPublisher;
+  private final @NonNull AuthFailureThrottle authFailureThrottle;
 
   @Transactional
   public @NonNull LoginInfo login(final @NonNull LoginForm form) {
+
+    // Before the user lookup: a blocked client learns nothing about a username, whichever it sends
+    // (RPS-906). A refused login costs no BCrypt (RPS-1092).
+    this.authFailureThrottle.checkAllowed();
 
     final UserInfo user;
     try {
@@ -57,10 +63,12 @@ public class AuthUserService {
     } catch (final ItemNotFoundException exception) {
       // Perform the same hash work for unknown usernames to avoid leaking account existence.
       PasswordHasher.verifyDummy(form.getPassword());
+      this.authFailureThrottle.recordFailure();
       throw new UnAuthorizedException(INVALID_CREDENTIALS);
     }
 
     if (!PasswordHasher.matches(form.getPassword(), user.getHash())) {
+      this.authFailureThrottle.recordFailure();
       throw new UnAuthorizedException(INVALID_CREDENTIALS);
     }
 

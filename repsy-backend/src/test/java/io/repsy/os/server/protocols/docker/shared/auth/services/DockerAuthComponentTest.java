@@ -25,6 +25,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
+import io.repsy.os.server.shared.auth.AuthFailureThrottle;
+import io.repsy.os.server.shared.auth.AuthThrottleProperties;
 import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
 import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
@@ -67,7 +69,8 @@ class DockerAuthComponentTest {
           this.userTxService,
           Mockito.mock(JwtUtils.class),
           Mockito.mock(DeployTokenService.class),
-          new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
+          new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+          new AuthFailureThrottle(AuthThrottleProperties.disabled()));
 
   private static String basicAuth(final String username, final String password) {
     final var raw = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
@@ -109,7 +112,8 @@ class DockerAuthComponentTest {
                 Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)),
             jwtUtils,
             Mockito.mock(DeployTokenService.class),
-            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
 
     assertUnauthorized(() -> component.authenticateUser("Bearer signed.jwt.token"));
   }
@@ -183,7 +187,8 @@ class DockerAuthComponentTest {
             DockerAuthComponentTest.this.userTxService,
             this.jwtUtils,
             Mockito.mock(DeployTokenService.class),
-            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
 
     DeletedUserToken() {
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
@@ -267,7 +272,8 @@ class DockerAuthComponentTest {
             DockerAuthComponentTest.this.userTxService,
             this.jwtUtils,
             Mockito.mock(DeployTokenService.class),
-            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
 
     AnonymousToken() {
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))

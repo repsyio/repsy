@@ -143,6 +143,37 @@ class VerifiedPasswordCacheTest {
   }
 
   @Test
+  @DisplayName("tells whether a password is remembered without running a hash check")
+  void isRemembered() {
+    final var alice = user(USERNAME, BCRYPT_HASH);
+
+    assertThat(this.cache.isRemembered(alice, PASSWORD)).isFalse();
+
+    assertThat(this.cache.matches(alice, "wrong")).isFalse();
+    assertThat(this.cache.isRemembered(alice, "wrong")).isFalse();
+    assertThat(this.cache.isRemembered(alice, PASSWORD)).isFalse();
+
+    assertThat(this.cache.matches(alice, PASSWORD)).isTrue();
+    assertThat(this.cache.isRemembered(alice, PASSWORD)).isTrue();
+    assertThat(this.cache.isRemembered(alice, "wrong")).isFalse();
+    assertThat(this.cache.isRemembered(user(USERNAME, OTHER_BCRYPT_HASH), PASSWORD)).isFalse();
+    assertThat(this.cache.isRemembered(user(USERNAME, null), PASSWORD)).isFalse();
+
+    this.nanos.addAndGet(Duration.ofSeconds(TTL_SECONDS).toNanos());
+    assertThat(this.cache.isRemembered(alice, PASSWORD)).isFalse();
+  }
+
+  @Test
+  @DisplayName("remembers nothing when disabled")
+  void isNeverRememberedWhenDisabled() {
+    final var disabled = new VerifiedPasswordCache(BasicAuthCacheProperties.disabled());
+    final var alice = user(USERNAME, BCRYPT_HASH);
+
+    assertThat(disabled.matches(alice, PASSWORD)).isTrue();
+    assertThat(disabled.isRemembered(alice, PASSWORD)).isFalse();
+  }
+
+  @Test
   @DisplayName("forgets a check once the time to live has passed")
   void expires() {
     final var alice = user(USERNAME, BCRYPT_HASH);

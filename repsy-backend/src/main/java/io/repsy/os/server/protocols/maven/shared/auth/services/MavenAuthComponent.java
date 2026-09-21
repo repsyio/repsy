@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.maven.shared.auth.services;
 
+import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
 import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
@@ -31,8 +32,9 @@ public class MavenAuthComponent extends ProtocolAuthService {
       final UserTxService userTxService,
       final JwtUtils jwtUtils,
       final DeployTokenService deployTokenService,
-      final VerifiedPasswordCache verifiedPasswordCache) {
+      final VerifiedPasswordCache verifiedPasswordCache,
+      final AuthFailureThrottle authFailureThrottle) {
 
-    super(userTxService, jwtUtils, deployTokenService, verifiedPasswordCache);
+    super(userTxService, jwtUtils, deployTokenService, verifiedPasswordCache, authFailureThrottle);
   }
 }

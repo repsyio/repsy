@@ -40,6 +40,7 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.mappers.UserConverter;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -49,6 +50,7 @@ import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -57,6 +59,8 @@ import org.mockito.Mockito;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 @DisplayName("ProtocolAuthService")
 class ProtocolAuthServiceTest {
@@ -74,7 +78,8 @@ class ProtocolAuthServiceTest {
           this.userTxService,
           Mockito.mock(JwtUtils.class),
           Mockito.mock(DeployTokenService.class),
-          new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
+          new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+          new AuthFailureThrottle(AuthThrottleProperties.disabled()));
 
   private static final UserInfo ALICE =
       UserInfo.builder()
@@ -325,7 +330,8 @@ class ProtocolAuthServiceTest {
             this.users,
             Mockito.mock(JwtUtils.class),
             Mockito.mock(DeployTokenService.class),
-            this.cache);
+            this.cache,
+            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
 
     private final UserInfo carol =
         UserInfo.builder()
@@ -416,6 +422,118 @@ class ProtocolAuthServiceTest {
   }
 
   /**
+   * RPS-1092: a client that keeps failing the password check is refused before the check, an
+   * unknown username counts like a wrong password, and what needs no hash check is not counted.
+   */
+  @Nested
+  @DisplayName("failed password checks are throttled")
+  class Throttled {
+
+    private static final int LIMIT = 2;
+
+    private final UserTxService users = Mockito.mock(UserTxService.class);
+    private final VerifiedPasswordCache cache =
+        new VerifiedPasswordCache(new BasicAuthCacheProperties(true, 300, 100));
+    private final AuthFailureThrottle throttle =
+        new AuthFailureThrottle(new AuthThrottleProperties(true, LIMIT, 60, 100));
+    private final ProtocolAuthService service =
+        new ProtocolAuthService(
+            this.users,
+            Mockito.mock(JwtUtils.class),
+            Mockito.mock(DeployTokenService.class),
+            this.cache,
+            this.throttle);
+
+    private final UserInfo dave =
+        UserInfo.builder()
+            .id(UUID.randomUUID())
+            .username("dave")
+            .hash(PasswordHasher.hash(PASSWORD))
+            .role(UserRole.USER)
+            .build();
+
+    @BeforeEach
+    void seedDaveAndAClient() {
+      when(this.users.getUserByUsernameOptional("dave")).thenReturn(Optional.of(this.dave));
+      when(this.users.getUserByUsernameOptional("ghost")).thenReturn(Optional.empty());
+
+      final var request = new MockHttpServletRequest();
+      request.setRemoteAddr("203.0.113.7");
+      RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+    }
+
+    @AfterEach
+    void forgetTheClient() {
+      RequestContextHolder.resetRequestAttributes();
+    }
+
+    private void failTwice(final String username) {
+      for (var i = 0; i < LIMIT; i++) {
+        assertUnauthorized(() -> this.service.authenticateUser(basicAuth(username, "wrong")));
+      }
+    }
+
+    @Test
+    @DisplayName("a wrong password over the limit is refused with 429 before the hash check")
+    void wrongPasswordsAreCounted() {
+      this.failTwice("dave");
+
+      assertThatThrownBy(() -> this.service.authenticateUser(basicAuth("dave", PASSWORD)))
+          .isInstanceOf(TooManyRequestsException.class);
+      assertThat(this.cache.isRemembered(this.dave, PASSWORD)).isFalse();
+    }
+
+    @Test
+    @DisplayName("an unknown username counts like a wrong password")
+    void unknownUsernamesAreCounted() {
+      this.failTwice("ghost");
+
+      assertThatThrownBy(() -> this.service.authenticateUser(basicAuth("dave", "wrong")))
+          .isInstanceOf(TooManyRequestsException.class);
+      assertThatThrownBy(() -> this.service.authenticateUser(basicAuth("ghost", "wrong")))
+          .isInstanceOf(TooManyRequestsException.class);
+    }
+
+    @Test
+    @DisplayName("a request without a username costs no hash check and is not counted")
+    void missingUsernameIsNotCounted() {
+      for (var i = 0; i < LIMIT * 3; i++) {
+        assertUnauthorized(() -> this.service.authenticateUser(basicAuth("", "wrong")));
+      }
+
+      assertUnauthorized(() -> this.service.authenticateUser(basicAuth("dave", "wrong")));
+    }
+
+    @Test
+    @DisplayName("a success is not counted and does not reset the count")
+    void successDoesNotReset() {
+      assertUnauthorized(() -> this.service.authenticateUser(basicAuth("dave", "wrong")));
+      assertThat(this.service.authenticateUser(basicAuth("dave", PASSWORD))).isSameAs(this.dave);
+      assertUnauthorized(() -> this.service.authenticateUser(basicAuth("dave", "wrong")));
+
+      assertThatThrownBy(() -> this.service.authenticateUser(basicAuth("dave", "wrong")))
+          .isInstanceOf(TooManyRequestsException.class);
+    }
+
+    @Test
+    @DisplayName("a remembered password passes while the client is blocked, until it saturates")
+    void rememberedPasswordPassesUntilSaturated() {
+      this.service.authenticateUser(basicAuth("dave", PASSWORD));
+      this.failTwice("dave");
+
+      assertThat(this.service.authenticateUser(basicAuth("dave", PASSWORD))).isSameAs(this.dave);
+
+      for (var i = LIMIT; i < LIMIT * AuthFailureThrottle.SATURATION_FACTOR; i++) {
+        assertThatThrownBy(() -> this.service.authenticateUser(basicAuth("dave", "guess")))
+            .isInstanceOf(TooManyRequestsException.class);
+      }
+
+      assertThatThrownBy(() -> this.service.authenticateUser(basicAuth("dave", PASSWORD)))
+          .isInstanceOf(TooManyRequestsException.class);
+    }
+  }
+
+  /**
    * RPS-962: a correctly signed token whose user no longer exists is an authentication failure, so
    * the client re-authenticates, instead of a 404 that reads as a missing resource.
    */
@@ -434,7 +552,8 @@ class ProtocolAuthServiceTest {
                 Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)),
             this.jwtUtils,
             Mockito.mock(DeployTokenService.class),
-            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
 
     TokenUserNoLongerExists() {
       when(this.jwtUtils.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
@@ -476,7 +595,8 @@ class ProtocolAuthServiceTest {
             ProtocolAuthServiceTest.this.userTxService,
             this.jwtUtils,
             this.deployTokenService,
-            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
 
     DeployTokenJwt() {
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
@@ -690,7 +810,8 @@ class ProtocolAuthServiceTest {
             ProtocolAuthServiceTest.this.userTxService,
             this.jwtUtils,
             mock(DeployTokenService.class),
-            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
 
     @Test
     @DisplayName("a read is checked against the repo and path of the token")

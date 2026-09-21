@@ -24,6 +24,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
+import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -109,6 +110,9 @@ public abstract class AbstractCargoMeProtocolMethodHandler implements ProtocolMe
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
           .body(Map.of("token", token));
 
+    } catch (final TooManyRequestsException e) {
+      // 429 with Retry-After is the answer, not a 401 that makes the client log in again.
+      throw e;
     } catch (final Exception e) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .header(WWW_AUTHENTICATE, WWW_AUTHENTICATE_VALUE)

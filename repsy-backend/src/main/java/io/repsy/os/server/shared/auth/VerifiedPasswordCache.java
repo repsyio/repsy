@@ -116,6 +116,17 @@ public class VerifiedPasswordCache {
     return matches;
   }
 
+  /**
+   * Tells whether this password already matched the stored hash of {@code user} a moment ago, which
+   * costs a lookup and never a hash check.
+   */
+  public boolean isRemembered(final @NonNull UserInfo user, final @NonNull String password) {
+
+    return this.verified != null
+        && user.getHash() != null
+        && this.verified.getIfPresent(this.keyOf(user, password)) != null;
+  }
+
   @VisibleForTesting
   long hitCount() {
 
