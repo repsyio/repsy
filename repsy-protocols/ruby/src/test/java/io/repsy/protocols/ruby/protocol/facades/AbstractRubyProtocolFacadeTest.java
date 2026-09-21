@@ -24,6 +24,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
@@ -116,11 +118,22 @@ class AbstractRubyProtocolFacadeTest {
     return tarBytes.toByteArray();
   }
 
+  /** Makes the mocked service run the file writer like the real one does after the row. */
+  private void publishRunsFileWriter(final boolean replacesExisting) throws IOException {
+    when(this.gemService.publishGem(any(), any(), any(), any()))
+        .thenAnswer(
+            invocation ->
+                invocation
+                    .<RubyGemProtocolService.GemFileWriter>getArgument(3)
+                    .write(replacesExisting));
+  }
+
   @Test
   @DisplayName("stores the gem as streamed from the spooled file and records it with its SHA-256")
   void storesGemAndRecordsIt() throws Exception {
     final var gemBytes = gem(GEMSPEC);
     final var stored = new AtomicReference<byte[]>();
+    this.publishRunsFileWriter(false);
     when(this.storageService.writeGem(
             eq(REPO_ID), eq(REPO_NAME), eq("demo"), eq("1.2.3"), eq("ruby"), any()))
         .thenAnswer(
@@ -133,7 +146,7 @@ class AbstractRubyProtocolFacadeTest {
       this.facade.publishGem(this.context, upload);
 
       final var metadata = ArgumentCaptor.forClass(GemMetadata.class);
-      verify(this.gemService).publishGem(any(), metadata.capture(), eq(upload.sha256Hex()));
+      verify(this.gemService).publishGem(any(), metadata.capture(), eq(upload.sha256Hex()), any());
       assertThat(metadata.getValue().getName()).isEqualTo("demo");
     }
 
@@ -143,6 +156,8 @@ class AbstractRubyProtocolFacadeTest {
     assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage())
         .isEqualTo(gemBytes.length);
     verify(this.gemService).getCompactEntriesByGemName(any(), eq("demo"));
+    verify(this.gemService).saveVersionsChecksum(any(), eq("demo"), any());
+    verify(this.storageService, never()).deleteGem(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -155,6 +170,85 @@ class AbstractRubyProtocolFacadeTest {
     }
 
     verify(this.storageService, never()).writeGem(any(), any(), any(), any(), any(), any());
-    verify(this.gemService, never()).publishGem(any(), any(), any());
+    verify(this.gemService, never()).publishGem(any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("does not write the file when the row is rejected, and reports nothing")
+  void writesNothingWhenTheRowIsRejected() throws Exception {
+    when(this.gemService.publishGem(any(), any(), any(), any()))
+        .thenThrow(new ItemAlreadyExistException("gemVersionAlreadyExists"));
+
+    try (final var upload = SpooledUpload.spool(new ByteArrayInputStream(gem(GEMSPEC)))) {
+      assertThatThrownBy(() -> this.facade.publishGem(this.context, upload))
+          .isInstanceOf(ItemAlreadyExistException.class);
+    }
+
+    verify(this.storageService, never()).writeGem(any(), any(), any(), any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+    assertThat(this.context.<String>getProperty("gemName")).isNull();
+  }
+
+  @Test
+  @DisplayName("does not write the file when the versions checksum cannot be refreshed")
+  void writesNothingWhenTheChecksumRefreshFails() throws Exception {
+    this.publishRunsFileWriter(false);
+    when(this.gemService.getCompactEntriesByGemName(any(), eq("demo")))
+        .thenThrow(new IllegalStateException("database went away"));
+
+    try (final var upload = SpooledUpload.spool(new ByteArrayInputStream(gem(GEMSPEC)))) {
+      assertThatThrownBy(() -> this.facade.publishGem(this.context, upload))
+          .isInstanceOf(IllegalStateException.class);
+    }
+
+    verify(this.storageService, never()).writeGem(any(), any(), any(), any(), any(), any());
+    verify(this.storageService, never()).deleteGem(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("removes the partly written file of a new version when the write fails")
+  void removesThePartialFileOfANewVersion() throws Exception {
+    this.publishRunsFileWriter(false);
+    final var failure = new IllegalStateException("disk full");
+    when(this.storageService.writeGem(any(), any(), any(), any(), any(), any())).thenThrow(failure);
+
+    try (final var upload = SpooledUpload.spool(new ByteArrayInputStream(gem(GEMSPEC)))) {
+      assertThatThrownBy(() -> this.facade.publishGem(this.context, upload)).isSameAs(failure);
+    }
+
+    verify(this.storageService)
+        .deleteGem(eq(REPO_ID), eq(REPO_NAME), eq("demo"), eq("1.2.3"), eq("ruby"));
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+  }
+
+  @Test
+  @DisplayName("keeps the file of the version being replaced when the write fails")
+  void keepsTheFileOfAReplacedVersion() throws Exception {
+    this.publishRunsFileWriter(true);
+    final var failure = new IllegalStateException("disk full");
+    when(this.storageService.writeGem(any(), any(), any(), any(), any(), any())).thenThrow(failure);
+
+    try (final var upload = SpooledUpload.spool(new ByteArrayInputStream(gem(GEMSPEC)))) {
+      assertThatThrownBy(() -> this.facade.publishGem(this.context, upload)).isSameAs(failure);
+    }
+
+    verify(this.storageService, never()).deleteGem(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("reports the write failure, not the cleanup failure, when nothing was written")
+  void keepsTheWriteFailureWhenTheCleanupFails() throws Exception {
+    this.publishRunsFileWriter(false);
+    final var failure = new IllegalStateException("disk full");
+    final var cleanupFailure = new ItemNotFoundException("gemNotFound");
+    when(this.storageService.writeGem(any(), any(), any(), any(), any(), any())).thenThrow(failure);
+    when(this.storageService.deleteGem(any(), any(), any(), any(), any()))
+        .thenThrow(cleanupFailure);
+
+    try (final var upload = SpooledUpload.spool(new ByteArrayInputStream(gem(GEMSPEC)))) {
+      assertThatThrownBy(() -> this.facade.publishGem(this.context, upload))
+          .isSameAs(failure)
+          .hasSuppressedException(cleanupFailure);
+    }
   }
 }

@@ -15,10 +15,12 @@
  */
 package io.repsy.protocols.ruby.shared.gem.services;
 
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemCompactEntry;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemVersionsEntry;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.NullMarked;
@@ -30,7 +32,20 @@ public interface RubyGemProtocolService<ID> {
 
   List<GemCompactEntry> getCompactEntriesByGemName(BaseRepoInfo<ID> repoInfo, String gemName);
 
-  void publishGem(BaseRepoInfo<ID> repoInfo, GemMetadata metadata, String checksum);
+  /**
+   * Records the gem version and, while that write is still open, stores its file through {@code
+   * fileWriter}.
+   *
+   * <p>The row is written first (and flushed, so a unique-index conflict surfaces here) and the
+   * file second, inside one transaction. If the row cannot be written, the file is never touched,
+   * so a publish that loses a race for a version cannot replace the winner's file. If the file
+   * cannot be written, the row is rolled back.
+   *
+   * @return the usages reported by {@code fileWriter}
+   */
+  BaseUsages publishGem(
+      BaseRepoInfo<ID> repoInfo, GemMetadata metadata, String checksum, GemFileWriter fileWriter)
+      throws IOException;
 
   void yankGem(BaseRepoInfo<ID> repoInfo, String gemName, String version, String platform);
 
@@ -39,4 +54,17 @@ public interface RubyGemProtocolService<ID> {
   void saveVersionsChecksum(BaseRepoInfo<ID> repoInfo, String gemName, String checksum);
 
   List<GemCompactEntry> getAllNonYankedEntries(BaseRepoInfo<ID> repoInfo);
+
+  /** Stores the file of a version whose row {@link #publishGem} has just written. */
+  @FunctionalInterface
+  interface GemFileWriter {
+
+    /**
+     * Writes the file of the version.
+     *
+     * @param replacesExisting whether the version already had a row and a file, which are being
+     *     replaced. A writer that fails must not delete a file it did not create.
+     */
+    BaseUsages write(boolean replacesExisting) throws IOException;
+  }
 }

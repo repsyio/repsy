@@ -31,10 +31,12 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
+@Slf4j
 @NullMarked
 @RequiredArgsConstructor
 public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFacade {
@@ -145,26 +147,71 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
       metadata = GemspecParser.parse(in);
     }
 
-    final BaseUsages usages;
-    try (final var in = gem.openStream()) {
-      usages =
-          this.storageService.writeGem(
-              repoInfo.getStorageKey(),
-              repoInfo.getName(),
-              metadata.getName(),
-              metadata.getVersion(),
-              metadata.getPlatform(),
-              in);
-    }
-
-    this.gemService.publishGem(repoInfo, metadata, gem.sha256Hex());
-    this.refreshVersionsChecksum(repoInfo, metadata.getName());
+    final var usages =
+        this.gemService.publishGem(
+            repoInfo,
+            metadata,
+            gem.sha256Hex(),
+            replacesExisting -> this.storeGem(repoInfo, metadata, gem, replacesExisting));
 
     context.addProperty(USAGES, usages);
     context.addProperty(GEM_NAME, metadata.getName());
     context.addProperty(GEM_VERSION, metadata.getVersion());
     context.addProperty(ARTIFACT_NAME, metadata.getName());
     context.addProperty(ARTIFACT_VERSION, metadata.getVersion());
+  }
+
+  /**
+   * Refreshes the versions checksum and stores the gem file, in that order, while {@link
+   * RubyGemProtocolService#publishGem} still holds the version's row: a failure of either rolls the
+   * row back, and for a new version the partly written file is removed.
+   */
+  private BaseUsages storeGem(
+      final BaseRepoInfo<ID> repoInfo,
+      final GemMetadata metadata,
+      final SpooledUpload gem,
+      final boolean replacesExisting)
+      throws IOException {
+
+    this.refreshVersionsChecksum(repoInfo, metadata.getName());
+
+    try (final var in = gem.openStream()) {
+      return this.storageService.writeGem(
+          repoInfo.getStorageKey(),
+          repoInfo.getName(),
+          metadata.getName(),
+          metadata.getVersion(),
+          metadata.getPlatform(),
+          in);
+    } catch (final IOException | RuntimeException e) {
+      // The row is rolled back with this failure, so a half-written new version would be an
+      // orphaned file. A version being replaced keeps its row, so its file is left alone.
+      if (!replacesExisting) {
+        this.discardPartialGem(repoInfo, metadata, e);
+      }
+      throw e;
+    }
+  }
+
+  private void discardPartialGem(
+      final BaseRepoInfo<ID> repoInfo, final GemMetadata metadata, final Exception cause) {
+
+    try {
+      this.storageService.deleteGem(
+          repoInfo.getStorageKey(),
+          repoInfo.getName(),
+          metadata.getName(),
+          metadata.getVersion(),
+          metadata.getPlatform());
+    } catch (final RuntimeException e) {
+      // Nothing to delete when the failure came before the file was created.
+      log.debug(
+          "No partial file removed for gem {} {}: {}",
+          metadata.getName(),
+          metadata.getVersion(),
+          e.getMessage());
+      cause.addSuppressed(e);
+    }
   }
 
   @Override

@@ -134,7 +134,11 @@ public abstract class AbstractIntegrationTest {
       new PostgreSQLContainer<>("postgres:18")
           .withDatabaseName("repsy")
           .withUsername("repsy")
-          .withPassword("repsy123");
+          .withPassword("repsy123")
+          // Every cached Spring context keeps its own connection pool, and a class that stubs a
+          // bean gets a context of its own. PostgreSQL's default of 100 connections runs out once
+          // about ten contexts are cached ("sorry, too many clients already").
+          .withCommand("postgres", "-c", "fsync=off", "-c", "max_connections=300");
 
   /** Root of the filesystem storage; each protocol keeps its repos under {@code <root>/<type>}. */
   protected static final Path STORAGE_ROOT;
