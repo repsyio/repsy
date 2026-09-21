@@ -28,6 +28,29 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { Converter } from 'showdown';
 import showdownHighlight from 'showdown-highlight';
 
+/** Elements that fetch or embed remote content. They have no place in a panel-rendered README. */
+const REMOVED_ELEMENTS = 'source, video, audio, track, link, object, embed, iframe, area, noscript';
+
+/** Attributes that can trigger a request (or hide one in CSS) without going through src or href. */
+const REMOVED_ATTRIBUTES = ['style', 'background', 'poster', 'srcset'];
+
+const EXTERNAL_LINK_REL = 'noopener noreferrer nofollow';
+
+/**
+ * How a URL found in a README resolves in the browser:
+ * - `external`: http(s) or protocol-relative, so it points at a publisher-chosen host.
+ * - `data-image`: an inline image, which needs no request.
+ * - `scheme`: any other scheme (mailto:, javascript:, ...); left to Angular's sanitiser.
+ * - `relative`: resolves against the panel's own origin, so it is meaningless here.
+ */
+type UrlKind = 'external' | 'data-image' | 'scheme' | 'relative';
+
+interface ClassifiedUrl {
+  kind: UrlKind;
+  /** The URL with whitespace and control characters removed and backslashes read as slashes. */
+  url: string;
+}
+
 @Component({
   selector: 'app-markdown',
   templateUrl: './markdown.component.html',
@@ -65,9 +88,94 @@ export class MarkdownComponent implements OnInit, AfterViewInit {
       return;
     }
 
-    const html = this.mdConverter.makeHtml(markdown);
+    // README content is written by the package publisher, so it must not make the viewer's browser
+    // request a publisher-chosen host, nor link into the panel's own routes. Angular's sanitiser
+    // below stays the last line of defence against script injection.
+    const html = this.restrictRemoteContent(this.mdConverter.makeHtml(markdown));
     const safeHtml = this.sanitizer.sanitize(SecurityContext.HTML, html);
     this.markdownHtml = this.sanitizer.bypassSecurityTrustHtml(safeHtml || '');
+  }
+
+  /**
+   * Blocks external images (a tracking pixel fires on page open), drops elements that fetch remote
+   * content, and turns links that would resolve against the panel's origin into plain text.
+   * The HTML is parsed with DOMParser, which builds an inert document: nothing is loaded from it.
+   */
+  private restrictRemoteContent(html: string): string {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+
+    doc.querySelectorAll(REMOVED_ELEMENTS).forEach((element) => element.remove());
+    doc.querySelectorAll('picture').forEach((picture) => picture.replaceWith(...Array.from(picture.childNodes)));
+    doc.querySelectorAll('img').forEach((img) => this.restrictImage(doc, img));
+    doc.querySelectorAll('a[href]').forEach((anchor) => this.restrictLink(anchor));
+    doc.querySelectorAll(REMOVED_ATTRIBUTES.map((name) => `[${name}]`).join(', ')).forEach((element) => {
+      REMOVED_ATTRIBUTES.forEach((name) => element.removeAttribute(name));
+    });
+
+    return doc.body.innerHTML;
+  }
+
+  /** Keeps inline data:image/* pictures. Any other image is replaced by its alt text (and a link, if external). */
+  private restrictImage(doc: Document, img: HTMLImageElement): void {
+    const { kind, url } = this.classifyUrl(img.getAttribute('src'));
+    if (kind === 'data-image') {
+      return;
+    }
+
+    const replacement: Node[] = [];
+    const alt = img.getAttribute('alt')?.trim();
+    if (alt) {
+      const caption = doc.createElement('span');
+      caption.className = 'blocked-image';
+      caption.textContent = alt;
+      replacement.push(caption);
+    }
+    // An image inside a link is usually a badge; a second, nested anchor would be invalid HTML.
+    if (kind === 'external' && !img.closest('a')) {
+      const link = doc.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('target', '_blank');
+      link.setAttribute('rel', EXTERNAL_LINK_REL);
+      link.textContent = url;
+      replacement.push(doc.createTextNode(' '), link);
+    }
+    img.replaceWith(...replacement);
+  }
+
+  /** Relative links become text, external links open in a new tab without leaking the panel. */
+  private restrictLink(anchor: Element): void {
+    const { kind, url } = this.classifyUrl(anchor.getAttribute('href'));
+    if (kind === 'relative') {
+      anchor.replaceWith(...Array.from(anchor.childNodes));
+    } else if (kind === 'external') {
+      anchor.setAttribute('href', url);
+      anchor.setAttribute('target', '_blank');
+      anchor.setAttribute('rel', EXTERNAL_LINK_REL);
+    }
+  }
+
+  /**
+   * Browsers ignore leading and trailing whitespace, tabs and newlines inside a URL, read a backslash
+   * as a slash, and match schemes case-insensitively; the classification does the same so that
+   * ` HTTPS://x` or `/\x` cannot slip past. Attribute values are already entity-decoded by the parser.
+   */
+  private classifyUrl(raw: string | null): ClassifiedUrl {
+    const url = Array.from(raw ?? '')
+      .filter((char) => char.charCodeAt(0) > 32 && char.charCodeAt(0) !== 127 && !/\s/.test(char))
+      .join('')
+      .replace(/\\/g, '/');
+    const lower = url.toLowerCase();
+
+    if (lower.startsWith('//') || /^https?:/.test(lower)) {
+      return { kind: 'external', url };
+    }
+    if (lower.startsWith('data:image/')) {
+      return { kind: 'data-image', url };
+    }
+    if (/^[a-z][a-z0-9+.-]*:/.test(lower)) {
+      return { kind: 'scheme', url };
+    }
+    return { kind: 'relative', url };
   }
 
   private addCopyButtons(): void {
