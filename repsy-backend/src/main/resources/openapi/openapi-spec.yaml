@@ -3408,9 +3408,15 @@ components:
         releases:
           type: boolean
           nullable: false
+          description: >-
+            Maven only. When false, uploads of release versions are refused, including redeploys of
+            release versions that already exist.
         snapshots:
           type: boolean
           nullable: false
+          description: >-
+            Maven only. When false, uploads of snapshot versions are refused, including redeploys of
+            snapshot versions that already exist.
         securityScanEnabled:
           type: boolean
           nullable: false
@@ -3814,8 +3820,14 @@ components:
           nullable: false
         releases:
           type: boolean
+          description: >-
+            Maven only. When false, uploads of release versions are refused, including redeploys of
+            release versions that already exist.
         snapshots:
           type: boolean
+          description: >-
+            Maven only. When false, uploads of snapshot versions are refused, including redeploys of
+            snapshot versions that already exist.
         allowOverride:
           type: boolean
           nullable: false

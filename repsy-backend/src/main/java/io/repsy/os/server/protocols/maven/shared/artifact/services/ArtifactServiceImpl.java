@@ -154,6 +154,13 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     return this.getDeployAndVersionTypesByMetadata(repoInfo, metadata);
   }
 
+  /**
+   * Refuses an upload that the repo settings do not allow. The version-type rule ({@code releases}
+   * and {@code snapshots}) applies to new versions and to redeploys alike (RPS-1174), so switching
+   * a kind off also stops overwriting the versions of that kind that already exist. The override
+   * rule is checked first, so {@code artifactOverrideIsProhibited} keeps precedence when both rules
+   * would refuse the upload.
+   */
   @Override
   public void checkDeploymentRules(
       final BaseRepoInfo<UUID> baseRepoInfo,
@@ -167,7 +174,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     }
 
     this.checkAllowOverride(baseRepoInfo, gav, storagePath);
-    this.handleDeployTypeRules(baseRepoInfo, artifactPair);
+    this.checkVersionTypeRules(baseRepoInfo, artifactPair.getValue());
   }
 
   @Override
@@ -597,6 +604,11 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
             artifact.getId(), lastComingVersionName);
 
     if (artifactVersionOptional.isPresent()) {
+      // No version type on purpose. The last listed version is the deployed one only for a new
+      // version (Maven appends it); on a redeploy the list keeps its order, so the last entry may
+      // be any earlier version of the other kind. The artifact files of the deploy were already
+      // judged by their own GAV. This method is not reached today, because isPluginMetadata is
+      // always true (RPS-1176); revisit this when that is fixed.
       result = new MutablePair<>(REDEPLOY, null);
     } else {
       if (ArtifactUtils.isSnapshot(lastComingVersionName)) {
@@ -837,20 +849,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
             repoId, groupName, artifactName);
 
     return artifactOptional.orElse(null);
-  }
-
-  private void handleDeployTypeRules(
-      final BaseRepoInfo<UUID> repoInfo,
-      final MutablePair<ArtifactDeployType, ArtifactVersionType> result) {
-
-    final var deployType = result.getKey();
-    final var versionType = result.getValue();
-
-    if (deployType == REDEPLOY) {
-      return;
-    }
-
-    this.checkVersionTypeRules(repoInfo, versionType);
   }
 
   private @Nullable String getSnapshotArtifactVersionPomFileName(
