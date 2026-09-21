@@ -67,11 +67,19 @@ export function isApiErrorStatus(err: unknown, status: number): boolean {
   return err instanceof ApiError && err.status === status;
 }
 
+/** One page of `GET /api/repos/{repoName}/deploy-tokens`, read straight off the JSON envelope. */
+export interface DeployTokenPage {
+  content: DeployTokenInfoListItem[];
+  totalPages: number;
+}
+
 export class PanelApi {
   private readonly client: PanelClient;
+  private readonly baseUrl: string;
   private token: string | undefined;
 
   constructor(baseUrl: string) {
+    this.baseUrl = baseUrl;
     this.client = new PanelClient({
       BASE: baseUrl,
       // Resolved per request, not fixed at construction time, so login() can populate it later.
@@ -156,16 +164,84 @@ export class PanelApi {
   }
 
   /**
-   * Lists every deploy token of a repo. The generated client serialises the `pageable` query param
-   * as `pageable[page]=..&pageable[size]=..`, which Spring's `Pageable` resolver does not bind, so
-   * an empty object is passed here and the server's own default (`page=0`, sorted by id descending)
-   * applies instead. That default page is large enough for what one repo in this harness ever holds.
+   * One page of a repo's deploy tokens, newest first. The generated client's `listDeployTokens`
+   * serialises its `pageable` query param as `pageable[page]=..&pageable[size]=..`, which Spring's
+   * `Pageable` resolver does not bind (it always falls back to the server's default page), so this
+   * calls the endpoint directly with `page`/`size`/`sort` as plain query parameters instead — the
+   * form Spring actually binds.
    */
+  async listDeployTokensPage(
+    repoName: string,
+    page: number,
+    size: number,
+  ): Promise<DeployTokenPage> {
+    const url = new URL(`${this.baseUrl}/api/repos/${encodeURIComponent(repoName)}/deploy-tokens`);
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('size', String(size));
+    // Newest first (repo_deploy_token.id is a UUIDv7, so DESC on it is DESC on creation time too):
+    // a token this harness just created is always on page 0, but sorting explicitly rather than
+    // relying on the server's own default keeps that true even if the default ever changes.
+    url.searchParams.set('sort', 'id,desc');
+
+    const res = await fetch(url, { headers: { Authorization: this.authorization() } });
+    if (!res.ok) {
+      throw new ApiError(
+        { method: 'GET', url: url.toString() },
+        {
+          status: res.status,
+          statusText: res.statusText,
+          url: url.toString(),
+          ok: false,
+          body: null,
+        },
+        `listDeployTokensPage failed with status ${res.status}`,
+      );
+    }
+
+    const body = (await res.json()) as {
+      data?: { content?: DeployTokenInfoListItem[]; page?: { totalPages?: number } };
+    };
+    return {
+      content: body.data?.content ?? [],
+      totalPages: body.data?.page?.totalPages ?? 0,
+    };
+  }
+
+  /** Lists every deploy token of a repo (its first page, `DEFAULT_TOKEN_LIST_PAGE_SIZE` items). */
   async listDeployTokens(repoName: string): Promise<DeployTokenInfoListItem[]> {
-    const res = await this.client.protocolDeployTokenController.listDeployTokens({
-      repoName,
-      pageable: {},
-    });
-    return unwrap(res.data, 'listDeployTokens').content ?? [];
+    const { content } = await this.listDeployTokensPage(repoName, 0, DEFAULT_TOKEN_LIST_PAGE_SIZE);
+    return content;
+  }
+
+  /**
+   * Finds one deploy token by name, paging through the repo's tokens (newest first,
+   * `TOKEN_LOOKUP_PAGE_SIZE` at a time) instead of assuming it fits on one default-sized page —
+   * unlike page 0 alone, this stays correct even if a repo ever holds enough tokens to need more
+   * than one page, up to `TOKEN_LOOKUP_MAX_PAGES` pages as a sanity cap against an infinite loop.
+   */
+  async findDeployTokenByName(
+    repoName: string,
+    name: string,
+  ): Promise<DeployTokenInfoListItem | undefined> {
+    for (let page = 0; page < TOKEN_LOOKUP_MAX_PAGES; page += 1) {
+      const { content, totalPages } = await this.listDeployTokensPage(
+        repoName,
+        page,
+        TOKEN_LOOKUP_PAGE_SIZE,
+      );
+
+      const match = content.find((item) => item.name === name);
+      if (match) {
+        return match;
+      }
+      if (page + 1 >= totalPages) {
+        return undefined;
+      }
+    }
+    return undefined;
   }
 }
+
+const DEFAULT_TOKEN_LIST_PAGE_SIZE = 20;
+const TOKEN_LOOKUP_PAGE_SIZE = 50;
+const TOKEN_LOOKUP_MAX_PAGES = 40;

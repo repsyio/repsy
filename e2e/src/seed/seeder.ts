@@ -85,7 +85,7 @@ export class Seeder {
 
   constructor(
     private readonly api: PanelApi,
-    private readonly runId: string,
+    public readonly runId: string,
   ) {}
 
   async createUser(opts: CreateUserOptions = {}): Promise<SeededUser> {
@@ -137,8 +137,9 @@ export class Seeder {
     });
 
     // The create response carries the secret token but not its id; the id is only in the list.
-    const listed = await this.api.listDeployTokens(repoName);
-    const match = listed.find((item) => item.name === name);
+    // findDeployTokenByName pages through (newest first) instead of assuming one default-sized
+    // page holds every token a repo has, so this stays correct however many tokens a repo holds.
+    const match = await this.api.findDeployTokenByName(repoName, name);
     if (!match) {
       throw new Error(
         `Seeder: created deploy token "${name}" on repo "${repoName}" but it is missing from ` +
@@ -156,6 +157,24 @@ export class Seeder {
       username: created.username ?? '',
       readOnly: match.read_only,
     };
+  }
+
+  /**
+   * Revokes an already-created token right away, for a "token-revoked" credential: the token was
+   * tracked (and will be cleaned up, tolerating the 404 a second revoke gets) when it was created;
+   * this just makes it stop working immediately instead of at test teardown.
+   */
+  async revokeNow(repoName: string, tokenId: string): Promise<void> {
+    await this.api.revokeDeployToken(repoName, tokenId);
+  }
+
+  /**
+   * Rotates an already-created token, invalidating its old value immediately and returning the new
+   * one. Used for a "token-rotated-old" credential, which deliberately keeps using the value from
+   * before this call.
+   */
+  async rotateNow(repoName: string, tokenId: string): Promise<string> {
+    return this.api.rotateDeployToken(repoName, tokenId);
   }
 
   /**

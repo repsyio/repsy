@@ -136,7 +136,9 @@ cmd_test() {
   if [ -n "$protocols" ]; then
     IFS=',' read -ra services <<< "$protocols"
   else
-    # The only runner defined so far; a protocol runner joins this list as it is added (step 2+).
+    # No --protocol given: run the skeleton harness proof only. A protocol runner (maven, and more
+    # from step 3 onward) is opt-in via --protocol so a plain "run.sh test" stays fast; pass e.g.
+    # --protocol maven or --protocol skeleton,maven to run more.
     services=(skeleton)
   fi
 
