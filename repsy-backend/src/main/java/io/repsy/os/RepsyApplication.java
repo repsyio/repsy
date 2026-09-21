@@ -26,6 +26,7 @@ import io.repsy.os.server.protocols.npm.shared.storage.configs.NpmFileSystemStor
 import io.repsy.os.server.protocols.nuget.shared.storage.configs.NuGetFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.pypi.shared.storage.configs.PypiFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.ruby.shared.storage.configs.RubyFileSystemStorageBackendConfigProps;
+import io.repsy.os.server.protocols.shared.configs.StorageTrashProperties;
 import io.repsy.os.server.security.scanner.trivy.DockerRegistryProperties;
 import io.repsy.os.server.security.scanner.trivy.TrivyScannerProperties;
 import io.repsy.os.server.shared.auth.AuthThrottleProperties;
@@ -50,6 +51,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
   HelmFileSystemStorageBackendConfigProps.class,
   NuGetFileSystemStorageBackendConfigProps.class,
   RubyFileSystemStorageBackendConfigProps.class,
+  StorageTrashProperties.class,
   TrivyScannerProperties.class,
   DockerRegistryProperties.class,
   BasicAuthCacheProperties.class,

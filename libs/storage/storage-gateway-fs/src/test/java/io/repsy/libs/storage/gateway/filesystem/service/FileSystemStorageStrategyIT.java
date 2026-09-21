@@ -35,7 +35,7 @@ import java.nio.file.attribute.FileTime;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -641,8 +641,8 @@ class FileSystemStorageStrategyIT {
               Duration.ofDays(1));
 
       // Create an old dated dir (2 days ago) and a recent one (today)
-      final var oldDate = LocalDate.now(ZoneOffset.UTC).minusDays(2).toString();
-      final var newDate = LocalDate.now(ZoneOffset.UTC).toString();
+      final var oldDate = LocalDate.now(ZoneId.systemDefault()).minusDays(2).toString();
+      final var newDate = LocalDate.now(ZoneId.systemDefault()).toString();
 
       final var oldDir = FileSystemStorageStrategyIT.this.trashPath.resolve(oldDate);
       final var newDir = FileSystemStorageStrategyIT.this.trashPath.resolve(newDate);
@@ -656,6 +656,66 @@ class FileSystemStorageStrategyIT {
     }
 
     @Test
+    @DisplayName("a directory moved into the trash while the retention is one day survives")
+    void keepDirectoryMovedInWhileRetentionIsOneDay() throws Exception {
+      final var localStrategy =
+          new FileSystemStorageStrategy(
+              FileSystemStorageStrategyIT.this.basePath.toString(),
+              FileSystemStorageStrategyIT.this.trashPath.toString(),
+              Duration.ofDays(1));
+      final var key = UUID.randomUUID();
+      FileSystemStorageStrategyIT.this.seedFile(key + "/file.txt", "data");
+      final var oldDir =
+          Files.createDirectories(
+              FileSystemStorageStrategyIT.this.trashPath.resolve(
+                  LocalDate.now(ZoneId.systemDefault()).minusDays(2).toString()));
+
+      localStrategy.deleteDirectory(FileSystemStorageStrategyIT.this.storagePath(key, "file.txt"));
+      localStrategy.clearTrash();
+
+      assertThat(oldDir).doesNotExist();
+      try (var stream = Files.walk(FileSystemStorageStrategyIT.this.trashPath)) {
+        assertThat(stream.filter(p -> p.getFileName().toString().equals("file.txt")).toList())
+            .hasSize(1);
+      }
+    }
+
+    @Test
+    @DisplayName("keeps a date directory that is still inside the retention period")
+    void keepDirectoryInsideRetentionPeriod() throws Exception {
+      final var insideRetention =
+          Files.createDirectories(
+              FileSystemStorageStrategyIT.this.trashPath.resolve(
+                  LocalDate.now(ZoneId.systemDefault()).minusDays(3).toString()));
+      final var outsideRetention =
+          Files.createDirectories(
+              FileSystemStorageStrategyIT.this.trashPath.resolve(
+                  LocalDate.now(ZoneId.systemDefault()).minusDays(30).toString()));
+
+      // the shared strategy keeps seven days
+      FileSystemStorageStrategyIT.this.strategy.clearTrash();
+
+      assertThat(insideRetention).exists();
+      assertThat(outsideRetention).doesNotExist();
+    }
+
+    @Test
+    @DisplayName("leaves a directory whose name is not a date alone and still cleans the others")
+    void leaveDirectoryThatIsNotADateAlone() throws Exception {
+      final var stray =
+          Files.createDirectories(FileSystemStorageStrategyIT.this.trashPath.resolve("not-a-date"));
+      final var old =
+          Files.createDirectories(
+              FileSystemStorageStrategyIT.this.trashPath.resolve(
+                  LocalDate.now(ZoneId.systemDefault()).minusDays(30).toString()));
+
+      FileSystemStorageStrategyIT.this.strategy.clearTrash();
+
+      assertThat(stray).exists();
+      assertThat(old).doesNotExist();
+    }
+
+    @Test
     @DisplayName("Duration.ZERO retention deletes all dated directories including a past date")
     void deleteAllTrashDirectoriesWhenRetentionIsZero() throws Exception {
       final var localStrategy =
@@ -665,7 +725,7 @@ class FileSystemStorageStrategyIT {
 
       final var yesterdayDir =
           FileSystemStorageStrategyIT.this.trashPath.resolve(
-              LocalDate.now(ZoneOffset.UTC).minusDays(1).toString());
+              LocalDate.now(ZoneId.systemDefault()).minusDays(1).toString());
       Files.createDirectories(yesterdayDir);
 
       localStrategy.clearTrash();

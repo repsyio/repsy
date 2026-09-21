@@ -307,7 +307,7 @@ Access at:
 | `DB_URL` | JDBC database URL. Defaults to embedded H2. | `jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE` |
 | `DB_USERNAME` | Database username | `repsy` |
 | `DB_PASSWORD` | Database password | `repsy123` |
-| `STORAGE_BASE_PATH` | Base directory for artifact file storage. Set to a path inside `/app/data` (e.g. `/app/data/storage`) to persist artifacts with a single volume mount. | `~/.repsy` |
+| `STORAGE_BASE_PATH` | Base directory for artifact file storage. Set to a path inside `/app/data` (e.g. `/app/data/storage`) to persist artifacts with a single volume mount. Deleting a repo, a package or a version moves its files into a `trash/` directory of the protocol (for example `maven/trash`) first; the trash older than `TRASH_RETENTION` is removed every day (see `TRASH_CLEANUP_ENABLED`). | `~/.repsy` |
 | `OS_APP_JWT_SECRET` | JWT signing secret. If not set, a random 256-bit secret is generated on every startup — every restart/redeploy invalidates all existing sessions, forcing every user to log in again. Set a stable, secure random value for any production/self-host deployment. | *(random, regenerated on every startup)* |
 | `SERVER_PORT` | Repository operations port | `9090` |
 | `API_PORT` | Backend API and Frontend web UI port | `8080` |
@@ -329,6 +329,10 @@ Access at:
 | `ABANDONED_UPLOAD_TTL` | How long an upload can go without receiving data before it counts as abandoned (ISO-8601 duration) | `PT24H` |
 | `ABANDONED_UPLOAD_CLEANUP_INTERVAL` | How often the cleanup runs (ISO-8601 duration) | `PT1H` |
 | `ABANDONED_UPLOAD_CLEANUP_INITIAL_DELAY` | How long after startup the first cleanup runs (ISO-8601 duration) | `PT10M` |
+| `TRASH_CLEANUP_ENABLED` | Periodically empty the storage trash: what you delete (a repo, a package or a version) is moved into a `trash/` directory of its protocol first, and this job removes it from the disk for good once it is older than `TRASH_RETENTION`. **The first run after an upgrade deletes all the trash older than `TRASH_RETENTION` that has piled up so far, and that cannot be undone.** Set it to `false` to keep the trash | `true` |
+| `TRASH_RETENTION` | How long deleted items stay in the trash before they are removed for good (ISO-8601 duration, at least `P1D`; a shorter value stops the application from starting). Raise it to keep deleted items recoverable for longer | `P7D` |
+| `TRASH_CLEANUP_INTERVAL` | How often the trash is emptied (ISO-8601 duration) | `PT24H` |
+| `TRASH_CLEANUP_INITIAL_DELAY` | How long after startup the first trash cleanup runs (ISO-8601 duration) | `PT15M` |
 | `MULTIPART_MAX_FILE_SIZE` | Largest single file a multipart upload may carry: the package archive of a PyPI (`twine upload`), Helm (`POST /{repo}/api/charts`) or NuGet push. A larger upload is answered with `413`. Accepts a size such as `100MB` or `1GB`. A Helm chart is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory, so keep that directory on a disk with room for the largest chart | `500MB` |
 | `MULTIPART_MAX_REQUEST_SIZE` | Largest total size of a multipart request, all parts included. Keep it at least as large as `MULTIPART_MAX_FILE_SIZE` | `500MB` |
 | `RUBY_MAX_GEM_SIZE` | Largest gem a `gem push` may carry (the raw request body, so the multipart limits do not apply to it). A larger gem is answered with `413`. The gem is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory. Accepts a size such as `100MB` or `1GB` | `500MB` |
