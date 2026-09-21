@@ -104,7 +104,7 @@ public abstract class AbstractHelmOciBlobUploadStartProtocolMethodHandler<ID>
 
     final var uploadId = this.helmFacade.startBlobUpload(context);
 
-    final var requestPath = request.getRequestURI().replaceAll("/+$", "");
+    final var requestPath = stripTrailingSlashes(request.getRequestURI());
     final var location =
         ServletUriComponentsBuilder.fromCurrentContextPath()
             .path(requestPath + "/" + uploadId)
@@ -115,5 +115,16 @@ public abstract class AbstractHelmOciBlobUploadStartProtocolMethodHandler<ID>
         .header(LOCATION, location)
         .header(DOCKER_UPLOAD_UUID, uploadId.toString())
         .build();
+  }
+
+  /** Drops the slashes at the end of the path, a loop instead of a regex so it stays linear. */
+  private static String stripTrailingSlashes(final String path) {
+    var end = path.length();
+
+    while (end > 0 && path.charAt(end - 1) == '/') {
+      end--;
+    }
+
+    return path.substring(0, end);
   }
 }

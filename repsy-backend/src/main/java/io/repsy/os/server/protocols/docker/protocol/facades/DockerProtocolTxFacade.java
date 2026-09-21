@@ -92,7 +92,7 @@ public class DockerProtocolTxFacade extends AbstractDockerProtocolTxFacade<UUID>
   }
 
   @Override
-  @Transactional
+  @Transactional(rollbackFor = IOException.class)
   public void finalizeLayerUpload(
       final ProtocolContext context, final RelativePath relativePath, final LayerInfo layerInfo)
       throws IOException {
@@ -111,7 +111,7 @@ public class DockerProtocolTxFacade extends AbstractDockerProtocolTxFacade<UUID>
   }
 
   @Override
-  @Transactional
+  @Transactional(rollbackFor = IOException.class)
   public @Nullable String saveManifest(
       final ProtocolContext context, final BaseImageInfo<UUID> imageInfo, final ManifestForm form)
       throws IOException {

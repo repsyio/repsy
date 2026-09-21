@@ -17,6 +17,7 @@ package io.repsy.protocols.nuget.protocol.handlers;
 
 import static io.repsy.protocols.nuget.NuGetTestContexts.context;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -26,6 +27,8 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -33,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
@@ -117,6 +121,43 @@ class AbstractNuGetDownloadProtocolMethodHandlerTest {
       assertThat(result).containsSame(ctx);
     } else {
       assertThat(result).isEmpty();
+    }
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(
+      strings = {
+        "/nuget/v3/package/id/1.0.0/sub/id.1.0.0.nupkg",
+        "/nuget/v3/package/id/1.0.0/",
+        "/nuget/v3/package//1.0.0/id.1.0.0.nupkg",
+        "/nuget/v3/package/id/1.0.0/.nupkg"
+      })
+  @DisplayName("getPathParser() needs exactly id, version and file after /v3/package/")
+  void pathParserRejectsOtherSegmentCounts(final String path) {
+    final var request = request("GET", path);
+
+    assertThat(this.handler(true).getPathParser().parse(request)).isEmpty();
+    assertThat(this.handler(false).getPathParser().parse(request)).isEmpty();
+  }
+
+  @ParameterizedTest(name = "isNupkg={0}")
+  @ValueSource(booleans = {true, false})
+  @DisplayName("getPathParser() rejects a very long path a client controls in linear time")
+  void pathParserIsLinearOnAHostilePath(final boolean isNupkg) {
+    // The .+/.+/.+ this used to be took about a minute on the first of these, since the three
+    // wildcards could trade slashes.
+    final var hostilePaths =
+        List.of(
+            "/nuget/v3/package/" + "a/".repeat(4_000),
+            "/nuget/v3/package/" + "a".repeat(20_000),
+            "/v3/package/".repeat(2_000) + "a");
+    final var parser = this.handler(isNupkg).getPathParser();
+
+    for (final var path : hostilePaths) {
+      final var request = request("GET", path);
+
+      assertTimeoutPreemptively(
+          Duration.ofSeconds(1), () -> assertThat(parser.parse(request)).isEmpty());
     }
   }
 

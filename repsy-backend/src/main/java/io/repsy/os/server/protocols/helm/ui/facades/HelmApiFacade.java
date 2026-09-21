@@ -95,6 +95,7 @@ public class HelmApiFacade implements ProtocolApiFacade {
     return this.helmChartMapper.toDetail(info);
   }
 
+  @Transactional(rollbackFor = IOException.class)
   public BaseUsages deleteAllVersions(final RepoInfo repoInfo, final String name)
       throws IOException {
 
@@ -129,6 +130,7 @@ public class HelmApiFacade implements ProtocolApiFacade {
     return BaseUsages.ofDisk(-freed);
   }
 
+  @Transactional(rollbackFor = IOException.class)
   public BaseUsages delete(final RepoInfo repoInfo, final String name, final String version)
       throws IOException {
     final var chartInfo =

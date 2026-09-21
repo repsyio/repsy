@@ -2,7 +2,6 @@ name: CodeQL
 
 permissions:
   contents: read
-  security-events: write
 
 # TEMPORARILY DISABLED for pull requests while the backlog is worked through: restore the
 # commented pull_request trigger below to turn it back on. The weekly scan is unchanged.
@@ -20,6 +19,10 @@ concurrency:
 jobs:
   analyze-actions:
     name: Analyze GitHub Actions
+    # The write scope is here, not at workflow level, so only this job holds it.
+    permissions:
+      contents: read
+      security-events: write
     runs-on: warp-ubuntu-latest-x64-2x
     steps:
       - name: Checkout
@@ -37,6 +40,10 @@ jobs:
 
   analyze-java:
     name: Analyze Java
+    # The write scope is here, not at workflow level, so only this job holds it.
+    permissions:
+      contents: read
+      security-events: write
     runs-on: warp-ubuntu-latest-x64-2x
     steps:
       - name: Checkout
@@ -74,6 +81,10 @@ jobs:
 
   analyze-javascript:
     name: Analyze JavaScript/TypeScript
+    # The write scope is here, not at workflow level, so only this job holds it.
+    permissions:
+      contents: read
+      security-events: write
     runs-on: warp-ubuntu-latest-x64-2x
     steps:
       - name: Checkout

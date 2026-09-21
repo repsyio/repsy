@@ -41,8 +41,12 @@ import org.springframework.http.ResponseEntity;
 @NullMarked
 public abstract class AbstractNuGetDownloadProtocolMethodHandler implements ProtocolMethodHandler {
 
-  private static final Pattern NUPKG_PATTERN = Pattern.compile(".*/v3/package/.+/.+/.+\\.nupkg$");
-  private static final Pattern NUSPEC_PATTERN = Pattern.compile(".*/v3/package/.+/.+/.+\\.nuspec$");
+  // Each segment is [^/]+ so the three of them cannot trade characters, which keeps the match
+  // linear on a long path a client controls.
+  private static final Pattern NUPKG_PATTERN =
+      Pattern.compile(".*/v3/package/[^/]+/[^/]+/[^/]+\\.nupkg$");
+  private static final Pattern NUSPEC_PATTERN =
+      Pattern.compile(".*/v3/package/[^/]+/[^/]+/[^/]+\\.nuspec$");
 
   private final PathParser basePathParser;
   private final NuGetProtocolFacade facade;
