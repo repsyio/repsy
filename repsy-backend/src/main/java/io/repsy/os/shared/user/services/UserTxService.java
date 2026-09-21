@@ -158,15 +158,9 @@ public class UserTxService {
   public @NonNull UserResponse updateUserDetails(
       final @NonNull UUID userId, final @NonNull UserUpdateForm dto) {
 
-    final var user = this.findUserById(userId);
     final var newRole = UserRole.valueOf(dto.getRole().name());
 
-    // Checked before any field is touched so a rejected request leaves the user unmodified.
-    if (user.getRole() == UserRole.ADMIN
-        && newRole != UserRole.ADMIN
-        && this.userRepository.countByRole(UserRole.ADMIN) <= 1) {
-      throw new BadRequestException(ERR_CANNOT_DEMOTE_LAST_ADMIN);
-    }
+    final var user = this.findUserForRoleChange(userId, newRole);
 
     if (!user.getUsername().equals(dto.getUsername())) {
       if (this.userRepository.existsByUsername(dto.getUsername())) {
@@ -195,9 +189,13 @@ public class UserTxService {
 
   @Transactional
   public void deleteUserById(final @NonNull UUID userId) {
+    // The admin rows are locked before the user is read and counted, so two requests that each
+    // remove one of the last two admins run one after the other instead of both seeing two
+    // (RPS-1101).
+    final var adminCount = this.userRepository.lockIdsByRole(UserRole.ADMIN).size();
     final var user = this.findUserById(userId);
 
-    if (user.getRole() == UserRole.ADMIN && this.userRepository.countByRole(UserRole.ADMIN) <= 1) {
+    if (user.getRole() == UserRole.ADMIN && adminCount <= 1) {
       throw new BadRequestException(ERR_CANNOT_DELETE_LAST_ADMIN);
     }
 
@@ -235,6 +233,29 @@ public class UserTxService {
     if (this.userRepository.updateLastLoginAt(username, Instant.now()) == 0) {
       throw new ItemNotFoundException(ERR_USER_NOT_FOUND);
     }
+  }
+
+  /**
+   * Reads the user whose role is about to change to {@code newRole}, and refuses a change that
+   * would leave the instance without an ADMIN. It checks before any field is touched, so a rejected
+   * request leaves the user unmodified.
+   *
+   * <p>The admin rows are locked before the user is read, so a user that a concurrent request
+   * demoted or deleted while this one waited is read as it is now. A request that keeps the role
+   * ADMIN can only add admins, so it does not have to queue behind the others (RPS-1101).
+   */
+  private @NonNull User findUserForRoleChange(
+      final @NonNull UUID userId, final @NonNull UserRole newRole) {
+
+    final var mayDemote = newRole != UserRole.ADMIN;
+    final var adminCount = mayDemote ? this.userRepository.lockIdsByRole(UserRole.ADMIN).size() : 0;
+    final var user = this.findUserById(userId);
+
+    if (mayDemote && user.getRole() == UserRole.ADMIN && adminCount <= 1) {
+      throw new BadRequestException(ERR_CANNOT_DEMOTE_LAST_ADMIN);
+    }
+
+    return user;
   }
 
   private @NonNull User findUserById(final @NonNull UUID id) {

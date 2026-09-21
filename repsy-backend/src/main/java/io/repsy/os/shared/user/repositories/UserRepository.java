@@ -17,6 +17,7 @@ package io.repsy.os.shared.user.repositories;
 
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +26,7 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -50,6 +52,22 @@ public interface UserRepository extends JpaRepository<User, UUID> {
       @NonNull @Param("search") String search, @NonNull Pageable pageable);
 
   Long countByRole(UserRole userRole);
+
+  /**
+   * Locks every user row that holds {@code role} until the surrounding transaction ends and returns
+   * their ids (RPS-1101). Every operation that can shrink the set of admins takes this lock before
+   * it counts them, so two of them can never both see "two admins left" and both remove one.
+   *
+   * <p>Three details matter. It selects ids, not entities: a user that another transaction demoted
+   * or deleted while this one waited is then never held in the persistence context as a stale copy.
+   * The caller counts the list itself, because {@code FOR UPDATE} is not allowed on an aggregate in
+   * PostgreSQL. And the {@code order by} gives every caller the same lock order, so two callers
+   * queue up instead of deadlocking. Under READ COMMITTED a caller that waited re-tests the role
+   * once the other transaction commits, so it sees the admins that are really left.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select u.id from User u where u.role = :role order by u.id")
+  @NonNull List<UUID> lockIdsByRole(@NonNull @Param("role") UserRole role);
 
   /**
    * Swaps a user's password hash only while it still holds {@code oldHash}, so a password change
