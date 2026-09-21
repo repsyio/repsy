@@ -40,7 +40,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -344,7 +344,16 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   }
 
   /**
-   * Runs on the application's {@code maintenanceTaskExecutor} bean: walking and deleting the trash
+   * Deletes the date directories of the trash that are older than the retention period, for good.
+   *
+   * <p>{@link #deleteDirectory} files a deleted item under the directory named after today's date
+   * in the system time zone, and this method reads that name back in the same zone, so a directory
+   * counts as old once its whole day lies before {@code now - retention}. A retention of at least
+   * one day therefore never touches the directory a concurrent delete is moving into. A {@link
+   * Duration#ZERO} retention does, and is only meant for tests. A directory whose name is not a
+   * date is not ours and is left alone.
+   *
+   * <p>Runs on the application's {@code maintenanceTaskExecutor}: walking and deleting the trash
    * can take minutes and must not hold up the default {@code @Async} pool. An application that
    * enables {@code @Async} has to define a bean of that name.
    */
@@ -362,15 +371,23 @@ public class FileSystemStorageStrategy implements StorageStrategy {
       final List<Path> dateDirs = trashItems.filter(Files::isDirectory).toList();
 
       for (final Path dateDir : dateDirs) {
-        final Instant dirInstant =
-            LocalDate.parse(dateDir.getFileName().toString())
-                .atStartOfDay(ZoneOffset.UTC)
-                .toInstant();
+        final Optional<Instant> dirInstant = toDayStart(dateDir);
 
-        if (dirInstant.isBefore(threshold)) {
+        if (dirInstant.isPresent() && dirInstant.get().isBefore(threshold)) {
           FileSystemUtils.deleteRecursively(dateDir);
         }
       }
+    }
+  }
+
+  private static Optional<Instant> toDayStart(final Path dateDir) {
+    try {
+      return Optional.of(
+          LocalDate.parse(dateDir.getFileName().toString())
+              .atStartOfDay(ZoneId.systemDefault())
+              .toInstant());
+    } catch (final DateTimeParseException e) {
+      return Optional.empty();
     }
   }
 

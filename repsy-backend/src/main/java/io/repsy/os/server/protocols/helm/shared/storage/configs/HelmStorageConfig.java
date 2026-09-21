@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.helm.shared.storage.configs;
 
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.libs.storage.gateway.filesystem.service.FileSystemStorageStrategy;
+import io.repsy.os.server.protocols.shared.configs.StorageTrashProperties;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.context.annotation.Bean;
@@ -28,10 +29,13 @@ import org.springframework.context.annotation.Configuration;
 public class HelmStorageConfig {
 
   private final HelmFileSystemStorageBackendConfigProps fileSystemProps;
+  private final StorageTrashProperties trashProperties;
 
   @Bean("osStorageStrategyHelm")
   public StorageStrategy storageStrategy() {
     return new FileSystemStorageStrategy(
-        this.fileSystemProps.getBasePath(), this.fileSystemProps.getTrashPath());
+        this.fileSystemProps.getBasePath(),
+        this.fileSystemProps.getTrashPath(),
+        this.trashProperties.trashRetention());
   }
 }

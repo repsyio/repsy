@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.ruby.shared.storage.configs;
 
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.libs.storage.gateway.filesystem.service.FileSystemStorageStrategy;
+import io.repsy.os.server.protocols.shared.configs.StorageTrashProperties;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
@@ -27,10 +28,13 @@ import org.springframework.context.annotation.Configuration;
 public class RubyStorageConfig {
 
   private final @NonNull RubyFileSystemStorageBackendConfigProps fileSystemStorageProps;
+  private final @NonNull StorageTrashProperties trashProperties;
 
   @Bean("osStorageStrategyRuby")
   public @NonNull StorageStrategy storageStrategy() {
     return new FileSystemStorageStrategy(
-        this.fileSystemStorageProps.getBasePath(), this.fileSystemStorageProps.getTrashPath());
+        this.fileSystemStorageProps.getBasePath(),
+        this.fileSystemStorageProps.getTrashPath(),
+        this.trashProperties.trashRetention());
   }
 }

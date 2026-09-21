@@ -127,6 +127,14 @@ repsy:
       ttl: ${ABANDONED_UPLOAD_TTL:PT24H}
       initial-delay: ${ABANDONED_UPLOAD_CLEANUP_INITIAL_DELAY:PT10M}
       interval: ${ABANDONED_UPLOAD_CLEANUP_INTERVAL:PT1H}
+    # Removes for good what was deleted from the filesystem storage. A deleted repo, package or
+    # version is first moved into the `trash` directory of its protocol; this job deletes the trash
+    # older than `os.app.storage.file-system.trash-retention` (at least P1D, or the application does
+    # not start). The first run after an upgrade deletes the whole backlog older than that.
+    trash-cleanup:
+      enabled: ${TRASH_CLEANUP_ENABLED:true}
+      initial-delay: ${TRASH_CLEANUP_INITIAL_DELAY:PT15M}
+      interval: ${TRASH_CLEANUP_INTERVAL:PT24H}
 
 logging:
   level:
@@ -151,6 +159,7 @@ os:
 
     storage:
       file-system:
+        trash-retention: ${TRASH_RETENTION:P7D}
         maven:
           base-path: ${storage-gateway.fs.base-path}/maven
           trash-path: ${storage-gateway.fs.base-path}/maven/trash

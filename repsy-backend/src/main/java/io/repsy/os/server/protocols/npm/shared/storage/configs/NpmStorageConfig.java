@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.npm.shared.storage.configs;
 
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.libs.storage.gateway.filesystem.service.FileSystemStorageStrategy;
+import io.repsy.os.server.protocols.shared.configs.StorageTrashProperties;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
@@ -26,11 +27,14 @@ import org.springframework.context.annotation.Configuration;
 @RequiredArgsConstructor
 public class NpmStorageConfig {
   private final @NonNull NpmFileSystemStorageBackendConfigProps fileSystemStorageProps;
+  private final @NonNull StorageTrashProperties trashProperties;
 
   @Bean("osStorageStrategyNpm")
   public @NonNull StorageStrategy storageStrategy() {
 
     return new FileSystemStorageStrategy(
-        this.fileSystemStorageProps.getBasePath(), this.fileSystemStorageProps.getTrashPath());
+        this.fileSystemStorageProps.getBasePath(),
+        this.fileSystemStorageProps.getTrashPath(),
+        this.trashProperties.trashRetention());
   }
 }
