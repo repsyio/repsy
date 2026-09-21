@@ -30,6 +30,10 @@
  *    `releaseVersionsAreProhibited`), and refuses the version-level snapshot metadata by its
  *    `<version>`; the artifact-level metadata indexes both kinds and is never judged, and the other
  *    kind keeps working.
+ *  - A path outside the Maven layout (`<group>/<artifactId>/<version>/<artifactId>-<version>[-<classifier>].<ext>`)
+ *    is refused with 400 `invalidArtifactPath` and stores nothing, where it used to answer 200 and
+ *    silently drop the file (RPS-1182); every file a real Maven or Gradle client sends conforms
+ *    and keeps being stored.
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import {
@@ -37,8 +41,11 @@ import {
   artifactDir,
   artifactMetadataXml,
   minimalPom,
+  rawGet,
   rawPut,
   type RawResponse,
+  repoTree,
+  sha256Hex,
   versionDir,
   versionMetadataXml,
 } from '../../src/clients/maven-raw.js';
@@ -275,6 +282,83 @@ test.describe('maven upload rules (raw HTTP)', () => {
         undefined,
         'artifact-level metadata',
       );
+    },
+  );
+
+  test(
+    'a PUT outside the artifact layout is refused with 400 and stores nothing (RPS-1182)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder);
+      const releaseDir = versionDir(layout.groupId, ARTIFACT_ID, RELEASE);
+      const snapshotDir = versionDir(layout.groupId, ARTIFACT_ID, SNAPSHOT);
+      const stray = [
+        'io/stray.txt',
+        `${releaseDir}/other-${RELEASE}.jar`,
+        `${releaseDir}/${ARTIFACT_ID}-9.9.jar`,
+        // No extension at all.
+        `${releaseDir}/${ARTIFACT_ID}-${RELEASE}`,
+        `${snapshotDir}/stray.txt`,
+        // A file name shorter than the artifactId makes the GAV parser throw, not answer null.
+        `${snapshotDir}/x-1.0-SNAPSHOT.jar`,
+      ];
+      const admin = adminCredential();
+
+      for (const path of stray) {
+        expectPut(await layout.put(path, 'hello', TEXT), 400, 'invalidArtifactPath', path);
+      }
+      for (const path of stray) {
+        const res = await rawGet(layout.repoName, admin, path);
+        expect(res.status, `GET ${path} answered ${res.status}`).toBe(404);
+      }
+
+      expect(await repoTree(layout.repoName)).toEqual({});
+    },
+  );
+
+  test(
+    'the files real Maven and Gradle clients send are all stored',
+    { tag: ['@smoke'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder);
+      const releaseDir = versionDir(layout.groupId, ARTIFACT_ID, RELEASE);
+      const snapshotDir = versionDir(layout.groupId, ARTIFACT_ID, SNAPSHOT);
+      const base = `${releaseDir}/${ARTIFACT_ID}-${RELEASE}`;
+      const checksum = 'da39a3ee5e6b4b0d3255bfef95601890afd80709';
+
+      const files = new Map<string, string>([
+        [`${base}.pom`, minimalPom(layout.groupId, ARTIFACT_ID, RELEASE)],
+        [`${base}.jar`, 'jar'],
+        [`${base}-sources.jar`, 'sources'],
+        [`${base}-javadoc.jar`, 'javadoc'],
+        [`${base}-tests.jar`, 'tests'],
+        [`${base}.module`, '{"formatVersion":"1.1"}'],
+        [`${base}-kotlin-tooling-metadata.json`, '{"schemaVersion":"1.0.0"}'],
+        [`${base}.klib`, 'klib'],
+        [`${base}.tar.gz`, 'tarball'],
+        [`${base}.jar.asc`, '-----BEGIN PGP SIGNATURE-----\n\n-----END PGP SIGNATURE-----\n'],
+        [`${base}.jar.md5`, checksum.slice(0, 32)],
+        [`${base}.jar.sha1`, checksum],
+        [`${base}.jar.sha256`, sha256Hex('jar')],
+        [`${base}.jar.sha512`, `${sha256Hex('jar')}${sha256Hex('jar')}`],
+        [`${base}.module.sha512`, `${sha256Hex('module')}${sha256Hex('module')}`],
+        [`${snapshotDir}/${ARTIFACT_ID}-1.0-20260101.000000-1.jar`, 'timestamped'],
+        [`${snapshotDir}/${ARTIFACT_ID}-1.0-SNAPSHOT.jar`, 'literal snapshot'],
+      ]);
+
+      for (const [path, body] of files) {
+        expectPut(await layout.put(path, body, OCTET), 200, undefined, path);
+      }
+
+      const admin = adminCredential();
+      for (const [path, body] of files) {
+        const res = await rawGet(layout.repoName, admin, path);
+        expect(res.status, `GET ${path} answered ${res.status}`).toBe(200);
+        expect(res.body.toString('utf8'), `the body of ${path}`).toBe(body);
+      }
+
+      const tree = await repoTree(layout.repoName);
+      expect(Object.keys(tree).sort()).toEqual([...files.keys()].sort());
     },
   );
 });

@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.maven.shared.artifact.services.contracts;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
@@ -23,13 +24,18 @@ import java.io.IOException;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
 @NullMarked
 public interface ArtifactService<ID> {
 
-  @Nullable MutablePair<ArtifactDeployType, ArtifactVersionType> getDeployAndVersionType(
+  /**
+   * Classifies an upload of a file that is not a {@code maven-metadata.xml}.
+   *
+   * @throws BadRequestException {@code invalidArtifactPath} when the path is not a Maven 2 artifact
+   *     path (checksums of any path and metadata are not judged here)
+   */
+  MutablePair<ArtifactDeployType, ArtifactVersionType> getDeployAndVersionType(
       BaseRepoInfo<ID> repoInfo, StoragePath storagePath);
 
   MutablePair<ArtifactDeployType, ArtifactVersionType> getDeployAndVersionTypesByMetadataTypeFiles(

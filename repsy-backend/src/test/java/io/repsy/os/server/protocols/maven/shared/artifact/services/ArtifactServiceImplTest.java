@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.maven.shared.artifact.services;
 
+import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType.NEW;
 import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType.REDEPLOY;
 import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.PLUGIN;
 import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.RELEASE;
@@ -26,6 +27,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
@@ -43,12 +45,16 @@ import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -61,9 +67,12 @@ import org.springframework.core.io.ByteArrayResource;
  * <p>{@code maven-metadata.xml} is judged only at version level, by its {@code <version>}
  * (RPS-1176). Before, every parseable metadata file was classified as plugin metadata and no
  * version-type rule applied to a metadata upload.
+ *
+ * <p>A path that does not parse to a GAV is refused with {@code invalidArtifactPath} (RPS-1182).
+ * Before, the upload was dropped silently and answered 200.
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Maven ArtifactServiceImpl version-type rules (RPS-1174, RPS-1176)")
+@DisplayName("Maven ArtifactServiceImpl version-type rules (RPS-1174, RPS-1176, RPS-1182)")
 class ArtifactServiceImplTest {
 
   private static final String SNAPSHOT_JAR =
@@ -336,5 +345,74 @@ class ArtifactServiceImplTest {
                     StoragePath.of(id, SNAPSHOT_VERSION_METADATA)))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("snapshotVersionsAreProhibited");
+  }
+
+  @ParameterizedTest(name = "{0} is refused")
+  @ValueSource(
+      strings = {
+        "io/stray.txt",
+        "stray.txt",
+        "com/acme/lib/1.0/other-1.0.jar",
+        "com/acme/lib/1.0/lib-2.0.jar",
+        "com/acme/lib/1.0/Lib-1.0.jar",
+        "com/acme/lib/1.0/lib-1.0",
+        "com/acme/lib/1.0/jars/lib.jar",
+        "com/acme/lib/1.0-SNAPSHOT/stray.txt",
+        "com/acme/lib/1.0-SNAPSHOT/b-1.0-SNAPSHOT.jar"
+      })
+  @DisplayName("a path outside the artifact layout is refused before any query (RPS-1182)")
+  void refusesAPathOutsideTheArtifactLayoutBeforeAnyQuery(final String path) {
+    final var id = UUID.randomUUID();
+
+    assertThatThrownBy(
+            () ->
+                this.artifactService.getDeployAndVersionType(
+                    repo(id, true, true, true), StoragePath.of(id, path)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("invalidArtifactPath");
+    verifyNoInteractions(this.artifactRepository, this.artifactVersionRepository);
+  }
+
+  @ParameterizedTest(name = "{0} is a {1}")
+  @CsvSource({
+    "com/acme/lib/1.0/lib-1.0.jar, RELEASE",
+    "com/acme/lib/1.0/lib-1.0.pom, RELEASE",
+    "com/acme/lib/1.0/lib-1.0-sources.jar, RELEASE",
+    "com/acme/lib/1.0/lib-1.0-javadoc.jar, RELEASE",
+    "com/acme/lib/1.0/lib-1.0-tests.jar, RELEASE",
+    "com/acme/lib/1.0/lib-1.0.tar.gz, RELEASE",
+    "com/acme/lib/1.0/lib-1.0.module, RELEASE",
+    "com/acme/lib/1.0/lib-1.0-kotlin-tooling-metadata.json, RELEASE",
+    "com/acme/lib/1.0/lib-1.0.klib, RELEASE",
+    "com/acme/lib/1.0/lib-1.0.jar.asc, RELEASE",
+    "com/acme/lib_2.13/1.0/lib_2.13-1.0.jar, RELEASE",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.jar, SNAPSHOT",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1-sources.jar, SNAPSHOT",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar, SNAPSHOT"
+  })
+  @DisplayName("the files real Maven, Gradle and sbt clients send are classified (RPS-1182)")
+  void classifiesTheFilesRealClientsSend(final String path, final ArtifactVersionType versionType) {
+    final var id = UUID.randomUUID();
+
+    final var result =
+        this.artifactService.getDeployAndVersionType(
+            repo(id, true, true, true), StoragePath.of(id, path));
+
+    assertThat(result).isEqualTo(pair(NEW, versionType));
+  }
+
+  @Test
+  @DisplayName("a checksum is not classified, whether or not its path is a Maven path (RPS-1182)")
+  void checksumOfAnArtifactIsNotClassified() {
+    final var id = UUID.randomUUID();
+
+    for (final var path : List.of("com/acme/lib/1.0/lib-1.0.jar.sha256", "io/stray.txt.sha1")) {
+      assertThat(
+              this.artifactService.getDeployAndVersionType(
+                  repo(id, true, true, true), StoragePath.of(id, path)))
+          .as(path)
+          .isEqualTo(pair(null, null));
+    }
+    verifyNoInteractions(this.artifactRepository, this.artifactVersionRepository);
   }
 }

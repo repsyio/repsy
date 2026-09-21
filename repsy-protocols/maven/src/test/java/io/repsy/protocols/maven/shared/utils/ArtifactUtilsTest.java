@@ -31,6 +31,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.InputStreamResource;
 
@@ -196,5 +197,62 @@ class ArtifactUtilsTest {
     final var storagePath = StoragePath.of(UUID.randomUUID(), path);
 
     assertThat(ArtifactUtils.isPomToParse(storagePath)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest(name = "{0} is {1}:{2}:{3} (classifier {4}, extension {5})")
+  @CsvSource(
+      nullValues = "NULL",
+      value = {
+        "com/acme/lib/1.0/lib-1.0.jar, com.acme, lib, 1.0, NULL, jar",
+        "com/acme/lib/1.0/lib-1.0-sources.jar, com.acme, lib, 1.0, sources, jar",
+        "com/acme/lib/1.0/lib-1.0.tar.gz, com.acme, lib, 1.0, NULL, tar.gz",
+        "com/acme/lib/1.0/lib-1.0.module, com.acme, lib, 1.0, NULL, module",
+        "com/acme/lib/1.0/lib-1.0-kotlin-tooling-metadata.json, com.acme, lib, 1.0,"
+            + " kotlin-tooling-metadata, json",
+        "com/acme/lib/1.0/lib-1.0.klib, com.acme, lib, 1.0, NULL, klib",
+        "com/acme/lib/1.0/lib-1.0.jar.asc, com.acme, lib, 1.0, NULL, jar",
+        "com/acme/lib/1.0/lib-1.0.jar.asc.sha1, com.acme, lib, 1.0, NULL, jar",
+        "com/acme/lib_2.13/1.0/lib_2.13-1.0.jar, com.acme, lib_2.13, 1.0, NULL, jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1-sources.jar, com.acme, lib,"
+            + " 1.0-20260921.101010-1, sources, jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar, com.acme, lib, 1.0-SNAPSHOT, NULL, jar"
+      })
+  @DisplayName(
+      "calculates the GAV of the files real Maven, Gradle and sbt clients send, with the signature"
+          + " and checksum suffixes stripped")
+  void calculatesTheGavOfTheFilesRealClientsSend(
+      final String path,
+      final String groupId,
+      final String artifactId,
+      final String version,
+      final String classifier,
+      final String extension) {
+    final var gav = ArtifactUtils.getGavByFile(StoragePath.of(UUID.randomUUID(), path));
+
+    assertThat(gav).isNotNull();
+    assertThat(gav.getGroupId()).isEqualTo(groupId);
+    assertThat(gav.getArtifactId()).isEqualTo(artifactId);
+    assertThat(gav.getVersion()).isEqualTo(version);
+    assertThat(gav.getClassifier()).isEqualTo(classifier);
+    assertThat(gav.getExtension()).isEqualTo(extension);
+  }
+
+  @ParameterizedTest(name = "{0} has no GAV")
+  @ValueSource(
+      strings = {
+        "io/stray.txt",
+        "stray.txt",
+        "com/acme/lib/1.0/other-1.0.jar",
+        "com/acme/lib/1.0/lib-2.0.jar",
+        "com/acme/lib/1.0/Lib-1.0.jar",
+        "com/acme/lib/1.0/lib-1.0",
+        "com/acme/lib/1.0/jars/lib.jar",
+        "com/acme/lib/1.0-SNAPSHOT/stray.txt",
+        "com/acme/lib/1.0-SNAPSHOT/b-1.0-SNAPSHOT.jar",
+        "archetype-catalog.xml"
+      })
+  @DisplayName("finds no GAV for a path outside the layout")
+  void noGavOutsideTheLayout(final String path) {
+    assertThat(ArtifactUtils.getGavByFile(StoragePath.of(UUID.randomUUID(), path))).isNull();
   }
 }
