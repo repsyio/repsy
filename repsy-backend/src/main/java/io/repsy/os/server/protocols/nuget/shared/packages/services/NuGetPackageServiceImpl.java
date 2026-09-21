@@ -24,6 +24,7 @@ import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageV
 import io.repsy.os.server.protocols.nuget.shared.packages.mappers.NuGetPackageConverter;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
+import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.utils.OffsetPageRequest;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
@@ -31,7 +32,6 @@ import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -60,7 +60,6 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   private static final String ERR_VERSION_NOT_FOUND = "versionNotFound";
   private static final String VERSION_UNIQUE_CONSTRAINT =
       "ux_nuget_package_version__package_id_version";
-  private static final String UNIQUE_VIOLATION_SQL_STATE = "23505";
 
   private final NuGetPackageRepository packageRepository;
   private final NuGetPackageVersionRepository packageVersionRepository;
@@ -116,7 +115,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     } catch (final DataIntegrityViolationException e) {
       // Only that index means the version exists. Any other violation is not the client's
       // conflict, so it is left to surface as the server error it is.
-      if (!this.isUniqueConstraintViolation(e, VERSION_UNIQUE_CONSTRAINT)) {
+      if (!ConstraintViolations.violatesConstraint(e, VERSION_UNIQUE_CONSTRAINT)) {
         throw e;
       }
 
@@ -410,23 +409,6 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     return this.packageRepository
         .findByRepoIdAndPackageIdIgnoreCase(repoId, normalizedId)
         .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
-  }
-
-  private boolean isUniqueConstraintViolation(
-      final DataIntegrityViolationException exception, final String constraintName) {
-
-    final var rootCause = exception.getMostSpecificCause();
-
-    if (!(rootCause instanceof final SQLException sqlException)) {
-      return false;
-    }
-
-    if (!UNIQUE_VIOLATION_SQL_STATE.equals(sqlException.getSQLState())) {
-      return false;
-    }
-
-    final var message = sqlException.getMessage();
-    return message != null && message.toLowerCase(Locale.ROOT).contains(constraintName);
   }
 
   private NuGetPackageVersion createNuGetPackageVersion(

@@ -32,11 +32,11 @@ import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import io.repsy.os.shared.error_handling.exceptions.InvalidPagingParameterException;
+import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.protocols.golang.shared.exceptions.GoVersionGoneException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ValidationException;
-import java.sql.SQLException;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -96,12 +96,6 @@ public class ErrorHandler {
   private static final @NonNull String ERR_SIGNATURE_NOT_VERIFIED = "artifactSignatureNotVerified";
   private static final @NonNull String ERR_MISSING_REQUEST_HEADER = "missingRequestHeader";
   private static final @NonNull String ERR_SCAN_EXECUTOR_SATURATED = "scanExecutorSaturated";
-
-  /** SQL state of a value longer than its column (PostgreSQL and H2 alike). */
-  private static final @NonNull String SQL_STATE_VALUE_TOO_LONG = "22001";
-
-  /** SQL state of a unique constraint or unique index violation (PostgreSQL and H2 alike). */
-  private static final @NonNull String SQL_STATE_UNIQUE_VIOLATION = "23505";
 
   private final @NonNull RestResponseFactory resp;
 
@@ -771,16 +765,15 @@ public class ErrorHandler {
       return null;
     }
 
-    final var sqlState =
-        ex.getMostSpecificCause() instanceof final SQLException e ? e.getSQLState() : null;
+    final var sqlState = ConstraintViolations.sqlState(ex);
 
     final HttpStatus status;
     final String msgId;
 
-    if (SQL_STATE_VALUE_TOO_LONG.equals(sqlState)) {
+    if (ConstraintViolations.SQL_STATE_VALUE_TOO_LONG.equals(sqlState)) {
       status = HttpStatus.BAD_REQUEST;
       msgId = ERR_VALIDATION;
-    } else if (SQL_STATE_UNIQUE_VIOLATION.equals(sqlState)) {
+    } else if (ConstraintViolations.SQL_STATE_UNIQUE_VIOLATION.equals(sqlState)) {
       status = HttpStatus.CONFLICT;
       msgId = ERR_ITEM_ALREADY_EXISTS;
     } else {
