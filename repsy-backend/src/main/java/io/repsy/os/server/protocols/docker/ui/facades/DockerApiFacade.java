@@ -230,6 +230,10 @@ public class DockerApiFacade implements ProtocolApiFacade {
 
   public void deleteOrphanLayers(final @NonNull RepoInfo repoInfo) {
 
+    // The rows go first, in their own transaction, so a concurrent push cannot re-reference a row
+    // whose blob is about to be deleted. The price: a blob whose delete fails stays on disk, still
+    // charged to the repo and unreachable from the DB, and nothing sweeps it later (the abandoned
+    // upload cleanup only matches UUID-named upload files, not sha256: blobs).
     final var orphans = this.layerTxService.deleteOrphanLayers(repoInfo.getStorageKey());
 
     this.orphanLayerCleanupService.cleanupBlobs(repoInfo.getStorageKey(), orphans);
