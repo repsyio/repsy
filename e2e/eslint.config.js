@@ -43,9 +43,23 @@ export default tseslint.config(
     ...playwright.configs['flat/recommended'],
     rules: {
       ...playwright.configs['flat/recommended'].rules,
-      // expectOutcome() (tests/maven/publish-consume.spec.ts and friends) wraps expect() so every
-      // scenario gets the same failure message; the rule only recognises calls to `expect` itself.
-      'playwright/expect-expect': ['warn', { assertFunctionNames: ['expectOutcome'] }],
+      // expectOutcome() and the other expect*() helpers (tests/maven/*.spec.ts) wrap expect() so
+      // every scenario gets the same failure message; the rule only recognises calls to `expect`
+      // itself.
+      'playwright/expect-expect': [
+        'warn',
+        {
+          assertFunctionNames: [
+            'expectOutcome',
+            'runScenario',
+            'expectClientAgrees',
+            'expectNothingStored',
+            'expectResolvedContent',
+            'expectSnapshotFollowedThroughMetadata',
+            'expectPut',
+          ],
+        },
+      ],
       // This harness's whole point is data-driven, catalog-generated tests (plan section "Scenario
       // model"): `{ tag: scenario.tags }` is necessarily a runtime value, not a literal the rule can
       // statically validate. catalog.ts is the single place tags are written by hand and typed as

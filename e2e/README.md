@@ -6,7 +6,9 @@ data seeded through the panel API. Step 1 ("skeleton") built the tooling, config
 client, a seeder with cleanup, a sweep script and the stack/runner containers, proven by one test
 suite (`tests/skeleton`). This is **step 2 ("scenario engine + maven")**: the scenario model
 (`src/scenarios/`) and its catalog, the maven client adapter and runner, and the full catalog
-running green against a local stack. Every other protocol (npm, cargo, nuget, docker, helm, pypi,
+running green against a local stack. Since then the maven catalog also covers SNAPSHOT deploys and
+redeploys, and the refusal scenarios check that nothing was stored ("SNAPSHOT and redeploy
+behaviour, as probed", below). Every other protocol (npm, cargo, nuget, docker, helm, pypi,
 golang, ruby) replicates the same model in later steps; nothing about the model itself is
 maven-specific.
 
@@ -56,12 +58,14 @@ e2e/
     clients/
       exec.ts                   # execa wrapper: isolated work dir/HOME, redacted logs, attach-on-fail
       maven.ts                  # the maven adapter: publish()/resolve(), raw-HTTP status pinning
+      maven-raw.ts              # raw PUT/GET, repo-tree fingerprint, maven-metadata.xml builders/parsers
     packages/
       maven/                    # mustache templates of the tiny jar project + settings.xml
   tests/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe
     maven/
       publish-consume.spec.ts   # the scenario loop for maven
+      upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules
       remote-throttle.spec.ts   # sanity check of RemoteAuthBudget/withBackoff429, no server needed
 ```
 
@@ -114,21 +118,38 @@ credential first. Everything created is tracked by the `Seeder` and removed in t
 
 A spec is then a loop over `scenariosFor(SCENARIOS, protocol)` (see
 `tests/maven/publish-consume.spec.ts`): for each scenario, seed the `World`, publish with it,
-assert the expected `Outcome`, then consume with it and assert that `Outcome` too.
+assert the expected `Outcome`, then consume with it and assert that `Outcome` too. On top of the
+outcome, every maven scenario checks what a status cannot show: the real `mvn` exit code agrees with
+the outcome (a refused deploy fails the client, an accepted one does not); a refused publish left the
+repository byte-for-byte as it was (see "Nothing stored" below); and a consumer that succeeded got the
+very jar that was deployed (the deploy's own jar, or the pre-published one when the scenario's own
+publish was refused). Every deploy packs a fresh random marker into its jar, so two deploys of one
+coordinate never share a digest.
 
-### Two coordinates, not one
+### Two coordinates, or one
 
 `World` carries `publishTarget` and `consumeTarget` (both `{ packageName, version }`), not a single
-package: for most scenarios they are the same coordinate, but a scenario whose own publish is
-expected to fail needs `consumeTarget` to be a _separate_ one an admin already pre-published.
-Reusing the exact coordinate the scenario's own (doomed) publish attempt targets would make that
-attempt a **redeploy** of something that already exists rather than a fresh push — and Repsy's own
-`handleDeployTypeRules` skips the release/snapshot check entirely for a redeploy (only the
-allow-override check still applies), which would silently turn `maven-releases-off`/
-`maven-snapshots-off`'s "publish a prohibited version type" test into a no-op "redeploy an existing
-artifact" test instead, passing for the wrong reason. `no-override`/`override` are the deliberate
-exception: reusing the same coordinate for both is the whole point of those two (a second write to
-existing coordinates is exactly what `allowOverride` gates).
+package. For most scenarios they are the same coordinate. A scenario whose own publish is expected to
+fail while consume still succeeds pre-publishes (with the admin credential, before the scenario's
+`repo` settings are applied) a _separate_ coordinate of the same package, so the scenario's own
+(doomed) attempt is a genuine first deploy of a version that does not exist yet: that is what
+`maven-releases-off`/`maven-snapshots-off` are about, and it gives their "nothing stored" check a
+version that must not exist anywhere afterwards.
+
+A scenario with `reuseCoordinates: true` is about a **redeploy** instead: the pre-publish puts the
+very coordinate the scenario's own publish then targets, and `consumeTarget === publishTarget`. These
+are `no-override`/`override` (a second write to existing coordinates is exactly what `allowOverride`
+gates), the RPS-1174 scenarios `redeploy-snapshots-off`/`redeploy-releases-off`, and
+`snapshot-redeploy`/`snapshot-redeploy-no-override`. A scenario's `repo` settings are always applied
+_after_ its pre-publish, which runs on a fresh repo's permissive defaults, so "deploy while the kind
+was still allowed, switch it off, deploy again" needs no extra field.
+
+Before RPS-1174, Repsy's release/snapshot check skipped a redeploy of an existing version entirely
+(only the allow-override check applied), so a scenario had to keep a separate coordinate or its
+"publish a prohibited version kind" attempt would silently turn into a redeploy that succeeded. Since
+RPS-1174 the `releases`/`snapshots` switches judge a redeploy exactly like a first deploy, and the
+`redeploy-*-off` scenarios pin that. RPS-1176 makes the version-level snapshot `maven-metadata.xml`
+judged by its own `<version>`, exactly like the artifact files of that directory.
 
 ### Scenario outcomes pinned against a running instance
 
@@ -141,6 +162,11 @@ from the plan's table (see that file's header comment for the full detail and re
 | no-override (2nd publish)           | `403 forbidden`          | `200 ok`                 | publish: conflict (409)                 |
 | maven-releases-off (RELEASE push)   | `403 forbidden`          | `200 ok`                 | publish: "rejected", unspecified status |
 | maven-snapshots-off (SNAPSHOT push) | `403 forbidden`          | `200 ok`                 | publish: "rejected", unspecified status |
+| snapshot-deploy                     | `200 ok`                 | `200 ok`                 | — (not in the plan)                     |
+| snapshot-redeploy                   | `200 ok`                 | `200 ok`                 | — (not in the plan)                     |
+| snapshot-redeploy-no-override       | `200 ok`                 | `200 ok`                 | — (a refusal was the fear, see below)   |
+| redeploy-snapshots-off (RPS-1174)   | `403 forbidden`          | `200 ok`                 | — (not in the plan)                     |
+| redeploy-releases-off (RPS-1174)    | `403 forbidden`          | `200 ok`                 | — (not in the plan)                     |
 | everything else                     | matches the plan's table | matches the plan's table | —                                       |
 
 In short: `ProtocolAuthService.authorizeDeployToken` (a read-only token attempting a write) throws
@@ -150,13 +176,60 @@ insufficient permission" status for a deploy token. Rejecting an override, a rel
 snapshot version throws `AccessNotAllowedException`, which `ErrorHandler` maps to 403 — not the
 plan's 409/"conflict".
 
+### SNAPSHOT and redeploy behaviour, as probed
+
+A real `mvn deploy` PUTs all artifact files first (the POM, the jar, each followed by its
+checksums), then all metadata, and stops at the first refusal. A snapshot deploy uploads timestamped
+files (`lib-1.0-20260921.101010-1.jar`), the version-level `g/a/1.0-SNAPSHOT/maven-metadata.xml`
+(`<version>`, `versioning/snapshot` timestamp and buildNumber, `snapshotVersions`) and the
+artifact-level `g/a/maven-metadata.xml` (`<versions>`). Every redeploy writes new timestamped files
+with buildNumber + 1 and uploads both metadata files again. The consumer (`dependency:get` of
+`X-SNAPSHOT` into a clean local repo) resolves through the version-level metadata to the timestamped
+jar; `snapshot-deploy`/`snapshot-redeploy` assert the metadata's buildNumber, the resolved
+timestamped file name, that every deploy's own jar is still stored, and that the resolved jar is the
+deployed one.
+
+What the server does, per rule (all pinned above or in `tests/maven/upload-rules.spec.ts`):
+
+- **A switched-off kind** (`releases: false` / `snapshots: false`) refuses an upload of that kind
+  with `403` (`releaseVersionsAreProhibited` / `snapshotVersionsAreProhibited`) on the first file of
+  the deploy, whether the version is new or already exists (RPS-1174). The other kind keeps working.
+- **Metadata**: the version-level snapshot `maven-metadata.xml` is judged by its `<version>` (RPS-1176:
+  refused under `snapshots: false`, accepted under `releases: false`); the artifact-level file lists
+  both kinds and is never judged; checksum files (`.sha1`/`.md5`) carry no kind and are never judged.
+- **`allowOverride: false`** refuses re-uploading a file that already exists
+  (`403 artifactOverrideIsProhibited`) and never judges metadata. A normal SNAPSHOT redeploy writes
+  new timestamped files and re-uploads the metadata, so it **succeeds** under `allowOverride: false`
+  (`snapshot-redeploy-no-override`: real client exit 0, consumer resolves buildNumber 2). Only a name
+  that already exists is an override, and a real client never sends one twice.
+- A raw PUT must send an explicit `Content-Type`, or the body is consumed as form data and the
+  server answers 400 (see the comment in `clients/maven.ts`).
+
+The adapter's raw publish probe (what pins the exact status) is a PUT of the deploy's first file: the
+release POM for a RELEASE, a fresh timestamped POM (`a-<base>-<now>-9000nn.pom`, a build number no real
+deploy reaches) for a SNAPSHOT. It is not the literal `a-<base>-SNAPSHOT.pom`: a real client never
+sends that name, and it is judged differently (with `allowOverride: false` it is refused as soon as
+the version exists, because that rule looks the version up in the database for a POM).
+
+### Nothing stored
+
+After every refused publish the spec compares a fingerprint of the whole repository (every file
+found by walking the directory listings from the root, hashed by content, read with the admin
+credential whatever the scenario's own credential is) with the one taken right before the publish:
+they must be equal, so nothing was stored and nothing was overwritten, metadata included. For a
+version that did not exist before, it also asserts `404` on the version directory, its
+`maven-metadata.xml`, its POM and jar, and that the artifact-level `maven-metadata.xml` is absent or
+does not list the version. The directory listing itself answers `404` for a path with nothing under
+it, which is what makes "not stored" a plain status check.
+
 ### Adding a scenario
 
 Add an entry to `SCENARIOS` in `catalog.ts` with a unique `id`, the repo settings and credential it
 needs, and the pinned `Outcome`s — pin them by probing a running instance the way the header comment
 of that file describes, don't guess. Restrict it to specific protocols via `protocols` if it only
-makes sense for some (like the maven-only settings scenarios). It is picked up automatically by
-every protocol spec that calls `scenariosFor(SCENARIOS, protocol)`.
+makes sense for some (like the maven-only settings scenarios), and set `reuseCoordinates` when the
+scenario is about redeploying a coordinate that already exists. It is picked up automatically by every
+protocol spec that calls `scenariosFor(SCENARIOS, protocol)`.
 
 ### Adding a protocol adapter
 
@@ -208,7 +281,12 @@ a tail lookup can never already hold.
 Because `mvn` hides the HTTP status behind its own exit code, `clients/maven.ts` also does a raw
 HTTP PUT (publish) or GET (consume, of the repo root — see that file's comment on why the repo root
 rather than the artifact's own resolved path) with the same credential, and derives the `Outcome`
-from that raw status, not from `mvn`'s exit code.
+from that raw status, not from `mvn`'s exit code (the spec asserts the two agree). Each `publish` also
+packs a fresh random marker resource into the jar and reports the built jar's sha256; `resolve` reports
+the sha256 and file name of the jar `dependency:get` left in its clean local repo (for a SNAPSHOT the
+timestamped file, not the literal `-SNAPSHOT` copy Maven also writes), so a test can prove the consumer
+got the very bytes that were deployed. The fixture's pre-publish runs only the real client (no raw
+probe), so a later "repository unchanged" comparison sees exactly what a real deploy stored.
 
 ```bash
 ./run.sh test --protocol maven
@@ -308,4 +386,5 @@ pnpm exec prettier --check .
 After a run, confirm no `e2e-*` repos or users remain: `GET /api/repos/{repoType}/info` for every
 `RepoType` and `GET /api/users` should list none. A meaningfulness check for the maven catalog:
 temporarily flip one scenario's expectation in `catalog.ts` (e.g. `token-expired`'s publish to
-`'ok'`), confirm `./run.sh test --protocol maven --grep token-expired` fails, then restore it.
+`'ok'`, or `redeploy-snapshots-off`'s), confirm `./run.sh test --protocol maven --grep <id>` fails,
+then restore it. `./run.sh sweep --dry-run` lists any `e2e-*` leftovers without deleting them.

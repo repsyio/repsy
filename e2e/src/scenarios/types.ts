@@ -78,10 +78,25 @@ export interface Scenario {
   /** `@`-prefixed, enforced at the type level since ESLint's tag-format rule cannot check a value
    *  built at runtime from `scenariosFor()` (see eslint.config.js's `playwright/valid-test-tags`). */
   tags: readonly `@${string}`[];
+  /**
+   * The repo settings the scenario's own publish/consume run under. They are applied AFTER the
+   * fixture's pre-publish (if the scenario has one), which runs against a freshly created repo's
+   * permissive defaults: a scenario that switches a version kind off or forbids overriding therefore
+   * still has its first deploy in place, which is exactly what the `redeploy-*-off` and
+   * `no-override`/`snapshot-redeploy-no-override` scenarios need (RPS-1174).
+   */
   repo: RepoSettingsSpec;
   credential: CredentialKind;
   /** Forces a RELEASE or SNAPSHOT coordinate; adapters that don't distinguish ignore it. */
   versionType?: 'release' | 'snapshot';
+  /**
+   * The scenario is about a REdeploy: the fixture pre-publishes (with admin, under the permissive
+   * defaults) the very coordinate the scenario's own publish then targets, instead of a separate
+   * one, and consume targets that same coordinate. Left out, a pre-publish (which only scenarios
+   * expecting a refused publish and a successful consume get) lands on a separate coordinate so the
+   * scenario's own attempt is a first deploy of a version that does not exist yet.
+   */
+  reuseCoordinates?: boolean;
   expect: ScenarioExpectation;
   /**
    * Restricts a scenario to specific protocols (lower-case runner/service names, e.g. `'maven'`).
