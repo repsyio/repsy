@@ -31,6 +31,7 @@ import io.repsy.os.server.protocols.ruby.shared.ruby_gem.mappers.RubyGemConverte
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemDependencyRepository;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemRepository;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemVersionRepository;
+import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemCompactEntry;
@@ -41,9 +42,7 @@ import io.repsy.protocols.ruby.shared.gem.services.RubyGemProtocolService;
 import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
-import java.sql.SQLException;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -68,7 +67,6 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
   private static final String RUNTIME_TYPE = "runtime";
   private static final String VERSION_UNIQUE_CONSTRAINT =
       "ux_ruby_gem_version__gem_id_version_platform";
-  private static final String UNIQUE_VIOLATION_SQL_STATE = "23505";
 
   private final RubyGemRepository gemRepository;
   private final RubyGemVersionRepository versionRepository;
@@ -115,7 +113,7 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
     } catch (final DataIntegrityViolationException e) {
       // Only that index means the version exists. Any other violation is not the client's
       // conflict, so it is left to surface as the server error it is.
-      if (!this.isUniqueConstraintViolation(e, VERSION_UNIQUE_CONSTRAINT)) {
+      if (!ConstraintViolations.violatesConstraint(e, VERSION_UNIQUE_CONSTRAINT)) {
         throw e;
       }
 
@@ -341,22 +339,6 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
 
     this.createVersion(gem, metadata, checksum);
     return false;
-  }
-
-  private boolean isUniqueConstraintViolation(
-      final DataIntegrityViolationException exception, final String constraintName) {
-    final var rootCause = exception.getMostSpecificCause();
-
-    if (!(rootCause instanceof final SQLException sqlException)) {
-      return false;
-    }
-
-    if (!UNIQUE_VIOLATION_SQL_STATE.equals(sqlException.getSQLState())) {
-      return false;
-    }
-
-    final var message = sqlException.getMessage();
-    return message != null && message.toLowerCase(Locale.ROOT).contains(constraintName);
   }
 
   private void overrideVersion(

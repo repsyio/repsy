@@ -35,6 +35,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionDe
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionLicenseRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
+import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
@@ -46,7 +47,6 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -84,7 +84,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   private static final String SIGNED_POM_SUFFIX = ".asc";
   private static final String ERR_ARTIFACT_VERSION_NOT_FOUND = "artifactVersionNotFound";
   private static final String ERR_ARTIFACT_NOT_FOUND = "artifactNotFound";
-  private static final String UNIQUE_VIOLATION_SQL_STATE = "23505";
   private static final String ARTIFACT_UNIQUE_CONSTRAINT =
       "ux_maven_artifact__repo_id_group_artifact";
   private static final String ARTIFACT_VERSION_UNIQUE_CONSTRAINT =
@@ -502,7 +501,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       final ArtifactVersion version,
       final DataIntegrityViolationException e) {
 
-    if (!this.isUniqueConstraintViolation(e, ARTIFACT_VERSION_UNIQUE_CONSTRAINT)) {
+    if (!ConstraintViolations.violatesConstraint(e, ARTIFACT_VERSION_UNIQUE_CONSTRAINT)) {
       throw e;
     }
 
@@ -684,7 +683,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       final @Nullable Model pomModel,
       final DataIntegrityViolationException e) {
 
-    if (!this.isUniqueConstraintViolation(e, ARTIFACT_UNIQUE_CONSTRAINT)) {
+    if (!ConstraintViolations.violatesConstraint(e, ARTIFACT_UNIQUE_CONSTRAINT)) {
       throw e;
     }
 
@@ -702,24 +701,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     }
 
     return this.updateArtifactProperties(existing, pomModel);
-  }
-
-  private boolean isUniqueConstraintViolation(
-      final DataIntegrityViolationException exception, final String constraintName) {
-
-    final var rootCause = exception.getMostSpecificCause();
-
-    if (!(rootCause instanceof final SQLException sqlException)) {
-      return false;
-    }
-
-    if (!UNIQUE_VIOLATION_SQL_STATE.equals(sqlException.getSQLState())) {
-      return false;
-    }
-
-    final var message = sqlException.getMessage();
-
-    return message != null && message.contains(constraintName);
   }
 
   private boolean versionTypeNotMatched(final Repo repo, final boolean snapshot) {
