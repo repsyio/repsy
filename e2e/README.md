@@ -221,8 +221,18 @@ What the server does, per rule (all pinned above or in `tests/maven/upload-rules
   An `.asc` that is not a signature at all (the two armor lines only, a bad CRC, binary garbage)
   answers the same `422 artifactSignatureNotVerified` and stores nothing, where it used to be a
   `500 errorOccurred` (RPS-1191). A `.pom.asc` of a POM that is stored but has no registered version
-  (its `<groupId>` is not its directory's, so `checkExtractedInfos` skipped it) answers
-  `404 artifactVersionNotFound` before anything is stored (RPS-1191).
+  answers `404 artifactVersionNotFound` before anything is stored (RPS-1191); such a POM can no
+  longer be uploaded (next point), so that case is pinned by `MavenPomSignatureIT` on the backend
+  side, not here.
+- **A POM whose `<groupId>` is not its directory's** (`<groupId>org.other</groupId>` at
+  `g/a/1.0/a-1.0.pom`, or no `<groupId>` and `<parent><groupId>org.other</groupId>`, or an
+  expression such as `${g}`, or the group in another case) is refused with `400 pomGroupIdMismatch`
+  and stores nothing (RPS-1193). It used to be stored and answered `200` but never registered: the
+  file was served, yet invisible and undeletable in the panel, with no artifact row, version event or
+  scan. Only the groupId is compared, case-sensitively like the layout; a POM that declares none
+  (and has no parent) is not checked, and the artifactId and version are never compared (a
+  `${revision}` version or an sbt cross-versioned artifactId is legitimate). `mvn deploy` derives the
+  path from the POM, so it never produces a mismatch.
 - A raw PUT must send an explicit `Content-Type`, or the body is consumed as form data and the
   server answers 400 (see the comment in `clients/maven.ts`).
 

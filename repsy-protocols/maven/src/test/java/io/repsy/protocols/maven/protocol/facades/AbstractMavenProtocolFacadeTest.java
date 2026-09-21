@@ -63,6 +63,9 @@ import org.springframework.core.io.Resource;
  * <p>RPS-1186: the same for a POM signature. It was stored and only then verified, and a refused
  * one was rolled back by deleting the whole version (and the artifact, and the group, when it was
  * the last one). It is verified before it is stored now, so a refused one changes nothing.
+ *
+ * <p>RPS-1193: a POM whose groupId is not the one of its path was stored and answered 200 but never
+ * registered. It is refused before it is stored now, like a malformed one.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractMavenProtocolFacade upload")
@@ -153,6 +156,49 @@ class AbstractMavenProtocolFacadeTest {
     verify(this.storageService, never()).writeInputStreamToPath(any(), any(), anyString());
     verify(this.artifactService, never()).createOrUpdateArtifact(any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+  }
+
+  @Test
+  @DisplayName("stores nothing and reports no usage for a POM of another group")
+  void rejectsAPomOfAnotherGroupBeforeStoringIt() {
+    requestFor(POM_PATH);
+    deployIsAllowed();
+
+    assertThatThrownBy(() -> upload(VALID_POM.replace("com.example", "org.other")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("pomGroupIdMismatch");
+
+    verify(this.storageService, never()).writeInputStreamToPath(any(), any(), anyString());
+    verify(this.artifactService, never()).createOrUpdateArtifact(any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+  }
+
+  @Test
+  @DisplayName("stores a POM that inherits its groupId from the parent of its own group")
+  void storesAPomWithAnInheritedGroupId() throws Exception {
+    final var inherited =
+        """
+        <project>
+          <modelVersion>4.0.0</modelVersion>
+          <parent>
+            <groupId>com.example</groupId>
+            <artifactId>parent</artifactId>
+            <version>1</version>
+          </parent>
+          <artifactId>lib</artifactId>
+          <version>1.0</version>
+        </project>
+        """;
+    requestFor(POM_PATH);
+    deployIsAllowed();
+    storageReportsUsage(inherited.length());
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(inherited.getBytes(UTF_8)));
+
+    upload(inherited);
+
+    assertThat(this.stored).singleElement().isEqualTo(inherited.getBytes(UTF_8));
+    verify(this.artifactService).createOrUpdateArtifact(any(), any(StoragePath.class), any());
   }
 
   @Test

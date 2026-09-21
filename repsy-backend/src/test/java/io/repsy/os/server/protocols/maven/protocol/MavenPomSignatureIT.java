@@ -58,7 +58,9 @@ import reactor.core.publisher.Mono;
  * RPS-1186: the signature of a POM ({@code .pom.asc}) is verified before it is stored, so a refused
  * one changes nothing. RPS-1191: that holds for a body that is not a signature at all (invalid
  * armor answers 422, it was a 500) and for a signature that verifies but whose POM has no
- * registered version (404 {@code artifactVersionNotFound}, it used to be stored first).
+ * registered version (404 {@code artifactVersionNotFound}, it used to be stored first). Such a POM
+ * can no longer be uploaded since RPS-1193 (a POM of another group is refused), so the test removes
+ * the rows of a stored one instead.
  *
  * <p>It used to be stored first and verified second, and a refusal was rolled back by deleting the
  * version the signature belongs to: the artifact too when that was its only version, the group too
@@ -431,13 +433,19 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("a verified signature of a POM without a version row answers 404 and stores nothing")
-  void aVerifiedSignatureOfAnUnregisteredPomIs404AndStoresNothing() throws Exception {
+  @DisplayName(
+      "a verified signature of a POM whose version row is gone answers 404, stores nothing")
+  void aVerifiedSignatureOfAPomWhoseVersionRowIsGoneIs404AndStoresNothing() throws Exception {
     final var repo = this.mavenRepo(false);
     final var admin = this.admin();
-    // The POM declares a groupId other than its directory's, so it is stored but not registered.
-    final var pom = pomOfGroup("org.other", "1.0");
+    final var pom = pom("1.0");
     this.uploadOk(repo, admin, RELEASE_POM, pom);
+    // A POM stored before RPS-1193 has no rows when its groupId is not its directory's. It can no
+    // longer be uploaded, so the rows are removed the way the panel would (the versions cascade).
+    this.jdbcTemplate.update(
+        "delete from maven_artifact where repo_id = ? and group_name = 'com.acme'"
+            + " and artifact_name = 'lib'",
+        repo.getId());
     assertThat(this.artifactCount(repo)).isZero();
     assertThat(this.signedOf(repo, "lib", "1.0")).isEmpty();
 
@@ -452,5 +460,25 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
     assertThat(Files.readAllBytes(stored(repo, RELEASE_POM))).isEqualTo(pom);
     assertThat(this.artifactCount(repo)).isZero();
     assertThat(this.reportedUsage()).containsExactly(usageOf(repo, pom));
+  }
+
+  @Test
+  @DisplayName("a POM of another group is refused before it is stored, so it has no signature")
+  void aPomOfAnotherGroupIsRefusedBeforeItIsStored() throws Exception {
+    final var repo = this.mavenRepo(false);
+    final var admin = this.admin();
+    final var pom = pomOfGroup("org.other", "1.0");
+
+    expectError(
+        this.upload(repo, admin, RELEASE_POM, pom),
+        HttpStatus.BAD_REQUEST,
+        "pomGroupIdMismatch",
+        "pomGroupIdMismatch",
+        "The POM declares a groupId that is not the one of its path; its <groupId> (or"
+            + " <parent><groupId>) must equal the directory group.");
+
+    assertThat(stored(repo, RELEASE_POM)).doesNotExist();
+    assertThat(this.artifactCount(repo)).isZero();
+    assertThat(this.reportedUsage()).isEmpty();
   }
 }

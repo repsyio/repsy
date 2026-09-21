@@ -615,9 +615,10 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
             .get(nonSignedStoragePath, repoInfo.getName())
             .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
 
-    // A POM is stored without a registered version when its declared groupId is not its path's
-    // (checkExtractedInfos skips it). A signature could then not be recorded, so it is refused
-    // here, before the key lookup and before anything is stored (RPS-1191).
+    // A POM stored before RPS-1193, or whose rows are gone, can lack a registered version (a POM of
+    // another group was stored but skipped by checkExtractedInfos). A signature could then not be
+    // recorded, so it is refused here, before the key lookup and before anything is stored
+    // (RPS-1191).
     final var gav =
         ArtifactUtils.convertPathToGav(nonSignedStoragePath.getRelativePath().getPath());
 
@@ -728,18 +729,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     return snapshot != repo.getSnapshots() && !(repo.getSnapshots() && repo.getReleases());
   }
 
-  private @Nullable String getGroupIdFromPomModel(final Model pomModel) {
-
-    var groupId = pomModel.getGroupId();
-
-    if (groupId == null && pomModel.getParent() != null) {
-      groupId = pomModel.getParent().getGroupId();
-      pomModel.setGroupId(groupId);
-    }
-
-    return groupId;
-  }
-
   private boolean checkExtractedInfos(
       final @Nullable Model pomModel,
       final @Nullable Gav gav,
@@ -760,9 +749,21 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       return false;
     }
 
-    final var groupId = this.getGroupIdFromPomModel(pomModel);
+    // The upload refuses such a POM before it is stored (RPS-1193). This stays as a logged skip for
+    // a POM stored before that, or reached by another path: it must still not be registered.
+    final var declared = ArtifactUtils.declaredGroupId(pomModel);
 
-    return !this.isGroupIdMismatch(groupId, gav);
+    if (declared != null && !declared.equals(gav.getGroupId())) {
+      log.warn(
+          "Stored POM {} declares groupId {} under group {}, not registered (refused before the"
+              + " store since RPS-1193)",
+          storagePath.getPath(),
+          declared,
+          gav.getGroupId());
+      return false;
+    }
+
+    return true;
   }
 
   private boolean isInvalidGav(final @Nullable Gav gav) {
@@ -773,11 +774,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   private boolean isInvalidPomModel(final @Nullable Model model) {
 
     return model == null;
-  }
-
-  private boolean isGroupIdMismatch(final @Nullable String groupId, final Gav gav) {
-
-    return groupId != null && !groupId.equalsIgnoreCase(gav.getGroupId());
   }
 
   private void createOrUpdateArtifactByPomFile(

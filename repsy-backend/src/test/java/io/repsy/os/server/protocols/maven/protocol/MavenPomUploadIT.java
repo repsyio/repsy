@@ -31,12 +31,18 @@ import org.springframework.test.web.servlet.MvcResult;
  * RPS-994: a POM that cannot be parsed used to be echoed back whole as the {@code msgId}, {@code
  * text} and {@code data} of a 500. It is the client's input that is malformed, so the answer is now
  * a 400 with the fixed {@code malformedPomFile} id and a readable sentence.
+ *
+ * <p>RPS-1193: a POM that declares another groupId than its directory's is refused with a 400 as
+ * well, with the fixed {@code pomGroupIdMismatch} id.
  */
 @DisplayName("Maven POM upload")
 class MavenPomUploadIT extends AbstractIntegrationTest {
 
   private static final String POM_PATH = "com/example/lib/1.0/lib-1.0.pom";
   private static final String MARKER = "reflected-marker-8f3a1c";
+  private static final String GROUP_ID_MISMATCH_TEXT =
+      "The POM declares a groupId that is not the one of its path; its <groupId> (or"
+          + " <parent><groupId>) must equal the directory group.";
 
   private MvcResult uploadPom(final String repoName, final String pom) throws Exception {
     return this.mockMvc
@@ -64,5 +70,28 @@ class MavenPomUploadIT extends AbstractIntegrationTest {
     assertThat(JsonPath.<String>read(body, "$.msgId")).isEqualTo("malformedPomFile");
     assertThat(JsonPath.<String>read(body, "$.text")).contains("POM file is malformed");
     assertThat(JsonPath.<String>read(body, "$.data")).isEqualTo("malformedPomFile");
+  }
+
+  @Test
+  @DisplayName("answers a POM of another group with 400 and the fixed pomGroupIdMismatch id")
+  void pomOfAnotherGroupIsAFixedBadRequest() throws Exception {
+    final var repo = this.seedRepo(RepoType.MAVEN, uniqueRepoName("pom-group"));
+    final var otherGroup =
+        """
+        <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>org.other</groupId>
+          <artifactId>lib</artifactId>
+          <version>1.0</version>
+        </project>
+        """;
+
+    final var response = uploadPom(repo.getName(), otherGroup).getResponse();
+    final var body = response.getContentAsString();
+
+    assertThat(response.getStatus()).isEqualTo(400);
+    assertThat(JsonPath.<String>read(body, "$.msgId")).isEqualTo("pomGroupIdMismatch");
+    assertThat(JsonPath.<String>read(body, "$.data")).isEqualTo("pomGroupIdMismatch");
+    assertThat(JsonPath.<String>read(body, "$.text")).isEqualTo(GROUP_ID_MISMATCH_TEXT);
   }
 }
