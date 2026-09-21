@@ -31,31 +31,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: "24"
-
-      # Pinned, with lifecycle scripts off, so a new pnpm release cannot change this job.
-      - name: Install pnpm
-        run: npm install -g --ignore-scripts pnpm@10.16.0
-
-      - name: Install dependencies
-        run: pnpm install --ignore-scripts
-
-      - name: Set up JDK
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
-        with:
-          java-version: "25"
-          distribution: "temurin"
-
-      # Same path and key as pr-checks.yml. On a hit this only refreshes the entry's access time.
-      - name: Cache OpenAPI generator jar
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
-        with:
-          path: ~/.cache/openapi-generator-cli
-          key: openapi-generator-${{ runner.os }}-${{ hashFiles('repsy-frontend/openapitools.json') }}
-
-      # Downloads the jar on a miss. The generated client itself is thrown away.
-      - name: Generate API client
-        run: pnpm run gen:api
+      # The same setup as the "Repsy frontend" job in pr-checks.yml, including the cache step whose
+      # entry this job saves: on a miss gen:api downloads the jar and the post-job step saves it,
+      # on a hit this only refreshes the entry's access time. The generated client itself is
+      # thrown away.
+      - name: Set up the frontend
+        uses: ./.github/actions/setup-frontend
