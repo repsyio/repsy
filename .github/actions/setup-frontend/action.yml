@@ -1,0 +1,79 @@
+name: Set up the frontend
+description: >-
+  Installs Node, a pinned pnpm and the frontend dependencies, and generates the OpenAPI client the
+  specs and the build import. Shared by pr-checks.yml, sonarcloud.yml and
+  openapi-generator-cache.yml, so a change here reaches all of them.
+
+inputs:
+  node-version:
+    description: Node.js version. package.json engines allows 24.x only.
+    default: "24"
+  java-version:
+    description: JRE that runs the OpenAPI generator (gen:api).
+    default: "25"
+  working-directory:
+    description: Frontend directory, relative to the workspace root.
+    default: repsy-frontend
+  generate-api:
+    description: Set up Java and run gen:api (src/generated/api is git-ignored). "true" or "false".
+    default: "true"
+  cache-generator-jar:
+    description: >-
+      Cache the OpenAPI generator jar, with the path and key release.yml restores. Only used when
+      generate-api is "true". "true" or "false".
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    # The one place the pnpm version lives: bump the literal below and every workflow follows.
+    # It is a literal on purpose. SonarCloud (githubactions:S8543) reads the version off this line,
+    # so an input or a variable would look unpinned. --ignore-scripts is githubactions:S6505.
+    # Not the "packageManager" field of package.json: with it, pnpm 12 rewrites pnpm-lock.yaml
+    # (a leading env document that pins its own binary) and fails --frozen-lockfile without it.
+    # Every run step sets shell and working-directory itself: a job's `defaults.run` does not
+    # apply inside a composite action.
+    - name: Install pnpm
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: npm install -g --ignore-scripts pnpm@12.5.1
+
+    # --frozen-lockfile fails instead of rewriting pnpm-lock.yaml (githubactions:S8543) and
+    # --ignore-scripts skips dependency lifecycle scripts (githubactions:S6505). None of the
+    # dependencies that have one (esbuild, @parcel/watcher, lmdb, ...) needs it to lint, test or
+    # build: their binaries come from platform packages.
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: pnpm install --frozen-lockfile --ignore-scripts
+
+    # gen:api runs the generator, a Java tool that openapi-generator-cli downloads on first use.
+    - name: Set up JDK
+      if: inputs.generate-api == 'true'
+      uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+      with:
+        java-version: ${{ inputs.java-version }}
+        distribution: "temurin"
+
+    # openapi-generator-cli downloads the generator jar from Maven Central the first time it
+    # runs, so keep it in a cache and a Maven Central outage cannot fail a required check.
+    # openapitools.json pins the version and the storage directory. A cache is only readable from
+    # the ref that saved it and from main, so openapi-generator-cache.yml seeds it from main.
+    # The path and key must stay byte-identical to the restore step in release.yml.
+    - name: Cache OpenAPI generator jar
+      if: inputs.generate-api == 'true' && inputs.cache-generator-jar == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        path: ~/.cache/openapi-generator-cli
+        key: openapi-generator-${{ runner.os }}-${{ hashFiles('repsy-frontend/openapitools.json') }}
+
+    - name: Generate API client
+      if: inputs.generate-api == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: pnpm run gen:api

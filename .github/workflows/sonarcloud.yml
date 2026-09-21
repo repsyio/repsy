@@ -24,29 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Set up Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      # No generator jar cache here: this job never had one. Everything else is what the "Repsy
+      # frontend" job in pr-checks.yml sets up.
+      - name: Set up the frontend
+        uses: ./.github/actions/setup-frontend
         with:
-          node-version: "24"
-
-      # Pinned (and without lifecycle scripts) to satisfy SonarCloud's githubactions:S6505 and S8543.
-      # This is the pnpm version "Repsy frontend" in pr-checks.yml resolves to today.
-      - name: Install pnpm
-        run: npm install -g --ignore-scripts pnpm@12.5.1
-
-      - name: Install dependencies
-        run: pnpm install --ignore-scripts
-
-      # The specs import the generated API client (src/generated/api, git-ignored), and the
-      # generator is a Java tool that openapi-generator-cli downloads on first use.
-      - name: Set up JDK
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
-        with:
-          java-version: "25"
-          distribution: "temurin"
-
-      - name: Generate API client
-        run: pnpm run gen:api
+          cache-generator-jar: "false"
 
       - name: Unit tests
         run: |

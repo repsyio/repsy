@@ -2,7 +2,11 @@ version: 2
 
 updates:
   - package-ecosystem: "github-actions"
-    directory: "/"
+    # "/" only covers .github/workflows; a composite action's own `uses:` pins need their
+    # directory listed to stay fresh.
+    directories:
+      - "/"
+      - "/.github/actions/setup-frontend"
     schedule:
       interval: "weekly"
     groups:
