@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.helm.shared.listeners;
 
 import io.repsy.core.events.UserCreatedEvent;
 import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
-import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.os.shared.repo.services.DefaultRepoSeeder;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -26,22 +26,18 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
-@NullMarked
 @Service
 @RequiredArgsConstructor
+@NullMarked
 public class HelmAuthListener {
-
   private static final String HELM_REPO_NAME = "helm";
 
-  private final RepoTxService repoTxService;
+  private final DefaultRepoSeeder defaultRepoSeeder;
   private final HelmStorageService helmStorageService;
 
   @Async
   @EventListener
   public void onRegistrationCompleted(final UserCreatedEvent<UUID> ignoredEvent) {
-
-    final var repoInfo = this.repoTxService.createRepo(HELM_REPO_NAME, RepoType.HELM, true, null);
-
-    this.helmStorageService.createRepo(repoInfo.getStorageKey());
+    this.defaultRepoSeeder.seed(HELM_REPO_NAME, RepoType.HELM, this.helmStorageService::createRepo);
   }
 }

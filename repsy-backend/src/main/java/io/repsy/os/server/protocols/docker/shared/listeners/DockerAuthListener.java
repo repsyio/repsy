@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.docker.shared.listeners;
 
 import io.repsy.core.events.UserCreatedEvent;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
-import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.os.shared.repo.services.DefaultRepoSeeder;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -30,19 +30,15 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 @NullMarked
 public class DockerAuthListener {
-
   private static final String DOCKER_REPO_NAME = "docker";
 
-  private final RepoTxService repoTxService;
+  private final DefaultRepoSeeder defaultRepoSeeder;
   private final DockerStorageService dockerStorageService;
 
   @Async
   @EventListener
   public void onRegistrationCompleted(final UserCreatedEvent<UUID> ignoredEvent) {
-
-    final var repoInfo =
-        this.repoTxService.createRepo(DOCKER_REPO_NAME, RepoType.DOCKER, true, null);
-
-    this.dockerStorageService.createRepo(repoInfo.getStorageKey());
+    this.defaultRepoSeeder.seed(
+        DOCKER_REPO_NAME, RepoType.DOCKER, this.dockerStorageService::createRepo);
   }
 }

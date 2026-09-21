@@ -17,29 +17,27 @@ package io.repsy.os.server.protocols.npm.shared.listeners;
 
 import io.repsy.core.events.UserCreatedEvent;
 import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;
-import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.os.shared.repo.services.DefaultRepoSeeder;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@NullMarked
 public class NpmAuthListener {
-  private static final @NonNull String NPM_REPO_NAME = "npm";
+  private static final String NPM_REPO_NAME = "npm";
 
-  private final @NonNull RepoTxService repoTxService;
-  private final @NonNull NpmStorageService npmStorageService;
+  private final DefaultRepoSeeder defaultRepoSeeder;
+  private final NpmStorageService npmStorageService;
 
   @Async
   @EventListener
-  public void onRegistrationCompleted(final @NonNull UserCreatedEvent<UUID> ignoredEvent) {
-
-    final var repoInfo = this.repoTxService.createRepo(NPM_REPO_NAME, RepoType.NPM, true, null);
-
-    this.npmStorageService.createRepo(repoInfo.getStorageKey());
+  public void onRegistrationCompleted(final UserCreatedEvent<UUID> ignoredEvent) {
+    this.defaultRepoSeeder.seed(NPM_REPO_NAME, RepoType.NPM, this.npmStorageService::createRepo);
   }
 }

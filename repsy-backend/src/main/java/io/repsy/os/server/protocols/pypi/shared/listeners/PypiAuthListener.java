@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.pypi.shared.listeners;
 
 import io.repsy.core.events.UserCreatedEvent;
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
-import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.os.shared.repo.services.DefaultRepoSeeder;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -32,15 +32,12 @@ import org.springframework.stereotype.Service;
 public class PypiAuthListener {
   private static final String PYPI_REPO_NAME = "pypi";
 
-  private final RepoTxService repoTxService;
+  private final DefaultRepoSeeder defaultRepoSeeder;
   private final PypiStorageService pypiStorageService;
 
   @Async
   @EventListener
   public void onRegistrationCompleted(final UserCreatedEvent<UUID> ignoredEvent) {
-
-    final var repoInfo = this.repoTxService.createRepo(PYPI_REPO_NAME, RepoType.PYPI, true, null);
-
-    this.pypiStorageService.createRepo(repoInfo.getStorageKey());
+    this.defaultRepoSeeder.seed(PYPI_REPO_NAME, RepoType.PYPI, this.pypiStorageService::createRepo);
   }
 }
