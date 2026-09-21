@@ -100,6 +100,14 @@ repsy:
       enabled: ${BASIC_AUTH_CACHE_ENABLED:true}
       ttl-seconds: ${BASIC_AUTH_CACHE_TTL_SECONDS:300}
       max-entries: ${BASIC_AUTH_CACHE_MAX_ENTRIES:10000}
+    # Limits the failed password checks (HTTP Basic and panel login) of one client, so wrong
+    # credentials cannot keep the CPU busy with BCrypt. The client is the remote address, which
+    # behind a reverse proxy is the X-Forwarded-For entry of a trusted proxy.
+    auth-throttle:
+      enabled: ${AUTH_THROTTLE_ENABLED:true}
+      max-failures: ${AUTH_THROTTLE_MAX_FAILURES:20}
+      window-seconds: ${AUTH_THROTTLE_WINDOW_SECONDS:60}
+      max-clients: ${AUTH_THROTTLE_MAX_CLIENTS:10000}
     scanner: ${SECURITY_SCANNER:disabled}
     trivy:
       scanner-base-url: ${TRIVY_SCANNER_BASE_URL:http://localhost:8090}

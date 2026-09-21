@@ -475,6 +475,16 @@ paths:
                 "$ref": "#/components/schemas/RestResponseLoginInfo"
         '401':
           description: Unknown username or wrong password (invalidCredentials)
+        '429':
+          description: >-
+            The client made too many failed password checks and is refused until its window ends
+            (tooManyRequests). The answer is the same whatever username or password was sent.
+          headers:
+            Retry-After:
+              description: Seconds until the client may try again
+              schema:
+                type: integer
+                format: int64
       summary: Authenticate user and return JWT tokens
   "/api/repos/{repoName}/name":
     patch:

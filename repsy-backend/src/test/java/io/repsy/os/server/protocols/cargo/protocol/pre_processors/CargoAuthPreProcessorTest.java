@@ -29,6 +29,8 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.cargo.shared.auth.services.CargoAuthComponent;
+import io.repsy.os.server.shared.auth.AuthFailureThrottle;
+import io.repsy.os.server.shared.auth.AuthThrottleProperties;
 import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
 import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
@@ -73,7 +75,8 @@ class CargoAuthPreProcessorTest {
                   Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)),
               this.jwtUtils,
               Mockito.mock(DeployTokenService.class),
-              new VerifiedPasswordCache(BasicAuthCacheProperties.disabled())),
+              new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+              new AuthFailureThrottle(AuthThrottleProperties.disabled())),
           Mockito.mock(CargoProtocolProvider.class));
 
   CargoAuthPreProcessorTest() {

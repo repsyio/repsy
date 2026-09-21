@@ -27,6 +27,7 @@ import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.parser.DockerScopeParser;
 import io.repsy.protocols.docker.shared.auth.services.DockerAuthService;
 import io.repsy.protocols.shared.auth.dtos.LoginResponse;
+import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -120,6 +121,9 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
       final var loginResponse = this.createLoginResponse(sessionToken);
 
       return ResponseEntity.ok(loginResponse);
+    } catch (final TooManyRequestsException e) {
+      // 429 with Retry-After is the answer, not a 401 that makes the client log in again.
+      throw e;
     } catch (final Exception _) {
       return this.buildUnauthorizedResponse();
     }

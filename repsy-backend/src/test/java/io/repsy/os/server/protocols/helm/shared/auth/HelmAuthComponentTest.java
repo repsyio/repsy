@@ -24,6 +24,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
+import io.repsy.os.server.shared.auth.AuthFailureThrottle;
+import io.repsy.os.server.shared.auth.AuthThrottleProperties;
 import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
 import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
@@ -61,7 +63,8 @@ class HelmAuthComponentTest {
           this.userTxService,
           this.jwtUtils,
           this.deployTokenService,
-          new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
+          new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+          new AuthFailureThrottle(AuthThrottleProperties.disabled()));
 
   private static void assertUnauthorized(final ThrowingCallable call) {
     assertThatThrownBy(call)
@@ -108,7 +111,8 @@ class HelmAuthComponentTest {
                 Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)),
             this.jwtUtils,
             this.deployTokenService,
-            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()));
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
 
     assertUnauthorized(
         () -> component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));

@@ -34,6 +34,7 @@ import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import io.repsy.os.shared.error_handling.exceptions.InvalidPagingParameterException;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.protocols.golang.shared.exceptions.GoVersionGoneException;
+import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ValidationException;
@@ -96,6 +97,7 @@ public class ErrorHandler {
   private static final @NonNull String ERR_SIGNATURE_NOT_VERIFIED = "artifactSignatureNotVerified";
   private static final @NonNull String ERR_MISSING_REQUEST_HEADER = "missingRequestHeader";
   private static final @NonNull String ERR_SCAN_EXECUTOR_SATURATED = "scanExecutorSaturated";
+  private static final @NonNull String ERR_TOO_MANY_REQUESTS = "tooManyRequests";
 
   private final @NonNull RestResponseFactory resp;
 
@@ -563,6 +565,34 @@ public class ErrorHandler {
     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(messageText, ex.getMessage()));
+  }
+
+  /**
+   * Answers a client that made too many failed password checks with 429 and the seconds until it
+   * may try again. No {@code WWW-Authenticate} challenge is sent, so a package manager does not
+   * prompt for credentials again and again. The answer is the same whatever username or password
+   * was sent (RPS-906), and it is not logged per request, since a flood would fill the log.
+   *
+   * @param ex Thrown exception
+   * @return REST response
+   */
+  @ExceptionHandler(TooManyRequestsException.class)
+  @Nullable ResponseEntity<RestResponse<String>> handleException(
+      final @NonNull TooManyRequestsException ex,
+      final @NonNull HttpServletRequest request,
+      final @Nullable HttpServletResponse response) {
+
+    if (response == null) {
+      log.debug("Too many requests", ex);
+      return null;
+    }
+
+    log.debug("Too many failed authentication attempts: {}", request.getRemoteAddr());
+
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        .contentType(MediaType.APPLICATION_JSON)
+        .header(HttpHeaders.RETRY_AFTER, Long.toString(ex.getRetryAfterSeconds()))
+        .body(this.resp.error(ERR_TOO_MANY_REQUESTS));
   }
 
   /**

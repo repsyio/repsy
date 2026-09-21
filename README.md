@@ -321,6 +321,10 @@ Access at:
 | `BASIC_AUTH_CACHE_ENABLED` | Remember successful HTTP Basic password checks, so a client that sends its username and password on every request pays for one password verification instead of one per request. See [Authenticating from CI](#authenticating-from-ci). | `true` |
 | `BASIC_AUTH_CACHE_TTL_SECONDS` | How long a remembered password check stays valid | `300` |
 | `BASIC_AUTH_CACHE_MAX_ENTRIES` | How many remembered password checks are kept | `10000` |
+| `AUTH_THROTTLE_ENABLED` | Limit the failed password checks of one client (HTTP Basic and web UI login), so a flood of wrong credentials cannot keep the CPU busy with password verification. A client over the limit is answered with `429 Too Many Requests`. See [Authenticating from CI](#authenticating-from-ci). | `true` |
+| `AUTH_THROTTLE_MAX_FAILURES` | How many failed password checks one client may make per window before its next password check is refused | `20` |
+| `AUTH_THROTTLE_WINDOW_SECONDS` | Length of the window in seconds. When it ends, the client starts again with a clean count | `60` |
+| `AUTH_THROTTLE_MAX_CLIENTS` | How many clients are tracked at once | `10000` |
 | `ABANDONED_UPLOAD_CLEANUP_ENABLED` | Periodically delete Docker and Helm OCI blob uploads that were started and never finished (aborted pushes), and release the disk usage they were charged for | `true` |
 | `ABANDONED_UPLOAD_TTL` | How long an upload can go without receiving data before it counts as abandoned (ISO-8601 duration) | `PT24H` |
 | `ABANDONED_UPLOAD_CLEANUP_INTERVAL` | How often the cleanup runs (ISO-8601 duration) | `PT1H` |
@@ -346,7 +350,15 @@ proxy_set_header Host $host;
 proxy_set_header X-Forwarded-Proto $scheme;
 proxy_set_header X-Forwarded-Host $host;
 proxy_set_header X-Forwarded-Port $server_port;
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 ```
+
+**Client address and the failed-login limit.** The [failed-login limit](#authenticating-from-ci) counts per client address, and behind a proxy that address is the one your proxy puts in `X-Forwarded-For`. Tomcat honours that header only when the connection comes from a trusted proxy: by default every private and loopback address (`server.tomcat.remoteip.internal-proxies`, for example `SERVER_TOMCAT_REMOTEIP_INTERNAL_PROXIES` as an environment variable). A client that connects directly from a public address cannot choose its own address with the header. Two things have to hold behind your proxy:
+
+- The proxy must **append** the connecting client to `X-Forwarded-For` (`$proxy_add_x_forwarded_for` in nginx), not forward the header as it received it, or a client could pick its own address and never be limited.
+- The proxy must be a trusted proxy. Otherwise every request appears to come from the proxy's own address, all clients share one count, and one client sending wrong passwords could get everybody refused for the rest of the window.
+
+If that happens, Repsy fails safe: the limit is generous (20 failures in 60 seconds), remembered passwords and deploy tokens keep working, and each blocked address is logged once per window at `WARN` level (`Client <address> made N failed password checks ...`), so an address that turns out to be your proxy tells you what to fix. `AUTH_THROTTLE_ENABLED=false` turns the limit off if you already rate-limit failed logins in the proxy.
 
 > **Note:** The web UI's "how to connect" config snippets for repository operations (Maven, npm, pip, etc.) use the `REPO_BASE_URL` environment variable, resolved at container startup — set it to your public repository-operations URL (e.g. `https://repo.example.com`) when running behind a reverse proxy.
 
@@ -409,9 +421,37 @@ changed role takes effect on the next request, and a wrong password or an unknow
 never remembered, so it is checked and answered exactly as before. Set `BASIC_AUTH_CACHE_ENABLED`
 to `false` to turn the cache off.
 
-The cache does not make a *failed* login cheaper: a client that keeps sending wrong credentials
-still costs one BCrypt verification per request. If your instance is exposed to the internet, put
-a rate limit for failed authentication in front of it, for example in your reverse proxy.
+The cache does not make a *failed* login cheaper, so Repsy limits those instead. Every client, told
+apart by its address (see [Reverse Proxy](#reverse-proxy)), may make `AUTH_THROTTLE_MAX_FAILURES`
+failed password checks (20 by default) per `AUTH_THROTTLE_WINDOW_SECONDS` (60 seconds by default).
+The repository ports, the `/api` routes that take Basic credentials and the web UI login all count
+into the same number. After that the client's next password check is answered with
+`429 Too Many Requests` and a `Retry-After` header (the seconds left in the window) without spending
+a BCrypt verification, until the window ends. That caps what a flood of wrong credentials costs at
+about a second of CPU per client and minute. Set `AUTH_THROTTLE_ENABLED` to `false` to turn the
+limit off.
+
+- **What counts:** only a failed password verification: a wrong password, or a username that does
+  not exist. Both count the same and are refused the same way, so the limit never reveals which
+  usernames exist, and it is keyed on the client, never on the username. A request that succeeds,
+  a deploy token, a bearer token and a request that carries no username do not count, and a success
+  does not reset the count: only the end of the window does.
+- **Shared addresses:** many users behind one address (a company NAT, shared CI egress) share one
+  count. A password Repsy remembers (see above) and a deploy token cost no verification and keep
+  working for a client that is over the limit, so a CI job is not locked out by a neighbour that
+  sends wrong passwords. A client that keeps sending guesses after it was blocked (ten times the
+  limit) loses that as well until its window ends. Raise `AUTH_THROTTLE_MAX_FAILURES` if a shared
+  address regularly trips the limit.
+- **Package managers:** none of them is sent a `WWW-Authenticate` challenge with the 429, so none
+  asks for credentials again in a loop. Maven and npm retry with a backoff; pip, twine, cargo, go,
+  NuGet, gem and bundler show the HTTP error; Docker and Helm print `toomanyrequests`. Fix the
+  credentials in the job and wait for the `Retry-After` time.
+- **IPv6:** the whole address is one client. A client that controls a whole IPv6 network can use
+  many addresses, so a rate limit in your reverse proxy that groups IPv6 clients by network (for
+  example per `/64`) is a good addition.
+
+A rate limit in your reverse proxy can be used in addition: it can also cap the request rate as a
+whole, which this limit does not do.
 
 For detailed information on creating repositories, managing deploy tokens, and using different protocols (Golang, Cargo(Rust), Maven, npm, PyPI, Docker), see the [documentation](https://docs.repsy.io).
 

@@ -36,6 +36,7 @@ import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
+import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
@@ -393,6 +394,33 @@ class ErrorHandlerTest {
   }
 
   @Test
+  @DisplayName("answers 429 tooManyRequests with Retry-After and no challenge (RPS-1092)")
+  void tooManyRequests() throws Exception {
+    this.mockMvc
+        .perform(get("/too-many-requests"))
+        .andExpect(status().isTooManyRequests())
+        .andExpect(header().string(HttpHeaders.RETRY_AFTER, "42"))
+        .andExpect(header().doesNotExist(HttpHeaders.WWW_AUTHENTICATE))
+        .andExpect(jsonPath("$.msgId").value("tooManyRequests"))
+        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(
+            jsonPath("$.text")
+                .value("Too many failed authentication attempts. Please try again later."));
+  }
+
+  @Test
+  @DisplayName("leaves a 429 to the caller when there is no response to write")
+  void tooManyRequestsWithoutResponse() {
+    final var handler =
+        new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+
+    assertThat(
+            handler.handleException(
+                new TooManyRequestsException(1), new MockHttpServletRequest(), null))
+        .isNull();
+  }
+
+  @Test
   @DisplayName("falls back to a readable unauthorizedRequest when the exception has no message")
   void unauthorizedWithoutMessage() throws Exception {
     this.mockMvc
@@ -580,6 +608,11 @@ class ErrorHandlerTest {
     @GetMapping("/retryable")
     String retryable() {
       throw new RetryableException("scanExecutorSaturated");
+    }
+
+    @GetMapping("/too-many-requests")
+    String tooManyRequests() {
+      throw new TooManyRequestsException(42);
     }
 
     @GetMapping("/unauthorized")

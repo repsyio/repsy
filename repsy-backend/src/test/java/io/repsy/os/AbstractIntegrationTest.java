@@ -22,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.jayway.jsonpath.JsonPath;
+import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.shared.auth.services.RefreshTokenService;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -48,6 +49,7 @@ import java.util.Collection;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -168,7 +170,19 @@ public abstract class AbstractIntegrationTest {
   @Autowired protected UserRepository userRepository;
   @Autowired protected RepoRepository repoRepository;
   @Autowired protected JdbcTemplate jdbcTemplate;
+  @Autowired protected AuthFailureThrottle authFailureThrottle;
   @PersistenceContext protected EntityManager entityManager;
+
+  /**
+   * Every MockMvc request comes from {@code 127.0.0.1}, so the failed logins and Basic checks of
+   * all the classes of a JVM would add up in the one throttle bean they share and block the next
+   * class (RPS-1092). It starts each test with no failures on record. A class that tests the
+   * throttle itself moves a request to another client with {@link #remoteAddr}.
+   */
+  @BeforeEach
+  void resetAuthFailureThrottle() {
+    this.authFailureThrottle.reset();
+  }
 
   protected void registerRefreshToken(final String token) {
     final var claims = this.jwtUtils.verifyRefreshToken(token);
@@ -215,6 +229,14 @@ public abstract class AbstractIntegrationTest {
     return request -> {
       request.setLocalPort(PROTOCOL_PORT);
       request.setServletPath(request.getRequestURI());
+      return request;
+    };
+  }
+
+  /** Sends the request from another client address than MockMvc's default {@code 127.0.0.1}. */
+  protected static RequestPostProcessor remoteAddr(final String address) {
+    return request -> {
+      request.setRemoteAddr(address);
       return request;
     };
   }

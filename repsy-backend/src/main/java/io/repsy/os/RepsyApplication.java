@@ -28,6 +28,7 @@ import io.repsy.os.server.protocols.pypi.shared.storage.configs.PypiFileSystemSt
 import io.repsy.os.server.protocols.ruby.shared.storage.configs.RubyFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.security.scanner.trivy.DockerRegistryProperties;
 import io.repsy.os.server.security.scanner.trivy.TrivyScannerProperties;
+import io.repsy.os.server.shared.auth.AuthThrottleProperties;
 import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +53,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
   TrivyScannerProperties.class,
   DockerRegistryProperties.class,
   BasicAuthCacheProperties.class,
+  AuthThrottleProperties.class,
 })
 @EnableAsync
 @EnableScheduling

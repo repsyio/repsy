@@ -54,6 +54,7 @@ public class ProtocolAuthService {
   protected final @NonNull JwtUtils jwtUtils;
   protected final @NonNull DeployTokenService deployTokenService;
   protected final @NonNull VerifiedPasswordCache verifiedPasswordCache;
+  protected final @NonNull AuthFailureThrottle authFailureThrottle;
 
   /**
    * The credential a protocol request carries, which is its {@code Authorization} header and
@@ -293,21 +294,13 @@ public class ProtocolAuthService {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
-    final var userInfoOpt = this.userTxService.getUserByUsernameOptional(username);
+    final var userInfo = this.userTxService.getUserByUsernameOptional(username).orElse(null);
 
-    if (userInfoOpt.isEmpty()) {
-      // Spend the time of a real check, so an unknown username is as slow as a wrong password.
-      PasswordHasher.verifyDummy(password);
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    final var userInfo = userInfoOpt.get();
-
-    // A client that sends Basic credentials on every request would otherwise pay one BCrypt check
-    // per request (RPS-1025). Only a successful check is remembered, so this path costs what it did
-    // before for a wrong password.
-    if (!this.verifiedPasswordCache.matches(userInfo, password)) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    // A password the cache remembers costs no hash check, so it is let through even for a client
+    // that is blocked: a CI behind a shared address keeps working while a neighbour that sends
+    // wrong passwords is refused. It is not counted, since it did not fail.
+    if (userInfo == null || !this.isRemembered(userInfo, password)) {
+      this.checkPassword(userInfo, password);
     }
 
     // Hashes from an older algorithm or work factor are replaced now that the password is known.
@@ -316,6 +309,37 @@ public class ProtocolAuthService {
     }
 
     return userInfo;
+  }
+
+  /**
+   * The password check that costs a BCrypt verification. The client is refused before it starts if
+   * it has used up its failures for the window (RPS-1092), and a failed check counts against it. An
+   * unknown username is counted like a wrong password, so the two stay indistinguishable (RPS-906).
+   */
+  private void checkPassword(final @Nullable UserInfo userInfo, final @NonNull String password) {
+
+    this.authFailureThrottle.checkAllowed();
+
+    if (userInfo == null) {
+      // Spend the time of a real check, so an unknown username is as slow as a wrong password.
+      PasswordHasher.verifyDummy(password);
+      this.authFailureThrottle.recordFailure();
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    // A client that sends Basic credentials on every request would otherwise pay one BCrypt check
+    // per request (RPS-1025). Only a successful check is remembered, so this path costs what it did
+    // before for a wrong password.
+    if (!this.verifiedPasswordCache.matches(userInfo, password)) {
+      this.authFailureThrottle.recordFailure();
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+  }
+
+  private boolean isRemembered(final @NonNull UserInfo userInfo, final @NonNull String password) {
+
+    return !this.authFailureThrottle.isSaturated()
+        && this.verifiedPasswordCache.isRemembered(userInfo, password);
   }
 
   private @NonNull RepoPermissionInfo authorizeRepoUser(
