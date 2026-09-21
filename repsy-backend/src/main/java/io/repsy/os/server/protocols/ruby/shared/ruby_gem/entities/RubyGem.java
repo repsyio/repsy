@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.protocols.ruby.shared.utils.GemspecParser;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -58,10 +59,10 @@ public class RubyGem {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private Repo repo;
 
-  @Column(name = "name", nullable = false, length = 255)
+  @Column(name = "name", nullable = false, length = GemspecParser.MAX_NAME_LENGTH)
   private String name;
 
-  @Column(name = "latest", nullable = false, length = 64)
+  @Column(name = "latest", nullable = false, length = GemspecParser.MAX_VERSION_LENGTH)
   private String latest;
 
   @Column(name = "versions_checksum", length = 32)

@@ -18,6 +18,8 @@ package io.repsy.os.server.protocols.ruby;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -45,21 +47,46 @@ public final class RubyGemFixtures {
   public static byte[] gem(
       final String name, final String version, final String platform, final String description)
       throws IOException {
+    return gem(
+        name,
+        version,
+        platform,
+        description,
+        List.of("Alice", "Bob"),
+        "https://example.test/" + name,
+        "3.1.0");
+  }
+
+  /**
+   * Like {@link #gem(String, String, String, String)}, with the length-limited metadata given: the
+   * authors, the homepage and the version of the {@code >= x} required Ruby version (RPS-1071).
+   * String values are quoted in the YAML, so a value such as {@code 1.0000} stays a string.
+   */
+  public static byte[] gem(
+      final String name,
+      final String version,
+      final String platform,
+      final String description,
+      final List<String> authors,
+      final String homepage,
+      final String requiredRubyVersion)
+      throws IOException {
+    final var authorLines =
+        authors.stream().map(author -> "- \"" + author + "\"").collect(Collectors.joining("\n"));
     final var metadata =
         """
-        name: %s
+        name: "%s"
         version:
-          version: %s
-        platform: %s
+          version: "%s"
+        platform: "%s"
         description: %s
         authors:
-        - Alice
-        - Bob
-        homepage: https://example.test/%s
+        %s
+        homepage: "%s"
         required_ruby_version:
           requirements:
           - - ">="
-            - version: 3.1.0
+            - version: "%s"
         dependencies:
         - name: rack
           type: runtime
@@ -74,7 +101,8 @@ public final class RubyGemFixtures {
             - - ">="
               - version: 13.0.0
         """
-            .formatted(name, version, platform, description, name);
+            .formatted(
+                name, version, platform, description, authorLines, homepage, requiredRubyVersion);
     final var output = new ByteArrayOutputStream();
 
     try (var tar = new TarArchiveOutputStream(output)) {

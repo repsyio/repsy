@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.protocols.ruby.shared.utils.GemspecParser;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -57,25 +58,25 @@ public class RubyGemVersion {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private RubyGem gem;
 
-  @Column(name = "version", nullable = false, length = 64)
+  @Column(name = "version", nullable = false, length = GemspecParser.MAX_VERSION_LENGTH)
   private String version;
 
-  @Column(name = "platform", nullable = false, length = 64)
+  @Column(name = "platform", nullable = false, length = GemspecParser.MAX_PLATFORM_LENGTH)
   private String platform;
 
   @Column(name = "checksum", nullable = false, length = 64)
   private String checksum;
 
-  @Column(name = "authors", length = 512)
+  @Column(name = "authors", length = GemspecParser.MAX_AUTHORS_LENGTH)
   private @Nullable String authors;
 
   @Column(name = "description", columnDefinition = "TEXT")
   private @Nullable String description;
 
-  @Column(name = "homepage", length = 512)
+  @Column(name = "homepage", length = GemspecParser.MAX_HOMEPAGE_LENGTH)
   private @Nullable String homepage;
 
-  @Column(name = "required_ruby_version", length = 64)
+  @Column(name = "required_ruby_version", length = GemspecParser.MAX_REQUIRED_RUBY_VERSION_LENGTH)
   private @Nullable String requiredRubyVersion;
 
   @Column(name = "yanked", nullable = false)
