@@ -89,6 +89,14 @@ COPY repsy-protocols/ ./repsy-protocols/
 RUN mvn -f ./repsy-protocols/pom.xml install -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B
 
 # ─────────────────────────────────────────
+# Stage 4a: OpenAPI generator jar (optional)
+# ─────────────────────────────────────────
+# Empty by default: the generator CLI then downloads the jar from Maven Central. The release
+# workflow replaces this stage with the directory it restored from the actions/cache entry
+# (`--build-context openapi-jar=<dir>`), so a release build with a warm cache does not download it.
+FROM scratch AS openapi-jar
+
+# ─────────────────────────────────────────
 # Stage 4: Build Angular Frontend
 # ─────────────────────────────────────────
 FROM node:24-alpine AS frontend-build
@@ -100,6 +108,10 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # openapi-generator-cli shells out to a JRE to run the generator jar
 RUN apk add --no-cache openjdk21-jre-headless
+
+# Pre-seeds the `storageDir` from repsy-frontend/openapitools.json (~ is /root here). The CLI
+# finds <version>.jar there and skips the download; the version is pinned only in that file.
+COPY --from=openapi-jar / /root/.cache/openapi-generator-cli/
 
 COPY repsy-frontend/package.json repsy-frontend/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
