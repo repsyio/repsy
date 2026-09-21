@@ -54,7 +54,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.MutablePair;
-import org.apache.maven.artifact.repository.metadata.Metadata;
 import org.apache.maven.artifact.repository.metadata.SnapshotVersion;
 import org.apache.maven.artifact.repository.metadata.Versioning;
 import org.apache.maven.index.artifact.Gav;
@@ -129,6 +128,14 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
         this.getDeployTypeByGav(repoInfo, gav), gav.isSnapshot() ? SNAPSHOT : RELEASE);
   }
 
+  /**
+   * Classifies a {@code maven-metadata.xml} upload. Only the version-level file (the {@code
+   * g/a/<baseVersion>/} file of a snapshot deploy) is judged, by its own {@code <version>}, exactly
+   * like the artifact files of that directory. The artifact-level and group-level files index
+   * versions of both kinds, and the files of the version they describe were judged by their own
+   * GAV, so no version-type rule applies to them. No deploy type is returned for metadata: {@code
+   * checkDeploymentRules} does not read it.
+   */
   @Override
   public MutablePair<@Nullable ArtifactDeployType, @Nullable ArtifactVersionType>
       getDeployAndVersionTypesByMetadataTypeFiles(
@@ -139,27 +146,27 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       return new MutablePair<>(null, null);
     }
 
-    final var repoInfo = (RepoInfo) baseRepoInfo;
-    final var metadata = ArtifactUtils.readMetadata(content);
+    // readMetadata throws for malformed content, it never returns null.
+    final var metadata = Objects.requireNonNull(ArtifactUtils.readMetadata(content));
 
-    if (metadata == null) {
-      log.error("maven-metadata could not read for {}", repoInfo.getName());
-      throw new AccessNotAllowedException("unReadableMetadataFile");
+    if (ArtifactUtils.isVersionLevelMetadata(metadata)) {
+      return new MutablePair<>(
+          null, ArtifactUtils.isSnapshot(metadata.getVersion()) ? SNAPSHOT : RELEASE);
     }
 
-    if (ArtifactUtils.isPluginMetadata(metadata)) {
-      return new MutablePair<>(ArtifactDeployType.NEW, PLUGIN);
-    }
-
-    return this.getDeployAndVersionTypesByMetadata(repoInfo, metadata);
+    // Artifact-level and group-level metadata index versions of both kinds. The files of the
+    // version they describe were judged by their own GAV, so no rule applies to them.
+    return new MutablePair<>(null, ArtifactUtils.isPluginMetadata(metadata) ? PLUGIN : null);
   }
 
   /**
    * Refuses an upload that the repo settings do not allow. The version-type rule ({@code releases}
    * and {@code snapshots}) applies to new versions and to redeploys alike (RPS-1174), so switching
-   * a kind off also stops overwriting the versions of that kind that already exist. The override
-   * rule is checked first, so {@code artifactOverrideIsProhibited} keeps precedence when both rules
-   * would refuse the upload.
+   * a kind off also stops overwriting the versions of that kind that already exist. It applies to
+   * version-level metadata by its {@code <version>}; other metadata carries no version type and is
+   * not judged, and override never applies to metadata. The override rule is checked first for real
+   * artifact files, so {@code artifactOverrideIsProhibited} keeps precedence when both rules would
+   * refuse the upload. The version-type rule does not depend on the path parsing to a GAV.
    */
   @Override
   public void checkDeploymentRules(
@@ -169,11 +176,10 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
 
     final var gav = ArtifactUtils.getGavByFile(storagePath);
 
-    if (gav == null) {
-      return;
+    if (gav != null) {
+      this.checkAllowOverride(baseRepoInfo, gav, storagePath);
     }
 
-    this.checkAllowOverride(baseRepoInfo, gav, storagePath);
     this.checkVersionTypeRules(baseRepoInfo, artifactPair.getValue());
   }
 
@@ -577,48 +583,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     final var customKeys = this.keyStoreService.findHostsByRepoId(repo.getId());
 
     this.pgpVerifierService.verify(nonSignedFileResource, signedFileResource, customKeys);
-  }
-
-  private MutablePair<ArtifactDeployType, @Nullable ArtifactVersionType>
-      getDeployAndVersionTypesByMetadata(final RepoInfo repoInfo, final Metadata metadata) {
-
-    final MutablePair<ArtifactDeployType, @Nullable ArtifactVersionType> result;
-
-    final var lastComingVersionName = metadata.getVersioning().getVersions().getLast();
-
-    final var artifact =
-        this.getArtifact(repoInfo.getStorageKey(), metadata.getArtifactId(), metadata.getGroupId());
-
-    if (artifact == null) {
-      if (ArtifactUtils.isSnapshot(lastComingVersionName)) {
-        result = new MutablePair<>(ArtifactDeployType.NEW, SNAPSHOT);
-      } else {
-        result = new MutablePair<>(ArtifactDeployType.NEW, RELEASE);
-      }
-
-      return result;
-    }
-
-    final var artifactVersionOptional =
-        this.artifactVersionRepository.findByArtifactIdAndVersionName(
-            artifact.getId(), lastComingVersionName);
-
-    if (artifactVersionOptional.isPresent()) {
-      // No version type on purpose. The last listed version is the deployed one only for a new
-      // version (Maven appends it); on a redeploy the list keeps its order, so the last entry may
-      // be any earlier version of the other kind. The artifact files of the deploy were already
-      // judged by their own GAV. This method is not reached today, because isPluginMetadata is
-      // always true (RPS-1176); revisit this when that is fixed.
-      result = new MutablePair<>(REDEPLOY, null);
-    } else {
-      if (ArtifactUtils.isSnapshot(lastComingVersionName)) {
-        result = new MutablePair<>(ArtifactDeployType.NEW, SNAPSHOT);
-      } else {
-        result = new MutablePair<>(ArtifactDeployType.NEW, RELEASE);
-      }
-    }
-
-    return result;
   }
 
   private @Nullable ArtifactVersion getArtifactVersionByGav(final UUID artifactId, final Gav gav) {

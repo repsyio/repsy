@@ -217,9 +217,25 @@ public class ArtifactUtils {
     }
   }
 
+  /**
+   * Tells the group-level {@code maven-metadata.xml} Maven writes for plugin deploys. {@code
+   * Metadata.getPlugins()} never returns {@code null}: it creates an empty list on first access, so
+   * the presence of at least one plugin is what makes the file plugin metadata.
+   */
   public static boolean isPluginMetadata(final @Nullable Metadata metadata) {
 
-    return metadata != null && metadata.getPlugins() != null;
+    return metadata != null && !metadata.getPlugins().isEmpty();
+  }
+
+  /**
+   * Tells the version-level {@code maven-metadata.xml}, the {@code g/a/<baseVersion>/} file Maven
+   * writes for snapshot deploys. It is the only metadata file that names a single version, in its
+   * {@code <version>} element; the artifact-level file lists every version and the group-level file
+   * lists plugins, and neither has one.
+   */
+  public static boolean isVersionLevelMetadata(final @Nullable Metadata metadata) {
+
+    return metadata != null && metadata.getVersion() != null && !metadata.getVersion().isBlank();
   }
 
   public static boolean isChecksumFile(final String fileName) {
