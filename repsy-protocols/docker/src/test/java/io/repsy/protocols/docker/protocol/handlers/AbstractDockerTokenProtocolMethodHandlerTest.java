@@ -17,9 +17,13 @@ package io.repsy.protocols.docker.protocol.handlers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
@@ -28,6 +32,7 @@ import io.repsy.protocols.docker.protocol.parser.DockerScopeParser;
 import io.repsy.protocols.docker.shared.auth.services.DockerAuthService;
 import io.repsy.protocols.shared.auth.dtos.LoginResponse;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
+import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,7 +46,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-/** RPS-1092: {@code /v2/token} answers a failed login with 401, and a throttled one with 429. */
+/**
+ * RPS-1092: {@code /v2/token} answers a failed login with 401, and a throttled one with 429.
+ * RPS-1097: a caller without credentials gets an anonymous token for a public repo only.
+ */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractDockerTokenProtocolMethodHandler")
 class AbstractDockerTokenProtocolMethodHandlerTest {
@@ -121,5 +129,58 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
         .isInstanceOfSatisfying(
             TooManyRequestsException.class,
             ex -> assertThat(ex.getRetryAfterSeconds()).isEqualTo(42));
+  }
+
+  private static final String PULL_SCOPE = "repository:images/app:pull";
+
+  private MockHttpServletRequest anonymousTokenRequest() {
+    final var request = new MockHttpServletRequest("GET", "/v2/token");
+    request.setParameter("scope", PULL_SCOPE);
+
+    return request;
+  }
+
+  private static BaseRepoInfo<UUID> repo(final boolean privateRepo) {
+    return BaseRepoInfo.<UUID>builder()
+        .name("images")
+        .storageKey(UUID.randomUUID())
+        .privateRepo(privateRepo)
+        .build();
+  }
+
+  @Test
+  @DisplayName("hands an anonymous token to a caller without credentials for a public repo")
+  void anonymousTokenForPublicRepo() throws Exception {
+    final var repo = repo(false);
+    doReturn(Optional.of(repo)).when(this.scopeParser).getRepoInfoByScope(PULL_SCOPE);
+    when(this.authService.createAnonymousUser()).thenReturn("anon-tok");
+
+    final var result =
+        this.handler.handle(
+            new ProtocolContext(), this.anonymousTokenRequest(), new MockHttpServletResponse());
+
+    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("anon-tok");
+    verify(this.authService).authorizePublicRead(repo);
+  }
+
+  @Test
+  @DisplayName("answers 401 with a challenge, and no token, when the repo is not public")
+  void noAnonymousTokenForPrivateRepo() throws Exception {
+    final var repo = repo(true);
+    doReturn(Optional.of(repo)).when(this.scopeParser).getRepoInfoByScope(PULL_SCOPE);
+    doThrow(new ItemNotFoundException("repoNotFound"))
+        .when(this.authService)
+        .authorizePublicRead(repo);
+
+    final var result =
+        this.handler.handle(
+            new ProtocolContext(), this.anonymousTokenRequest(), new MockHttpServletResponse());
+
+    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    assertThat(result.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE))
+        .startsWith("Basic realm=");
+    assertThat(result.getBody()).isNull();
+    verify(this.authService, never()).createAnonymousUser();
   }
 }

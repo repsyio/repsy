@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.docker.protocol.handlers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
@@ -39,6 +40,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p>The user is created directly, which is how an instance that predates the reserved name has
  * one.
+ *
+ * <p>RPS-1097: the token endpoint hands the token out for a public repo only. A private repo is
+ * refused at the endpoint itself, before any token exists.
  */
 @DisplayName("Docker anonymous token")
 class DockerAnonymousTokenIT extends AbstractIntegrationTest {
@@ -131,5 +135,24 @@ class DockerAnonymousTokenIT extends AbstractIntegrationTest {
     final var token = this.adminProtocolBearerToken();
 
     assertThat(this.pullManifest(this.privateRepo, token)).isEqualTo(404);
+  }
+
+  @Test
+  @DisplayName("is not handed out for a private repo, whose token request is challenged")
+  void noTokenForPrivateRepo() throws Exception {
+    final var response =
+        this.mockMvc
+            .perform(
+                get("/v2/token")
+                    .param(
+                        "scope",
+                        "repository:%s/%s:pull".formatted(this.privateRepo.getName(), IMAGE))
+                    .with(protocolPort()))
+            .andReturn()
+            .getResponse();
+
+    assertThat(response.getStatus()).isEqualTo(401);
+    assertThat(response.getHeader(WWW_AUTHENTICATE)).startsWith("Basic realm=");
+    assertThat(response.getContentAsString()).doesNotContain("token");
   }
 }
