@@ -84,6 +84,8 @@
                   [scanned]="securitySummary[crate.name]?.scanned ?? false"
                   [rescanInProgressCount]="securitySummary[crate.name]?.rescanInProgressCount ?? 0"
                   [rescanFailedCount]="securitySummary[crate.name]?.rescanFailedCount ?? 0"
+                  [unscannedInProgressCount]="securitySummary[crate.name]?.unscannedInProgressCount ?? 0"
+                  [unscannedFailedCount]="securitySummary[crate.name]?.unscannedFailedCount ?? 0"
                 />
                 <app-tooltip
                   class="text-[#FDFDFD]"
@@ -168,6 +170,8 @@
                     [scanned]="securitySummary[crate.name]?.scanned ?? false"
                     [rescanInProgressCount]="securitySummary[crate.name]?.rescanInProgressCount ?? 0"
                     [rescanFailedCount]="securitySummary[crate.name]?.rescanFailedCount ?? 0"
+                    [unscannedInProgressCount]="securitySummary[crate.name]?.unscannedInProgressCount ?? 0"
+                    [unscannedFailedCount]="securitySummary[crate.name]?.unscannedFailedCount ?? 0"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

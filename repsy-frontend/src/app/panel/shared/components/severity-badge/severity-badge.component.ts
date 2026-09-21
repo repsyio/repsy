@@ -18,7 +18,12 @@ import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
 
 import { ScanStatus, Severity } from '../../../../../generated/api';
-import { isRescanInProgress, rescanCountsTitle, rescanTitle } from '../../util/rescan-status.util';
+import {
+  isRescanInProgress,
+  rescanCountsTitle,
+  rescanTitle,
+  unscannedCountsTitle,
+} from '../../util/rescan-status.util';
 
 
 const SEVERITY_CLASSES: Record<string, string> = {
@@ -56,15 +61,53 @@ export class SeverityBadgeComponent {
   @Input() public rescanInProgressCount: number | null = null;
   /** For a badge that rolls up several versions: how many of them have a failed newest scan. */
   @Input() public rescanFailedCount: number | null = null;
+  /** For a badge that rolls up several versions: how many have no completed scan and a first scan still unfinished. */
+  @Input() public unscannedInProgressCount: number | null = null;
+  /** For a badge that rolls up several versions: how many have no completed scan and a failed first scan. */
+  @Input() public unscannedFailedCount: number | null = null;
 
   protected readonly Severity = Severity;
 
+  /** Nothing has completed yet and a first scan is still unfinished: there is no severity to show. */
+  public get isFirstScanInProgress(): boolean {
+    return !this.scanned && (this.unscannedInProgressCount ?? 0) > 0;
+  }
+
+  /** Nothing has completed yet and every first scan failed. An unfinished one wins, it may still succeed. */
+  public get isFirstScanFailed(): boolean {
+    return !this.scanned && !this.isFirstScanInProgress && (this.unscannedFailedCount ?? 0) > 0;
+  }
+
+  /** Tooltip of the whole badge while no severity exists yet, naming every unscanned version. */
+  public get unscannedTitle(): string {
+    return this.isFirstScanInProgress || this.isFirstScanFailed
+      ? unscannedCountsTitle(this.unscannedInProgressCount, this.unscannedFailedCount)
+      : '';
+  }
+
+  /**
+   * Tooltip of the small icon next to a severity: flags versions the severity is not (or not fully)
+   * built from, that is versions being rescanned and versions that have no completed scan yet.
+   */
   public get rescanTitle(): string {
-    return rescanTitle(this.scanStatus) || rescanCountsTitle(this.rescanInProgressCount, this.rescanFailedCount);
+    const parts = [
+      rescanTitle(this.scanStatus) || rescanCountsTitle(this.rescanInProgressCount, this.rescanFailedCount),
+    ];
+
+    if (this.scanned) {
+      const unscanned = unscannedCountsTitle(this.unscannedInProgressCount, this.unscannedFailedCount);
+      parts.push(unscanned && `${unscanned} Not included in the severity shown.`);
+    }
+
+    return parts.filter(Boolean).join(' ');
   }
 
   public get rescanInProgress(): boolean {
-    return isRescanInProgress(this.scanStatus) || (this.rescanInProgressCount ?? 0) > 0;
+    return (
+      isRescanInProgress(this.scanStatus) ||
+      (this.rescanInProgressCount ?? 0) > 0 ||
+      (this.scanned && (this.unscannedInProgressCount ?? 0) > 0)
+    );
   }
 
   public get isClean(): boolean {
@@ -76,12 +119,24 @@ export class SeverityBadgeComponent {
       return CLEAN_CLASSES;
     }
 
+    if (this.isFirstScanInProgress || this.isFirstScanFailed) {
+      return SEVERITY_CLASSES[Severity.Unknown];
+    }
+
     return this.severity ? (SEVERITY_CLASSES[this.severity] ?? SEVERITY_CLASSES[Severity.Unknown]) : SEVERITY_CLASSES[Severity.Unknown];
   }
 
   public get label(): string {
     if (this.isClean) {
       return 'Clean';
+    }
+
+    if (this.isFirstScanInProgress) {
+      return 'Scanning...';
+    }
+
+    if (this.isFirstScanFailed) {
+      return 'Scan failed';
     }
 
     return this.severity ? (SEVERITY_LABELS[this.severity] ?? SEVERITY_LABELS[Severity.Unknown]) : SEVERITY_LABELS[Severity.Unknown];

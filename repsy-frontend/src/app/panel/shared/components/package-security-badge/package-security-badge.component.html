@@ -1,10 +1,12 @@
-@if (scanned && (isSupported$ | async)) {
+@if ((scanned || (unscannedInProgressCount ?? 0) > 0 || (unscannedFailedCount ?? 0) > 0) && (isSupported$ | async)) {
   <button type="button" (click)="openModal($event)" class="cursor-pointer">
     <app-severity-badge
       [severity]="severity"
       [scanned]="scanned"
       [rescanInProgressCount]="rescanInProgressCount"
       [rescanFailedCount]="rescanFailedCount"
+      [unscannedInProgressCount]="unscannedInProgressCount"
+      [unscannedFailedCount]="unscannedFailedCount"
       [compact]="true"
       [attr.aria-label]="artifactName + ' security status'"
     />

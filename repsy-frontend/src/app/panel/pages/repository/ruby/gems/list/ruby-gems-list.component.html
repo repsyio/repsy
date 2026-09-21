@@ -77,6 +77,8 @@
                   [scanned]="securitySummary[gem.name]?.scanned ?? false"
                   [rescanInProgressCount]="securitySummary[gem.name]?.rescanInProgressCount ?? 0"
                   [rescanFailedCount]="securitySummary[gem.name]?.rescanFailedCount ?? 0"
+                  [unscannedInProgressCount]="securitySummary[gem.name]?.unscannedInProgressCount ?? 0"
+                  [unscannedFailedCount]="securitySummary[gem.name]?.unscannedFailedCount ?? 0"
                 />
                 <a
                   class="group text-secondary-500 flex w-max gap-2 text-[14px]"
@@ -171,6 +173,8 @@
                     [scanned]="securitySummary[gem.name]?.scanned ?? false"
                     [rescanInProgressCount]="securitySummary[gem.name]?.rescanInProgressCount ?? 0"
                     [rescanFailedCount]="securitySummary[gem.name]?.rescanFailedCount ?? 0"
+                    [unscannedInProgressCount]="securitySummary[gem.name]?.unscannedInProgressCount ?? 0"
+                    [unscannedFailedCount]="securitySummary[gem.name]?.unscannedFailedCount ?? 0"
                   />
                 </div>
                 <div class="flex justify-between gap-2">
