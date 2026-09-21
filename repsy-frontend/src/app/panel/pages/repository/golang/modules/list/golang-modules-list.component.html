@@ -100,6 +100,8 @@
                   [scanned]="securitySummary[mod.modulePath]?.scanned ?? false"
                   [rescanInProgressCount]="securitySummary[mod.modulePath]?.rescanInProgressCount ?? 0"
                   [rescanFailedCount]="securitySummary[mod.modulePath]?.rescanFailedCount ?? 0"
+                  [unscannedInProgressCount]="securitySummary[mod.modulePath]?.unscannedInProgressCount ?? 0"
+                  [unscannedFailedCount]="securitySummary[mod.modulePath]?.unscannedFailedCount ?? 0"
                 />
 
                 <app-tooltip
@@ -169,6 +171,8 @@
                     [scanned]="securitySummary[mod.modulePath]?.scanned ?? false"
                     [rescanInProgressCount]="securitySummary[mod.modulePath]?.rescanInProgressCount ?? 0"
                     [rescanFailedCount]="securitySummary[mod.modulePath]?.rescanFailedCount ?? 0"
+                    [unscannedInProgressCount]="securitySummary[mod.modulePath]?.unscannedInProgressCount ?? 0"
+                    [unscannedFailedCount]="securitySummary[mod.modulePath]?.unscannedFailedCount ?? 0"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

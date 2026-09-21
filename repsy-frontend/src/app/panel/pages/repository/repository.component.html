@@ -263,6 +263,8 @@
                     [scanned]="securitySummary[repo.name]?.scanned ?? false"
                     [rescanInProgressCount]="securitySummary[repo.name]?.rescanInProgressCount ?? 0"
                     [rescanFailedCount]="securitySummary[repo.name]?.rescanFailedCount ?? 0"
+                    [unscannedInProgressCount]="securitySummary[repo.name]?.unscannedInProgressCount ?? 0"
+                    [unscannedFailedCount]="securitySummary[repo.name]?.unscannedFailedCount ?? 0"
                   />
                 </div>
 
@@ -566,6 +568,8 @@
                     [scanned]="securitySummary[repo.name]?.scanned ?? false"
                     [rescanInProgressCount]="securitySummary[repo.name]?.rescanInProgressCount ?? 0"
                     [rescanFailedCount]="securitySummary[repo.name]?.rescanFailedCount ?? 0"
+                    [unscannedInProgressCount]="securitySummary[repo.name]?.unscannedInProgressCount ?? 0"
+                    [unscannedFailedCount]="securitySummary[repo.name]?.unscannedFailedCount ?? 0"
                   />
               </div>
 

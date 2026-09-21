@@ -5415,6 +5415,20 @@ components:
             last known result.
           type: integer
           format: int32
+        unscannedInProgressCount:
+          description: >-
+            Number of versions in the repository that have no completed scan yet and whose newest
+            scan is pending, queued or running, so they are not part of the severity above. scanned
+            stays false while none of the repository's versions has a completed scan.
+          type: integer
+          format: int32
+        unscannedFailedCount:
+          description: >-
+            Number of versions in the repository that have no completed scan yet and whose newest
+            scan failed, so they are not part of the severity above. scanned stays false while none
+            of the repository's versions has a completed scan.
+          type: integer
+          format: int32
     SecuritySummary:
       type: object
       additionalProperties:
@@ -5466,6 +5480,24 @@ components:
             the same version completed, so severity and findingCount still include that version's
             last known result. Only set on the per-artifact summary; absent on the per-version
             summary, which has latestScanStatus instead.
+          type: integer
+          format: int32
+        unscannedInProgressCount:
+          description: >-
+            Number of versions of the artifact that have no completed scan yet and whose newest
+            scan is pending, queued or running, so they are not part of severity and findingCount.
+            scanned stays false while none of the artifact's versions has a completed scan. Only
+            set on the per-artifact summary; absent on the per-version summary, which has
+            latestScanStatus instead.
+          type: integer
+          format: int32
+        unscannedFailedCount:
+          description: >-
+            Number of versions of the artifact that have no completed scan yet and whose newest
+            scan failed, so they are not part of severity and findingCount. scanned stays false
+            while none of the artifact's versions has a completed scan. Only set on the
+            per-artifact summary; absent on the per-version summary, which has latestScanStatus
+            instead.
           type: integer
           format: int32
     VersionSecuritySummaryMap:

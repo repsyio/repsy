@@ -75,6 +75,25 @@ export function rescanCountsTitle(inProgress: number | null | undefined, failed:
   return parts.length ? `${capitalize(parts.join(' and '))}. Showing the last completed scans.` : '';
 }
 
+/**
+ * Tooltip for a badge that rolls up several versions (a package or a repository) when some of them
+ * have no completed scan yet, so their first scan is unfinished or failed and they are not part of
+ * the severity. Empty when there is nothing to flag.
+ */
+export function unscannedCountsTitle(inProgress: number | null | undefined, failed: number | null | undefined): string {
+  const parts: string[] = [];
+
+  if (inProgress && inProgress > 0) {
+    parts.push(`${versions(inProgress)} being scanned for the first time`);
+  }
+
+  if (failed && failed > 0) {
+    parts.push(`the first scan of ${versions(failed)} failed`);
+  }
+
+  return parts.length ? `${capitalize(parts.join(' and '))}.` : '';
+}
+
 function versions(count: number): string {
   return count === 1 ? '1 version' : `${count} versions`;
 }

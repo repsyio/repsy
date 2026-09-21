@@ -101,6 +101,8 @@
                   [scanned]="securitySummary[image.name]?.scanned ?? false"
                   [rescanInProgressCount]="securitySummary[image.name]?.rescanInProgressCount ?? 0"
                   [rescanFailedCount]="securitySummary[image.name]?.rescanFailedCount ?? 0"
+                  [unscannedInProgressCount]="securitySummary[image.name]?.unscannedInProgressCount ?? 0"
+                  [unscannedFailedCount]="securitySummary[image.name]?.unscannedFailedCount ?? 0"
                 />
 
                 <app-tooltip
@@ -182,6 +184,8 @@
                     [scanned]="securitySummary[image.name]?.scanned ?? false"
                     [rescanInProgressCount]="securitySummary[image.name]?.rescanInProgressCount ?? 0"
                     [rescanFailedCount]="securitySummary[image.name]?.rescanFailedCount ?? 0"
+                    [unscannedInProgressCount]="securitySummary[image.name]?.unscannedInProgressCount ?? 0"
+                    [unscannedFailedCount]="securitySummary[image.name]?.unscannedFailedCount ?? 0"
                   />
                 </div>
                 <div class="flex justify-between gap-2">

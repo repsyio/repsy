@@ -15,7 +15,14 @@
 ///
 
 import { ScanStatus } from '../../../../generated/api';
-import { hasRescanFailed, isRescanInProgress, recentScanNote, rescanCountsTitle, rescanTitle } from './rescan-status.util';
+import {
+  hasRescanFailed,
+  isRescanInProgress,
+  recentScanNote,
+  rescanCountsTitle,
+  rescanTitle,
+  unscannedCountsTitle,
+} from './rescan-status.util';
 
 const IN_PROGRESS = [ScanStatus.Pending, ScanStatus.Queued, ScanStatus.Running];
 
@@ -76,12 +83,37 @@ describe('rescan status', () => {
 
     it('names the versions whose last rescan failed', () => {
       expect(rescanCountsTitle(0, 1)).toBe('The last rescan of 1 version failed. Showing the last completed scans.');
-      expect(rescanCountsTitle(undefined, 2)).toBe('The last rescan of 2 versions failed. Showing the last completed scans.');
+      expect(rescanCountsTitle(undefined, 2)).toBe(
+        'The last rescan of 2 versions failed. Showing the last completed scans.',
+      );
     });
 
     it('names both when some are rescanned and some failed', () => {
       expect(rescanCountsTitle(2, 1)).toBe(
         '2 versions being rescanned and the last rescan of 1 version failed. Showing the last completed scans.',
+      );
+    });
+  });
+
+  describe('unscannedCountsTitle', () => {
+    it('flags nothing when every version has a completed scan', () => {
+      expect(unscannedCountsTitle(0, 0)).toBe('');
+      expect(unscannedCountsTitle(null, undefined)).toBe('');
+    });
+
+    it('names the versions being scanned for the first time', () => {
+      expect(unscannedCountsTitle(1, 0)).toBe('1 version being scanned for the first time.');
+      expect(unscannedCountsTitle(3, null)).toBe('3 versions being scanned for the first time.');
+    });
+
+    it('names the versions whose first scan failed', () => {
+      expect(unscannedCountsTitle(0, 1)).toBe('The first scan of 1 version failed.');
+      expect(unscannedCountsTitle(undefined, 2)).toBe('The first scan of 2 versions failed.');
+    });
+
+    it('names both when some are being scanned and some failed', () => {
+      expect(unscannedCountsTitle(2, 1)).toBe(
+        '2 versions being scanned for the first time and the first scan of 1 version failed.',
       );
     });
   });

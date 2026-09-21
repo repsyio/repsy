@@ -39,6 +39,8 @@ export class PackageSecurityBadgeComponent implements OnInit {
   @Input() public scanned = false;
   @Input() public rescanInProgressCount: number | null = null;
   @Input() public rescanFailedCount: number | null = null;
+  @Input() public unscannedInProgressCount: number | null = null;
+  @Input() public unscannedFailedCount: number | null = null;
 
   public isSupported$: Observable<boolean>;
   public showModal = false;

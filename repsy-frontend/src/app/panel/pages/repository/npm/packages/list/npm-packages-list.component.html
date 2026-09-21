@@ -158,6 +158,8 @@
                   [scanned]="securitySummary[packageSecurityKey(pkg)]?.scanned ?? false"
                   [rescanInProgressCount]="securitySummary[packageSecurityKey(pkg)]?.rescanInProgressCount ?? 0"
                   [rescanFailedCount]="securitySummary[packageSecurityKey(pkg)]?.rescanFailedCount ?? 0"
+                  [unscannedInProgressCount]="securitySummary[packageSecurityKey(pkg)]?.unscannedInProgressCount ?? 0"
+                  [unscannedFailedCount]="securitySummary[packageSecurityKey(pkg)]?.unscannedFailedCount ?? 0"
                 />
 
                 <a
@@ -316,6 +318,8 @@
                     [scanned]="securitySummary[packageSecurityKey(pkg)]?.scanned ?? false"
                     [rescanInProgressCount]="securitySummary[packageSecurityKey(pkg)]?.rescanInProgressCount ?? 0"
                     [rescanFailedCount]="securitySummary[packageSecurityKey(pkg)]?.rescanFailedCount ?? 0"
+                    [unscannedInProgressCount]="securitySummary[packageSecurityKey(pkg)]?.unscannedInProgressCount ?? 0"
+                    [unscannedFailedCount]="securitySummary[packageSecurityKey(pkg)]?.unscannedFailedCount ?? 0"
                   />
                 </div>
                 <div class="flex justify-between gap-2">
