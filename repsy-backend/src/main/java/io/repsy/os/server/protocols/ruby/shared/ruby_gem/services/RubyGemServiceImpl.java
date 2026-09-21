@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.ruby.shared.ruby_gem.services;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.GemListItem;
 import io.repsy.os.generated.model.GemVersionInfo;
 import io.repsy.os.generated.model.GemVersionListItem;
@@ -39,13 +40,17 @@ import io.repsy.protocols.ruby.shared.gem.dtos.GemVersionsEntry;
 import io.repsy.protocols.ruby.shared.gem.services.RubyGemProtocolService;
 import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.io.IOException;
+import java.sql.SQLException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -61,6 +66,9 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
   private static final String GEM_VERSION_NOT_FOUND = "gemVersionNotFound";
   private static final String REPO_NOT_FOUND = "repoNotFound";
   private static final String RUNTIME_TYPE = "runtime";
+  private static final String VERSION_UNIQUE_CONSTRAINT =
+      "ux_ruby_gem_version__gem_id_version_platform";
+  private static final String UNIQUE_VIOLATION_SQL_STATE = "23505";
 
   private final RubyGemRepository gemRepository;
   private final RubyGemVersionRepository versionRepository;
@@ -87,12 +95,34 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
   }
 
   @Override
-  @Transactional
-  public void publishGem(
-      final BaseRepoInfo<UUID> repoInfo, final GemMetadata metadata, final String checksum) {
-    final var repo = this.requireRepo(repoInfo.getId());
-    final var gem = this.upsertGem(repo, metadata.getName(), metadata.getVersion());
-    this.upsertVersion(gem, metadata, checksum, repoInfo.isAllowOverride());
+  @Transactional(rollbackFor = IOException.class)
+  public BaseUsages publishGem(
+      final BaseRepoInfo<UUID> repoInfo,
+      final GemMetadata metadata,
+      final String checksum,
+      final GemFileWriter fileWriter)
+      throws IOException {
+    final boolean replacesExisting;
+
+    try {
+      final var repo = this.requireRepo(repoInfo.getId());
+      final var gem = this.upsertGem(repo, metadata.getName(), metadata.getVersion());
+      replacesExisting = this.upsertVersion(gem, metadata, checksum, repoInfo.isAllowOverride());
+      // Flush so a unique-index conflict (a concurrent push of the same version) fails here, before
+      // the file is written. The transaction, and the row lock it holds, stays open while the file
+      // is written, so a losing push waits for the winner instead of replacing its file.
+      this.versionRepository.flush();
+    } catch (final DataIntegrityViolationException e) {
+      // Only that index means the version exists. Any other violation is not the client's
+      // conflict, so it is left to surface as the server error it is.
+      if (!this.isUniqueConstraintViolation(e, VERSION_UNIQUE_CONSTRAINT)) {
+        throw e;
+      }
+
+      throw new ItemAlreadyExistException("gemVersionAlreadyExists");
+    }
+
+    return fileWriter.write(replacesExisting);
   }
 
   @Override
@@ -288,7 +318,10 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
             });
   }
 
-  private void upsertVersion(
+  /**
+   * @return whether the version already had a row, which is being replaced
+   */
+  private boolean upsertVersion(
       final RubyGem gem,
       final GemMetadata metadata,
       final String checksum,
@@ -303,10 +336,27 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
         throw new ItemAlreadyExistException("gemVersionAlreadyExists");
       }
       this.overrideVersion(v, metadata, checksum);
-      return;
+      return true;
     }
 
     this.createVersion(gem, metadata, checksum);
+    return false;
+  }
+
+  private boolean isUniqueConstraintViolation(
+      final DataIntegrityViolationException exception, final String constraintName) {
+    final var rootCause = exception.getMostSpecificCause();
+
+    if (!(rootCause instanceof final SQLException sqlException)) {
+      return false;
+    }
+
+    if (!UNIQUE_VIOLATION_SQL_STATE.equals(sqlException.getSQLState())) {
+      return false;
+    }
+
+    final var message = sqlException.getMessage();
+    return message != null && message.toLowerCase(Locale.ROOT).contains(constraintName);
   }
 
   private void overrideVersion(
