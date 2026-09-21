@@ -81,15 +81,22 @@ public interface NuGetPackageConverter {
       final boolean prerelease,
       final List<NuGetPackageVersion> allVersions) {
 
+    // Highest version first, as NuGet orders versions: a backport published after a newer release
+    // (1.0.5 after 2.0.0) must not be reported as the latest.
+    final Comparator<NuGetPackageVersion> highestFirst =
+        Comparator.comparing(NuGetPackageVersion::getVersion, NuGetPackageUtils.VERSION_COMPARATOR)
+            .reversed();
+
     final var filteredVersions =
         allVersions.stream()
             .filter(v -> !v.isPrerelease() || prerelease)
-            .sorted(Comparator.comparing(NuGetPackageVersion::getPublishedAt).reversed())
+            .sorted(highestFirst)
             .toList();
 
+    // Only pre-releases exist and they were not asked for: the package still has to show one.
     final var latestVersion =
         filteredVersions.isEmpty()
-            ? allVersions.stream().findFirst()
+            ? allVersions.stream().min(highestFirst)
             : filteredVersions.stream().findFirst();
 
     final var versionSummaries = filteredVersions.stream().map(this::toVersionSummary).toList();

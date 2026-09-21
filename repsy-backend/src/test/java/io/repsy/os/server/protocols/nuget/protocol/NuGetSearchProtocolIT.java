@@ -24,9 +24,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
+import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
+import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.time.Instant;
 import java.util.List;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -47,6 +50,10 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * {@code skip} that was not a multiple of {@code take} was rounded down to the previous page
  * boundary and the client got a window that repeated rows it already had and skipped others
  * (RPS-1057). The window is now exactly the {@code take} packages that start at {@code skip}.
+ *
+ * <p>The version a package is found under, and the order of its version list, follow NuGet's
+ * version order, not the publish order: a backport published after a newer release is not the
+ * latest version (RPS-1066).
  */
 @DisplayName("NuGet wire protocol search")
 class NuGetSearchProtocolIT extends AbstractIntegrationTest {
@@ -55,6 +62,7 @@ class NuGetSearchProtocolIT extends AbstractIntegrationTest {
   private static final int PACKAGE_COUNT = 25;
 
   @Autowired private NuGetPackageRepository nugetPackageRepository;
+  @Autowired private NuGetPackageVersionRepository nugetPackageVersionRepository;
 
   /** The ids of the seeded packages in the order the search returns them (by package id). */
   private List<String> packageIds;
@@ -158,5 +166,58 @@ class NuGetSearchProtocolIT extends AbstractIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.totalHits").value(10))
         .andExpect(jsonPath("$.data[*].id", contains(this.packageIds.subList(13, 17).toArray())));
+  }
+
+  private void seedVersions(final String packageId, final String... versionsInPublishOrder) {
+    final var pkg = new NuGetPackage();
+    pkg.setRepo(this.repo);
+    pkg.setPackageId(packageId);
+    final var saved = this.nugetPackageRepository.save(pkg);
+
+    final var start = Instant.parse("2026-01-01T00:00:00Z");
+    for (int i = 0; i < versionsInPublishOrder.length; i++) {
+      final var version = versionsInPublishOrder[i];
+      final var row = new NuGetPackageVersion();
+      row.setNugetPackage(saved);
+      row.setVersion(version);
+      row.setPrerelease(version.contains("-"));
+      row.setListed(true);
+      row.setPublishedAt(start.plusSeconds(i * 3600L));
+      row.setDownloadCount(i);
+      row.setCreatedAt(start.plusSeconds(i * 3600L));
+      this.nugetPackageVersionRepository.save(row);
+    }
+
+    this.entityManager.flush();
+  }
+
+  @Test
+  @DisplayName("reports the highest version as the latest, not the one published last")
+  void latestIsTheHighestVersion() throws Exception {
+    // 1.0.5 is a backport, published after 2.0.0.
+    this.seedVersions("search.versions", "1.0.0", "2.0.0", "1.0.5");
+
+    this.search("?q=search.versions&take=10")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalHits").value(1))
+        .andExpect(jsonPath("$.data[*].version", contains("2.0.0")))
+        .andExpect(jsonPath("$.data[0].versions[*].version", contains("2.0.0", "1.0.5", "1.0.0")));
+  }
+
+  @Test
+  @DisplayName("leaves a pre-release out unless it is asked for, and then ranks it by its version")
+  void preReleaseFollowsTheVersionOrder() throws Exception {
+    this.seedVersions("search.versions", "1.0.0", "3.0.0-beta", "1.1.0");
+
+    this.search("?q=search.versions&take=10")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[*].version", contains("1.1.0")))
+        .andExpect(jsonPath("$.data[0].versions[*].version", contains("1.1.0", "1.0.0")));
+
+    this.search("?q=search.versions&take=10&prerelease=true")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[*].version", contains("3.0.0-beta")))
+        .andExpect(
+            jsonPath("$.data[0].versions[*].version", contains("3.0.0-beta", "1.1.0", "1.0.0")));
   }
 }
