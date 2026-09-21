@@ -228,14 +228,19 @@ class AbstractMavenProtocolFacadeTest {
   }
 
   @Test
-  @DisplayName("stores nothing for a file whose deploy type cannot be worked out")
-  void ignoresAFileWithoutADeployType() throws Exception {
-    requestFor(POM_PATH);
-    when(this.artifactService.getDeployAndVersionType(any(), any())).thenReturn(null);
+  @DisplayName("refuses a path outside the artifact layout before checking rules or storing it")
+  void refusesANonArtifactPathBeforeStoringIt() {
+    requestFor("io/stray.txt");
+    when(this.artifactService.getDeployAndVersionType(any(), any()))
+        .thenThrow(new BadRequestException("invalidArtifactPath"));
 
-    upload(VALID_POM);
+    assertThatThrownBy(() -> upload("hello"))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("invalidArtifactPath");
 
     verifyNoInteractions(this.storageService);
+    verify(this.artifactService, never()).checkDeploymentRules(any(), any(), any());
+    verify(this.artifactService, never()).createOrUpdateArtifact(any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
   }
 

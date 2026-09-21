@@ -21,6 +21,7 @@ import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.
 import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.SNAPSHOT;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -102,8 +103,19 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   @Qualifier("osStorageStrategyMaven")
   private final StorageStrategy storageStrategy;
 
+  /**
+   * Classifies an upload of a file that sits in the Maven layout, {@code
+   * <group>/<artifactId>/<version>/<artifactId>-<version>[-<classifier>].<extension>}. A path that
+   * is not a Maven 2 artifact path is refused here, before any query and before anything is stored,
+   * because every rule (override, releases and snapshots, the artifact rows, the scanner) is keyed
+   * on the GAV and a file without one would bypass them all. Sonatype Nexus refuses the same paths
+   * with {@code 400} under its strict layout policy. A checksum of any path is not judged and comes
+   * back without a type.
+   *
+   * @throws BadRequestException {@code invalidArtifactPath} if the path does not parse to a GAV
+   */
   @Override
-  public @Nullable MutablePair<@Nullable ArtifactDeployType, @Nullable ArtifactVersionType>
+  public MutablePair<@Nullable ArtifactDeployType, @Nullable ArtifactVersionType>
       getDeployAndVersionType(
           final BaseRepoInfo<UUID> baseRepoInfo, final StoragePath storagePath) {
 
@@ -117,11 +129,11 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     final var gav = ArtifactUtils.getGavByFile(storagePath);
 
     if (gav == null) {
-      log.error(
-          "Maven Gav could not calculated for repo {} for file {}",
-          repoInfo.getStorageKey(),
-          fileName);
-      return null;
+      log.info(
+          "Refusing a Maven upload outside the artifact layout for repo {}: {}",
+          repoInfo.getName(),
+          storagePath.getRelativePath().getPath());
+      throw new BadRequestException("invalidArtifactPath");
     }
 
     return new MutablePair<>(

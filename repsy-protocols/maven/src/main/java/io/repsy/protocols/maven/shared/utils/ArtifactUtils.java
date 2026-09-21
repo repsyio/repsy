@@ -90,7 +90,15 @@ public class ArtifactUtils {
   @Nullable
   public static Gav convertPathToGav(final String path) {
 
-    return new M2GavCalculator().pathToGav(path);
+    try {
+      return new M2GavCalculator().pathToGav(path);
+    } catch (final RuntimeException e) {
+      // M2GavCalculator throws IndexOutOfBoundsException for a file in a snapshot directory whose
+      // name is shorter than the artifactId (com/acme/lib/1.0-SNAPSHOT/b-1.0-SNAPSHOT.jar). Such a
+      // path is not a Maven path, exactly like the ones it answers null for.
+      log.debug("No Maven GAV for {}: {}", path, e.toString());
+      return null;
+    }
   }
 
   public static @Nullable Gav getGavByFile(final StoragePath storagePath) {

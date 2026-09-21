@@ -62,6 +62,12 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     return this.mavenStorageService.getResource(repoInfo.getName(), storagePath);
   }
 
+  /**
+   * Stores a file and registers it. A path outside the Maven layout is refused inside {@code
+   * getDeployAndVersionType}, before {@code checkDeploymentRules} and {@code store}, so nothing is
+   * written and the {@code usages} context property is never set (the usage post-processor reads it
+   * only when present).
+   */
   @Override
   public void upload(
       final ProtocolContext context, final InputStream inputStream, final long contentLength)
@@ -83,10 +89,6 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       artifactPair =
           this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
               repoInfo, content, fileName);
-    }
-
-    if (artifactPair == null) {
-      return;
     }
 
     this.artifactService.checkDeploymentRules(repoInfo, artifactPair, storagePath);
