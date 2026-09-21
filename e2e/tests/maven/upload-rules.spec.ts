@@ -33,7 +33,9 @@
  *  - A path outside the Maven layout (`<group>/<artifactId>/<version>/<artifactId>-<version>[-<classifier>].<ext>`)
  *    is refused with 400 `invalidArtifactPath` and stores nothing, where it used to answer 200 and
  *    silently drop the file (RPS-1182); every file a real Maven or Gradle client sends conforms
- *    and keeps being stored.
+ *    and keeps being stored. A file of a `SNAPSHOT` directory must also carry that directory's
+ *    artifactId and base version, literal or timestamped: `lib-2.0-SNAPSHOT.jar` or
+ *    `other-1.0-SNAPSHOT.jar` in `lib/1.0-SNAPSHOT/` is refused the same way (RPS-1184).
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import {
@@ -317,6 +319,44 @@ test.describe('maven upload rules (raw HTTP)', () => {
   );
 
   test(
+    'a snapshot-directory file named for another artifact or version is refused with 400 and stores nothing (RPS-1184)',
+    { tag: ['@negative', '@snapshot'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder);
+      const snapshotDir = versionDir(layout.groupId, ARTIFACT_ID, SNAPSHOT);
+      for (const [path, body, contentType] of [
+        ...snapshotDeployFiles(layout, FIRST_BUILD),
+        artifactMetadata(layout, [SNAPSHOT]),
+      ]) {
+        expectPut(await layout.put(path, body, contentType), 200, undefined, `seed ${path}`);
+      }
+      const before = await repoTree(layout.repoName);
+      const wrong = [
+        // Another base version, literal and timestamped.
+        `${snapshotDir}/${ARTIFACT_ID}-2.0-SNAPSHOT.jar`,
+        `${snapshotDir}/${ARTIFACT_ID}-2.0-20260101.000000-1.jar`,
+        // Another artifactId, and the same one in another case.
+        `${snapshotDir}/other-1.0-SNAPSHOT.jar`,
+        `${snapshotDir}/Raw-1.0-SNAPSHOT.jar`,
+        // Not the literal marker, and not a timestamp.
+        `${snapshotDir}/${ARTIFACT_ID}-1.0-SNAPSHOTX.jar`,
+        `${snapshotDir}/${ARTIFACT_ID}-1.0-20260101-000000-1.jar`,
+      ];
+      const admin = adminCredential();
+
+      for (const path of wrong) {
+        expectPut(await layout.put(path, 'hello', OCTET), 400, 'invalidArtifactPath', path);
+      }
+      for (const path of wrong) {
+        const res = await rawGet(layout.repoName, admin, path);
+        expect(res.status, `GET ${path} answered ${res.status}`).toBe(404);
+      }
+
+      expect(await repoTree(layout.repoName)).toEqual(before);
+    },
+  );
+
+  test(
     'the files real Maven and Gradle clients send are all stored',
     { tag: ['@smoke'] },
     async ({ seeder }) => {
@@ -344,6 +384,8 @@ test.describe('maven upload rules (raw HTTP)', () => {
         [`${base}.module.sha512`, `${sha256Hex('module')}${sha256Hex('module')}`],
         [`${snapshotDir}/${ARTIFACT_ID}-1.0-20260101.000000-1.jar`, 'timestamped'],
         [`${snapshotDir}/${ARTIFACT_ID}-1.0-SNAPSHOT.jar`, 'literal snapshot'],
+        [`${snapshotDir}/${ARTIFACT_ID}-1.0-20260101.000000-1-sources.jar`, 'timestamped sources'],
+        [`${snapshotDir}/${ARTIFACT_ID}-1.0-SNAPSHOT-sources.jar`, 'literal snapshot sources'],
       ]);
 
       for (const [path, body] of files) {

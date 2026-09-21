@@ -110,7 +110,8 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    * because every rule (override, releases and snapshots, the artifact rows, the scanner) is keyed
    * on the GAV and a file without one would bypass them all. Sonatype Nexus refuses the same paths
    * with {@code 400} under its strict layout policy. A checksum of any path is not judged and comes
-   * back without a type.
+   * back without a type. A file in a {@code SNAPSHOT} directory must also carry that directory's
+   * artifactId and base version, literal or timestamped (RPS-1184).
    *
    * @throws BadRequestException {@code invalidArtifactPath} if the path does not parse to a GAV
    */

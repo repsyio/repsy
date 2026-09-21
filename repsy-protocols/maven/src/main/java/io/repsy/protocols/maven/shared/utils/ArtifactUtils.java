@@ -27,6 +27,7 @@ import java.io.InputStreamReader;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.maven.artifact.repository.metadata.Metadata;
@@ -50,6 +51,8 @@ public class ArtifactUtils {
   private static final String POM_SUFFIX = ".pom";
   private static final String SIGNED_POM_SUFFIX = ".asc";
   private static final Set<String> CHECKSUM_TYPES = Set.of(".md5", ".sha1", ".sha256", ".sha512");
+  private static final String SNAPSHOT_SUFFIX = "SNAPSHOT";
+  private static final String SNAPSHOT_MARKER = "(SNAPSHOT|\\d{8}\\.\\d{6}-\\d+)[.-]";
 
   public static boolean containsIgnoreCase(final String str, final String subString) {
 
@@ -91,7 +94,17 @@ public class ArtifactUtils {
   public static Gav convertPathToGav(final String path) {
 
     try {
-      return new M2GavCalculator().pathToGav(path);
+      final var gav = new M2GavCalculator().pathToGav(path);
+
+      if (gav == null || isSnapshotFileOfItsDirectory(path)) {
+        return gav;
+      }
+
+      log.debug(
+          "No Maven GAV for {}: the file name does not carry the artifactId and base version of"
+              + " its SNAPSHOT directory",
+          path);
+      return null;
     } catch (final RuntimeException e) {
       // M2GavCalculator throws IndexOutOfBoundsException for a file in a snapshot directory whose
       // name is shorter than the artifactId (com/acme/lib/1.0-SNAPSHOT/b-1.0-SNAPSHOT.jar). Such a
@@ -99,6 +112,51 @@ public class ArtifactUtils {
       log.debug("No Maven GAV for {}: {}", path, e.toString());
       return null;
     }
+  }
+
+  /**
+   * Tells whether a file sits in a directory it may be named for. {@code M2GavCalculator} only
+   * checks, for a directory ending with {@code SNAPSHOT}, that the {@code SNAPSHOT} marker or a
+   * {@code yyyyMMdd.HHmmss-N} timestamp sits where {@code <artifactId>-<baseVersion>-} would end;
+   * it compares neither the artifactId nor the version, so {@code lib-2.0-SNAPSHOT.jar} in {@code
+   * com/acme/lib/1.0-SNAPSHOT/} would be registered as {@code lib:1.0-SNAPSHOT}. A release
+   * directory refuses the same mistakes.
+   *
+   * <p>The rule is the one of the Maven repository layout (Maven Resolver's {@code
+   * Maven2RepositoryLayoutFactory}, Gradle and sbt write the same names): the directory is the base
+   * version and the file name starts with {@code <artifactId>-<version>}, where the version is the
+   * base version (a non-unique snapshot, the literal {@code SNAPSHOT}) or the base version with
+   * {@code SNAPSHOT} replaced by {@code <yyyyMMdd.HHmmss>-<buildNumber>} (a unique snapshot, {@code
+   * 1.0-SNAPSHOT} becomes {@code 1.0-20260921.101010-1}, {@code SNAPSHOT} becomes {@code
+   * 20260921.101010-1}). A classifier, an extension, a checksum or a signature may follow, so the
+   * raw file name is only tested as a prefix. The comparison is case-sensitive like the release
+   * one.
+   *
+   * <p>It is decided on the directory and not on {@code Gav.isSnapshot()}: for {@code
+   * lib-1.0-2026092.1010101-1.jar} the calculator answers a GAV that is not a snapshot.
+   *
+   * <p>RPS-1184.
+   *
+   * @param path A path the calculator already answered a GAV for, so it has at least four segments
+   * @return {@code true} if the directory is not a {@code SNAPSHOT} one or the file is named for it
+   */
+  private static boolean isSnapshotFileOfItsDirectory(final String path) {
+
+    final var segments = path.split("/", -1);
+    final var last = segments.length - 1;
+    final var fileName = segments[last];
+    final var version = segments[last - 1];
+    final var artifactId = segments[last - 2];
+
+    if (!version.endsWith(SNAPSHOT_SUFFIX)) {
+      return true;
+    }
+
+    final var stem = version.substring(0, version.length() - SNAPSHOT_SUFFIX.length());
+
+    return Pattern.compile(Pattern.quote(artifactId + "-" + stem) + SNAPSHOT_MARKER)
+        .matcher(fileName)
+        .lookingAt();
   }
 
   public static @Nullable Gav getGavByFile(final StoragePath storagePath) {
