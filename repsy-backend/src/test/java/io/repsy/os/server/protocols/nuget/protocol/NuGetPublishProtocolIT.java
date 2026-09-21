@@ -52,6 +52,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -160,6 +161,114 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
           entry(this.id + ".nuspec", this.nuspec()),
           entry("lib/net8.0/" + this.id + ".dll", "MZ fixture assembly for " + this.id));
     }
+  }
+
+  /**
+   * A version {@code 1.0.0} package in which every metadata value, the README and the dependencies
+   * carry {@code label}, so two pushes of it never share a value and a row built from the wrong
+   * package shows up in an assertion. {@code dependenciesXml} is a {@code <dependencies>} block or
+   * empty, and {@code withReadme} decides whether the nuspec declares a README and the archive
+   * holds it.
+   */
+  private record Labelled(String id, String label, String dependenciesXml, boolean withReadme) {
+
+    static final String VERSION = "1.0.0";
+
+    String title() {
+      return "Title " + this.label;
+    }
+
+    String authors() {
+      return "Authors " + this.label;
+    }
+
+    String description() {
+      return "Description " + this.label;
+    }
+
+    String tags() {
+      return "tags-" + this.label;
+    }
+
+    String iconUrl() {
+      return "https://example.test/" + this.label + "/icon.png";
+    }
+
+    String licenseUrl() {
+      return "https://example.test/" + this.label + "/license";
+    }
+
+    String projectUrl() {
+      return "https://example.test/" + this.label + "/project";
+    }
+
+    String repositoryUrl() {
+      return "https://github.com/repsyio/" + this.label;
+    }
+
+    String readme() {
+      return "# Readme " + this.label;
+    }
+
+    String nuspec() {
+      return """
+          <?xml version="1.0" encoding="utf-8"?>
+          <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+            <metadata>
+              <id>%1$s</id>
+              <version>%2$s</version>
+              <title>%3$s</title>
+              <authors>%4$s</authors>
+              <description>%5$s</description>
+              <tags>%6$s</tags>
+              <iconUrl>%7$s</iconUrl>
+              <licenseUrl>%8$s</licenseUrl>
+              <projectUrl>%9$s</projectUrl>
+              <repository type="git" url="%10$s" />
+              %11$s
+              %12$s
+            </metadata>
+          </package>
+          """
+          .formatted(
+              this.id,
+              VERSION,
+              this.title(),
+              this.authors(),
+              this.description(),
+              this.tags(),
+              this.iconUrl(),
+              this.licenseUrl(),
+              this.projectUrl(),
+              this.repositoryUrl(),
+              this.withReadme ? "<readme>docs/README.md</readme>" : "",
+              this.dependenciesXml);
+    }
+
+    /** A structurally real package; the README entry is there only when the nuspec declares it. */
+    byte[] nupkg() {
+      final var entries = new java.util.ArrayList<Entry>();
+      entries.add(entry("[Content_Types].xml", "<Types/>"));
+      entries.add(entry("_rels/.rels", "<Relationships/>"));
+      entries.add(entry(this.id + ".nuspec", this.nuspec()));
+      if (this.withReadme) {
+        entries.add(entry("docs/README.md", this.readme()));
+      }
+      entries.add(entry("lib/net8.0/" + this.id + ".dll", "MZ assembly of " + this.label));
+
+      return zip(entries.toArray(Entry[]::new));
+    }
+  }
+
+  private static String dependencyOn(final String id, final String range, final String framework) {
+    return """
+        <dependencies>
+          <group targetFramework="%s">
+            <dependency id="%s" version="%s" />
+          </group>
+        </dependencies>
+        """
+        .formatted(framework, id, range);
   }
 
   private record Entry(String name, byte[] content) {}
@@ -311,6 +420,55 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
             storageDirOf(repo).resolve("packages").resolve(id.toLowerCase(java.util.Locale.ROOT)))
         .doesNotExist();
     verifyNoInteractions(this.usageUpdateService);
+  }
+
+  /**
+   * The stored file of {@code pkg}'s version {@code 1.0.0}, {@code extension} being nupkg or
+   * nuspec.
+   */
+  private static java.nio.file.Path storedFile(
+      final Repo repo, final Labelled pkg, final String extension) {
+    return java.nio.file.Path.of(
+        packageDir(repo, pkg.id(), Labelled.VERSION),
+        pkg.id().toLowerCase(Locale.ROOT) + "." + Labelled.VERSION + "." + extension);
+  }
+
+  /**
+   * Asserts that the one row of {@code pkg}'s package holds {@code pkg}'s metadata and README and
+   * nothing that only the other push of the pair carries, and returns it for further assertions.
+   */
+  private NuGetPackageVersion assertMetadataOf(final Repo repo, final Labelled pkg) {
+    final var versions = this.storedVersions(repo, pkg.id());
+
+    assertThat(versions).hasSize(1);
+    final var stored = versions.getFirst();
+    assertThat(stored.getVersion()).isEqualTo(Labelled.VERSION);
+    assertThat(stored.getTitle()).isEqualTo(pkg.title());
+    assertThat(stored.getAuthors()).isEqualTo(pkg.authors());
+    assertThat(stored.getDescription()).isEqualTo(pkg.description());
+    assertThat(stored.getTags()).isEqualTo(pkg.tags());
+    assertThat(stored.getIconUrl()).isEqualTo(pkg.iconUrl());
+    assertThat(stored.getLicenseUrl()).isEqualTo(pkg.licenseUrl());
+    assertThat(stored.getProjectUrl()).isEqualTo(pkg.projectUrl());
+    assertThat(stored.getRepositoryUrl()).isEqualTo(pkg.repositoryUrl());
+    assertThat(stored.getReadme()).isEqualTo(pkg.withReadme() ? pkg.readme() : null);
+
+    return stored;
+  }
+
+  /**
+   * The dependencies of a stored version, read back through the JSON reader the API uses. That
+   * reader turns an unreadable column into an empty list, so a column that holds anything is also
+   * required to be a JSON array.
+   */
+  private static List<NuGetDependencyInfo> dependenciesOf(
+      final NuGetPackageVersion stored, final Labelled pkg) {
+    if (stored.getDependencies() != null) {
+      assertThat(stored.getDependencies()).startsWith("[");
+    }
+
+    return NuGetPackageUtils.parseDependenciesJson(
+        stored.getDependencies(), pkg.id(), stored.getVersion());
   }
 
   @Nested
@@ -1056,38 +1214,40 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
   @DisplayName("repo rules")
   class RepoRules {
 
+    /**
+     * The replacement differs from the first package in every nuspec value, the README, the
+     * dependencies and the archive, so a rejected push that still touched the row or the files
+     * would show in an assertion (RPS-1076).
+     */
     @Test
     @DisplayName("rejects a duplicate version with 409 and leaves the first push untouched")
     void rejectsDuplicate() throws Exception {
       // Repos are created with allowOverride on, so switch it off for this one.
       final var created = NuGetPublishProtocolIT.this.nugetRepo();
       final var repo = NuGetPublishProtocolIT.this.withRepoSettings(created, false, null, null);
-      final var pkg = new Pkg(uniquePackageId(), "1.0.0");
+      final var id = uniquePackageId();
+      final var first =
+          new Labelled(id, "first", dependencyOn("Newtonsoft.Json", "13.0.3", "net8.0"), true);
+      final var second =
+          new Labelled(id, "second", dependencyOn("Serilog", "3.1.1", ".NETStandard2.0"), false);
       final var token = NuGetPublishProtocolIT.this.adminProtocolBearerToken();
-      final var original = pkg.nupkg();
+      final var original = first.nupkg();
 
       assertStatus(NuGetPublishProtocolIT.this.pushAs(repo, original, token), 201);
       clearInvocations(NuGetPublishProtocolIT.this.usageUpdateService);
 
-      final var replacement =
-          zip(
-              entry(pkg.id() + ".nuspec", pkg.nuspec()),
-              entry("lib/net8.0/other.dll", "different content"));
-
       NuGetPublishProtocolIT.this
-          .protocol(push(repo, replacement, token))
+          .protocol(push(repo, second.nupkg(), token))
           .andExpect(status().isConflict())
           .andExpect(
               jsonPath("$.errors[0].message")
-                  .value("Version 1.0.0 of package " + pkg.id() + " already exists."));
+                  .value("Version 1.0.0 of package " + id + " already exists."));
 
-      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, pkg.id())).hasSize(1);
-      assertThat(
-              Files.readAllBytes(
-                  java.nio.file.Path.of(
-                      packageDir(repo, pkg.id(), "1.0.0"),
-                      pkg.id().toLowerCase() + ".1.0.0.nupkg")))
-          .isEqualTo(original);
+      final var stored = NuGetPublishProtocolIT.this.assertMetadataOf(repo, first);
+      assertThat(dependenciesOf(stored, first))
+          .containsExactly(new NuGetDependencyInfo("Newtonsoft.Json", "13.0.3", "net8.0"));
+      assertThat(Files.readAllBytes(storedFile(repo, first, "nupkg"))).isEqualTo(original);
+      assertThat(Files.readString(storedFile(repo, first, "nuspec"))).isEqualTo(first.nuspec());
       verifyNoInteractions(NuGetPublishProtocolIT.this.usageUpdateService);
     }
 
@@ -1159,6 +1319,73 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
                       packageDir(repo, pkg.id(), "1.0.0"),
                       pkg.id().toLowerCase() + ".1.0.0.nupkg")))
           .isEqualTo(replacement);
+    }
+
+    /**
+     * RPS-1013 pins the same at the service, with a hand-written nuspec. Here the second package
+     * goes through the router, the handler and the facade, which read the nuspec and the README out
+     * of the pushed {@code .nupkg}, so the row cannot be built from the first package (RPS-1076).
+     */
+    @Test
+    @DisplayName("stores the metadata, README and dependencies of the replacement package")
+    void overrideStoresTheReplacementPackageMetadata() throws Exception {
+      final var created = NuGetPublishProtocolIT.this.nugetRepo();
+      final var repo = NuGetPublishProtocolIT.this.withRepoSettings(created, true, null, null);
+      final var id = uniquePackageId();
+      final var first =
+          new Labelled(id, "first", dependencyOn("Newtonsoft.Json", "13.0.3", "net8.0"), true);
+      final var second =
+          new Labelled(id, "second", dependencyOn("Serilog", "3.1.1", ".NETStandard2.0"), true);
+      final var token = NuGetPublishProtocolIT.this.adminProtocolBearerToken();
+
+      assertStatus(NuGetPublishProtocolIT.this.pushAs(repo, first.nupkg(), token), 201);
+      NuGetPublishProtocolIT.this.assertMetadataOf(repo, first);
+
+      assertStatus(NuGetPublishProtocolIT.this.pushAs(repo, second.nupkg(), token), 201);
+
+      final var stored = NuGetPublishProtocolIT.this.assertMetadataOf(repo, second);
+      assertThat(dependenciesOf(stored, second))
+          .containsExactly(new NuGetDependencyInfo("Serilog", "3.1.1", ".NETStandard2.0"));
+      assertThat(Files.readAllBytes(storedFile(repo, second, "nupkg"))).isEqualTo(second.nupkg());
+      assertThat(Files.readString(storedFile(repo, second, "nuspec"))).isEqualTo(second.nuspec());
+
+      NuGetPublishProtocolIT.this
+          .perform(
+              get("/api/nuget/packages/{repo}/{id}/{version}", repo.getName(), id, "1.0.0")
+                  .header(AUTHORIZATION, NuGetPublishProtocolIT.this.adminBearerToken()))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.title").value(second.title()))
+          .andExpect(jsonPath("$.data.authors").value(second.authors()))
+          .andExpect(jsonPath("$.data.description").value(second.description()))
+          .andExpect(jsonPath("$.data.readme").value(second.readme()))
+          .andExpect(jsonPath("$.data.dependencies", hasSize(1)))
+          .andExpect(jsonPath("$.data.dependencies[0].packageId").value("Serilog"))
+          .andExpect(jsonPath("$.data.dependencies[0].versionRange").value("3.1.1"))
+          .andExpect(jsonPath("$.data.dependencies[0].targetFramework").value(".NETStandard2.0"));
+    }
+
+    @Test
+    @DisplayName("clears the dependencies and the README when the replacement declares none")
+    void overrideWithoutDependenciesOrReadmeClearsThem() throws Exception {
+      final var created = NuGetPublishProtocolIT.this.nugetRepo();
+      final var repo = NuGetPublishProtocolIT.this.withRepoSettings(created, true, null, null);
+      final var id = uniquePackageId();
+      final var first =
+          new Labelled(id, "first", dependencyOn("Newtonsoft.Json", "13.0.3", "net8.0"), true);
+      final var second = new Labelled(id, "second", "", false);
+      final var token = NuGetPublishProtocolIT.this.adminProtocolBearerToken();
+
+      assertStatus(NuGetPublishProtocolIT.this.pushAs(repo, first.nupkg(), token), 201);
+      assertThat(NuGetPublishProtocolIT.this.assertMetadataOf(repo, first).getDependencies())
+          .startsWith("[");
+
+      assertStatus(NuGetPublishProtocolIT.this.pushAs(repo, second.nupkg(), token), 201);
+
+      // assertMetadataOf also expects the README to be null, as the second package has none.
+      final var stored = NuGetPublishProtocolIT.this.assertMetadataOf(repo, second);
+      assertThat(stored.getDependencies()).isNull();
+      assertThat(dependenciesOf(stored, second)).isEmpty();
+      assertThat(Files.readString(storedFile(repo, second, "nuspec"))).isEqualTo(second.nuspec());
     }
 
     @Test
