@@ -68,8 +68,6 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.ResultActions;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /** Full-stack integration tests for {@code /api/pypi/packages/*}. */
 @DisplayName("PypiPackageController /api/pypi/packages/*")
@@ -79,17 +77,6 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
   @Autowired private PypiApiFacade pypiApiFacade;
   @Autowired private PypiProtocolFacadeImpl pypiProtocolFacade;
   @MockitoBean private UsageUpdateService usageUpdateService;
-
-  private static RequestPostProcessor port(final int port) {
-    return request -> {
-      request.setLocalPort(port);
-      return request;
-    };
-  }
-
-  private static MockHttpServletRequestBuilder api(final MockHttpServletRequestBuilder request) {
-    return request.with(port(API_PORT));
-  }
 
   private static String unique(final String prefix) {
     return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
@@ -223,9 +210,8 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
 
     final var packageResponse =
         body(
-            this.mockMvc
-                .perform(
-                    api(get("/api/pypi/packages/" + repo.getName() + "?page=0&size=2"))
+            this.perform(
+                    get("/api/pypi/packages/" + repo.getName() + "?page=0&size=2")
                         .header(AUTHORIZATION, token))
                 .andExpect(status().isOk()));
     assertSuccessEnvelope(packageResponse, "packagesFetched");
@@ -243,12 +229,8 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
 
     final var filteredResponse =
         body(
-            this.mockMvc
-                .perform(
-                    api(get(
-                            "/api/pypi/packages/"
-                                + repo.getName()
-                                + "?name=My_Package&page=0&size=20"))
+            this.perform(
+                    get("/api/pypi/packages/" + repo.getName() + "?name=My_Package&page=0&size=20")
                         .header(AUTHORIZATION, token))
                 .andExpect(status().isOk()));
     assertSuccessEnvelope(filteredResponse, "packagesFetched");
@@ -258,12 +240,10 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
 
     final var releasesResponse =
         body(
-            this.mockMvc
-                .perform(
-                    api(get(
-                            "/api/pypi/packages/"
-                                + repo.getName()
-                                + "/my-package/releases?version=2&page=0&size=20"))
+            this.perform(
+                    get("/api/pypi/packages/"
+                            + repo.getName()
+                            + "/my-package/releases?version=2&page=0&size=20")
                         .header(AUTHORIZATION, token))
                 .andExpect(status().isOk()));
     assertSuccessEnvelope(releasesResponse, "releasesFetched");
@@ -278,9 +258,8 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
 
     final var detailResponse =
         body(
-            this.mockMvc
-                .perform(
-                    api(get("/api/pypi/packages/" + repo.getName() + "/MY-PACKAGE/releases/2.0.0"))
+            this.perform(
+                    get("/api/pypi/packages/" + repo.getName() + "/MY-PACKAGE/releases/2.0.0")
                         .header(AUTHORIZATION, token))
                 .andExpect(status().isOk()));
     assertSuccessEnvelope(detailResponse, "releaseDetailFetched");
@@ -318,9 +297,8 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
 
     final var latestResponse =
         body(
-            this.mockMvc
-                .perform(
-                    api(get("/api/pypi/packages/" + repo.getName() + "/my_package"))
+            this.perform(
+                    get("/api/pypi/packages/" + repo.getName() + "/my_package")
                         .header(AUTHORIZATION, token))
                 .andExpect(status().isOk()));
     assertSuccessEnvelope(latestResponse, "releaseDetailFetched");
@@ -338,8 +316,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     this.upload(publicRepo, "public-package", "1.0.0", "public-package-1.0.0.tar.gz");
 
     final var privateResponse =
-        this.mockMvc
-            .perform(api(get("/api/pypi/packages/" + privateRepo.getName())))
+        this.perform(get("/api/pypi/packages/" + privateRepo.getName()))
             .andExpect(status().isUnauthorized())
             .andReturn()
             .getResponse()
@@ -347,8 +324,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     assertErrorEnvelope(privateResponse, "unAuthorized", "unAuthorized");
 
     final var publicResponse =
-        this.mockMvc
-            .perform(api(get("/api/pypi/packages/" + publicRepo.getName())))
+        this.perform(get("/api/pypi/packages/" + publicRepo.getName()))
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
@@ -356,9 +332,8 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     assertSuccessEnvelope(publicResponse, "packagesFetched");
 
     final var malformedResponse =
-        this.mockMvc
-            .perform(
-                api(get("/api/pypi/packages/" + privateRepo.getName()))
+        this.perform(
+                get("/api/pypi/packages/" + privateRepo.getName())
                     .header(AUTHORIZATION, "Bearer not-a-jwt"))
             .andExpect(status().isUnauthorized())
             .andReturn()
@@ -374,8 +349,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
 
     final var emptyResponse =
         body(
-            this.mockMvc
-                .perform(api(get("/api/pypi/packages/" + repo.getName() + "?page=0&size=2")))
+            this.perform(get("/api/pypi/packages/" + repo.getName() + "?page=0&size=2"))
                 .andExpect(status().isOk()));
     assertSuccessEnvelope(emptyResponse, "packagesFetched");
     assertThat((List<?>) JsonPath.read(emptyResponse, "$.data.content")).isEmpty();
@@ -389,8 +363,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     this.upload(repo, "page-package", "1.0.0", "page-package-1.0.0.tar.gz");
     final var pageResponse =
         body(
-            this.mockMvc
-                .perform(api(get("/api/pypi/packages/" + repo.getName() + "?page=1&size=1")))
+            this.perform(get("/api/pypi/packages/" + repo.getName() + "?page=1&size=1"))
                 .andExpect(status().isOk()));
     assertSuccessEnvelope(pageResponse, "packagesFetched");
     assertThat((List<?>) JsonPath.read(pageResponse, "$.data.content")).isEmpty();
@@ -402,8 +375,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
 
     final var noMatchResponse =
         body(
-            this.mockMvc
-                .perform(api(get("/api/pypi/packages/" + repo.getName() + "?name=does-not-exist")))
+            this.perform(get("/api/pypi/packages/" + repo.getName() + "?name=does-not-exist"))
                 .andExpect(status().isOk()));
     assertSuccessEnvelope(noMatchResponse, "packagesFetched");
     assertThat((List<?>) JsonPath.read(noMatchResponse, "$.data.content")).isEmpty();
@@ -417,23 +389,18 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     final var path = "/api/pypi/packages/" + repo.getName();
 
     final var unknownPackage =
-        body(
-            this.mockMvc
-                .perform(api(get(path + "/missing-package")))
-                .andExpect(status().isNotFound()));
+        body(this.perform(get(path + "/missing-package")).andExpect(status().isNotFound()));
     assertErrorEnvelope(unknownPackage, "packageNotFound", "packageNotFound");
 
     final var unknownRelease =
         body(
-            this.mockMvc
-                .perform(api(get(path + "/known-package/releases/9.9.9")))
+            this.perform(get(path + "/known-package/releases/9.9.9"))
                 .andExpect(status().isNotFound()));
     assertErrorEnvelope(unknownRelease, "releaseNotFound", "releaseNotFound");
 
     final var noReleaseMatch =
         body(
-            this.mockMvc
-                .perform(api(get(path + "/known-package/releases?version=9.9")))
+            this.perform(get(path + "/known-package/releases?version=9.9"))
                 .andExpect(status().isOk()));
     assertSuccessEnvelope(noReleaseMatch, "releasesFetched");
     assertThat((List<?>) JsonPath.read(noReleaseMatch, "$.data.content")).isEmpty();
@@ -449,10 +416,8 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     this.upload(repo, "delete.package", "2.0.0", "delete-package-2.0.0-py3-none-any.whl");
 
     final var releaseResponse =
-        this.mockMvc
-            .perform(
-                api(delete(
-                        "/api/pypi/packages/" + repo.getName() + "/DELETE-PACKAGE/releases/1.0.0"))
+        this.perform(
+                delete("/api/pypi/packages/" + repo.getName() + "/DELETE-PACKAGE/releases/1.0.0")
                     .header(AUTHORIZATION, token))
             .andExpect(status().isOk())
             .andReturn()
@@ -461,9 +426,8 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     assertSuccessEnvelope(releaseResponse, "packageReleaseDeleted");
 
     final var packageResponse =
-        this.mockMvc
-            .perform(
-                api(delete("/api/pypi/packages/" + repo.getName() + "/delete_package"))
+        this.perform(
+                delete("/api/pypi/packages/" + repo.getName() + "/delete_package")
                     .header(AUTHORIZATION, token))
             .andExpect(status().isOk())
             .andReturn()
@@ -472,9 +436,8 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     assertSuccessEnvelope(packageResponse, "packageDeleted");
 
     final var missingResponse =
-        this.mockMvc
-            .perform(
-                api(delete("/api/pypi/packages/" + repo.getName() + "/delete-package"))
+        this.perform(
+                delete("/api/pypi/packages/" + repo.getName() + "/delete-package")
                     .header(AUTHORIZATION, token))
             .andExpect(status().isNotFound())
             .andReturn()
@@ -496,30 +459,24 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
 
     final var readOnlyResponse =
         body(
-            this.mockMvc
-                .perform(
-                    api(delete("/api/pypi/packages/" + repo.getName() + "/keep-package"))
+            this.perform(
+                    delete("/api/pypi/packages/" + repo.getName() + "/keep-package")
                         .header(AUTHORIZATION, userToken))
                 .andExpect(status().isUnauthorized()));
     assertErrorEnvelope(readOnlyResponse, "unAuthorized", "unAuthorized");
 
     final var releaseDeleteResponse =
         body(
-            this.mockMvc
-                .perform(
-                    api(delete(
-                            "/api/pypi/packages/"
-                                + repo.getName()
-                                + "/KEEP_PACKAGE/releases/1.0.0"))
+            this.perform(
+                    delete("/api/pypi/packages/" + repo.getName() + "/KEEP_PACKAGE/releases/1.0.0")
                         .header(AUTHORIZATION, adminToken))
                 .andExpect(status().isOk()));
     assertSuccessEnvelope(releaseDeleteResponse, "packageReleaseDeleted");
 
     final var remainingResponse =
         body(
-            this.mockMvc
-                .perform(
-                    api(get("/api/pypi/packages/" + repo.getName() + "/keep.package"))
+            this.perform(
+                    get("/api/pypi/packages/" + repo.getName() + "/keep.package")
                         .header(AUTHORIZATION, adminToken))
                 .andExpect(status().isOk()));
     assertSuccessEnvelope(remainingResponse, "releaseDetailFetched");
@@ -527,9 +484,8 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
 
     final var unsupportedResponse =
         body(
-            this.mockMvc
-                .perform(
-                    api(post("/api/pypi/packages/" + repo.getName() + "/keep-package"))
+            this.perform(
+                    post("/api/pypi/packages/" + repo.getName() + "/keep-package")
                         .header(AUTHORIZATION, adminToken))
                 .andExpect(status().isNotFound()));
     assertThat(JsonPath.<Map<String, Object>>read(unsupportedResponse, "$"))
@@ -596,9 +552,8 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     private ResultActions list(
         final Seed seed, final String path, final String param, final String value)
         throws Exception {
-      return PypiPackageControllerIT.this.mockMvc.perform(
-          api(get(path, seed.repo().getName()).param(param, value))
-              .header(AUTHORIZATION, seed.token()));
+      return PypiPackageControllerIT.this.perform(
+          get(path, seed.repo().getName()).param(param, value).header(AUTHORIZATION, seed.token()));
     }
 
     @ParameterizedTest(name = "{0} sort={1}")
