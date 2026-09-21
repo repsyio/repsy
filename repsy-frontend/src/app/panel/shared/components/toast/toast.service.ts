@@ -37,8 +37,11 @@ export class ToastService {
     const toast: Toast = { id: this.nextId++, message, type };
     this.toasts.push(toast);
 
+    // RPS-1089: keep at most three toasts and evict the oldest, so the newest one (typically the
+    // latest error of a burst) stays visible. The evicted toast's timer later finds no matching id
+    // in remove() and does nothing.
     if (this.toasts.length > 3) {
-      this.toasts.pop();
+      this.toasts.shift();
     }
 
     setTimeout(() => this.remove(toast.id), duration);
