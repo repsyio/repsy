@@ -63,6 +63,9 @@ public interface ArtifactService<ID> {
    *     signature is malformed or does not match the stored file
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException {@code itemNotFound} when
    *     the signed file is not stored, or when no key server knows the key that made the signature
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException {@code
+   *     artifactVersionNotFound} when the POM is stored but its version is not registered
+   *     (RPS-1191)
    */
   void verifySignature(
       BaseRepoInfo<ID> repoInfo, StoragePath signedStoragePath, Resource signature);

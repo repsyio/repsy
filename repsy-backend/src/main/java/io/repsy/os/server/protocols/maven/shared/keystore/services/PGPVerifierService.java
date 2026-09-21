@@ -74,7 +74,17 @@ public class PGPVerifierService {
         Security.addProvider(new BouncyCastleProvider());
       }
 
-      final var signature = this.extractSignature(signatureStream);
+      final PGPSignature signature;
+      try {
+        signature = this.extractSignature(signatureStream);
+      } catch (final IOException exception) {
+        // RPS-1191: ArmoredInputException ("invalid armor", "crc check failed ..."), an invalid
+        // armor header and EOFException all mean that the bytes the client sent are not an OpenPGP
+        // signature. Only this parsing is caught: an IOException from a key server's answer or from
+        // reading the stored file is infrastructure and stays a 5xx.
+        log.warn("signature could not be parsed. Cause: {}", exception.toString());
+        throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
+      }
 
       final var publicKey =
           this.getPublicKey(signature.getKeyID(), customHosts)

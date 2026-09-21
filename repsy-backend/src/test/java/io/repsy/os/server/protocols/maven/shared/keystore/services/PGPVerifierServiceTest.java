@@ -23,13 +23,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import org.bouncycastle.bcpg.ArmoredOutputStream;
+import org.bouncycastle.bcpg.CompressionAlgorithmTags;
+import org.bouncycastle.openpgp.PGPCompressedDataGenerator;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -41,7 +48,9 @@ import reactor.core.publisher.Mono;
 /**
  * The detached-signature check of a Maven upload, with real OpenPGP signatures and a key server
  * that is an in-memory exchange function (no network). RPS-1186: a refused signature answers the
- * fixed {@code artifactSignatureNotVerified} id, not the BouncyCastle text.
+ * fixed {@code artifactSignatureNotVerified} id, not the BouncyCastle text. RPS-1191: so does a
+ * body that is not an OpenPGP signature at all (invalid armor, a bad CRC, binary garbage), which
+ * BouncyCastle reports as an {@code IOException} and which used to answer 500.
  */
 @DisplayName("PGPVerifierService")
 class PGPVerifierServiceTest {
@@ -137,6 +146,112 @@ class PGPVerifierServiceTest {
         .hasMessage(NOT_VERIFIED);
 
     assertThat(this.asked).isEmpty();
+  }
+
+  /** Asserts that the check refuses these bytes as {@code artifactSignatureNotVerified}. */
+  private void assertRefusedWithoutAskingAKeyServer(final Resource signature) {
+    assertThatThrownBy(
+            () -> this.serviceWithTheKey().verify(new ByteArrayResource(POM), signature, null))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
+
+    assertThat(this.asked).isEmpty();
+  }
+
+  /** The lines of an armored signature, without their line endings. */
+  private static List<String> armorLines(final String armored) {
+    return new ArrayList<>(List.of(armored.split("\r?\n")));
+  }
+
+  /** The index of the {@code =XXXX} CRC line of an armored block. */
+  private static int crcLineIndex(final List<String> lines) {
+    for (var i = lines.size() - 1; i >= 0; i--) {
+      if (lines.get(i).startsWith("=")) {
+        return i;
+      }
+    }
+
+    throw new IllegalStateException("no CRC line in " + lines);
+  }
+
+  @ParameterizedTest(name = "line ending {0}")
+  @ValueSource(strings = {"\n", "\r\n"})
+  @DisplayName("refuses an armor with no packet in it (RPS-1191: it used to answer 500)")
+  void refusesArmorWithoutAPacket(final String eol) {
+    this.assertRefusedWithoutAskingAKeyServer(
+        resource(
+            "-----BEGIN PGP SIGNATURE-----" + eol + eol + "-----END PGP SIGNATURE-----" + eol));
+  }
+
+  @Test
+  @DisplayName("refuses an armor with an invalid header line")
+  void refusesAnArmorWithAnInvalidHeaderLine() {
+    this.assertRefusedWithoutAskingAKeyServer(
+        resource("-----BEGIN PGP SIGNATURE-----\nabc\n\n-----END PGP SIGNATURE-----\n"));
+  }
+
+  @Test
+  @DisplayName("refuses text that is not armored at all")
+  void refusesPlainText() {
+    this.assertRefusedWithoutAskingAKeyServer(resource("hello"));
+  }
+
+  @Test
+  @DisplayName("refuses an armored signature that ends early, with the fixed id")
+  void refusesATruncatedArmoredSignature() {
+    final var lines = armorLines(keys.detachedSignature(POM));
+    final var crc = crcLineIndex(lines);
+    lines.subList(crc - 3, crc).clear();
+
+    this.assertRefusedWithoutAskingAKeyServer(resource(String.join("\n", lines) + "\n"));
+  }
+
+  @Test
+  @DisplayName("refuses an armored signature whose CRC does not match, with the fixed id")
+  void refusesACorruptedArmoredSignature() {
+    final var lines = armorLines(keys.detachedSignature(POM));
+    final var firstData = lines.indexOf("") + 1;
+    final var line = lines.get(firstData);
+    final var flipped = line.charAt(40) == 'A' ? 'B' : 'A';
+    lines.set(firstData, line.substring(0, 40) + flipped + line.substring(41));
+
+    this.assertRefusedWithoutAskingAKeyServer(resource(String.join("\n", lines) + "\n"));
+  }
+
+  @Test
+  @DisplayName("refuses binary garbage")
+  void refusesBinaryGarbage() {
+    this.assertRefusedWithoutAskingAKeyServer(new ByteArrayResource(new byte[] {-1, -1}));
+  }
+
+  @Test
+  @DisplayName("refuses an armored compressed-data packet, which holds no signature")
+  void refusesACompressedDataPacket() throws IOException {
+    // Not an IOException: this one was already a PGPException (422) before RPS-1191; pinned so that
+    // the IOException catch does not change it.
+    final var bytes = new ByteArrayOutputStream();
+
+    try (final var armored = new ArmoredOutputStream(bytes)) {
+      final var generator = new PGPCompressedDataGenerator(CompressionAlgorithmTags.ZIP);
+
+      try (final var compressed = generator.open(armored)) {
+        compressed.write(POM);
+      }
+    }
+
+    this.assertRefusedWithoutAskingAKeyServer(new ByteArrayResource(bytes.toByteArray()));
+  }
+
+  @Test
+  @DisplayName("accepts an armored signature without its CRC line, as BouncyCastle does by default")
+  void acceptsASignatureWithoutACrcLine() {
+    final var lines = armorLines(keys.detachedSignature(POM));
+    lines.remove(crcLineIndex(lines));
+    final var signature = resource(String.join("\n", lines) + "\n");
+
+    assertThatCode(
+            () -> this.serviceWithTheKey().verify(new ByteArrayResource(POM), signature, null))
+        .doesNotThrowAnyException();
   }
 
   @Test

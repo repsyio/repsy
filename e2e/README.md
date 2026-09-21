@@ -218,6 +218,11 @@ What the server does, per rule (all pinned above or in `tests/maven/upload-rules
   with no signature packet, which is refused before any key server is asked, so no network and no
   `gpg` are needed; a signature that verifies (or fails against a real key) is covered by
   `MavenPomSignatureIT` on the backend side.
+  An `.asc` that is not a signature at all (the two armor lines only, a bad CRC, binary garbage)
+  answers the same `422 artifactSignatureNotVerified` and stores nothing, where it used to be a
+  `500 errorOccurred` (RPS-1191). A `.pom.asc` of a POM that is stored but has no registered version
+  (its `<groupId>` is not its directory's, so `checkExtractedInfos` skipped it) answers
+  `404 artifactVersionNotFound` before anything is stored (RPS-1191).
 - A raw PUT must send an explicit `Content-Type`, or the body is consumed as form data and the
   server answers 400 (see the comment in `clients/maven.ts`).
 
