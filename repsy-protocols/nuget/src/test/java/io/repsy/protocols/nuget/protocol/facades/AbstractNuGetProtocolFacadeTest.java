@@ -86,9 +86,7 @@ class AbstractNuGetProtocolFacadeTest {
     final BaseRepoInfo<UUID> repoInfo = repoInfo();
     final var ctx = context("/v3/package", repoInfo);
     final var usages = BaseUsages.ofDisk(42);
-    final var packageId = UUID.randomUUID();
     when(packageService.versionExists(repoInfo, "Some.Package", "1.0.0")).thenReturn(false);
-    when(packageService.findOrCreatePackage(repoInfo, "Some.Package")).thenReturn(packageId);
     publishRunsFilesWriter(false);
     when(storageService.writePackage(
             eq(repoInfo.getStorageKey()),
@@ -106,15 +104,13 @@ class AbstractNuGetProtocolFacadeTest {
         .isEqualTo("packages/some.package/1.0.0/some.package.1.0.0.nupkg");
     assertThat(ctx.<BaseUsages>getProperty("usages")).isSameAs(usages);
     verify(packageService)
-        .publishVersion(eq(repoInfo), eq(packageId), eq("1.0.0"), any(), any(), any());
+        .publishVersion(eq(repoInfo), eq("Some.Package"), eq("1.0.0"), any(), any(), any());
   }
 
   @Test
   @DisplayName("does not touch storage when the package row cannot be written")
   void leavesStorageAloneWhenRowFails() throws IOException {
     final BaseRepoInfo<UUID> repoInfo = repoInfo();
-    final var packageId = UUID.randomUUID();
-    when(packageService.findOrCreatePackage(repoInfo, "Some.Package")).thenReturn(packageId);
     when(packageService.publishVersion(any(), any(), any(), any(), any(), any()))
         .thenThrow(new IllegalStateException("row rejected"));
 
@@ -131,8 +127,6 @@ class AbstractNuGetProtocolFacadeTest {
   void discardsPartialFilesOfNewVersion() throws IOException {
     final BaseRepoInfo<UUID> repoInfo = repoInfo();
     final var failure = new IOException("disk full");
-    when(packageService.findOrCreatePackage(repoInfo, "Some.Package"))
-        .thenReturn(UUID.randomUUID());
     publishRunsFilesWriter(false);
     when(storageService.writePackage(any(), any(), any(), any(InputStream.class), any()))
         .thenThrow(failure);
@@ -149,8 +143,6 @@ class AbstractNuGetProtocolFacadeTest {
   void keepsFilesOfReplacedVersion() throws IOException {
     final BaseRepoInfo<UUID> repoInfo = repoInfo();
     final var failure = new IOException("disk full");
-    when(packageService.findOrCreatePackage(repoInfo, "Some.Package"))
-        .thenReturn(UUID.randomUUID());
     publishRunsFilesWriter(true);
     when(storageService.writePackage(any(), any(), any(), any(InputStream.class), any()))
         .thenThrow(failure);
@@ -168,8 +160,6 @@ class AbstractNuGetProtocolFacadeTest {
     final BaseRepoInfo<UUID> repoInfo = repoInfo();
     final var failure = new IOException("disk full");
     final var cleanupFailure = new IOException("nothing to delete");
-    when(packageService.findOrCreatePackage(repoInfo, "Some.Package"))
-        .thenReturn(UUID.randomUUID());
     publishRunsFilesWriter(false);
     when(storageService.writePackage(any(), any(), any(), any(InputStream.class), any()))
         .thenThrow(failure);

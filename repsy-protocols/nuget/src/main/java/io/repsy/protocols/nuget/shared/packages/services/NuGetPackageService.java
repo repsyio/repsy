@@ -30,8 +30,6 @@ import org.springframework.data.domain.Pageable;
 @NullMarked
 public interface NuGetPackageService<ID> {
 
-  ID findOrCreatePackage(BaseRepoInfo<ID> repoInfo, String packageId);
-
   /**
    * Records the version and, while that write is still open, stores its files through {@code
    * filesWriter}.
@@ -41,11 +39,14 @@ public interface NuGetPackageService<ID> {
    * touched, so a publish that loses a race for a version cannot replace the winner's files. If the
    * files cannot be written, the row is rolled back.
    *
+   * <p>The package row of a package's first version is created in that same transaction, so a first
+   * push that fails leaves no package without versions behind.
+   *
    * @return the usages reported by {@code filesWriter}
    */
   BaseUsages publishVersion(
       BaseRepoInfo<ID> repoInfo,
-      ID pkgId,
+      String packageId,
       String version,
       String nuspecXml,
       @Nullable String readme,

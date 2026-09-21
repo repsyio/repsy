@@ -1197,15 +1197,9 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       Files.writeString(
           directory.resolve(lowerId + "." + LEGACY + ".nuspec"), new Pkg(id, LEGACY).nuspec());
 
-      final var packageId =
-          NuGetPublishProtocolIT.this
-              .nugetPackageRepository
-              .findByRepoIdAndPackageIdIgnoreCase(repo.getId(), lowerId)
-              .orElseThrow()
-              .getId();
       NuGetPublishProtocolIT.this.nugetPackageService.publishVersion(
           NuGetPublishProtocolIT.this.repoTxService.getRepoByName(repo.getName()),
-          packageId,
+          id,
           LEGACY,
           new Pkg(id, LEGACY).nuspec(),
           null,

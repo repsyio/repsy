@@ -33,6 +33,7 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
+import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -52,7 +53,10 @@ import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpMethod;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockPart;
@@ -67,6 +71,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>The version row is written first and the files second, inside one transaction. So a push whose
  * row cannot be written never touches the files, and a push whose files cannot be written leaves no
  * row (and, for a new version, no files) behind.
+ *
+ * <p>RPS-1061: the package row of a first push is written in that same transaction, so a first push
+ * that fails leaves no package without versions in the listings.
  *
  * <p>Runs without a test transaction, unlike {@link NuGetPublishProtocolIT}: a failed row write
  * aborts a PostgreSQL transaction, so inside a test transaction the state afterwards could not be
@@ -98,6 +105,7 @@ class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
   @Autowired private NuGetPackageRepository nugetPackageRepository;
   @Autowired private NuGetPackageVersionRepository nugetPackageVersionRepository;
   @Autowired private RepoTxService repoTxService;
+  @Autowired private NuGetPackageService<UUID> nugetPackageService;
 
   private final List<UUID> createdRepoIds = new ArrayList<>();
   private final List<UUID> createdUserIds = new ArrayList<>();
@@ -220,6 +228,21 @@ class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
         .orElse(0);
   }
 
+  private boolean packageRowExists(final Repo repo, final String id) {
+    return this.nugetPackageRepository
+        .findByRepoIdAndPackageIdIgnoreCase(repo.getId(), id.toLowerCase(Locale.ROOT))
+        .isPresent();
+  }
+
+  /** What a client sees of the repo's packages: the search, the panel list and the autocomplete. */
+  private void assertNoPackageListed(final Repo repo, final String id) {
+    final var repoInfo = this.repoTxService.getRepoByName(repo.getName());
+
+    assertThat(this.nugetPackageService.searchPage(repoInfo, id, PageRequest.of(0, 20), true))
+        .isEmpty();
+    assertThat(this.nugetPackageService.autocomplete(repoInfo, id, 0, 20, true)).isEmpty();
+  }
+
   /** Writes the files like the real service, then fails, as a storage that dies mid-push would. */
   private void failAfterWritingFiles() throws IOException {
     doAnswer(
@@ -245,6 +268,8 @@ class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
         .as("a rejection that is not a duplicate version is a server error, not a 409 (RPS-1005)")
         .isEqualTo(500);
     assertThat(this.storedVersionCount(repo, id)).isZero();
+    assertThat(this.packageRowExists(repo, id)).as("no package without versions").isFalse();
+    this.assertNoPackageListed(repo, id);
     assertThat(versionDir(repo, id, "1.0.0")).doesNotExist();
     verifyNoInteractions(this.usageUpdateService);
   }
@@ -336,8 +361,98 @@ class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
 
     assertThat(response.getStatus()).isEqualTo(500);
     assertThat(this.storedVersionCount(repo, id)).isZero();
+    assertThat(this.packageRowExists(repo, id)).as("no package without versions").isFalse();
+    this.assertNoPackageListed(repo, id);
     assertThat(versionDir(repo, id, "1.0.0")).doesNotExist();
     verifyNoInteractions(this.usageUpdateService);
+  }
+
+  @Test
+  @DisplayName("a push after a failed first push creates the package and lists it")
+  void retryAfterFailedFirstPushPublishes() throws Exception {
+    final var repo = this.nugetRepo(false);
+    final var id = uniquePackageId();
+    final var token = this.adminToken();
+    this.failAfterWritingFiles();
+
+    assertThat(this.push(repo, nupkg(id, "1.0.0", "first", "half stored"), token).getStatus())
+        .isEqualTo(500);
+    assertThat(this.packageRowExists(repo, id)).isFalse();
+    Mockito.reset(this.nugetStorageService);
+
+    final var retry = this.push(repo, nupkg(id, "1.0.0", "retry", "stored"), token);
+
+    assertThat(retry.getStatus()).isEqualTo(201);
+    assertThat(this.packageRowExists(repo, id)).isTrue();
+    assertThat(this.storedVersionCount(repo, id)).isEqualTo(1);
+    assertThat(
+            this.nugetPackageService.searchPage(
+                this.repoTxService.getRepoByName(repo.getName()), id, PageRequest.of(0, 20), true))
+        .hasSize(1);
+  }
+
+  @Test
+  @DisplayName("a failed push of a further version keeps the package and its other versions")
+  void failedPushOfFurtherVersionKeepsThePackage() throws Exception {
+    final var repo = this.nugetRepo(false);
+    final var id = uniquePackageId();
+    final var token = this.adminToken();
+    assertThat(this.push(repo, nupkg(id, "1.0.0", "first", "stored"), token).getStatus())
+        .isEqualTo(201);
+    this.failAfterWritingFiles();
+
+    assertThat(this.push(repo, nupkg(id, "2.0.0", "second", "half stored"), token).getStatus())
+        .isEqualTo(500);
+
+    assertThat(this.packageRowExists(repo, id)).isTrue();
+    assertThat(this.storedVersionCount(repo, id)).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("two first pushes of different versions of a package end up in one package row")
+  void concurrentFirstPushesShareOnePackageRow() throws Exception {
+    final var repo = this.nugetRepo(false);
+    final var id = uniquePackageId();
+    final var token = this.adminToken();
+
+    // Holds the first push inside the storage write, so its package row is uncommitted when the
+    // second push reaches its own insert of that package and has to wait for it.
+    final var firstWriting = new CountDownLatch(1);
+    final var releaseFirst = new CountDownLatch(1);
+    doAnswer(
+            invocation -> {
+              firstWriting.countDown();
+              releaseFirst.await(30, TimeUnit.SECONDS);
+              return invocation.callRealMethod();
+            })
+        .doAnswer(InvocationOnMock::callRealMethod)
+        .when(this.nugetStorageService)
+        .writePackage(any(), any(), any(), any(), any());
+
+    final var executor = Executors.newFixedThreadPool(2);
+    try {
+      final var first = executor.submit(() -> this.push(repo, nupkg(id, "1.0.0", "a", "a"), token));
+      assertThat(firstWriting.await(30, TimeUnit.SECONDS)).isTrue();
+
+      final var second =
+          executor.submit(() -> this.push(repo, nupkg(id, "2.0.0", "b", "b"), token));
+      TimeUnit.MILLISECONDS.sleep(500);
+      releaseFirst.countDown();
+
+      assertThat(first.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(201);
+      assertThat(second.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(201);
+    } finally {
+      releaseFirst.countDown();
+      executor.shutdownNow();
+    }
+
+    assertThat(this.storedVersionCount(repo, id)).isEqualTo(2);
+    assertThat(
+            this.jdbcTemplate.queryForObject(
+                "select count(*) from nuget_package where repo_id = ?",
+                Integer.class,
+                repo.getId()))
+        .isEqualTo(1);
   }
 
   @Test

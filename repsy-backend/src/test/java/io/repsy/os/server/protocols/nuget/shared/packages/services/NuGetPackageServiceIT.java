@@ -20,16 +20,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.AbstractIntegrationTest;
-import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
-import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -37,7 +35,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -61,7 +58,6 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
   private static final String NO_DEPENDENCIES = "";
 
   @Autowired private NuGetPackageService<UUID> packageService;
-  @Autowired private NuGetPackageRepository packageRepository;
   @Autowired private RepoTxService repoTxService;
 
   private RepoInfo seedNuGetRepo() {
@@ -69,42 +65,30 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
     return this.repoTxService.getRepoByName(repo.getName());
   }
 
-  @Test
-  @DisplayName("propagates non-duplicate integrity violations from package creation")
-  void propagatesNonDuplicateIntegrityViolation() {
-    final var repoInfo = this.seedNuGetRepo();
-
-    assertThatThrownBy(() -> this.packageService.findOrCreatePackage(repoInfo, PACKAGE_ID))
-        .isInstanceOf(DataIntegrityViolationException.class);
+  private List<UUID> packageRowIds(final RepoInfo repoInfo, final String packageId) {
+    return this.jdbcTemplate.queryForList(
+        """
+        select "id" from "public"."nuget_package" where "repo_id" = ? and "package_id" = ?
+        """,
+        UUID.class,
+        repoInfo.getId(),
+        packageId.toLowerCase(Locale.ROOT));
   }
 
-  /**
-   * Creates the package row directly. {@code findOrCreatePackage} writes it in a {@code
-   * REQUIRES_NEW} transaction, which cannot see this test's uncommitted repo row.
-   */
-  private UUID createPackage(final RepoInfo repoInfo) {
-    final var pkg = new NuGetPackage();
-    pkg.setRepo(this.entityManager.getReference(Repo.class, repoInfo.getId()));
-    pkg.setPackageId(PACKAGE_ID.toLowerCase(Locale.ROOT));
-    final var saved = this.packageRepository.save(pkg);
-    this.entityManager.flush();
-    return saved.getId();
+  /** The row {@link NuGetPackageService#publishVersion} created for {@link #PACKAGE_ID}. */
+  private UUID packageRowId(final RepoInfo repoInfo) {
+    return this.packageRowIds(repoInfo, PACKAGE_ID).getFirst();
+  }
+
+  private void publish(final RepoInfo repoInfo, final String version, final String nuspec) {
+    this.publish(repoInfo, version, nuspec, null);
   }
 
   private void publish(
-      final RepoInfo repoInfo, final UUID packageId, final String version, final String nuspec) {
-    this.publish(repoInfo, packageId, version, nuspec, null);
-  }
-
-  private void publish(
-      final RepoInfo repoInfo,
-      final UUID packageId,
-      final String version,
-      final String nuspec,
-      final String readme) {
+      final RepoInfo repoInfo, final String version, final String nuspec, final String readme) {
     try {
       this.packageService.publishVersion(
-          repoInfo, packageId, version, nuspec, readme, replacesExisting -> BaseUsages.ofDisk(0));
+          repoInfo, PACKAGE_ID, version, nuspec, readme, replacesExisting -> BaseUsages.ofDisk(0));
     } catch (final IOException e) {
       throw new UncheckedIOException(e);
     }
@@ -133,7 +117,7 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
         .formatted(version, dependenciesXml);
   }
 
-  private Map<String, Object> dependenciesColumn(final UUID packageId, final String version) {
+  private Map<String, Object> dependenciesColumn(final RepoInfo repoInfo, final String version) {
     return this.jdbcTemplate.queryForMap(
         """
         select jsonb_typeof("dependencies") as json_type,
@@ -142,19 +126,55 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
         from "public"."nuget_package_version"
         where "package_id" = ? and "version" = ?
         """,
-        packageId,
+        this.packageRowId(repoInfo),
         version);
+  }
+
+  @Test
+  @DisplayName("creates the package row with its first version and reuses it for the next")
+  void createsThePackageWithItsFirstVersion() {
+    final var repoInfo = this.seedNuGetRepo();
+    assertThat(this.packageRowIds(repoInfo, PACKAGE_ID)).isEmpty();
+
+    this.publish(repoInfo, "1.0.0", nuspec("1.0.0", NO_DEPENDENCIES));
+    final var created = this.packageRowIds(repoInfo, PACKAGE_ID);
+    this.publish(repoInfo, "2.0.0", nuspec("2.0.0", NO_DEPENDENCIES));
+
+    assertThat(created).hasSize(1);
+    assertThat(this.packageRowIds(repoInfo, PACKAGE_ID)).isEqualTo(created);
+    assertThat(this.packageService.getVersions(repoInfo, PACKAGE_ID))
+        .containsExactlyInAnyOrder("1.0.0", "2.0.0");
+  }
+
+  @Test
+  @DisplayName("matches the package id case-insensitively and stores it lower-cased")
+  void packageIdIsCaseInsensitive() {
+    final var repoInfo = this.seedNuGetRepo();
+
+    this.publish(repoInfo, "1.0.0", nuspec("1.0.0", NO_DEPENDENCIES));
+    try {
+      this.packageService.publishVersion(
+          repoInfo,
+          "FIXTURE.PACKAGE",
+          "2.0.0",
+          nuspec("2.0.0", NO_DEPENDENCIES),
+          null,
+          replacesExisting -> BaseUsages.ofDisk(0));
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
+
+    assertThat(this.packageRowIds(repoInfo, PACKAGE_ID)).hasSize(1);
+    assertThat(this.packageService.getVersions(repoInfo, PACKAGE_ID)).hasSize(2);
   }
 
   @Test
   @DisplayName("stores grouped dependencies as a jsonb array and reads them back")
   void storesGroupedDependenciesAsJsonbArray() {
     final var repoInfo = this.seedNuGetRepo();
-    final var packageId = this.createPackage(repoInfo);
 
     this.publish(
         repoInfo,
-        packageId,
         "1.2.3",
         nuspec(
             "1.2.3",
@@ -170,7 +190,7 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
             </dependencies>
             """));
 
-    final var column = this.dependenciesColumn(packageId, "1.2.3");
+    final var column = this.dependenciesColumn(repoInfo, "1.2.3");
     assertThat(column)
         .containsEntry("json_type", "array")
         .containsEntry("json_length", 3)
@@ -193,11 +213,9 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
   @DisplayName("stores flat, ungrouped dependencies without a target framework")
   void storesFlatDependencies() {
     final var repoInfo = this.seedNuGetRepo();
-    final var packageId = this.createPackage(repoInfo);
 
     this.publish(
         repoInfo,
-        packageId,
         "2.0.0",
         nuspec(
             "2.0.0",
@@ -207,7 +225,7 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
             </dependencies>
             """));
 
-    assertThat(this.dependenciesColumn(packageId, "2.0.0"))
+    assertThat(this.dependenciesColumn(repoInfo, "2.0.0"))
         .containsEntry("json_type", "array")
         .containsEntry("json_length", 1);
 
@@ -222,11 +240,10 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
   @DisplayName("stores SQL NULL and returns no dependencies when the nuspec declares none")
   void storesNullWhenNoDependencies() {
     final var repoInfo = this.seedNuGetRepo();
-    final var packageId = this.createPackage(repoInfo);
 
-    this.publish(repoInfo, packageId, "3.0.0", nuspec("3.0.0", ""));
+    this.publish(repoInfo, "3.0.0", nuspec("3.0.0", ""));
 
-    assertThat(this.dependenciesColumn(packageId, "3.0.0")).containsEntry("json_type", null);
+    assertThat(this.dependenciesColumn(repoInfo, "3.0.0")).containsEntry("json_type", null);
 
     final var info = this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, "3.0.0");
 
@@ -238,15 +255,13 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
   @DisplayName("stores SQL NULL for a bare nuspec that declares only an id and a version")
   void storesNullForBareNuspec() {
     final var repoInfo = this.seedNuGetRepo();
-    final var packageId = this.createPackage(repoInfo);
 
     this.publish(
         repoInfo,
-        packageId,
         "3.1.0",
         "<package><metadata><id>Fixture.Package</id><version>3.1.0</version></metadata></package>");
 
-    assertThat(this.dependenciesColumn(packageId, "3.1.0")).containsEntry("json_type", null);
+    assertThat(this.dependenciesColumn(repoInfo, "3.1.0")).containsEntry("json_type", null);
 
     final var info = this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, "3.1.0");
 
@@ -258,11 +273,9 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
   @DisplayName("persists version metadata alongside dependencies")
   void persistsVersionMetadata() {
     final var repoInfo = this.seedNuGetRepo();
-    final var packageId = this.createPackage(repoInfo);
 
     this.publish(
         repoInfo,
-        packageId,
         "4.0.0-beta.1",
         nuspec(
             "4.0.0-beta.1",
@@ -298,7 +311,7 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
                 where "package_id" = ? and "version" = ?
                 """,
                 Boolean.class,
-                packageId,
+                this.packageRowId(repoInfo),
                 "4.0.0-beta.1"))
         .isTrue();
   }
@@ -307,11 +320,9 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
   @DisplayName("stores the repository URL and README and returns them with the version detail")
   void storesRepositoryUrlAndReadme() {
     final var repoInfo = this.seedNuGetRepo();
-    final var packageId = this.createPackage(repoInfo);
 
     this.publish(
         repoInfo,
-        packageId,
         "5.0.0",
         nuspec(
             "5.0.0",
@@ -332,11 +343,9 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
   @DisplayName("keeps the README out of the version list but still returns the repository URL")
   void versionListOmitsReadme() {
     final var repoInfo = this.seedNuGetRepo();
-    final var packageId = this.createPackage(repoInfo);
 
     this.publish(
         repoInfo,
-        packageId,
         "5.1.0",
         nuspec("5.1.0", "<repository type=\"git\" url=\"https://github.com/repsyio/fixture\" />"),
         "# Fixture");
@@ -354,9 +363,8 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
   @DisplayName("leaves the repository URL and README empty when the nuspec declares neither")
   void repositoryUrlAndReadmeAreOptional() {
     final var repoInfo = this.seedNuGetRepo();
-    final var packageId = this.createPackage(repoInfo);
 
-    this.publish(repoInfo, packageId, "5.2.0", nuspec("5.2.0", ""));
+    this.publish(repoInfo, "5.2.0", nuspec("5.2.0", ""));
 
     final var info = this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, "5.2.0");
 
@@ -416,12 +424,8 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
 
   /** Publishes {@link #VERSION} with a nuspec and README that are all {@code label}'s. */
   private void publishLabelled(
-      final RepoInfo repoInfo,
-      final UUID packageId,
-      final String label,
-      final String dependenciesXml) {
-    this.publish(
-        repoInfo, packageId, VERSION, labelledNuspec(label, dependenciesXml), readmeOf(label));
+      final RepoInfo repoInfo, final String label, final String dependenciesXml) {
+    this.publish(repoInfo, VERSION, labelledNuspec(label, dependenciesXml), readmeOf(label));
   }
 
   /** A NuGet repo that rejects a republish of an existing version. */
@@ -436,14 +440,14 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
     return repoInfo;
   }
 
-  private Integer versionRows(final UUID packageId, final String version) {
+  private Integer versionRows(final RepoInfo repoInfo, final String version) {
     return this.jdbcTemplate.queryForObject(
         """
         select count(*) from "public"."nuget_package_version"
         where "package_id" = ? and "version" = ?
         """,
         Integer.class,
-        packageId,
+        this.packageRowId(repoInfo),
         version);
   }
 
@@ -467,12 +471,11 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
   @DisplayName("replaces the metadata and the README with the override's")
   void overrideReplacesMetadata() {
     final var repoInfo = this.seedNuGetRepo();
-    final var packageId = this.createPackage(repoInfo);
 
-    this.publishLabelled(repoInfo, packageId, "first", NO_DEPENDENCIES);
+    this.publishLabelled(repoInfo, "first", NO_DEPENDENCIES);
     this.assertMetadataOf(repoInfo, "first");
 
-    this.publishLabelled(repoInfo, packageId, "second", NO_DEPENDENCIES);
+    this.publishLabelled(repoInfo, "second", NO_DEPENDENCIES);
 
     this.assertMetadataOf(repoInfo, "second");
   }
@@ -481,18 +484,16 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
   @DisplayName("replaces the dependencies with the override's, in the column and on the read side")
   void overrideReplacesDependencies() {
     final var repoInfo = this.seedNuGetRepo();
-    final var packageId = this.createPackage(repoInfo);
 
     this.publishLabelled(
-        repoInfo, packageId, "first", dependencyOn("Newtonsoft.Json", "[13.0.1, )", "net8.0"));
-    assertThat(this.dependenciesColumn(packageId, VERSION))
+        repoInfo, "first", dependencyOn("Newtonsoft.Json", "[13.0.1, )", "net8.0"));
+    assertThat(this.dependenciesColumn(repoInfo, VERSION))
         .containsEntry("json_type", "array")
         .containsEntry("json_length", 1);
 
-    this.publishLabelled(
-        repoInfo, packageId, "second", dependencyOn("Serilog", "3.1.1", ".NETStandard2.0"));
+    this.publishLabelled(repoInfo, "second", dependencyOn("Serilog", "3.1.1", ".NETStandard2.0"));
 
-    final var column = this.dependenciesColumn(packageId, VERSION);
+    final var column = this.dependenciesColumn(repoInfo, VERSION);
     assertThat(column)
         .containsEntry("json_type", "array")
         .containsEntry("json_length", 1)
@@ -511,16 +512,15 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
   @DisplayName("turns the dependencies column into SQL NULL when the override declares none")
   void overrideWithoutDependenciesClearsTheColumn() {
     final var repoInfo = this.seedNuGetRepo();
-    final var packageId = this.createPackage(repoInfo);
 
     this.publishLabelled(
-        repoInfo, packageId, "first", dependencyOn("Newtonsoft.Json", "[13.0.1, )", "net8.0"));
-    assertThat(this.dependenciesColumn(packageId, VERSION)).containsEntry("json_type", "array");
+        repoInfo, "first", dependencyOn("Newtonsoft.Json", "[13.0.1, )", "net8.0"));
+    assertThat(this.dependenciesColumn(repoInfo, VERSION)).containsEntry("json_type", "array");
 
-    this.publishLabelled(repoInfo, packageId, "second", NO_DEPENDENCIES);
+    this.publishLabelled(repoInfo, "second", NO_DEPENDENCIES);
 
     // json_type is null for a SQL NULL, but 'null' for a jsonb null scalar and 'array' for '[]'.
-    assertThat(this.dependenciesColumn(packageId, VERSION)).containsEntry("json_type", null);
+    assertThat(this.dependenciesColumn(repoInfo, VERSION)).containsEntry("json_type", null);
     final var info = this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, VERSION);
     assertThat(info).isPresent();
     assertThat(info.get().dependencies()).isNull();
@@ -531,20 +531,19 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
   @DisplayName("leaves one row for the version, however often it is overridden, and no other")
   void overrideLeavesOneRow() {
     final var repoInfo = this.seedNuGetRepo();
-    final var packageId = this.createPackage(repoInfo);
-    this.publish(repoInfo, packageId, "2.0.0", nuspec("2.0.0", NO_DEPENDENCIES));
+    this.publish(repoInfo, "2.0.0", nuspec("2.0.0", NO_DEPENDENCIES));
 
-    this.publishLabelled(repoInfo, packageId, "first", NO_DEPENDENCIES);
-    assertThat(this.versionRows(packageId, VERSION)).isEqualTo(1);
+    this.publishLabelled(repoInfo, "first", NO_DEPENDENCIES);
+    assertThat(this.versionRows(repoInfo, VERSION)).isEqualTo(1);
 
-    this.publishLabelled(repoInfo, packageId, "second", NO_DEPENDENCIES);
-    this.publishLabelled(repoInfo, packageId, "third", NO_DEPENDENCIES);
+    this.publishLabelled(repoInfo, "second", NO_DEPENDENCIES);
+    this.publishLabelled(repoInfo, "third", NO_DEPENDENCIES);
 
-    assertThat(this.versionRows(packageId, VERSION)).isEqualTo(1);
+    assertThat(this.versionRows(repoInfo, VERSION)).isEqualTo(1);
     this.assertMetadataOf(repoInfo, "third");
 
     // Another version of the same package is not touched by the override.
-    assertThat(this.versionRows(packageId, "2.0.0")).isEqualTo(1);
+    assertThat(this.versionRows(repoInfo, "2.0.0")).isEqualTo(1);
     assertThat(this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, "2.0.0"))
         .get()
         .satisfies(v -> assertThat(v.title()).isEqualTo("Fixture Package"));
@@ -561,9 +560,8 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
   @DisplayName("starts the override at zero downloads and listed, as a new publish does")
   void overrideResetsDownloadCountAndListing() {
     final var repoInfo = this.seedNuGetRepo();
-    final var packageId = this.createPackage(repoInfo);
 
-    this.publishLabelled(repoInfo, packageId, "first", NO_DEPENDENCIES);
+    this.publishLabelled(repoInfo, "first", NO_DEPENDENCIES);
     // Flush and clear between the calls: incrementDownloadCount is a bulk update, so an entity
     // that unlistVersion still had in the persistence context would write the old count back.
     this.packageService.unlistVersion(repoInfo, PACKAGE_ID, VERSION);
@@ -582,7 +580,7 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
               assertThat(v.listed()).isFalse();
             });
 
-    this.publishLabelled(repoInfo, packageId, "second", NO_DEPENDENCIES);
+    this.publishLabelled(repoInfo, "second", NO_DEPENDENCIES);
 
     assertThat(this.packageService.findVersionInfo(repoInfo, PACKAGE_ID, VERSION))
         .get()
@@ -598,9 +596,8 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
       "answers 409 to a republish when overrides are off and keeps the first publish's row")
   void rejectedRepublishLeavesTheRowUnchanged() {
     final var repoInfo = this.seedNuGetRepoRejectingOverride();
-    final var packageId = this.createPackage(repoInfo);
     this.publishLabelled(
-        repoInfo, packageId, "first", dependencyOn("Newtonsoft.Json", "[13.0.1, )", "net8.0"));
+        repoInfo, "first", dependencyOn("Newtonsoft.Json", "[13.0.1, )", "net8.0"));
 
     // The second nuspec declares no dependencies, so a row that had been rewritten would lose them.
     final var filesWritten = new AtomicBoolean();
@@ -608,7 +605,7 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
             () ->
                 this.packageService.publishVersion(
                     repoInfo,
-                    packageId,
+                    PACKAGE_ID,
                     VERSION,
                     labelledNuspec("second", NO_DEPENDENCIES),
                     readmeOf("second"),
@@ -626,9 +623,9 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
 
     assertThat(filesWritten).isFalse();
     this.entityManager.clear();
-    assertThat(this.versionRows(packageId, VERSION)).isEqualTo(1);
+    assertThat(this.versionRows(repoInfo, VERSION)).isEqualTo(1);
     this.assertMetadataOf(repoInfo, "first");
-    assertThat(this.dependenciesColumn(packageId, VERSION))
+    assertThat(this.dependenciesColumn(repoInfo, VERSION))
         .containsEntry("json_type", "array")
         .containsEntry("json_length", 1)
         .extractingByKey("json_text")
