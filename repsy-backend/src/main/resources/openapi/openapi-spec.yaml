@@ -685,7 +685,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseString"
-      summary: Create a one-minute token that only authorizes downloading the given path of a Maven repository
+      summary: Create a one-minute token that only authorizes downloading the given path of a repository
     parameters:
       - name: repoName
         in: path
@@ -848,7 +848,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
-      summary: Delete a repository
+      summary: Delete a PyPI package
     parameters:
       - name: repoName
         in: path
@@ -1230,7 +1230,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelPackageVersionListItem"
-      summary: List versions of a Maven artifact
+      summary: List versions of an npm package
     parameters:
       - name: repoName
         in: path
@@ -1771,7 +1771,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelGoModuleListItem"
-      summary: List crates in a Cargo repository
+      summary: List Go modules in a repository
     delete:
       tags:
         - golang-module-controller
@@ -1950,7 +1950,7 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/RestResponsePagedModelImageListItem"
-      summary: List Go modules in a repository
+      summary: List Docker images in a repository
     parameters:
       - name: repoName
         in: path
