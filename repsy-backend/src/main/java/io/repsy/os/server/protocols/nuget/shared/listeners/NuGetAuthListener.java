@@ -16,7 +16,7 @@
 package io.repsy.os.server.protocols.nuget.shared.listeners;
 
 import io.repsy.core.events.UserCreatedEvent;
-import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.os.shared.repo.services.DefaultRepoSeeder;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.UUID;
@@ -30,18 +30,15 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 @NullMarked
 public class NuGetAuthListener {
-
   private static final String NUGET_REPO_NAME = "nuget";
 
-  private final RepoTxService repoTxService;
+  private final DefaultRepoSeeder defaultRepoSeeder;
   private final NuGetStorageService nuGetStorageService;
 
   @Async
   @EventListener
   public void onRegistrationCompleted(final UserCreatedEvent<UUID> ignoredEvent) {
-
-    final var repoInfo = this.repoTxService.createRepo(NUGET_REPO_NAME, RepoType.NUGET, true, null);
-
-    this.nuGetStorageService.createRepo(repoInfo.getId());
+    this.defaultRepoSeeder.seed(
+        NUGET_REPO_NAME, RepoType.NUGET, this.nuGetStorageService::createRepo);
   }
 }

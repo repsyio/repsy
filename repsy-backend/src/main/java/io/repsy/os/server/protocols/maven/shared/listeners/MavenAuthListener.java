@@ -17,28 +17,28 @@ package io.repsy.os.server.protocols.maven.shared.listeners;
 
 import io.repsy.core.events.UserCreatedEvent;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
-import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.os.shared.repo.services.DefaultRepoSeeder;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@NullMarked
 public class MavenAuthListener {
-  private static final @NonNull String MAVEN_REPO_NAME = "maven";
+  private static final String MAVEN_REPO_NAME = "maven";
 
-  private final @NonNull RepoTxService repoTxService;
-  private final @NonNull MavenStorageService mavenStorageService;
+  private final DefaultRepoSeeder defaultRepoSeeder;
+  private final MavenStorageService mavenStorageService;
 
   @Async
   @EventListener
-  public void onRegistrationCompleted(final @NonNull UserCreatedEvent<UUID> ignoredEvent) {
-    final var repoInfo = this.repoTxService.createRepo(MAVEN_REPO_NAME, RepoType.MAVEN, true, null);
-
-    this.mavenStorageService.createRepo(repoInfo.getStorageKey());
+  public void onRegistrationCompleted(final UserCreatedEvent<UUID> ignoredEvent) {
+    this.defaultRepoSeeder.seed(
+        MAVEN_REPO_NAME, RepoType.MAVEN, this.mavenStorageService::createRepo);
   }
 }

@@ -23,11 +23,11 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.events.UserCreatedEvent;
 import io.repsy.os.RepsyApplication;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.DefaultRepoSeeder;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -35,6 +35,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -46,7 +47,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.LoggerFactory;
-import org.springframework.aop.interceptor.SimpleAsyncUncaughtExceptionHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -54,6 +54,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.util.FileSystemUtils;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -61,7 +62,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 /**
  * Pins what the {@code @Async} per-protocol {@code *AuthListener}s do when a {@code
  * UserCreatedEvent} is published: one default repository per {@link RepoType}, private, without
- * usage and with its storage directory created, and a repeated event changing none of that.
+ * usage and with its storage directory created, and a repeated event changing none of that, failing
+ * no listener, and repairing a repository whose storage directory is missing (RPS-1070).
  *
  * <p>Since every {@code AbstractIntegrationTest} class shares one PostgreSQL database (RPS-941),
  * the default repositories already exist there and repo names are unique ({@code ux_repo__name}),
@@ -85,6 +87,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class DefaultRepoSeedingIT {
 
   private static final Duration ASYNC_TIMEOUT = Duration.ofSeconds(30);
+  private static final Duration NO_FAILURE_WINDOW = Duration.ofSeconds(2);
   private static final int TYPE_COUNT = RepoType.values().length;
 
   /** The name each protocol's listener gives its default repository. */
@@ -107,8 +110,11 @@ class DefaultRepoSeedingIT {
   @Autowired private RepoRepository repoRepository;
   @Autowired private ApplicationEventPublisher eventPublisher;
 
-  private final ListAppender<ILoggingEvent> asyncFailures = new ListAppender<>();
-  private Logger asyncFailureLogger;
+  /** Everything logged while a test runs; async listener failures are ERROR events of the root. */
+  private final ListAppender<ILoggingEvent> logged = new ListAppender<>();
+
+  private Logger rootLogger;
+  private Logger seederLogger;
 
   @BeforeEach
   void startFromFreshlySeededEmptyTable() {
@@ -118,19 +124,23 @@ class DefaultRepoSeedingIT {
     this.repoRepository.deleteAllInBatch();
     assertThat(this.repoRepository.count()).isZero();
 
-    this.asyncFailureLogger =
-        (Logger) LoggerFactory.getLogger(SimpleAsyncUncaughtExceptionHandler.class);
-    this.asyncFailures.start();
-    this.asyncFailureLogger.addAppender(this.asyncFailures);
+    this.rootLogger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+    this.seederLogger = (Logger) LoggerFactory.getLogger(DefaultRepoSeeder.class);
+    // The "already exists" line is how a test knows that a repeated event reached a listener.
+    this.seederLogger.setLevel(Level.DEBUG);
+    this.logged.start();
+    this.rootLogger.addAppender(this.logged);
 
     this.publishUserCreated();
     this.awaitRepoCount(TYPE_COUNT);
+    this.awaitAllStorageDirs();
   }
 
   @AfterEach
   void detachAppender() {
-    this.asyncFailureLogger.detachAppender(this.asyncFailures);
-    this.asyncFailures.stop();
+    this.rootLogger.detachAppender(this.logged);
+    this.logged.stop();
+    this.seederLogger.setLevel(null);
   }
 
   private static Map<RepoType, String> defaultNames() {
@@ -163,6 +173,15 @@ class DefaultRepoSeedingIT {
     await()
         .atMost(ASYNC_TIMEOUT)
         .untilAsserted(() -> assertThat(this.repoRepository.count()).isEqualTo(expected));
+  }
+
+  private void awaitAllStorageDirs() {
+    await()
+        .atMost(ASYNC_TIMEOUT)
+        .untilAsserted(
+            () ->
+                assertThat(this.repoRepository.findAll())
+                    .allSatisfy(repo -> assertThat(storageDirOf(repo)).isDirectory()));
   }
 
   private Repo defaultRepoOf(final RepoType type) {
@@ -210,35 +229,125 @@ class DefaultRepoSeedingIT {
   }
 
   @Test
-  @DisplayName("a repeated event neither duplicates nor changes the existing repositories")
+  @DisplayName("a repeated event neither duplicates nor changes the repositories, nor fails")
   void repeatedEventIsHarmless() {
-    final var before =
-        this.repoRepository.findAll().stream().collect(Collectors.toMap(Repo::getId, repo -> repo));
+    final var before = this.snapshotOfRepos();
 
     assertThatCode(this::publishUserCreated).doesNotThrowAnyException();
 
-    // The listeners run asynchronously and a failure only shows up in the log, so wait for each of
-    // them to have reported one instead of sleeping.
+    // The listeners run asynchronously and log a failure instead of throwing it, so wait until each
+    // of them has seen its repo, then keep watching for a failure that arrives late.
+    this.awaitEveryListenerFoundItsRepo();
+    this.assertNoErrorLogged();
+
+    this.assertReposUnchanged(before);
+    this.awaitAllStorageDirs();
+  }
+
+  @Test
+  @DisplayName("a burst of repeated events neither duplicates the repositories nor fails")
+  void repeatedEventsInParallelAreHarmless() {
+    final var before = this.snapshotOfRepos();
+
+    for (var i = 0; i < 3; i++) {
+      this.publishUserCreated();
+    }
+
     await()
         .atMost(ASYNC_TIMEOUT)
-        .untilAsserted(() -> assertThat(this.asyncFailures.list).hasSize(TYPE_COUNT));
+        .untilAsserted(
+            () -> assertThat(this.seederMessages("already exists")).hasSize(3 * TYPE_COUNT));
+    this.assertNoErrorLogged();
 
-    assertThat(this.asyncFailedWith(ItemAlreadyExistException.class)).isEqualTo(TYPE_COUNT);
+    this.assertReposUnchanged(before);
+    this.awaitAllStorageDirs();
+  }
 
+  @ParameterizedTest(name = "{0}")
+  @EnumSource(RepoType.class)
+  @DisplayName("a repeated event recreates a missing storage directory without touching the row")
+  void missingStorageDirectoryIsRecreated(final RepoType type) {
+    final var before = this.snapshotOfRepos();
+    final var repo = this.defaultRepoOf(type);
+    final var dir = storageDirOf(repo);
+    deleteDir(dir);
+    assertThat(dir).doesNotExist();
+
+    this.publishUserCreated();
+
+    await().atMost(ASYNC_TIMEOUT).untilAsserted(() -> assertThat(dir).isDirectory());
+    this.awaitEveryListenerFoundItsRepo();
+    this.assertNoErrorLogged();
+
+    // Repo is a @Data entity, so this compares every column, createdAt included.
+    assertThat(this.defaultRepoOf(type)).isEqualTo(before.get(repo.getId()));
+    this.assertReposUnchanged(before);
+    this.awaitAllStorageDirs();
+  }
+
+  @Test
+  @DisplayName("a repeated event recreates the storage directories of every repository")
+  void allMissingStorageDirectoriesAreRecreated() {
+    final var before = this.snapshotOfRepos();
+    before.values().forEach(repo -> deleteDir(storageDirOf(repo)));
+    assertThat(before.values()).allSatisfy(repo -> assertThat(storageDirOf(repo)).doesNotExist());
+
+    this.publishUserCreated();
+
+    this.awaitAllStorageDirs();
+    this.awaitEveryListenerFoundItsRepo();
+    this.assertNoErrorLogged();
+    this.assertReposUnchanged(before);
+  }
+
+  private static void deleteDir(final Path dir) {
+    try {
+      assertThat(FileSystemUtils.deleteRecursively(dir)).as("deleted %s", dir).isTrue();
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  private Map<UUID, Repo> snapshotOfRepos() {
+    return this.repoRepository.findAll().stream()
+        .collect(Collectors.toMap(Repo::getId, repo -> repo));
+  }
+
+  private void assertReposUnchanged(final Map<UUID, Repo> before) {
     final var after = this.repoRepository.findAll();
+
     assertThat(after).hasSize(TYPE_COUNT);
     assertThat(after.stream().map(Repo::getId).collect(Collectors.toSet()))
         .isEqualTo(before.keySet());
     assertThat(after).allSatisfy(repo -> assertThat(repo).isEqualTo(before.get(repo.getId())));
   }
 
-  private long asyncFailedWith(final Class<? extends Throwable> type) {
-    return this.asyncFailures.list.stream()
-        .filter(
-            event ->
-                event.getLevel() == Level.ERROR
-                    && event.getThrowableProxy() != null
-                    && type.getName().equals(event.getThrowableProxy().getClassName()))
-        .count();
+  private void awaitEveryListenerFoundItsRepo() {
+    await()
+        .atMost(ASYNC_TIMEOUT)
+        .untilAsserted(() -> assertThat(this.seederMessages("already exists")).hasSize(TYPE_COUNT));
+  }
+
+  private List<String> seederMessages(final String fragment) {
+    return this.logged.list.stream()
+        .filter(event -> DefaultRepoSeeder.class.getName().equals(event.getLoggerName()))
+        .map(ILoggingEvent::getFormattedMessage)
+        .filter(message -> message.contains(fragment))
+        .toList();
+  }
+
+  /** Nothing may have been logged at ERROR, which is where an uncaught {@code @Async} lands. */
+  private void assertNoErrorLogged() {
+    await()
+        .during(NO_FAILURE_WINDOW)
+        .atMost(ASYNC_TIMEOUT)
+        .untilAsserted(
+            () ->
+                assertThat(
+                        this.logged.list.stream()
+                            .filter(event -> event.getLevel().isGreaterOrEqual(Level.ERROR))
+                            .map(ILoggingEvent::getFormattedMessage)
+                            .toList())
+                    .isEmpty());
   }
 }

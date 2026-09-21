@@ -16,7 +16,7 @@
 package io.repsy.os.server.protocols.cargo.shared.listeners;
 
 import io.repsy.core.events.UserCreatedEvent;
-import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.os.shared.repo.services.DefaultRepoSeeder;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.UUID;
@@ -30,18 +30,15 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 @NullMarked
 public class CargoAuthListener {
-
   private static final String CARGO_REPO_NAME = "cargo";
 
-  private final RepoTxService repoTxService;
+  private final DefaultRepoSeeder defaultRepoSeeder;
   private final CargoStorageService cargoStorageService;
 
   @Async
   @EventListener
   public void onRegistrationCompleted(final UserCreatedEvent<UUID> ignoredEvent) {
-
-    final var repoInfo = this.repoTxService.createRepo(CARGO_REPO_NAME, RepoType.CARGO, true, null);
-
-    this.cargoStorageService.createRepo(repoInfo.getStorageKey());
+    this.defaultRepoSeeder.seed(
+        CARGO_REPO_NAME, RepoType.CARGO, this.cargoStorageService::createRepo);
   }
 }
