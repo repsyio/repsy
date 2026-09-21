@@ -15,7 +15,6 @@
  */
 package io.repsy.os.server.protocols.maven.shared.artifact.services;
 
-import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType.NEW;
 import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType.REDEPLOY;
 import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.PLUGIN;
 import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.RELEASE;
@@ -23,6 +22,7 @@ import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
@@ -41,6 +41,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
@@ -56,29 +57,44 @@ import org.springframework.core.io.ByteArrayResource;
 /**
  * The {@code releases} / {@code snapshots} repo settings refuse a version of that kind, whether it
  * is new or already exists (RPS-1174). Before, a redeploy returned early and skipped the rule.
+ *
+ * <p>{@code maven-metadata.xml} is judged only at version level, by its {@code <version>}
+ * (RPS-1176). Before, every parseable metadata file was classified as plugin metadata and no
+ * version-type rule applied to a metadata upload.
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Maven ArtifactServiceImpl version-type rules (RPS-1174)")
+@DisplayName("Maven ArtifactServiceImpl version-type rules (RPS-1174, RPS-1176)")
 class ArtifactServiceImplTest {
 
   private static final String SNAPSHOT_JAR =
       "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.jar";
   private static final String RELEASE_JAR = "com/acme/lib/1.0/lib-1.0.jar";
   private static final String ARTIFACT_METADATA = "com/acme/lib/maven-metadata.xml";
-  private static final String PLUGIN_METADATA =
+  private static final String GROUP_METADATA_PATH = "com/acme/maven-metadata.xml";
+  private static final String SNAPSHOT_VERSION_METADATA =
+      "com/acme/lib/1.0-SNAPSHOT/maven-metadata.xml";
+  private static final String RELEASE_VERSION_METADATA = "com/acme/lib/1.0/maven-metadata.xml";
+  private static final String METADATA_FILE = "maven-metadata.xml";
+
+  private static final String GROUP_METADATA =
       """
-      <metadata>
-        <groupId>com.acme</groupId>
-        <artifactId>lib</artifactId>
-        <plugins>
-          <plugin>
-            <name>Lib Plugin</name>
-            <prefix>lib</prefix>
-            <artifactId>lib-maven-plugin</artifactId>
-          </plugin>
-        </plugins>
-      </metadata>
-      """;
+      <metadata><plugins><plugin><name>Acme Maven Plugin</name><prefix>acme</prefix>\
+      <artifactId>acme-maven-plugin</artifactId></plugin></plugins></metadata>""";
+  private static final String ARTIFACT_METADATA_MIXED =
+      """
+      <metadata><groupId>com.acme</groupId><artifactId>lib</artifactId><versioning>\
+      <release>1.0</release><versions><version>1.1-SNAPSHOT</version><version>1.0</version>\
+      </versions><lastUpdated>20260921101010</lastUpdated></versioning></metadata>""";
+  private static final String VERSION_METADATA =
+      """
+      <metadata modelVersion="1.1.0"><groupId>com.acme</groupId><artifactId>lib</artifactId>\
+      <version>%s</version><versioning><snapshot><timestamp>20260921.101010</timestamp>\
+      <buildNumber>1</buildNumber></snapshot><lastUpdated>20260921101010</lastUpdated>\
+      <snapshotVersions><snapshotVersion><extension>jar</extension>\
+      <value>1.0-20260921.101010-1</value><updated>20260921101010</updated></snapshotVersion>\
+      <snapshotVersion><extension>pom</extension><value>1.0-20260921.101010-1</value>\
+      <updated>20260921101010</updated></snapshotVersion></snapshotVersions></versioning>\
+      </metadata>""";
 
   @Mock RepoRepository repoRepository;
   @Mock ArtifactRepository artifactRepository;
@@ -195,21 +211,130 @@ class ArtifactServiceImplTest {
         .hasMessage("artifactOverrideIsProhibited");
   }
 
+  private MutablePair<ArtifactDeployType, ArtifactVersionType> classify(
+      final RepoInfo repo, final String xml) throws Exception {
+    return this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
+        repo, xml.getBytes(StandardCharsets.UTF_8), METADATA_FILE);
+  }
+
   @Test
-  @DisplayName("plugin metadata is a new deploy of a plugin and no version-type rule applies")
+  @DisplayName("plugin metadata is classified as a plugin and no version-type rule applies to it")
   void pluginMetadataIsNotSubjectToTheRule() throws Exception {
     final var id = UUID.randomUUID();
     final var repo = repo(id, false, false, true);
 
-    final var result =
-        this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
-            repo, PLUGIN_METADATA.getBytes(StandardCharsets.UTF_8), "maven-metadata.xml");
+    final var result = this.classify(repo, GROUP_METADATA);
 
-    assertThat(result).isEqualTo(pair(NEW, PLUGIN));
+    assertThat(result).isEqualTo(pair(null, PLUGIN));
+    assertThatCode(
+            () ->
+                this.artifactService.checkDeploymentRules(
+                    repo, result, StoragePath.of(id, GROUP_METADATA_PATH)))
+        .doesNotThrowAnyException();
+    verifyNoInteractions(this.artifactRepository, this.artifactVersionRepository);
+  }
+
+  @Test
+  @DisplayName("version-level metadata of a snapshot is judged as a snapshot by its version")
+  void versionLevelSnapshotMetadataIsJudgedAsASnapshot() throws Exception {
+    final var id = UUID.randomUUID();
+    final var path = StoragePath.of(id, SNAPSHOT_VERSION_METADATA);
+    final var xml = VERSION_METADATA.formatted("1.0-SNAPSHOT");
+
+    final var refusing = repo(id, true, false, true);
+    final var result = this.classify(refusing, xml);
+
+    assertThat(result).isEqualTo(pair(null, SNAPSHOT));
+    assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(refusing, result, path))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("snapshotVersionsAreProhibited");
+    assertThatCode(
+            () ->
+                this.artifactService.checkDeploymentRules(repo(id, true, true, true), result, path))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("version-level metadata of a release version is judged as a release")
+  void versionLevelMetadataOfAReleaseVersionIsARelease() throws Exception {
+    final var id = UUID.randomUUID();
+    final var path = StoragePath.of(id, RELEASE_VERSION_METADATA);
+    final var xml = VERSION_METADATA.formatted("1.0");
+
+    final var refusing = repo(id, false, true, true);
+    final var result = this.classify(refusing, xml);
+
+    assertThat(result).isEqualTo(pair(null, RELEASE));
+    assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(refusing, result, path))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("releaseVersionsAreProhibited");
+    assertThatCode(
+            () ->
+                this.artifactService.checkDeploymentRules(repo(id, true, true, true), result, path))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("artifact-level metadata lists versions of both kinds and is not judged")
+  void artifactLevelMetadataIsNotJudged() throws Exception {
+    final var id = UUID.randomUUID();
+    final var repo = repo(id, false, false, true);
+
+    final var result = this.classify(repo, ARTIFACT_METADATA_MIXED);
+
+    assertThat(result).isEqualTo(pair(null, null));
     assertThatCode(
             () ->
                 this.artifactService.checkDeploymentRules(
                     repo, result, StoragePath.of(id, ARTIFACT_METADATA)))
         .doesNotThrowAnyException();
+    verifyNoInteractions(this.artifactRepository, this.artifactVersionRepository);
+  }
+
+  @Test
+  @DisplayName("a metadata checksum is stored without parsing the file")
+  void metadataChecksumIsStoredWithoutParsing() throws Exception {
+    final var repo = repo(UUID.randomUUID(), false, false, true);
+
+    final var result =
+        this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
+            repo, "garbage".getBytes(StandardCharsets.UTF_8), METADATA_FILE + ".sha1");
+
+    assertThat(result).isEqualTo(pair(null, null));
+  }
+
+  @Test
+  @DisplayName("the version-type rule applies even when the path does not parse to a GAV")
+  void versionTypeRuleAppliesWithoutAGav() {
+    final var id = UUID.randomUUID();
+    final var noGav = StoragePath.of(id, GROUP_METADATA_PATH);
+
+    assertThat(ArtifactUtils.getGavByFile(noGav)).isNull();
+    assertThatThrownBy(
+            () ->
+                this.artifactService.checkDeploymentRules(
+                    repo(id, true, false, true), pair(null, SNAPSHOT), noGav))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("snapshotVersionsAreProhibited");
+    assertThatCode(
+            () ->
+                this.artifactService.checkDeploymentRules(
+                    repo(id, true, true, true), pair(null, SNAPSHOT), noGav))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("the version-type rule applies to a path that parses to a GAV")
+  void versionTypeRuleAppliesToVersionLevelMetadataPath() {
+    final var id = UUID.randomUUID();
+
+    assertThatThrownBy(
+            () ->
+                this.artifactService.checkDeploymentRules(
+                    repo(id, true, false, true),
+                    pair(null, SNAPSHOT),
+                    StoragePath.of(id, SNAPSHOT_VERSION_METADATA)))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("snapshotVersionsAreProhibited");
   }
 }
