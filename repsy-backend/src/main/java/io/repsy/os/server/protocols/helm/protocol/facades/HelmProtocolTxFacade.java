@@ -71,7 +71,7 @@ public class HelmProtocolTxFacade extends AbstractHelmProtocolTxFacade<UUID> {
   }
 
   @Override
-  @Transactional
+  @Transactional(rollbackFor = IOException.class)
   public HelmChartInfo pushChart(
       final ProtocolContext context,
       final String name,
@@ -88,7 +88,7 @@ public class HelmProtocolTxFacade extends AbstractHelmProtocolTxFacade<UUID> {
   }
 
   @Override
-  @Transactional
+  @Transactional(rollbackFor = IOException.class)
   public void deleteChart(final ProtocolContext context, final String name, final String version)
       throws IOException {
     super.deleteChart(context, name, version);
@@ -111,7 +111,7 @@ public class HelmProtocolTxFacade extends AbstractHelmProtocolTxFacade<UUID> {
   }
 
   @Override
-  @Transactional
+  @Transactional(rollbackFor = IOException.class)
   public HelmOciBlobInfo finalizeBlob(
       final ProtocolContext context,
       final UUID uploadId,
@@ -143,7 +143,7 @@ public class HelmProtocolTxFacade extends AbstractHelmProtocolTxFacade<UUID> {
   }
 
   @Override
-  @Transactional
+  @Transactional(rollbackFor = IOException.class)
   public void pushManifest(
       final ProtocolContext context,
       final String name,

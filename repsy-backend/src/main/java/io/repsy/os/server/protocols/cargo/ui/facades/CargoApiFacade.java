@@ -111,6 +111,7 @@ public class CargoApiFacade implements ProtocolApiFacade {
         .map(this.cargoCrateConverter::toCrateVersionListItemDto);
   }
 
+  @Transactional(rollbackFor = IOException.class)
   public BaseUsages deleteCrate(final RepoInfo repoInfo, final String name) throws IOException {
 
     final var normalizedName = CrateUtils.normalizeCrateName(name);
@@ -124,6 +125,7 @@ public class CargoApiFacade implements ProtocolApiFacade {
     return BaseUsages.builder().diskUsage(-1L * usage).build();
   }
 
+  @Transactional(rollbackFor = IOException.class)
   public BaseUsages deleteCrateVersion(
       final RepoInfo repoInfo, final String name, final String vers) throws IOException {
 

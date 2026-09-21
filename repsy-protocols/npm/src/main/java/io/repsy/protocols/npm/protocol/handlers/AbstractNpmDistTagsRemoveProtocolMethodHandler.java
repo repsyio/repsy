@@ -40,7 +40,7 @@ public abstract class AbstractNpmDistTagsRemoveProtocolMethodHandler
     implements ProtocolMethodHandler {
 
   private static final Pattern DIST_TAGS_REMOVE_PATTERN =
-      Pattern.compile("^/-/package/(.+?)/dist-tags/(.+)$");
+      Pattern.compile("^/-/package/(.+)/dist-tags/([^/]+)$");
 
   private final PathParser basePathParser;
   private final NpmProtocolFacade npmProtocolFacade;

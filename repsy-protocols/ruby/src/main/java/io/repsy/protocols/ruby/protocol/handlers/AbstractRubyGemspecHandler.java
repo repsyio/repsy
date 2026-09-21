@@ -104,7 +104,7 @@ public abstract class AbstractRubyGemspecHandler implements ProtocolMethodHandle
     }
   }
 
-  private static @Nullable String[] parseGemspecFilename(final String filename) {
+  private static String @Nullable [] parseGemspecFilename(final String filename) {
     if (!filename.endsWith(".gemspec.rz")) {
       return null;
     }

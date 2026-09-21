@@ -57,6 +57,10 @@ public class RepoInfoResolver implements HandlerMethodArgumentResolver {
 
     final var repoName = ResolverUtils.extractRepoInfo(uriVariables);
 
+    if (repoName == null) {
+      throw new ItemNotFoundException("repoNotFound");
+    }
+
     return this.repoTxService.getRepoByName(repoName);
   }
 
