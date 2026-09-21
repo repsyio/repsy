@@ -75,7 +75,9 @@ cmd_local_up() {
 }
 
 cmd_local_down() {
-  docker compose -f "$STACK_FILE" down
+  # Compose interpolates the whole file for every command, "down" included, and the stack file
+  # requires REPSY_ADMIN_PASSWORD. Tearing down does not use it, so any value will do.
+  REPSY_ADMIN_PASSWORD="${REPSY_ADMIN_PASSWORD:-unused}" docker compose -f "$STACK_FILE" down
 }
 
 cmd_test() {
