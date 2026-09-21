@@ -36,6 +36,11 @@
  *    and keeps being stored. A file of a `SNAPSHOT` directory must also carry that directory's
  *    artifactId and base version, literal or timestamped: `lib-2.0-SNAPSHOT.jar` or
  *    `other-1.0-SNAPSHOT.jar` in `lib/1.0-SNAPSHOT/` is refused the same way (RPS-1184).
+ *  - A POM signature (`<pom>.asc`) is verified before it is stored, so a refused one answers 422
+ *    `artifactSignatureNotVerified` and changes nothing: no file, no row, no other version and no
+ *    metadata is removed, and the `.asc` itself is not stored (RPS-1186). It used to be stored
+ *    first and the whole version, the artifact and the group deleted on a refusal. Only a `.pom.asc`
+ *    is verified; a `.jar.asc` is stored as sent.
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import {
@@ -57,6 +62,12 @@ import type { Seeder } from '../../src/seed/seeder.js';
 const OCTET = 'application/octet-stream';
 const XML = 'application/xml';
 const TEXT = 'text/plain';
+
+/**
+ * An `.asc` that holds no signature packet: the check refuses it (422) before it asks any key
+ * server, so this test needs neither a network nor a key pair.
+ */
+const NO_SIGNATURE = '';
 
 const ARTIFACT_ID = 'raw';
 const SNAPSHOT = '1.0-SNAPSHOT';
@@ -353,6 +364,48 @@ test.describe('maven upload rules (raw HTTP)', () => {
       }
 
       expect(await repoTree(layout.repoName)).toEqual(before);
+    },
+  );
+
+  test(
+    'a refused POM signature answers 422 and leaves the version untouched (RPS-1186)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder);
+      // A snapshot (timestamped files) and a release next to it, so that the snapshot is not the only
+      // version of its artifact and the release is not the only file of its directory.
+      await seedBothKinds(layout);
+      const before = await repoTree(layout.repoName);
+      const [snapshotPom] = snapshotDeployFiles(layout, FIRST_BUILD);
+      const releasePom = `${versionDir(layout.groupId, ARTIFACT_ID, RELEASE)}/${ARTIFACT_ID}-${RELEASE}.pom`;
+      const admin = adminCredential();
+
+      for (const pom of [releasePom, snapshotPom[0]]) {
+        expectPut(
+          await layout.put(`${pom}.asc`, NO_SIGNATURE, OCTET),
+          422,
+          'artifactSignatureNotVerified',
+          `${pom}.asc`,
+        );
+        const res = await rawGet(layout.repoName, admin, `${pom}.asc`);
+        expect(res.status, `GET ${pom}.asc answered ${res.status}`).toBe(404);
+      }
+
+      // Every file, every version directory and both metadata files are byte for byte as before.
+      expect(await repoTree(layout.repoName)).toEqual(before);
+    },
+  );
+
+  test(
+    'a POM signature that arrives before its POM answers 404 and stores nothing (RPS-1186)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder);
+      const pom = `${versionDir(layout.groupId, ARTIFACT_ID, RELEASE)}/${ARTIFACT_ID}-${RELEASE}.pom`;
+
+      expectPut(await layout.put(`${pom}.asc`, NO_SIGNATURE, OCTET), 404, 'itemNotFound', pom);
+
+      expect(await repoTree(layout.repoName)).toEqual({});
     },
   );
 

@@ -240,6 +240,17 @@ public class ArtifactUtils {
         && !relativePath.getPath().endsWith(SIGNED_POM_SUFFIX);
   }
 
+  /**
+   * Tells whether the path is the {@code .asc} signature of a POM: a {@code .pom} path that ends in
+   * {@code .asc}. It is the one kind of signature the artifact service verifies.
+   */
+  public static boolean isPomSignature(final StoragePath storagePath) {
+
+    final var path = storagePath.getRelativePath().getPath();
+
+    return containsIgnoreCase(path, POM_SUFFIX) && path.endsWith(SIGNED_POM_SUFFIX);
+  }
+
   public static void setReleaseAndLatest(final Metadata metadata) {
 
     // sorts the versions and finds real release and latest versions not to put last

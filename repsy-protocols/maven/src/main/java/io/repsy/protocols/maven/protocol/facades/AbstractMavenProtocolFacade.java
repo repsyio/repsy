@@ -36,6 +36,7 @@ import org.apache.maven.index.artifact.Gav;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 
 @RequiredArgsConstructor
@@ -66,7 +67,9 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * Stores a file and registers it. A path outside the Maven layout is refused inside {@code
    * getDeployAndVersionType}, before {@code checkDeploymentRules} and {@code store}, so nothing is
    * written and the {@code usages} context property is never set (the usage post-processor reads it
-   * only when present).
+   * only when present). A POM signature ({@code .pom.asc}) is verified against the stored POM
+   * before it is stored, so a refused one never reaches the repo and takes nothing else with it: an
+   * existing version, its previous signature and its {@code signed} flag are left as they were.
    */
   @Override
   public void upload(
@@ -92,6 +95,12 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     }
 
     this.artifactService.checkDeploymentRules(repoInfo, artifactPair, storagePath);
+
+    if (content == null && ArtifactUtils.isPomSignature(storagePath)) {
+      // A signature is well below 1 KB, and it is read once here to be verified and then stored.
+      content = inputStream.readAllBytes();
+      this.artifactService.verifySignature(repoInfo, storagePath, new ByteArrayResource(content));
+    }
 
     final var afterUploadUsage = this.store(repoInfo.getName(), storagePath, inputStream, content);
 

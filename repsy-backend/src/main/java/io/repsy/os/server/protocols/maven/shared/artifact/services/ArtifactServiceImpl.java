@@ -216,9 +216,10 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       return;
     }
 
-    // Cannot create artifact for signed files.
-    if (storagePath.getRelativePath().getPath().endsWith(SIGNED_POM_SUFFIX)) {
-      this.processSignedFileProcess(resource, storagePath, repo);
+    // Cannot create artifact for signed files. The signature itself was verified before it was
+    // stored (see verifySignature), so here it only marks the version signed.
+    if (ArtifactUtils.isPomSignature(storagePath)) {
+      this.processSignedFileProcess(storagePath, repo);
       return;
     }
 
@@ -548,8 +549,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     this.updateArtifactVersion(repo, existingVersion, versionPath, pomModel);
   }
 
-  private void processSignedFileProcess(
-      final Resource resource, final StoragePath storagePath, final Repo repo) {
+  private void processSignedFileProcess(final StoragePath storagePath, final Repo repo) {
 
     final var nonSignedStoragePath = this.getNonSignedStoragePath(storagePath);
 
@@ -560,7 +560,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       throw new ItemNotFoundException("itemNotFound");
     }
 
-    this.verifySignature(resource, storagePath, repo);
     this.markArtifactSigned(repo, gav);
   }
 
@@ -583,19 +582,29 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     this.artifactVersionRepository.save(artifactVersion);
   }
 
-  private void verifySignature(
-      final Resource signedFileResource, final StoragePath signedStoragePath, final Repo repo) {
+  /**
+   * Verifies the signature of a stored file before the signature itself is stored, so a refused
+   * signature leaves no trace: nothing is written and no row or file is deleted (RPS-1186). It used
+   * to run after the signature was stored, and the facade then rolled the whole version back.
+   *
+   * @throws ItemNotFoundException {@code itemNotFound} when the signed file is not stored
+   */
+  @Override
+  public void verifySignature(
+      final BaseRepoInfo<UUID> repoInfo,
+      final StoragePath signedStoragePath,
+      final Resource signature) {
 
     final var nonSignedStoragePath = this.getNonSignedStoragePath(signedStoragePath);
 
     final var nonSignedFileResource =
         this.storageStrategy
-            .get(nonSignedStoragePath, repo.getName())
+            .get(nonSignedStoragePath, repoInfo.getName())
             .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
 
-    final var customKeys = this.keyStoreService.findHostsByRepoId(repo.getId());
+    final var customKeys = this.keyStoreService.findHostsByRepoId(repoInfo.getStorageKey());
 
-    this.pgpVerifierService.verify(nonSignedFileResource, signedFileResource, customKeys);
+    this.pgpVerifierService.verify(nonSignedFileResource, signature, customKeys);
   }
 
   private @Nullable ArtifactVersion getArtifactVersionByGav(final UUID artifactId, final Gav gav) {

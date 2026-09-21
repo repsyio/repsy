@@ -207,6 +207,17 @@ What the server does, per rule (all pinned above or in `tests/maven/upload-rules
   `400 invalidArtifactPath` and stores nothing: the file name must start with the directory's
   artifactId and base version, literal or timestamped (RPS-1184). The GAV parser only checks where
   the `SNAPSHOT` marker sits, so the server compares the rest itself.
+- **A POM signature** (`<pom>.asc`) is verified against the stored POM **before** it is stored
+  (RPS-1186), so a refusal answers `422 artifactSignatureNotVerified` and changes nothing: the
+  `.asc` is not stored, and no file, row, other version or `maven-metadata.xml` of the repo is
+  touched (the spec compares the whole repo tree before and after, for a release and for a
+  timestamped snapshot that has another version beside it). It used to be stored first and the
+  version, the artifact and the group deleted on a refusal (a 500 for a timestamped snapshot with
+  other versions). A `.pom.asc` that arrives before its `.pom` answers `404 itemNotFound` and stores
+  nothing. Only a `.pom.asc` is verified; a `.jar.asc` is stored as sent. The pin sends an `.asc`
+  with no signature packet, which is refused before any key server is asked, so no network and no
+  `gpg` are needed; a signature that verifies (or fails against a real key) is covered by
+  `MavenPomSignatureIT` on the backend side.
 - A raw PUT must send an explicit `Content-Type`, or the body is consumed as form data and the
   server answers 400 (see the comment in `clients/maven.ts`).
 
