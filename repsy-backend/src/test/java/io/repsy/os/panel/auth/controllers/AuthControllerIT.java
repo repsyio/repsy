@@ -17,6 +17,7 @@ package io.repsy.os.panel.auth.controllers;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -79,11 +80,13 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Every test method runs in one transaction that is rolled back afterwards, so the only data
  * that survives between tests is what the application seeds at startup: the {@code admin} user,
  * whose password {@link #SEEDED_ADMIN_PASSWORD} is pinned through {@code admin.initial-password} in
- * {@link AbstractIntegrationTest}. The one exception is {@code updatesLastLoginAt}: {@code
- * UserLoginListener} is {@code @Async} and runs on another thread, which cannot see rows that are
- * still uncommitted inside a test transaction, so that test runs without one and cleans up after
- * itself. In every other test the listener still fires but finds no such user and logs the failure
- * on its own thread; that is expected noise, not a test failure.
+ * {@link AbstractIntegrationTest}. The exceptions are {@code updatesLastLoginAt} and the {@code
+ * UserDeletion} tests. {@code UserLoginListener} is {@code @Async} and runs on another thread,
+ * which cannot see rows that are still uncommitted inside a test transaction, so {@code
+ * updatesLastLoginAt} runs without one; {@code UserDeletion} checks the {@code ON DELETE CASCADE}
+ * of {@code refresh_tokens}, which only a committed delete exercises. Both clean up after
+ * themselves. In every other test the listener still fires but finds no such user and logs the
+ * failure on its own thread; that is expected noise, not a test failure.
  */
 @RecordApplicationEvents
 @DisplayName("AuthController /api/auth/*")
@@ -227,15 +230,6 @@ class AuthControllerIT extends AbstractIntegrationTest {
         "unsupportedMediaType",
         null,
         UNSUPPORTED_MEDIA_TYPE_TEXT);
-  }
-
-  private static void expectUnauthorized(final ResultActions result) throws Exception {
-    expectError(
-        result,
-        HttpStatus.UNAUTHORIZED,
-        "unAuthorized",
-        "unAuthorized",
-        "The user has logged in but has no permissions.");
   }
 
   private static void expectInvalidCredentials(final ResultActions result) throws Exception {
@@ -1020,9 +1014,15 @@ class AuthControllerIT extends AbstractIntegrationTest {
       expectAccessNotAllowed(AuthControllerIT.this.refreshWith(token));
     }
 
+    /**
+     * {@code refresh_tokens.user_id} references {@code users} (RPS-1082), so a token of a user that
+     * does not exist cannot be registered at all and the "missing user" state cannot be built. The
+     * defensive lookup in {@code AuthUserService.refreshToken} stays as defence in depth. The
+     * rejected INSERT aborts the test transaction, so nothing may follow it.
+     */
     @Test
-    @DisplayName("returns 401 unAuthorized when the token's user does not exist")
-    void unknownUser() throws Exception {
+    @DisplayName("cannot register a refresh token for a user that does not exist")
+    void unknownUser() {
       final var token =
           AuthControllerIT.this.jwtUtils.createRefreshToken(
               UUID.randomUUID(),
@@ -1030,13 +1030,17 @@ class AuthControllerIT extends AbstractIntegrationTest {
               AuthUtils.TIMEOUT_REFRESH_TOKEN,
               Instant.now(),
               0);
-      AuthControllerIT.this.registerRefreshToken(token);
 
-      expectUnauthorized(AuthControllerIT.this.refreshWith(token));
+      assertThatThrownBy(
+              () -> {
+                AuthControllerIT.this.registerRefreshToken(token);
+                AuthControllerIT.this.entityManager.flush();
+              })
+          .hasStackTraceContaining("fk_refresh_tokens__user_id");
     }
 
     @Test
-    @DisplayName("returns 401 unAuthorized once the token's user has been deleted")
+    @DisplayName("returns 401 refreshTokenExpired once the token's user has been deleted")
     void deletedUser() throws Exception {
       final var adminToken = AuthControllerIT.this.adminBearerToken();
       final var user = AuthControllerIT.this.createUser(uniqueUsername("deleted"), UserRole.USER);
@@ -1050,7 +1054,8 @@ class AuthControllerIT extends AbstractIntegrationTest {
           "userDeleted");
       AuthControllerIT.this.entityManager.flush();
 
-      expectUnauthorized(AuthControllerIT.this.refreshWith(refreshToken));
+      // The deletion took the user's refresh tokens with it (RPS-1082), so the token is unknown.
+      expectRefreshTokenExpired(AuthControllerIT.this.refreshWith(refreshToken));
     }
 
     @Test
@@ -1159,6 +1164,107 @@ class AuthControllerIT extends AbstractIntegrationTest {
               post("/api/auth/tokens/refresh")
                   .contentType(MediaType.TEXT_PLAIN)
                   .content(refreshBody("some-token"))));
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // refresh_tokens rows of a deleted user (RPS-1082)
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * The rows are counted straight from the table, so these tests commit for real: the {@code ON
+   * DELETE CASCADE} of {@code refresh_tokens.user_id} runs in the database, and a rolled-back test
+   * transaction (or a Hibernate first-level cache that still holds the row) would hide a missing
+   * cascade. They delete what they create.
+   */
+  @Nested
+  @DisplayName("refresh tokens of a deleted user")
+  class UserDeletion {
+
+    @Test
+    @DisplayName("are deleted with the user when an admin deletes the account")
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void adminDeletesUser() throws Exception {
+      final var userId = UserDeletion.this.committedUserWithSessions();
+
+      try {
+        expectSuccess(
+            AuthControllerIT.this.perform(
+                delete("/api/users/" + userId)
+                    .header(
+                        AUTHORIZATION,
+                        AuthControllerIT.this.bearerTokenFor(AuthControllerIT.this.seededAdmin()))),
+            "userDeleted");
+
+        assertThat(UserDeletion.this.refreshTokenRows(userId)).isZero();
+      } finally {
+        AuthControllerIT.this.deleteCommittedUsers(List.of(userId));
+      }
+    }
+
+    @Test
+    @DisplayName("are deleted with the user when the user deletes their own profile")
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void userDeletesProfile() throws Exception {
+      final var userId = UserDeletion.this.committedUserWithSessions();
+
+      try {
+        expectSuccess(
+            AuthControllerIT.this.perform(
+                delete("/api/profile")
+                    .header(
+                        AUTHORIZATION,
+                        AuthControllerIT.this.bearerTokenFor(
+                            AuthControllerIT.this.userRepository.findById(userId).orElseThrow()))),
+            "profileDeleted");
+
+        assertThat(UserDeletion.this.refreshTokenRows(userId)).isZero();
+      } finally {
+        AuthControllerIT.this.deleteCommittedUsers(List.of(userId));
+      }
+    }
+
+    @Test
+    @DisplayName("of other users are left alone")
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void otherUsersKeepTheirTokens() throws Exception {
+      final var deletedId = UserDeletion.this.committedUserWithSessions();
+      final var keptId = UserDeletion.this.committedUserWithSessions();
+
+      try {
+        AuthControllerIT.this.userTxService.deleteUserById(deletedId);
+
+        assertThat(UserDeletion.this.refreshTokenRows(deletedId)).isZero();
+        assertThat(UserDeletion.this.refreshTokenRows(keptId)).isEqualTo(2);
+      } finally {
+        AuthControllerIT.this.deleteCommittedUsers(List.of(deletedId, keptId));
+      }
+    }
+
+    /** Commits a USER that logged in twice, so it owns two refresh tokens. */
+    private UUID committedUserWithSessions() throws Exception {
+      final var username = uniqueUsername("sessions");
+      final var userId =
+          AuthControllerIT.this
+              .userTxService
+              .create(username, UserRole.USER, PasswordHasher.hash(VALID_PASSWORD))
+              .getId();
+
+      try {
+        expectSuccess(AuthControllerIT.this.login(username, VALID_PASSWORD), "loginSucceeded");
+        expectSuccess(AuthControllerIT.this.login(username, VALID_PASSWORD), "loginSucceeded");
+        assertThat(UserDeletion.this.refreshTokenRows(userId)).isEqualTo(2);
+      } catch (final Exception | AssertionError e) {
+        AuthControllerIT.this.deleteCommittedUsers(List.of(userId));
+        throw e;
+      }
+
+      return userId;
+    }
+
+    private long refreshTokenRows(final UUID userId) {
+      return AuthControllerIT.this.jdbcTemplate.queryForObject(
+          "select count(*) from refresh_tokens where user_id = ?", Long.class, userId);
     }
   }
 

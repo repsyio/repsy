@@ -330,15 +330,10 @@ public abstract class AbstractIntegrationTest {
   }
 
   /**
-   * Deletes users a test committed, together with the refresh tokens their logins registered:
-   * {@code refresh_tokens} has no foreign key to {@code users}, so deleting the user alone leaves
-   * the session rows behind. For classes that run with {@code Propagation.NOT_SUPPORTED}.
+   * Deletes users a test committed. The refresh tokens their logins registered go with them ({@code
+   * refresh_tokens.user_id} cascades). For classes that run with {@code Propagation.NOT_SUPPORTED}.
    */
   protected void deleteCommittedUsers(final Collection<UUID> userIds) {
-    for (final var userId : userIds) {
-      this.jdbcTemplate.update("delete from refresh_tokens where user_id = ?", userId);
-    }
-
     this.userRepository.deleteAllById(userIds);
   }
 
