@@ -453,7 +453,9 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     pkgVersion.setRepositoryUrl(NuGetPackageUtils.extractRepositoryUrl(nuspecXml));
     pkgVersion.setReadme(readme);
 
-    final var deps = NuGetPackageUtils.extractDependenciesFromNuspec(nuspecXml);
+    final var deps =
+        NuGetPackageUtils.extractDependenciesFromNuspec(
+            nuspecXml, nugetPackage.getPackageId(), version);
     if (!deps.isEmpty()) {
       try {
         pkgVersion.setDependencies(NuGetPackageUtils.toDependenciesJson(deps));

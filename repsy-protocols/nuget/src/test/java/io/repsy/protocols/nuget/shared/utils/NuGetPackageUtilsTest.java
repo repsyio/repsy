@@ -55,6 +55,28 @@ class NuGetPackageUtilsTest {
 
   @TempDir Path tempDir;
 
+  private final ListAppender<ILoggingEvent> logEvents = new ListAppender<>();
+  private final Logger utilsLogger = (Logger) LoggerFactory.getLogger(NuGetPackageUtils.class);
+
+  @BeforeEach
+  void captureLogs() {
+    this.logEvents.start();
+    this.utilsLogger.addAppender(this.logEvents);
+  }
+
+  @AfterEach
+  void releaseLogs() {
+    this.utilsLogger.detachAppender(this.logEvents);
+    this.logEvents.stop();
+  }
+
+  private List<String> warnings() {
+    return this.logEvents.list.stream()
+        .filter(event -> event.getLevel() == Level.WARN)
+        .map(ILoggingEvent::getFormattedMessage)
+        .toList();
+  }
+
   @ParameterizedTest
   @CsvSource({
     "1, 1.0.0",
@@ -382,28 +404,6 @@ class NuGetPackageUtilsTest {
   @DisplayName("stored dependencies (RPS-1015)")
   class StoredDependencies {
 
-    private final ListAppender<ILoggingEvent> logEvents = new ListAppender<>();
-    private final Logger utilsLogger = (Logger) LoggerFactory.getLogger(NuGetPackageUtils.class);
-
-    @BeforeEach
-    void captureLogs() {
-      this.logEvents.start();
-      this.utilsLogger.addAppender(this.logEvents);
-    }
-
-    @AfterEach
-    void releaseLogs() {
-      this.utilsLogger.detachAppender(this.logEvents);
-      this.logEvents.stop();
-    }
-
-    private List<String> warnings() {
-      return this.logEvents.list.stream()
-          .filter(event -> event.getLevel() == Level.WARN)
-          .map(ILoggingEvent::getFormattedMessage)
-          .toList();
-    }
-
     @ParameterizedTest
     @ValueSource(
         strings = {
@@ -418,7 +418,7 @@ class NuGetPackageUtilsTest {
       assertThat(NuGetPackageUtils.parseDependenciesJson(stored, "Some.Package", "1.2.3"))
           .isEmpty();
 
-      assertThat(this.warnings())
+      assertThat(warnings())
           .singleElement()
           .asString()
           .contains("Some.Package", "1.2.3")
@@ -433,7 +433,7 @@ class NuGetPackageUtilsTest {
           .isEmpty();
       assertThat(NuGetPackageUtils.parseDependenciesJson(null, "Some.Package", "1.2.3")).isEmpty();
 
-      assertThat(this.warnings()).isEmpty();
+      assertThat(warnings()).isEmpty();
     }
 
     @Test
@@ -446,7 +446,7 @@ class NuGetPackageUtilsTest {
                   NuGetPackageUtils.toDependenciesJson(dependencies), "Some.Package", "1.2.3"))
           .isEqualTo(dependencies);
 
-      assertThat(this.warnings()).isEmpty();
+      assertThat(warnings()).isEmpty();
     }
   }
 
@@ -455,17 +455,89 @@ class NuGetPackageUtilsTest {
   class NuspecDependencies {
 
     @Test
-    @DisplayName("reads grouped dependencies")
+    @DisplayName("reads grouped dependencies, keeping the target framework")
     void readsGroupedDependencies() {
       final var nuspec =
           """
           <package><metadata><dependencies>
             <group targetFramework="net8.0"><dependency id="Serilog" version="3.1.1"/></group>
+            <group><dependency id="Newtonsoft.Json" version="13.0.3"/></group>
           </dependencies></metadata></package>
           """;
 
-      assertThat(NuGetPackageUtils.extractDependenciesFromNuspec(nuspec))
-          .containsExactly(new NuGetDependencyInfo("Serilog", "3.1.1", "net8.0"));
+      assertThat(extract(nuspec))
+          .containsExactly(
+              new NuGetDependencyInfo("Serilog", "3.1.1", "net8.0"),
+              new NuGetDependencyInfo("Newtonsoft.Json", "13.0.3", null));
+      assertThat(warnings()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("reads the flat dependencies of the old format")
+    void readsFlatDependencies() {
+      final var nuspec =
+          """
+          <package><metadata><dependencies>
+            <dependency id="Serilog" version="3.1.1"/>
+            <dependency id="Newtonsoft.Json"/>
+          </dependencies></metadata></package>
+          """;
+
+      assertThat(extract(nuspec))
+          .containsExactly(
+              new NuGetDependencyInfo("Serilog", "3.1.1", null),
+              new NuGetDependencyInfo("Newtonsoft.Json", "", null));
+      assertThat(warnings()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("skips a dependency without an id and keeps the others, without a warning")
+    void skipsDependencyWithoutId() {
+      final var nuspec =
+          """
+          <package><metadata><dependencies>
+            <dependency id="" version="1.0.0"/>
+            <dependency version="2.0.0"/>
+            <dependency id="Serilog" version="3.1.1"/>
+          </dependencies></metadata></package>
+          """;
+
+      assertThat(extract(nuspec))
+          .containsExactly(new NuGetDependencyInfo("Serilog", "3.1.1", null));
+      assertThat(warnings()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("treats a nuspec without a dependencies element as no dependencies, no warning")
+    void noDependenciesElementIsNoDependencies() {
+      final var nuspec = "<package><metadata><id>Some.Package</id></metadata></package>";
+
+      assertThat(extract(nuspec)).isEmpty();
+      assertThat(warnings()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("treats an empty dependencies element as no dependencies, no warning")
+    void emptyDependenciesElementIsNoDependencies() {
+      final var nuspec = "<package><metadata><dependencies/></metadata></package>";
+
+      assertThat(extract(nuspec)).isEmpty();
+      assertThat(warnings()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("warns with the package id and version, not the nuspec, when it is not XML")
+    void warnsForMalformedNuspec() {
+      final var nuspec =
+          "<package><metadata><dependencies><dependency id=\"Secret.Marker\" version=\"1.0\"/>";
+
+      assertThat(extract(nuspec)).isEmpty();
+
+      assertThat(warnings())
+          .singleElement()
+          .asString()
+          .contains("Some.Package", "1.2.3")
+          .doesNotContain("Secret.Marker", "<package>");
     }
 
     @Test
@@ -480,7 +552,8 @@ class NuGetPackageUtilsTest {
           </dependencies></metadata></package>
           """;
 
-      assertThat(NuGetPackageUtils.extractDependenciesFromNuspec(nuspec)).isEmpty();
+      assertThat(extract(nuspec)).isEmpty();
+      assertThat(warnings()).singleElement().asString().contains("Some.Package", "1.2.3");
     }
 
     @Test
@@ -498,7 +571,57 @@ class NuGetPackageUtilsTest {
           """
               .formatted(dtd.toUri());
 
-      assertThat(NuGetPackageUtils.extractDependenciesFromNuspec(nuspec)).isEmpty();
+      assertThat(extract(nuspec)).isEmpty();
+      assertThat(warnings()).singleElement().asString().contains("Some.Package", "1.2.3");
+    }
+
+    @Test
+    @DisplayName("refuses a package whose nuspec is not well-formed XML with a 400")
+    void refusesMalformedNuspecOnRead() throws IOException {
+      final var nupkg =
+          nupkgWithNuspec(
+              "<package><metadata><id>Some.Package</id><version>1.2.3</version><dependencies>");
+
+      assertThatThrownBy(() -> NuGetPackageUtils.readNuspecMetadata(nupkg))
+          .isInstanceOfSatisfying(
+              ResponseStatusException.class,
+              e -> {
+                assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                assertThat(e.getReason())
+                    .isEqualTo("The .nuspec in the package is not well-formed XML.");
+              });
+    }
+
+    @Test
+    @DisplayName("refuses a package whose nuspec carries a DOCTYPE with a 400")
+    void refusesDoctypeOnRead() throws IOException {
+      final var nupkg =
+          nupkgWithNuspec(
+              """
+              <?xml version="1.0"?>
+              <!DOCTYPE package [<!ENTITY ver "9.9.9">]>
+              <package><metadata><id>Some.Package</id><version>1.2.3</version>
+                <dependencies><dependency id="Serilog" version="&ver;"/></dependencies>
+              </metadata></package>
+              """);
+
+      assertThatThrownBy(() -> NuGetPackageUtils.readNuspecMetadata(nupkg))
+          .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    @DisplayName("still reads a well-formed nuspec")
+    void readsWellFormedNuspecOnRead() throws IOException {
+      final var nupkg =
+          nupkgWithNuspec(
+              "<package><metadata><id>Some.Package</id><version>1.2.3</version><dependencies/>"
+                  + "</metadata></package>");
+
+      assertThat(NuGetPackageUtils.readNuspecMetadata(nupkg).packageId()).isEqualTo("Some.Package");
+    }
+
+    private List<NuGetDependencyInfo> extract(final String nuspec) {
+      return NuGetPackageUtils.extractDependenciesFromNuspec(nuspec, "Some.Package", "1.2.3");
     }
   }
 
@@ -646,10 +769,18 @@ class NuGetPackageUtilsTest {
   }
 
   private Path nupkg(final String id, final String version) throws IOException {
-    final var file = Files.createTempFile(tempDir, "pkg", ".nupkg");
-    final var nuspec =
+    return nupkgWithNuspec(
         "<package><metadata><id>%s</id><version>%s</version></metadata></package>"
-            .formatted(id, version);
+            .formatted(id, version),
+        id);
+  }
+
+  private Path nupkgWithNuspec(final String nuspec) throws IOException {
+    return nupkgWithNuspec(nuspec, "Some.Package");
+  }
+
+  private Path nupkgWithNuspec(final String nuspec, final String id) throws IOException {
+    final var file = Files.createTempFile(tempDir, "pkg", ".nupkg");
 
     try (final OutputStream out = Files.newOutputStream(file);
         final var zip = new ZipOutputStream(out)) {
