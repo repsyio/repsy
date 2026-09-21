@@ -22,12 +22,23 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.protocols.ruby.shared.utils.GemspecParser;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
@@ -150,5 +161,214 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .content(gem("pushed-gem", "1.2.3")))
         .andExpect(status().isNotFound());
+  }
+
+  /**
+   * RPS-1071: a gemspec value longer than its {@code ruby_gem_version} column used to fail the row
+   * insert with a {@code DataIntegrityViolationException} that named no field. The authors are now
+   * cut and a homepage dropped; a name, version, platform or required Ruby version is rejected with
+   * a 400 that names the field. All of it happens before a row or the file is written, for a new
+   * version and for one that replaces an existing version alike.
+   *
+   * <p>None of these reaches the database with an over-long value, so they run in this class's test
+   * transaction. A row the database itself rejects is in {@link RubyPublishStorageConsistencyIT}.
+   */
+  @Nested
+  @DisplayName("over-long gemspec metadata (RPS-1071)")
+  class OverLongMetadata {
+
+    private static final String GEM = "long-metadata";
+
+    private Repo overridableRepo() {
+      final var repo = RubyGemProtocolIT.this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+      final var managed =
+          RubyGemProtocolIT.this.repoRepository.findByName(repo.getName()).orElseThrow();
+      managed.setAllowOverride(true);
+      RubyGemProtocolIT.this.repoRepository.saveAndFlush(managed);
+
+      return RubyGemProtocolIT.this.reloadRepo(repo.getName());
+    }
+
+    private Repo newRepo() {
+      return RubyGemProtocolIT.this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    }
+
+    private ResultActions push(final Repo repo, final byte[] gem) throws Exception {
+      return RubyGemProtocolIT.this.push(
+          repo.getName(), gem, RubyGemProtocolIT.this.adminProtocolBearerToken());
+    }
+
+    private Map<String, Object> storedVersion(final Repo repo) {
+      return RubyGemProtocolIT.this.jdbcTemplate.queryForMap(
+          """
+          select v.version, v.platform, v.checksum, v.authors, v.homepage, v.required_ruby_version
+            from ruby_gem_version v join ruby_gem g on g.id = v.gem_id
+           where g.repo_id = ? and g.name = ?
+          """,
+          repo.getId(),
+          GEM);
+    }
+
+    private int rowCount(final Repo repo) {
+      final var count =
+          RubyGemProtocolIT.this.jdbcTemplate.queryForObject(
+              """
+              select (select count(*) from ruby_gem where repo_id = ?)
+                   + (select count(*) from ruby_gem_version v join ruby_gem g on g.id = v.gem_id
+                       where g.repo_id = ?)
+              """,
+              Integer.class,
+              repo.getId(),
+              repo.getId());
+
+      return count == null ? 0 : count;
+    }
+
+    private List<String> storedGemFiles(final Repo repo) throws IOException {
+      final var dir = storageDirOf(repo);
+      if (!Files.exists(dir)) {
+        return List.of();
+      }
+      try (final var files = Files.walk(dir)) {
+        return files
+            .filter(Files::isRegularFile)
+            .map(file -> file.getFileName().toString())
+            .filter(name -> name.endsWith(".gem"))
+            .toList();
+      }
+    }
+
+    private static List<String> authors(final int count) {
+      // 10 characters each, so 42 of them and the separators between them fit the column.
+      return IntStream.rangeClosed(1, count).mapToObj("author-%03d"::formatted).toList();
+    }
+
+    /** A gem whose one length-limited field is one character over its column. */
+    private static byte[] overLongGem(final String column) throws IOException {
+      final var name = "name".equals(column) ? "n".repeat(256) : GEM;
+      final var version = "version".equals(column) ? "1." + "0".repeat(63) : "1.0.0";
+      final var platform = "platform".equals(column) ? "p".repeat(65) : "ruby";
+      final var ruby = "required_ruby_version".equals(column) ? "1".repeat(62) : "3.1.0";
+
+      return gem(
+          name, version, platform, "fixture", List.of("Alice"), "https://example.test", ruby);
+    }
+
+    @Test
+    @DisplayName("stores every field that fits its column, including a value exactly at the limit")
+    void storesValuesAtTheLimit() throws Exception {
+      final var repo = this.newRepo();
+      final var version = "1." + "0".repeat(GemspecParser.MAX_VERSION_LENGTH - 2);
+      final var platform = "p".repeat(GemspecParser.MAX_PLATFORM_LENGTH);
+      final var authors = "a".repeat(GemspecParser.MAX_AUTHORS_LENGTH);
+      final var homepage = "h".repeat(GemspecParser.MAX_HOMEPAGE_LENGTH);
+      final var ruby = "1".repeat(GemspecParser.MAX_REQUIRED_RUBY_VERSION_LENGTH - 3);
+
+      this.push(repo, gem(GEM, version, platform, "fixture", List.of(authors), homepage, ruby))
+          .andExpect(status().isOk());
+
+      assertThat(this.storedVersion(repo))
+          .containsEntry("version", version)
+          .containsEntry("platform", platform)
+          .containsEntry("authors", authors)
+          .containsEntry("homepage", homepage)
+          .containsEntry("required_ruby_version", ">= " + ruby);
+    }
+
+    @Test
+    @DisplayName("cuts over-long authors after the last author that fits and accepts the push")
+    void cutsAuthorsOfANewVersion() throws Exception {
+      final var repo = this.newRepo();
+
+      this.push(
+              repo,
+              gem(GEM, "1.0.0", "ruby", "fixture", authors(60), "https://example.test", "3.1.0"))
+          .andExpect(status().isOk());
+
+      final var stored = (String) this.storedVersion(repo).get("authors");
+      assertThat(stored).isEqualTo(String.join(", ", authors(42)));
+      assertThat(stored).hasSizeLessThanOrEqualTo(GemspecParser.MAX_AUTHORS_LENGTH);
+    }
+
+    @Test
+    @DisplayName("drops an over-long homepage and accepts the push")
+    void dropsHomepageOfANewVersion() throws Exception {
+      final var repo = this.newRepo();
+      final var homepage = "https://example.test/" + "h".repeat(GemspecParser.MAX_HOMEPAGE_LENGTH);
+
+      this.push(repo, gem(GEM, "1.0.0", "ruby", "fixture", List.of("Alice"), homepage, "3.1.0"))
+          .andExpect(status().isOk());
+
+      assertThat(this.storedVersion(repo)).containsEntry("homepage", null);
+    }
+
+    @Test
+    @DisplayName("cuts the authors and drops the homepage of a version that replaces another")
+    void cutsAndDropsOnOverride() throws Exception {
+      final var repo = this.overridableRepo();
+      this.push(repo, gem(GEM, "1.0.0", "ruby", "original")).andExpect(status().isOk());
+      final var originalChecksum = this.storedVersion(repo).get("checksum");
+      final var homepage = "https://example.test/" + "h".repeat(GemspecParser.MAX_HOMEPAGE_LENGTH);
+
+      this.push(repo, gem(GEM, "1.0.0", "ruby", "second", authors(60), homepage, "3.1.0"))
+          .andExpect(status().isOk());
+
+      assertThat(this.storedVersion(repo))
+          .containsEntry("authors", String.join(", ", authors(42)))
+          .containsEntry("homepage", null)
+          .doesNotContainEntry("checksum", originalChecksum);
+      assertThat(this.rowCount(repo)).as("the version is replaced, not added").isEqualTo(2);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(
+        delimiter = '|',
+        textBlock =
+            """
+            name                  | gemNameTooLong                | The gem name is longer than 255 characters.
+            version               | gemVersionTooLong             | The gem version is longer than 64 characters.
+            platform              | gemPlatformTooLong            | The gem platform is longer than 64 characters.
+            required_ruby_version | gemRequiredRubyVersionTooLong | The required_ruby_version of the gem is longer than 64 characters.
+            """)
+    @DisplayName("rejects an over-long field with a 400 that names it and stores nothing")
+    void rejectsOverLongFieldOfANewVersion(
+        final String column, final String msgId, final String text) throws Exception {
+      final var repo = this.newRepo();
+
+      this.push(repo, overLongGem(column))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.msgId").value(msgId))
+          .andExpect(jsonPath("$.text").value(text));
+
+      assertThat(this.rowCount(repo)).as("no gem or version row").isZero();
+      assertThat(this.storedGemFiles(repo)).as("no .gem file").isEmpty();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+      "name,gemNameTooLong",
+      "version,gemVersionTooLong",
+      "platform,gemPlatformTooLong",
+      "required_ruby_version,gemRequiredRubyVersionTooLong"
+    })
+    @DisplayName(
+        "rejects an over-long field of a push to an overridable repo and keeps the version")
+    void rejectsOverLongFieldOnOverride(final String column, final String msgId) throws Exception {
+      final var repo = this.overridableRepo();
+      final var original = gem(GEM, "1.0.0", "ruby", "original");
+      this.push(repo, original).andExpect(status().isOk());
+      final var before = this.storedVersion(repo);
+      final var rows = this.rowCount(repo);
+
+      this.push(repo, overLongGem(column))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.msgId").value(msgId));
+
+      assertThat(this.storedVersion(repo)).as("the stored version is untouched").isEqualTo(before);
+      assertThat(this.rowCount(repo)).isEqualTo(rows);
+      assertThat(this.storedGemFiles(repo)).containsExactly(GEM + "-1.0.0.gem");
+      assertThat(storageDirOf(repo).resolve("gems").resolve(GEM).resolve(GEM + "-1.0.0.gem"))
+          .hasBinaryContent(original);
+    }
   }
 }

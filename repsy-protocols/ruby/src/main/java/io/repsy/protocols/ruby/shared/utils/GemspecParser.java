@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import lombok.experimental.UtilityClass;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.jspecify.annotations.NullMarked;
@@ -55,6 +56,7 @@ import org.yaml.snakeyaml.resolver.Resolver;
  *
  * <p>.gem format: outer POSIX tar containing metadata.gz (gzipped YAML gemspec) and data.tar.gz.
  */
+@Slf4j
 @UtilityClass
 @NullMarked
 public class GemspecParser {
@@ -64,6 +66,30 @@ public class GemspecParser {
   /** The largest compressed {@code metadata.gz} a gem may carry; real ones are a few KiB. */
   static final long MAX_METADATA_GZ_BYTES = 10L * 1024 * 1024;
 
+  // The limits of the ruby_gem and ruby_gem_version columns the metadata is stored in (RPS-1071).
+  // Both PostgreSQL and H2 create them as varchar of exactly this length. They are counted in
+  // UTF-16 units, the stricter of the two ways either database might count a character, so a value
+  // that passes is never refused by the column. The entities take their @Column lengths from here.
+
+  /** {@code ruby_gem.name}. */
+  public static final int MAX_NAME_LENGTH = 255;
+
+  /** {@code ruby_gem_version.version}, and {@code ruby_gem.latest}, which is set from it. */
+  public static final int MAX_VERSION_LENGTH = 64;
+
+  /** {@code ruby_gem_version.platform}. */
+  public static final int MAX_PLATFORM_LENGTH = 64;
+
+  /** {@code ruby_gem_version.authors}. */
+  public static final int MAX_AUTHORS_LENGTH = 512;
+
+  /** {@code ruby_gem_version.homepage}. */
+  public static final int MAX_HOMEPAGE_LENGTH = 512;
+
+  /** {@code ruby_gem_version.required_ruby_version}. */
+  public static final int MAX_REQUIRED_RUBY_VERSION_LENGTH = 64;
+
+  private static final String AUTHOR_SEPARATOR = ", ";
   private static final String RUNTIME_DEP = "runtime";
   private static final String DEFAULT_PLATFORM = "ruby";
   private static final String RUBY_TAG_PREFIX = "!ruby/";
@@ -97,6 +123,21 @@ public class GemspecParser {
     }
   }
 
+  /**
+   * Turns the gemspec into the metadata that is stored. It is the one place the values of a push
+   * are known before any row or file is written, for a new version and for a replacement alike, so
+   * the column limits are applied here (RPS-1071):
+   *
+   * <ul>
+   *   <li>the name, version, platform and required Ruby version are rejected with a 400 that names
+   *       the field. The first three are identifiers, part of the unique key and of the file name,
+   *       and cutting a Ruby requirement would change which Rubies the gem installs on, while
+   *       dropping it would make the gem look installable everywhere
+   *   <li>the authors are cut to the last whole author that fits, so the stored list stays valid;
+   *       they are only shown, and the full gemspec is stored with the gem
+   *   <li>a homepage is dropped, because a cut URL links somewhere else
+   * </ul>
+   */
   private static GemMetadata parseMetadataGz(final byte[] gzBytes) {
     final @Nullable Map<String, Object> spec;
     try (final var gzip = new GZIPInputStream(new ByteArrayInputStream(gzBytes))) {
@@ -113,6 +154,10 @@ public class GemspecParser {
     final var version = requireGemField(extractVersion(spec), "gemVersionMissing");
 
     final var platform = extractPlatform(spec);
+    final var requiredRubyVersion = extractRequiredRubyVersion(spec);
+
+    rejectOverLongIdentifiers(name, version, platform, requiredRubyVersion);
+
     final var deps = extractDependencies(spec);
 
     return GemMetadata.builder()
@@ -120,13 +165,74 @@ public class GemspecParser {
         .version(version)
         .platform(platform)
         .description(extractString(spec, "description"))
-        .authors(extractAuthors(spec))
-        .homepage(extractString(spec, "homepage"))
-        .requiredRubyVersion(extractRequiredRubyVersion(spec))
+        .authors(cutAuthors(extractAuthors(spec)))
+        .homepage(dropIfTooLong(extractString(spec, "homepage"), MAX_HOMEPAGE_LENGTH, "homepage"))
+        .requiredRubyVersion(requiredRubyVersion)
         .runtimeDependencies(deps.stream().filter(d -> RUNTIME_DEP.equals(d.getType())).toList())
         .developmentDependencies(
             deps.stream().filter(d -> !RUNTIME_DEP.equals(d.getType())).toList())
         .build();
+  }
+
+  private static void rejectOverLongIdentifiers(
+      final String name,
+      final String version,
+      final String platform,
+      final @Nullable String requiredRubyVersion) {
+
+    if (isTooLong(name, MAX_NAME_LENGTH)) {
+      throw new BadRequestException("gemNameTooLong");
+    }
+    if (isTooLong(version, MAX_VERSION_LENGTH)) {
+      throw new BadRequestException("gemVersionTooLong");
+    }
+    if (isTooLong(platform, MAX_PLATFORM_LENGTH)) {
+      throw new BadRequestException("gemPlatformTooLong");
+    }
+    if (isTooLong(requiredRubyVersion, MAX_REQUIRED_RUBY_VERSION_LENGTH)) {
+      throw new BadRequestException("gemRequiredRubyVersionTooLong");
+    }
+  }
+
+  private static boolean isTooLong(final @Nullable String value, final int maxLength) {
+    return value != null && value.length() > maxLength;
+  }
+
+  /**
+   * Cuts a list of authors to the column length at the last {@code ", "} that leaves it whole, so
+   * no author is left half written. A first author that alone is over-long is cut on a character
+   * boundary instead, as an empty list would say nothing.
+   */
+  @Nullable
+  private static String cutAuthors(final @Nullable String authors) {
+    if (authors == null || authors.length() <= MAX_AUTHORS_LENGTH) {
+      return authors;
+    }
+
+    log.warn("Truncating authors: longer than {} characters", MAX_AUTHORS_LENGTH);
+    final var boundary = authors.lastIndexOf(AUTHOR_SEPARATOR, MAX_AUTHORS_LENGTH);
+    if (boundary > 0) {
+      return authors.substring(0, boundary);
+    }
+    return cutAtCodePoint(authors, MAX_AUTHORS_LENGTH);
+  }
+
+  /** Cuts to {@code maxLength} UTF-16 units without leaving half of a surrogate pair behind. */
+  private static String cutAtCodePoint(final String value, final int maxLength) {
+    final var end =
+        Character.isHighSurrogate(value.charAt(maxLength - 1)) ? maxLength - 1 : maxLength;
+    return value.substring(0, end);
+  }
+
+  @Nullable
+  private static String dropIfTooLong(
+      final @Nullable String value, final int maxLength, final String field) {
+
+    if (isTooLong(value, maxLength)) {
+      log.warn("Skipping {}: longer than {} characters", field, maxLength);
+      return null;
+    }
+    return value;
   }
 
   private static String requireGemField(final @Nullable String value, final String errorKey) {
