@@ -744,6 +744,16 @@ public class ErrorHandler {
    * (not-null, foreign key, check) means the server wrote something it should not have, so it stays
    * a 500 through {@link #defaultExceptionHandler}, which logs it as an error.
    *
+   * <p>The other class-22 (data exception) states stay a 500 on purpose (RPS-1080), among them
+   * 22003 numeric value out of range, 22P02 and 22018 invalid text representation, 22007 invalid
+   * datetime format and 22012 division by zero. No request can cause them today: every numeric
+   * column is as wide as its Java field, so binding is the range check, no query casts or divides a
+   * request value, and Spring already answers 400 for a malformed path variable or parameter. One
+   * that occurs is therefore a server bug, and a 500 keeps exposing it. PostgreSQL and H2 also
+   * spell the same fault differently (integer overflow is 22003 on PostgreSQL and 22004 on H2; a
+   * text that does not cast is 22P02 and 22018), so a state added here later has to be added for
+   * both databases.
+   *
    * <p>A mapped violation still means an up-front check missed a case, so it is logged as a warning
    * with the SQL state. The constraint name and offending value stay out of the response.
    *

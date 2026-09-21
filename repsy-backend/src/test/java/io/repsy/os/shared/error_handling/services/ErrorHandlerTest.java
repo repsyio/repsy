@@ -306,10 +306,29 @@ class ErrorHandlerTest {
   }
 
   @ParameterizedTest(name = "SQL state {0}")
-  @ValueSource(strings = {"23502", "23503", "23513", "23514", "22003", "40001"})
-  @DisplayName("keeps 500 errorOccurred for a violation the client cannot correct")
+  @ValueSource(
+      strings = {
+        "23502",
+        "23503",
+        "23513",
+        "23514",
+        "40001",
+        // RPS-1080: the class-22 states other than 22001 stay 500 on purpose. Both databases'
+        // spellings are pinned, because PostgreSQL and H2 report the same fault differently:
+        // out of range is 22003 on PostgreSQL and 22004 on H2 for an integer column; a text that
+        // does not cast is 22P02 on PostgreSQL and 22018 on H2.
+        "22003",
+        "22004",
+        "22P02",
+        "22018",
+        "22007",
+        "22012"
+      })
+  @DisplayName("keeps 500 errorOccurred for a violation the client cannot correct (RPS-1080)")
   void otherViolationsStayServerErrors(final String sqlState) throws Exception {
     // Not-null, foreign key and check violations mean the server wrote a row it should not have.
+    // The class-22 states (numeric out of range, invalid text, division by zero) cannot be caused
+    // by a request today, so one that occurs is a server bug that a 500 must keep exposing.
     this.mockMvc
         .perform(get("/db/" + sqlState))
         .andExpect(status().isInternalServerError())
