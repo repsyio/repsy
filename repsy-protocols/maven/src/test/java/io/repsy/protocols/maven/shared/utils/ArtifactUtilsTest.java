@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.util.Objects;
 import java.util.UUID;
 import org.apache.maven.artifact.repository.metadata.Metadata;
+import org.apache.maven.model.Model;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -297,5 +298,102 @@ class ArtifactUtilsTest {
   @DisplayName("finds no GAV for a path outside the layout")
   void noGavOutsideTheLayout(final String path) {
     assertThat(ArtifactUtils.getGavByFile(StoragePath.of(UUID.randomUUID(), path))).isNull();
+  }
+
+  private static final String POM_PATH_OF_ACME_LIB = "com/acme/lib/1.0/lib-1.0.pom";
+
+  /** A POM with the given elements in place of the coordinates, like a client would send it. */
+  private static Model pomWith(final String elements) {
+    final var pom =
+        "<project xmlns=\"http://maven.apache.org/POM/4.0.0\"><modelVersion>4.0.0</modelVersion>"
+            + elements
+            + "</project>";
+
+    return Objects.requireNonNull(
+        ArtifactUtils.readModel(new ByteArrayInputStream(pom.getBytes(UTF_8))));
+  }
+
+  private static String parentOf(final String groupId) {
+    return "<parent><groupId>"
+        + groupId
+        + "</groupId><artifactId>par</artifactId><version>1</version></parent>";
+  }
+
+  @Test
+  @DisplayName("declares the groupId of the POM, else the one of its parent, else none")
+  void declaredGroupIdFallsBackToTheParent() {
+    assertThat(
+            ArtifactUtils.declaredGroupId(
+                pomWith("<groupId>com.acme</groupId>" + parentOf("org.parent"))))
+        .isEqualTo("com.acme");
+    assertThat(ArtifactUtils.declaredGroupId(pomWith(parentOf("org.parent"))))
+        .isEqualTo("org.parent");
+    assertThat(ArtifactUtils.declaredGroupId(pomWith("<artifactId>lib</artifactId>"))).isNull();
+  }
+
+  @ParameterizedTest(name = "a POM of {0} under com/acme is refused")
+  @ValueSource(
+      strings = {
+        "<groupId>org.other</groupId><artifactId>lib</artifactId><version>1.0</version>",
+        "<groupId>com.Acme</groupId><artifactId>lib</artifactId><version>1.0</version>",
+        "<groupId>${g}</groupId><artifactId>lib</artifactId><version>1.0</version>",
+        "<groupId></groupId><artifactId>lib</artifactId><version>1.0</version>",
+        "<parent><groupId>org.other</groupId><artifactId>par</artifactId><version>1</version>"
+            + "</parent><artifactId>lib</artifactId><version>1.0</version>",
+        "<groupId>org.other</groupId>"
+            + "<parent><groupId>com.acme</groupId>"
+            + "<artifactId>par</artifactId><version>1</version></parent>"
+            + "<artifactId>lib</artifactId><version>1.0</version>"
+      })
+  @DisplayName(
+      "refuses a POM whose groupId is not the one of its path, with a fixed msgId (RPS-1193)")
+  void refusesAPomWhoseGroupIdIsNotItsPaths(final String elements) {
+    final var model = pomWith(elements);
+
+    assertThatThrownBy(() -> ArtifactUtils.checkPomGroupIdMatchesPath(model, POM_PATH_OF_ACME_LIB))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("pomGroupIdMismatch");
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        "com/acme/lib/1.0/lib-1.0.pom | <groupId>com.acme</groupId><artifactId>lib</artifactId>"
+            + "<version>1.0</version>",
+        "com/acme/lib/1.0/lib-1.0.pom | <parent><groupId>com.acme</groupId><artifactId>par</artifactId>"
+            + "<version>1</version></parent><artifactId>lib</artifactId><version>1.0</version>",
+        "com/acme/lib/1.0/lib-1.0.pom | <artifactId>lib</artifactId><version>1.0</version>",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.pom |"
+            + " <groupId>com.acme</groupId><artifactId>lib</artifactId>"
+            + "<version>1.0-SNAPSHOT</version>",
+        "com/acme/lib/1.0/lib-1.0.pom | <groupId>com.acme</groupId><artifactId>lib</artifactId>"
+            + "<version>${revision}</version>",
+        "com/acme/lib/1.0/lib-1.0.pom | <groupId>com.acme</groupId><artifactId>other</artifactId>"
+            + "<version>1.0</version>",
+        "com/acme/lib/1.0/lib-1.0.pom | <groupId>com.acme</groupId><artifactId>lib</artifactId>"
+            + "<version>1.0</version><packaging>pom</packaging>",
+        "com/acme/lib/1.0/lib-1.0.pom | <groupId>com.acme</groupId><artifactId>lib</artifactId>"
+            + "<version>1.0</version><packaging>maven-plugin</packaging>",
+        "com/acme/lib/1.0/lib-1.0.pom | <groupId>com.acme</groupId><artifactId>lib</artifactId>"
+            + "<version>1.0</version><distributionManagement><relocation><groupId>com.new</groupId>"
+            + "</relocation></distributionManagement>",
+        "com/acme/sub/lib/1.0/lib-1.0.pom | <groupId>com.acme.sub</groupId>"
+            + "<artifactId>lib</artifactId><version>1.0</version>"
+      })
+  @DisplayName("accepts the POMs real clients send, whatever their artifactId and version")
+  void acceptsThePomsRealClientsSend(final String path, final String elements) {
+    ArtifactUtils.checkPomGroupIdMatchesPath(pomWith(elements), path);
+  }
+
+  @Test
+  @DisplayName("does not check a POM that has no model or a path that has no GAV")
+  void skipsThePathCheckWhenThePathHasNoGav() {
+    final var mismatching =
+        pomWith("<groupId>org.other</groupId><artifactId>lib</artifactId><version>1.0</version>");
+
+    ArtifactUtils.checkPomGroupIdMatchesPath(mismatching, "io/stray.pom");
+    ArtifactUtils.checkPomGroupIdMatchesPath(mismatching, "com/acme/lib/1.0/other-1.0.pom");
+    ArtifactUtils.checkPomGroupIdMatchesPath(null, POM_PATH_OF_ACME_LIB);
   }
 }

@@ -227,6 +227,52 @@ public class ArtifactUtils {
     }
   }
 
+  /** The groupId a POM declares: its own, else its parent's (Maven inherits it), else null. */
+  public static @Nullable String declaredGroupId(final Model model) {
+
+    if (model.getGroupId() != null) {
+      return model.getGroupId();
+    }
+
+    return model.getParent() != null ? model.getParent().getGroupId() : null;
+  }
+
+  /**
+   * Refuses a POM whose declared groupId is not the group of its path. The artifact service
+   * registers a version under the group of the path, so a POM of another group used to be stored
+   * and answered 200 but never registered: served, yet invisible and undeletable in the panel and
+   * out of reach of the version events and the scanner (RPS-1193).
+   *
+   * <p>There is no check when the POM declares no groupId at all (Maven refuses such a POM itself)
+   * or when the path has no GAV (it is refused earlier as {@code invalidArtifactPath}). The
+   * comparison is case-sensitive like the repository layout, and the artifactId and the version are
+   * not compared: they are never used for the registration, and {@code ${revision}}, an inherited
+   * version or an sbt cross-versioned artifactId would be refused wrongly.
+   *
+   * @param model The parsed POM, {@code null} when there is none to check
+   * @param path The repository-relative path the POM is uploaded to
+   * @throws BadRequestException With the fixed {@code pomGroupIdMismatch} id
+   */
+  public static void checkPomGroupIdMatchesPath(final @Nullable Model model, final String path) {
+
+    final var gav = convertPathToGav(path);
+
+    if (model == null || gav == null) {
+      return;
+    }
+
+    final var declared = declaredGroupId(model);
+
+    if (declared != null && !declared.equals(gav.getGroupId())) {
+      log.info(
+          "Refusing POM {}: it declares groupId {} under group {}",
+          path,
+          declared,
+          gav.getGroupId());
+      throw new BadRequestException("pomGroupIdMismatch");
+    }
+  }
+
   /**
    * Tells whether the artifact service parses the uploaded file as a POM: a {@code .pom} path that
    * is neither a checksum nor a {@code .asc} signature of the POM.

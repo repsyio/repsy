@@ -43,9 +43,15 @@
  *    is verified; a `.jar.asc` is stored as sent.
  *  - The same holds for an `.asc` that is not a signature at all (invalid armor, a bad CRC, binary
  *    garbage): 422 `artifactSignatureNotVerified`, where it used to be a 500 (RPS-1191). And an
- *    `.asc` of a stored POM that has no registered version (its `<groupId>` is not its directory's,
- *    so it was stored but never registered) is refused with 404 `artifactVersionNotFound` before it
- *    is stored, not stored and then refused (RPS-1191).
+ *    `.asc` of a stored POM that has no registered version is refused with 404
+ *    `artifactVersionNotFound` before it is stored, not stored and then refused (RPS-1191); such a
+ *    POM can no longer be uploaded (see the next point), so `MavenPomSignatureIT` pins that case
+ *    by removing the rows of a stored POM.
+ *  - A POM whose `<groupId>` (else its `<parent><groupId>`) is not its directory's group is refused
+ *    with 400 `pomGroupIdMismatch` and stores nothing, where it used to be stored and answered 200
+ *    but never registered: served, yet invisible and undeletable in the panel (RPS-1193). Only the
+ *    groupId is compared, case-sensitively; a POM that declares none is not checked, and its
+ *    artifactId and version are never compared.
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import {
@@ -444,32 +450,59 @@ test.describe('maven upload rules (raw HTTP)', () => {
   );
 
   test(
-    'a .pom.asc for a POM the server did not register answers 404 and stores nothing (RPS-1191)',
+    "a POM whose groupId is not its directory's is refused with 400 and stores nothing (RPS-1193)",
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder);
-      const pom = `${versionDir(layout.groupId, ARTIFACT_ID, RELEASE)}/${ARTIFACT_ID}-${RELEASE}.pom`;
       const admin = adminCredential();
+      const pomPath = (version: string): string =>
+        `${versionDir(layout.groupId, ARTIFACT_ID, version)}/${ARTIFACT_ID}-${version}.pom`;
+      const pomWith = (groupElements: string, version: string): string =>
+        '<?xml version="1.0" encoding="UTF-8"?>\n' +
+        '<project xmlns="http://maven.apache.org/POM/4.0.0">\n' +
+        '  <modelVersion>4.0.0</modelVersion>\n' +
+        `  ${groupElements}\n` +
+        `  <artifactId>${ARTIFACT_ID}</artifactId>\n` +
+        `  <version>${version}</version>\n` +
+        '</project>\n';
+      const parentOf = (groupId: string): string =>
+        `<parent><groupId>${groupId}</groupId><artifactId>par</artifactId><version>1</version></parent>`;
+      const refusedMessage = 'pomGroupIdMismatch';
 
-      // A POM that declares another groupId than its directory's is stored but not registered.
-      expectPut(
-        await layout.put(pom, minimalPom('org.other', ARTIFACT_ID, RELEASE), OCTET),
-        200,
-        undefined,
-        pom,
+      const refused: [string, string][] = [
+        ['its own groupId is another', minimalPom('org.other', ARTIFACT_ID, RELEASE)],
+        ['only its parent has another groupId', pomWith(parentOf('org.other'), RELEASE)],
+        ['its groupId is an expression', pomWith('<groupId>${g}</groupId>', RELEASE)],
+        [
+          'its groupId differs in case',
+          minimalPom(layout.groupId.toUpperCase(), ARTIFACT_ID, RELEASE),
+        ],
+      ];
+      for (const [what, pom] of refused) {
+        expectPut(await layout.put(pomPath(RELEASE), pom, OCTET), 400, refusedMessage, what);
+        const res = await rawGet(layout.repoName, admin, pomPath(RELEASE));
+        expect(res.status, `${what}: GET answered ${res.status}`).toBe(404);
+      }
+      expect(await repoTree(layout.repoName)).toEqual({});
+
+      // The POMs real clients send: the group of the path, inherited from the parent, or none at all
+      // (the artifactId and version are never compared, so a matching group is enough).
+      const accepted: [string, string, string][] = [
+        ['2.0', 'its own groupId', minimalPom(layout.groupId, ARTIFACT_ID, '2.0')],
+        ['2.1', 'the groupId of its parent', pomWith(parentOf(layout.groupId), '2.1')],
+        ['2.2', 'no groupId and no parent', pomWith('', '2.2')],
+      ];
+      for (const [version, what, pom] of accepted) {
+        expectPut(await layout.put(pomPath(version), pom, OCTET), 200, undefined, what);
+        const res = await rawGet(layout.repoName, admin, pomPath(version));
+        expect(res.status, `${what}: GET answered ${res.status}`).toBe(200);
+        expect(res.body.toString('utf8'), `${what}: the stored POM`).toBe(pom);
+      }
+
+      const tree = await repoTree(layout.repoName);
+      expect(Object.keys(tree).sort()).toEqual(
+        accepted.map(([version]) => pomPath(version)).sort(),
       );
-      const before = await repoTree(layout.repoName);
-
-      expectPut(
-        await layout.put(`${pom}.asc`, NO_SIGNATURE, OCTET),
-        404,
-        'artifactVersionNotFound',
-        `${pom}.asc`,
-      );
-      const res = await rawGet(layout.repoName, admin, `${pom}.asc`);
-      expect(res.status, `GET ${pom}.asc answered ${res.status}`).toBe(404);
-
-      expect(await repoTree(layout.repoName)).toEqual(before);
     },
   );
 

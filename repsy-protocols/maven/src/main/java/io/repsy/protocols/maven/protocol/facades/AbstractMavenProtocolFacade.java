@@ -33,6 +33,7 @@ import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.maven.index.artifact.Gav;
+import org.apache.maven.model.Model;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -67,7 +68,8 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * Stores a file and registers it. A path outside the Maven layout is refused inside {@code
    * getDeployAndVersionType}, before {@code checkDeploymentRules} and {@code store}, so nothing is
    * written and the {@code usages} context property is never set (the usage post-processor reads it
-   * only when present). A POM signature ({@code .pom.asc}) is verified against the stored POM
+   * only when present). A POM is parsed, and refused if its groupId is not the one of its path,
+   * before it is stored. A POM signature ({@code .pom.asc}) is verified against the stored POM
    * before it is stored, so a refused one never reaches the repo and takes nothing else with it: an
    * existing version, its previous signature and its {@code signed} flag are left as they were.
    */
@@ -143,15 +145,23 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * storage, so a malformed POM used to be written first and stay in the repo (and off the usage
    * counter) when the parse then failed. A POM is spooled to a temporary file, parsed, and only
    * then copied to storage, so a rejected one never reaches it.
+   *
+   * <p>The same holds for a POM whose declared groupId (its own, else its parent's) is not the
+   * group of its path: it would be stored and served but never registered, so it is refused with
+   * {@code pomGroupIdMismatch} before it is stored (RPS-1193).
    */
   private BaseUsages writeValidatedPom(
       final String repoName, final StoragePath storagePath, final InputStream inputStream)
       throws IOException {
 
     try (final var pom = SpooledUpload.spool(inputStream)) {
+      final @Nullable Model model;
+
       try (final var pomStream = pom.openStream()) {
-        ArtifactUtils.readModel(pomStream);
+        model = ArtifactUtils.readModel(pomStream);
       }
+
+      ArtifactUtils.checkPomGroupIdMatchesPath(model, storagePath.getRelativePath().getPath());
 
       try (final var pomStream = pom.openStream()) {
         return this.mavenStorageService.writeInputStreamToPath(storagePath, pomStream, repoName);

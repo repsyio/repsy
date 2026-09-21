@@ -81,6 +81,9 @@ import org.springframework.core.io.Resource;
  *
  * <p>A path that does not parse to a GAV is refused with {@code invalidArtifactPath} (RPS-1182).
  * Before, the upload was dropped silently and answered 200.
+ *
+ * <p>A stored POM that declares another groupId than its path's is not registered (RPS-1193). The
+ * facade refuses such a POM before it is stored; the skip stays for one stored before that.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Maven ArtifactServiceImpl version-type rules (RPS-1174, RPS-1176, RPS-1182)")
@@ -622,6 +625,83 @@ class ArtifactServiceImplTest {
         .hasMessage("artifactVersionNotFound");
 
     verify(this.artifactVersionRepository, never()).save(any());
+  }
+
+  private static final String POM_OF_GROUP =
+      """
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        %s
+        <artifactId>lib</artifactId>
+        <version>1.0</version>
+      </project>
+      """;
+
+  private Repo stubRepo(final UUID id) {
+    final var repo = new Repo();
+    repo.setId(id);
+    repo.setName("mvn");
+    repo.setReleases(true);
+    repo.setSnapshots(true);
+    when(this.repoRepository.findByNameAndType("mvn", RepoType.MAVEN))
+        .thenReturn(Optional.of(repo));
+
+    return repo;
+  }
+
+  @ParameterizedTest(name = "a stored POM declaring {0} under com/acme is not registered")
+  @ValueSource(
+      strings = {
+        "<groupId>org.other</groupId>",
+        "<groupId>com.Acme</groupId>",
+        "<parent><groupId>org.other</groupId><artifactId>par</artifactId><version>1</version>"
+            + "</parent>"
+      })
+  @DisplayName("skips a stored POM whose groupId is not the one of its path (RPS-1193)")
+  void createOrUpdateArtifactSkipsAStoredPomOfAnotherGroup(final String groupElements) {
+    final var id = UUID.randomUUID();
+    this.stubRepo(id);
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom"),
+        new ByteArrayResource(
+            POM_OF_GROUP.formatted(groupElements).getBytes(StandardCharsets.UTF_8)));
+
+    verifyNoInteractions(this.artifactUpsertHelper, this.artifactRepository);
+  }
+
+  @ParameterizedTest(
+      name = "a stored POM declaring {0} under com/acme is registered as com.acme:lib")
+  @ValueSource(
+      strings = {
+        "<groupId>com.acme</groupId>",
+        "<parent><groupId>com.acme</groupId><artifactId>par</artifactId><version>1</version>"
+            + "</parent>",
+        ""
+      })
+  @DisplayName("registers a stored POM whose own or inherited groupId is the one of its path")
+  void createOrUpdateArtifactRegistersAPomWithAnInheritedGroupId(final String groupElements) {
+    final var id = UUID.randomUUID();
+    this.stubRepo(id);
+    when(this.artifactUpsertHelper.insertArtifact(any(Artifact.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom"),
+        new ByteArrayResource(
+            POM_OF_GROUP.formatted(groupElements).getBytes(StandardCharsets.UTF_8)));
+
+    verify(this.artifactUpsertHelper)
+        .insertArtifact(
+            argThat(
+                artifact ->
+                    "com.acme".equals(artifact.getGroupName())
+                        && "lib".equals(artifact.getArtifactName())));
+    verify(this.artifactUpsertHelper)
+        .insertArtifactVersion(
+            argThat(version -> "1.0".equals(version.getVersionName())), any(), any());
   }
 
   private Resource stubStoredPom(final String relativePath) {
