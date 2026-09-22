@@ -4,13 +4,15 @@ An end-to-end protocol-test harness (Playwright + TypeScript), outside the Maven
 drives real client flows (`mvn deploy`, `npm publish`, ...) against a real Repsy instance, with all
 data seeded through the panel API. Step 1 ("skeleton") built the tooling, config, the panel API
 client, a seeder with cleanup, a sweep script and the stack/runner containers, proven by one test
-suite (`tests/skeleton`). This is **step 2 ("scenario engine + maven")**: the scenario model
+suite (`tests/skeleton`). Step 2 ("scenario engine + maven") built the scenario model
 (`src/scenarios/`) and its catalog, the maven client adapter and runner, and the full catalog
-running green against a local stack. Since then the maven catalog also covers SNAPSHOT deploys and
+running green against a local stack; since then the maven catalog also covers SNAPSHOT deploys and
 redeploys, and the refusal scenarios check that nothing was stored ("SNAPSHOT and redeploy
-behaviour, as probed", below). Every other protocol (npm, cargo, nuget, docker, helm, pypi,
-golang, ruby) replicates the same model in later steps; nothing about the model itself is
-maven-specific.
+behaviour, as probed", below). This is **step 3a ("generalise the engine + npm")**: the scenario
+loop itself (`scenarios/loop.ts`) and the `ProtocolAdapter` interface (`scenarios/adapter.ts`) it
+runs, generalised out of what was maven-only code so a second protocol reuses it verbatim, plus the
+npm client adapter and runner. Every other protocol (cargo, nuget, docker, helm, pypi, golang,
+ruby) replicates the same model in later steps; nothing about the model itself is maven-specific.
 
 ## Rules
 
@@ -32,12 +34,13 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 ```
 e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example
-  playwright.config.ts        # one project per protocol: "skeleton", "maven"
+  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm"
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres:18 + Repsy, started/stopped by `run.sh local up|down`
-  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven"
+  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven; see "Adding a protocol adapter" below
+  runners/npm.Dockerfile       # + nothing else: npm ships with the node:24 base already
   runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
   src/
     env.ts                     # typed config from env/.env
@@ -50,25 +53,37 @@ e2e/
       seeder.ts                 # createUser/createRepo/setSettings/createToken + cleanup()
       sweep.ts                  # deletes e2e-* leftovers older than N hours (or --all)
     scenarios/
-      types.ts                  # Scenario/Outcome model, outcomeForStatus()
+      types.ts                  # Scenario/Outcome model, outcomeForStatus(), expectationFor()
       catalog.ts                # the scenario matrix -- see "Scenario model" below
-      world.ts                  # World/Coordinates types, the seed-publisher registry
-      fixtures.ts                # Playwright fixtures: panelApi, seeder, world(scenario, protocol)
+      adapter.ts                 # ProtocolAdapter/AdapterResult -- what the loop needs from a client
+      loop.ts                    # registerPublishConsumeLoop(adapter): the scenario loop, protocol-agnostic
+      coordinates.ts             # slugify() -- shared by every adapter's packageName()
+      world.ts                  # World/Coordinates/MaterializedCredential types
+      fixtures.ts                # Playwright fixtures: panelApi, seeder, world(scenario, adapter)
       remote-throttle.ts        # RemoteAuthBudget/withBackoff429 -- see "Remote hardening" below
     clients/
       exec.ts                   # execa wrapper: isolated work dir/HOME, redacted logs, attach-on-fail
-      maven.ts                  # the maven adapter: publish()/resolve(), raw-HTTP status pinning
-      maven-raw.ts              # raw PUT/GET, repo-tree fingerprint, maven-metadata.xml builders/parsers
-      pgp.ts                    # real OpenPGP.js key generation and detached signing, no gpg/network
+      raw-http.ts                # shared raw-HTTP building blocks: RawResponse, adminCredential(), authHeader(), sha256Hex, 429 backoff
+      maven.ts                  # the maven client: publish()/resolve()/seedPublish(), raw-HTTP status pinning
+      maven-raw.ts              # maven-specific raw PUT/GET, repo-tree fingerprint, maven-metadata.xml builders/parsers
+      maven-checks.ts            # expectNothingStored / expectSnapshotFollowedThroughMetadata
+      maven-adapter.ts           # mavenAdapter: the ProtocolAdapter object registerPublishConsumeLoop takes
+      npm-raw.ts                  # npm-specific raw PUT/GET (packument/tarball), publish-document builder
+      npm.ts                      # the npm client + npmAdapter: publish()/resolve()/seedPublish(), npm pack/publish/install
+      pgp.ts                     # real OpenPGP.js key generation and detached signing, no gpg/network
     packages/
-      maven/                    # mustache templates of the tiny jar project + settings.xml
+      maven/                     # mustache templates of the tiny jar project + settings.xml
+      npm/                       # mustache templates of the tiny package.json/index.js + .npmrc
   tests/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe
     maven/
-      publish-consume.spec.ts   # the scenario loop for maven
+      publish-consume.spec.ts   # registerPublishConsumeLoop(mavenAdapter) + the RPS-1196 real-client test
       upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules
       pgp-signature.spec.ts     # registered PGP public keys (RPS-1189): verify, reject, isolate, delete
       remote-throttle.spec.ts   # sanity check of RemoteAuthBudget/withBackoff429, no server needed
+    npm/
+      publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
+      registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
 ```
 
 ## Setup
@@ -274,24 +289,40 @@ protocol spec that calls `scenariosFor(SCENARIOS, protocol)`.
 
 ### Adding a protocol adapter
 
-1. `src/clients/<protocol>.ts`: `publish(world)`/`resolve(world)` (or that protocol's equivalent
-   verbs) returning an `AdapterResult` (`{ outcome, httpStatus, clientExitCode, command }`), derived
-   from a **raw HTTP request with the same credential**, not from the client's exit code (see
-   `clients/maven.ts`'s file header: a real client hides the HTTP status behind its own exit code).
-   Register a seed publisher at module load: `registerSeedPublisher('<protocol>', async (world) =>
-{...})` (see `scenarios/world.ts`).
-2. `src/packages/<protocol>/`: mustache templates of a tiny publishable project.
-3. `runners/<protocol>.Dockerfile`: the toolchain that protocol's client needs, pinned versions as
+The scenario loop itself (`scenarios/loop.ts`'s `registerPublishConsumeLoop`) is protocol-agnostic
+as of step 3a (RPS-294): a new protocol implements the `ProtocolAdapter` interface
+(`scenarios/adapter.ts`) and hands the loop that one object, instead of copying the loop's
+machinery. `clients/maven-adapter.ts` and `clients/npm.ts`'s `npmAdapter` are the two worked
+examples.
+
+1. `src/clients/<protocol>.ts` (+ a `<protocol>-raw.ts` for its raw-HTTP building blocks, built on
+   the shared pieces in `clients/raw-http.ts`): `publish(world)`/`resolve(world)`/`seedPublish(world)`
+   (or that protocol's equivalent verbs), each returning an `AdapterResult`
+   (`{ outcome, httpStatus, clientExitCode, command, contentSha256?, resolvedFile? }`, `adapter.ts`),
+   derived from a **raw HTTP request with the same credential**, not from the client's exit code
+   (see `clients/maven.ts`'s file header: a real client hides the HTTP status behind its own exit
+   code).
+2. `src/clients/<protocol>-adapter.ts` (or inline in `<protocol>.ts`, as `npm.ts` does): the
+   `ProtocolAdapter` object itself -- `protocol`, `client` (name/publishVerb/consumeVerb, used only
+   in messages), `packageName`/`version` (coordinate generation), `publish`/`resolve`/`seedPublish`
+   (from step 1), `fingerprint`/`expectNothingStored` (a snapshot of "what exists" a refused publish
+   must leave untouched, and the assertion that it did), and optionally
+   `afterSuccessfulRoundTrip`/`knownConsumeFailure` (a known, already-filed backend bug that only
+   affects the consume side -- see `npmAdapter.knownConsumeFailure` and RPS-1205 below).
+3. `src/packages/<protocol>/`: mustache templates of a tiny publishable project.
+4. `runners/<protocol>.Dockerfile`: the toolchain that protocol's client needs, pinned versions as
    build args. See `runners/maven.Dockerfile`'s header comment for why it repeats
    `runners/base.Dockerfile`'s early layers instead of `FROM`ing it as a separately built image.
-4. A service in `docker-compose.runners.yml` (copy the `maven` service: same `x-runner-common`/
+5. A service in `docker-compose.runners.yml` (copy the `maven` service: same `x-runner-common`/
    `x-runner-environment` anchors, its own named volume for third-party downloads if the client
-   caches those).
-5. A project in `playwright.config.ts` (`testMatch: '<protocol>/**/*.spec.ts'`).
-6. `tests/<protocol>/publish-consume.spec.ts`: the scenario loop (copy
-   `tests/maven/publish-consume.spec.ts`).
-7. Restrict any scenario your adapter cannot express (or add one only it needs) via the catalog
-   entry's `protocols` field.
+   caches those -- npm's does not, since its test packages declare no dependencies).
+6. A project in `playwright.config.ts` (`testMatch: '<protocol>/**/*.spec.ts'`).
+7. `tests/<protocol>/publish-consume.spec.ts`: `registerPublishConsumeLoop(<protocol>Adapter);` (see
+   `tests/npm/publish-consume.spec.ts`), plus any real-client test the catalog-driven loop cannot
+   express (a scoped-package round trip, for npm).
+8. Restrict any scenario your adapter cannot express (or add one only it needs) via the catalog
+   entry's `protocols` field, or override its `expect` for your protocol via `expectByProtocol`
+   (`scenarios/types.ts`'s `expectationFor`) when the real, probed status differs from maven's.
 
 ## Maven runner
 
@@ -333,6 +364,118 @@ probe), so a later "repository unchanged" comparison sees exactly what a real de
 ./run.sh test --protocol maven
 ```
 
+## npm runner
+
+`runners/npm.Dockerfile` adds nothing beyond the base image: npm ships with the `node:24-bookworm-slim`
+base already used. `clients/npm.ts` renders `src/packages/npm/{package,npmrc,index}.template.*` into
+a per-invocation isolated work directory (`clients/exec.ts`) and runs the real `npm` binary:
+
+- **`publish`**: `npm pack --pack-destination <isolated dir>` (deterministic, no network) followed by
+  `npm publish <that tarball> --userconfig <isolated .npmrc> --cache <isolated dir> --ignore-scripts`,
+  `--force` iff the scenario is about a redeploy (`reuseCoordinates`, correction #1 of the plan: this
+  bypasses npm 11's client-side "cannot publish over previous version" pre-flight, so the real request
+  reaches the server whether the redeploy is allowed or refused).
+- **`resolve`**: `npm install <name>@<version>` in a separate, also-fresh work directory with its own
+  isolated `.npmrc`/cache, `--ignore-scripts --no-save --no-package-lock`.
+- **`.npmrc`** (correction #4): `registry=<repoBaseUrl>/<repo>/` plus a matching
+  `//<host:port>/<repo>/:_authToken=` (a deploy token, `MaterializedCredential.kind === 'token'`) or
+  `:_auth=` (a real password, `kind === 'password'`) line — both need the SAME trailing slash to
+  match under npm's per-path scoping (verified against
+  [the npmrc docs](https://docs.npmjs.com/cli/v11/configuring-npm/npmrc)). **Every value interpolated
+  into `.npmrc` or `package.json` uses triple-mustache (`{{{...}}}`), never `{{...}}`**: mustache's
+  default double-brace interpolation HTML-escapes `/` and `=` (`&#x2F;`, `&#x3D;`), which is invisible
+  inside maven's XML templates (numeric character references there round-trip correctly through any
+  XML parser) but corrupts a plain `.npmrc`/`package.json` file outright — this broke every npm
+  scenario the first time this step ran it live (a corrupted `registry=` line and a scoped package
+  name with a literal `&#x2F;` in it), and is exactly the kind of thing only running the real client
+  against a real instance catches.
+- **Version scheme** (correction #3): `0.<seconds since 2026-01-01T00:00:00Z>.<seq>`, not a
+  14+-digit `Date.now()`-derived number — `PackageUtils.extractVersionNameFromPayload` parses with
+  semver4j 3.1.0, which stores each part as a Java `Integer`.
+- Because `npm` hides the HTTP status behind its own exit code, `clients/npm.ts` also does a raw HTTP
+  companion probe with the same credential: `publish`'s is a `PUT` of the identical publish document
+  `npm publish` just sent (same packed tarball bytes, so a successful client publish followed by the
+  raw re-PUT is a harmless, byte-identical redeploy of the version it just created, exactly like
+  `clients/maven.ts`'s raw POM re-PUT); `resolve`'s is a packument `GET`, deliberately never a tarball
+  fetch (see "RPS-1205", below) so its status is a clean authn/authz signal on its own.
+- **Fingerprint** (`ProtocolAdapter.fingerprint`/`expectNothingStored`): npm has no repo-wide
+  directory listing the way maven's does, so this is scoped to the one package a scenario's publish
+  targets — the packument body's hash (`undefined` when the package does not exist at all) plus every
+  version's stored tarball hash (by its canonical path, never `dist.tarball`), read with
+  `npm-raw.ts`'s `rawGetPackument`/`parsePackument`/`rawGetTarballCanonical`, not the panel API.
+
+```bash
+./run.sh test --protocol npm
+```
+
+### Scenario mapping onto the shared catalog
+
+Every catalog scenario that is not maven-restricted (`protocols: ['maven']` — the release/snapshot
+and SNAPSHOT-redeploy scenarios) applies to npm unchanged, with **no `expectByProtocol` override
+needed**: `ProtocolAuthService`/`ErrorHandler` (auth, throttle, status-code mapping) are shared with
+maven verbatim, so every auth scenario's `Outcome` bucket (`unauthorized`/`forbidden`/`ok`) is
+identical, even though the exact msgId sometimes differs (see below). The override rule
+(`AbstractNpmProtocolFacade.publish`) and the malformed-version check
+(`PackageUtils.extractVersionNameFromPayload`) were read from source first and then confirmed live
+(`tests/npm/registry-rules.spec.ts`):
+
+| scenario (shared catalog)                                                                      | real status observed              | msgId / note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `token-ro` publish                                                                             | `401 unauthorized`                | same as maven: a read-only deploy token attempting a write throws the plain `UnAuthorizedException` `ProtocolAuthService.authorizeDeployToken`/`authorizeDeployTokenRequest` always throws for that, not a distinct "forbidden"                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `token-expired`/`token-revoked`/`token-rotated-old`/`token-other-repo` (Bearer, correction #5) | `401`, all four                   | The raw deploy-token secret is sent as npm's Bearer `_authToken`. `ProtocolAuthService.handleBearerAuth` tries it as a deploy token first (`tryAuthorizeWithDeployToken`) exactly like Basic's password; when that lookup finds nothing (revoked = row gone, rotated-old = value changed, other-repo = wrong repo id), it falls through to plain JWT verification of that same string, which fails to parse and throws `UnAuthorizedException(accessNotAllowed)` — 401 either way, so the shared `expect` needs no override, but (per correction #5) this fallback path never calls `AuthFailureThrottle`, unlike maven's Basic-auth equivalent |
+| `no-override` (2nd publish, `allowOverride:false`)                                             | `403 packageVersionAlreadyExists` | `AbstractNpmProtocolFacade.publish`: `packageVersionOptional.isPresent() && !repoInfo.isAllowOverride()`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `override` (2nd publish, `allowOverride:true`)                                                 | `200 ok`                          | a NEW version of an existing package is _always_ accepted regardless of `allowOverride`; only re-publishing an _existing_ version is checked                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| everything else (`password-admin`, `token-rw`, `anonymous-public`, ...)                        | matches the shared `expect`       | unchanged from maven                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+
+`registry-rules.spec.ts` additionally pins an invalid/malformed version string at `400
+invalidPackageVersion` (`PackageUtils.extractVersionNameFromPayload`, before anything is stored).
+
+### RPS-1205, confirmed live: the exact shape
+
+`PackageUtils.fixTarballUrl` (`repsy-protocols/npm/.../shared/utils/PackageUtils.java`) rewrites a
+version's `dist.tarball` at publish time by splicing the repo name into the URL's path at a fixed
+offset, a transform whose own javadoc describes a cloud, multi-tenant path shape
+(`/npm/username/@foo/demo/-/@foo/demo-0.2.1.tgz`) Repsy OS does not have. On OS, a real npm client's
+own `dist.tarball` (computed client-side as `<registry>/<name>/-/<tarballFilename>`, i.e. already
+just `/<repoName>/<packagePath>/-/<file>`) gets a **second, wrong `/<repoName>/` segment spliced into
+the middle of the path**. Live evidence from one run (`tests/npm/registry-rules.spec.ts`):
+
+```
+canonical path "e2e-y50b4j9002-tarball/-/e2e-y50b4j9002-tarball-0.22833922.2.tgz" -> 200
+dist.tarball   "http://localhost:9090/e2e-y50b4j9002-npm-1/e2e-y50b4j9002-tarball/e2e-y50b4j9002-npm-1/-/e2e-y50b4j9002-tarball-0.22833922.2.tgz" -> 404
+```
+
+(`e2e-y50b4j9002-npm-1` — the repo name — appears twice: once correctly, as the request's own repo
+segment, and once spliced in mid-path by `fixTarballUrl`.) The **canonical path always serves the
+real, byte-correct tarball** (confirmed by content hash, not just status); **`dist.tarball` always
+answers `404`**, confirmed on unscoped and scoped packages alike (`tests/npm/publish-consume.spec.ts`'s
+scoped-package test). This is what makes RPS-1205 a URL-construction bug, not a storage one, and why
+`npmAdapter.knownConsumeFailure` routes only the final client-exit-code/content-equality consume
+assertions through `test.fail()` (`scenarios/loop.ts`) — the auth-only packument-GET outcome is
+asserted for real, same as every other scenario, and never weakened.
+
+### A second, distinct backend bug found live (not RPS-1205, not fixed here)
+
+Re-publishing (redeploying, `allowOverride: true`) an **existing** npm version whose manifest has no
+`keywords` field crashes with `400 badRequest`, swallowing a `ClassCastException`:
+`PackageUtils.liftFieldsToTopLevel` defaults an absent version `keywords` onto the **top-level**
+packument as a native `new String[] {}`; `NpmPackageServiceImpl.updateVersionFromMetadata` (reached
+only on a re-publish of an _existing_ version, via `AbstractNpmProtocolFacade.publish`'s "already
+exists" branch) then calls `addKeywords`/`addMaintainers` with that **top-level** payload instead of
+the version's own sub-object, and `addKeywords` casts what it finds at `"keywords"` to
+`ArrayList<String>` — which throws, because the value is a `String[]`, not an `ArrayList`, when it
+came from that default. A first-ever publish of a package never hits this (`addPackage`'s DB path
+passes the version's own sub-object, which legitimately has no `"keywords"` key, so the read is
+`null` and skipped safely); only a **redeploy of an already-existing version** does. Confirmed live by
+adding `"keywords": []` to a version manifest, which alone made an otherwise-identical redeploy
+succeed. This is **not** filed as RPS-1205 (a different bug, a different code path, no relation to
+tarball URLs) and **not fixed here** (out of scope, per the plan) — `clients/npm-raw.ts`'s
+`buildPublishDocument` and `src/packages/npm/package.template.json` both always include `"keywords":
+[]` (a real npm client's own normalised manifest almost always does too), which routes around it
+without touching backend code. Report this to whoever files Jira tickets as a candidate `RPS-XXXX`
+("npm: redeploying an existing version whose manifest has no `keywords` throws a `ClassCastException`,
+answered as a generic `400 badRequest`") — no ticket number is invented here.
+
 ## Remote hardening
 
 On a `remote` target (`target.isRemote`, see `src/target.ts`), `AUTH_THROTTLE_MAX_FAILURES` cannot
@@ -359,7 +502,8 @@ real shared remote. Both are called out in the plan as later, "remote hardening"
                               # set REPSY_IMAGE to test a published image instead)
 ./run.sh test                # runs the "skeleton" runner container against it
 ./run.sh test --protocol maven
-./run.sh test --protocol skeleton,maven
+./run.sh test --protocol npm
+./run.sh test --protocol skeleton,maven,npm
 ./run.sh test --grep '@smoke'
 ./run.sh test -b             # rebuild the runner image(s) first (Dockerfile/lockfile changed)
 ./run.sh local down
@@ -367,8 +511,10 @@ real shared remote. Both are called out in the plan as later, "remote hardening"
 ```
 
 `run.sh test` accepts `--target local|remote|ci` and `--protocol a,b` (a comma-separated list of
-runner services: `skeleton`, `maven`). Reports land under `e2e/test-results/` (JUnit XML) and
-`e2e/playwright-report/` (HTML).
+runner services: `skeleton`, `maven`, `npm`). Reports land under `e2e/test-results/` (JUnit XML) and
+`e2e/playwright-report/` (HTML) — one `run.sh test` invocation covering several `--protocol` services
+overwrites that JUnit file per service, so diff/compare a single protocol's run in isolation
+(`--protocol maven` alone) rather than a combined one if you need its own report.
 
 Editing a test, a file under `src/`, or the openapi spec needs no image rebuild: both are
 bind-mounted into the runner container, which regenerates the API client on every start. Only a
@@ -420,12 +566,22 @@ pnpm exec prettier --check .
 ./run.sh local up
 ./run.sh test --protocol maven
 ./run.sh test --protocol maven   # again, without resetting the stack — proves run isolation
+./run.sh test --protocol npm
+./run.sh test --protocol npm     # again — proves run isolation for npm too
 ./run.sh test                    # the skeleton project
+./run.sh sweep --dry-run         # before tearing down: confirms nothing was left behind
 ./run.sh local down
 ```
 
 After a run, confirm no `e2e-*` repos or users remain: `GET /api/repos/{repoType}/info` for every
-`RepoType` and `GET /api/users` should list none. A meaningfulness check for the maven catalog:
-temporarily flip one scenario's expectation in `catalog.ts` (e.g. `token-expired`'s publish to
-`'ok'`, or `redeploy-snapshots-off`'s), confirm `./run.sh test --protocol maven --grep <id>` fails,
-then restore it. `./run.sh sweep --dry-run` lists any `e2e-*` leftovers without deleting them.
+`RepoType` and `GET /api/users` should list none (`./run.sh sweep --all --dry-run` does this for
+you). A meaningfulness check for the maven catalog: temporarily flip one scenario's expectation in
+`catalog.ts` (e.g. `token-expired`'s publish to `'ok'`, or `redeploy-snapshots-off`'s), confirm
+`./run.sh test --protocol maven --grep <id>` fails, then restore it. `./run.sh sweep --dry-run` lists
+any `e2e-*` leftovers without deleting them.
+
+The npm suite's `'ok'`-expected scenarios currently report as an _expected_ failure
+(`test.fail`, RPS-1205 — see "npm runner" above), not a plain pass: Playwright's list reporter still
+prints a `✘` for each (something inside the test body did throw, which is exactly what `test.fail`
+is watching for), but the run's own summary line and exit code both say "passed"/`0` — treat those
+two as authoritative over the per-line glyphs.

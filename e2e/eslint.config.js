@@ -24,6 +24,9 @@ const IGNORES = [
   'src/api/generated/**',
   'playwright-report/**',
   'test-results/**',
+  // Rendered verbatim into an isolated work directory by clients/maven.ts / clients/npm.ts (mustache
+  // templates of the tiny publishable test packages) -- not part of this project's own source.
+  'src/packages/**',
 ];
 
 export default tseslint.config(

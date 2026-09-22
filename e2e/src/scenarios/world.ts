@@ -16,27 +16,35 @@
 
 /**
  * `World`: what a scenario turns into once seeded (plan section "Scenario model"). Kept in its own
- * module, separate from `fixtures.ts`, so a protocol adapter (`clients/maven.ts`) can import the
- * type and register its seed publisher without also pulling in `@playwright/test`'s fixture
- * machinery.
+ * module, separate from `fixtures.ts`, so a protocol adapter (`clients/maven-adapter.ts`,
+ * `clients/npm.ts`, ...) can import the type without also pulling in `@playwright/test`'s fixture
+ * machinery. The seed-publisher registry that used to live here (`registerSeedPublisher`/
+ * `seedPublisherFor`) is gone: a `ProtocolAdapter` (`scenarios/adapter.ts`) carries its own
+ * `seedPublish` directly, so there is no module-load-order dependency on a protocol's client module
+ * having been imported first.
  */
 import type { Scenario } from './types.js';
 
 /**
  * The credential a scenario resolved to, in the shape every protocol's Basic-auth-based adapter
  * needs. `transport` is `undefined` for the `anonymous` credential: no `Authorization` header is
- * sent at all, which is a different thing from sending one with empty/wrong values.
+ * sent at all, which is a different thing from sending one with empty/wrong values. `kind`
+ * distinguishes a real user/admin password from a deploy token for a protocol whose raw client
+ * speaks more than one auth scheme over the same "username + secret" shape (npm's `_authToken`
+ * vs. `_auth`); it is left out for the `anonymous` credential, which has neither.
  */
 export interface MaterializedCredential {
   transport?: 'basic';
   username?: string;
   password?: string;
+  kind?: 'password' | 'token';
 }
 
 /** A protocol-appropriate package identity: for maven, `groupId:artifactId` plus a version. */
 export interface Coordinates {
-  /** For maven this is `groupId:artifactId`; other protocols (npm, cargo, ...) would use their own
-   *  bare package name once their adapters exist. */
+  /** For maven this is `groupId:artifactId`; other protocols use their own bare package name
+   *  instead (npm: a possibly-scoped bare name, `name` or `@scope/name`, never a `groupId:...`
+   *  pair). */
   packageName: string;
   /** Carries `-SNAPSHOT` when `scenario.versionType === 'snapshot'`. */
   version: string;
@@ -72,25 +80,4 @@ export interface World {
 export interface SeedResult {
   /** sha256 of the primary artifact file, when the adapter can tell (see `AdapterResult`). */
   contentSha256?: string;
-}
-
-/**
- * Publishes `world`'s package with an already-authorized (normally admin) credential, for a
- * scenario whose own credential cannot publish but is still expected to consume successfully, or
- * that redeploys a coordinate (`reuseCoordinates`) -- see `fixtures.ts`'s `world` fixture:
- * "pre-publish" scenarios. A protocol adapter registers its own
- * implementation via `registerSeedPublisher` when its module loads.
- */
-export type SeedPublisher = (world: World) => Promise<SeedResult>;
-
-const seedPublishers = new Map<string, SeedPublisher>();
-
-/** Registers `publisher` as the way to pre-seed a package for `protocol`'s "pre-publish" scenarios. */
-export function registerSeedPublisher(protocol: string, publisher: SeedPublisher): void {
-  seedPublishers.set(protocol, publisher);
-}
-
-/** Looks up the seed publisher `protocol` registered, if its adapter module has been imported. */
-export function seedPublisherFor(protocol: string): SeedPublisher | undefined {
-  return seedPublishers.get(protocol);
 }

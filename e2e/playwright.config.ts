@@ -46,5 +46,9 @@ export default defineConfig({
       name: 'maven',
       testMatch: 'maven/**/*.spec.ts',
     },
+    {
+      name: 'npm',
+      testMatch: 'npm/**/*.spec.ts',
+    },
   ],
 });

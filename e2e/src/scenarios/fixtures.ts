@@ -18,8 +18,13 @@
  * The Playwright fixtures every spec uses: an admin-authenticated `PanelApi`, a per-test `Seeder`
  * that cleans up after itself, and `world` — the factory that turns a `Scenario` into a ready-to-test
  * `World` (plan section "Scenario model"). `world` is a function-valued fixture (`world(scenario,
- * protocol)`), not a single resolved value, because one spec calls it once per scenario in its own
- * loop (see `tests/maven/publish-consume.spec.ts`).
+ * adapter)`), not a single resolved value, because one spec calls it once per scenario in its own
+ * loop (see `scenarios/loop.ts`'s `registerPublishConsumeLoop`).
+ *
+ * Step 3a (RPS-294) generalised this from a hardcoded maven `protocol` string to a `ProtocolAdapter`
+ * object (`scenarios/adapter.ts`): coordinates come from `adapter.packageName`/`adapter.version`,
+ * and a pre-publish runs through `adapter.seedPublish` instead of the old
+ * `registerSeedPublisher`/`seedPublisherFor` registry.
  */
 import { test as base } from '@playwright/test';
 
@@ -27,13 +32,10 @@ import { PanelApi, RepoType } from '../api/panel-api.js';
 import { env } from '../env.js';
 import { perTestRunId } from '../seed/run-id.js';
 import { Seeder } from '../seed/seeder.js';
+import type { ProtocolAdapter } from './adapter.js';
 import type { Scenario } from './types.js';
-import {
-  type Coordinates,
-  type MaterializedCredential,
-  seedPublisherFor,
-  type World,
-} from './world.js';
+import { expectationFor } from './types.js';
+import type { Coordinates, MaterializedCredential, World } from './world.js';
 
 export type { Coordinates, World, MaterializedCredential } from './world.js';
 
@@ -43,6 +45,7 @@ const ADMIN_CREDENTIAL: MaterializedCredential = {
   transport: 'basic',
   username: env.adminUsername,
   password: env.adminPassword,
+  kind: 'password',
 };
 
 /** Lower-case runner/service name -> the RepoType its repos are created as. */
@@ -66,20 +69,6 @@ function repoTypeForProtocol(protocol: string): RepoType {
   return repoType;
 }
 
-/** `password-admin`, `no-override`, ... -> `password-admin`, `no-override` (already slug-safe). */
-function slugify(id: string): string {
-  return id.replace(/[^a-z0-9-]/gi, '-').toLowerCase();
-}
-
-let versionSeq = 0;
-
-/** A version unique to this test process, in `versionType`'s form. Not a coordinate by itself. */
-function uniqueVersion(versionType: 'release' | 'snapshot'): string {
-  versionSeq += 1;
-  const base = `0.0.${Date.now()}${versionSeq}`;
-  return versionType === 'snapshot' ? `${base}-SNAPSHOT` : base;
-}
-
 async function materializeCredential(
   seeder: Seeder,
   scenario: Scenario,
@@ -92,17 +81,22 @@ async function materializeCredential(
 
     case 'user-password': {
       const user = await seeder.createUser();
-      return { transport: 'basic', username: user.username, password: user.password };
+      return {
+        transport: 'basic',
+        username: user.username,
+        password: user.password,
+        kind: 'password',
+      };
     }
 
     case 'token-rw': {
       const token = await seeder.createToken(repoName, { readOnly: false });
-      return { transport: 'basic', username: token.username, password: token.token };
+      return { transport: 'basic', username: token.username, password: token.token, kind: 'token' };
     }
 
     case 'token-ro': {
       const token = await seeder.createToken(repoName, { readOnly: true });
-      return { transport: 'basic', username: token.username, password: token.token };
+      return { transport: 'basic', username: token.username, password: token.token, kind: 'token' };
     }
 
     case 'token-expired': {
@@ -110,26 +104,26 @@ async function materializeCredential(
         readOnly: false,
         expirationDate: new Date(Date.now() - ONE_DAY_MS),
       });
-      return { transport: 'basic', username: token.username, password: token.token };
+      return { transport: 'basic', username: token.username, password: token.token, kind: 'token' };
     }
 
     case 'token-revoked': {
       const token = await seeder.createToken(repoName, { readOnly: false });
       await seeder.revokeNow(repoName, token.id);
-      return { transport: 'basic', username: token.username, password: token.token };
+      return { transport: 'basic', username: token.username, password: token.token, kind: 'token' };
     }
 
     case 'token-rotated-old': {
       const token = await seeder.createToken(repoName, { readOnly: false });
       // The new value is discarded on purpose: this credential deliberately keeps using the old one.
       await seeder.rotateNow(repoName, token.id);
-      return { transport: 'basic', username: token.username, password: token.token };
+      return { transport: 'basic', username: token.username, password: token.token, kind: 'token' };
     }
 
     case 'token-other-repo': {
       const otherRepo = await seeder.createRepo(repoType, { privateRepo: true });
       const token = await seeder.createToken(otherRepo.name, { readOnly: false });
-      return { transport: 'basic', username: token.username, password: token.token };
+      return { transport: 'basic', username: token.username, password: token.token, kind: 'token' };
     }
 
     case 'wrong-password':
@@ -137,6 +131,7 @@ async function materializeCredential(
         transport: 'basic',
         username: env.adminUsername,
         password: `${env.adminPassword}-wrong`,
+        kind: 'password',
       };
 
     case 'anonymous':
@@ -147,7 +142,7 @@ async function materializeCredential(
 export interface Fixtures {
   panelApi: PanelApi;
   seeder: Seeder;
-  world: (scenario: Scenario, protocol: string) => Promise<World>;
+  world: (scenario: Scenario, adapter: ProtocolAdapter) => Promise<World>;
 }
 
 let testSeqByWorker = 0;
@@ -169,24 +164,15 @@ export const test = base.extend<Fixtures>({
   },
 
   world: async ({ seeder }, use) => {
-    const factory = async (scenario: Scenario, protocol: string): Promise<World> => {
-      const repoType = repoTypeForProtocol(protocol);
+    const factory = async (scenario: Scenario, adapter: ProtocolAdapter): Promise<World> => {
+      const repoType = repoTypeForProtocol(adapter.protocol);
       const repo = await seeder.createRepo(repoType, { privateRepo: scenario.repo.privateRepo });
 
       const credential = await materializeCredential(seeder, scenario, repo.name, repoType);
 
       const versionType = scenario.versionType ?? 'release';
-      const packageName = `io.repsy.e2e.${seeder.runId}:${protocol}-${slugify(scenario.id)}`;
-      const publishTarget: Coordinates = { packageName, version: uniqueVersion(versionType) };
-
-      let world: World = {
-        scenario,
-        protocol,
-        repoName: repo.name,
-        credential,
-        publishTarget,
-        consumeTarget: publishTarget,
-      };
+      const packageName = adapter.packageName(seeder.runId, scenario);
+      const expectation = expectationFor(scenario, adapter.protocol);
 
       // A scenario whose own credential cannot publish but is still expected to consume
       // successfully (token-ro, anonymous-public, maven-releases-off/snapshots-off) needs something
@@ -195,18 +181,28 @@ export const test = base.extend<Fixtures>({
       // deploy and never exercise the rule it is meant to test (allowOverride, a switched-off kind).
       const needsPrePublish =
         scenario.reuseCoordinates === true ||
-        (scenario.expect.consume === 'ok' && scenario.expect.publish !== 'ok');
+        (expectation.consume === 'ok' && expectation.publish !== 'ok');
+
+      // Correction #2 (the plan): for a SEPARATE pre-publish coordinate, generate the SEED version
+      // BEFORE the scenario's own version, not after -- otherwise the seed (used for consume-only
+      // scenarios) never ends up numerically lower than the scenario's own doomed publish attempt,
+      // and a real npm client refuses to publish a version lower than the highest one already
+      // published without an explicit --tag. Assertion-neutral for maven (nothing there asserts the
+      // relative order of the two coordinates).
+      const seedVersionForSeparateCoordinate =
+        needsPrePublish && !scenario.reuseCoordinates ? adapter.version(versionType) : undefined;
+      const publishTarget: Coordinates = { packageName, version: adapter.version(versionType) };
+
+      let world: World = {
+        scenario,
+        protocol: adapter.protocol,
+        repoName: repo.name,
+        credential,
+        publishTarget,
+        consumeTarget: publishTarget,
+      };
 
       if (needsPrePublish) {
-        const publish = seedPublisherFor(protocol);
-        if (!publish) {
-          throw new Error(
-            `world(): scenario "${scenario.id}" needs a pre-publish, but no seed publisher is ` +
-              `registered for protocol "${protocol}" (its clients/<protocol>.ts must be imported ` +
-              'before the test runs, which registers it as a side effect of module load)',
-          );
-        }
-
         // A `reuseCoordinates` scenario pre-publishes the SAME coordinate its own publish targets
         // (that redeploy, allowed or refused, is what it tests). Every other pre-publish scenario
         // pre-publishes at a SEPARATE coordinate, so the scenario's own (doomed) publish lands on a
@@ -217,7 +213,7 @@ export const test = base.extend<Fixtures>({
         // their "nothing was stored" check a coordinate that must not exist at all.
         const seedTarget: Coordinates = scenario.reuseCoordinates
           ? publishTarget
-          : { packageName, version: uniqueVersion(versionType) };
+          : { packageName, version: seedVersionForSeparateCoordinate as string };
 
         world = { ...world, consumeTarget: seedTarget };
 
@@ -225,7 +221,7 @@ export const test = base.extend<Fixtures>({
         // snapshots off are a repo-wide write rule, not a permission check, so even admin could not
         // publish here once the scenario's real settings (applied right below) are in effect. The
         // artifact has to land in storage before that restriction exists.
-        const seeded = await publish({
+        const seeded = await adapter.seedPublish({
           ...world,
           credential: ADMIN_CREDENTIAL,
           publishTarget: seedTarget,

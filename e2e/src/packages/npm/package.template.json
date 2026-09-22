@@ -1,0 +1,8 @@
+{
+  "name": "{{{packageName}}}",
+  "version": "{{{version}}}",
+  "description": "Repsy e2e test package, published by clients/npm.ts",
+  "main": "index.js",
+  "license": "MIT",
+  "keywords": []
+}
