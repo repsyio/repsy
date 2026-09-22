@@ -42,9 +42,10 @@ public interface ArtifactService<ID> {
       BaseRepoInfo<ID> repoInfo, StoragePath storagePath);
 
   /**
-   * Classifies an upload of a {@code maven-metadata.xml} or of one of its checksums. A metadata
-   * checksum holds a hash, not XML, so it is judged by its directory: a file of a {@code SNAPSHOT}
-   * version directory is a snapshot, any other level is not judged (RPS-1183).
+   * Classifies an upload of a {@code maven-metadata.xml}, of one of its checksums or of its {@code
+   * .asc} signature. A metadata checksum or signature holds a hash or armored text, not XML, so it
+   * is judged by its directory: a file of a {@code SNAPSHOT} version directory is a snapshot, any
+   * other level is not judged (RPS-1183, RPS-1185).
    */
   MutablePair<ArtifactDeployType, ArtifactVersionType> getDeployAndVersionTypesByMetadataTypeFiles(
       BaseRepoInfo<ID> repoInfo, byte[] content, StoragePath storagePath)

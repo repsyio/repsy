@@ -71,6 +71,9 @@ import org.springframework.core.io.Resource;
  *
  * <p>RPS-1183: a checksum is judged by the file it belongs to, so one of a refused kind is refused
  * before it is stored; a metadata checksum is classified by its path, its body being a hash.
+ *
+ * <p>RPS-1185: the {@code .asc} signature of a metadata file is handled like a metadata checksum,
+ * classified by its path and never parsed, and it is not a POM signature, so it is never verified.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractMavenProtocolFacade upload")
@@ -88,6 +91,8 @@ class AbstractMavenProtocolFacadeTest {
         <version>1.0</version>
       </project>
       """;
+  private static final String ARMORED_SIGNATURE =
+      "-----BEGIN PGP SIGNATURE-----\n\n-----END PGP SIGNATURE-----\n";
   private static final String MALFORMED_POM =
       "<project><modelVersion>4.0.0</modelVersion><groupId>";
 
@@ -442,6 +447,53 @@ class AbstractMavenProtocolFacadeTest {
 
     verifyNoInteractions(this.storageService);
     verify(this.artifactService, never()).createOrUpdateArtifact(any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+  }
+
+  @Test
+  @DisplayName(
+      "hands a metadata signature to the metadata classifier, unparsed, and never verifies it")
+  void passesAMetadataSignatureToTheMetadataClassifierUnparsedAndNeverVerifiesIt()
+      throws Exception {
+    final var path = "com/example/lib/1.0-SNAPSHOT/maven-metadata.xml.asc";
+    requestFor(path);
+    when(this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
+            any(), any(byte[].class), any(StoragePath.class)))
+        .thenReturn(new MutablePair<>(null, ArtifactVersionType.SNAPSHOT));
+    storageReportsUsage(ARMORED_SIGNATURE.length());
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(ARMORED_SIGNATURE.getBytes(UTF_8)));
+
+    upload(ARMORED_SIGNATURE);
+
+    final var storagePath = ArgumentCaptor.forClass(StoragePath.class);
+    verify(this.artifactService)
+        .getDeployAndVersionTypesByMetadataTypeFiles(
+            any(), eq(ARMORED_SIGNATURE.getBytes(UTF_8)), storagePath.capture());
+    assertThat(storagePath.getValue().getRelativePath().getPath()).isEqualTo(path);
+    verify(this.artifactService, never()).getDeployAndVersionType(any(), any());
+    verify(this.artifactService, never()).verifySignature(any(), any(), any());
+    assertThat(this.stored).singleElement().isEqualTo(ARMORED_SIGNATURE.getBytes(UTF_8));
+  }
+
+  @Test
+  @DisplayName("stores nothing and reports no usage for a metadata signature whose kind is refused")
+  void storesNothingForAMetadataSignatureWhoseKindIsRefused() throws Exception {
+    requestFor("com/example/lib/1.0-SNAPSHOT/maven-metadata.xml.asc");
+    when(this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
+            any(), any(byte[].class), any(StoragePath.class)))
+        .thenReturn(new MutablePair<>(null, ArtifactVersionType.SNAPSHOT));
+    doThrow(new AccessNotAllowedException("snapshotVersionsAreProhibited"))
+        .when(this.artifactService)
+        .checkDeploymentRules(any(), any(), any());
+
+    assertThatThrownBy(() -> upload(ARMORED_SIGNATURE))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("snapshotVersionsAreProhibited");
+
+    verifyNoInteractions(this.storageService);
+    verify(this.artifactService, never()).createOrUpdateArtifact(any(), any(), any());
+    verify(this.artifactService, never()).verifySignature(any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
   }
 

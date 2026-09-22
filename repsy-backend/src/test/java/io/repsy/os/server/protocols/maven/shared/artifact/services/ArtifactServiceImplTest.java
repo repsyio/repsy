@@ -88,10 +88,15 @@ import org.springframework.core.io.Resource;
  * <p>A checksum is judged by the file it belongs to: its layout check, version type and override
  * rule are those of that file. A metadata checksum, whose body is a hash, is judged by its
  * directory alone (RPS-1183). Before, every checksum was let through unjudged.
+ *
+ * <p>The {@code .asc} signature of a metadata file is classified like a metadata checksum: never
+ * parsed, judged by its directory, and neither verified nor registered (RPS-1185). Before, it was
+ * parsed as XML and refused with {@code malformedMetadataFile}.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName(
-    "Maven ArtifactServiceImpl version-type rules (RPS-1174, RPS-1176, RPS-1182, RPS-1183)")
+    "Maven ArtifactServiceImpl version-type rules (RPS-1174, RPS-1176, RPS-1182, RPS-1183,"
+        + " RPS-1185)")
 class ArtifactServiceImplTest {
 
   private static final String SNAPSHOT_JAR =
@@ -102,6 +107,8 @@ class ArtifactServiceImplTest {
   private static final String SNAPSHOT_VERSION_METADATA =
       "com/acme/lib/1.0-SNAPSHOT/maven-metadata.xml";
   private static final String RELEASE_VERSION_METADATA = "com/acme/lib/1.0/maven-metadata.xml";
+  private static final String ARMORED_SIGNATURE =
+      "-----BEGIN PGP SIGNATURE-----\n\n-----END PGP SIGNATURE-----\n";
 
   private static final String GROUP_METADATA =
       """
@@ -348,15 +355,79 @@ class ArtifactServiceImplTest {
         .doesNotThrowAnyException();
   }
 
+  @Test
+  @DisplayName("an artifact-level metadata signature is stored without parsing the file (RPS-1185)")
+  void metadataSignatureIsStoredWithoutParsing() throws Exception {
+    final var id = UUID.randomUUID();
+    final var repo = repo(id, false, false, true);
+
+    final var result = this.classify(repo, ARTIFACT_METADATA + ".asc", ARMORED_SIGNATURE);
+
+    assertThat(result).isEqualTo(pair(null, null));
+    assertThatCode(
+            () ->
+                this.artifactService.checkDeploymentRules(
+                    repo, result, StoragePath.of(id, ARTIFACT_METADATA + ".asc")))
+        .doesNotThrowAnyException();
+    verifyNoInteractions(this.artifactRepository, this.artifactVersionRepository);
+  }
+
+  @Test
+  @DisplayName(
+      "a version-level snapshot metadata signature is judged as a snapshot by its directory"
+          + " (RPS-1185)")
+  void versionLevelMetadataSignatureIsJudgedAsASnapshotByItsDirectory() throws Exception {
+    final var id = UUID.randomUUID();
+    final var path = StoragePath.of(id, SNAPSHOT_VERSION_METADATA + ".asc");
+
+    final var refusing = repo(id, true, false, true);
+    final var result =
+        this.classify(refusing, SNAPSHOT_VERSION_METADATA + ".asc", ARMORED_SIGNATURE);
+
+    assertThat(result).isEqualTo(pair(null, SNAPSHOT));
+    assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(refusing, result, path))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("snapshotVersionsAreProhibited");
+    assertThatCode(
+            () ->
+                this.artifactService.checkDeploymentRules(repo(id, true, true, true), result, path))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("a metadata signature is neither verified nor registered (RPS-1185)")
+  void metadataSignatureIsNeitherVerifiedNorRegistered() {
+    final var id = UUID.randomUUID();
+    this.stubRepo(id);
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, SNAPSHOT_VERSION_METADATA + ".asc"),
+        new ByteArrayResource(ARMORED_SIGNATURE.getBytes(StandardCharsets.UTF_8)));
+
+    verifyNoInteractions(
+        this.pgpVerifierService,
+        this.keyStoreService,
+        this.artifactRepository,
+        this.artifactVersionRepository,
+        this.artifactUpsertHelper);
+  }
+
   @ParameterizedTest(name = "{0} is not judged")
   @ValueSource(
       strings = {
         "com/acme/maven-metadata.xml.sha1",
         "com/acme/lib/maven-metadata.xml.sha1",
         "com/acme/lib/maven-metadata.xml.md5",
-        "com/acme/lib/1.0/maven-metadata.xml.sha1"
+        "com/acme/lib/1.0/maven-metadata.xml.sha1",
+        "com/acme/maven-metadata.xml.asc",
+        "com/acme/lib/maven-metadata.xml.asc",
+        "com/acme/lib/1.0/maven-metadata.xml.asc",
+        "com/acme/lib/maven-metadata.xml.asc.sha1"
       })
-  @DisplayName("the other metadata checksums are not judged, the file being a hash (RPS-1183)")
+  @DisplayName(
+      "the other metadata checksums and signatures are not judged, the file being a hash or armored"
+          + " text (RPS-1183, RPS-1185)")
   void otherMetadataChecksumsAreNotJudged(final String path) throws Exception {
     final var id = UUID.randomUUID();
     final var repo = repo(id, false, false, true);

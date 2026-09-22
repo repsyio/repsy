@@ -310,13 +310,41 @@ class ArtifactUtilsTest {
   @CsvSource({
     "com/acme/lib/1.0-SNAPSHOT/maven-metadata.xml.sha1, true",
     "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar, true",
+    "com/acme/lib/1.0-SNAPSHOT/maven-metadata.xml.asc, true",
     "com/acme/lib/maven-metadata.xml.sha1, false",
+    "com/acme/lib/maven-metadata.xml.asc, false",
     "com/acme/lib/1.0/maven-metadata.xml.md5, false",
     "maven-metadata.xml, false"
   })
-  @DisplayName("tells a file of a SNAPSHOT version directory by its directory (RPS-1183)")
+  @DisplayName("tells a file of a SNAPSHOT version directory by its directory (RPS-1183, RPS-1185)")
   void recognisesAFileOfASnapshotVersionDirectory(final String path, final boolean expected) {
     assertThat(ArtifactUtils.isSnapshotVersionDirectoryFile(path)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest(name = "{0} is a metadata signature: {1}")
+  @CsvSource({
+    "com/acme/maven-metadata.xml.asc, true",
+    "com/acme/lib/maven-metadata.xml.asc, true",
+    "com/acme/lib/1.0-SNAPSHOT/maven-metadata.xml.asc, true",
+    "com/acme/lib/maven-metadata.xml.asc.sha1, false",
+    "com/acme/lib/maven-metadata.xml, false",
+    "com/acme/lib/1.0/lib-1.0.pom.asc, false",
+    "com/acme/lib/1.0/lib-1.0.jar.asc, false",
+    "com/acme/lib/maven-metadata.xml.ASC, false"
+  })
+  @DisplayName("tells the .asc signature of a maven-metadata.xml at any level (RPS-1185)")
+  void recognisesAMetadataSignature(final String path, final boolean expected) {
+    assertThat(ArtifactUtils.isMetadataSignature(path)).isEqualTo(expected);
+  }
+
+  @Test
+  @DisplayName("a metadata signature is neither a POM signature nor a POM to parse (RPS-1185)")
+  void aMetadataSignatureIsNotAPomSignature() {
+    final var storagePath =
+        StoragePath.of(UUID.randomUUID(), "com/acme/lib/maven-metadata.xml.asc");
+
+    assertThat(ArtifactUtils.isPomSignature(storagePath)).isFalse();
+    assertThat(ArtifactUtils.isPomToParse(storagePath)).isFalse();
   }
 
   private static final String POM_PATH_OF_ACME_LIB = "com/acme/lib/1.0/lib-1.0.pom";
