@@ -67,7 +67,8 @@ e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example
   playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"
   run.sh                       # single entry point: local | test | sweep
-  docker-compose.stack.yml     # postgres:18 + Repsy, started/stopped by `run.sh local up|down`
+  docker-compose.stack.yml     # postgres profile: postgres:18 + Repsy, `run.sh local up|down`
+  docker-compose.stack-h2.yml  # H2 profile: Repsy alone (embedded H2, no postgres service), `run.sh local up|down --h2`
   docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven; see "Adding a protocol adapter" below
@@ -138,7 +139,8 @@ e2e/
       golang/                    # go.template.mod + hello.template.go (rendered into the zip in code) + consumer-go.template.mod/consumer-main.template.go
       ruby/                      # metadata.template.yaml (the hand-built .gem's gzipped gemspec YAML) + lib.template.rb + Gemfile.template
   tests/
-    skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe
+    skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe; both tests tagged @smoke
+    skeleton/repo-settings.spec.ts  # RPS-1200 settings-PUT field-by-field matrix across RepoTypes; untagged (not smoke-sized)
     maven/
       publish-consume.spec.ts   # registerPublishConsumeLoop(mavenAdapter) + the RPS-1196 real-client test
       upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules
@@ -190,6 +192,7 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 | `REPSY_ADMIN_PASSWORD`        | _(none — required)_        | must match the target's admin password                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_TARGET`                | `local`                    | `local` \| `remote` \| `ci` — see Targets below                                                                                                                                                                                                                                                                                                                                                                                          |
 | `REPSY_E2E_RUN_ID`            | random 6-char lowercase id | shared by every runner in one `run.sh test`                                                                                                                                                                                                                                                                                                                                                                                              |
+| `REPSY_E2E_STACK`             | _(unset — postgres)_       | `local up\|down` stack profile: unset/anything but `h2` is the postgres profile, `h2` is the embedded-H2 profile; equivalent to `--h2` on the command line. Unread by `run.sh test`, which is identical against either profile — see "Stack profiles" below                                                                                                                                                                              |
 | `REPSY_E2E_INSECURE_REGISTRY` | _(unset)_                  | docker runner's `--insecure` (only needed for a remote plain-HTTP host; `localhost` already works without it); helm runner's `--insecure-skip-tls-verify` (a REMOTE HTTPS target with a bad cert only -- helm's own `--plain-http` is derived from `REPSY_REPO_BASE_URL`'s scheme instead, unconditionally on this harness's own `http://localhost:9090` stack, confirmed live H3: unlike `crane`, Helm has no localhost auto-detection) |
 
 ## Targets (`src/target.ts`)
@@ -199,6 +202,99 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 - **ci** — a pipeline-started stack; same freedoms as `local`. Wiring is deferred (see the plan).
 - **remote** — an already-running instance the harness does not own or reset. Throttle cannot be
   tuned and nothing global is touched; later steps add a failure budget and a preflight check.
+
+## Stack profiles (postgres and H2)
+
+`./run.sh local up|down` starts/stops one of two mutually exclusive stack profiles, chosen with
+`--h2` (or `REPSY_E2E_STACK=h2`):
+
+- **postgres** (default, `docker-compose.stack.yml`) — `postgres:18` + Repsy.
+- **H2** (`docker-compose.stack-h2.yml`) — Repsy alone, backed by the embedded H2 database. No
+  `postgres` service at all: a compose _override_ cannot remove a service, and profile-gating
+  `postgres` while `repsy` still `depends_on` it makes Compose auto-enable the disabled service
+  anyway, so this is a second, standalone compose file instead. Both files share the same
+  `name: repsy-e2e` project and the same `8080`/`9090` ports, so the two profiles can never run at
+  once by construction, and `./run.sh local down` (either flavour) always tears down whichever one
+  is actually up.
+
+`./run.sh test` needs **no flag and no code change at all**: a runner only ever sees
+`REPSY_API_BASE_URL`/`REPSY_REPO_BASE_URL` (both `localhost`, identical in either profile), so every
+spec, adapter and runner image is bit-for-bit unchanged between the two databases. This is
+deliberate — see "Scope decision" below.
+
+**Fresh database per `up`**: neither compose file mounts a named volume for `/app/data`. The image
+declares `VOLUME /app/data`, so each `repsy` container gets its own anonymous volume; `down` followed
+by `up` therefore always starts from an empty database with the 9 default repos freshly seeded,
+mirroring the postgres profile's own anonymous `pgdata` volume (confirmed live — see "Verification").
+
+### H2-1, confirmed live: which `DB_URL` actually boots the image
+
+`repsy-backend/src/main/resources/application.yml` defaults `spring.datasource.url` to
+`jdbc:postgresql://localhost:5432/repsy`, **not** H2 — nothing in the root `Dockerfile`/
+`entrypoint.sh` overrides it, so H2 is only ever selected by setting `DB_URL` explicitly. Two
+variants were run directly against the locally built image (`repsy-os-e2e:local`, from
+`./run.sh local up`/`down` against the postgres profile) with `docker run` (no compose, no
+postgres container reachable):
+
+- **(a)** the root `README.md`'s own documented default value,
+  `DB_URL=jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE` —
+  **boots cleanly.** Flyway ran all 19 H2 migrations with no error, the app logged
+  `repsy started successfully!`, the SPA answered `200` on `/`, `POST /api/auth/login` with the
+  configured `ADMIN_INITIAL_PASSWORD` returned a token, and `GET /api/repos/{TYPE}/info` for all 9
+  `RepoType`s (`MAVEN`, `NPM`, `PYPI`, `DOCKER`, `CARGO`, `GOLANG`, `HELM`, `NUGET`, `RUBY`) each
+  returned exactly the one expected default repo.
+- **(b)** the same value with `;DATABASE_TO_LOWER=TRUE` appended (matching
+  `H2IntegrationTest`'s own in-memory URL) — **also boots cleanly**, same Flyway/login/repos-list
+  result. This harness pins **(a)**, the exact value already documented in the root `README.md`'s
+  environment table, since it already works and needs no extra flag; `DATABASE_TO_LOWER=TRUE` turned
+  out not to be load-bearing for this schema/H2-version combination, contrary to the plan's initial
+  suspicion — confirmed live, not assumed.
+
+There was no losing variant to record an error for: both DB_URL values booted the image cleanly.
+
+### H2-2, confirmed live: no `DB_URL` at all does NOT default to H2
+
+The root `README.md`'s "Quick Start" and "Option 1: Docker with H2 (Embedded Database)" sections
+both imply (and the former's `docker run` example sets no `DB_URL` at all) that omitting `DB_URL`
+gives you embedded H2. Run directly against the locally built image with no `DB_URL` set, the
+container instead tries the `application.yml` default and fails immediately:
+
+```
+Caused by: org.postgresql.util.PSQLException: Connection to localhost:5432 refused. Check that the
+hostname and port are correct and that the postmaster is accepting TCP/IP connections.
+```
+
+(Full chain: `FlywayAutoConfiguration` fails to resolve migration locations because it cannot open a
+JDBC connection at all — this happens before the app can even seed default repos.) This is exactly
+the documentation bug already tracked by
+[RPS-1173](https://zyfera.atlassian.net/browse/RPS-1173) ("README says the embedded H2 database is
+the default, but application.yml defaults DB_URL to PostgreSQL") — re-confirmed live here with fresh
+evidence (commented on that ticket) rather than filed again. **Not fixed here**: this step touches
+only `e2e/`, never the backend or its docs.
+
+### Scope decision: `@smoke` everywhere plus one full catalog, not ten full catalogs
+
+RPS-294's own "Out of scope" text keeps a per-database full run out of scope: "The design keeps it a
+matter of `run.sh local up && run.sh test` per protocol in a matrix, and an `@smoke` tag already
+selects a PR-sized subset." The "passes the full scenario catalog for every protocol" acceptance
+criterion is about the default (postgres) stack, not about repeating that catalog per stack profile.
+Each protocol suite runs roughly 29-45 tests; a full second pass across all 9 protocols would
+roughly double this harness's wall-clock time for a question that is database-agnostic above the JPA
+layer. Schema/JPA/dialect divergence between postgres and H2 is already covered on the backend side
+by `H2IntegrationTest` and the `H2*IT` suite; what only the e2e H2 profile can show is that the
+built image actually boots on H2 and that each protocol's real client completes a round trip against
+it — which `@smoke` across every runner, plus one full catalog (maven, the protocol with the most
+repo-setting scenarios) on H2, demonstrates without doubling the run.
+
+### H2-9, confirmed live: the skeleton `@smoke` tag gap
+
+Before this step, no test under `tests/skeleton/` carried an `@smoke` tag, so
+`./run.sh test --protocol skeleton --grep '@smoke'` reported "No tests found" and a non-zero exit —
+confirmed live. Both tests in `tests/skeleton/seed.spec.ts` (the seed/cleanup test and the
+expired-token test) now carry `{ tag: ['@smoke'] }`, the same tag signature every other suite's
+dedicated tests already use. `tests/skeleton/repo-settings.spec.ts` (RPS-1200's settings-PUT
+field-by-field matrix, looped over `RepoType.NPM`/`RepoType.MAVEN`) is left untagged: it is the
+settings-matrix-style test the plan says to leave alone, not smoke-sized.
 
 ## Scenario model
 
@@ -1972,11 +2068,17 @@ so there is no equivalent of `REPSY_E2E_INSECURE_REGISTRY` this protocol could h
 ./run.sh test -b             # rebuild the runner image(s) first (Dockerfile/lockfile changed)
 ./run.sh local down
 ./run.sh sweep               # deletes e2e-* leftovers older than 24h; --hours N or --all
+
+./run.sh local up --h2       # starts the H2 profile instead: Repsy alone, embedded H2, no postgres
+                              # (same ports, so stop the postgres profile first if it is up)
+./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby --grep '@smoke'
+./run.sh test --protocol maven   # one full catalog against H2 -- see "Stack profiles" above
+./run.sh local down --h2
 ```
 
 `run.sh test` accepts `--target local|remote|ci` and `--protocol a,b` (a comma-separated list of
 runner services: `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`,
-`ruby`).
+`ruby`) — identically whichever stack profile is up (see "Stack profiles (postgres and H2)" above).
 Reports land under `e2e/test-results/` (JUnit
 XML) and
 `e2e/playwright-report/` (HTML) — one `run.sh test` invocation covering several `--protocol` services
@@ -2083,3 +2185,30 @@ HL2/B-H3, HL4/B-H1, HL5/B-H2, R8/B-H3 — "Helm runner" above), the pypi suite's
 registry-rules tests (RPS-1221/1222/1223/1224/1225, P4/RPS-1124 — "PyPI runner" above), and the golang
 suite's three `test.fail`-routed registry-rules tests (candidates G1/G2/G10 — "Go runner" above): all
 counted as "passed", not a plain pass line.
+
+### H2 profile verification (this step)
+
+```bash
+./run.sh local up                # postgres profile: unaffected by this step
+./run.sh test --protocol maven   # 45 passed -- regression check, byte-for-byte same as before this step
+./run.sh local down
+./run.sh local up --h2
+./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby --grep '@smoke' -b
+./run.sh test --protocol maven   # one full catalog on H2: 45 passed
+./run.sh test --protocol maven   # again, no stack reset: 45 passed -- proves run isolation on H2 too
+./run.sh sweep --dry-run         # "sweep: deleted 0 repo(s) and 0 user(s)" -- nothing left behind
+./run.sh local down --h2
+./run.sh local up --h2 && ./run.sh local down --h2   # confirms a second up starts empty
+```
+
+All of the above ran clean (exit `0`) against the locally built `repsy-os-e2e:local` image. The
+`--grep '@smoke'` run across all 10 runners reported 38 passed total (skeleton 2, maven 4, npm 2,
+cargo 2, nuget 3, docker 4, helm 5, pypi 4, golang 6, ruby 6), including the same `test.fail`-routed
+tests reporting a per-line `✘` with an overall "passed"/`0` (npm's RPS-1205 real-client test, cargo's
+hyphenated-crate-name test, helm's HL1/HL2) documented above for the postgres profile — parity
+confirmed between the two database profiles for every runner, not just maven.
+
+The fresh-DB-per-`up` claim was confirmed directly, not just inferred: after the second `local up
+--h2` above, `GET /api/repos/MAVEN/info` returned exactly the one default `maven` repo (fresh
+`createdAt`, `diskUsage: 0`) and `GET /api/users` returned exactly the one `admin` user — no
+leftovers from the runs immediately before it.
