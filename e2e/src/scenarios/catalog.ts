@@ -43,6 +43,16 @@
  *  - `reuseCoordinates` marks the scenarios about a redeploy: the fixture pre-publishes (admin,
  *    permissive defaults) the same coordinate the scenario's own publish targets, and only then
  *    applies the scenario's `repo` settings. Every other pre-publish lands on a separate coordinate.
+ *  - cargo (step 3b) has no override rule at all: re-publishing an existing version is refused
+ *    unconditionally with 400 (`rejected`) by `CargoCrateServiceImpl.checkExistsVersion`, reached via
+ *    the publish handler's catch-all (`cargo-raw.ts`'s file header) -- `allowOverride` is settable
+ *    and visible for a cargo repo (the panel exposes it) but the protocol never reads it. Both
+ *    `no-override` and `override` therefore pin `expectByProtocol: { cargo: { publish: 'rejected' }
+ *    }` below instead of getting a cargo-only scenario or a `protocols` restriction: `override`
+ *    staying `rejected` for cargo is deliberate, documenting that `allowOverride: true` does NOT make
+ *    cargo accept a version override. The real `cargo publish` client never even sends that PUT (its
+ *    own client-side `verify_unpublished` preflight refuses first, exit 101) -- only the loop's raw
+ *    probe (`clients/cargo.ts`) reaches the server's rule at all.
  *
  * `versionType` matters only to the maven adapter today; other protocols ignore it once they exist.
  */
@@ -134,8 +144,10 @@ export const SCENARIOS: readonly Scenario[] = [
     credential: 'token-rw',
     reuseCoordinates: true,
     // Pinned: 403 ("artifactOverrideIsProhibited"), not the plan's "conflict" (409) -- see the
-    // file-level comment.
+    // file-level comment. cargo: 400 ("rejected") unconditionally -- see the file-level comment's
+    // cargo bullet.
     expect: { publish: 'forbidden', consume: 'ok' },
+    expectByProtocol: { cargo: { publish: 'rejected' } },
   },
   {
     id: 'override',
@@ -144,6 +156,10 @@ export const SCENARIOS: readonly Scenario[] = [
     credential: 'token-rw',
     reuseCoordinates: true,
     expect: { publish: 'ok', consume: 'ok' },
+    // cargo has no override rule at all -- see the file-level comment's cargo bullet. Deliberately
+    // still `rejected` here even though `allowOverride: true`: that is exactly the point being
+    // pinned.
+    expectByProtocol: { cargo: { publish: 'rejected' } },
   },
   {
     id: 'maven-releases-off',

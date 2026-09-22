@@ -11,8 +11,13 @@ redeploys, and the refusal scenarios check that nothing was stored ("SNAPSHOT an
 behaviour, as probed", below). This is **step 3a ("generalise the engine + npm")**: the scenario
 loop itself (`scenarios/loop.ts`) and the `ProtocolAdapter` interface (`scenarios/adapter.ts`) it
 runs, generalised out of what was maven-only code so a second protocol reuses it verbatim, plus the
-npm client adapter and runner. Every other protocol (cargo, nuget, docker, helm, pypi, golang,
-ruby) replicates the same model in later steps; nothing about the model itself is maven-specific.
+npm client adapter and runner. This is **step 3b ("cargo")**: a third worked example of the same
+`ProtocolAdapter` shape, the Cargo (Rust crate registry) client adapter and runner, plus a second
+routing-around hook on the loop itself (`ProtocolAdapter.knownPublishSideEffect`, the publish-side
+analogue of `knownConsumeFailure`, for a candidate backend bug that corrupts storage on a refused
+duplicate publish — see "Cargo runner" below). Every other protocol (nuget, docker, helm, pypi,
+golang, ruby) replicates the same model in later steps; nothing about the model itself is
+maven-specific.
 
 ## Rules
 
@@ -34,13 +39,14 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 ```
 e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example
-  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm"
+  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo"
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres:18 + Repsy, started/stopped by `run.sh local up|down`
-  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm"
+  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven; see "Adding a protocol adapter" below
   runners/npm.Dockerfile       # + nothing else: npm ships with the node:24 base already
+  runners/cargo.Dockerfile     # + a pinned Rust toolchain, copied in from the official rust image
   runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
   src/
     env.ts                     # typed config from env/.env
@@ -57,7 +63,7 @@ e2e/
       catalog.ts                # the scenario matrix -- see "Scenario model" below
       adapter.ts                 # ProtocolAdapter/AdapterResult -- what the loop needs from a client
       loop.ts                    # registerPublishConsumeLoop(adapter): the scenario loop, protocol-agnostic
-      coordinates.ts             # slugify() -- shared by every adapter's packageName()
+      coordinates.ts             # slugify(), boundedSemverVersion() -- shared by every adapter's packageName()/version()
       world.ts                  # World/Coordinates/MaterializedCredential types
       fixtures.ts                # Playwright fixtures: panelApi, seeder, world(scenario, adapter)
       remote-throttle.ts        # RemoteAuthBudget/withBackoff429 -- see "Remote hardening" below
@@ -71,9 +77,12 @@ e2e/
       npm-raw.ts                  # npm-specific raw PUT/GET (packument/tarball), publish-document builder
       npm.ts                      # the npm client + npmAdapter: publish()/resolve()/seedPublish(), npm pack/publish/install
       pgp.ts                     # real OpenPGP.js key generation and detached signing, no gpg/network
+      cargo-raw.ts                 # cargo-specific raw PUT/GET (publish/config.json/sparse-index/download), body builder
+      cargo.ts                     # the cargo client + cargoAdapter: publish()/resolve()/seedPublish(), cargo package/publish/fetch
     packages/
       maven/                     # mustache templates of the tiny jar project + settings.xml
       npm/                       # mustache templates of the tiny package.json/index.js + .npmrc
+      cargo/                     # mustache templates of the tiny crate + consumer Cargo.toml + .cargo/config.toml
   tests/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe
     maven/
@@ -84,6 +93,9 @@ e2e/
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
       registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
+    cargo/
+      publish-consume.spec.ts   # registerPublishConsumeLoop(cargoAdapter) + a hyphenated-crate-name real-client test
+      registry-rules.spec.ts    # raw-HTTP pins of the duplicate-version/version-validation/config.json/name-normalisation rules
 ```
 
 ## Setup
@@ -292,8 +304,8 @@ protocol spec that calls `scenariosFor(SCENARIOS, protocol)`.
 The scenario loop itself (`scenarios/loop.ts`'s `registerPublishConsumeLoop`) is protocol-agnostic
 as of step 3a (RPS-294): a new protocol implements the `ProtocolAdapter` interface
 (`scenarios/adapter.ts`) and hands the loop that one object, instead of copying the loop's
-machinery. `clients/maven-adapter.ts` and `clients/npm.ts`'s `npmAdapter` are the two worked
-examples.
+machinery. `clients/maven-adapter.ts`, `clients/npm.ts`'s `npmAdapter` and `clients/cargo.ts`'s
+`cargoAdapter` are the three worked examples.
 
 1. `src/clients/<protocol>.ts` (+ a `<protocol>-raw.ts` for its raw-HTTP building blocks, built on
    the shared pieces in `clients/raw-http.ts`): `publish(world)`/`resolve(world)`/`seedPublish(world)`
@@ -468,13 +480,160 @@ came from that default. A first-ever publish of a package never hits this (`addP
 passes the version's own sub-object, which legitimately has no `"keywords"` key, so the read is
 `null` and skipped safely); only a **redeploy of an already-existing version** does. Confirmed live by
 adding `"keywords": []` to a version manifest, which alone made an otherwise-identical redeploy
-succeed. This is **not** filed as RPS-1205 (a different bug, a different code path, no relation to
-tarball URLs) and **not fixed here** (out of scope, per the plan) — `clients/npm-raw.ts`'s
-`buildPublishDocument` and `src/packages/npm/package.template.json` both always include `"keywords":
-[]` (a real npm client's own normalised manifest almost always does too), which routes around it
-without touching backend code. Report this to whoever files Jira tickets as a candidate `RPS-XXXX`
-("npm: redeploying an existing version whose manifest has no `keywords` throws a `ClassCastException`,
-answered as a generic `400 badRequest`") — no ticket number is invented here.
+succeed. This is **not** the same bug as RPS-1205 (a different bug, a different code path, no
+relation to tarball URLs) — it is filed as **RPS-1211** — and **not fixed here** (out of scope, per
+the plan) — `clients/npm-raw.ts`'s `buildPublishDocument` and `src/packages/npm/package.template.json`
+both always include `"keywords": []` (a real npm client's own normalised manifest almost always does
+too), which routes around it without touching backend code.
+
+## Cargo runner
+
+`runners/cargo.Dockerfile` copies a pinned Rust toolchain (`rust:1.98.1-slim-bookworm`, latest
+stable per the Rust blog, `-slim` so no gcc lands in the image) in from that official image's
+`/usr/local/{rustup,cargo}` directories rather than installing it by hand — `/usr/local/cargo/bin/
+{cargo,rustc}` are rustup proxies that resolve the real toolchain via `RUSTUP_HOME` at run time, so
+both directories have to come along, not just the proxies. `clients/cargo.ts` renders
+`src/packages/cargo/{Cargo,lib,consumer-Cargo,config}.template.*` into a per-invocation isolated
+work directory (`clients/exec.ts`) and runs the real `cargo` binary:
+
+- **`publish`**: `cargo package --no-verify --offline` (deterministic, no network — pre-packages the
+  crate so a raw-probe body exists even when the real `cargo publish` never gets far enough to
+  produce one itself, e.g. an auth failure refuses the client before it packages anything) followed
+  by `cargo publish --registry repsy --no-verify`. `--no-verify` is deliberate on both: verifying
+  builds the crate, which needs `rustc` and a linker — a build is the toolchain's concern, not the
+  registry's, and this harness's crates are dependency-free and never need to actually compile.
+  `CARGO_PUBLISH_TIMEOUT=30` bounds cargo's own post-publish index poll (default 60s) — confirmed
+  live, an underscore-named crate's poll resolves on its first attempt (well under a second), so
+  nothing here relies on the longer default (see "H2" below for the one case that does hit it).
+- **`resolve`**: a fresh, separate work directory (fresh `CARGO_HOME` too) with a minimal consumer
+  crate (`[dependencies] <name> = { version = "=<version>", registry = "repsy" }`, an empty
+  `src/lib.rs` — cargo refuses a package with no targets at all) and a plain `cargo fetch`. The
+  downloaded `.crate` lands at `<CARGO_HOME>/registry/cache/<registry-hash>/<name>-<version>.crate`;
+  `cargo fetch` itself verifies its sha256 against the index `cksum`, so a mismatch fails the client
+  too, before this harness's own comparison ever runs.
+- **`.cargo/config.toml`** (rendered into the work directory, not `CARGO_HOME`'s own global config —
+  cargo looks upward from its cwd for this file): `[registries.repsy] index =
+"sparse+<repoBaseUrl>/<repo>/"` (the trailing slash is mandatory) plus an explicit `[registry]
+global-credential-providers = ["cargo:token"]`.
+- **Token delivery**: the credential is delivered ONLY via the `CARGO_REGISTRIES_REPSY_TOKEN` env
+  var (never written to a credentials file, never on the command line — nothing for `exec.ts`'s
+  redaction to miss). Cargo's `cargo:token` provider sends that env var's value **verbatim** as the
+  `Authorization` header, with no `Bearer`/`Basic` prefix of its own; `CargoAuthPreProcessor
+.normalizeAuthHeader` on the server prefixes it with `Bearer ` unless it already starts with
+  `Basic `/`Bearer `. That is what makes a `password`-kind credential expressible through cargo's
+  single "token" concept at all: `cargoAuthHeader`/`cargoToken` (`cargo-raw.ts`) send `Basic
+<base64(user:pass)>` as that literal env var value for a real user/admin password — confirmed live,
+  not just from the Cargo source citation (`crates-io/lib.rs`'s `check_token` accepts a space
+  character, RFC 9110 field-value ASCII, so a Basic header is a syntactically legal cargo token, and
+  the server dispatches it to `handleBasicAuth` unchanged since it already starts with `Basic `). A
+  `token`-kind credential (a deploy token, what the panel's own cargo docs tell users to `cargo
+login` with) is sent raw, with no prefix at all.
+- **The publish-side raw probe is NOT a re-PUT of the version the client just published** (unlike
+  maven's POM re-PUT and npm's tarball re-PUT): cargo's publish route has no override rule at all
+  (confirmed live, see "H1" below — every duplicate-version PUT is refused unconditionally), so
+  re-sending the just-published version would always come back `rejected`, never `ok`, breaking
+  every scenario whose publish is supposed to succeed. Instead: a non-redeploy scenario probes a
+  **prerelease sibling**, `<version>-probe` (accepted — semver orders a prerelease below its bare
+  version, so it never disturbs `max_version` and an `=<version>` consumer never resolves to it,
+  confirmed live); a redeploy scenario (`reuseCoordinates`, `no-override`/`override`) re-PUTs the
+  EXACT version the client just attempted — precisely what a real client would have hit had it not
+  refused client-side first (see "H1" below for what that then proves about storage).
+- **The consume-side raw probe** is a sparse-index `GET`, deliberately never the crate download,
+  mirroring npm's packument-GET reasoning: every consume expectation in the catalog is an authn/authz
+  outcome, and an index GET never touches the (possibly storage-corrupted, "H1" below) `.crate`
+  bytes.
+- **Fingerprint** (`ProtocolAdapter.fingerprint`/`expectNothingStored`): scoped to the one crate a
+  scenario's publish targets, like npm's — the served sparse index's own hash (`undefined` when the
+  crate does not exist at all) plus every listed version's downloaded `.crate` content hash, read
+  with `cargo-raw.ts`'s `rawGetIndex`/`parseIndex`/`rawDownload`, not the panel API.
+- **Underscore-only crate names** (`cargoAdapter.packageName`, `cargo-raw.ts`'s `crateName`): the
+  catalog loop deliberately never uses a hyphenated name — see "H2" below for why.
+
+```bash
+./run.sh test --protocol cargo
+```
+
+### Scenario mapping onto the shared catalog
+
+Every catalog scenario that is not maven-restricted applies to cargo unchanged, with the same
+`unauthorized`/`ok` buckets as maven and npm (`ProtocolAuthService`/`CargoAuthPreProcessor` share the
+same throw-on-any-auth-failure shape), EXCEPT the override pair, which cargo has no rule for at all:
+
+| scenario (shared catalog)                                                                             | real status observed        | note                                                                                                                                                                                                      |
+| ----------------------------------------------------------------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `no-override` (2nd publish, `allowOverride:false`)                                                    | `400 rejected`              | `CargoCrateServiceImpl.checkExistsVersion` throws unconditionally — `allowOverride` is never read by the protocol at all (`expectByProtocol: { cargo: { publish: 'rejected' } }`, `catalog.ts`)           |
+| `override` (2nd publish, `allowOverride:true`)                                                        | `400 rejected`              | deliberately still `rejected`: this is exactly what the scenario pins — `allowOverride: true` does NOT make cargo accept a version override                                                               |
+| `token-ro` publish                                                                                    | `401 unauthorized`          | same as maven/npm: `ProtocolAuthService.authorizeDeployToken` throws the plain `UnAuthorizedException`, not a distinct "forbidden"; the client fails at its own index-query preflight before ever PUTting |
+| `token-expired`/`token-revoked`/`token-rotated-old`/`token-other-repo`/`wrong-password`/`anonymous-*` | `401`, all                  | fails at the client's OWN preflight index GET (`config.json` is unauthenticated even on a private repo, but the index GET that follows needs the token) before any publish PUT is ever sent               |
+| everything else (`password-admin`, `token-rw`, `anonymous-public`, ...)                               | matches the shared `expect` | unchanged from maven/npm                                                                                                                                                                                  |
+
+`registry-rules.spec.ts` additionally pins an invalid/int-overflowing version string at `400` with a
+`"not a valid semver format"` detail (`CrateUtils.validateVersion`, semver4j 3.1.0 — the same library
+version, and the same Java-`Integer` overflow reasoning, as npm's correction #3; this is why
+`coordinates.ts`'s `boundedSemverVersion` is shared between the two adapters), and `config.json`'s
+own `dl`/`api`/`auth-required` shape.
+
+### H1, confirmed live: a refused duplicate publish still corrupts storage (RPS-1124)
+
+`AbstractCargoProtocolFacade.publish` writes the `.crate` bytes to storage (`FileSystemStorageStrategy
+.write`, `TRUNCATE_EXISTING` — overwrites whatever was already there) and appends an index line to a
+storage-only index FILE (never served — the sparse-index HTTP handler reads the DB instead) **BEFORE**
+calling `CargoCrateServiceImpl.publish`, where the duplicate-version check
+(`checkExistsVersion`) actually lives. When that check throws, the (Postgres) transaction the DB
+writes were inside rolls back — but the storage write already happened and is not, and cannot be,
+rolled back with it. Live evidence (`tests/cargo/registry-rules.spec.ts`):
+
+```
+seed publish (bytesA)                              -> 200
+download after seed                                 -> 200, equals bytesA
+duplicate publish (bytesB, allowOverride: false)    -> 400 "crate `...` already exists in this registry"
+served (DB-backed) sparse index after the duplicate -> unchanged (still bytesA's cksum)
+download after the duplicate                        -> 200, equals bytesB, NOT bytesA
+```
+
+The served index still names bytesA's checksum, but a download now serves bytesB's bytes — a real
+consumer's own sha256 check (`cargo fetch` verifies the downloaded `.crate` against the index
+`cksum`) would then fail for a version that was never touched by any _accepted_ publish. This is why
+`clients/cargo.ts` declares `ProtocolAdapter.knownPublishSideEffect` (a new hook this step added to
+`scenarios/adapter.ts`/`scenarios/loop.ts`, the publish-side analogue of npm's
+`knownConsumeFailure`): it routes only the loop's `expectNothingStored` comparison for `no-override`/
+`override` (the only catalog scenarios that redeploy an existing version with a credential that
+passes auth) through `test.fail()`, never the outcome or client-exit-code assertions, which are
+asserted for real like every other scenario. Tracked by **RPS-1124** ("Audit the Cargo, Helm, PyPI,
+npm and Go publish paths for storage-before-DB ordering"), an already-open story this live evidence
+was added to as a comment rather than a new ticket, since it already scoped exactly this class of fix
+for Cargo by name.
+
+### H2, confirmed live: the sparse index serves a crate under its normalised name (RPS-1212)
+
+`CrateUtils.normalizeCrateName` (lower-case, `-` -> `_`) is applied both when a crate is stored
+(`CargoCrateServiceImpl.publish` stores the crate row and its index row under the normalised name)
+and whenever it is looked up by name (`getIndexEntries`/`findCrate` normalise their own `name`
+argument before querying) — so a raw HTTP GET of a hyphenated crate's sparse index, by EITHER its
+hyphenated or its normalised spelling, answers `200` with the SAME entry, whose own `"name"` field
+always says the normalised spelling. A real `cargo publish` of a hyphenated name still exits 0 (its
+own post-publish index poll looks the crate up by the exact name it sent, and the server-side lookup
+normalises that too, so the poll does find an entry) — but slowly: confirmed live, ~30s (the full
+`CARGO_PUBLISH_TIMEOUT` window) instead of well under a second for an underscore-only name, before
+falling back to a "timed out waiting for ... to be available" WARNING (not a failure). A real `cargo
+fetch` of that same hyphenated name, however, does NOT trust the file location the way the raw probe
+does: it cross-checks the served entry's own `name` field against the dependency name it declared and
+refuses outright — confirmed live:
+
+```
+cargo publish (crate "e2e-<runid>-hyphen")  -> exit 0 (slow: ~30s post-publish poll timeout)
+raw index GET (hyphenated spelling)         -> 200, "name":"e2e_<runid>_hyphen"
+raw index GET (normalised spelling)         -> 200, "name":"e2e_<runid>_hyphen" (same entry)
+cargo fetch (dependency "e2e-<runid>-hyphen") -> exit 101, "error: no matching package named
+                                                  `e2e-<runid>-hyphen` found"
+```
+
+This is why the catalog loop's own crate names are underscore-only (`cargoAdapter.packageName`,
+`cargo-raw.ts`'s `crateName` — never `scenarios/coordinates.ts`'s hyphenated `slugify`): a hyphenated
+name round-trips through the loop under a spelling the server itself never agrees to serve back.
+`tests/cargo/publish-consume.spec.ts`'s dedicated real-client test and
+`tests/cargo/registry-rules.spec.ts`'s raw-HTTP test both pin this directly, through `test.fail()`.
+Filed as **RPS-1212**.
 
 ## Remote hardening
 
@@ -503,7 +662,8 @@ real shared remote. Both are called out in the plan as later, "remote hardening"
 ./run.sh test                # runs the "skeleton" runner container against it
 ./run.sh test --protocol maven
 ./run.sh test --protocol npm
-./run.sh test --protocol skeleton,maven,npm
+./run.sh test --protocol cargo
+./run.sh test --protocol skeleton,maven,npm,cargo
 ./run.sh test --grep '@smoke'
 ./run.sh test -b             # rebuild the runner image(s) first (Dockerfile/lockfile changed)
 ./run.sh local down
@@ -511,7 +671,8 @@ real shared remote. Both are called out in the plan as later, "remote hardening"
 ```
 
 `run.sh test` accepts `--target local|remote|ci` and `--protocol a,b` (a comma-separated list of
-runner services: `skeleton`, `maven`, `npm`). Reports land under `e2e/test-results/` (JUnit XML) and
+runner services: `skeleton`, `maven`, `npm`, `cargo`). Reports land under `e2e/test-results/` (JUnit
+XML) and
 `e2e/playwright-report/` (HTML) — one `run.sh test` invocation covering several `--protocol` services
 overwrites that JUnit file per service, so diff/compare a single protocol's run in isolation
 (`--protocol maven` alone) rather than a combined one if you need its own report.
@@ -568,6 +729,8 @@ pnpm exec prettier --check .
 ./run.sh test --protocol maven   # again, without resetting the stack — proves run isolation
 ./run.sh test --protocol npm
 ./run.sh test --protocol npm     # again — proves run isolation for npm too
+./run.sh test --protocol cargo
+./run.sh test --protocol cargo   # again — proves run isolation for cargo too
 ./run.sh test                    # the skeleton project
 ./run.sh sweep --dry-run         # before tearing down: confirms nothing was left behind
 ./run.sh local down
@@ -584,4 +747,6 @@ The npm suite's `'ok'`-expected scenarios currently report as an _expected_ fail
 (`test.fail`, RPS-1205 — see "npm runner" above), not a plain pass: Playwright's list reporter still
 prints a `✘` for each (something inside the test body did throw, which is exactly what `test.fail`
 is watching for), but the run's own summary line and exit code both say "passed"/`0` — treat those
-two as authoritative over the per-line glyphs.
+two as authoritative over the per-line glyphs. Likewise for the cargo suite's `no-override`/
+`override` scenarios (`knownPublishSideEffect`, "H1" above) and its two dedicated hyphen tests ("H2"
+above): all `test.fail`-routed, all counted as "passed".

@@ -94,6 +94,24 @@ services:
       - ./test-results:/app/test-results
       - ./playwright-report:/app/playwright-report
 
+  cargo:
+    <<: *runner-common
+    build:
+      context: .
+      dockerfile: runners/cargo.Dockerfile
+      args:
+        RUST_VERSION: '1.98.1'
+    environment:
+      <<: *runner-environment
+    volumes:
+      # No shared/named cache volume, same reasoning as npm's: the cargo test crates are
+      # dependency-free on purpose, so there is nothing third-party for `cargo fetch` to cache.
+      - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
+      - ./src:/app/src
+      - ./tests:/app/tests:ro
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+
 volumes:
   # Named (not bind-mounted): holds only downloaded third-party Maven plugins/dependencies, so it
   # persists across `run.sh test` invocations without leaving anything in the working tree.

@@ -38,6 +38,11 @@
  * checks, only marks the remaining consume-side assertions as an expected failure via
  * `test.fail(true, ...)` when the adapter names one. Maven has no such hook.
  *
+ * `adapter.knownPublishSideEffect` (step 3b, cargo's storage-before-DB-check routing-around hook)
+ * runs right before `adapter.expectNothingStored`, the symmetric case on the PUBLISH side: the
+ * outcome and client-exit-code assertions for the publish still ran and were asserted for real, only
+ * the "nothing changed" comparison becomes an expected failure when the adapter names one.
+ *
  * Remote hardening (plan section "Execution targets", "Remote specifics"): on a `remote` target,
  * `@local-only` scenarios are skipped, and `@negative` scenarios run serially, each reserving a slot
  * from a `RemoteAuthBudget` (one per protocol, scoped to this function's closure) first, so their
@@ -115,6 +120,10 @@ export function registerPublishConsumeLoop<F>(adapter: ProtocolAdapter<F>): void
     expectOutcome(adapter, published, expectation.publish);
     expectClientAgrees(adapter, published, expectation.publish, adapter.client.publishVerb);
     if (before !== undefined) {
+      const knownSideEffect = adapter.knownPublishSideEffect?.(scenario);
+      if (knownSideEffect) {
+        test.fail(true, knownSideEffect);
+      }
       await adapter.expectNothingStored(w, before);
     }
 
