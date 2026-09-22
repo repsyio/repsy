@@ -18,13 +18,17 @@ package io.repsy.os.server.protocols.maven.shared.keystore.services;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.bouncycastle.openpgp.PGPUtil.getDecoderStream;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
+import io.repsy.os.server.protocols.maven.shared.keystore.dtos.ParsedPublicKey;
+import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.Security;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +43,7 @@ import org.bouncycastle.openpgp.PGPSignature;
 import org.bouncycastle.openpgp.PGPSignatureList;
 import org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator;
 import org.bouncycastle.openpgp.operator.jcajce.JcaPGPContentVerifierBuilderProvider;
+import org.bouncycastle.util.encoders.Hex;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -53,6 +58,8 @@ public class PGPVerifierService {
 
   private static final String KEY_ID_FORMAT = "%016X";
   private static final int PGP_BUFFER_SIZE = 4_096;
+  private static final String PRIVATE_KEY_ARMOR_HEADER = "-----BEGIN PGP PRIVATE KEY BLOCK-----";
+  private static final int MAX_USER_ID_LENGTH = 255;
   private static final @NonNull Set<String> KEY_SERVERS =
       Set.of(
           "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x%s",
@@ -61,11 +68,21 @@ public class PGPVerifierService {
   @Qualifier("pgpVerifierWebClient")
   private final @NonNull WebClient webClient;
 
+  /**
+   * Verifies the detached {@code signedFile} signature of {@code file}. The signer's public key is
+   * looked up in {@code sources}: its registered armored keys first (RPS-1189), then the repo's
+   * custom key-server hosts, then the two hardcoded default key servers.
+   *
+   * @throws SignatureNotVerifiedException {@code artifactSignatureNotVerified} when {@code
+   *     signedFile} is not a parseable OpenPGP signature, or does not verify against {@code file}
+   * @throws ItemNotFoundException when no source in {@code sources} (nor the default servers) has
+   *     the signer's public key
+   */
   @SneakyThrows
   public void verify(
       final @NonNull Resource file,
       final @NonNull Resource signedFile,
-      final @Nullable List<String> customHosts) {
+      final @Nullable PublicKeySources sources) {
 
     try (final var dataStream = file.getInputStream();
         final var signatureStream = signedFile.getInputStream()) {
@@ -87,7 +104,7 @@ public class PGPVerifierService {
       }
 
       final var publicKey =
-          this.getPublicKey(signature.getKeyID(), customHosts)
+          this.getPublicKey(signature.getKeyID(), sources)
               .orElseThrow(
                   () ->
                       new ItemNotFoundException(
@@ -116,9 +133,16 @@ public class PGPVerifierService {
   }
 
   private @NonNull Optional<PGPPublicKey> getPublicKey(
-      final long keyId, @Nullable final List<String> customHosts) throws PGPException, IOException {
+      final long keyId, @Nullable final PublicKeySources sources) throws PGPException, IOException {
 
     final var keyIdHex = String.format(KEY_ID_FORMAT, keyId);
+
+    final var registeredKey = this.findInRegisteredKeys(sources, keyId);
+    if (registeredKey.isPresent()) {
+      return registeredKey;
+    }
+
+    final var customHosts = sources != null ? sources.keyServerHosts() : null;
 
     final var customKey = this.findInCustomHosts(customHosts, keyIdHex, keyId);
     if (customKey.isPresent()) {
@@ -130,6 +154,35 @@ public class PGPVerifierService {
 
       if (key.isPresent()) {
         return key;
+      }
+    }
+
+    return Optional.empty();
+  }
+
+  /**
+   * Tries every registered armored key of {@code sources} for {@code keyId} (RPS-1189), in order,
+   * before any key server is asked. A key that fails to parse is a stored row that was valid at
+   * registration time, so it is logged and skipped rather than allowed to break the whole lookup.
+   */
+  private @NonNull Optional<PGPPublicKey> findInRegisteredKeys(
+      @Nullable final PublicKeySources sources, final long keyId) {
+
+    if (sources == null || sources.registeredArmoredKeys().isEmpty()) {
+      return Optional.empty();
+    }
+
+    for (final var armoredKey : sources.registeredArmoredKeys()) {
+      try {
+        final var key = this.parsePublicKey(armoredKey, keyId);
+
+        if (key.isPresent()) {
+          return key;
+        }
+      } catch (final PGPException | IOException | RuntimeException exception) {
+        // A stored key was validated with parseArmoredPublicKey at registration time and should
+        // never fail here, but one corrupted row must not break the lookup for every other key.
+        log.warn("a registered public key could not be parsed. Cause: {}", exception.toString());
       }
     }
 
@@ -214,5 +267,78 @@ public class PGPVerifierService {
 
       return Optional.ofNullable(collection.getPublicKey(keyId));
     }
+  }
+
+  /**
+   * Parses an armored OpenPGP public key block a repo owner wants to register directly on its key
+   * store (RPS-1189), and reads the identity of its primary key. The block must hold exactly one
+   * key (its primary key, plus any subkeys); registering several keys is done with several calls.
+   *
+   * @throws BadRequestException {@code pgpPublicKeyInvalid} when {@code armored} is not exactly one
+   *     armored OpenPGP public key ring (a private key block, plain text, a signature, several
+   *     rings, ...)
+   */
+  public static @NonNull ParsedPublicKey parseArmoredPublicKey(final @NonNull String armored) {
+
+    final var trimmed = armored.trim();
+
+    if (trimmed.startsWith(PRIVATE_KEY_ARMOR_HEADER)) {
+      throw new BadRequestException("pgpPublicKeyInvalid");
+    }
+
+    ensureBouncyCastleProvider();
+
+    try (final var ds = getDecoderStream(new ByteArrayInputStream(trimmed.getBytes(UTF_8)))) {
+      final var collection = new PGPPublicKeyRingCollection(ds, new JcaKeyFingerprintCalculator());
+      final var primary = requireSinglePrimaryKey(collection);
+
+      return new ParsedPublicKey(
+          String.format(KEY_ID_FORMAT, primary.getKeyID()),
+          Hex.toHexString(primary.getFingerprint()).toUpperCase(Locale.ROOT),
+          firstUserId(primary));
+    } catch (final IOException
+        | PGPException
+        | IllegalArgumentException
+        | ClassCastException exception) {
+      log.warn("a submitted public key could not be parsed. Cause: {}", exception.toString());
+      throw new BadRequestException("pgpPublicKeyInvalid");
+    }
+  }
+
+  private static void ensureBouncyCastleProvider() {
+
+    if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+      Security.addProvider(new BouncyCastleProvider());
+    }
+  }
+
+  /**
+   * The one ring's primary key {@code parseArmoredPublicKey} requires, or {@code
+   * pgpPublicKeyInvalid}.
+   */
+  private static @NonNull PGPPublicKey requireSinglePrimaryKey(
+      final @NonNull PGPPublicKeyRingCollection collection) {
+
+    if (collection.size() != 1) {
+      throw new BadRequestException("pgpPublicKeyInvalid");
+    }
+
+    return collection.getKeyRings().next().getPublicKey();
+  }
+
+  /**
+   * The first user id of {@code primary}, truncated defensively, or {@code null} when it has none.
+   */
+  private static @Nullable String firstUserId(final @NonNull PGPPublicKey primary) {
+
+    final var userIds = primary.getUserIDs();
+
+    if (!userIds.hasNext()) {
+      return null;
+    }
+
+    final var userId = userIds.next();
+
+    return userId.length() > MAX_USER_ID_LENGTH ? userId.substring(0, MAX_USER_ID_LENGTH) : userId;
   }
 }

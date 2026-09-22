@@ -21,6 +21,8 @@ import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.AllowedKeyserverItem;
 import io.repsy.os.generated.model.KeyStoreForm;
 import io.repsy.os.generated.model.KeyStoreItem;
+import io.repsy.os.generated.model.PgpPublicKeyForm;
+import io.repsy.os.generated.model.PgpPublicKeyItem;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -29,6 +31,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -57,6 +60,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class KeyStoreController {
 
   private static final Set<String> SORT_PROPERTIES = Set.of("id", "host", "displayName");
+  private static final Set<String> SORT_PROPERTIES_PUBLIC_KEYS =
+      Set.of("id", "keyId", "fingerprint", "userId", "createdAt");
 
   private final KeyStoreService keyStoreService;
   private final RestResponseFactory restResponseFactory;
@@ -103,5 +108,38 @@ public class KeyStoreController {
     final var result = this.keyStoreService.findAll(repoInfo, pageable);
 
     return this.restResponseFactory.success("keyStoresFetched", new PagedModel<>(result));
+  }
+
+  @GetMapping("/{repoName}/public-keys")
+  @RepoOperation(permission = Permission.MANAGE)
+  public RestResponse<PagedModel<PgpPublicKeyItem>> listPublicKeys(
+      final RepoInfo repoInfo,
+      @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
+
+    SortValidator.requireSortableBy(pageable, SORT_PROPERTIES_PUBLIC_KEYS);
+
+    final var result = this.keyStoreService.findAllPublicKeys(repoInfo, pageable);
+
+    return this.restResponseFactory.success("pgpPublicKeysFetched", new PagedModel<>(result));
+  }
+
+  @PostMapping("/{repoName}/public-keys")
+  @RepoOperation(permission = Permission.MANAGE)
+  public RestResponse<PgpPublicKeyItem> createPublicKey(
+      final RepoInfo repoInfo, @RequestBody @Valid final PgpPublicKeyForm form) {
+
+    final var item = this.keyStoreService.createPublicKey(repoInfo, form);
+
+    return this.restResponseFactory.success("pgpPublicKeyCreated", item);
+  }
+
+  @DeleteMapping("/{repoName}/public-keys/{publicKeyId}")
+  @RepoOperation(permission = Permission.MANAGE)
+  public RestResponse<Void> deletePublicKey(
+      final RepoInfo repoInfo, @PathVariable final UUID publicKeyId) {
+
+    this.keyStoreService.deletePublicKey(repoInfo, publicKeyId);
+
+    return this.restResponseFactory.success("pgpPublicKeyDeleted");
   }
 }

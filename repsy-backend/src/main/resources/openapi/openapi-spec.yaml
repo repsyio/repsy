@@ -436,6 +436,83 @@ paths:
         required: true
         schema:
           type: string
+  "/api/mvn/key-stores/{repoName}/public-keys":
+    get:
+      tags:
+        - key-store-controller
+      operationId: listMavenPgpPublicKeys
+      parameters:
+        - name: pageable
+          in: query
+          required: true
+          schema:
+            "$ref": "#/components/schemas/Pageable"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelPgpPublicKeyItem"
+      summary: List the PGP public keys registered directly on a Maven repository's key store
+      description: >-
+        Registered keys are tried first when a .pom.asc is verified, then the repo's allowed
+        key-server hosts, then the two public default servers. A signature whose key is nowhere
+        among those is refused with 404 and nothing is stored.
+    post:
+      tags:
+        - key-store-controller
+      operationId: createMavenPgpPublicKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/PgpPublicKeyForm"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponsePgpPublicKeyItem"
+      summary: Register an armored OpenPGP public key directly on a Maven repository's key store
+      description: >-
+        Registered keys are tried first when a .pom.asc is verified, then the repo's allowed
+        key-server hosts, then the two public default servers. A signature whose key is nowhere
+        among those is refused with 404 and nothing is stored.
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/mvn/key-stores/{repoName}/public-keys/{publicKeyId}":
+    delete:
+      tags:
+        - key-store-controller
+      operationId: deleteMavenPgpPublicKey
+      parameters:
+        - name: publicKeyId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseVoid"
+      summary: Remove a registered PGP public key from a Maven repository's key store
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
   "/api/auth/tokens/refresh":
     post:
       tags:
@@ -3637,6 +3714,51 @@ components:
           type: string
         text:
           type: string
+    PgpPublicKeyForm:
+      type: object
+      properties:
+        armoredKey:
+          type: string
+          minLength: 1
+          maxLength: 65536
+          description: >-
+            An ASCII-armored OpenPGP public key block holding exactly one key with its subkeys.
+      required:
+        - armoredKey
+    PgpPublicKeyItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        keyId:
+          type: string
+        fingerprint:
+          type: string
+        userId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - keyId
+        - fingerprint
+        - createdAt
+    RestResponsePgpPublicKeyItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PgpPublicKeyItem"
+        errorCode:
+          type: string
+        text:
+          type: string
     RefreshTokenForm:
       type: object
       required:
@@ -4369,6 +4491,28 @@ components:
           "$ref": "#/components/schemas/ResponseType"
         data:
           "$ref": "#/components/schemas/PagedModelKeyStoreItem"
+        errorCode:
+          type: string
+        text:
+          type: string
+    PagedModelPgpPublicKeyItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/PgpPublicKeyItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelPgpPublicKeyItem:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelPgpPublicKeyItem"
         errorCode:
           type: string
         text:

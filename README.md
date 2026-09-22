@@ -407,6 +407,16 @@ access to that repository without a user account. Only create user accounts for 
 with every repository on the instance; to keep repositories apart between teams, run one Repsy
 instance per team.
 
+### Signed Maven Deploys
+
+A Maven repository's key store (panel API, `/api/mvn/key-stores/{repoName}/public-keys`) can hold
+armored OpenPGP public keys directly, in addition to the key-server hosts it already supports. When
+a `.pom.asc` signature is verified, its registered public keys are consulted first, before any key
+server. This lets a signature made with a key that is never published to a public server — a
+company-internal key, a CI key, a freshly generated key — verify without network access. A
+signature whose key is neither registered nor found on any allowed or default key server is
+refused with `404` and nothing is stored.
+
 ### Authenticating from CI
 
 Prefer a [deploy token](#repository-access) for CI jobs, build servers and anything else that

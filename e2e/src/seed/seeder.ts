@@ -160,6 +160,14 @@ export class Seeder {
   }
 
   /**
+   * Registers an armored OpenPGP public key directly on a repo's Maven key store (RPS-1189).
+   * Nothing to track for cleanup: the row cascades on delete when the repo is deleted.
+   */
+  async registerPgpPublicKey(repoName: string, armoredKey: string) {
+    return this.api.registerPgpPublicKey(repoName, armoredKey);
+  }
+
+  /**
    * Revokes an already-created token right away, for a "token-revoked" credential: the token was
    * tracked (and will be cleaned up, tolerating the 404 a second revoke gets) when it was created;
    * this just makes it stop working immediately instead of at test teardown.
