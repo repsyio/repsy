@@ -54,5 +54,9 @@ export default defineConfig({
       name: 'cargo',
       testMatch: 'cargo/**/*.spec.ts',
     },
+    {
+      name: 'nuget',
+      testMatch: 'nuget/**/*.spec.ts',
+    },
   ],
 });

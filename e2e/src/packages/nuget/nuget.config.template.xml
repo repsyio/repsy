@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="repsy" value="{{{serviceIndexUrl}}}" protocolVersion="3" allowInsecureConnections="true" />
+  </packageSources>
+{{#hasBasic}}
+  <packageSourceCredentials>
+    <repsy>
+      <add key="Username" value="{{{username}}}" />
+      <add key="ClearTextPassword" value="{{{password}}}" />
+    </repsy>
+  </packageSourceCredentials>
+{{/hasBasic}}
+</configuration>

@@ -25,8 +25,8 @@ const IGNORES = [
   'playwright-report/**',
   'test-results/**',
   // Rendered verbatim into an isolated work directory by clients/maven.ts / clients/npm.ts /
-  // clients/cargo.ts (mustache templates of the tiny publishable test packages) -- not part of this
-  // project's own source.
+  // clients/cargo.ts / clients/nuget.ts (mustache templates of the tiny publishable test packages) --
+  // not part of this project's own source.
   'src/packages/**',
 ];
 
@@ -61,6 +61,7 @@ export default tseslint.config(
             'expectResolvedContent',
             'expectSnapshotFollowedThroughMetadata',
             'expectPut',
+            'expectPublish',
           ],
         },
       ],
