@@ -191,13 +191,58 @@ class ArtifactUtilsTest {
     "com/example/lib/1.0/lib-1.0.pom.sha1, false",
     "com/example/lib/1.0/lib-1.0.pom.md5, false",
     "com/example/lib/1.0/lib-1.0.jar, false",
-    "com/example/lib/maven-metadata.xml, false"
+    "com/example/lib/maven-metadata.xml, false",
+    "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.jar, false",
+    "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.jar.asc, false",
+    "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.jar.sha1, false",
+    "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.pom, true",
+    "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.pom.asc, false",
+    "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.pom.sha1, false",
+    "com/acme/bar.pom.utils/maven-metadata.xml, false",
+    "com/acme/bar.pom.utils/maven-metadata.xml.asc, false",
+    "com/acme/x.pom/1.0/x.pom-1.0.jar, false",
+    "com/acme/x.pom/1.0/x.pom-1.0.pom, true",
+    "com/acme/lib/1.0.pom/lib-1.0.pom.jar, false",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.pom, true",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.pom, true",
+    "x, false"
   })
-  @DisplayName("tells the POMs the artifact service parses from the files stored beside them")
+  @DisplayName(
+      "tells the POMs the artifact service parses from the files stored beside them, by the file"
+          + " name alone (RPS-1196)")
   void recognisesThePomsToParse(final String path, final boolean expected) {
     final var storagePath = StoragePath.of(UUID.randomUUID(), path);
 
     assertThat(ArtifactUtils.isPomToParse(storagePath)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest(name = "{0} is a POM signature: {1}")
+  @CsvSource({
+    "com/acme/lib/1.0/lib-1.0.pom.asc, true",
+    "LIB-1.0.POM.asc, true",
+    "lib-1.0.pom.ASC, false",
+    "lib-1.0.jar.asc, false",
+    "lib-1.0.pom.asc.sha1, false",
+    "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.jar.asc, false",
+    "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.pom.asc, true",
+    "com/acme/bar.pom.utils/maven-metadata.xml.asc, false",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.pom.asc, true"
+  })
+  @DisplayName("tells the .asc signature of a POM by its file name alone (RPS-1196)")
+  void recognisesAPomSignature(final String path, final boolean expected) {
+    final var storagePath = StoragePath.of(UUID.randomUUID(), path);
+
+    assertThat(ArtifactUtils.isPomSignature(storagePath)).isEqualTo(expected);
+  }
+
+  @Test
+  @DisplayName("answers a binary POM body with the same fixed msgId (RPS-1196)")
+  void binaryBodyYieldsFixedMessageId() {
+    final var binary = new byte[] {'P', 'K', 3, 4, 0, 0};
+
+    assertThatThrownBy(() -> ArtifactUtils.readModel(new ByteArrayInputStream(binary)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("malformedPomFile");
   }
 
   @ParameterizedTest(name = "{0} is {1}:{2}:{3} (classifier {4}, extension {5})")
@@ -240,7 +285,11 @@ class ArtifactUtilsTest {
         "com/acme/lib_2.13/1.0-SNAPSHOT/lib_2.13-1.0-20260921.101010-1.jar, com.acme, lib_2.13,"
             + " 1.0-20260921.101010-1, NULL, jar",
         "com/acme/lib-core/1.0-SNAPSHOT/lib-core-1.0-SNAPSHOT.jar, com.acme, lib-core,"
-            + " 1.0-SNAPSHOT, NULL, jar"
+            + " 1.0-SNAPSHOT, NULL, jar",
+        "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.jar, com.acme, bar.pom.utils, 1.0, NULL, jar",
+        "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.pom, com.acme, bar.pom.utils, 1.0, NULL, pom",
+        "com/acme/bar.pom.utils/1.0-SNAPSHOT/bar.pom.utils-1.0-20260921.101010-1.jar, com.acme,"
+            + " bar.pom.utils, 1.0-20260921.101010-1, NULL, jar"
       })
   @DisplayName(
       "calculates the GAV of the files real Maven, Gradle and sbt clients send, with the signature"

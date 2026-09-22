@@ -62,6 +62,11 @@
  *    but never registered: served, yet invisible and undeletable in the panel (RPS-1193). Only the
  *    groupId is compared, case-sensitively; a POM that declares none is not checked, and its
  *    artifactId and version are never compared.
+ *  - A POM, its signature and its checksum are told by the file name's `.pom` suffix, never by a
+ *    directory or artifactId that merely contains `.pom` (RPS-1196): an artifactId such as
+ *    `raw.pom.utils` used to make its jar answer 400 `malformedPomFile` (parsed as XML), its jar
+ *    signature look up a POM that was never stored (404), and its stored `maven-metadata.xml` and
+ *    that file's signature fail the same way right after being written.
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import {
@@ -95,6 +100,8 @@ const NO_SIGNATURE = '';
 const ARMOR_ONLY = '-----BEGIN PGP SIGNATURE-----\n\n-----END PGP SIGNATURE-----\n';
 
 const ARTIFACT_ID = 'raw';
+/** An artifactId that itself contains ".pom", the RPS-1196 case. */
+const ARTIFACT_ID_POM = 'raw.pom.utils';
 const SNAPSHOT = '1.0-SNAPSHOT';
 const RELEASE = '2.0';
 
@@ -708,6 +715,70 @@ test.describe('maven upload rules (raw HTTP)', () => {
 
       const tree = await repoTree(layout.repoName);
       expect(Object.keys(tree).sort()).toEqual([...files.keys()].sort());
+    },
+  );
+
+  test(
+    'an artifactId containing ".pom" deploys like any other (RPS-1196)',
+    { tag: ['@smoke'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder);
+      const releaseDir = versionDir(layout.groupId, ARTIFACT_ID_POM, RELEASE);
+      const base = `${releaseDir}/${ARTIFACT_ID_POM}-${RELEASE}`;
+      const checksum = 'da39a3ee5e6b4b0d3255bfef95601890afd80709';
+      const artifactMetaPath = `${artifactDir(layout.groupId, ARTIFACT_ID_POM)}/maven-metadata.xml`;
+      const artifactMetaXml = artifactMetadataXml({
+        groupId: layout.groupId,
+        artifactId: ARTIFACT_ID_POM,
+        versions: [RELEASE],
+      });
+
+      const files = new Map<string, string>([
+        [`${base}.pom`, minimalPom(layout.groupId, ARTIFACT_ID_POM, RELEASE)],
+        [`${base}.pom.sha1`, checksum],
+        [`${base}.jar`, 'jar'],
+        [`${base}.jar.sha1`, checksum],
+        [`${base}.jar.asc`, ARMOR_ONLY],
+        [`${base}-sources.jar`, 'sources'],
+        [artifactMetaPath, artifactMetaXml],
+        [`${artifactMetaPath}.sha1`, checksum],
+        [`${artifactMetaPath}.asc`, ARMOR_ONLY],
+      ]);
+
+      for (const [path, body] of files) {
+        expectPut(await layout.put(path, body, OCTET), 200, undefined, path);
+      }
+
+      const admin = adminCredential();
+      for (const [path, body] of files) {
+        const res = await rawGet(layout.repoName, admin, path);
+        expect(res.status, `GET ${path} answered ${res.status}`).toBe(200);
+        expect(res.body.toString('utf8'), `the body of ${path}`).toBe(body);
+      }
+
+      const tree = await repoTree(layout.repoName);
+      expect(Object.keys(tree).sort()).toEqual([...files.keys()].sort());
+
+      // A malformed POM under the same artifactId is still parsed and refused, not stored.
+      const malformedPath = `${versionDir(layout.groupId, ARTIFACT_ID_POM, '3.0')}/${ARTIFACT_ID_POM}-3.0.pom`;
+      expectPut(
+        await layout.put(malformedPath, '<project><groupId>', OCTET),
+        400,
+        'malformedPomFile',
+        malformedPath,
+      );
+      const malformedRes = await rawGet(layout.repoName, admin, malformedPath);
+      expect(malformedRes.status, `GET ${malformedPath} answered ${malformedRes.status}`).toBe(404);
+
+      // A .pom.asc under the same artifactId is still verified and refused, not silently stored.
+      expectPut(
+        await layout.put(`${base}.pom.asc`, ARMOR_ONLY, OCTET),
+        422,
+        'artifactSignatureNotVerified',
+        `${base}.pom.asc`,
+      );
+      const ascRes = await rawGet(layout.repoName, admin, `${base}.pom.asc`);
+      expect(ascRes.status, `GET ${base}.pom.asc answered ${ascRes.status}`).toBe(404);
     },
   );
 });
