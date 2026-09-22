@@ -73,6 +73,27 @@
  *    `Bearer ` before dispatching to `handleBearerAuth` -- matching the real Cargo CLI, which "sends
  *    the token as a raw value with no prefix" (this file's own header comment on the pre-processor).
  *    A `Basic <base64>` value is dispatched to `handleBasicAuth` unchanged.
+ *  - Yank/unyank (step 5b): `DELETE`/`PUT /<repoName>/api/v1/crates/<name>/<version>/(yank|unyank)`
+ *    (`AbstractCargoYankProtocolMethodHandler`), `permission: WRITE`. Success: 200 `{"ok":true}`.
+ *    Confirmed live with the real `cargo yank`/`cargo yank --undo` binaries: both exit 0 and the
+ *    served sparse index entry's own `yanked` field flips accordingly; a yanked version's `.crate` is
+ *    still downloadable afterwards (`AbstractCargoDownloadProtocolMethodHandler` has no yanked check
+ *    at all) -- Cargo's yank semantics are index-only (a yanked version is excluded from fresh
+ *    dependency RESOLUTION, never from download of an already-pinned one), which is exactly what was
+ *    observed. A read-only deploy token is refused with a plain 401 `unAuthorized`, confirmed live
+ *    (the WRITE permission is enforced, not merely documented).
+ *  - Search: `GET /<repoName>/api/v1/crates?q=<query>` (`AbstractCargoSearchProtocolMethodHandler`),
+ *    `permission: READ`. Success: 200 `{"crates":[...],"meta":{"total":N}}`. Confirmed live with the
+ *    real `cargo search --registry repsy` binary: exit 0, stdout lists the crate.
+ *  - Owners: `GET/PUT/DELETE /<repoName>/api/v1/crates/<name>/owners`
+ *    (`CargoOwnersProtocolMethodHandler`, defined directly in `repsy-backend`, NOT the shared
+ *    `repsy-protocols/cargo` abstract-class family every other cargo route extends) -- confirmed
+ *    live: it answers every one of those three methods identically, with a FIXED body,
+ *    `{"ok":true,"msg":"Ownership is managed at the repository level in this registry"}`, and
+ *    `permission: WRITE` even for the GET. There is no `users` array at all. A real `cargo owner
+ *    --list --registry repsy <crate>` therefore FAILS client-side (confirmed live, exit 101: "missing
+ *    field `users` at line 1 column 81") even though the raw HTTP GET itself answers 200 -- see the
+ *    candidate-bug test in `tests/cargo/protocol-specific.spec.ts`.
  */
 import { env } from '../env.js';
 import type { Scenario } from '../scenarios/types.js';
@@ -162,6 +183,32 @@ export function crateFileName(name: string, version: string): string {
 /** The canonical, repo-relative download path Cargo's own `config.json` `dl` template resolves to. */
 export function downloadPath(name: string, version: string): string {
   return `api/v1/crates/${name}/${version}/download`;
+}
+
+/** `DELETE .../<name>/<version>/yank` (step 5b): confirmed live to answer 200 `{"ok":true}` for a
+ *  WRITE-permitted credential, matching `AbstractCargoYankProtocolMethodHandler`'s header. */
+export function yankUrl(name: string, version: string): string {
+  return `api/v1/crates/${name}/${version}/yank`;
+}
+
+/** `PUT .../<name>/<version>/unyank` (step 5b): same handler/response shape as `yankUrl`, the
+ *  `isYank` branch just flips (`AbstractCargoYankProtocolMethodHandler.handle`). */
+export function unyankUrl(name: string, version: string): string {
+  return `api/v1/crates/${name}/${version}/unyank`;
+}
+
+/** `GET .../api/v1/crates?q=<query>` (step 5b): `{"crates": [...], "meta": {"total": N}}`
+ *  (`AbstractCargoSearchProtocolMethodHandler.handle`). */
+export function searchUrl(query: string): string {
+  return `api/v1/crates?q=${encodeURIComponent(query)}`;
+}
+
+/** `GET .../<name>/owners` (step 5b): see this file's header -- Repsy OS's own
+ *  `CargoOwnersProtocolMethodHandler` (never the shared `repsy-protocols/cargo` abstract class)
+ *  answers this route with a FIXED `{"ok":true,"msg":"..."}` body, no `users` array at all, for
+ *  every one of GET/PUT/DELETE. */
+export function ownersUrl(name: string): string {
+  return `api/v1/crates/${name}/owners`;
 }
 
 async function rawRequest(
@@ -262,6 +309,66 @@ export async function rawDownload(
   return rawRequest(`${repoUrl(repoName)}${downloadPath(name, version)}`, {
     headers: cargoAuthHeader(credential),
   });
+}
+
+/** Raw `DELETE` yank of one crate version (step 5b), `permission: WRITE`. */
+export async function rawYank(
+  repoName: string,
+  credential: MaterializedCredential,
+  name: string,
+  version: string,
+): Promise<RawResponse> {
+  return rawRequest(`${repoUrl(repoName)}${yankUrl(name, version)}`, {
+    method: 'DELETE',
+    headers: cargoAuthHeader(credential),
+  });
+}
+
+/** Raw `PUT` unyank of one crate version (step 5b), `permission: WRITE`. */
+export async function rawUnyank(
+  repoName: string,
+  credential: MaterializedCredential,
+  name: string,
+  version: string,
+): Promise<RawResponse> {
+  return rawRequest(`${repoUrl(repoName)}${unyankUrl(name, version)}`, {
+    method: 'PUT',
+    headers: cargoAuthHeader(credential),
+  });
+}
+
+/** Raw `GET` crate search (step 5b), `permission: READ`. */
+export async function rawSearch(
+  repoName: string,
+  credential: MaterializedCredential,
+  query: string,
+): Promise<RawResponse> {
+  return rawRequest(`${repoUrl(repoName)}${searchUrl(query)}`, {
+    headers: cargoAuthHeader(credential),
+  });
+}
+
+/** Raw `GET` of one crate's owners (step 5b), `permission: WRITE` on Repsy OS's own handler
+ *  (`CargoOwnersProtocolMethodHandler` -- see this file's header, distinct from a real crates.io
+ *  registry's owners route, which is READ-only for a GET). */
+export async function rawOwners(
+  repoName: string,
+  credential: MaterializedCredential,
+  name: string,
+): Promise<RawResponse> {
+  return rawRequest(`${repoUrl(repoName)}${ownersUrl(name)}`, {
+    headers: cargoAuthHeader(credential),
+  });
+}
+
+/** Parses the search envelope's body (step 5b): `{"crates": [...], "meta": {"total": N}}`. */
+export interface ParsedSearchResult {
+  crates: unknown[];
+  meta: { total: number };
+}
+
+export function parseSearch(body: Buffer): ParsedSearchResult {
+  return JSON.parse(body.toString('utf8')) as ParsedSearchResult;
 }
 
 /** One line of the sparse index's `text/plain` body, parsed (`CrateIndexEntry`'s JSON shape). */

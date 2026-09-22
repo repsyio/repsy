@@ -805,6 +805,41 @@ name round-trips through the loop under a spelling the server itself never agree
 `tests/cargo/registry-rules.spec.ts`'s raw-HTTP test both pin this directly, through `test.fail()`.
 Filed as **RPS-1212**.
 
+### Cargo protocol-specific suite (step 5b, RPS-294)
+
+`tests/cargo/protocol-specific.spec.ts` — "cargo A", ported from `repsy-cloud`'s own e2e harness
+(`protocols/cargo/library/test.ts`'s yank/unyank/search parts, `checksum/test.ts`,
+`multi_version/test.ts`; that harness is read-only reference material, never a target this repo
+modifies) into real `cargo` binaries + hand-built `World`s, exactly this harness's own conventions.
+"Cargo B" (`dependency_tree`/`platform_deps`/`workspace`) is a separate, later PR. Every test here
+uses a fresh `token-rw` deploy-token credential built by hand (not a catalog-loop scenario), and every
+crate name is underscore-only, routing around RPS-1212 above by construction rather than re-tripping
+it.
+
+- **Yank/unyank** (`DELETE`/`PUT /<repo>/api/v1/crates/<name>/<version>/(yank|unyank)`,
+  `AbstractCargoYankProtocolMethodHandler`, `permission: WRITE`): confirmed live with the real `cargo
+yank`/`cargo yank --undo` binaries — both exit `0`, the served sparse-index entry's `yanked` field
+  flips accordingly, and a **yanked** crate's `.crate` bytes are still downloadable afterwards
+  (`AbstractCargoDownloadProtocolMethodHandler` has no yanked check at all) — matching real Cargo
+  semantics: yank affects fresh dependency resolution only, never a download of an already-pinned
+  version. A read-only deploy token's yank attempt is refused with a real, live `401 unAuthorized`
+  (both the real client and a raw probe) — the documented `permission: WRITE` is actually enforced.
+- **Search** (`GET /<repo>/api/v1/crates?q=<query>`, `AbstractCargoSearchProtocolMethodHandler`,
+  `permission: READ`): confirmed live with the real `cargo search --registry repsy` binary — exit `0`,
+  stdout lists the crate, and the raw envelope (`{"crates":[...],"meta":{"total":N}}`) matches.
+- **Owners — `candidate (RPS-1239)`**: `GET/PUT/DELETE /<repo>/api/v1/crates/<name>/owners`
+  (`CargoOwnersProtocolMethodHandler` — defined directly in `repsy-backend`, unlike every other cargo
+  route, which extends a shared abstract class in `repsy-protocols/cargo`) answers **every** owners
+  request, even a GET, with a FIXED body (`{"ok":true,"msg":"Ownership is managed at the repository
+level in this registry"}`) and `permission: WRITE` even for the GET. There is no `users` array at
+  all. A real `cargo owner --list --registry repsy <crate>` therefore fails client-side ("missing
+  field `users`", exit `101`) even though the raw HTTP GET itself succeeds (`200`) — confirmed live,
+  filed as **RPS-1239**, pinned with `test.fail()`.
+- **Index `cksum` / multi-version**: confirmed live that a crate's served sparse-index `cksum` equals
+  the sha256 of the raw-downloaded `.crate` bytes (and the adapter's own publish hash), and that two
+  versions of one crate coexist independently — distinct `cksum`s, distinct downloaded bytes, both
+  present in the index simultaneously.
+
 ## NuGet runner
 
 `runners/nuget.Dockerfile` copies a pinned .NET SDK (`mcr.microsoft.com/dotnet/sdk:10.0.401-noble`,
