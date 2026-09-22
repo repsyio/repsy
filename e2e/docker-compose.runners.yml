@@ -196,6 +196,26 @@ services:
       - ./test-results:/app/test-results
       - ./playwright-report:/app/playwright-report
 
+  golang:
+    <<: *runner-common
+    build:
+      context: .
+      dockerfile: runners/golang.Dockerfile
+      args:
+        GO_VERSION: '1.27.1'
+    environment:
+      <<: *runner-environment
+    volumes:
+      # No shared/named cache volume, same reasoning as npm's/cargo's/nuget's/docker's/helm's/pypi's:
+      # this harness's module zip is dependency-free and hand-built (never `go build`/`go mod`), so
+      # `go mod download` never fetches a third-party dependency to cache. No daemon/socket either --
+      # `curl`/`go` are pure HTTP clients (clients/golang.ts's file header).
+      - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
+      - ./src:/app/src
+      - ./tests:/app/tests:ro
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+
 volumes:
   # Named (not bind-mounted): holds only downloaded third-party Maven plugins/dependencies, so it
   # persists across `run.sh test` invocations without leaving anything in the working tree.

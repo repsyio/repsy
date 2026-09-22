@@ -74,5 +74,9 @@ export default defineConfig({
       name: 'helm',
       testMatch: 'helm/**/*.spec.ts',
     },
+    {
+      name: 'golang',
+      testMatch: 'golang/**/*.spec.ts',
+    },
   ],
 });
