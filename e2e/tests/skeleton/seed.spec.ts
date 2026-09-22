@@ -39,54 +39,59 @@ async function repoRootStatus(repoName: string, token: string): Promise<number> 
   return res.status;
 }
 
-test('seeds a user, a private repo and deploy tokens, and cleanup removes them', async ({
-  seeder,
-  panelApi,
-}) => {
-  const user = await seeder.createUser();
-  const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
-  const rwToken = await seeder.createToken(repo.name, { readOnly: false });
-  const roToken = await seeder.createToken(repo.name, { readOnly: true });
-  const expiredToken = await seeder.createToken(repo.name, {
-    readOnly: false,
-    expirationDate: new Date(Date.now() - ONE_DAY_MS),
-  });
+test(
+  'seeds a user, a private repo and deploy tokens, and cleanup removes them',
+  { tag: ['@smoke'] },
+  async ({ seeder, panelApi }) => {
+    const user = await seeder.createUser();
+    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+    const rwToken = await seeder.createToken(repo.name, { readOnly: false });
+    const roToken = await seeder.createToken(repo.name, { readOnly: true });
+    const expiredToken = await seeder.createToken(repo.name, {
+      readOnly: false,
+      expirationDate: new Date(Date.now() - ONE_DAY_MS),
+    });
 
-  const usersBefore = await panelApi.listUsers({ size: 100 });
-  expect(usersBefore.some((u) => u.id === user.id)).toBe(true);
+    const usersBefore = await panelApi.listUsers({ size: 100 });
+    expect(usersBefore.some((u) => u.id === user.id)).toBe(true);
 
-  const reposBefore = await panelApi.listRepos(RepoType.MAVEN);
-  expect(reposBefore.some((r) => r.name === repo.name)).toBe(true);
+    const reposBefore = await panelApi.listRepos(RepoType.MAVEN);
+    expect(reposBefore.some((r) => r.name === repo.name)).toBe(true);
 
-  const tokensBefore = await panelApi.listDeployTokens(repo.name);
-  const tokenIdsBefore = tokensBefore.map((t) => t.id);
-  expect(tokenIdsBefore).toEqual(expect.arrayContaining([rwToken.id, roToken.id, expiredToken.id]));
+    const tokensBefore = await panelApi.listDeployTokens(repo.name);
+    const tokenIdsBefore = tokensBefore.map((t) => t.id);
+    expect(tokenIdsBefore).toEqual(
+      expect.arrayContaining([rwToken.id, roToken.id, expiredToken.id]),
+    );
 
-  await seeder.cleanup();
+    await seeder.cleanup();
 
-  const usersAfter = await panelApi.listUsers({ size: 100 });
-  expect(usersAfter.some((u) => u.id === user.id)).toBe(false);
+    const usersAfter = await panelApi.listUsers({ size: 100 });
+    expect(usersAfter.some((u) => u.id === user.id)).toBe(false);
 
-  const reposAfter = await panelApi.listRepos(RepoType.MAVEN);
-  expect(reposAfter.some((r) => r.name === repo.name)).toBe(false);
-});
+    const reposAfter = await panelApi.listRepos(RepoType.MAVEN);
+    expect(reposAfter.some((r) => r.name === repo.name)).toBe(false);
+  },
+);
 
-test('an expired deploy token is refused on the repo port, a read-write token is not', async ({
-  seeder,
-}) => {
-  const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
-  const rwToken = await seeder.createToken(repo.name, { readOnly: false });
-  const expiredToken = await seeder.createToken(repo.name, {
-    readOnly: false,
-    expirationDate: new Date(Date.now() - ONE_DAY_MS),
-  });
+test(
+  'an expired deploy token is refused on the repo port, a read-write token is not',
+  { tag: ['@smoke'] },
+  async ({ seeder }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+    const rwToken = await seeder.createToken(repo.name, { readOnly: false });
+    const expiredToken = await seeder.createToken(repo.name, {
+      readOnly: false,
+      expirationDate: new Date(Date.now() - ONE_DAY_MS),
+    });
 
-  const expiredStatus = await repoRootStatus(repo.name, expiredToken.token);
-  const rwStatus = await repoRootStatus(repo.name, rwToken.token);
+    const expiredStatus = await repoRootStatus(repo.name, expiredToken.token);
+    const rwStatus = await repoRootStatus(repo.name, rwToken.token);
 
-  // Pinned by probing a running instance: an expired token answers 401 (deployTokenExpired); a
-  // valid read-write token answers 200 for the repo root.
-  expect(expiredStatus).toBe(UNAUTHORIZED);
-  expect(rwStatus).not.toBe(UNAUTHORIZED);
-  expect(rwStatus).toBe(OK);
-});
+    // Pinned by probing a running instance: an expired token answers 401 (deployTokenExpired); a
+    // valid read-write token answers 200 for the repo root.
+    expect(expiredStatus).toBe(UNAUTHORIZED);
+    expect(rwStatus).not.toBe(UNAUTHORIZED);
+    expect(rwStatus).toBe(OK);
+  },
+);

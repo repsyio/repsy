@@ -1,0 +1,54 @@
+# Copyright 2026 the original author or authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# The H2 stack profile: Repsy alone, backed by the embedded H2 database, no postgres service. See
+# README.md "Stack profiles (postgres and H2)" for how this was chosen and confirmed live -- the
+# root README's own documented `DB_URL` for embedded H2
+# (`jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE`) is the
+# one pinned here; a `DATABASE_TO_LOWER=TRUE` variant was probed too and also works, but is not
+# needed. Same project name and ports as docker-compose.stack.yml, so the two profiles are mutually
+# exclusive by construction and `run.sh local down [--h2]` tears down whichever is up. Started and
+# stopped by `./run.sh local up|down --h2`; REPSY_ADMIN_PASSWORD must be set (e2e/.env, copied from
+# .env.example).
+name: repsy-e2e
+
+services:
+  repsy:
+    image: ${REPSY_IMAGE:-repsy-os-e2e:local}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    ports:
+      - '8080:8080'
+      - '9090:9090'
+    environment:
+      DB_URL: jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+      DB_USERNAME: repsy
+      DB_PASSWORD: repsy123
+      ADMIN_INITIAL_PASSWORD: ${REPSY_ADMIN_PASSWORD:?Set REPSY_ADMIN_PASSWORD in e2e/.env}
+      # Negative-auth scenarios (wrong password, revoked/expired token) authenticate wrong on
+      # purpose; a stack this harness owns can raise the limit far above anything a run could trip
+      # (see target.ts: canTuneThrottle is false for a "remote" target, which cannot do this).
+      AUTH_THROTTLE_MAX_FAILURES: '100000'
+      AUTH_THROTTLE_WINDOW_SECONDS: '60'
+    healthcheck:
+      # No actuator in this image; the SPA's static root is served once the app is fully up.
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://localhost:8080/']
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 15s
+    # Deliberately no named volume for /app/data: the image declares VOLUME /app/data, so every
+    # container gets a fresh anonymous volume and each `up` starts with an empty H2 database (the 9
+    # default repos freshly seeded), mirroring the postgres profile's anonymous pgdata volume.

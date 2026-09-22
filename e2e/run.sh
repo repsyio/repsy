@@ -21,6 +21,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 STACK_FILE="docker-compose.stack.yml"
+STACK_FILE_H2="docker-compose.stack-h2.yml"
 RUNNERS_FILE="docker-compose.runners.yml"
 
 if [ -f .env ]; then
@@ -39,13 +40,30 @@ export HOST_UID HOST_GID
 usage() {
   cat <<'EOF'
 Usage:
-  run.sh local up|down
+  run.sh local up|down [--h2]
   run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
 REPSY_ADMIN_PASSWORD must be set (copy .env.example to .env and fill it in) for every subcommand
 except "local down".
+
+"local up|down" starts/stops the postgres profile by default (docker-compose.stack.yml). Pass
+--h2, or set REPSY_E2E_STACK=h2, to use the embedded-H2 profile (docker-compose.stack-h2.yml)
+instead -- same ports/image, no postgres service, a fresh H2 database on every "up". "run.sh test"
+needs no flag either way: both profiles serve the same REPSY_API_BASE_URL/REPSY_REPO_BASE_URL, so
+every runner is unchanged.
 EOF
+}
+
+# Resolves the stack compose file for "local up|down": --h2 (checked by the caller) or
+# REPSY_E2E_STACK=h2 selects docker-compose.stack-h2.yml; anything else keeps the postgres profile.
+stack_file() {
+  local use_h2="$1"
+  if [ "$use_h2" = "true" ] || [ "${REPSY_E2E_STACK:-}" = "h2" ]; then
+    printf '%s' "$STACK_FILE_H2"
+  else
+    printf '%s' "$STACK_FILE"
+  fi
 }
 
 require_admin_password() {
@@ -69,15 +87,45 @@ random_run_id() {
 }
 
 cmd_local_up() {
+  local use_h2="false"
+  case "${1:-}" in
+    --h2)
+      use_h2="true"
+      ;;
+    '') ;;
+    *)
+      echo "Unknown option for 'local up': $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
   require_admin_password
-  docker compose -f "$STACK_FILE" up -d --wait
-  echo "Repsy is up: panel API on http://localhost:8080, repo protocols on http://localhost:9090"
+  local file db_label
+  file="$(stack_file "$use_h2")"
+  db_label="postgres"
+  [ "$use_h2" = "true" ] || [ "${REPSY_E2E_STACK:-}" = "h2" ] && db_label="h2"
+  docker compose -f "$file" up -d --wait
+  echo "Repsy is up ($db_label): panel API on http://localhost:8080, repo protocols on http://localhost:9090"
 }
 
 cmd_local_down() {
+  local use_h2="false"
+  case "${1:-}" in
+    --h2)
+      use_h2="true"
+      ;;
+    '') ;;
+    *)
+      echo "Unknown option for 'local down': $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+  local file
+  file="$(stack_file "$use_h2")"
   # Compose interpolates the whole file for every command, "down" included, and the stack file
   # requires REPSY_ADMIN_PASSWORD. Tearing down does not use it, so any value will do.
-  REPSY_ADMIN_PASSWORD="${REPSY_ADMIN_PASSWORD:-unused}" docker compose -f "$STACK_FILE" down
+  REPSY_ADMIN_PASSWORD="${REPSY_ADMIN_PASSWORD:-unused}" docker compose -f "$file" down
 }
 
 cmd_test() {
@@ -187,10 +235,12 @@ main() {
       shift || true
       case "${1:-}" in
         up)
-          cmd_local_up
+          shift || true
+          cmd_local_up "${1:-}"
           ;;
         down)
-          cmd_local_down
+          shift || true
+          cmd_local_down "${1:-}"
           ;;
         *)
           usage
