@@ -74,7 +74,8 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * existing version, its previous signature and its {@code signed} flag are left as they were. A
    * checksum is judged by the file it belongs to, so it is refused, and nothing is stored, when
    * that file would be (RPS-1183). A metadata signature ({@code maven-metadata.xml.asc}) is stored
-   * unparsed and unverified, judged like a metadata checksum (RPS-1185).
+   * unparsed and unverified, judged like a metadata checksum (RPS-1185). A POM, its signature and
+   * its checksum are told by the file name, never by the directory (RPS-1196).
    */
   @Override
   public void upload(

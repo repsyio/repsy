@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
@@ -273,29 +272,32 @@ public class ArtifactUtils {
     }
   }
 
-  /**
-   * Tells whether the artifact service parses the uploaded file as a POM: a {@code .pom} path that
-   * is neither a checksum nor a {@code .asc} signature of the POM.
-   */
-  public static boolean isPomToParse(final StoragePath storagePath) {
-
-    final var relativePath = storagePath.getRelativePath();
-
-    return containsIgnoreCase(relativePath.getPath(), POM_SUFFIX)
-        && !isChecksumFile(Objects.requireNonNull(relativePath.getFileName()))
-        && !relativePath.getPath().endsWith(SIGNED_POM_SUFFIX);
+  private static boolean endsWithIgnoreCase(final String str, final String suffix) {
+    return str.length() >= suffix.length()
+        && str.regionMatches(true, str.length() - suffix.length(), suffix, 0, suffix.length());
   }
 
   /**
-   * Tells whether the path is the {@code .asc} signature of a POM: a {@code .pom} path that ends in
-   * {@code .asc}. It is the one kind of signature the artifact service verifies. A metadata
-   * signature is not one: its path carries no {@code .pom}.
+   * Tells a POM by its file name alone: it ends with {@code .pom} (any case). A checksum or an
+   * {@code .asc} of it does not, and a directory or artifactId containing {@code .pom} is not
+   * looked at (RPS-1196).
+   */
+  public static boolean isPomFile(final String fileName) {
+    return endsWithIgnoreCase(fileName, POM_SUFFIX);
+  }
+
+  public static boolean isPomToParse(final StoragePath storagePath) {
+    return isPomFile(storagePath.getRelativePath().getFileName());
+  }
+
+  /**
+   * The {@code .asc} (case-sensitive, like {@link #isMetadataSignature}) of a file that {@link
+   * #isPomFile}.
    */
   public static boolean isPomSignature(final StoragePath storagePath) {
-
-    final var path = storagePath.getRelativePath().getPath();
-
-    return containsIgnoreCase(path, POM_SUFFIX) && path.endsWith(SIGNED_POM_SUFFIX);
+    final var fileName = storagePath.getRelativePath().getFileName();
+    return fileName.endsWith(SIGNED_POM_SUFFIX)
+        && isPomFile(fileName.substring(0, fileName.length() - SIGNED_POM_SUFFIX.length()));
   }
 
   public static void setReleaseAndLatest(final Metadata metadata) {

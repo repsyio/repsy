@@ -373,6 +373,70 @@ class AbstractMavenProtocolFacadeTest {
   }
 
   @Test
+  @DisplayName(
+      "streams a jar of an artifactId containing \".pom\" straight to storage, never as a POM"
+          + " (RPS-1196)")
+  void streamsAJarOfAnArtifactIdContainingPomToStorage() throws Exception {
+    final var path = "com/example/bar.pom.utils/1.0/bar.pom.utils-1.0.jar";
+    final var body = "PK\u0003\u0004binarycontentnotxmlatall";
+    requestFor(path);
+    deployIsAllowed();
+    storageReportsUsage(body.length());
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(new byte[0]));
+
+    upload(body);
+
+    assertThat(this.stored).singleElement().isEqualTo(body.getBytes(UTF_8));
+    verify(this.artifactService, never()).verifySignature(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("does not verify the jar signature of an artifactId containing \".pom\" (RPS-1196)")
+  void doesNotVerifyAJarSignatureOfAnArtifactIdContainingPom() throws Exception {
+    requestFor("com/example/bar.pom.utils/1.0/bar.pom.utils-1.0.jar.asc");
+    deployIsAllowed();
+    storageReportsUsage(3);
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(new byte[0]));
+
+    upload("sig");
+
+    verify(this.artifactService, never()).verifySignature(any(), any(), any());
+    assertThat(this.stored).singleElement().isEqualTo("sig".getBytes(UTF_8));
+  }
+
+  @Test
+  @DisplayName("verifies the POM signature of an artifactId containing \".pom\" (RPS-1196)")
+  void verifiesThePomSignatureOfAnArtifactIdContainingPom() throws Exception {
+    final var signature = "-----BEGIN PGP SIGNATURE-----\nabc\n-----END PGP SIGNATURE-----\n";
+    requestFor("com/example/bar.pom.utils/1.0/bar.pom.utils-1.0.pom.asc");
+    deployIsAllowed();
+    storageReportsUsage(signature.length());
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(signature.getBytes(UTF_8)));
+
+    upload(signature);
+
+    verify(this.artifactService)
+        .verifySignature(any(), any(StoragePath.class), any(Resource.class));
+    assertThat(this.stored).singleElement().isEqualTo(signature.getBytes(UTF_8));
+  }
+
+  @Test
+  @DisplayName("rejects a malformed POM of an artifactId containing \".pom\" (RPS-1196)")
+  void rejectsAMalformedPomOfAnArtifactIdContainingPom() {
+    requestFor("com/example/bar.pom.utils/1.0/bar.pom.utils-1.0.pom");
+    deployIsAllowed();
+
+    assertThatThrownBy(() -> upload(MALFORMED_POM))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("malformedPomFile");
+
+    verify(this.storageService, never()).writeInputStreamToPath(any(), any(), anyString());
+  }
+
+  @Test
   @DisplayName("refuses a path outside the artifact layout before checking rules or storing it")
   void refusesANonArtifactPathBeforeStoringIt() {
     requestFor("io/stray.txt");

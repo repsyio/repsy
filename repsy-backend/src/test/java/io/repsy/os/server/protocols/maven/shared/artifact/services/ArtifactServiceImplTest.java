@@ -869,6 +869,85 @@ class ArtifactServiceImplTest {
             argThat(version -> "1.0".equals(version.getVersionName())), any(), any());
   }
 
+  private static final String POM_OF_BAR_POM_UTILS =
+      """
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.acme</groupId>
+        <artifactId>bar.pom.utils</artifactId>
+        <version>1.0</version>
+      </project>
+      """;
+
+  @Test
+  @DisplayName("ignores a jar of an artifactId containing \".pom\" (RPS-1196)")
+  void createOrUpdateArtifactIgnoresAJarOfAnArtifactIdContainingPom() {
+    final var id = UUID.randomUUID();
+    this.stubRepo(id);
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.jar"),
+        new ByteArrayResource(new byte[] {'P', 'K', 3, 4, 0, 0}));
+
+    verifyNoInteractions(
+        this.artifactRepository, this.artifactVersionRepository, this.artifactUpsertHelper);
+  }
+
+  @Test
+  @DisplayName("ignores maven-metadata.xml of an artifactId containing \".pom\" (RPS-1196)")
+  void createOrUpdateArtifactIgnoresMetadataOfAnArtifactIdContainingPom() {
+    final var id = UUID.randomUUID();
+    this.stubRepo(id);
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/bar.pom.utils/maven-metadata.xml"),
+        new ByteArrayResource(ARTIFACT_METADATA_MIXED.getBytes(StandardCharsets.UTF_8)));
+
+    verifyNoInteractions(
+        this.artifactRepository, this.artifactVersionRepository, this.artifactUpsertHelper);
+  }
+
+  @Test
+  @DisplayName("ignores the metadata signature of an artifactId containing \".pom\" (RPS-1196)")
+  void createOrUpdateArtifactIgnoresAMetadataSignatureOfAnArtifactIdContainingPom() {
+    final var id = UUID.randomUUID();
+    this.stubRepo(id);
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/bar.pom.utils/maven-metadata.xml.asc"),
+        new ByteArrayResource(ARMORED_SIGNATURE.getBytes(StandardCharsets.UTF_8)));
+
+    verify(this.artifactVersionRepository, never()).save(any());
+    verifyNoInteractions(this.artifactRepository, this.artifactUpsertHelper);
+  }
+
+  @Test
+  @DisplayName("registers a POM of an artifactId containing \".pom\" (RPS-1196)")
+  void createOrUpdateArtifactRegistersAPomOfAnArtifactIdContainingPom() {
+    final var id = UUID.randomUUID();
+    this.stubRepo(id);
+    when(this.artifactUpsertHelper.insertArtifact(any(Artifact.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.pom"),
+        new ByteArrayResource(POM_OF_BAR_POM_UTILS.getBytes(StandardCharsets.UTF_8)));
+
+    verify(this.artifactUpsertHelper)
+        .insertArtifact(
+            argThat(
+                artifact ->
+                    "com.acme".equals(artifact.getGroupName())
+                        && "bar.pom.utils".equals(artifact.getArtifactName())));
+    verify(this.artifactUpsertHelper)
+        .insertArtifactVersion(
+            argThat(version -> "1.0".equals(version.getVersionName())), any(), any());
+  }
+
   private Resource stubStoredPom(final String relativePath) {
     final Resource pom = new ByteArrayResource("<project/>".getBytes(StandardCharsets.UTF_8));
     when(this.storageStrategy.get(pathOf(relativePath), eq("mvn"))).thenReturn(Optional.of(pom));

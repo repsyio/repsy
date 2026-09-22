@@ -216,6 +216,16 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     this.checkVersionTypeRules(baseRepoInfo, artifactPair.getValue());
   }
 
+  /**
+   * Registers a stored POM, or marks a version signed for a stored POM signature. Neither is
+   * decided from the whole path any more: a file is told to be a POM (or the signature of one) by
+   * its file name's {@code .pom} (or {@code .pom.asc}) suffix alone, the same rule {@link
+   * ArtifactUtils#isPomToParse} and {@link ArtifactUtils#isPomSignature} apply before the file is
+   * stored. Before, an artifactId or directory that merely contained {@code .pom} (for example
+   * {@code bar.pom.utils}) made every one of its files, checksums and signatures look like a POM or
+   * a POM signature, so a jar answered {@code malformedPomFile} and a stored {@code
+   * maven-metadata.xml} failed the same way right after being written (RPS-1196).
+   */
   @Override
   @Transactional
   public void createOrUpdateArtifact(
@@ -230,16 +240,14 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     final var versionPath =
         fullPath.substring(fullPath.indexOf("/") + 1, fullPath.lastIndexOf("/"));
 
-    if (!ArtifactUtils.containsIgnoreCase(storagePath.getRelativePath().getPath(), POM_SUFFIX)
-        || ArtifactUtils.isChecksumFile(
-            Objects.requireNonNull(storagePath.getRelativePath().getFileName()))) {
-      return;
-    }
-
     // Cannot create artifact for signed files. The signature itself was verified before it was
     // stored (see verifySignature), so here it only marks the version signed.
     if (ArtifactUtils.isPomSignature(storagePath)) {
       this.processSignedFileProcess(storagePath, repo);
+      return;
+    }
+
+    if (!ArtifactUtils.isPomToParse(storagePath)) {
       return;
     }
 
