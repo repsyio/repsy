@@ -68,6 +68,15 @@
  *    `snapshot-redeploy*` stay maven-only: they are about Maven's timestamped-SNAPSHOT-file
  *    semantics, which nuget has no equivalent of (a nuget "snapshot" is just a version with a `-`
  *    prerelease label, stored once like any other version).
+ *  - docker (step 4a) needs NO data changes here at all: every non-maven-restricted scenario applies
+ *    unchanged, with the SAME shared `expect` maven already pins -- `no-override`'s 403 ("You cannot
+ *    override a version."/`packageOverrideDisabled`, `AbstractDockerProtocolTxFacade
+ *    .checkRepoAllowOverride`) matches the shared maven pin byte-for-byte, and every auth failure is
+ *    a flat 401 at whichever hop (token exchange or the write/read request itself) a real client
+ *    would fail at too -- confirmed live, see `docker-raw.ts`'s file header and README.md's "Docker
+ *    runner" section. Docker is never added to `maven-releases-off`/`maven-snapshots-off`/
+ *    `redeploy-*-off`/`snapshot-*` (it has no releases/snapshots rule, or a SNAPSHOT-file concept, at
+ *    all -- `releases`/`snapshots` repo settings are never read by the Docker protocol).
  *
  * `versionType` matters only to the maven adapter today; other protocols ignore it once they exist.
  */
@@ -161,7 +170,9 @@ export const SCENARIOS: readonly Scenario[] = [
     // Pinned: 403 ("artifactOverrideIsProhibited"), not the plan's "conflict" (409) -- see the
     // file-level comment. cargo: 400 ("rejected") unconditionally -- see the file-level comment's
     // cargo bullet. nuget: a REAL 409 ("conflict") -- the first protocol in this harness to use
-    // that outcome for real, see the file-level comment's nuget bullet.
+    // that outcome for real, see the file-level comment's nuget bullet. docker: the SAME 403
+    // ("packageOverrideDisabled") as the shared pin, no override needed -- see the file-level
+    // comment's docker bullet.
     expect: { publish: 'forbidden', consume: 'ok' },
     expectByProtocol: { cargo: { publish: 'rejected' }, nuget: { publish: 'conflict' } },
   },

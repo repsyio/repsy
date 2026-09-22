@@ -62,6 +62,7 @@ export default tseslint.config(
             'expectSnapshotFollowedThroughMetadata',
             'expectPut',
             'expectPublish',
+            'expectOci',
           ],
         },
       ],

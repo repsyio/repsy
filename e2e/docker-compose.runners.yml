@@ -131,6 +131,26 @@ services:
       - ./test-results:/app/test-results
       - ./playwright-report:/app/playwright-report
 
+  docker:
+    <<: *runner-common
+    build:
+      context: .
+      dockerfile: runners/docker.Dockerfile
+      args:
+        CRANE_VERSION: 'v0.22.1'
+    environment:
+      <<: *runner-environment
+    volumes:
+      # No shared/named cache volume, same reasoning as npm's/cargo's/nuget's: `crane` is a static,
+      # daemonless binary with no image cache of its own (clients/docker.ts's craneEnv points
+      # DOCKER_CONFIG at a fresh per-invocation directory), so there is nothing third-party to cache.
+      # No docker.sock/privileged/DinD either -- see runners/docker.Dockerfile's header.
+      - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
+      - ./src:/app/src
+      - ./tests:/app/tests:ro
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+
 volumes:
   # Named (not bind-mounted): holds only downloaded third-party Maven plugins/dependencies, so it
   # persists across `run.sh test` invocations without leaving anything in the working tree.
