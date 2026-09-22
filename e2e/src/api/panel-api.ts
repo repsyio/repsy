@@ -351,6 +351,43 @@ export class PanelApi {
       );
     }
   }
+
+  /**
+   * Deletes one Ruby gem version (`DELETE /api/ruby/gems/{repoName}/{gemName}/versions/
+   * {versionName}?platform=`, step 4e/RPS-294 R5/R16) -- a real panel-API delete, distinct from a
+   * protocol-level `gem yank`. Called directly with `fetch`, like {@link
+   * deleteGolangModuleVersion}: the generated client is not worth wiring in for a single endpoint no
+   * other part of this harness needs.
+   */
+  async deleteRubyGemVersion(
+    repoName: string,
+    gemName: string,
+    version: string,
+    platform = 'ruby',
+  ): Promise<void> {
+    const url = new URL(
+      `${this.baseUrl}/api/ruby/gems/${encodeURIComponent(repoName)}/${encodeURIComponent(gemName)}/versions/${encodeURIComponent(version)}`,
+    );
+    url.searchParams.set('platform', platform);
+
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: { Authorization: this.authorization() },
+    });
+    if (!res.ok) {
+      throw new ApiError(
+        { method: 'DELETE', url: url.toString() },
+        {
+          status: res.status,
+          statusText: res.statusText,
+          url: url.toString(),
+          ok: false,
+          body: null,
+        },
+        `deleteRubyGemVersion failed with status ${res.status}`,
+      );
+    }
+  }
 }
 
 const DEFAULT_TOKEN_LIST_PAGE_SIZE = 20;

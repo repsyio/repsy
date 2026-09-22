@@ -1,0 +1,41 @@
+--- !ruby/object:Gem::Specification
+name: {{{name}}}
+version: !ruby/object:Gem::Version
+  version: {{{version}}}
+platform: {{{platform}}}
+authors:
+- repsy-e2e
+bindir: bin
+cert_chain: []
+date: 2026-01-01 00:00:00.000000000 Z
+dependencies: []
+description: e2e probe gem {{{name}}}@{{{version}}}
+email: e2e@repsy.io
+executables: []
+extensions: []
+extra_rdoc_files: []
+files:
+- e2e-marker.txt
+- lib/{{{name}}}.rb
+homepage: https://example.com/{{{name}}}
+licenses:
+- Apache-2.0
+metadata: {}
+rdoc_options: []
+require_paths:
+- lib
+required_ruby_version: !ruby/object:Gem::Requirement
+  requirements:
+  - - ">="
+    - !ruby/object:Gem::Version
+      version: '0'
+required_rubygems_version: !ruby/object:Gem::Requirement
+  requirements:
+  - - ">="
+    - !ruby/object:Gem::Version
+      version: '0'
+requirements: []
+rubygems_version: 4.0.20
+specification_version: 4
+summary: e2e probe gem {{{name}}}@{{{version}}}
+test_files: []

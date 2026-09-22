@@ -109,6 +109,23 @@
  *    golang is never added to `maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/
  *    `snapshot-*`: it has no releases/snapshots rule at all (grep-confirmed: no Go code reads
  *    either repo setting) and no SNAPSHOT-file concept.
+ *  - ruby (step 4e, the LAST protocol of step 4) needs one data change: `no-override` pins
+ *    `expectByProtocol: { ruby: { publish: 'conflict' } }` -- confirmed live, a real `409`
+ *    ("gemVersionAlreadyExists", `RubyGemServiceImpl.upsertVersion`: an existing version that is
+ *    EITHER yanked OR published under `allowOverride:false` is refused) -- like nuget/helm/golang,
+ *    this is a genuine conflict, not maven's 403. `override` needs no data change: an existing,
+ *    non-yanked version under `allowOverride:true` is overwritten in place, so the shared `expect`
+ *    of `ok` already matches. Every auth scenario's shared `expect` already matches for ruby too
+ *    (single-hop Basic/Bearer, a read-only deploy token on a WRITE is the same flat 401 every other
+ *    protocol pins, confirmed live -- see `ruby-raw.ts`'s file header). ruby is never added to
+ *    `maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/`snapshot-*`: it has no
+ *    releases/snapshots rule at all (grep-confirmed: no Ruby code reads either repo setting) and no
+ *    SNAPSHOT-file concept. Unlike every other protocol in this harness, ruby's own `resolve()`
+ *    (real `bundle install`) needed NO routing-around hook at all -- the plan's central gating
+ *    hypothesis (a real `bundle install` cannot consume from Repsy OS because
+ *    `quick/Marshal.4.8/*.gemspec.rz` has no backend route) was confirmed REFUTED live: Bundler's
+ *    compact-index client never needs that route for a plain gem with no dependencies (see
+ *    `ruby-raw.ts`'s file header for the full evidence).
  *
  * `versionType` matters only to the maven adapter today; other protocols ignore it once they exist.
  */
@@ -207,7 +224,8 @@ export const SCENARIOS: readonly Scenario[] = [
     // comment's docker bullet. helm/helm-classic: a REAL 409 ("conflict") in both modes -- see the
     // file-level comment's helm bullet. pypi: the SAME 403 ("fileAlreadyExists") as the shared pin,
     // no override needed -- see the file-level comment's pypi bullet. golang: a REAL, UNCONDITIONAL
-    // 409 ("goModuleVersionAlreadyExists") -- see the file-level comment's golang bullet.
+    // 409 ("goModuleVersionAlreadyExists") -- see the file-level comment's golang bullet. ruby: a
+    // REAL 409 ("gemVersionAlreadyExists") -- see the file-level comment's ruby bullet.
     expect: { publish: 'forbidden', consume: 'ok' },
     expectByProtocol: {
       cargo: { publish: 'rejected' },
@@ -215,6 +233,7 @@ export const SCENARIOS: readonly Scenario[] = [
       helm: { publish: 'conflict' },
       'helm-classic': { publish: 'conflict' },
       golang: { publish: 'conflict' },
+      ruby: { publish: 'conflict' },
     },
   },
   {

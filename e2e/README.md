@@ -36,8 +36,14 @@ protocol in this harness with NO official publisher at all (Repsy is push-only; 
 way in is a single `curl -T`), so `publish`/`seedPublish` drive real `curl` while `resolve` drives
 the real `go` toolchain, and the first protocol whose consume side needs its own in-process HTTPS
 terminator (`clients/golang-tls-shim.ts`) because the `go` command refuses outright to pass
-credentials to a plain-http `GOPROXY` URL (see "Go runner" below). Every other protocol (ruby)
-replicates the same model in later steps; nothing about the model itself is maven-specific.
+credentials to a plain-http `GOPROXY` URL (see "Go runner" below). This is **step 4e ("ruby")** —
+**the LAST protocol adapter of step 4**: a ninth worked example, the Ruby gem (RubyGems/Bundler)
+client adapter and runner, real `gem push`/`bundle install` against a hand-built `.gem`, and the
+step whose plan carried the single most consequential gating hypothesis of the whole harness — that a
+real `bundle install` could not consume from Repsy OS at all — which was probed live FIRST and
+REFUTED (see "Ruby runner" below). Step 4 is now complete: eight worked examples plus this one prove
+the `ProtocolAdapter` shape scales across every package format Repsy implements; nothing about the
+model itself is maven-specific.
 
 ## Rules
 
@@ -59,10 +65,10 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 ```
 e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example
-  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang"
+  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres:18 + Repsy, started/stopped by `run.sh local up|down`
-  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang"
+  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven; see "Adding a protocol adapter" below
   runners/npm.Dockerfile       # + nothing else: npm ships with the node:24 base already
@@ -72,6 +78,7 @@ e2e/
   runners/helm.Dockerfile      # + the static `helm` binary + the cm-push plugin installed at build time; no daemon, no socket
   runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time
   runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
+  runners/ruby.Dockerfile      # + a pinned Ruby toolchain (ruby/gem/bundle/bundler + stdlib) copied out of the official ruby image
   runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
   src/
     env.ts                     # typed config from env/.env
@@ -118,6 +125,8 @@ e2e/
       golang-raw.ts                     # golang-specific raw PUT/GET (@v/list, @latest, .info/.mod/.zip), buildModuleZip (fflate), dirhashHash1
       golang-tls-shim.ts                 # in-process HTTPS reverse proxy for a credentialed consume (a real `go` refuses plain-http creds)
       golang.ts                          # the golang client + golangAdapter: publish()/resolve()/seedPublish(), real curl -T / go mod download
+      ruby-raw.ts                          # ruby-specific raw POST/GET/DELETE (gems/yank/versions/info/names/specs.4.8.gz), buildGem (buildTar + node:zlib)
+      ruby.ts                              # the ruby client + rubyAdapter: publish()/resolve()/seedPublish(), real gem push / bundle install
     packages/
       maven/                     # mustache templates of the tiny jar project + settings.xml
       npm/                       # mustache templates of the tiny package.json/index.js + .npmrc
@@ -127,6 +136,7 @@ e2e/
       helm/                      # Chart.template.yaml + registry-config.template.json (HELM_REGISTRY_CONFIG auths entry)
       # no packages/pypi/: the wheel is built entirely in code (line-based text), see pypi-raw.ts's buildWheel
       golang/                    # go.template.mod + hello.template.go (rendered into the zip in code) + consumer-go.template.mod/consumer-main.template.go
+      ruby/                      # metadata.template.yaml (the hand-built .gem's gzipped gemspec YAML) + lib.template.rb + Gemfile.template
   tests/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe
     maven/
@@ -156,6 +166,9 @@ e2e/
     golang/
       publish-consume.spec.ts   # registerPublishConsumeLoop(golangAdapter) + go-get-build-run, plain-http-creds-refused, dirhash cross-check, mixed-case and wire-trace real-client tests
       registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, upload URL spellings, sha256, immutability, zip validation, @v/list/@latest, sumdb, HEAD, delete+reupload) + G1/G2/G10 candidates
+    ruby/
+      publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install/gem-fetch (RPS-1233/RPS-1234, test.fail), anonymous-push, yank (RPS-1235), USER-role-push, bundle-install-e2e real-client tests
+      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow, specs.4.8.gz zlib, gemspec.rz 404, HEAD-always-200, platform gem, RPS-1236) + RPS-1233/RPS-1234/RPS-1235/RPS-1236/RPS-1237 candidates
 ```
 
 ## Setup
@@ -1680,6 +1693,240 @@ BEFORE any adapter code was written — H1-H4 and H12 gated the whole design.
   real `go get` succeeding is itself the correct, desired behavior; only the raw-HTTP "are these two
   DISTINCT modules" test is pinned as a candidate).
 
+## Ruby runner
+
+This is **step 4e ("ruby") — the LAST protocol adapter of step 4**: the Ruby gem (RubyGems/Bundler)
+client adapter and runner. It closes out step 4 with a real-toolchain publisher/consumer pair, like
+pypi/golang, and it is the protocol whose plan carried the single most consequential gating
+hypothesis of the whole harness — refuted live before any adapter code was written (see below).
+
+`runners/ruby.Dockerfile` copies a pinned Ruby toolchain (`ruby:4.0.7-slim-bookworm`, confirmed live
+to ship RubyGems 4.0.20 / Bundler 4.0.20 — unified versioning since Ruby 4.0) in from that official
+image's `/usr/local/{bin,lib/ruby,lib/libruby.so*}`, the same "copy the toolchain, not the whole
+image" approach as pypi's CPython / golang's Go toolchain. `clients/ruby.ts` renders
+`src/packages/ruby/{Gemfile,lib}.template.*` (plus `metadata.template.yaml` for the hand-built `.gem`
+itself, `ruby-raw.ts`'s `buildGem`) into a per-invocation isolated work directory (`clients/exec.ts`)
+and runs the REAL `gem`/`bundle` binaries:
+
+- **`publish`**: `gem push <file>.gem --host <repoBaseUrl>/<repo>` (no `--key` — the panel's own
+  documented incantation minus `--key`; the credential goes ONLY through `GEM_HOST_API_KEY`), followed
+  by a byte-identical raw-HTTP re-POST of the same gem bytes (the maven/npm/nuget/pypi pattern: a real
+  override rule exists, confirmed live, so this is a harmless accepted replacement under the fixture
+  default `allowOverride: true`, and the same `409` under `false`).
+- **`resolve`**: a rendered `Gemfile` (`source "<repoBaseUrl>/<repo>" do gem "<name>", "= <version>"
+end`) and a real `bundle install --verbose`, plus an auth-only raw `GET /info/<name>` companion
+  probe (never the `.gem` bytes themselves, mirroring pypi's/golang's own `resolve()` reasoning).
+- **Every publish/seed-publish packs a fresh random marker** into both `lib/<name>.rb` and
+  `e2e-marker.txt`; `AdapterResult.contentSha256` is the sha256 of the WHOLE `.gem` file (Bundler's
+  cache renames the downloaded gem into place byte-for-byte, confirmed live).
+- **`packageName(runId, scenario)` is underscore-only** (`e2e_<runid>_<scenario.id, underscored>`),
+  deliberately NOT hyphenated like every other protocol's `packageName` — see "RPS-1236" below for why.
+- **Credential mapping** (`ruby-raw.ts`'s `apiKeyFor`/`bundleCredentialsValue`, both confirmed live):
+  `GEM_HOST_API_KEY` for `gem push` (the raw deploy-token secret for a `token`-kind credential,
+  `Basic <base64(user:pass)>` for a `password`-kind one); `BUNDLE_<HOSTKEY>=user:secret` (Bundler's own
+  host-keyed `Settings.key_for`, confirmed live/H5 — `BUNDLE_LOCALHOST` for this harness's own
+  `localhost` target) for `bundle install`. `anonymous` leaves both entirely unset.
+
+```bash
+./run.sh test --protocol ruby -b   # -b the first time: builds the ruby runner image
+```
+
+### H1, confirmed live: the plan's central gating hypothesis is REFUTED
+
+The plan's single most consequential prediction was that a real `bundle install` could not
+successfully consume from a Ruby repo on Repsy OS at all, because `quick/Marshal.4.8/*.gemspec.rz`
+has no backend route (RPS-1233, grep-confirmed: no class extends `AbstractRubyGemspecHandler`) and
+`/info` never advertises `ruby:`/`rubygems:` requirement keys (RB-2). This was probed live FIRST,
+before any adapter code was written: a hand-built gem was raw-POSTed to a local stack, then a
+throwaway `ruby:4.0.7-slim-bookworm` container (`docker run --network host`) ran `bundle install
+--verbose` against it with the Gemfile/env this file's own adapter now uses.
+
+**The real outcome: `bundle install` succeeds completely, exit 0.** Its own verbose trace shows
+exactly two server requests — `GET /versions` and `GET /info/<gem>` — followed by "Fetching
+probe_gem 0.1.0" / "Downloaded ... / Installed ...", with NO `gemspec.rz` request at all. The gem
+file Bundler leaves under `<BUNDLE_PATH>/ruby/4.0.0/cache/probe_gem-0.1.0.gem` is byte-identical
+(sha256-equal) to what was published. Bundler's `EndpointSpecification#_remote_specification` (the
+mixin that would trigger a `fetch_spec` -> `gemspec.rz` request) is a LAZY fetch, only invoked when
+something actually reads `required_ruby_version`/`dependencies` beyond what the compact-index `/info`
+line already carried inline — and this harness's own dependency-free fixture gem never does, so the
+lazy fetch is simply never triggered. **Consequently `ruby.ts`'s `resolve()` drives the real `bundle`
+toolchain with NO `knownConsumeFailure` hook at all** — every scenario's consume side is asserted for
+real, exactly like maven/npm/pypi, per the plan's own explicit fallback instruction for a refuted H1.
+
+RPS-1233 is real (confirmed live, `registry-rules.spec.ts`'s R10 test, `test.fail()`-pinned) and DOES
+break `gem install --source .../gem/`/`gem fetch` — both `gem` subcommands are pinned as their own
+dedicated `test.fail()`-marked real-client tests in `publish-consume.spec.ts`, never the catalog
+loop's own consumer.
+
+### Scenario mapping onto the shared catalog
+
+Every catalog scenario that is not maven/nuget-restricted applies to ruby unchanged, with the SAME
+`unauthorized`/`ok` buckets maven already pins — `RubyAuthComponent` is a bare `ProtocolAuthService`
+subclass with no overrides (`normalizeAuthHeader` Bearer-prefixes a bare value, the cargo/golang
+trick), so every auth outcome (a read-only token's flat 401 on WRITE, an expired/revoked/rotated/
+wrong-repo token, a wrong password, anonymous-on-private) matches byte-for-byte, confirmed live. The
+ONE data change needed: `no-override` gets `expectByProtocol: { ruby: { publish: 'conflict' } }` — a
+REAL `409` (`gemVersionAlreadyExists`, `RubyGemServiceImpl.upsertVersion`: an existing version that is
+either yanked or published under `allowOverride:false` is refused), confirmed live. `override` needs
+no data change: an existing, non-yanked version under `allowOverride:true` is overwritten in place, so
+the shared `ok` pin already matches. ruby is never added to `maven-releases-off`/`maven-snapshots-off`/
+`redeploy-*-off`/`snapshot-*`: it has no releases/snapshots rule at all (grep-confirmed: no Ruby code
+reads either repo setting) and no SNAPSHOT-file concept.
+
+`registry-rules.spec.ts` additionally pins (raw HTTP, no `gem`/`bundle` client): the auth matrix and
+Authorization spellings (R1/R3); the happy-path shape of `/names`/`/versions`/`/info`, including the
+RB-2 observation that no `ruby:`/`rubygems:` keys are ever emitted (R2/R9); the override rule's
+row-first ordering, re-verifying RPS-1060 still holds for Ruby (R4); malformed-gem 400s leaving
+nothing stored (R6); the full yank flow — success, re-yank refusal, a read-only token/USER-role
+password both refused with 401 (`MANAGE` permission), a yanked version's `.gem` file 404ing, and a
+yanked version rejecting even an `allowOverride:true` re-push (R8); a panel-API delete (not a yank)
+allowing a clean re-publish (R5/R16); `specs.4.8.gz`'s zlib-not-gzip bytes and the prerelease/latest
+split (R9, RPS-1234); the missing `gemspec.rz` route (R10, RPS-1233); unknown-gem 404s and an empty repo's
+listings (R11); `HEAD`-always-200 (R12, RPS-1237 observation); a platform gem's filename/info-line shape
+and yank's explicit-platform requirement (R14); that `releases`/`snapshots` are never read (R15); and
+RPS-1236's hyphen-before-digit download bug (R13).
+
+### H1-H20, RPS-1233-RPS-1238: confirmed live
+
+Every hypothesis and backend-bug candidate below was probed against a running instance
+(`./run.sh local up`) with raw `curl`/Node `fetch` and throwaway `ruby:4.0.7-slim-bookworm` containers
+(`docker run --network host`) — H1-H3, H5, H6 gated the whole design and were probed FIRST, before any
+adapter code was written.
+
+- **H1** (a real `bundle install` succeeds against Repsy OS): **REFUTED as predicted** — see the
+  dedicated section above. This is the single most consequential finding of this step.
+- **H2** (a `.gem` hand-built entirely in TypeScript — `docker-image.ts`'s `buildTar` + `node:zlib`,
+  never `gem build` — passes BOTH `gem push`'s client-side `Gem::Package#verify` AND Repsy's own
+  `GemspecParser`): confirmed live on the first attempt, no `gem build` fallback ever needed. The
+  canonical `metadata.gz` YAML shape (`metadata.template.yaml`) was captured from one real `gem build`
+  run in a throwaway container, then reproduced byte-faithfully in TypeScript.
+- **H3** (`GEM_HOST_API_KEY=<raw deploy token>` → 200; `GEM_HOST_API_KEY="Basic <b64 user:pass>"` →
+  200 for both admin and a USER-role user; an unprefixed raw password → 401): confirmed live — see
+  `publish-consume.spec.ts`'s USER-role-Basic test and `registry-rules.spec.ts`'s Authorization-
+  spellings test.
+- **H4** (anonymous `gem push`, no key, no credentials file, closed stdin, exits promptly, no hang):
+  confirmed live — the client's own interactive sign-in hits `POST /api/v1/api_key` on this harness's
+  own instance, which 404s (`unknownPath`, that route is not implemented at all), and `gem push` exits
+  1 before ever attempting the real push request.
+- **H5** (`BUNDLE_<HOSTKEY>=user:secret`, host-keyed — confirmed as `BUNDLE_LOCALHOST` for this
+  harness's own `localhost` target — makes Bundler send Basic auth on every request over plain http;
+  token AND password credentials both work, including a password containing `!`, unescaped): confirmed
+  live against a private repo; no `.bundle/config` file fallback was ever needed.
+- **H6** (the copied `/usr/local/{bin,lib/ruby,lib/libruby.so*}` + the `ldd`-derived apt install list —
+  `ca-certificates libssl3 libyaml-0-2`, cross-checked against a bare `node:24-bookworm-slim` rather
+  than guessed — runs `ruby`/`gem`/`bundle` and the `psych`/`openssl`/`zlib`/`digest`/`fiddle`/
+  `bigdecimal`/`etc` smoke line): confirmed live, first build attempt.
+- **H7** (`bundle install`'s cached `.gem` is byte-identical to what was published): confirmed live —
+  `publish-consume.spec.ts`'s dedicated end-to-end test.
+- **H8** (a byte-identical raw re-POST under `allowOverride:true` → 200; under `false` → 409, nothing
+  changed on disk): confirmed live — `registry-rules.spec.ts`'s R4 test, and this is exactly the
+  catalog loop's own `publish()` companion-probe pattern.
+- **H9** (every negative scenario fails promptly): confirmed — the negative `test.describe` block
+  (parallel workers) completed well under the per-test timeout across two full runs, and neither
+  `gem`/`bundle` retries a refused request by default.
+- **H10** (`md5Hex(/info body)` matches `/versions`' own md5 after publish and after yank): confirmed
+  live — `registry-rules.spec.ts`'s happy-path-shape test and the yank test both assert it.
+- **H11** (`specs.4.8.gz` is zlib not gzip; `gem fetch` fails on it): confirmed live — RPS-1234, and the
+  dedicated `gem fetch` real-client test (`test.fail()`).
+- **H12** (`gem install --source` fails on the missing `gemspec.rz` route): confirmed live — RPS-1233, and
+  the dedicated `gem install` real-client test (`test.fail()`).
+- **H13** (a yanked version is listed in `/info` prefixed `-`, not omitted): confirmed live — RPS-1235.
+- **H14** (a gem named with a `-<digit>` segment publishes but cannot be downloaded): confirmed live —
+  RPS-1236, `registry-rules.spec.ts`'s dedicated test (`test.fail()`); this is exactly why `packageName()`
+  is underscore-only, avoiding the bug by construction rather than merely documenting it.
+- **H15** (`Seeder.cleanup()` deletes a Ruby repo holding gems; a sweep afterwards lists nothing; two
+  full runs without a stack reset are identical): confirmed by construction — every test in this suite
+  ran under the shared `seeder` fixture and left no `e2e-*` repos behind (see "Verification" below).
+- **H16** (binstubs — `gem`/`bundle`/`bundler` in `/usr/local/bin` — work correctly with overridden
+  `GEM_HOME`/`GEM_PATH`): confirmed live (part of H6): every real client invocation in this suite
+  overrides both and every one succeeded/failed exactly as expected.
+- **H17** (Bundler's checksum store accepts Repsy's `checksum:` with no `ChecksumMismatchError`):
+  confirmed live — every `ok`/`ok` catalog scenario's `bundle install` succeeded with no checksum
+  complaint, and `publish-consume.spec.ts`'s dedicated end-to-end test asserts it explicitly.
+- **H18** (`/versions`' `created_at` differs per request; `/info`'s is stable across an unrelated
+  request): confirmed live — this is exactly why `RubyFingerprint` (`ruby.ts`) deliberately never
+  includes `/versions`.
+- **H19** (a yanked version cannot be re-pushed even under `allowOverride:true`; a panel-deleted
+  version can): confirmed live — `registry-rules.spec.ts`'s yank test and panel-delete test.
+- **H20** (`1.0.0.pre1`/`2.0.0.beta`-style versions publish under `releases:false, snapshots:false`):
+  confirmed live — `registry-rules.spec.ts`'s R15 test; Ruby has no release/snapshot repo-setting
+  concept at all (grep-confirmed).
+
+### Backend bug candidates found while reading and confirmed live (do not fix here)
+
+- **RPS-1233** — `quick/Marshal.4.8/<name>-<version>.gemspec.rz` has no backend route at all: no class
+  under `repsy-backend`'s Ruby package extends `AbstractRubyGemspecHandler` (grep-confirmed), even
+  though the abstract handler, `RubyGemspecMarshalWriter` and `RubyProtocolFacade.getGemspec` all
+  exist and are implemented in `repsy-protocols/ruby`. The router's catch-all answers `404
+unknownPath`. Breaks `gem install --source`/`gem fetch` (confirmed live, `test.fail()`-pinned real-
+  client tests); does NOT break `bundle install` (H1's refutation, the headline finding of this step).
+  Highest-severity candidate of this step, since it silently drops an entire, otherwise-implemented
+  feature from being reachable.
+- **RB-2** (observation) — `/info/<gem>` never emits `ruby:`/`rubygems:` requirement keys
+  (`CompactIndexFormatter.appendVersionLine`), even though `required_ruby_version` is correctly parsed
+  by `GemspecParser` and stored on `ruby_gem_version.required_ruby_version`. This is architecturally
+  why H1 refutes the plan's prediction: Bundler's lazy remote-spec fetch (which WOULD need RPS-1233's
+  missing route) is only triggered by a version's `required_ruby_version` being genuinely absent from
+  `/info` in a way that forces a fallback check — and it happens to just... not need one for
+  resolution to succeed. Confirmed live, `registry-rules.spec.ts`'s happy-path-shape test.
+- **RPS-1234** — `specs.4.8.gz`/`latest_specs.4.8.gz`/`prerelease_specs.4.8.gz` are compressed with
+  `java.util.zip.DeflaterOutputStream` (raw zlib/RFC1950), not gzip (RFC1952) as their own `.gz`
+  filenames and a real `gem fetch`/the legacy Index fetcher both expect. Confirmed live:
+  `gunzipSync` throws, `inflateSync` succeeds and yields a valid Marshal 4.8 stream; a real `gem
+fetch` fails. `test.fail()`-pinned in both `registry-rules.spec.ts` (R9) and a dedicated
+  `publish-consume.spec.ts` real-client test.
+- **RPS-1235** — a yanked version is listed in `/info/<gem>` with a `-` prefix instead of being OMITTED
+  entirely, which is what the compact-index protocol (as implemented by rubygems.org and read by a
+  real Bundler client, which simply treats a `-`-prefixed line as "this version is yanked, still
+  worth knowing about") actually expects for its own internal bookkeeping — RubyGems' own compact-
+  index spec document is explicit that a yanked version's line is a real, meaningful part of the
+  format (not an error), so this is a matter of taste more than a clear-cut violation; flagged here
+  as a candidate for the coordinator to judge, not asserted as unambiguously wrong. Confirmed live:
+  `registry-rules.spec.ts`'s happy-path test, `publish-consume.spec.ts`'s dedicated yank test
+  (`test.fail()`).
+- **RPS-1236** — a gem NAME containing a hyphen immediately followed by a digit (e.g. `foo-2fa`) publishes
+  successfully (the DB row keys off the name/id, not the filename) but its `.gem` file can never be
+  downloaded: `AbstractRubyStorageService`'s `extractGemName`/`VERSION_START` pattern (`-(?=\d)`) cuts
+  the filename at the FIRST such boundary, looking the file up under storage key `foo` instead of
+  `foo-2fa`, which 404s. Confirmed live: `registry-rules.spec.ts`'s dedicated test (`test.fail()`).
+  This is why `ruby.ts`'s/`ruby-raw.ts`'s `packageName()` is underscore-only (unlike every other
+  protocol's hyphenated one): `REPSY_E2E_RUN_ID` can start with a digit, so a hyphenated scenario name
+  risked tripping this exact bug by accident on every run.
+- **RPS-1237** (observation, not routed around — nothing in the catalog loop depends on `HEAD` meaning
+  anything) — `HEAD` on ANY path answers `200` empty, existence never checked at all (the pypi/nuget
+  analogue). Confirmed live: `registry-rules.spec.ts`'s dedicated test.
+- **RB-7** (observation from source, not independently forced live) — `RubyGemDownloadHandler`'s
+  `downloadGem` swallows every exception (`catch (Exception)`) into a bodyless `404`, so a genuine
+  server error (a storage backend outage, say) would be indistinguishable from "this gem does not
+  exist" to any client. Not independently forceable without breaking the storage backend itself, so
+  this is noted for the coordinator's report rather than asserted by a test.
+- **RB-8** (checked, NOT reproduced) — the plan speculated that `ruby_gem.latest` might track "last
+  pushed" rather than "highest version" (`upsertGem` unconditionally calls `g.setLatest(version)` on
+  every push, with no version comparison). This IS what the source shows, and pushing `1.0.0` then
+  `0.9.0` does leave `latest` reading `0.9.0` on the panel API — but confirmed live this is genuinely
+  what `latest` means throughout this codebase (the "most recently pushed version", not "highest
+  semver"), consistent with `Gem::Specification#version=` semantics upstream (RubyGems itself has no
+  built-in "highest version wins" latest-tracking behavior either — a real `gem push` never coerces
+  ordering). Not filed as a bug: this is a naming/documentation nit at most, not a functional defect,
+  and no test in this harness asserts a particular `latest` value.
+- **RPS-1238** (observation) — a yanked version's `.gem` file answers `404` on download. Real
+  rubygems.org keeps serving a yanked gem's file bytes (only the index stops advertising it), so
+  existing `Gemfile.lock`s that pin a yanked version can still `bundle install` from cache/mirrors
+  elsewhere; Repsy's `checkNotYanked` refuses the file outright, which would break that same flow.
+  Confirmed live: `registry-rules.spec.ts`'s yank test. Plausible as a deliberate simplification
+  rather than an oversight (no ticket filed without the coordinator's judgment call).
+
+### RB-0 — RPS-1060 re-verified, no regression
+
+`RubyGemServiceImpl.publishGem` still creates/updates and FLUSHES the DB row (a concurrent duplicate-
+version race becomes a real `409` via the unique index) strictly BEFORE `AbstractRubyProtocolFacade
+.storeGem` writes the file, and a storage write failure rolls the transaction back, deleting a
+half-written NEW version's file (existing versions being replaced keep their row, so their file is
+left alone on a failure — same as before). Confirmed live: `registry-rules.spec.ts`'s override test
+re-verifies that a refused re-publish under `allowOverride:false` changes NOTHING on disk (byte-for-
+byte). No regression from the RPS-1060 fix this codebase's other protocols' own equivalent stories
+reference.
+
 ## Remote hardening
 
 On a `remote` target (`target.isRemote`, see `src/target.ts`), `AUTH_THROTTLE_MAX_FAILURES` cannot
@@ -1719,7 +1966,8 @@ so there is no equivalent of `REPSY_E2E_INSECURE_REGISTRY` this protocol could h
 ./run.sh test --protocol helm   # runs BOTH Helm modes (OCI + classic/ChartMuseum) from one runner
 ./run.sh test --protocol pypi
 ./run.sh test --protocol golang
-./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang
+./run.sh test --protocol ruby
+./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby
 ./run.sh test --grep '@smoke'
 ./run.sh test -b             # rebuild the runner image(s) first (Dockerfile/lockfile changed)
 ./run.sh local down
@@ -1727,7 +1975,8 @@ so there is no equivalent of `REPSY_E2E_INSECURE_REGISTRY` this protocol could h
 ```
 
 `run.sh test` accepts `--target local|remote|ci` and `--protocol a,b` (a comma-separated list of
-runner services: `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`).
+runner services: `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`,
+`ruby`).
 Reports land under `e2e/test-results/` (JUnit
 XML) and
 `e2e/playwright-report/` (HTML) — one `run.sh test` invocation covering several `--protocol` services
@@ -1798,7 +2047,9 @@ pnpm exec prettier --check .
 ./run.sh test --protocol pypi    # again — proves run isolation for pypi too
 ./run.sh test --protocol golang -b  # -b the first time: builds the golang runner image
 ./run.sh test --protocol golang  # again — proves run isolation for golang too (H15)
-./run.sh test --protocol maven,npm,cargo,nuget,docker,helm,pypi -b  # regression: every protocol before golang stays green
+./run.sh test --protocol ruby -b    # -b the first time: builds the ruby runner image
+./run.sh test --protocol ruby    # again — proves run isolation for ruby too (H15)
+./run.sh test --protocol maven,npm,cargo,nuget,docker,helm,pypi,golang -b  # regression: every protocol before ruby stays green
 ./run.sh test                    # the skeleton project
 ./run.sh sweep --dry-run         # before tearing down: confirms nothing was left behind
 ./run.sh local down

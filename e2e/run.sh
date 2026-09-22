@@ -137,9 +137,9 @@ cmd_test() {
     IFS=',' read -ra services <<< "$protocols"
   else
     # No --protocol given: run the skeleton harness proof only. A protocol runner (maven, npm,
-    # cargo, nuget, docker, helm, pypi, golang, and more from later steps) is opt-in via --protocol
-    # so a plain "run.sh test" stays fast; pass e.g. --protocol maven or
-    # --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang to run more. "helm" runs
+    # cargo, nuget, docker, helm, pypi, golang, ruby) is opt-in via --protocol so a plain "run.sh
+    # test" stays fast; pass e.g. --protocol maven or
+    # --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby to run more. "helm" runs
     # BOTH Helm protocols (OCI and classic/ChartMuseum, `tests/helm/*.spec.ts`) from one
     # runner/project.
     services=(skeleton)
