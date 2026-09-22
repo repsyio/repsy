@@ -1,0 +1,10 @@
+[package]
+name = "{{{crateName}}}"
+version = "{{{version}}}"
+edition = "2021"
+description = "Repsy e2e test crate, published by clients/cargo.ts"
+license = "MIT"
+publish = ["repsy"]
+
+[lib]
+path = "src/lib.rs"

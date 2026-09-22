@@ -102,4 +102,17 @@ export interface ProtocolAdapter<F = unknown> {
    * leaves this out entirely.
    */
   knownConsumeFailure?(scenario: Scenario): string | undefined;
+
+  /**
+   * A known, already-filed backend bug that makes a REFUSED publish still change what is stored
+   * (cargo, step 3b: `AbstractCargoProtocolFacade.publish` writes the `.crate` bytes and appends the
+   * index line to storage BEFORE `CargoCrateServiceImpl.publish` runs the duplicate-version check
+   * that then throws -- so a refused re-publish of an existing version has already overwritten the
+   * stored `.crate` file with the rejected attempt's bytes, even though the served (DB-backed) index
+   * entry still names the ORIGINAL checksum). Returning a string routes the loop's
+   * `adapter.expectNothingStored` call through `test.fail(true, <that string>)` instead of a plain
+   * assertion; the outcome and client-exit-code assertions right before it are never affected. An
+   * adapter with no such bug (maven, npm) leaves this out entirely.
+   */
+  knownPublishSideEffect?(scenario: Scenario): string | undefined;
 }

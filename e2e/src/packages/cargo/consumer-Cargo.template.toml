@@ -1,0 +1,7 @@
+[package]
+name = "e2e_consumer"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+{{{crateName}}} = { version = "={{{version}}}", registry = "repsy" }

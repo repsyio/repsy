@@ -15,12 +15,32 @@
 ///
 
 /**
- * Small helpers a protocol adapter's `packageName()` builds coordinates with. Moved out of
- * `fixtures.ts` (step 3a, RPS-294): npm needs `slugify` too, for its own package-name generation,
+ * Small helpers a protocol adapter's `packageName()`/`version()` builds coordinates with. Moved out
+ * of `fixtures.ts` (step 3a, RPS-294): npm needs `slugify` too, for its own package-name generation,
  * and it has nothing to do with fixtures/Playwright.
  */
 
 /** `password-admin`, `no-override`, ... -> `password-admin`, `no-override` (already slug-safe). */
 export function slugify(id: string): string {
   return id.replace(/[^a-z0-9-]/gi, '-').toLowerCase();
+}
+
+/**
+ * 2026-01-01T00:00:00Z: correction #3 (npm, plan section 2.3/step 3a) -- a bounded version scheme,
+ * since npm's `PackageUtils.extractVersionNameFromPayload` and Cargo's `CrateUtils.validateVersion`
+ * both parse with semver4j 3.1.0, which stores parts as Java `Integer`s (still `int` in the newer
+ * 6.0.0 jar too, per `javap`). A raw millisecond timestamp (maven's `0.0.<Date.now()>` scheme)
+ * overflows that. Seconds since this epoch stays well under 2^31 for the lifetime of this harness.
+ * Moved here (step 3b, RPS-294) from `clients/npm.ts` so `clients/cargo.ts` can share it without
+ * importing npm's own module.
+ */
+const VERSION_EPOCH_MS = Date.UTC(2026, 0, 1, 0, 0, 0, 0);
+
+let versionSeq = 0;
+
+/** `0.<seconds since VERSION_EPOCH_MS>.<seq>`; neither npm nor Cargo distinguishes release/snapshot. */
+export function boundedSemverVersion(): string {
+  versionSeq += 1;
+  const seconds = Math.floor((Date.now() - VERSION_EPOCH_MS) / 1000);
+  return `0.${seconds}.${versionSeq}`;
 }

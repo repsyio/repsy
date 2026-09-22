@@ -37,6 +37,12 @@
  * `clients/maven.ts`'s jar resource marker), so two publishes of one coordinate never share content,
  * and a successful `npm install` (once RPS-1205 is fixed) can prove it got the very bytes that were
  * published by reading that file back out of `node_modules`.
+ *
+ * Correction #3, the bounded version scheme (`0.<seconds since 2026-01-01Z>.<seq>`, since
+ * `PackageUtils.extractVersionNameFromPayload` parses with semver4j 3.1.0, which stores parts as
+ * Java `Integer`s): moved to `scenarios/coordinates.ts`'s `boundedSemverVersion` (step 3b, RPS-294)
+ * so `clients/cargo.ts` can reuse it verbatim -- Cargo's own `CrateUtils.validateVersion` parses with
+ * the same semver4j version. Behaviour-neutral for npm.
  */
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -48,7 +54,7 @@ import mustache from 'mustache';
 
 import { env } from '../env.js';
 import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
-import { slugify } from '../scenarios/coordinates.js';
+import { boundedSemverVersion, slugify } from '../scenarios/coordinates.js';
 import { expectationFor } from '../scenarios/types.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
@@ -71,20 +77,6 @@ const CONSUME_TIMEOUT_MS = 120_000;
 const PACK_TIMEOUT_MS = 60_000;
 
 const MARKER_FILENAME = 'e2e-marker.txt';
-
-/** 2026-01-01T00:00:00Z: correction #3 -- a bounded version scheme, since
- *  `PackageUtils.extractVersionNameFromPayload` parses with semver4j 3.1.0, which stores parts as
- *  Java `Integer`s. Seconds since this epoch stays well under 2^31 for the lifetime of this harness. */
-const VERSION_EPOCH_MS = Date.UTC(2026, 0, 1, 0, 0, 0, 0);
-
-let versionSeq = 0;
-
-/** `0.<seconds since VERSION_EPOCH_MS>.<seq>`; npm has no release/snapshot distinction to honour. */
-function uniqueVersion(): string {
-  versionSeq += 1;
-  const seconds = Math.floor((Date.now() - VERSION_EPOCH_MS) / 1000);
-  return `0.${seconds}.${versionSeq}`;
-}
 
 async function renderTemplate(
   templateName: string,
@@ -400,7 +392,7 @@ export const npmAdapter: ProtocolAdapter<NpmFingerprint> = {
   client: { name: 'npm', publishVerb: 'publish', consumeVerb: 'install' },
 
   packageName: (runId, scenario) => `e2e-${runId}-${slugify(scenario.id)}`,
-  version: () => uniqueVersion(),
+  version: () => boundedSemverVersion(),
 
   publish,
   resolve,
