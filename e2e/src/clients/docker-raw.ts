@@ -87,9 +87,15 @@ import { env } from '../env.js';
 import { withBackoff429 } from '../scenarios/remote-throttle.js';
 import type { Scenario } from '../scenarios/types.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
-import { adminCredential, authHeader, type RawResponse, sha256Hex } from './raw-http.js';
+import {
+  adminCredential,
+  authHeader,
+  ociErrorOf,
+  type RawResponse,
+  sha256Hex,
+} from './raw-http.js';
 
-export { adminCredential, authHeader, sha256Hex, type RawResponse };
+export { adminCredential, authHeader, ociErrorOf, sha256Hex, type RawResponse };
 
 /** Every raw manifest GET/HEAD's `Accept` header -- the four types this protocol understands. */
 export const MANIFEST_ACCEPT = [
@@ -135,26 +141,6 @@ async function rawFetch(
     return last.status;
   });
   return last as RawResponse & { headers: Headers };
-}
-
-/** `{"errors":[{"code","message","detail"}]}` -- `OciErrorBodyAdvice`'s envelope, distinct from
- *  Repsy's own `msgId` envelope every other protocol's raw helper reads. `undefined` when the body
- *  is not that shape (e.g. the token endpoint's bare, bodyless 401). */
-export function ociErrorOf(
-  body: Buffer,
-): { code: string; message: string; detail?: unknown } | undefined {
-  try {
-    const parsed = JSON.parse(body.toString('utf8')) as {
-      errors?: { code?: unknown; message?: unknown; detail?: unknown }[];
-    };
-    const first = parsed.errors?.[0];
-    if (!first || typeof first.code !== 'string' || typeof first.message !== 'string') {
-      return undefined;
-    }
-    return { code: first.code, message: first.message, detail: first.detail };
-  } catch {
-    return undefined;
-  }
 }
 
 /** Raw, unauthenticated `GET /v2/` -- the registry ping every real client opens with. */

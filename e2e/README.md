@@ -22,9 +22,13 @@ first to exercise the catalog's `conflict` outcome for real (see "NuGet runner" 
 **step 4a ("docker")**: a fifth worked example, the Docker (Registry HTTP API V2 / OCI distribution)
 client adapter and runner — the first protocol in this harness with a genuine two-hop Bearer
 token-exchange auth model instead of Basic-per-request, and the first with a daemonless real client
-(`crane`, go-containerregistry) instead of a language toolchain (see "Docker runner" below). Every
-other protocol (helm, pypi, golang, ruby) replicates the same model in later steps; nothing about
-the model itself is maven-specific.
+(`crane`, go-containerregistry) instead of a language toolchain (see "Docker runner" below). This is
+**step 4b ("helm")**: a sixth worked example, and the first protocol where Repsy implements TWO
+independent wire protocols on the same port for the same package format — OCI distribution-spec
+(`helmAdapter`, `clients/helm.ts`) and the classic ChartMuseum protocol (`helmClassicAdapter`,
+`clients/helm-classic.ts`) — so the shared catalog runs TWICE, once per mode, inside one runner/
+project (see "Helm runner" below). Every other protocol (pypi, golang, ruby) replicates the same
+model in later steps; nothing about the model itself is maven-specific.
 
 ## Rules
 
@@ -46,16 +50,17 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 ```
 e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example
-  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker"
+  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm"
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres:18 + Repsy, started/stopped by `run.sh local up|down`
-  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker"
+  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven; see "Adding a protocol adapter" below
   runners/npm.Dockerfile       # + nothing else: npm ships with the node:24 base already
   runners/cargo.Dockerfile     # + a pinned Rust toolchain, copied in from the official rust image
   runners/nuget.Dockerfile     # + a pinned .NET SDK, copied in from the official Ubuntu-noble SDK image
   runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image; no daemon, no socket
+  runners/helm.Dockerfile      # + the static `helm` binary + the cm-push plugin installed at build time; no daemon, no socket
   runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
   src/
     env.ts                     # typed config from env/.env
@@ -93,12 +98,17 @@ e2e/
       docker-image.ts                # hand-assembled OCI image layout builder (layer tar+gzip, config, manifest, index.json, oci-layout)
       docker-raw.ts                  # docker-specific raw HTTP: the two-hop token dance, manifest/blob PUT/GET/HEAD, OCI error envelope
       docker.ts                      # the docker client + dockerAdapter: publish()/resolve()/seedPublish(), crane push/pull
+      helm-chart.ts                   # hand-assembled Helm chart .tgz builder (Chart.yaml + values.yaml + marker, ustar+gzip)
+      helm-raw.ts                     # raw HTTP for BOTH Helm protocols: OCI manifest/blob PUT/GET/HEAD + classic index/chart/upload/delete
+      helm.ts                         # the OCI client + helmAdapter: publish()/resolve()/seedPublish(), helm push/pull --plain-http
+      helm-classic.ts                  # the classic (ChartMuseum) client + helmClassicAdapter: helm cm-push / pull --repo
     packages/
       maven/                     # mustache templates of the tiny jar project + settings.xml
       npm/                       # mustache templates of the tiny package.json/index.js + .npmrc
       cargo/                     # mustache templates of the tiny crate + consumer Cargo.toml + .cargo/config.toml
       nuget/                     # mustache templates of nuget.config + the consumer .csproj (the .nupkg itself is built in code, see nuget-raw.ts)
       docker/                    # config.template.json (DOCKER_CONFIG auths entry; the image itself is built in code, see docker-image.ts)
+      helm/                      # Chart.template.yaml + registry-config.template.json (HELM_REGISTRY_CONFIG auths entry)
   tests/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe
     maven/
@@ -118,6 +128,10 @@ e2e/
     docker/
       publish-consume.spec.ts   # registerPublishConsumeLoop(dockerAdapter) + D1-D4 real-client tests (OCI family, auth login, by-digest, retag)
       registry-rules.spec.ts    # raw-HTTP pins R1-R13: token dance, blob/manifest rules, override, HEAD-vs-GET, retag, bad config/content-type
+    helm/
+      publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
+      classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
+      registry-rules.spec.ts           # raw-HTTP pins R1-R14 for BOTH modes: single-hop Basic auth, blob/manifest rules, override, tags/list, classic upload/delete/index shape
 ```
 
 ## Setup
@@ -131,15 +145,15 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 
 ## Environment
 
-| Variable                      | Default                    | Notes                                                                                                                                                  |
-| ----------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `REPSY_API_BASE_URL`          | `http://localhost:8080`    | panel API                                                                                                                                              |
-| `REPSY_REPO_BASE_URL`         | `http://localhost:9090`    | repository/protocol operations                                                                                                                         |
-| `REPSY_ADMIN_USERNAME`        | `admin`                    |                                                                                                                                                        |
-| `REPSY_ADMIN_PASSWORD`        | _(none — required)_        | must match the target's admin password                                                                                                                 |
-| `REPSY_TARGET`                | `local`                    | `local` \| `remote` \| `ci` — see Targets below                                                                                                        |
-| `REPSY_E2E_RUN_ID`            | random 6-char lowercase id | shared by every runner in one `run.sh test`                                                                                                            |
-| `REPSY_E2E_INSECURE_REGISTRY` | _(unset)_                  | docker runner's `--insecure` (only needed for a remote plain-HTTP host; `localhost` already works without it); reserved for the future helm runner too |
+| Variable                      | Default                    | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REPSY_API_BASE_URL`          | `http://localhost:8080`    | panel API                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `REPSY_REPO_BASE_URL`         | `http://localhost:9090`    | repository/protocol operations                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `REPSY_ADMIN_USERNAME`        | `admin`                    |                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `REPSY_ADMIN_PASSWORD`        | _(none — required)_        | must match the target's admin password                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `REPSY_TARGET`                | `local`                    | `local` \| `remote` \| `ci` — see Targets below                                                                                                                                                                                                                                                                                                                                                                                          |
+| `REPSY_E2E_RUN_ID`            | random 6-char lowercase id | shared by every runner in one `run.sh test`                                                                                                                                                                                                                                                                                                                                                                                              |
+| `REPSY_E2E_INSECURE_REGISTRY` | _(unset)_                  | docker runner's `--insecure` (only needed for a remote plain-HTTP host; `localhost` already works without it); helm runner's `--insecure-skip-tls-verify` (a REMOTE HTTPS target with a bad cert only -- helm's own `--plain-http` is derived from `REPSY_REPO_BASE_URL`'s scheme instead, unconditionally on this harness's own `http://localhost:9090` stack, confirmed live H3: unlike `crane`, Helm has no localhost auto-detection) |
 
 ## Targets (`src/target.ts`)
 
@@ -1036,6 +1050,231 @@ back on GET"`), so B1 is invisible to `crane digest`'s own exit code — only a 
   deviating from the spec. Confirmed live, `registry-rules.spec.ts`'s R6 (`expectNothingStored`
   deliberately does NOT assert the refused blobs are absent, for exactly this reason).
 
+## Helm runner
+
+Repsy implements **two independent wire protocols** for Helm on the same protocol port: OCI
+distribution-spec (`GET|HEAD|PUT /v2/<repo>/<chart>/manifests|blobs/...`, what `helm push`/`helm
+pull oci://` speak) and the classic ChartMuseum protocol (`GET /<repo>/index.yaml`, `GET
+/<repo>/charts/<file>.tgz`, `POST /api/<repo>/charts` / `POST /<repo>/api/charts`, `DELETE
+/<repo>/api/charts/<name>/<version>`, what `helm repo add`/`helm pull --repo`/the `cm-push` plugin
+speak) — different path parsers, different handler classes, different override-check placement,
+different error envelopes (an OCI JSON envelope on `/v2/...`, the panel envelope or a bare body
+elsewhere). This harness therefore runs the **shared catalog twice**, as two adapters sharing one
+runner/project and one `RepoType.HELM` repo:
+
+- **`helmAdapter`** (`protocol: 'helm'`, `clients/helm.ts`) — real `helm push`/`helm pull
+oci://...`, both flags `--plain-http` (derived unconditionally from `REPSY_REPO_BASE_URL`'s
+  scheme, confirmed live H3: unlike `crane`, Helm has no localhost auto-detection).
+- **`helmClassicAdapter`** (`protocol: 'helm-classic'`, `clients/helm-classic.ts`) — real `helm
+cm-push` (the chartmuseum/helm-push plugin v0.11.1, installed at build time into a shared,
+  read-only `HELM_PLUGINS` dir, `runners/helm.Dockerfile`) and `helm pull --repo`.
+
+The only harness-wiring change either needed: `fixtures.ts`'s `REPO_TYPE_BY_PROTOCOL` maps
+`'helm-classic'` to the SAME `RepoType.HELM` as `'helm'` (the seeder derives repo names from the
+`RepoType`, so both adapters' repos are named `e2e-<runid>-helm-<n>`, never colliding since every
+test gets its own `Seeder`/run id), and `catalog.ts`'s `no-override` scenario gets
+`expectByProtocol: { helm: { publish: 'conflict' }, 'helm-classic': { publish: 'conflict' } }` — a
+real `409` in both modes, confirmed live (like nuget). Every other scenario's shared, maven-pinned
+`expect` already matches both Helm modes unchanged (single-hop Basic auth in both, no
+releases/snapshots concept in either — `protocols` excludes helm/helm-classic from
+`maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/`snapshot-*`, grep-confirmed no Helm
+code reads either repo setting).
+
+```bash
+./run.sh test --protocol helm -b   # -b the first time: builds the helm runner image
+```
+
+### Chart fixture
+
+`clients/helm-chart.ts`'s `buildChart` hand-assembles a chart `.tgz` (one `<name>/` directory:
+`Chart.yaml` rendered from a mustache template, `values.yaml`, `e2e-marker.txt` — a fresh random
+marker per publish), packed with `docker-image.ts`'s own `buildTar` (a minimal ustar builder, mtime
+0, no pax headers) and gzipped — deliberately never `helm package`, the same "own the exact bytes"
+reasoning as every other hand-built-artifact adapter here. Confirmed live (H17): Helm 4.3.0's
+loader accepts this exact shape for both `helm push` and `cm-push`.
+
+### Two corrections found only by running the real client (not in the original plan)
+
+Both surfaced as every "ok"-expected scenario failing outright the first time the real suite ran
+inside the container, and were root-caused with `helm --debug` and hand-built minimal repros
+(neither is a Repsy backend bug — both are this adapter's own client-usage mistakes, fixed in
+`helm.ts`/`helm-classic.ts` before any test was pinned against them):
+
+- **`helm push` takes a REPO-level ref, not a chart-level one.** `helm push <tgz> oci://<host>/
+<repo>` is correct; `oci://<host>/<repo>/<chart>` (this adapter's first attempt, by analogy with
+  `helm pull`, which DOES need the chart segment) makes Helm append the chart's OWN name from its
+  `Chart.yaml` a SECOND time (`pkg/pusher/ocipusher.go`: `ref = path.Join(<host>/<repo>,
+meta.Name) + ":" + meta.Version`), so the blob-upload/manifest requests land on a doubled path
+  (`/v2/<repo>/<chart>/<chart>/blobs/...`) that 404s with `NAME_UNKNOWN`/`unknownPath` — confirmed
+  live, reproduced with `helm --debug` and fixed by using `ociRepoRef(repoName)` (no chart
+  segment) for `helm push`, keeping `ociChartRef(repoName, chart)` (WITH the chart segment) for
+  `helm pull`, which has no local chart metadata to derive a name from.
+- **`helm pull --destination <dir>` does not create `<dir>` itself.** Unlike `crane pull
+--format=oci` (which does), a `helm pull` into a destination directory that does not exist yet
+  downloads successfully (prints `Pulled:`/`Digest:`) but then fails to persist the file
+  (`Error: open .../<file>.tgz<random>: no such file or directory`), exit 1 — confirmed live. Both
+  `resolve()` functions now `fs.mkdir(pulledDir, { recursive: true })` before calling `helm pull`.
+
+### `helm cm-push` repackages the chart -- confirmed live, a genuine plan deviation
+
+The plan assumed `cm-push`, like every other real client here, sends a file's bytes VERBATIM.
+Confirmed live that it does **not**: `cmd/helm-cm-push/main.go`'s `push()` always calls
+`helm.GetChartByName` (`loader.Load`, for a `.tgz` OR a directory) and then
+`helm.CreateChartPackage` (`chartutil.Save`) to build a FRESH package in a temp dir, which is what
+actually gets POSTed — so the classic-stored bytes for a `cm-push` are a repackaged chart, never
+byte-identical to the file this adapter built (same logical content, different tar/gzip layout).
+This does not break the adapter's design (the plan's own byte-identical-re-POST pattern already
+overwrites whatever `cm-push` stored with this adapter's own known bytes for every `ok` outcome),
+but it does mean `seedPublish()` cannot trust `sha256(tgzBytes)` for what actually landed in
+storage — it reads back an admin download right after a successful `cm-push` and hashes THAT
+instead (`helm-classic.ts`'s file header has the full reasoning). `helm push`'s OCI chart layer has
+no such issue: `pkg/registry/client.go` reads the file's bytes directly, confirmed live (the served
+layer digest always equals `sha256(tgzBytes)`).
+
+### Scenario mapping onto the shared catalog
+
+| scenario (shared catalog)                                                | helm (OCI)                  | helm-classic                | note                                                                                                                                                                                                |
+| ------------------------------------------------------------------------ | --------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `no-override` (2nd publish, `allowOverride:false`)                       | `409 conflict`              | `409 conflict`              | `ItemAlreadyExistException("chartAlreadyExists")` in each mode's own override check, confirmed live (OCI: `DENIED`/`chartAlreadyExists` OCI body; classic: the panel `chartAlreadyExists` envelope) |
+| `override` (2nd publish, `allowOverride:true`)                           | `201 ok`                    | `201 ok`                    | OCI: the manifest row is updated in place (chart-version row is NOT, see B-H2); classic: `update` overwrites the stored file AND refreshes the version row's digest                                 |
+| `token-ro` publish                                                       | `401 unauthorized`          | `401 unauthorized`          | single-hop Basic in both modes, no token exchange to succeed at                                                                                                                                     |
+| `anonymous-public` consume                                               | `200 ok`                    | `200 ok`                    | public + READ skips `HelmHeaderPreProcessor` in both modes                                                                                                                                          |
+| `maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/`snapshot-*` | n/a                         | n/a                         | `protocols` excludes helm/helm-classic — no releases/snapshots concept in either mode                                                                                                               |
+| everything else                                                          | matches the shared `expect` | matches the shared `expect` | unchanged                                                                                                                                                                                           |
+
+`registry-rules.spec.ts` additionally pins (R1-R14, mirroring the plan's own numbering, covering
+BOTH modes): the `/v2/` ping is Docker's own, not Helm's (R1); the OCI auth matrix — single-hop
+Basic, no token exchange (R2); blob upload flows — monolithic, chunked, wrong digest, dedup (R3);
+OCI manifest push validation — missing blob, malformed JSON, empty layers, a MISSING (not merely
+empty) `Content-Type` (R4, **B-H7**); the OCI override rule (R5); `GET tags/list` has no handler at
+all (R8, **B-H3**); classic upload rules — missing `chart` part (plain text, no envelope),
+Chart.yaml validation, uppercase names, both classic routes accepting the same request (R11);
+classic read auth — bare 401 on a private repo, 200 with credentials, anonymous 200 on a public one
+(R12); `index.yaml`'s shape (R13, **B-H8**); and `DELETE` removing a chart from both the classic
+index and, for an OCI-pushed chart, its manifest too (R14).
+
+### H1-H18, confirmed live
+
+Every hypothesis was probed against a running instance (`./run.sh local up`) before any adapter
+code was written — first with the real `helm`/`helm cm-push` binaries run directly against the
+stack (both from the host and inside the `helm` runner container), then with raw HTTP
+(`curl`/`tsx` scripts using `helm-raw.ts` directly). **H1, H4, H3, H9 gated the whole design and
+were probed first, as instructed.**
+
+- **H1** (does `helm registry login` fail with a WRONG password?): **the plan's own predicted
+  answer was right, confirmed live** — it does NOT fail. `helm registry login localhost:9090
+--plain-http -u <user> --password-stdin` with an intentionally wrong secret still prints "Login
+  Succeeded", exit 0, and writes the (wrong) credential into `HELM_REGISTRY_CONFIG` regardless —
+  see **B-H4** below.
+- **H3** (`--plain-http` required for `localhost:9090`): confirmed — without it, `helm registry
+login`/`push`/`pull` all fail with `http: server gave HTTP response to HTTPS client`.
+- **H4** (`helm pull oci://... --version <exact>` succeeds against Repsy): confirmed, the gating
+  result for the whole OCI consume design — a real `helm push` then `helm pull ... --version
+<exact>` round-trips with byte-identical content (sha256 verified).
+- **H9** (helm-push v0.11.1 loads under Helm 4.3.0 and `cm-push` works): confirmed, WITH ONE
+  ADDITION the plan did not anticipate — `helm plugin install <url> --version v0.11.1` alone
+  refuses with `Error: plugin source does not support verification. Use --verify=false to skip
+verification` (Helm 4 verifies a plugin's signature by default, and this plugin publishes none);
+  `--verify=false` (added to the install command, `runners/helm.Dockerfile`) makes the install
+  (and every subsequent `cm-push`) work. See "`helm cm-push` repackages the chart" above for the
+  one behavioural surprise found once it was actually exercised end to end.
+- **H2** (the push wire sequence): confirmed via `helm --debug` — `HEAD` the manifest by tag,
+  `HEAD` each blob, only missing blobs get `POST`/`PATCH`/`PUT ?digest=` (concurrently, both blobs
+  at once — not sequential, a detail the plan's guess did not call out), then `PUT` the manifest.
+- **H5** (`HELM_REGISTRY_CONFIG` shape after `helm registry login`): confirmed —
+  `{"auths":{"localhost:9090":{"auth":"<base64 user:secret>"}}}`, the exact shape
+  `renderHelmRegistryConfig` renders by hand (pinned literally by "HL1").
+- **H6** (every negative credential fails the real client promptly, no hang): confirmed across the
+  whole catalog, both modes, well within the 120s test timeout.
+- **H7** (an admin re-PUT of the served manifest under the same tag, `allowOverride:true`, answers
+  201 and `helm pull` still works afterwards): confirmed, WITH THE CONFIG-BLOB CAVEAT found live —
+  see the next paragraph.
+- **H8** (served manifest `Content-Type` has no `;charset=` suffix, `Docker-Content-Digest` equals
+  `sha256` of the body): confirmed, asserted on every successful OCI round trip
+  (`afterSuccessfulRoundTrip`).
+- **H10** (`helm pull --repo` works on a private repo with credentials, anonymous on public):
+  confirmed, exercised by every catalog scenario via `helmClassicAdapter`.
+- **H11 (B-H1)** (`helm pull --repo` of an OCI-pushed chart → 404): confirmed live, cleanly (a
+  chart name that never touched the classic route) — "HL4".
+- **H12 (B-H2)** (OCI override leaves `index.yaml`'s digest at the old layer): confirmed live —
+  "HL5".
+- **H13 (B-H3)** (`GET tags/list` → 404; `helm pull oci://` without `--version` fails): confirmed
+  live — "HL2", "R8".
+- **H14** (timing fits 120s per test; the whole suite twice without a stack reset passes
+  identically): confirmed — 43/43 both runs, ~8s wall time each across 12 workers.
+- **H15** (`Seeder.cleanup()` deletes a Helm repo with classic charts, OCI blobs and manifests;
+  `./run.sh sweep --dry-run` finds nothing): confirmed.
+- **H16** (`helm-classic` as a protocol key works end to end through `fixtures.ts`/
+  `registerPublishConsumeLoop`): confirmed — unique titles, `RepoType.HELM` shared with `helm`, no
+  name collisions.
+- **H17** (Helm 4's loader accepts the hand-built ustar tgz for both `helm push` and `cm-push`):
+  confirmed live, reused `docker-image.ts`'s own `buildTar`.
+- **H18** (classic refusals leave storage/index byte-identical): confirmed — `expectNothingStored`
+  held for every refused classic-mode scenario across two full suite runs.
+
+A discovery beyond the H-numbered list, found while making H7 work: an OCI manifest push handler
+never reads the CONFIG blob's own bytes (confirmed live — a manifest whose config digest names a
+blob that was NEVER uploaded still gets accepted, `201`), but a real `helm pull`'s own client-side
+fetch (`oras`'s `Copy`) DOES resolve every blob a served manifest names, config included, and fails
+("not found") if one is missing. `publish()`'s re-PUT therefore also raw-uploads a real config blob
+(`helm.ts`'s own `buildConfigBytes`) before referencing it, so every "ok"-expected scenario's own
+`resolve()` (a real `helm pull`) keeps working — otherwise this would have looked like a server
+bug on every successful scenario, when it is actually this adapter needing to satisfy the CLIENT's
+own validation, which is stricter than the server's.
+
+### Backend bug candidates found while reading and confirmed live (do not fix here)
+
+- **B-H1 (filed as [RPS-1217](https://zyfera.atlassian.net/browse/RPS-1217))** — `index.yaml`
+  (`generateIndex`) lists every chart version a repo has, INCLUDING ones that only ever went
+  through the OCI route, at `charts/<name>-<version>.tgz` — but the classic download handler
+  (`getChart`) only ever reads the classic storage path, which an OCI-only publish never wrote, so
+  `GET charts/<name>-<version>.tgz` (and therefore `helm repo add` + `helm
+search`/`install`/`pull <repo>/<chart>`, or a raw `helm pull --repo`) 404s (`chartNotFound`) for a
+  chart that was only ever pushed via `helm push oci://`. Confirmed live, cleanly (a chart name that
+  never touched the classic route): `tests/helm/publish-consume.spec.ts`'s "HL4".
+- **B-H2 (filed as [RPS-1218](https://zyfera.atlassian.net/browse/RPS-1218); related to, but
+  distinct from, the pre-existing RPS-1111 — see that ticket's description for how)** — An accepted
+  OCI override (`allowOverride:true`, different chart bytes, same name:version) updates only the
+  manifest row in place; the chart VERSION row (and therefore `index.yaml`'s `digest` field, and the
+  panel's own version-detail DTO) stays at the OLD layer digest. Confirmed live: "HL5".
+- **B-H3 (filed as [RPS-1219](https://zyfera.atlassian.net/browse/RPS-1219))** — There is no
+  `GET /v2/<repo>/<name>/tags/list` handler at all (`404` with OCI code `NAME_UNKNOWN`, msgId
+  `unknownPath`), although `HelmFacade.listTags`/`HelmOciTagListDto` exist (used only by the panel's
+  own `GET /api/helm/charts/{repo}/{name}/tags`). Helm's own `ValidateReference` calls `Tags(...)`
+  whenever `--version` is empty or a semver CONSTRAINT, so a real `helm pull`/`install`/`show
+oci://.../<chart>` without an EXACT version fails outright against Repsy. Confirmed live: "HL2",
+  "R8".
+- **B-H4 (filed as [RPS-1220](https://zyfera.atlassian.net/browse/RPS-1220))** — Lives in the
+  DOCKER provider's token endpoint, surfaces through Helm's shared `/v2/` ping: `helm registry
+login` succeeds with a WRONG password. Docker's `/v2/token` answers the ping's own OAuth2-form
+  POST (no `Authorization` header at all — oras-go's `ForceAttemptOAuth2` path, requesting the
+  wildcard `repository:*:pull` scope) with an ANONYMOUS token, `200`, before any credential is ever
+  checked; `helm registry login` treats that `200` as success. Confirmed live: "HL1". The push/pull
+  REQUEST itself is still credential-checked for real (a wrong-password login still fronts a
+  failing push) — this only affects the login COMMAND's own reported success, never an actual
+  write/read.
+- **B-H5** (observation) — A manifest is only addressable by the exact reference it was pushed
+  under: `GET`/`HEAD` by digest of a tag-pushed manifest both `404`. Would affect `helm pull
+oci://...@sha256:<digest>` if that were expected to work; not otherwise exercised by any real
+  client flow this step drives.
+- **B-H6** — Not exercised: a repro needs a real `helm push` to emit a `.prov` layer BEFORE the
+  chart layer in one manifest, which was not confirmed to be producible with the harness's own
+  chart fixture (no `.prov` file is ever generated here) — left as an open question, not a
+  confirmed bug, per the plan's own "only write this test if you confirm..." guidance.
+- **B-H7 (pre-existing story, [RPS-1110](https://zyfera.atlassian.net/browse/RPS-1110) — commented
+  with this live evidence, not a new ticket)** — An OCI manifest push with NO `Content-Type` header
+  at all answers a bodyless `400` — no OCI envelope despite RPS-1039 (`OciErrorBodyAdvice`); RPS-1110
+  already lists exactly this handler (`AbstractHelmOciManifestPushProtocolMethodHandler`, "a bare 400
+  when ... a header is missing") among its scope. Likewise the classic push handler's `Missing
+'chart' part` `400` is plain text, not the panel's own JSON envelope — that one is NOT in
+  RPS-1110's scope (the classic route was never meant to carry the OCI envelope, so this is by
+  design, not a bug). Confirmed live: `registry-rules.spec.ts`'s R4/R11. (An EMPTY, as opposed to
+  ABSENT, `Content-Type` header does not trip this — confirmed live while writing R4: only a truly
+  missing header does.)
+- **B-H8** (observation) — `index.yaml`'s `digest` field carries a `sha256:` prefix, whereas a real
+  `helm repo index` emits bare hex. Low impact: neither `helm repo add`/`update`/`pull`/`install`
+  verify it against anything. Confirmed live: `registry-rules.spec.ts`'s R13.
+
 ## Remote hardening
 
 On a `remote` target (`target.isRemote`, see `src/target.ts`), `AUTH_THROTTLE_MAX_FAILURES` cannot
@@ -1066,7 +1305,8 @@ real shared remote. Both are called out in the plan as later, "remote hardening"
 ./run.sh test --protocol cargo
 ./run.sh test --protocol nuget
 ./run.sh test --protocol docker
-./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker
+./run.sh test --protocol helm   # runs BOTH Helm modes (OCI + classic/ChartMuseum) from one runner
+./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm
 ./run.sh test --grep '@smoke'
 ./run.sh test -b             # rebuild the runner image(s) first (Dockerfile/lockfile changed)
 ./run.sh local down
@@ -1074,7 +1314,7 @@ real shared remote. Both are called out in the plan as later, "remote hardening"
 ```
 
 `run.sh test` accepts `--target local|remote|ci` and `--protocol a,b` (a comma-separated list of
-runner services: `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`). Reports land under `e2e/test-results/` (JUnit
+runner services: `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`, `helm`). Reports land under `e2e/test-results/` (JUnit
 XML) and
 `e2e/playwright-report/` (HTML) — one `run.sh test` invocation covering several `--protocol` services
 overwrites that JUnit file per service, so diff/compare a single protocol's run in isolation
@@ -1138,6 +1378,8 @@ pnpm exec prettier --check .
 ./run.sh test --protocol nuget   # again — proves run isolation for nuget too
 ./run.sh test --protocol docker -b  # -b the first time: builds the docker runner image
 ./run.sh test --protocol docker  # again — proves run isolation for docker too
+./run.sh test --protocol helm -b    # -b the first time: builds the helm runner image
+./run.sh test --protocol helm    # again — proves run isolation for helm too (both modes)
 ./run.sh test                    # the skeleton project
 ./run.sh sweep --dry-run         # before tearing down: confirms nothing was left behind
 ./run.sh local down
@@ -1150,7 +1392,10 @@ you). A meaningfulness check for the maven catalog: temporarily flip one scenari
 `./run.sh test --protocol maven --grep <id>` fails, then restore it (this was also re-run once for
 the docker protocol specifically, flipping `token-expired`'s `publish` to `'ok'`: `./run.sh test
 --protocol docker --grep token-expired` failed as expected, with `crane push`'s own raw-probe status
-`401` reported against the flipped `'ok'` expectation). `./run.sh sweep --dry-run` lists any `e2e-*`
+`401` reported against the flipped `'ok'` expectation; and once for helm, adding a temporary
+`expectByProtocol: { helm: { publish: 'ok' } }` to `token-expired` — `./run.sh test --protocol helm
+--grep "helm > token-expired"` failed as expected, `helm push`'s own raw-probe status `401` against
+the flipped `'ok'` expectation, then reverted). `./run.sh sweep --dry-run` lists any `e2e-*`
 leftovers without deleting them.
 
 The npm suite's `'ok'`-expected scenarios currently report as an _expected_ failure
@@ -1159,5 +1404,7 @@ prints a `✘` for each (something inside the test body did throw, which is exac
 is watching for), but the run's own summary line and exit code both say "passed"/`0` — treat those
 two as authoritative over the per-line glyphs. Likewise for the cargo suite's `no-override`/
 `override` scenarios (`knownPublishSideEffect`, "H1" above) and its two dedicated hyphen tests ("H2"
-above), and the docker suite's four `test.fail`-routed registry-rules tests (R5/B4, R7/B2, R8/B1,
-R12/B5 — "H9"/"H10"/"H13" above): all counted as "passed", not a plain pass line.
+above), the docker suite's four `test.fail`-routed registry-rules tests (R5/B4, R7/B2, R8/B1,
+R12/B5 — "H9"/"H10"/"H13" above), and the helm suite's five `test.fail`-routed tests (HL1/B-H4,
+HL2/B-H3, HL4/B-H1, HL5/B-H2, R8/B-H3 — "Helm runner" above): all counted as "passed", not a plain
+pass line.

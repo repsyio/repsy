@@ -3,3 +3,10 @@ pnpm-lock.yaml
 src/api/generated
 test-results
 playwright-report
+# Rendered verbatim into an isolated work directory by clients/helm.ts/helm-classic.ts (a mustache
+# template of a tiny publishable Chart.yaml) -- not real YAML syntax until after mustache renders
+# it, so prettier's own YAML parser must never reformat it: its triple-mustache placeholders
+# (`{{{name}}}`) parse as YAML flow-mapping syntax when unquoted and get mangled into
+# `{ { { name } } }`, breaking the template (every other package template under src/packages/ is
+# a file type prettier has no parser for at all, so this is the one that needs an explicit entry).
+src/packages/helm/Chart.template.yaml

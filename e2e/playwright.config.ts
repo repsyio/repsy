@@ -62,5 +62,13 @@ export default defineConfig({
       name: 'docker',
       testMatch: 'docker/**/*.spec.ts',
     },
+    {
+      // Both Helm protocols (OCI and classic/ChartMuseum, `clients/helm.ts`/`clients/helm-classic
+      // .ts`) run inside this one project/runner -- they share one client toolchain (the `helm`
+      // binary plus the build-time-installed `cm-push` plugin), so there is no reason to split
+      // them into two runner services.
+      name: 'helm',
+      testMatch: 'helm/**/*.spec.ts',
+    },
   ],
 });
