@@ -97,14 +97,30 @@ public class RepoTxService {
     return this.findRepoById(repoId);
   }
 
+  /**
+   * Applies the given settings; a field that is null (absent from the request) is left as it is.
+   */
   @Transactional
   public void updateSettings(final @NonNull UUID repoId, final @NonNull RepoSettingsForm settings) {
+
     final var repo = this.findRepoById(repoId);
-    repo.setPrivateRepo(Boolean.TRUE.equals(settings.getPrivateRepo()));
-    repo.setAllowOverride(Boolean.TRUE.equals(settings.getAllowOverride()));
-    repo.setReleases(settings.getReleases());
-    repo.setSnapshots(settings.getSnapshots());
-    repo.setSecurityScanEnabled(Boolean.TRUE.equals(settings.getSecurityScanEnabled()));
+
+    if (settings.getPrivateRepo() != null) {
+      repo.setPrivateRepo(settings.getPrivateRepo());
+    }
+    if (settings.getAllowOverride() != null) {
+      repo.setAllowOverride(settings.getAllowOverride());
+    }
+    if (settings.getReleases() != null) {
+      repo.setReleases(settings.getReleases());
+    }
+    if (settings.getSnapshots() != null) {
+      repo.setSnapshots(settings.getSnapshots());
+    }
+    if (settings.getSecurityScanEnabled() != null) {
+      repo.setSecurityScanEnabled(settings.getSecurityScanEnabled());
+    }
+
     this.repoRepository.save(repo);
   }
 

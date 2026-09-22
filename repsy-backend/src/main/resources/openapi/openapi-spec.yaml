@@ -98,6 +98,9 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponseVoid"
       summary: Update repository settings
+      description: >-
+        Settings are updated field by field: a field that is omitted (or sent as null) keeps its
+        current value, so a client may send only the fields it wants to change.
     parameters:
       - name: repoName
         in: path
@@ -3475,6 +3478,9 @@ components:
           "$ref": "#/components/schemas/RepoType"
     RepoSettingsForm:
       type: object
+      description: >-
+        Settings are updated field by field: a field that is omitted (or sent as null) keeps its
+        current value, so a client may send only the fields it wants to change.
       properties:
         privateRepo:
           type: boolean
