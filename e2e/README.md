@@ -15,9 +15,12 @@ npm client adapter and runner. This is **step 3b ("cargo")**: a third worked exa
 `ProtocolAdapter` shape, the Cargo (Rust crate registry) client adapter and runner, plus a second
 routing-around hook on the loop itself (`ProtocolAdapter.knownPublishSideEffect`, the publish-side
 analogue of `knownConsumeFailure`, for a candidate backend bug that corrupts storage on a refused
-duplicate publish — see "Cargo runner" below). Every other protocol (nuget, docker, helm, pypi,
-golang, ruby) replicates the same model in later steps; nothing about the model itself is
-maven-specific.
+duplicate publish — see "Cargo runner" below). This is **step 3c ("nuget")**: a fourth worked
+example, the NuGet (.NET package registry) client adapter and runner — the first protocol in this
+harness with a REAL override conflict (`409`) and a real releases/snapshots `422`, so it is also the
+first to exercise the catalog's `conflict` outcome for real (see "NuGet runner" below). Every other
+protocol (docker, helm, pypi, golang, ruby) replicates the same model in later steps; nothing about
+the model itself is maven-specific.
 
 ## Rules
 
@@ -39,14 +42,15 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 ```
 e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example
-  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo"
+  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo", "nuget"
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres:18 + Repsy, started/stopped by `run.sh local up|down`
-  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo"
+  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven; see "Adding a protocol adapter" below
   runners/npm.Dockerfile       # + nothing else: npm ships with the node:24 base already
   runners/cargo.Dockerfile     # + a pinned Rust toolchain, copied in from the official rust image
+  runners/nuget.Dockerfile     # + a pinned .NET SDK, copied in from the official Ubuntu-noble SDK image
   runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
   src/
     env.ts                     # typed config from env/.env
@@ -79,10 +83,13 @@ e2e/
       pgp.ts                     # real OpenPGP.js key generation and detached signing, no gpg/network
       cargo-raw.ts                 # cargo-specific raw PUT/GET (publish/config.json/sparse-index/download), body builder
       cargo.ts                     # the cargo client + cargoAdapter: publish()/resolve()/seedPublish(), cargo package/publish/fetch
+      nuget-raw.ts                  # nuget-specific raw PUT/GET (publish/versions/download/registration/service-index), buildNupkg (fflate)
+      nuget.ts                      # the nuget client + nugetAdapter: publish()/resolve()/seedPublish(), dotnet nuget push/restore
     packages/
       maven/                     # mustache templates of the tiny jar project + settings.xml
       npm/                       # mustache templates of the tiny package.json/index.js + .npmrc
       cargo/                     # mustache templates of the tiny crate + consumer Cargo.toml + .cargo/config.toml
+      nuget/                     # mustache templates of nuget.config + the consumer .csproj (the .nupkg itself is built in code, see nuget-raw.ts)
   tests/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe
     maven/
@@ -96,6 +103,9 @@ e2e/
     cargo/
       publish-consume.spec.ts   # registerPublishConsumeLoop(cargoAdapter) + a hyphenated-crate-name real-client test
       registry-rules.spec.ts    # raw-HTTP pins of the duplicate-version/version-validation/config.json/name-normalisation rules
+    nuget/
+      publish-consume.spec.ts   # registerPublishConsumeLoop(nugetAdapter) + api-key-only-push and mixed-case-id real-client tests
+      registry-rules.spec.ts    # raw-HTTP pins of the 409/422 override & version-kind rules, service index, X-NuGet-ApiKey (H7)
 ```
 
 ## Setup
@@ -635,6 +645,170 @@ name round-trips through the loop under a spelling the server itself never agree
 `tests/cargo/registry-rules.spec.ts`'s raw-HTTP test both pin this directly, through `test.fail()`.
 Filed as **RPS-1212**.
 
+## NuGet runner
+
+`runners/nuget.Dockerfile` copies a pinned .NET SDK (`mcr.microsoft.com/dotnet/sdk:10.0.401-noble`,
+current .NET 10 LTS per `dotnet/dotnet-docker`'s `README.sdk.md`) in from that official image's
+`/usr/share/dotnet` directory rather than installing it by hand — there is no Debian image for the
+.NET 10 SDK at all (`noble`/`resolute`/`alpine`/`azurelinux` only; 9.0 was the last SDK with a
+`bookworm-slim` tag), but the noble image itself only untars the portable `linux-x64` SDK build into
+that one directory, and Debian 12 is a supported .NET 10 OS, so the copy works unmodified into the
+`node:24-bookworm-slim` base every other runner uses.
+`DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` avoids coupling the image to a specific ICU package
+version (this harness's rendered packages/projects carry no culture-sensitive data), the same
+approach the official Alpine .NET images take. `clients/nuget.ts` builds a `.nupkg` directly with
+`fflate` (`nuget-raw.ts`'s `buildNupkg` — **no `dotnet pack`, no build, no `[Content_Types].xml`**:
+a zip containing a root `<id>.nuspec` and `content/e2e-marker.txt`, which is all the server's own
+`.nuspec`-extraction regex and the real client's package reader need) and runs the real `dotnet`
+binary:
+
+- **`publish`**: `dotnet nuget push <nupkg> --source repsy --configfile <nuget.config>
+--allow-insecure-connections --no-symbols --timeout 60 [--api-key <k>]` against the pre-built nupkg —
+  no packaging step to precede it, unlike cargo/maven, since the nupkg bytes are already on disk
+  before the client ever runs. `k` is the raw deploy token for a `token`-kind credential (the panel's
+  "Option B" for a token), or the literal string `any` for a `password`-kind credential (the panel's
+  "Option B" text VERBATIM — confirmed live to be a dummy value, see "H7" below); `anonymous` gets no
+  `--api-key` at all.
+- **`resolve`**: a fresh, separate work directory (fresh `NUGET_PACKAGES`/`HOME` too) with a minimal
+  consumer **classlib** project (`net10.0`, `<PackageReference Include="<id>" Version="[<version>]"
+/>`, no `Program.cs`/apphost needed) and `dotnet restore <consumer.csproj> --configfile <nuget.config>
+--packages <isolated dir> --no-http-cache --disable-build-servers -p:NuGetAudit=false -v minimal`.
+  `net10.0`'s targeting pack ships inside the SDK image's own `packs/` directory, and `<clear/>` in
+  every rendered `nuget.config` guarantees nothing is ever fetched from nuget.org — confirmed live,
+  H3 below. The restored `.nupkg` lands at `<NUGET_PACKAGES>/<idLower>/<verLower>/
+<idLower>.<verLower>.nupkg`, kept whole (never unpacked into the consumer's own tree), so
+  `AdapterResult.contentSha256` is the sha256 of that WHOLE file, exactly like cargo's `.crate`.
+- **`nuget.config`** (rendered fresh into an isolated `HOME` per invocation, one shared shape for
+  BOTH push and restore — never `dotnet`'s own machine-wide config): `<clear/>` plus one `repsy`
+  source (`protocolVersion="3" allowInsecureConnections="true"`) and, whenever the credential carries
+  a Basic pair (both `token`- and `password`-kind credentials do — a deploy token's username + token
+  value, or a real user/admin username + password), a `packageSourceCredentials` block with that same
+  pair. `anonymous` renders no credentials block at all.
+- **A real override rule, with a real `409`**: `AbstractNuGetProtocolFacade.publish` refuses
+  `!allowOverride && versionExists` with `409 Conflict` ("Version `<v>` of package `<id>` already
+  exists.") — the first protocol in this harness where the catalog's `conflict` outcome is exercised
+  for real (maven: 403; npm: always refused regardless of `allowOverride`, also 403; cargo: no
+  override rule at all, unconditional 400). `checkVersionAllowance` (releases/snapshots) runs BEFORE
+  that check, so a redeploy of an existing version under `releases: false`/`snapshots: false` is
+  `422`, never `409` — confirmed live, see the registry-rules test below.
+- **The publish-side raw probe IS a byte-identical re-PUT** of the exact nupkg the client just pushed
+  (the maven/npm pattern, unlike cargo's prerelease-sibling workaround): every `ok`-expected scenario
+  runs with `allowOverride: true` (the fixture default), so the re-PUT is an accepted, identical
+  replacement; `no-override` gets the same `409` the client got; a releases/snapshots refusal gets
+  the same `422`.
+- **The consume-side raw probe** is a flat-version-list `GET` (`v3/package/<idLower>/index.json`),
+  mirroring npm's packument-GET / cargo's sparse-index-GET reasoning: every consume expectation in
+  the catalog is an authn/authz outcome, and this GET never touches the `.nupkg` bytes.
+- **Fingerprint** (`ProtocolAdapter.fingerprint`/`expectNothingStored`): scoped to the one package a
+  scenario's publish targets, like npm's/cargo's — the flat-version-list body hash (`undefined` when
+  the package does not exist at all) plus every listed version's downloaded `.nupkg` content hash.
+- **No `knownConsumeFailure`/`knownPublishSideEffect`**: H4 (below) found no RPS-1124-style storage
+  corruption on a refused publish, and H5 found no RPS-1205-style broken URL — both checked live
+  before being left out, not assumed from the plan.
+
+```bash
+./run.sh test --protocol nuget
+```
+
+### Scenario mapping onto the shared catalog
+
+Every catalog scenario that is not maven-restricted applies to nuget unchanged, with the same
+`unauthorized`/`ok` buckets as every other protocol (`NuGetAuthPreProcessor` throws the same flat
+`401` + `WWW-Authenticate: Basic` challenge for every authn/authz failure — there is no separate
+"forbidden" outcome here either), EXCEPT the override pair and the four releases/snapshots
+scenarios, which nuget has REAL rules for (unlike cargo's "no rule at all" or maven's 403s):
+
+| scenario (shared catalog)                                                             | real status observed        | note                                                                                       |
+| ------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------ |
+| `no-override` (2nd publish, `allowOverride:false`)                                    | `409 conflict`              | `AbstractNuGetProtocolFacade.publish`, a REAL conflict — the first protocol here to use it |
+| `override` (2nd publish, `allowOverride:true`)                                        | `201 ok`                    | the row is replaced and the file is overwritten; no `expectByProtocol` override needed     |
+| `maven-releases-off`/`redeploy-releases-off` (added to nuget's `protocols`)           | `422 rejected`              | `checkVersionAllowance` — a nuget "release" is any version without a `-` prerelease label  |
+| `maven-snapshots-off`/`redeploy-snapshots-off` (added to nuget's `protocols`, `-pre`) | `422 rejected`              | a nuget "snapshot" is a `-pre` prerelease label, not a Maven-style timestamped SNAPSHOT    |
+| `token-ro` publish                                                                    | `401 unauthorized`          | same shape as every other protocol: every auth failure maps to a flat 401                  |
+| everything else (`password-admin`, `token-rw`, `anonymous-public`, ...)               | matches the shared `expect` | unchanged                                                                                  |
+
+`snapshot-deploy`/`snapshot-redeploy*` stay maven-only (`protocols: ['maven']`): they are about
+Maven's timestamped-SNAPSHOT-file semantics (`buildNumber`, version-level `maven-metadata.xml`),
+which nuget has no equivalent of — a nuget "snapshot" is stored once, like any other version.
+
+`registry-rules.spec.ts` additionally pins: a duplicate-version publish leaving storage untouched
+(H4); a new version always accepted, an existing one replaced only when `allowOverride: true`; the
+redeploy-under-`releases:false` ordering (422 before 409); invalid/too-long/5-part version strings
+and non-package/non-multipart bodies at 400; `1.0.0.0` normalized to `1.0.0` on both the flat index
+and the download path; the service index's exact `@id`/`@type` shape including the three
+non-standard types (H6); and `X-NuGet-ApiKey`'s three cases (H7).
+
+### H1-H13, confirmed live
+
+Every hypothesis below was probed against a running instance (`./run.sh local up`) before being
+pinned — first with raw HTTP (`tsx` scripts using `nuget-raw.ts` directly), then with the real
+`dotnet` client inside the `nuget` runner container. All were confirmed **exactly as the plan
+predicted**; none required a workaround or a routing-around hook.
+
+- **H1** (a `password`-kind push succeeds through the 401→Basic retry on a chunked multipart PUT):
+  confirmed — every scenario using `admin-password`/`user-password` (`--api-key any` plus
+  `packageSourceCredentials`) publishes successfully with the real `dotnet nuget push`; no
+  `"Basic <base64>"`-as-api-key fallback was needed.
+- **H2** (whether `--allow-insecure-connections` is needed in addition to
+  `allowInsecureConnections="true"` on the source): both are present in the final implementation and
+  every push/restore succeeds; this step did NOT separately ablate one flag to prove the other alone
+  suffices (time-boxed) — left as a known, harmless redundancy rather than an unconfirmed guess about
+  which one is load-bearing.
+- **H3** (the hand-assembled nupkg both pushes and restores; nothing is fetched from nuget.org):
+  confirmed — every scenario's `dotnet restore` exits 0 against a `<clear/>` source with no
+  third-party dependency, and the restored file's sha256 matches the published one
+  (`expectResolvedContent`, `scenarios/loop.ts`).
+- **H4** (no storage side effect on a refused publish): confirmed, live —
+  `tests/nuget/registry-rules.spec.ts`'s duplicate-version test shows the stored `.nupkg` unchanged
+  (still bytesA, never bytesB) after a refused `409` duplicate. Unlike cargo's RPS-1124, the DB write
+  and the storage write happen in the SAME call, after every refusal check throws, so there is
+  nothing to corrupt. `ProtocolAdapter.knownPublishSideEffect` is left out entirely.
+- **H5** (advertised URLs resolve on the single-tenant layout, one `/<repoName>/` segment): confirmed
+  — the registration leaf's `packageContent` and the service index's `PackageBaseAddress/3.0.0`
+  `@id` both name exactly `<repoBaseUrl>/<repoName>/v3/package[...]`, and `afterSuccessfulRoundTrip`
+  (`nuget.ts`) GETs that exact URL and gets `200` with the published bytes on every successful
+  scenario.
+- **H6** (`dotnet package search`/registration-based commands fail; push/restore do not): the service
+  index's exact `@type` shape was confirmed live
+  (`tests/nuget/registry-rules.spec.ts`) — `RegistrationsBaseUrl/3.0.0`, `SearchQueryService/3.0.0`,
+  `SearchAutocompleteService/3.0.0` and a non-standard `PackageDelete/2.0.0`, none of which
+  NuGet.Client's `ServiceTypes.cs` resolves, while `PackageBaseAddress/3.0.0`/`PackagePublish/2.0.0`
+  (what push/restore use) are correct. This step did not additionally run
+  `dotnet package search`/`dotnet list package` against the server to watch it fail live (the
+  service-index evidence alone is what the plan's own hypothesis was about) — filed as **RPS-1213**.
+- **H7** (`X-NuGet-ApiKey: <user password>` → `401`, contradicting the panel's Option B text):
+  confirmed live, exactly as predicted —
+  `X-NuGet-ApiKey: <admin password>` → `401`; `X-NuGet-ApiKey: <deploy token>` → `201`;
+  `X-NuGet-ApiKey: "Basic <base64(user:pass)>"` → `201` (the workaround, since
+  `NuGetAuthPreProcessor.normalizeAuthHeader` leaves an already-`Basic `-prefixed value alone and
+  dispatches it to the Basic path). Filed as **RPS-1214** (a frontend-docs fix, or a server-side
+  "try the api key as a Basic password" fallback, is left as an open decision — not fixed here).
+- **H8** (mixed-case id round trip): confirmed live —
+  `tests/nuget/publish-consume.spec.ts`'s dedicated test publishes `E2E-<runid>-MixedCase` with the
+  real client, then shows the flat index is only queryable by the LOWERCASED id and the registration
+  echoes `catalogEntry.id` as that same lowercased spelling (`findOrCreatePackage` stores
+  `packageId.toLowerCase()`), never the mixed-case one it was actually published under. The real
+  client itself still round-trips correctly (`Include="E2E-<runid>-MixedCase"` resolves fine — NuGet
+  package references are already case-insensitive on the client side).
+- **H9** (timing fits the 120s test timeout): confirmed — every scenario in two full catalog runs
+  completed in 1-2s (a positive scenario) to ~7-8s (a `@negative` one waiting out the auth
+  throttle window), both runs finishing in ~14s total wall time for all 27 tests together, run in
+  parallel across 12 workers.
+- **H10** (a `-pre` prerelease version restores exactly and is listed): confirmed —
+  `redeploy-snapshots-off` (the catalog's only `versionType: 'snapshot'` scenario reused for nuget)
+  seeds and later consumes a `-pre` version with the real client end to end.
+- **H11** (an anonymous push fails non-interactively, exit 1, no hang): confirmed — `anonymous-private`
+  and `anonymous-public`'s publish attempts both fail the real client cleanly (no `--interactive`
+  flag was ever needed) well within the timeout.
+- **H12** (`0.0.<Date.now()>`, a version no real client could parse, is accepted server-side):
+  confirmed live — `201`, listed verbatim as `0.0.<the exact digits>`. Pinned as an observation in
+  `registry-rules.spec.ts`, not filed (the client-side bound is exactly why
+  `coordinates.ts`'s `boundedSemverVersion` is still used for every real-client scenario).
+- **H13** (parallel workers, no cross-test interference): confirmed — every isolated `HOME`/
+  `NUGET_PACKAGES`/`NUGET_SCRATCH`/HTTP-cache directory is unique per invocation
+  (`isolatedWorkDir`/`nugetEnv`), and two full 27-test runs (12 parallel workers each) both passed
+  with no flakiness or leftover-state failures.
+
 ## Remote hardening
 
 On a `remote` target (`target.isRemote`, see `src/target.ts`), `AUTH_THROTTLE_MAX_FAILURES` cannot
@@ -663,7 +837,8 @@ real shared remote. Both are called out in the plan as later, "remote hardening"
 ./run.sh test --protocol maven
 ./run.sh test --protocol npm
 ./run.sh test --protocol cargo
-./run.sh test --protocol skeleton,maven,npm,cargo
+./run.sh test --protocol nuget
+./run.sh test --protocol skeleton,maven,npm,cargo,nuget
 ./run.sh test --grep '@smoke'
 ./run.sh test -b             # rebuild the runner image(s) first (Dockerfile/lockfile changed)
 ./run.sh local down
@@ -671,7 +846,7 @@ real shared remote. Both are called out in the plan as later, "remote hardening"
 ```
 
 `run.sh test` accepts `--target local|remote|ci` and `--protocol a,b` (a comma-separated list of
-runner services: `skeleton`, `maven`, `npm`, `cargo`). Reports land under `e2e/test-results/` (JUnit
+runner services: `skeleton`, `maven`, `npm`, `cargo`, `nuget`). Reports land under `e2e/test-results/` (JUnit
 XML) and
 `e2e/playwright-report/` (HTML) — one `run.sh test` invocation covering several `--protocol` services
 overwrites that JUnit file per service, so diff/compare a single protocol's run in isolation
@@ -731,6 +906,8 @@ pnpm exec prettier --check .
 ./run.sh test --protocol npm     # again — proves run isolation for npm too
 ./run.sh test --protocol cargo
 ./run.sh test --protocol cargo   # again — proves run isolation for cargo too
+./run.sh test --protocol nuget
+./run.sh test --protocol nuget   # again — proves run isolation for nuget too
 ./run.sh test                    # the skeleton project
 ./run.sh sweep --dry-run         # before tearing down: confirms nothing was left behind
 ./run.sh local down

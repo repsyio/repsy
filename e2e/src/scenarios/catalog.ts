@@ -53,6 +53,21 @@
  *    cargo accept a version override. The real `cargo publish` client never even sends that PUT (its
  *    own client-side `verify_unpublished` preflight refuses first, exit 101) -- only the loop's raw
  *    probe (`clients/cargo.ts`) reaches the server's rule at all.
+ *  - nuget (step 3c) is the first protocol with a REAL override rule and a genuine `409 Conflict`:
+ *    `AbstractNuGetProtocolFacade.publish` refuses `!allowOverride && versionExists` with `409`
+ *    (`nuget-raw.ts`'s file header), so `no-override` pins `expectByProtocol: { nuget: { publish:
+ *    'conflict' } }` below, and `override` needs no nuget override at all (its shared `expect` of
+ *    `ok` already matches). `checkVersionAllowance` runs BEFORE that override check and answers `422`
+ *    (`Outcome` `rejected`) whenever the version's kind (release/prerelease, by whether it contains a
+ *    `-`) is switched off by the repo's `releases`/`snapshots` settings -- unlike maven, this applies
+ *    identically to a first deploy AND a redeploy, so nuget is added to the `protocols` list of
+ *    `maven-releases-off`/`maven-snapshots-off`/`redeploy-releases-off`/`redeploy-snapshots-off`
+ *    (still maven-prefixed ids for JUnit/HTML report stability; the prefix is now historical) with
+ *    `expectByProtocol: { nuget: { publish: 'rejected' } }`, and the redeploy pair is `422`, never
+ *    `409`, for nuget specifically (the kind check runs first). `snapshot-deploy`/
+ *    `snapshot-redeploy*` stay maven-only: they are about Maven's timestamped-SNAPSHOT-file
+ *    semantics, which nuget has no equivalent of (a nuget "snapshot" is just a version with a `-`
+ *    prerelease label, stored once like any other version).
  *
  * `versionType` matters only to the maven adapter today; other protocols ignore it once they exist.
  */
@@ -145,9 +160,10 @@ export const SCENARIOS: readonly Scenario[] = [
     reuseCoordinates: true,
     // Pinned: 403 ("artifactOverrideIsProhibited"), not the plan's "conflict" (409) -- see the
     // file-level comment. cargo: 400 ("rejected") unconditionally -- see the file-level comment's
-    // cargo bullet.
+    // cargo bullet. nuget: a REAL 409 ("conflict") -- the first protocol in this harness to use
+    // that outcome for real, see the file-level comment's nuget bullet.
     expect: { publish: 'forbidden', consume: 'ok' },
-    expectByProtocol: { cargo: { publish: 'rejected' } },
+    expectByProtocol: { cargo: { publish: 'rejected' }, nuget: { publish: 'conflict' } },
   },
   {
     id: 'override',
@@ -167,10 +183,12 @@ export const SCENARIOS: readonly Scenario[] = [
     repo: { privateRepo: true, releases: false },
     credential: 'token-rw',
     versionType: 'release',
-    protocols: ['maven'],
+    protocols: ['maven', 'nuget'],
     // Pinned: 403 ("releaseVersionsAreProhibited") for a first deploy of a version that does not
-    // exist yet (`redeploy-releases-off` covers an existing one).
+    // exist yet (`redeploy-releases-off` covers an existing one). nuget: 422 ("rejected") --
+    // `checkVersionAllowance`, see the file-level comment's nuget bullet.
     expect: { publish: 'forbidden', consume: 'ok' },
+    expectByProtocol: { nuget: { publish: 'rejected' } },
   },
   {
     id: 'maven-snapshots-off',
@@ -178,10 +196,12 @@ export const SCENARIOS: readonly Scenario[] = [
     repo: { privateRepo: true, snapshots: false },
     credential: 'token-rw',
     versionType: 'snapshot',
-    protocols: ['maven'],
+    protocols: ['maven', 'nuget'],
     // Pinned: 403 ("snapshotVersionsAreProhibited") for a first deploy of a version that does not
-    // exist yet (`redeploy-snapshots-off` covers an existing one).
+    // exist yet (`redeploy-snapshots-off` covers an existing one). nuget: 422 ("rejected") -- a
+    // nuget "snapshot" is a `-pre` prerelease version, see the file-level comment's nuget bullet.
     expect: { publish: 'forbidden', consume: 'ok' },
+    expectByProtocol: { nuget: { publish: 'rejected' } },
   },
   {
     id: 'snapshot-deploy',
@@ -225,10 +245,12 @@ export const SCENARIOS: readonly Scenario[] = [
     credential: 'token-rw',
     versionType: 'snapshot',
     reuseCoordinates: true,
-    protocols: ['maven'],
+    protocols: ['maven', 'nuget'],
     // Pinned (RPS-1174): 403 ("snapshotVersionsAreProhibited") on the first file of the redeploy.
-    // The version published while snapshots were still on stays consumable.
+    // The version published while snapshots were still on stays consumable. nuget: 422
+    // ("rejected"), never 409 -- `checkVersionAllowance` runs before the override/conflict check.
     expect: { publish: 'forbidden', consume: 'ok' },
+    expectByProtocol: { nuget: { publish: 'rejected' } },
   },
   {
     id: 'redeploy-releases-off',
@@ -237,8 +259,10 @@ export const SCENARIOS: readonly Scenario[] = [
     credential: 'token-rw',
     versionType: 'release',
     reuseCoordinates: true,
-    protocols: ['maven'],
-    // Pinned (RPS-1174): 403 ("releaseVersionsAreProhibited"), as above.
+    protocols: ['maven', 'nuget'],
+    // Pinned (RPS-1174): 403 ("releaseVersionsAreProhibited"), as above. nuget: 422 ("rejected"),
+    // as above.
     expect: { publish: 'forbidden', consume: 'ok' },
+    expectByProtocol: { nuget: { publish: 'rejected' } },
   },
 ];

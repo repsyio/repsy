@@ -112,6 +112,25 @@ services:
       - ./test-results:/app/test-results
       - ./playwright-report:/app/playwright-report
 
+  nuget:
+    <<: *runner-common
+    build:
+      context: .
+      dockerfile: runners/nuget.Dockerfile
+      args:
+        DOTNET_SDK_VERSION: '10.0.401'
+    environment:
+      <<: *runner-environment
+    volumes:
+      # No shared/named cache volume, same reasoning as npm's/cargo's: net10.0's targeting pack
+      # ships inside the SDK image itself (packs/), and this harness's test packages/projects are
+      # dependency-free, so `dotnet restore` never fetches anything third-party to cache.
+      - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
+      - ./src:/app/src
+      - ./tests:/app/tests:ro
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+
 volumes:
   # Named (not bind-mounted): holds only downloaded third-party Maven plugins/dependencies, so it
   # persists across `run.sh test` invocations without leaving anything in the working tree.
