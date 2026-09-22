@@ -99,10 +99,15 @@ async function renderTemplate(
   await fs.writeFile(destPath, mustache.render(template, view), 'utf8');
 }
 
-/** `.cargo/config.toml` in `work`: `[registries.repsy] index = "sparse+<repoBaseUrl>/<repo>/"` plus
- *  an explicit `cargo:token` credential provider. Cargo looks upward from its cwd for this file, so
- *  running with `cwd: work` finds it without touching `CARGO_HOME`'s own global config. */
-async function renderConfig(work: string, repoName: string): Promise<void> {
+/**
+ * `.cargo/config.toml` in `work`: `[registries.repsy] index = "sparse+<repoBaseUrl>/<repo>/"` plus
+ * an explicit `cargo:token` credential provider. Cargo looks upward from its cwd for this file, so
+ * running with `cwd: work` finds it without touching `CARGO_HOME`'s own global config. Exported
+ * (step 5b) for `tests/cargo/protocol-specific.spec.ts`'s hand-built-`World` tests, which run the
+ * real `cargo yank`/`search`/`owner` subcommands directly instead of through `publish`/`resolve` --
+ * the same precedent as `nuget.ts`'s `renderNugetConfig`/`nugetEnv`.
+ */
+export async function renderCargoConfig(work: string, repoName: string): Promise<void> {
   const cargoDir = path.join(work, '.cargo');
   await fs.mkdir(cargoDir, { recursive: true });
   await renderTemplate('config.template.toml', path.join(cargoDir, 'config.toml'), {
@@ -140,7 +145,8 @@ async function renderConsumerCrate(work: string, crate: string, version: string)
   await fs.writeFile(path.join(srcDir, 'lib.rs'), '', 'utf8');
 }
 
-function cargoEnv(home: string, credential: World['credential']): NodeJS.ProcessEnv {
+/** Exported (step 5b) for the same reason as `renderCargoConfig` above. */
+export function cargoEnv(home: string, credential: World['credential']): NodeJS.ProcessEnv {
   const token = cargoToken(credential);
   return {
     ...process.env,
@@ -201,7 +207,7 @@ async function publishWithClient(world: World, label: string): Promise<PublishRu
   const { packageName, version } = world.publishTarget;
 
   const { marker } = await renderCrate(work, packageName, version);
-  await renderConfig(work, world.repoName);
+  await renderCargoConfig(work, world.repoName);
   await packageCrate(work, home, `${label}-package`);
 
   // Read right after packaging: a scenario whose own publish attempt never reaches the point of
@@ -308,7 +314,7 @@ export async function resolve(world: World): Promise<AdapterResult> {
   const { packageName, version } = world.consumeTarget;
 
   await renderConsumerCrate(work, packageName, version);
-  await renderConfig(work, world.repoName);
+  await renderCargoConfig(work, world.repoName);
 
   const secrets = world.credential.password ? [world.credential.password] : [];
   const execResult = await run('cargo', ['fetch'], {
