@@ -270,7 +270,11 @@ the documentation bug already tracked by
 [RPS-1173](https://zyfera.atlassian.net/browse/RPS-1173) ("README says the embedded H2 database is
 the default, but application.yml defaults DB_URL to PostgreSQL") — re-confirmed live here with fresh
 evidence (commented on that ticket) rather than filed again. **Not fixed here**: this step touches
-only `e2e/`, never the backend or its docs.
+only `e2e/`, never the backend or its docs. **Fixed by RPS-1173 itself**: the `Dockerfile` now sets
+`ENV DB_URL=jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE`
+(the exact H2-1 (a) value this section already pinned), so the image now boots with embedded H2 when
+no `DB_URL` is passed, matching the README. This transcript is kept as the historical record of the
+bug, not rewritten.
 
 ### Scope decision: `@smoke` everywhere plus one full catalog, not ten full catalogs
 
