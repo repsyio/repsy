@@ -1278,6 +1278,62 @@ back on GET"`), so B1 is invisible to `crane digest`'s own exit code — only a 
   deviating from the spec. Confirmed live, `registry-rules.spec.ts`'s R6 (`expectNothingStored`
   deliberately does NOT assert the refused blobs are absent, for exactly this reason).
 
+### Docker protocol-specific suite (step 5g, RPS-294)
+
+`tests/docker/protocol-specific.spec.ts` ports `repsy-cloud`'s own e2e harness's docker
+"multi-platform" case — with one deliberate, evidence-backed deviation from what that file actually
+does, decided by the gating hypothesis (HD-1) below.
+
+- **`repsy-cloud`'s own "multi-platform" case does NOT use `crane index append`.** It shells out to
+  `docker buildx build --platform linux/amd64,linux/arm64 --push` (its `util.ts`'s
+  `dockerBuildxAndPush`), fronted by `docker buildx create` with a `docker-container` driver — a
+  full BuildKit daemon, needing exactly the `--privileged`/root-started-daemon/shared-image-store
+  machinery this runner's own "Why no daemon" section above already rejects. Porting that literally
+  was never an option here; the implementation plan's own HD-1 asked instead whether the daemonless
+  `crane` binary this runner already uses everywhere else could build a genuine multi-arch index on
+  its own.
+- **HD-1 (gating), confirmed live**: `crane index append -m <ref1> -m <ref2> -t <indexRef>` is
+  entirely daemon-free and needs nothing beyond the plain manifest-PUT wire calls this server
+  already supports for a single-platform image. Read from the source FIRST:
+  `AbstractDockerProtocolTxFacade.saveManifest`'s own `switch` (`repsy-protocols/docker`) routes
+  `OCI_IMAGE_INDEX`/`DOCKER_MANIFEST_LIST` to `createManifestList`, a genuinely distinct,
+  purpose-built code path — not the flat-500 `default -> throw new
+IllegalArgumentException("unsupportedMediaType")` branch B4/RPS-1110 above pins for a truly unknown
+  `Content-Type`. `createManifestList`'s own `findPlatformManifests` (same file) is what makes "push
+  every child by digest FIRST" a hard SERVER rule, not just client politeness: it `getResource()`s
+  each `platformManifest.getDigest()` by file name and throws `ItemNotFoundException
+("resourceNotFound")` if that digest was never separately stored, so an index referencing a
+  dangling child is refused outright, never silently accepted.
+
+  Confirmed against the already-running local stack with `crane -v index append`, traced live: it
+  HEADs each platform ref's manifest (already pushed by TAG in an earlier `crane push`), then
+  RE-PUTs each one's exact bytes under its OWN digest as the manifest reference (`PUT
+.../manifests/sha256:<digest>`, `201` both times — exactly the "a real client always pushes an
+  index's children by digest first" comment `registry-rules.spec.ts`'s R13 already left for a
+  hand-built RAW probe, here confirmed by a REAL client, unprompted), then `PUT`s the assembled
+  index itself under the requested tag — `Content-Type: application/vnd.oci.image.index.v1+json` by
+  default (crane's own default family), or `application/vnd.docker.distribution.manifest.list.v2
++json` with `--docker-empty-base` (both media types pinned by this suite's two tests) — `201`,
+  `Docker-Content-Digest` echoing the index's own digest. `crane manifest <indexRef>` (no
+  `--platform`) then lists both `platform` entries with their exact `architecture`/`os`, matching
+  the two earlier pushes' own manifest digests exactly; `crane pull
+--platform=linux/arm64 --format=oci <indexRef> <dir>` resolves to the ARM64 child specifically —
+  proven by reading the PULLED config blob's own `architecture` field back out, not merely trusting
+  the index's platform label.
+
+- No new backend bug was found while building this suite. R13 (`registry-rules.spec.ts`) had
+  already pinned the raw-HTTP shape of an index push; RPS-946 ("Docker image manifest lookup by
+  digest fails for per-platform manifests of multi-platform tags", filed independently, status
+  Done) turned out to be about the _different_ panel UI endpoint
+  (`/api/docker/images/.../manifests/{reference}`), not the registry protocol path `crane`/this
+  suite exercises — its own description says the registry path "already resolves such digests"
+  (`ManifestService.findManifestByRepoIdAndImageNameAndDigest`), which is exactly what this suite
+  confirms live, end to end, with a real client.
+
+```bash
+./run.sh test --protocol docker -b   # -b the first time: builds the docker runner image
+```
+
 ## Helm runner
 
 Repsy implements **two independent wire protocols** for Helm on the same protocol port: OCI
