@@ -71,6 +71,15 @@
  *    from either path becomes a flat `401` with that same challenge header -- there is no separate
  *    "forbidden" outcome for this protocol either (`token-ro` publish: `401`, like every other
  *    protocol in this harness).
+ *
+ * Step 5e (RPS-294, `tests/nuget/protocol-specific.spec.ts`) adds `rawUnlist`/`rawRelist`
+ * (`DELETE`/`POST /v3/package/<idLower>/<verLower>`, confirmed against
+ * `AbstractNuGetUnlistProtocolMethodHandler`/`AbstractNuGetRelistProtocolMethodHandler` before this
+ * file was written, then live: `204`/`200`, the registration leaf's `listed` flips both ways, the
+ * flat container keeps the version regardless -- real NuGet unlist semantics, ported from
+ * `repsy-cloud`'s own `protocols/nuget/unlist`/`relist`) and `rawSearch`/`rawAutocomplete`
+ * (`v3/search`/`v3/autocomplete`, confirmed live to return `totalHits`/`data[].id`/
+ * `data[].registration` exactly as `NuGetSearchResponse`/`NuGetAutocompleteResponse` declare).
  */
 import { zipSync } from 'fflate';
 
@@ -125,6 +134,40 @@ export function nuspecPath(idLower: string, verLower: string): string {
 
 export function registrationIndexPath(idLower: string): string {
   return `v3/registration/${idLower}/index.json`;
+}
+
+/**
+ * `v3/package/<idLower>/<verLower>` -- NO trailing segment (distinct from `versionsPath`'s
+ * `.../index.json`): the same two-path-segment shape both unlist (`DELETE`) and relist (`POST`)
+ * match, confirmed against the server's own handlers
+ * (`AbstractNuGetUnlistProtocolMethodHandler`/`AbstractNuGetRelistProtocolMethodHandler`, whose
+ * `UNLIST_PATTERN`/`RELIST_PATTERN` match exactly two path segments under `v3/package/`) before
+ * this file was written. Confirmed live: `DELETE` -> `204`, flips the registration leaf's `listed`
+ * to `false`, the flat container keeps the version regardless; `POST` -> `200`, flips `listed`
+ * back to `true`.
+ */
+export function unlistRelistPath(idLower: string, verLower: string): string {
+  return `v3/package/${idLower}/${verLower}`;
+}
+
+export function searchPath(query: string, prerelease: boolean, skip = 0, take = 20): string {
+  const params = new URLSearchParams({
+    q: query,
+    skip: String(skip),
+    take: String(take),
+    prerelease: String(prerelease),
+  });
+  return `v3/search?${params.toString()}`;
+}
+
+export function autocompletePath(query: string, prerelease: boolean, skip = 0, take = 20): string {
+  const params = new URLSearchParams({
+    q: query,
+    skip: String(skip),
+    take: String(take),
+    prerelease: String(prerelease),
+  });
+  return `v3/autocomplete?${params.toString()}`;
 }
 
 /**
@@ -299,6 +342,114 @@ export async function rawGetRegistrationIndex(
   return rawRequest(`${repoUrl(repoName)}${registrationIndexPath(idLower)}`, {
     headers: nugetReadHeaders(credential),
   });
+}
+
+/**
+ * Raw `DELETE` unlist of one (lowercased id, lowercased/normalized version) leaf -- NuGet's own
+ * "unlist" convention (`PackagePublish/2.0.0`'s own `DELETE`, not the non-standard `PackageDelete/
+ * 2.0.0` service the index also advertises -- see `nuget-raw.ts`'s file header and README.md's H6).
+ * `permission: WRITE` (`AbstractNuGetUnlistProtocolMethodHandler.getProperties`).
+ */
+export async function rawUnlist(
+  repoName: string,
+  credential: MaterializedCredential,
+  idLower: string,
+  verLower: string,
+): Promise<RawResponse> {
+  return rawRequest(`${repoUrl(repoName)}${unlistRelistPath(idLower, verLower)}`, {
+    method: 'DELETE',
+    headers: nugetPublishHeaders(credential),
+  });
+}
+
+/** Raw `POST` relist of one (lowercased id, lowercased/normalized version) leaf, the exact inverse
+ *  of `rawUnlist`. `permission: WRITE`. */
+export async function rawRelist(
+  repoName: string,
+  credential: MaterializedCredential,
+  idLower: string,
+  verLower: string,
+): Promise<RawResponse> {
+  return rawRequest(`${repoUrl(repoName)}${unlistRelistPath(idLower, verLower)}`, {
+    method: 'POST',
+    headers: nugetPublishHeaders(credential),
+  });
+}
+
+/** Raw `GET` search (`v3/search?q=...`), `permission: READ`. */
+export async function rawSearch(
+  repoName: string,
+  credential: MaterializedCredential,
+  query: string,
+  prerelease = true,
+): Promise<RawResponse> {
+  return rawRequest(`${repoUrl(repoName)}${searchPath(query, prerelease)}`, {
+    headers: nugetReadHeaders(credential),
+  });
+}
+
+/** Raw `GET` autocomplete (`v3/autocomplete?q=...`), `permission: READ`. */
+export async function rawAutocomplete(
+  repoName: string,
+  credential: MaterializedCredential,
+  query: string,
+  prerelease = true,
+): Promise<RawResponse> {
+  return rawRequest(`${repoUrl(repoName)}${autocompletePath(query, prerelease)}`, {
+    headers: nugetReadHeaders(credential),
+  });
+}
+
+/** One `NuGetSearchData` entry the way the server serializes it: `id` is `@JsonProperty("id")` on
+ *  the java field named `packageId` (the spec's own `id` key), `registration` is the URL to the
+ *  package's registration index. Confirmed live: `data[].id` is always the LOWERCASED, stored
+ *  spelling (`findOrCreatePackage` stores `packageId.toLowerCase()`, same as the registration/flat
+ *  index -- H8), so a caller matches it against a pushed id case-insensitively. */
+export interface SearchResultData {
+  id: string;
+  version: string;
+  registration: string;
+}
+
+export interface SearchResponse {
+  totalHits: number;
+  data: SearchResultData[];
+}
+
+/** Parses `{"totalHits":N,"data":[{"id","version","registration",...}]}` (`NuGetSearchResponse`). */
+export function parseSearchResponse(body: Buffer): SearchResponse {
+  const parsed = JSON.parse(body.toString('utf8')) as {
+    totalHits?: unknown;
+    data?: { id?: unknown; version?: unknown; registration?: unknown }[];
+  };
+  const data = (parsed.data ?? [])
+    .filter(
+      (d) =>
+        typeof d.id === 'string' &&
+        typeof d.version === 'string' &&
+        typeof d.registration === 'string',
+    )
+    .map((d) => ({
+      id: d.id as string,
+      version: d.version as string,
+      registration: d.registration as string,
+    }));
+  return { totalHits: typeof parsed.totalHits === 'number' ? parsed.totalHits : 0, data };
+}
+
+/** Autocomplete's own shape (`NuGetAutocompleteResponse`): `{"totalHits":N,"data":["<id>",...]}`,
+ *  bare id strings, never `SearchResultData` objects. */
+export interface AutocompleteResponse {
+  totalHits: number;
+  data: string[];
+}
+
+export function parseAutocompleteResponse(body: Buffer): AutocompleteResponse {
+  const parsed = JSON.parse(body.toString('utf8')) as { totalHits?: unknown; data?: unknown };
+  const data = Array.isArray(parsed.data)
+    ? (parsed.data as unknown[]).filter((d): d is string => typeof d === 'string')
+    : [];
+  return { totalHits: typeof parsed.totalHits === 'number' ? parsed.totalHits : 0, data };
 }
 
 /** Parses `{"versions":[...]}`; `[]` when the body is not that shape. */
