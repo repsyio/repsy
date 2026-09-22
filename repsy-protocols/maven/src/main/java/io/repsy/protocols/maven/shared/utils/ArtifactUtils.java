@@ -369,6 +369,21 @@ public class ArtifactUtils {
         ((dotIndex == -1) ? "" : fileName.substring(dotIndex)).toLowerCase(Locale.getDefault()));
   }
 
+  /**
+   * Tells whether a file sits in a {@code SNAPSHOT} version directory: the second-to-last segment
+   * of the path ends with {@code SNAPSHOT}, the same rule as {@code isSnapshotFileOfItsDirectory}
+   * and the GAV calculator's. It is how a version-level {@code maven-metadata.xml} checksum is told
+   * from the artifact-level and group-level ones, as its body is a hash and holds no {@code
+   * <version>} (RPS-1183).
+   */
+  public static boolean isSnapshotVersionDirectoryFile(final String path) {
+
+    final var segments = path.split("/", -1);
+    final var directoryIndex = segments.length - 2;
+
+    return directoryIndex >= 0 && segments[directoryIndex].endsWith(SNAPSHOT_SUFFIX);
+  }
+
   public static boolean isFileSuitableForGavExtraction(final String fileName) {
 
     // Condition for detection metadata files and metadata hash files.

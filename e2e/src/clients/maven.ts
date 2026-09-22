@@ -29,9 +29,10 @@
  * which the raw probe below and the catalog's pinned statuses depend on: the release/snapshot
  * switches (`releases`/`snapshots`) refuse an upload of that version kind with 403 whether the
  * version is new or already exists; `allowOverride: false` refuses re-uploading an existing file
- * (403), never metadata; a checksum file and the artifact-level/group-level `maven-metadata.xml`
- * carry no version kind and are not judged, while the version-level snapshot metadata is judged by
- * its own `<version>`. A real `mvn deploy` PUTs all artifact files first (pom, jar, each followed by
+ * (403), never metadata; a checksum is judged by the file it belongs to (RPS-1183), and a
+ * metadata checksum by its directory (`g/a/<X-SNAPSHOT>/` is a snapshot); the artifact-level and
+ * group-level `maven-metadata.xml` carry no version kind and are not judged, while the
+ * version-level snapshot metadata is judged by its own `<version>`. A real `mvn deploy` PUTs all artifact files first (pom, jar, each followed by
  * its checksums), then all metadata, and stops at the first refusal, so a refused deploy is refused
  * on its first file and leaves nothing behind.
  *

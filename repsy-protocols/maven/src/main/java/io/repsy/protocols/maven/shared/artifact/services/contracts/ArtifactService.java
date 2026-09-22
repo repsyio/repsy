@@ -32,14 +32,22 @@ public interface ArtifactService<ID> {
   /**
    * Classifies an upload of a file that is not a {@code maven-metadata.xml}.
    *
+   * <p>A checksum is judged by the file it belongs to: it is refused when the path of that file is
+   * not a Maven 2 artifact path, and it carries the version type of that file (RPS-1183).
+   *
    * @throws BadRequestException {@code invalidArtifactPath} when the path is not a Maven 2 artifact
-   *     path (checksums of any path and metadata are not judged here)
+   *     path (metadata is not judged here)
    */
   MutablePair<ArtifactDeployType, ArtifactVersionType> getDeployAndVersionType(
       BaseRepoInfo<ID> repoInfo, StoragePath storagePath);
 
+  /**
+   * Classifies an upload of a {@code maven-metadata.xml} or of one of its checksums. A metadata
+   * checksum holds a hash, not XML, so it is judged by its directory: a file of a {@code SNAPSHOT}
+   * version directory is a snapshot, any other level is not judged (RPS-1183).
+   */
   MutablePair<ArtifactDeployType, ArtifactVersionType> getDeployAndVersionTypesByMetadataTypeFiles(
-      BaseRepoInfo<ID> repoInfo, byte[] content, String fileName)
+      BaseRepoInfo<ID> repoInfo, byte[] content, StoragePath storagePath)
       throws IOException, XmlPullParserException;
 
   void checkDeploymentRules(

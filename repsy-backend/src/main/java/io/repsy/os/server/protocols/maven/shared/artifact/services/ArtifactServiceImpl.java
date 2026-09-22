@@ -109,9 +109,13 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    * is not a Maven 2 artifact path is refused here, before any query and before anything is stored,
    * because every rule (override, releases and snapshots, the artifact rows, the scanner) is keyed
    * on the GAV and a file without one would bypass them all. Sonatype Nexus refuses the same paths
-   * with {@code 400} under its strict layout policy. A checksum of any path is not judged and comes
-   * back without a type. A file in a {@code SNAPSHOT} directory must also carry that directory's
-   * artifactId and base version, literal or timestamped (RPS-1184).
+   * with {@code 400} under its strict layout policy. A file in a {@code SNAPSHOT} directory must
+   * also carry that directory's artifactId and base version, literal or timestamped (RPS-1184).
+   *
+   * <p>A checksum of any path is judged by the file it belongs to: the GAV calculator strips the
+   * checksum suffix, so the layout check, the version type and the override rule of the base file
+   * apply to its {@code .sha1}, {@code .md5}, {@code .sha256} and {@code .sha512} alike (RPS-1183).
+   * Otherwise a checksum would create the directory of a version whose file is refused.
    *
    * @throws BadRequestException {@code invalidArtifactPath} if the path does not parse to a GAV
    */
@@ -119,12 +123,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   public MutablePair<@Nullable ArtifactDeployType, @Nullable ArtifactVersionType>
       getDeployAndVersionType(
           final BaseRepoInfo<UUID> baseRepoInfo, final StoragePath storagePath) {
-
-    final var fileName = storagePath.getRelativePath().getFileName();
-
-    if (ArtifactUtils.isChecksumFile(fileName)) {
-      return new MutablePair<>(null, null);
-    }
 
     final var repoInfo = (RepoInfo) baseRepoInfo;
     final var gav = ArtifactUtils.getGavByFile(storagePath);
@@ -148,15 +146,26 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    * versions of both kinds, and the files of the version they describe were judged by their own
    * GAV, so no version-type rule applies to them. No deploy type is returned for metadata: {@code
    * checkDeploymentRules} does not read it.
+   *
+   * <p>A metadata checksum holds a hash, not XML, so it is never parsed and carries no {@code
+   * <version>}. Its version-level file is recognised by its directory instead ({@code
+   * g/a/<X-SNAPSHOT>/}), the only level a real client writes at version level, and is judged as a
+   * snapshot. A checksum at any other level stays unjudged (RPS-1183).
    */
   @Override
   public MutablePair<@Nullable ArtifactDeployType, @Nullable ArtifactVersionType>
       getDeployAndVersionTypesByMetadataTypeFiles(
-          final BaseRepoInfo<UUID> baseRepoInfo, final byte[] content, final String fileName)
+          final BaseRepoInfo<UUID> baseRepoInfo,
+          final byte[] content,
+          final StoragePath storagePath)
           throws IOException, XmlPullParserException {
 
-    if (ArtifactUtils.isChecksumFile(fileName)) {
-      return new MutablePair<>(null, null);
+    final var relativePath = storagePath.getRelativePath();
+
+    if (ArtifactUtils.isChecksumFile(relativePath.getFileName())) {
+      return new MutablePair<>(
+          null,
+          ArtifactUtils.isSnapshotVersionDirectoryFile(relativePath.getPath()) ? SNAPSHOT : null);
     }
 
     // readMetadata throws for malformed content, it never returns null.
@@ -177,9 +186,12 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    * and {@code snapshots}) applies to new versions and to redeploys alike (RPS-1174), so switching
    * a kind off also stops overwriting the versions of that kind that already exist. It applies to
    * version-level metadata by its {@code <version>}; other metadata carries no version type and is
-   * not judged, and override never applies to metadata. The override rule is checked first for real
-   * artifact files, so {@code artifactOverrideIsProhibited} keeps precedence when both rules would
-   * refuse the upload. The version-type rule does not depend on the path parsing to a GAV.
+   * not judged, and override never applies to metadata. Both rules apply to a checksum as they do
+   * to the file it belongs to (RPS-1183); the override rule looks for the checksum file itself, so
+   * the first checksum of a stored file is not an override and a second upload of it is. The
+   * override rule is checked first for real artifact files, so {@code artifactOverrideIsProhibited}
+   * keeps precedence when both rules would refuse the upload. The version-type rule does not depend
+   * on the path parsing to a GAV.
    */
   @Override
   public void checkDeploymentRules(

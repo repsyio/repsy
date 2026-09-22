@@ -213,6 +213,10 @@ class ArtifactUtilsTest {
         "com/acme/lib/1.0/lib-1.0.klib, com.acme, lib, 1.0, NULL, klib",
         "com/acme/lib/1.0/lib-1.0.jar.asc, com.acme, lib, 1.0, NULL, jar",
         "com/acme/lib/1.0/lib-1.0.jar.asc.sha1, com.acme, lib, 1.0, NULL, jar",
+        "com/acme/lib/1.0/lib-1.0.jar.md5, com.acme, lib, 1.0, NULL, jar",
+        "com/acme/lib/1.0/lib-1.0.module.sha512, com.acme, lib, 1.0, NULL, module",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.jar.sha1, com.acme, lib,"
+            + " 1.0-20260921.101010-1, NULL, jar",
         "com/acme/lib_2.13/1.0/lib_2.13-1.0.jar, com.acme, lib_2.13, 1.0, NULL, jar",
         "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1-sources.jar, com.acme, lib,"
             + " 1.0-20260921.101010-1, sources, jar",
@@ -293,11 +297,26 @@ class ArtifactUtilsTest {
         "com/acme/lib/1.0/jars/lib.jar",
         "com/acme/lib/1.0-SNAPSHOT/stray.txt",
         "com/acme/lib/1.0-SNAPSHOT/b-1.0-SNAPSHOT.jar",
-        "archetype-catalog.xml"
+        "archetype-catalog.xml",
+        "io/stray.txt.sha1",
+        "com/acme/lib/1.0/other-1.0.jar.sha1"
       })
-  @DisplayName("finds no GAV for a path outside the layout")
+  @DisplayName("finds no GAV for a path outside the layout, nor for a checksum of it")
   void noGavOutsideTheLayout(final String path) {
     assertThat(ArtifactUtils.getGavByFile(StoragePath.of(UUID.randomUUID(), path))).isNull();
+  }
+
+  @ParameterizedTest(name = "{0} is in a snapshot version directory: {1}")
+  @CsvSource({
+    "com/acme/lib/1.0-SNAPSHOT/maven-metadata.xml.sha1, true",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar, true",
+    "com/acme/lib/maven-metadata.xml.sha1, false",
+    "com/acme/lib/1.0/maven-metadata.xml.md5, false",
+    "maven-metadata.xml, false"
+  })
+  @DisplayName("tells a file of a SNAPSHOT version directory by its directory (RPS-1183)")
+  void recognisesAFileOfASnapshotVersionDirectory(final String path, final boolean expected) {
+    assertThat(ArtifactUtils.isSnapshotVersionDirectoryFile(path)).isEqualTo(expected);
   }
 
   private static final String POM_PATH_OF_ACME_LIB = "com/acme/lib/1.0/lib-1.0.pom";
