@@ -73,7 +73,8 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * before it is stored, so a refused one never reaches the repo and takes nothing else with it: an
    * existing version, its previous signature and its {@code signed} flag are left as they were. A
    * checksum is judged by the file it belongs to, so it is refused, and nothing is stored, when
-   * that file would be (RPS-1183).
+   * that file would be (RPS-1183). A metadata signature ({@code maven-metadata.xml.asc}) is stored
+   * unparsed and unverified, judged like a metadata checksum (RPS-1185).
    */
   @Override
   public void upload(

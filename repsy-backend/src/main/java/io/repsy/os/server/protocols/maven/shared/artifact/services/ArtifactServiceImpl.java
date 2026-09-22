@@ -147,10 +147,11 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    * GAV, so no version-type rule applies to them. No deploy type is returned for metadata: {@code
    * checkDeploymentRules} does not read it.
    *
-   * <p>A metadata checksum holds a hash, not XML, so it is never parsed and carries no {@code
-   * <version>}. Its version-level file is recognised by its directory instead ({@code
-   * g/a/<X-SNAPSHOT>/}), the only level a real client writes at version level, and is judged as a
-   * snapshot. A checksum at any other level stays unjudged (RPS-1183).
+   * <p>A metadata checksum or signature ({@code .asc}) holds a hash or armored text, not XML, so it
+   * is never parsed and carries no {@code <version>}. Its version-level file is recognised by its
+   * directory instead ({@code g/a/<X-SNAPSHOT>/}), the only level a real client writes at version
+   * level, and is judged as a snapshot. A checksum or signature at any other level stays unjudged
+   * (RPS-1183, RPS-1185).
    */
   @Override
   public MutablePair<@Nullable ArtifactDeployType, @Nullable ArtifactVersionType>
@@ -161,8 +162,9 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
           throws IOException, XmlPullParserException {
 
     final var relativePath = storagePath.getRelativePath();
+    final var fileName = relativePath.getFileName();
 
-    if (ArtifactUtils.isChecksumFile(relativePath.getFileName())) {
+    if (holdsNoXml(fileName)) {
       return new MutablePair<>(
           null,
           ArtifactUtils.isSnapshotVersionDirectoryFile(relativePath.getPath()) ? SNAPSHOT : null);
@@ -179,6 +181,12 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     // Artifact-level and group-level metadata index versions of both kinds. The files of the
     // version they describe were judged by their own GAV, so no rule applies to them.
     return new MutablePair<>(null, ArtifactUtils.isPluginMetadata(metadata) ? PLUGIN : null);
+  }
+
+  /** A metadata checksum holds a hash and a metadata signature armored text: neither is XML. */
+  private static boolean holdsNoXml(final String fileName) {
+
+    return ArtifactUtils.isChecksumFile(fileName) || ArtifactUtils.isMetadataSignature(fileName);
   }
 
   /**

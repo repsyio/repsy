@@ -28,6 +28,8 @@ import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,12 +52,16 @@ import org.springframework.transaction.annotation.Transactional;
  * version-level file returned 200 with snapshots switched off. The artifact-level and group-level
  * files list versions of both kinds and are never judged, and no metadata file is an override.
  *
+ * <p>The {@code .asc} signature of a metadata file is stored unparsed and unverified, and judged
+ * like a metadata checksum: by its directory only (RPS-1185). It used to be parsed as XML and
+ * refused with {@code malformedMetadataFile}.
+ *
  * <p>Each test uploads in the order {@code mvn deploy} does: the artifacts (each followed by its
  * checksums) first, then all the metadata. Runs without a test transaction, like {@link
  * MavenVersionTypeRedeployIT}, and deletes the repos and users it commits.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@DisplayName("Maven metadata classification follows the version-level file (RPS-1176)")
+@DisplayName("Maven metadata classification follows the version-level file (RPS-1176, RPS-1185)")
 class MavenMetadataUploadIT extends AbstractIntegrationTest {
 
   private static final String LIB_DIR = "com/acme/lib/";
@@ -69,6 +75,10 @@ class MavenMetadataUploadIT extends AbstractIntegrationTest {
   private static final String RELEASE_POM = RELEASE_DIR + "lib-1.0.pom";
   private static final String ARTIFACT_METADATA_PATH = LIB_DIR + "maven-metadata.xml";
   private static final String GROUP_METADATA_PATH = "com/acme/maven-metadata.xml";
+  private static final String ARMORED_SIGNATURE =
+      "-----BEGIN PGP SIGNATURE-----\n\n-----END PGP SIGNATURE-----\n";
+  private static final String GARBAGE_SIGNATURE = "not a signature";
+  private static final String HASH = "da39a3ee5e6b4b0d3255bfef95601890afd80709";
 
   private static final String SNAPSHOTS_PROHIBITED =
       "Snapshot versions are prohibited in this repository!";
@@ -363,5 +373,77 @@ class MavenMetadataUploadIT extends AbstractIntegrationTest {
         "malformedMetadataFile",
         MALFORMED_METADATA);
     assertThat(stored(repo, ARTIFACT_METADATA_PATH)).doesNotExist();
+  }
+
+  @Test
+  @DisplayName("a metadata signature is stored unparsed at every level, ahead of its file too")
+  void metadataSignatureIsStoredUnparsedAtEveryLevel() throws Exception {
+    final var repo = this.mavenRepo();
+    final var admin = this.admin();
+    this.settings(repo, admin, true, true, true);
+
+    final var signatures =
+        List.of(
+            GROUP_METADATA_PATH + ".asc",
+            ARTIFACT_METADATA_PATH + ".asc",
+            SNAPSHOT_VERSION_METADATA + ".asc");
+    for (final var path : signatures) {
+      assertThat(this.status(repo, admin, path, ARMORED_SIGNATURE))
+          .as("PUT %s", path)
+          .isEqualTo(200);
+    }
+    // The checksum of a signature is a checksum, whose body is a hash.
+    assertThat(this.status(repo, admin, ARTIFACT_METADATA_PATH + ".asc.sha1", HASH))
+        .as("PUT the checksum of a signature")
+        .isEqualTo(200);
+
+    for (final var path : signatures) {
+      assertThat(Files.readString(stored(repo, path), StandardCharsets.UTF_8))
+          .as("the stored %s", path)
+          .isEqualTo(ARMORED_SIGNATURE);
+    }
+    assertThat(Files.readString(stored(repo, ARTIFACT_METADATA_PATH + ".asc.sha1")))
+        .isEqualTo(HASH);
+    // A signature registers nothing, and it may precede the file it signs.
+    assertThat(this.versionRows(repo, "1.0-SNAPSHOT")).isZero();
+    assertThat(stored(repo, GROUP_METADATA_PATH)).doesNotExist();
+    assertThat(stored(repo, ARTIFACT_METADATA_PATH)).doesNotExist();
+    assertThat(stored(repo, SNAPSHOT_VERSION_METADATA)).doesNotExist();
+  }
+
+  @Test
+  @DisplayName("a version-level metadata signature is refused while snapshots are off")
+  void versionLevelMetadataSignatureIsRefusedWhileSnapshotsAreOff() throws Exception {
+    final var repo = this.mavenRepo();
+    final var admin = this.admin();
+    this.settings(repo, admin, true, false, true);
+
+    expectRefused(
+        this.upload(repo, admin, SNAPSHOT_VERSION_METADATA + ".asc", ARMORED_SIGNATURE),
+        "snapshotVersionsAreProhibited",
+        SNAPSHOTS_PROHIBITED);
+    // The artifact-level file is not judged, and neither is its signature.
+    assertThat(this.status(repo, admin, ARTIFACT_METADATA_PATH + ".asc", ARMORED_SIGNATURE))
+        .isEqualTo(200);
+
+    assertThat(stored(repo, SNAPSHOT_DIR)).doesNotExist();
+    assertThat(stored(repo, ARTIFACT_METADATA_PATH + ".asc")).exists();
+    assertThat(this.versionRows(repo, "1.0-SNAPSHOT")).isZero();
+  }
+
+  @Test
+  @DisplayName("a metadata signature is never an override and is not validated")
+  void metadataSignatureIsNeverAnOverrideAndIsNotValidated() throws Exception {
+    final var repo = this.mavenRepo();
+    final var admin = this.admin();
+    this.settings(repo, admin, true, true, false);
+    final var path = ARTIFACT_METADATA_PATH + ".asc";
+
+    assertThat(this.status(repo, admin, path, ARMORED_SIGNATURE)).isEqualTo(200);
+    // Stored as sent and never verified: RPS-1188 is the story that may change that.
+    assertThat(this.status(repo, admin, path, GARBAGE_SIGNATURE)).isEqualTo(200);
+
+    assertThat(Files.readString(stored(repo, path), StandardCharsets.UTF_8))
+        .isEqualTo(GARBAGE_SIGNATURE);
   }
 }

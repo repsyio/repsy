@@ -42,6 +42,10 @@
  *    whose file was refused (RPS-1183). A metadata checksum is judged by its directory only, as
  *    its body is a hash: `g/a/<X-SNAPSHOT>/maven-metadata.xml.sha1` is a snapshot, the
  *    artifact-level and group-level ones are not judged.
+ *  - The `.asc` signature of a metadata file is stored unparsed and judged like a metadata
+ *    checksum: by its directory only, never verified (RPS-1185). It used to be parsed as XML and
+ *    refused with 400 `malformedMetadataFile`. No official client writes one (maven-gpg-plugin,
+ *    Maven Resolver and Gradle sign artifacts only), but Maven Central serves them.
  *  - A POM signature (`<pom>.asc`) is verified before it is stored, so a refused one answers 422
  *    `artifactSignatureNotVerified` and changes nothing: no file, no row, no other version and no
  *    metadata is removed, and the `.asc` itself is not stored (RPS-1186). It used to be stored
@@ -64,6 +68,7 @@ import {
   adminCredential,
   artifactDir,
   artifactMetadataXml,
+  groupPath,
   minimalPom,
   rawGet,
   rawPut,
@@ -466,6 +471,70 @@ test.describe('maven upload rules (raw HTTP)', () => {
       const jar = `${versionDir(layout.groupId, ARTIFACT_ID, '3.6')}/${ARTIFACT_ID}-3.6.jar`;
       expectPut(await layout.put(`${jar}.sha1`, 'da39', TEXT), 200, undefined, 'checksum first');
       expectPut(await layout.put(jar, 'jar 3.6', OCTET), 200, undefined, 'its file');
+    },
+  );
+
+  test(
+    'a signature of a metadata file is stored unparsed and judged by its directory (RPS-1185)',
+    { tag: ['@settings', '@snapshot', '@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder);
+      await seedBothKinds(layout);
+      const admin = adminCredential();
+      const before = await repoTree(layout.repoName);
+      const groupSignature = `${groupPath(layout.groupId)}/maven-metadata.xml.asc`;
+      const artifactSignature = `${artifactDir(layout.groupId, ARTIFACT_ID)}/maven-metadata.xml.asc`;
+      const snapshotSignature = `${versionDir(layout.groupId, ARTIFACT_ID, SNAPSHOT)}/maven-metadata.xml.asc`;
+      const signatureChecksum = `${artifactSignature}.sha1`;
+
+      // With everything allowed, a signature of a metadata file is stored at every level, as sent,
+      // and so is the checksum of a signature. The body is armored text, not XML.
+      for (const path of [groupSignature, artifactSignature, snapshotSignature]) {
+        expectPut(await layout.put(path, ARMOR_ONLY, OCTET), 200, undefined, `signature ${path}`);
+      }
+      expectPut(
+        await layout.put(signatureChecksum, 'da39', TEXT),
+        200,
+        undefined,
+        'checksum of a metadata signature',
+      );
+      const stored = await rawGet(layout.repoName, admin, artifactSignature);
+      expect(stored.status, `GET ${artifactSignature} answered ${stored.status}`).toBe(200);
+      expect(stored.body.toString('utf8')).toBe(ARMOR_ONLY);
+      const afterSignatures = {
+        ...before,
+        [groupSignature]: sha256Hex(ARMOR_ONLY),
+        [artifactSignature]: sha256Hex(ARMOR_ONLY),
+        [snapshotSignature]: sha256Hex(ARMOR_ONLY),
+        [signatureChecksum]: sha256Hex('da39'),
+      };
+      expect(await repoTree(layout.repoName)).toEqual(afterSignatures);
+
+      // snapshots:false refuses the version-level one, by its directory. The artifact-level one is
+      // not judged, is never an override (allowOverride:false) and is not validated: a body that
+      // is no signature at all replaces the previous one.
+      await seeder.setSettings(layout.repoName, {
+        privateRepo: true,
+        allowOverride: false,
+        releases: true,
+        snapshots: false,
+      });
+      expectPut(
+        await layout.put(snapshotSignature, ARMOR_ONLY, OCTET),
+        403,
+        'snapshotVersionsAreProhibited',
+        'signature of the version-level snapshot metadata',
+      );
+      expectPut(
+        await layout.put(artifactSignature, 'not a signature', OCTET),
+        200,
+        undefined,
+        'signature of the artifact-level metadata, not an override',
+      );
+      expect(await repoTree(layout.repoName)).toEqual({
+        ...afterSignatures,
+        [artifactSignature]: sha256Hex('not a signature'),
+      });
     },
   );
 

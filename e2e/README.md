@@ -201,7 +201,10 @@ What the server does, per rule (all pinned above or in `tests/maven/upload-rules
   the override rule apply to it as to that file, so it no longer creates the directory of a version
   whose file is refused. A metadata checksum holds a hash, not XML, so it is judged by its
   directory: `g/a/<X-SNAPSHOT>/maven-metadata.xml.sha1` is a snapshot; the artifact-level and
-  group-level ones are not judged.
+  group-level ones are not judged. The same holds for the `.asc` signature of a metadata file
+  (`maven-metadata.xml.asc`, which no official client writes but Maven Central serves): it is
+  stored unparsed, judged only by its directory and not verified (RPS-1185); it used to answer
+  `400 malformedMetadataFile`.
 - **`allowOverride: false`** refuses re-uploading a file that already exists
   (`403 artifactOverrideIsProhibited`) and never judges metadata. A normal SNAPSHOT redeploy writes
   new timestamped files and re-uploads the metadata, so it **succeeds** under `allowOverride: false`

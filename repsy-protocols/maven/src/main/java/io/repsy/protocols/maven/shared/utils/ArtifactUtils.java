@@ -288,7 +288,8 @@ public class ArtifactUtils {
 
   /**
    * Tells whether the path is the {@code .asc} signature of a POM: a {@code .pom} path that ends in
-   * {@code .asc}. It is the one kind of signature the artifact service verifies.
+   * {@code .asc}. It is the one kind of signature the artifact service verifies. A metadata
+   * signature is not one: its path carries no {@code .pom}.
    */
   public static boolean isPomSignature(final StoragePath storagePath) {
 
@@ -370,6 +371,20 @@ public class ArtifactUtils {
   }
 
   /**
+   * Tells the detached PGP signature of a {@code maven-metadata.xml}: {@code
+   * maven-metadata.xml.asc} at any level. No official client writes one (maven-gpg-plugin, Maven
+   * Resolver and Gradle sign artifacts only), but Maven Central serves them and Nexus stores them
+   * as a subordinate of the metadata, like a checksum. Its body is armored text, not XML, so it is
+   * never parsed and is judged by its directory like a metadata checksum (RPS-1185). A checksum of
+   * it ({@code .asc.sha1}) is a checksum. The suffix is matched case-sensitively like {@link
+   * #isPomSignature}.
+   */
+  public static boolean isMetadataSignature(final String fileName) {
+
+    return containsIgnoreCase(fileName, METADATA_FILENAME) && fileName.endsWith(SIGNED_POM_SUFFIX);
+  }
+
+  /**
    * Tells whether a file sits in a {@code SNAPSHOT} version directory: the second-to-last segment
    * of the path ends with {@code SNAPSHOT}, the same rule as {@code isSnapshotFileOfItsDirectory}
    * and the GAV calculator's. It is how a version-level {@code maven-metadata.xml} checksum is told
@@ -386,7 +401,7 @@ public class ArtifactUtils {
 
   public static boolean isFileSuitableForGavExtraction(final String fileName) {
 
-    // Condition for detection metadata files and metadata hash files.
+    // Condition for detection metadata files, their checksums and their signatures.
     if (ArtifactUtils.containsIgnoreCase(fileName, METADATA_FILENAME)) {
       return isSnapshot(fileName);
     }
