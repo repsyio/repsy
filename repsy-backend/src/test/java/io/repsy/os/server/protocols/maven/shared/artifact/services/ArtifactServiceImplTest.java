@@ -45,6 +45,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactR
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionDeveloperRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionLicenseRepository;
+import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -660,14 +661,15 @@ class ArtifactServiceImplTest {
     when(this.storageStrategy.get(pathOf("com/acme/lib/1.0/lib-1.0.pom"), eq("mvn")))
         .thenReturn(Optional.of(pom));
     this.stubVersion(this.stubArtifact(id), "1.0", true);
-    when(this.keyStoreService.findHostsByRepoId(id)).thenReturn(List.of("keys.acme.com"));
+    final var sources = new PublicKeySources(List.of(), List.of("keys.acme.com"));
+    when(this.keyStoreService.findPublicKeySources(id)).thenReturn(sources);
 
     this.artifactService.verifySignature(
         repo(id, true, true, true),
         StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
         signature);
 
-    verify(this.pgpVerifierService).verify(pom, signature, List.of("keys.acme.com"));
+    verify(this.pgpVerifierService).verify(pom, signature, sources);
   }
 
   @Test
@@ -679,10 +681,11 @@ class ArtifactServiceImplTest {
     when(this.storageStrategy.get(pathOf("com/acme/lib/1.0/lib-1.0.pom"), eq("mvn")))
         .thenReturn(Optional.of(pom));
     this.stubVersion(this.stubArtifact(id), "1.0", true);
-    when(this.keyStoreService.findHostsByRepoId(id)).thenReturn(List.of());
+    final var sources = PublicKeySources.none();
+    when(this.keyStoreService.findPublicKeySources(id)).thenReturn(sources);
     doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
         .when(this.pgpVerifierService)
-        .verify(pom, signature, List.of());
+        .verify(pom, signature, sources);
 
     assertThatThrownBy(
             () ->
@@ -759,14 +762,15 @@ class ArtifactServiceImplTest {
     final var pom = this.stubStoredPom("com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.pom");
     final var signature = new ByteArrayResource(new byte[0]);
     this.stubVersion(this.stubArtifact(id), "1.0-SNAPSHOT", true);
-    when(this.keyStoreService.findHostsByRepoId(id)).thenReturn(List.of());
+    final var sources = PublicKeySources.none();
+    when(this.keyStoreService.findPublicKeySources(id)).thenReturn(sources);
 
     this.artifactService.verifySignature(
         repo(id, true, true, true),
         StoragePath.of(id, "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.pom.asc"),
         signature);
 
-    verify(this.pgpVerifierService).verify(pom, signature, List.of());
+    verify(this.pgpVerifierService).verify(pom, signature, sources);
   }
 
   @Test

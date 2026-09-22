@@ -20,9 +20,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
+import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
@@ -32,6 +35,11 @@ import java.util.function.Function;
 import org.bouncycastle.bcpg.ArmoredOutputStream;
 import org.bouncycastle.bcpg.CompressionAlgorithmTags;
 import org.bouncycastle.openpgp.PGPCompressedDataGenerator;
+import org.bouncycastle.openpgp.PGPException;
+import org.bouncycastle.openpgp.PGPPublicKeyRing;
+import org.bouncycastle.openpgp.PGPPublicKeyRingCollection;
+import org.bouncycastle.openpgp.PGPUtil;
+import org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,7 +58,8 @@ import reactor.core.publisher.Mono;
  * that is an in-memory exchange function (no network). RPS-1186: a refused signature answers the
  * fixed {@code artifactSignatureNotVerified} id, not the BouncyCastle text. RPS-1191: so does a
  * body that is not an OpenPGP signature at all (invalid armor, a bad CRC, binary garbage), which
- * BouncyCastle reports as an {@code IOException} and which used to answer 500.
+ * BouncyCastle reports as an {@code IOException} and which used to answer 500. RPS-1189: a repo's
+ * registered public keys (see {@link PublicKeySources}) are tried before any key server.
  */
 @DisplayName("PGPVerifierService")
 class PGPVerifierServiceTest {
@@ -58,6 +67,7 @@ class PGPVerifierServiceTest {
   private static final byte[] POM = "<project>lib 1.0</project>".getBytes(UTF_8);
   private static final byte[] OTHER_POM = "<project>lib 2.0</project>".getBytes(UTF_8);
   private static final String NOT_VERIFIED = "artifactSignatureNotVerified";
+  private static final String INVALID_KEY = "pgpPublicKeyInvalid";
 
   private static PgpTestKeys keys;
 
@@ -99,13 +109,28 @@ class PGPVerifierServiceTest {
     return new ByteArrayResource(text.getBytes(UTF_8));
   }
 
+  /** No registered keys, no custom hosts: only the (faked) default key servers are asked. */
+  private static PublicKeySources noRegisteredKeys() {
+    return PublicKeySources.none();
+  }
+
+  private static PublicKeySources hosts(final String... hosts) {
+    return new PublicKeySources(List.of(), List.of(hosts));
+  }
+
+  private static PublicKeySources registeredKeys(final String... armoredKeys) {
+    return new PublicKeySources(List.of(armoredKeys), List.of());
+  }
+
   @Test
   @DisplayName("accepts the detached signature of the stored file")
   void verifiesADetachedSignatureOfTheStoredFile() {
     final var signature = resource(keys.detachedSignature(POM));
 
     assertThatCode(
-            () -> this.serviceWithTheKey().verify(new ByteArrayResource(POM), signature, null))
+            () ->
+                this.serviceWithTheKey()
+                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
         .doesNotThrowAnyException();
   }
 
@@ -115,7 +140,9 @@ class PGPVerifierServiceTest {
     final var signature = resource(keys.detachedSignature(OTHER_POM));
 
     assertThatThrownBy(
-            () -> this.serviceWithTheKey().verify(new ByteArrayResource(POM), signature, null))
+            () ->
+                this.serviceWithTheKey()
+                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
   }
@@ -126,7 +153,10 @@ class PGPVerifierServiceTest {
     assertThatThrownBy(
             () ->
                 this.serviceWithTheKey()
-                    .verify(new ByteArrayResource(POM), new ByteArrayResource(new byte[0]), null))
+                    .verify(
+                        new ByteArrayResource(POM),
+                        new ByteArrayResource(new byte[0]),
+                        noRegisteredKeys()))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
 
@@ -141,7 +171,10 @@ class PGPVerifierServiceTest {
     assertThatThrownBy(
             () ->
                 this.serviceWithTheKey()
-                    .verify(new ByteArrayResource(POM), publicKeyInsteadOfSignature, null))
+                    .verify(
+                        new ByteArrayResource(POM),
+                        publicKeyInsteadOfSignature,
+                        noRegisteredKeys()))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
 
@@ -151,7 +184,9 @@ class PGPVerifierServiceTest {
   /** Asserts that the check refuses these bytes as {@code artifactSignatureNotVerified}. */
   private void assertRefusedWithoutAskingAKeyServer(final Resource signature) {
     assertThatThrownBy(
-            () -> this.serviceWithTheKey().verify(new ByteArrayResource(POM), signature, null))
+            () ->
+                this.serviceWithTheKey()
+                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
 
@@ -250,7 +285,9 @@ class PGPVerifierServiceTest {
     final var signature = resource(String.join("\n", lines) + "\n");
 
     assertThatCode(
-            () -> this.serviceWithTheKey().verify(new ByteArrayResource(POM), signature, null))
+            () ->
+                this.serviceWithTheKey()
+                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
         .doesNotThrowAnyException();
   }
 
@@ -262,7 +299,7 @@ class PGPVerifierServiceTest {
     assertThatThrownBy(
             () ->
                 this.serviceAnswering(uri -> notFound())
-                    .verify(new ByteArrayResource(POM), signature, List.of("keys.acme.com")))
+                    .verify(new ByteArrayResource(POM), signature, hosts("keys.acme.com")))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("no public key found with Id %016X".formatted(keys.keyId()));
 
@@ -288,7 +325,7 @@ class PGPVerifierServiceTest {
                     new ByteArrayResource(POM),
                     signature,
                     // A scheme or a path in the stored host is dropped, only the host is used.
-                    List.of("keys.acme.com", "https://mirror.acme.com/somewhere")))
+                    hosts("keys.acme.com", "https://mirror.acme.com/somewhere")))
         .doesNotThrowAnyException();
 
     assertThat(this.asked).extracting(URI::toString).containsExactly(acme, mirror);
@@ -304,7 +341,7 @@ class PGPVerifierServiceTest {
             uri -> uri.getHost().equals("keys.acme.com") ? notFound() : keyResponse());
 
     assertThatCode(
-            () -> service.verify(new ByteArrayResource(POM), signature, List.of("keys.acme.com")))
+            () -> service.verify(new ByteArrayResource(POM), signature, hosts("keys.acme.com")))
         .doesNotThrowAnyException();
 
     assertThat(this.asked.getFirst().getHost()).isEqualTo("keys.acme.com");
@@ -325,7 +362,185 @@ class PGPVerifierServiceTest {
                                 .header(HttpHeaders.CONTENT_TYPE, "text/plain")
                                 .body("<html>not a key</html>")
                                 .build())
-                    .verify(new ByteArrayResource(POM), signature, null))
+                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
         .isInstanceOf(ItemNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("a registered key verifies a real signature and asks no key server (RPS-1189)")
+  void aRegisteredKeyVerifiesWithoutAskingAKeyServer() {
+    final var signature = resource(keys.detachedSignature(POM));
+
+    assertThatCode(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(keys.armoredPublicKey())))
+        .doesNotThrowAnyException();
+
+    assertThat(this.asked).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a signature by a different key falls through to the key servers and verifies there")
+  void aSignatureByADifferentKeyFallsThroughToKeyServers() {
+    final var otherKeys = PgpTestKeys.generate();
+    final var signature = resource(otherKeys.detachedSignature(POM));
+
+    assertThatCode(
+            () ->
+                this.serviceAnswering(uri -> keyResponse(otherKeys))
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(keys.armoredPublicKey())))
+        .doesNotThrowAnyException();
+
+    // The registered key does not match, so the lookup falls through to the (faked) default key
+    // servers; the first one answers with the right key, so it stops there.
+    assertThat(this.asked).hasSize(1);
+  }
+
+  private static ClientResponse keyResponse(final PgpTestKeys of) {
+    return ClientResponse.create(HttpStatus.OK)
+        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+        .body(of.armoredPublicKey())
+        .build();
+  }
+
+  @Test
+  @DisplayName("a registered key with the wrong bytes signed is refused, no server is asked")
+  void aRegisteredKeyWithWrongBytesSignedIsRefused() {
+    final var signature = resource(keys.detachedSignature(OTHER_POM));
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(keys.armoredPublicKey())))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
+
+    assertThat(this.asked).isEmpty();
+  }
+
+  @Test
+  @DisplayName("two registered keys: the second one matches")
+  void twoRegisteredKeysTheSecondMatches() {
+    final var otherKeys = PgpTestKeys.generate();
+    final var signature = resource(otherKeys.detachedSignature(POM));
+
+    assertThatCode(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(keys.armoredPublicKey(), otherKeys.armoredPublicKey())))
+        .doesNotThrowAnyException();
+
+    assertThat(this.asked).isEmpty();
+  }
+
+  @Test
+  @DisplayName("one malformed registered key string is skipped, a second good one still verifies")
+  void oneMalformedRegisteredKeyIsSkipped() {
+    final var signature = resource(keys.detachedSignature(POM));
+
+    assertThatCode(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys("not a key at all", keys.armoredPublicKey())))
+        .doesNotThrowAnyException();
+
+    assertThat(this.asked).isEmpty();
+  }
+
+  @Test
+  @DisplayName("parseArmoredPublicKey reads the primary key's id, a 40 hex char fingerprint")
+  void parseArmoredPublicKeyReadsTheIdentity() {
+    final var parsed = PGPVerifierService.parseArmoredPublicKey(keys.armoredPublicKey());
+
+    assertThat(parsed.keyIdHex()).isEqualTo("%016X".formatted(keys.keyId()));
+    assertThat(parsed.fingerprintHex()).hasSize(40).matches("[0-9A-F]{40}");
+  }
+
+  @Test
+  @DisplayName("parseArmoredPublicKey refuses plain text")
+  void parseArmoredPublicKeyRefusesPlainText() {
+    assertThatThrownBy(() -> PGPVerifierService.parseArmoredPublicKey("hello"))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage(INVALID_KEY);
+  }
+
+  @Test
+  @DisplayName("parseArmoredPublicKey refuses a signature block")
+  void parseArmoredPublicKeyRefusesASignatureBlock() {
+    assertThatThrownBy(() -> PGPVerifierService.parseArmoredPublicKey(keys.detachedSignature(POM)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage(INVALID_KEY);
+  }
+
+  @Test
+  @DisplayName("parseArmoredPublicKey refuses a private-key block")
+  void parseArmoredPublicKeyRefusesAPrivateKeyBlock() {
+    final var privateKeyArmor =
+        "-----BEGIN PGP PRIVATE KEY BLOCK-----\n\n" + keys.armoredPublicKey();
+
+    assertThatThrownBy(() -> PGPVerifierService.parseArmoredPublicKey(privateKeyArmor))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage(INVALID_KEY);
+  }
+
+  @Test
+  @DisplayName("parseArmoredPublicKey refuses a block holding two rings")
+  void parseArmoredPublicKeyRefusesTwoRings() throws Exception {
+    final var otherKeys = PgpTestKeys.generate();
+    final var twoRings = twoKeyRingArmor(keys, otherKeys);
+
+    assertThatThrownBy(() -> PGPVerifierService.parseArmoredPublicKey(twoRings))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage(INVALID_KEY);
+  }
+
+  /**
+   * A single armored block holding both keys' rings, the way {@code gpg --export --armor} would
+   * export a keyring of two keys (one ASCII-armored block wrapping every key's binary packets, not
+   * two armored blocks concatenated: {@link org.bouncycastle.openpgp.PGPPublicKeyRingCollection}
+   * only reads the first armor block of a stream, so simply concatenating two exports would only
+   * ever be read as the first key).
+   */
+  private static String twoKeyRingArmor(final PgpTestKeys a, final PgpTestKeys b)
+      throws IOException, PGPException {
+
+    final var collection =
+        new PGPPublicKeyRingCollection(
+            List.of(singleRingOf(a.armoredPublicKey()), singleRingOf(b.armoredPublicKey())));
+
+    final var bytes = new ByteArrayOutputStream();
+
+    try (final var armored = new ArmoredOutputStream(bytes)) {
+      collection.encode(armored);
+    }
+
+    return bytes.toString(UTF_8);
+  }
+
+  private static PGPPublicKeyRing singleRingOf(final String armored)
+      throws IOException, PGPException {
+
+    try (final var ds =
+        PGPUtil.getDecoderStream(new ByteArrayInputStream(armored.getBytes(UTF_8)))) {
+      final var collection = new PGPPublicKeyRingCollection(ds, new JcaKeyFingerprintCalculator());
+
+      return collection.getKeyRings().next();
+    }
   }
 }

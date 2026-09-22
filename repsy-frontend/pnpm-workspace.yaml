@@ -1,0 +1,18 @@
+# pnpm 12's approval gate for dependency install scripts (see the "--ignore-scripts" comment on
+# the frontend-build stage in the root Dockerfile, and e2e/pnpm-workspace.yaml for the same choice
+# made there). None of these scripts are needed for this stage's one-shot `pnpm run build:prod`:
+#   - @openapitools/openapi-generator-cli: its postinstall downloads the generator JAR; the
+#     Dockerfile pre-seeds it from the `openapi-jar` build stage instead, so the download is never
+#     reached.
+#   - esbuild: its postinstall only picks the right platform binary, which it also ships as a
+#     resolved optionalDependency package, so skipping the script does not break it (same finding
+#     as e2e's).
+#   - @parcel/watcher, lmdb, msgpackr-extract: back Angular CLI's file watcher and persistent build
+#     cache, used for repeated/incremental builds and `ng serve`. A one-shot `build:prod` needs
+#     neither.
+allowBuilds:
+  "@openapitools/openapi-generator-cli": false
+  esbuild: false
+  "@parcel/watcher": false
+  lmdb: false
+  msgpackr-extract: false

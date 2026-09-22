@@ -16,15 +16,20 @@
 package io.repsy.os.server.protocols;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.H2IntegrationTest;
+import io.repsy.os.generated.model.PgpPublicKeyForm;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrateIndex;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateIndexRepository;
+import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.os.shared.repo.mappers.RepoConverter;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
@@ -39,6 +44,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 
 /** Regression coverage for JSON-typed entity fields on H2's CLOB columns (RPS-957). */
 @DisplayName("JSON persistence on embedded H2")
@@ -50,6 +56,8 @@ class H2JsonPersistenceIT extends H2IntegrationTest {
   @Autowired private NuGetPackageService<UUID> nuGetPackageService;
   @Autowired private CargoCrateService<UUID> cargoCrateService;
   @Autowired private CargoCrateIndexRepository cargoCrateIndexRepository;
+  @Autowired private KeyStoreService keyStoreService;
+  @Autowired private RepoConverter repoConverter;
 
   @Test
   @DisplayName("publishes and reads NuGet dependency JSON")
@@ -121,6 +129,23 @@ class H2JsonPersistenceIT extends H2IntegrationTest {
     assertThat(stored.getFeatures()).contains("default");
     assertThat(stored.getFeatures2()).contains("serde");
     assertThat(this.cargoCrateService.getIndexEntries(info, "h2-crate")).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("registers and lists a PGP public key on embedded H2 (RPS-1189, V0019)")
+  void registersAndListsAPgpPublicKeyOnH2() {
+    final var repo = this.repo(RepoType.MAVEN, "h2mvnkeys");
+    final var repoInfo = this.repoConverter.toRepoInfo(repo);
+    final var armoredKey = PgpTestKeys.generate().armoredPublicKey();
+    final var form = new PgpPublicKeyForm().armoredKey(armoredKey);
+
+    assertThatCode(() -> this.keyStoreService.createPublicKey(repoInfo, form))
+        .doesNotThrowAnyException();
+
+    final var page = this.keyStoreService.findAllPublicKeys(repoInfo, PageRequest.of(0, 10));
+
+    assertThat(page.getTotalElements()).isEqualTo(1);
+    assertThat(page.getContent().getFirst().getFingerprint()).hasSize(40);
   }
 
   private Repo repo(final RepoType type, final String name) {

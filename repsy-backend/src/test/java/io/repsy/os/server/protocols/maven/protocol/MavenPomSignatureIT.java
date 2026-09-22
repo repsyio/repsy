@@ -19,6 +19,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mockingDetails;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
@@ -37,8 +38,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +57,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * RPS-1186: the signature of a POM ({@code .pom.asc}) is verified before it is stored, so a refused
@@ -105,6 +110,9 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
 
   private static final String NOT_VERIFIED = "artifactSignatureNotVerified";
 
+  /** How many requests {@link #keyServer} has answered, reset in {@link #resetKeyServerCalls}. */
+  private static final AtomicInteger KEY_SERVER_REQUESTS = new AtomicInteger();
+
   /**
    * Replaces the key-server client of {@code PGPVerifierWebClientConfig}, see {@link #keyServer}.
    */
@@ -115,6 +123,7 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private MavenStorageService mavenStorageService;
+  @Autowired private ObjectMapper objectMapper;
 
   private final List<UUID> createdRepoIds = new ArrayList<>();
   private final List<UUID> createdUserIds = new ArrayList<>();
@@ -124,13 +133,21 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
   static WebClient keyServer() {
     return WebClient.builder()
         .exchangeFunction(
-            request ->
-                Mono.just(
-                    ClientResponse.create(HttpStatus.OK)
-                        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
-                        .body(KEYS.armoredPublicKey())
-                        .build()))
+            request -> {
+              KEY_SERVER_REQUESTS.incrementAndGet();
+
+              return Mono.just(
+                  ClientResponse.create(HttpStatus.OK)
+                      .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+                      .body(KEYS.armoredPublicKey())
+                      .build());
+            })
         .build();
+  }
+
+  @BeforeEach
+  void resetKeyServerCalls() {
+    KEY_SERVER_REQUESTS.set(0);
   }
 
   @AfterEach
@@ -180,6 +197,25 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
     assertThat(this.upload(repo, admin, path, body).andReturn().getResponse().getStatus())
         .as("PUT %s", path)
         .isEqualTo(200);
+  }
+
+  /** Registers {@code keys}' public key directly on {@code repo}'s key store (RPS-1189). */
+  private void registerPublicKey(final Repo repo, final User admin, final PgpTestKeys keys)
+      throws Exception {
+    final var body =
+        this.objectMapper.writeValueAsString(Map.of("armoredKey", keys.armoredPublicKey()));
+
+    final var result =
+        this.mockMvc
+            .perform(
+                post("/api/mvn/key-stores/" + repo.getName() + "/public-keys")
+                    .with(apiPort())
+                    .header(AUTHORIZATION, this.bearerTokenFor(admin))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body))
+            .andReturn();
+
+    assertThat(result.getResponse().getStatus()).as("register public key").isEqualTo(200);
   }
 
   private static byte[] pom(final String version) {
@@ -389,6 +425,64 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
     assertThat(stored(repo, RELEASE_ASC)).doesNotExist();
     assertThat(Files.readAllBytes(stored(repo, RELEASE_POM))).isEqualTo(pom);
     assertThat(this.signedOf(repo, "lib", "1.0")).containsExactly(false);
+  }
+
+  @Test
+  @DisplayName("a signature by a REGISTERED key verifies with zero key-server requests (RPS-1189)")
+  void aSignatureByARegisteredKeyVerifiesWithoutAskingTheKeyServer() throws Exception {
+    final var repo = this.mavenRepo(false);
+    final var admin = this.admin();
+    final var registeredKeys = PgpTestKeys.generate();
+    this.registerPublicKey(repo, admin, registeredKeys);
+    final var pom = pom("1.0");
+    final var signature = registeredKeys.detachedSignature(pom).getBytes(UTF_8);
+    this.uploadOk(repo, admin, RELEASE_POM, pom);
+
+    this.uploadOk(repo, admin, RELEASE_ASC, signature);
+
+    assertThat(Files.readAllBytes(stored(repo, RELEASE_ASC))).isEqualTo(signature);
+    assertThat(this.signedOf(repo, "lib", "1.0")).containsExactly(true);
+    assertThat(KEY_SERVER_REQUESTS.get()).isZero();
+  }
+
+  @Test
+  @DisplayName("a bad signature by a registered key is refused with 422, nothing stored")
+  void aBadSignatureByARegisteredKeyIsRefused() throws Exception {
+    final var repo = this.mavenRepo(false);
+    final var admin = this.admin();
+    final var registeredKeys = PgpTestKeys.generate();
+    this.registerPublicKey(repo, admin, registeredKeys);
+    final var pom = pom("1.0");
+    this.uploadOk(repo, admin, RELEASE_POM, pom);
+    final var badSignature =
+        registeredKeys.detachedSignature(("not " + new String(pom, UTF_8)).getBytes(UTF_8));
+
+    expectSignatureRefused(this.upload(repo, admin, RELEASE_ASC, badSignature.getBytes(UTF_8)));
+
+    assertThat(stored(repo, RELEASE_ASC)).doesNotExist();
+    assertThat(this.signedOf(repo, "lib", "1.0")).containsExactly(false);
+    assertThat(KEY_SERVER_REQUESTS.get()).isZero();
+  }
+
+  @Test
+  @DisplayName("a key registered on one repo does not verify a signature on a different repo")
+  void aKeyRegisteredOnOneRepoDoesNotVerifyAnotherRepo() throws Exception {
+    final var repoA = this.mavenRepo(false);
+    final var repoB = this.mavenRepo(false);
+    final var admin = this.admin();
+    final var registeredKeys = PgpTestKeys.generate();
+    this.registerPublicKey(repoA, admin, registeredKeys);
+    final var pom = pom("1.0");
+    this.uploadOk(repoB, admin, RELEASE_POM, pom);
+    final var signature = registeredKeys.detachedSignature(pom).getBytes(UTF_8);
+
+    // repoB does not have registeredKeys, and the faked key server only knows KEYS, so it 404s.
+    assertThat(
+            this.upload(repoB, admin, RELEASE_ASC, signature).andReturn().getResponse().getStatus())
+        .isEqualTo(404);
+
+    assertThat(stored(repoB, RELEASE_ASC)).doesNotExist();
+    assertThat(this.signedOf(repoB, "lib", "1.0")).containsExactly(false);
   }
 
   @Test

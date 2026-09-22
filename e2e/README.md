@@ -59,6 +59,7 @@ e2e/
       exec.ts                   # execa wrapper: isolated work dir/HOME, redacted logs, attach-on-fail
       maven.ts                  # the maven adapter: publish()/resolve(), raw-HTTP status pinning
       maven-raw.ts              # raw PUT/GET, repo-tree fingerprint, maven-metadata.xml builders/parsers
+      pgp.ts                    # real OpenPGP.js key generation and detached signing, no gpg/network
     packages/
       maven/                    # mustache templates of the tiny jar project + settings.xml
   tests/
@@ -66,6 +67,7 @@ e2e/
     maven/
       publish-consume.spec.ts   # the scenario loop for maven
       upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules
+      pgp-signature.spec.ts     # registered PGP public keys (RPS-1189): verify, reject, isolate, delete
       remote-throttle.spec.ts   # sanity check of RemoteAuthBudget/withBackoff429, no server needed
 ```
 

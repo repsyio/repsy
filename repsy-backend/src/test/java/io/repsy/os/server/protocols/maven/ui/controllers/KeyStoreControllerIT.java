@@ -26,28 +26,34 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.PagingAssertions;
+import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.AllowedKeyserver;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.AllowedKeyserverRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.KeyStoreRepository;
+import io.repsy.os.server.protocols.maven.shared.keystore.repositories.PgpPublicKeyRepository;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
+import tools.jackson.databind.ObjectMapper;
 
 /** Full-stack integration tests for the Maven key-store API. */
 @DisplayName("KeyStoreController /api/mvn/key-stores/*")
@@ -61,6 +67,8 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
   @Autowired private RepoTxService repoTxService;
   @Autowired private AllowedKeyserverRepository allowedKeyserverRepository;
   @Autowired private KeyStoreRepository keyStoreRepository;
+  @Autowired private PgpPublicKeyRepository pgpPublicKeyRepository;
+  @Autowired private ObjectMapper objectMapper;
 
   private static String unique(final String prefix) {
     return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
@@ -424,6 +432,271 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
       assertThat(malformed.getResponse().getStatus()).isEqualTo(400);
       assertError(malformed.getResponse().getContentAsString(), "validationError");
     }
+  }
+
+  @Nested
+  @DisplayName("repository PGP public keys (RPS-1189)")
+  class PublicKeys {
+
+    // PgpTestKeys carries no OpenPGP user id packet, so a created item's "userId" is always null
+    // and the envelope omits it (JSON omits nulls throughout this API), never listed here.
+    private static final String[] PGP_PUBLIC_KEY_KEYS = {"id", "keyId", "fingerprint", "createdAt"};
+
+    private String armoredKeyBody(final String armoredKey) throws Exception {
+      return KeyStoreControllerIT.this.objectMapper.writeValueAsString(
+          Map.of("armoredKey", armoredKey));
+    }
+
+    private ResultActions createPublicKey(final Repo repo, final String token, final String body)
+        throws Exception {
+      return KeyStoreControllerIT.this.mockMvc.perform(
+          post("/api/mvn/key-stores/" + repo.getName() + "/public-keys")
+              .with(apiPort())
+              .header(AUTHORIZATION, token)
+              .contentType(MediaType.APPLICATION_JSON)
+              .content(body));
+    }
+
+    private ResultActions listPublicKeys(final Repo repo, final String token) throws Exception {
+      return KeyStoreControllerIT.this.mockMvc.perform(
+          get("/api/mvn/key-stores/" + repo.getName() + "/public-keys")
+              .with(apiPort())
+              .header(AUTHORIZATION, token)
+              .param("page", "0")
+              .param("size", "10"));
+    }
+
+    private ResultActions deletePublicKey(final Repo repo, final String token, final UUID id)
+        throws Exception {
+      return KeyStoreControllerIT.this.mockMvc.perform(
+          delete("/api/mvn/key-stores/" + repo.getName() + "/public-keys/" + id)
+              .with(apiPort())
+              .header(AUTHORIZATION, token));
+    }
+
+    @Test
+    void createsListsAndDeletesPublicKeysWithCompleteJson() throws Exception {
+      final var repo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
+      final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
+      final var key = PgpTestKeys.generate();
+
+      final var createdResult =
+          this.createPublicKey(repo, token, this.armoredKeyBody(key.armoredPublicKey()))
+              .andExpect(status().isOk())
+              .andReturn();
+      final var created = createdResult.getResponse().getContentAsString();
+      assertSuccess(created, "pgpPublicKeyCreated");
+      final Map<String, Object> data = JsonPath.read(created, "$.data");
+      assertThat(data).containsOnlyKeys(PGP_PUBLIC_KEY_KEYS);
+      assertThat((String) data.get("keyId")).isEqualTo("%016X".formatted(key.keyId()));
+      assertThat((String) data.get("id")).matches(UUID_PATTERN);
+      assertThat(data.get("userId")).isNull();
+
+      final var row =
+          KeyStoreControllerIT.this.pgpPublicKeyRepository.findAll().stream()
+              .filter(k -> k.getId().toString().equals(data.get("id")))
+              .findFirst()
+              .orElseThrow();
+      assertThat(row.getFingerprint()).isEqualTo(data.get("fingerprint"));
+
+      final var listed =
+          this.listPublicKeys(repo, token)
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      assertSuccess(listed, "pgpPublicKeysFetched");
+      final Map<String, Object> listedData = JsonPath.read(listed, "$.data");
+      assertThat(listedData).containsKeys(PAGE_KEYS);
+      final List<Map<String, Object>> content = JsonPath.read(listed, "$.data.content");
+      assertThat(content).hasSize(1);
+      assertThat(content.getFirst()).containsOnlyKeys(PGP_PUBLIC_KEY_KEYS);
+
+      final var deleted =
+          this.deletePublicKey(repo, token, row.getId())
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      assertSuccess(deleted, "pgpPublicKeyDeleted");
+      assertThat(KeyStoreControllerIT.this.pgpPublicKeyRepository.findById(row.getId())).isEmpty();
+    }
+
+    @Test
+    void rejectsADuplicateFingerprintOnTheSameRepoButAllowsItOnAnother() throws Exception {
+      final var repo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
+      final var otherRepo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
+      final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
+      final var key = PgpTestKeys.generate();
+      final var body = this.armoredKeyBody(key.armoredPublicKey());
+
+      this.createPublicKey(repo, token, body).andExpect(status().isOk());
+
+      final var duplicate = this.createPublicKey(repo, token, body).andReturn();
+      assertThat(duplicate.getResponse().getStatus()).isEqualTo(409);
+      assertError(duplicate.getResponse().getContentAsString(), "pgpPublicKeyAlreadyExists");
+
+      final var onOtherRepo = this.createPublicKey(otherRepo, token, body).andReturn();
+      assertThat(onOtherRepo.getResponse().getStatus()).isEqualTo(200);
+      assertSuccess(onOtherRepo.getResponse().getContentAsString(), "pgpPublicKeyCreated");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(
+        "io.repsy.os.server.protocols.maven.ui.controllers.KeyStoreControllerIT#invalidPublicKeyBodies")
+    @DisplayName(
+        "refuses a body that is not exactly one armored public key with pgpPublicKeyInvalid")
+    void refusesAnInvalidArmoredKey(final String description, final String armoredKey)
+        throws Exception {
+      final var repo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
+      final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
+
+      final var result =
+          this.createPublicKey(repo, token, this.armoredKeyBody(armoredKey)).andReturn();
+
+      assertThat(result.getResponse().getStatus()).as(description).isEqualTo(400);
+      assertError(result.getResponse().getContentAsString(), "pgpPublicKeyInvalid");
+    }
+
+    @Test
+    @DisplayName("refuses an empty or missing armoredKey with validationError")
+    void refusesAnEmptyOrMissingArmoredKey() throws Exception {
+      final var repo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
+      final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
+
+      final var empty = this.createPublicKey(repo, token, this.armoredKeyBody("")).andReturn();
+      assertThat(empty.getResponse().getStatus()).isEqualTo(400);
+      assertError(empty.getResponse().getContentAsString(), "validationError");
+
+      final var missing = this.createPublicKey(repo, token, "{}").andReturn();
+      assertThat(missing.getResponse().getStatus()).isEqualTo(400);
+      assertError(missing.getResponse().getContentAsString(), "validationError");
+    }
+
+    @Test
+    @DisplayName("a USER-role caller is refused for create, list and delete")
+    void aUserRoleCallerIsRefusedForCreateListAndDelete() throws Exception {
+      final var repo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("admin"), UserRole.ADMIN);
+      final var adminToken = KeyStoreControllerIT.this.bearerTokenFor(admin);
+      final var user = KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.USER);
+      final var userToken = KeyStoreControllerIT.this.bearerTokenFor(user);
+      final var key = PgpTestKeys.generate();
+      final var created =
+          this.createPublicKey(repo, adminToken, this.armoredKeyBody(key.armoredPublicKey()))
+              .andReturn();
+      final String id = JsonPath.read(created.getResponse().getContentAsString(), "$.data.id");
+
+      final var createAttempt =
+          this.createPublicKey(
+                  repo, userToken, this.armoredKeyBody(PgpTestKeys.generate().armoredPublicKey()))
+              .andReturn();
+      assertThat(createAttempt.getResponse().getStatus()).isEqualTo(401);
+      assertError(createAttempt.getResponse().getContentAsString(), "unAuthorized");
+
+      final var listAttempt = this.listPublicKeys(repo, userToken).andReturn();
+      assertThat(listAttempt.getResponse().getStatus()).isEqualTo(401);
+      assertError(listAttempt.getResponse().getContentAsString(), "unAuthorized");
+
+      final var deleteAttempt =
+          this.deletePublicKey(repo, userToken, UUID.fromString(id)).andReturn();
+      assertThat(deleteAttempt.getResponse().getStatus()).isEqualTo(401);
+      assertError(deleteAttempt.getResponse().getContentAsString(), "unAuthorized");
+    }
+
+    @Test
+    @DisplayName("deleting another repo's key id answers 404 pgpPublicKeyNotFound")
+    void deletingAnotherReposKeyIdIsNotFound() throws Exception {
+      final var repo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
+      final var otherRepo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
+      final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
+      final var key = PgpTestKeys.generate();
+      final var created =
+          this.createPublicKey(otherRepo, token, this.armoredKeyBody(key.armoredPublicKey()))
+              .andReturn();
+      final String id = JsonPath.read(created.getResponse().getContentAsString(), "$.data.id");
+
+      final var result = this.deletePublicKey(repo, token, UUID.fromString(id)).andReturn();
+
+      assertThat(result.getResponse().getStatus()).isEqualTo(404);
+      assertError(result.getResponse().getContentAsString(), "pgpPublicKeyNotFound");
+      assertThat(KeyStoreControllerIT.this.pgpPublicKeyRepository.findById(UUID.fromString(id)))
+          .isPresent();
+    }
+
+    @ParameterizedTest(name = "sort={0}")
+    @ValueSource(strings = {"id", "keyId", "fingerprint", "userId", "createdAt"})
+    @DisplayName("accepts every documented sort property in both directions")
+    void acceptsSort(final String property) throws Exception {
+      final var repo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
+      final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
+      this.createPublicKey(
+              repo, token, this.armoredKeyBody(PgpTestKeys.generate().armoredPublicKey()))
+          .andExpect(status().isOk());
+
+      KeyStoreControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/mvn/key-stores/" + repo.getName() + "/public-keys")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token)
+                  .param("sort", property + ",asc"))
+          .andExpect(status().isOk());
+      KeyStoreControllerIT.this
+          .mockMvc
+          .perform(
+              get("/api/mvn/key-stores/" + repo.getName() + "/public-keys")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token)
+                  .param("sort", property + ",desc"))
+          .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("returns 400 validationError naming sort for an unknown sort property")
+    void unknownSortIs400() throws Exception {
+      final var repo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
+      final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
+
+      PagingAssertions.expectInvalidParameter(
+          KeyStoreControllerIT.this.mockMvc.perform(
+              get("/api/mvn/key-stores/" + repo.getName() + "/public-keys")
+                  .with(apiPort())
+                  .header(AUTHORIZATION, token)
+                  .param("sort", PagingAssertions.UNKNOWN_SORT)),
+          "sort");
+    }
+  }
+
+  /**
+   * Bodies {@link PublicKeys#refusesAnInvalidArmoredKey} must refuse with {@code
+   * pgpPublicKeyInvalid}.
+   */
+  static Stream<Arguments> invalidPublicKeyBodies() {
+    final var signatureBlock =
+        PgpTestKeys.generate().detachedSignature("anything".getBytes(StandardCharsets.UTF_8));
+    final var privateKeyBlock =
+        "-----BEGIN PGP PRIVATE KEY BLOCK-----\n\n" + PgpTestKeys.generate().armoredPublicKey();
+
+    return Stream.of(
+        Arguments.of("plain text", "not a pgp key at all"),
+        Arguments.of("a signature block", signatureBlock),
+        Arguments.of("a private-key block", privateKeyBlock));
   }
 
   @Nested

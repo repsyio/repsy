@@ -104,7 +104,7 @@ FROM node:24-alpine AS frontend-build
 WORKDIR /app
 ENV CI=true
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@12.5.1 --activate
 
 # openapi-generator-cli shells out to a JRE to run the generator jar
 RUN apk add --no-cache openjdk21-jre-headless

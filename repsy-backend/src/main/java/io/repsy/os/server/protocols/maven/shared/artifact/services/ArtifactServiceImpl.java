@@ -654,9 +654,9 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       throw new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND);
     }
 
-    final var customKeys = this.keyStoreService.findHostsByRepoId(repoInfo.getStorageKey());
+    final var sources = this.keyStoreService.findPublicKeySources(repoInfo.getStorageKey());
 
-    this.pgpVerifierService.verify(nonSignedFileResource, signature, customKeys);
+    this.pgpVerifierService.verify(nonSignedFileResource, signature, sources);
   }
 
   private @Nullable ArtifactVersion getArtifactVersionByGav(final UUID artifactId, final Gav gav) {

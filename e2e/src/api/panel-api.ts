@@ -30,6 +30,7 @@ import { ApiError, PanelClient, RepoType, UserRole } from './generated/index.js'
 import type { DeployTokenForm } from './generated/models/DeployTokenForm.js';
 import type { DeployTokenInfoListItem } from './generated/models/DeployTokenInfoListItem.js';
 import type { LoginInfo } from './generated/models/LoginInfo.js';
+import type { PgpPublicKeyItem } from './generated/models/PgpPublicKeyItem.js';
 import type { RepoCreateForm } from './generated/models/RepoCreateForm.js';
 import type { RepoListInfo } from './generated/models/RepoListInfo.js';
 import type { RepoSettingsForm } from './generated/models/RepoSettingsForm.js';
@@ -43,6 +44,7 @@ export type {
   DeployTokenForm,
   DeployTokenInfoListItem,
   LoginInfo,
+  PgpPublicKeyItem,
   RepoCreateForm,
   RepoListInfo,
   RepoSettingsForm,
@@ -70,6 +72,15 @@ export function isApiErrorStatus(err: unknown, status: number): boolean {
 /** One page of `GET /api/repos/{repoName}/deploy-tokens`, read straight off the JSON envelope. */
 export interface DeployTokenPage {
   content: DeployTokenInfoListItem[];
+  totalPages: number;
+}
+
+/**
+ * One page of `GET /api/mvn/key-stores/{repoName}/public-keys`, read straight off the JSON
+ * envelope (RPS-1189).
+ */
+export interface PgpPublicKeyPage {
+  content: PgpPublicKeyItem[];
   totalPages: number;
 }
 
@@ -240,8 +251,75 @@ export class PanelApi {
     }
     return undefined;
   }
+
+  /** Registers an armored OpenPGP public key directly on a Maven repo's key store (RPS-1189). */
+  async registerPgpPublicKey(repoName: string, armoredKey: string): Promise<PgpPublicKeyItem> {
+    const res = await this.client.keyStoreController.createMavenPgpPublicKey({
+      repoName,
+      requestBody: { armoredKey },
+    });
+    return unwrap(res.data, 'registerPgpPublicKey');
+  }
+
+  /**
+   * One page of a Maven repo's registered PGP public keys. Like {@link listDeployTokensPage}, the
+   * generated client's `listMavenPgpPublicKeys` serialises its `pageable` query param as
+   * `pageable[page]=..&pageable[size]=..`, which Spring's `Pageable` resolver does not bind, so
+   * this calls the endpoint directly with `page`/`size`/`sort` as plain query parameters instead.
+   */
+  async listPgpPublicKeysPage(
+    repoName: string,
+    page: number,
+    size: number,
+  ): Promise<PgpPublicKeyPage> {
+    const url = new URL(
+      `${this.baseUrl}/api/mvn/key-stores/${encodeURIComponent(repoName)}/public-keys`,
+    );
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('size', String(size));
+    url.searchParams.set('sort', 'id,desc');
+
+    const res = await fetch(url, { headers: { Authorization: this.authorization() } });
+    if (!res.ok) {
+      throw new ApiError(
+        { method: 'GET', url: url.toString() },
+        {
+          status: res.status,
+          statusText: res.statusText,
+          url: url.toString(),
+          ok: false,
+          body: null,
+        },
+        `listPgpPublicKeysPage failed with status ${res.status}`,
+      );
+    }
+
+    const body = (await res.json()) as {
+      data?: { content?: PgpPublicKeyItem[]; page?: { totalPages?: number } };
+    };
+    return {
+      content: body.data?.content ?? [],
+      totalPages: body.data?.page?.totalPages ?? 0,
+    };
+  }
+
+  /** Lists every registered PGP public key of a repo (its first page, up to 50 items). */
+  async listPgpPublicKeys(repoName: string): Promise<PgpPublicKeyItem[]> {
+    const { content } = await this.listPgpPublicKeysPage(
+      repoName,
+      0,
+      PGP_PUBLIC_KEY_LIST_PAGE_SIZE,
+    );
+    return content;
+  }
+
+  /** Removes a registered PGP public key from a Maven repo's key store (RPS-1189). */
+  async deletePgpPublicKey(repoName: string, id: string): Promise<void> {
+    await this.client.keyStoreController.deleteMavenPgpPublicKey({ repoName, publicKeyId: id });
+  }
 }
 
 const DEFAULT_TOKEN_LIST_PAGE_SIZE = 20;
 const TOKEN_LOOKUP_PAGE_SIZE = 50;
 const TOKEN_LOOKUP_MAX_PAGES = 40;
+const PGP_PUBLIC_KEY_LIST_PAGE_SIZE = 50;
