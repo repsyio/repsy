@@ -18,8 +18,12 @@ analogue of `knownConsumeFailure`, for a candidate backend bug that corrupts sto
 duplicate publish — see "Cargo runner" below). This is **step 3c ("nuget")**: a fourth worked
 example, the NuGet (.NET package registry) client adapter and runner — the first protocol in this
 harness with a REAL override conflict (`409`) and a real releases/snapshots `422`, so it is also the
-first to exercise the catalog's `conflict` outcome for real (see "NuGet runner" below). Every other
-protocol (docker, helm, pypi, golang, ruby) replicates the same model in later steps; nothing about
+first to exercise the catalog's `conflict` outcome for real (see "NuGet runner" below). This is
+**step 4a ("docker")**: a fifth worked example, the Docker (Registry HTTP API V2 / OCI distribution)
+client adapter and runner — the first protocol in this harness with a genuine two-hop Bearer
+token-exchange auth model instead of Basic-per-request, and the first with a daemonless real client
+(`crane`, go-containerregistry) instead of a language toolchain (see "Docker runner" below). Every
+other protocol (helm, pypi, golang, ruby) replicates the same model in later steps; nothing about
 the model itself is maven-specific.
 
 ## Rules
@@ -42,15 +46,16 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 ```
 e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example
-  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo", "nuget"
+  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker"
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres:18 + Repsy, started/stopped by `run.sh local up|down`
-  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget"
+  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven; see "Adding a protocol adapter" below
   runners/npm.Dockerfile       # + nothing else: npm ships with the node:24 base already
   runners/cargo.Dockerfile     # + a pinned Rust toolchain, copied in from the official rust image
   runners/nuget.Dockerfile     # + a pinned .NET SDK, copied in from the official Ubuntu-noble SDK image
+  runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image; no daemon, no socket
   runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
   src/
     env.ts                     # typed config from env/.env
@@ -85,11 +90,15 @@ e2e/
       cargo.ts                     # the cargo client + cargoAdapter: publish()/resolve()/seedPublish(), cargo package/publish/fetch
       nuget-raw.ts                  # nuget-specific raw PUT/GET (publish/versions/download/registration/service-index), buildNupkg (fflate)
       nuget.ts                      # the nuget client + nugetAdapter: publish()/resolve()/seedPublish(), dotnet nuget push/restore
+      docker-image.ts                # hand-assembled OCI image layout builder (layer tar+gzip, config, manifest, index.json, oci-layout)
+      docker-raw.ts                  # docker-specific raw HTTP: the two-hop token dance, manifest/blob PUT/GET/HEAD, OCI error envelope
+      docker.ts                      # the docker client + dockerAdapter: publish()/resolve()/seedPublish(), crane push/pull
     packages/
       maven/                     # mustache templates of the tiny jar project + settings.xml
       npm/                       # mustache templates of the tiny package.json/index.js + .npmrc
       cargo/                     # mustache templates of the tiny crate + consumer Cargo.toml + .cargo/config.toml
       nuget/                     # mustache templates of nuget.config + the consumer .csproj (the .nupkg itself is built in code, see nuget-raw.ts)
+      docker/                    # config.template.json (DOCKER_CONFIG auths entry; the image itself is built in code, see docker-image.ts)
   tests/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe
     maven/
@@ -106,6 +115,9 @@ e2e/
     nuget/
       publish-consume.spec.ts   # registerPublishConsumeLoop(nugetAdapter) + api-key-only-push and mixed-case-id real-client tests
       registry-rules.spec.ts    # raw-HTTP pins of the 409/422 override & version-kind rules, service index, X-NuGet-ApiKey (H7)
+    docker/
+      publish-consume.spec.ts   # registerPublishConsumeLoop(dockerAdapter) + D1-D4 real-client tests (OCI family, auth login, by-digest, retag)
+      registry-rules.spec.ts    # raw-HTTP pins R1-R13: token dance, blob/manifest rules, override, HEAD-vs-GET, retag, bad config/content-type
 ```
 
 ## Setup
@@ -119,15 +131,15 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 
 ## Environment
 
-| Variable                      | Default                    | Notes                                           |
-| ----------------------------- | -------------------------- | ----------------------------------------------- |
-| `REPSY_API_BASE_URL`          | `http://localhost:8080`    | panel API                                       |
-| `REPSY_REPO_BASE_URL`         | `http://localhost:9090`    | repository/protocol operations                  |
-| `REPSY_ADMIN_USERNAME`        | `admin`                    |                                                 |
-| `REPSY_ADMIN_PASSWORD`        | _(none — required)_        | must match the target's admin password          |
-| `REPSY_TARGET`                | `local`                    | `local` \| `remote` \| `ci` — see Targets below |
-| `REPSY_E2E_RUN_ID`            | random 6-char lowercase id | shared by every runner in one `run.sh test`     |
-| `REPSY_E2E_INSECURE_REGISTRY` | _(unset)_                  | reserved for the future docker/helm runners     |
+| Variable                      | Default                    | Notes                                                                                                                                                  |
+| ----------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `REPSY_API_BASE_URL`          | `http://localhost:8080`    | panel API                                                                                                                                              |
+| `REPSY_REPO_BASE_URL`         | `http://localhost:9090`    | repository/protocol operations                                                                                                                         |
+| `REPSY_ADMIN_USERNAME`        | `admin`                    |                                                                                                                                                        |
+| `REPSY_ADMIN_PASSWORD`        | _(none — required)_        | must match the target's admin password                                                                                                                 |
+| `REPSY_TARGET`                | `local`                    | `local` \| `remote` \| `ci` — see Targets below                                                                                                        |
+| `REPSY_E2E_RUN_ID`            | random 6-char lowercase id | shared by every runner in one `run.sh test`                                                                                                            |
+| `REPSY_E2E_INSECURE_REGISTRY` | _(unset)_                  | docker runner's `--insecure` (only needed for a remote plain-HTTP host; `localhost` already works without it); reserved for the future helm runner too |
 
 ## Targets (`src/target.ts`)
 
@@ -314,8 +326,9 @@ protocol spec that calls `scenariosFor(SCENARIOS, protocol)`.
 The scenario loop itself (`scenarios/loop.ts`'s `registerPublishConsumeLoop`) is protocol-agnostic
 as of step 3a (RPS-294): a new protocol implements the `ProtocolAdapter` interface
 (`scenarios/adapter.ts`) and hands the loop that one object, instead of copying the loop's
-machinery. `clients/maven-adapter.ts`, `clients/npm.ts`'s `npmAdapter` and `clients/cargo.ts`'s
-`cargoAdapter` are the three worked examples.
+machinery. `clients/maven-adapter.ts`, `clients/npm.ts`'s `npmAdapter`, `clients/cargo.ts`'s
+`cargoAdapter`, `clients/nuget.ts`'s `nugetAdapter` and `clients/docker.ts`'s `dockerAdapter` are
+five worked examples.
 
 1. `src/clients/<protocol>.ts` (+ a `<protocol>-raw.ts` for its raw-HTTP building blocks, built on
    the shared pieces in `clients/raw-http.ts`): `publish(world)`/`resolve(world)`/`seedPublish(world)`
@@ -809,6 +822,220 @@ predicted**; none required a workaround or a routing-around hook.
   (`isolatedWorkDir`/`nugetEnv`), and two full 27-test runs (12 parallel workers each) both passed
   with no flakiness or leftover-state failures.
 
+## Docker runner
+
+`runners/docker.Dockerfile` copies the single static `crane` binary (go-containerregistry v0.22.1,
+`/ko-app/crane` in its own distroless image) into the harness image — **no daemon, no
+`docker.sock`, no `--privileged`, no DinD anywhere in this runner.** `clients/docker-image.ts`
+builds a tiny, fully hand-assembled OCI image layout directly (`buildImage`: a hand-written ustar
+tar with one `e2e-marker.txt` file, gzipped with `node:zlib`; a JSON config; a JSON manifest;
+`index.json`; `oci-layout` — deliberately never `docker build`/`crane append`, the nuget/cargo
+precedent of never shelling out to a tool this harness does not control the exact bytes of), and
+`clients/docker.ts` runs the real `crane` binary against that directory:
+
+- **`publish`**: `crane push <oci-layout-dir> <ref> [--insecure]` against the pre-built layout — no
+  packaging step to precede it, like nuget's pre-built nupkg. `ref` is
+  `<registryHost>/<repoName>/<image>:<tag>` (`docker-raw.ts`'s `imageRef`), matching exactly what
+  the panel's own Docker config screen tells a user (`docker login <domain>` /
+  `docker pull <domain>/<repo>/<image>:<tag>`).
+- **`resolve`**: a fresh, separate work directory (fresh `DOCKER_CONFIG`/`HOME` too) with
+  `crane pull --format=oci <ref> <dir> [--insecure]`. The resolved manifest blob is read back out of
+  the written OCI layout's `index.json` (`manifests[0].digest`) plus `blobs/sha256/<hex>`, and its
+  OWN sha256 is checked against that filename before it is trusted (`readResolvedImage`).
+- **`DOCKER_CONFIG/config.json`** (rendered fresh into an isolated `HOME` per invocation, one shared
+  shape for BOTH push and pull — never a machine-wide config): a Basic-transport credential (both
+  `password`- and `token`-kind, same as every other protocol here) renders one
+  `auths["<registryHost>"]` entry with a base64 `user:secret` `auth` value — the exact shape
+  `crane auth login --password-stdin` itself writes, pinned literally by the "D2" test.
+  `anonymous` writes `{"auths":{}}` directly (not through the template — see `renderDockerConfig`'s
+  own comment for why a conditionally-present entry is a code decision, not a mustache section: the
+  template's raw, UNRENDERED file has to stay valid JSON for `prettier`, exactly like every other
+  protocol's own `*.template.json`).
+- **A genuine two-hop auth model**, the first in this harness: every operation is preceded by a
+  Bearer _token exchange_ (`GET /v2/token?service=repsy&scope=...`) against a `WWW-Authenticate`
+  challenge `GET /v2/` returns. `docker-raw.ts`'s `dockerRequest` wraps both hops and reports which
+  one answered (`hop: 'token' | 'request'`) so the loop still sees one plain HTTP status. Confirmed
+  live (H6): a read-only/other-repo deploy token's own token-exchange still succeeds (`200` — the
+  scope is never checked at issuance), and only the WRITE request itself is refused (`401`, at the
+  OPERATION hop) — so `publish`'s raw companion probe (`rawPutManifest`, a byte-identical re-PUT of
+  the exact manifest `crane push` just sent, under the same tag, with the same credential — the
+  maven/npm/nuget re-PUT pattern) gets the SAME status at the SAME hop a real client would fail at.
+- **The override rule is the SAME `403`** (`packageOverrideDisabled`) the shared maven pin already
+  uses (`AbstractDockerProtocolTxFacade.checkRepoAllowOverride`) — no `expectByProtocol` override
+  needed anywhere in `catalog.ts` for docker. **`releases`/`snapshots` are never read by the Docker
+  protocol at all** (grep-confirmed), so docker is never added to
+  `maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/`snapshot-*`.
+- **Fingerprint** (`ProtocolAdapter.fingerprint`/`expectNothingStored`): scoped to the ONE
+  `<image>:<tag>` a scenario's own publish targets — Docker has no `tags/list`/`_catalog` route on
+  Repsy (no handler exists for either) — a raw manifest GET by tag (`tagDigest`, a body hash) plus a
+  `HEAD` of every blob digest the served manifest names (`'present'`/`'status:N'`). A refused
+  publish's own blobs are allowed to be present (protocol-inherent: blobs go up before the manifest,
+  confirmed live — see "R6" below), so `expectNothingStored` only additionally asserts the tag
+  itself was never created when it did not exist before.
+- **No `knownConsumeFailure`**: docker's `resolve` companion probe is a manifest GET, which never
+  touches blob bytes, so there is no RPS-1205-style broken-URL failure mode to route around.
+  **No `knownPublishSideEffect`** either: unlike cargo's RPS-1124, a refused manifest push never
+  writes/overwrites the manifest itself (only pre-existing, already-uploaded blobs are affected, and
+  that is by protocol design, not a bug — see "R6").
+
+```bash
+./run.sh test --protocol docker
+```
+
+### Why no daemon (host socket / DinD both rejected)
+
+- **A bind-mounted host `docker.sock`** would let the HOST's own Docker daemon perform the actual
+  push/pull — a host-native execution path this harness's own rule forbids (tests only ever run
+  inside a runner container). It would also pollute the host's own image cache (a pull right after a
+  push could be served from that cache, proving nothing about the server), cannot set
+  insecure-registries for a remote plain-HTTP target without touching host-level daemon config, and
+  needs docker-group socket access a `user: HOST_UID` container is not given.
+- **Docker-in-Docker** needs `--privileged` and a root-started daemon (the official
+  `docker:<ver>-dind`/`-dind-rootless` images both say so), a shared image store across this
+  harness's parallel workers (a pull right after a push proves nothing unless the image is `rmi`'d
+  first, adding synchronization this harness does not otherwise need), and ties every pinned
+  manifest-media-type expectation to a DAEMON's own default image store (classic vs. containerd)
+  instead of to Repsy's behaviour.
+- Both are left as an explicit, opt-in follow-up ("docker-cli smoke", a later step) rather than part
+  of this one. `crane` alone — daemonless, static, the same wire protocol `docker-raw.ts` probes
+  raw — covers everything this step needs to pin.
+
+### Scenario mapping onto the shared catalog
+
+Docker needed **no changes to `catalog.ts`'s data at all**: every non-maven-restricted scenario
+applies unchanged, with the SAME shared `expect` maven already pins.
+
+| scenario (shared catalog)                                                | docker status observed      | note                                                                             |
+| ------------------------------------------------------------------------ | --------------------------- | -------------------------------------------------------------------------------- |
+| `no-override` (2nd publish, `allowOverride:false`)                       | `403 forbidden`             | the SAME `packageOverrideDisabled` the shared pin already expects                |
+| `override` (2nd publish, `allowOverride:true`)                           | `201 ok`                    | the tag is re-pointed to the new digest                                          |
+| `token-ro` publish                                                       | `401 unauthorized`          | token-endpoint issuance succeeds (`200`); the WRITE request itself fails (`401`) |
+| `anonymous-public` consume                                               | `200 ok`                    | an anonymous Bearer token, issued for a public repo's `pull` scope               |
+| `maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/`snapshot-*` | n/a                         | `protocols` excludes docker — no releases/snapshots/SNAPSHOT-file concept exists |
+| everything else (`password-admin`, `token-rw`, ...)                      | matches the shared `expect` | unchanged                                                                        |
+
+`registry-rules.spec.ts` additionally pins (R1-R13, mirroring the plan's own hypothesis numbering):
+the ping challenge's exact `realm`/`service`/`scope` (R1); the token-endpoint matrix — issuance is
+never scope-checked, only an expired/revoked/wrong credential fails at the token hop (R2); a
+read-only token's write refusal at the OPERATION hop, reads still working (R3); monolithic/chunked
+blob upload, a wrong digest, and dedup (R4); manifest push validation — missing blobs, a wrong
+`sha256:` reference, an unknown `Content-Type` (R5, **B4**); the override rule and an orphaned blob
+after a refusal (R6); overriding a tag breaking the OLD manifest's pull-by-digest (R7, **B2**);
+`HEAD` vs. `GET` by digest (R8, **B1**); retagging the same digest under a second tag (R9); a
+config blob missing `os`/`architecture` (R12, **B5**); a multi-arch index referencing a
+digest-pushed child (R13); and that even a PUBLIC repo still needs real credentials to WRITE,
+refused at the token hop with no OCI body at all (distinct from an operation-hop 401's Bearer
+challenge + OCI envelope).
+
+### H1-H14, confirmed live
+
+Every hypothesis was probed against a running instance (`./run.sh local up`) before being pinned —
+first with raw HTTP (`node`/`tsx` scripts using `docker-raw.ts`/`docker-image.ts` directly, and
+`curl`), then with the real `crane` binary (both via `docker run --network host` directly against
+the stack, and inside the `docker` runner container). Where a result differed from the plan's own
+prediction, the actual observed behaviour is what got pinned, not the guess.
+
+- **H1** (no `--insecure` needed for `localhost:9090`; the ping challenge shape): confirmed —
+  `GET /v2/` (no auth) answers `401` with
+  `WWW-Authenticate: Bearer realm="http://localhost:9090/v2/token",service="repsy",scope="repository:*:pull"`;
+  `crane push`/`pull` against `localhost:9090` succeed with no `--insecure` flag at all (ggcr's own
+  `pkg/name/registry.go` resolves `localhost`/loopback/RFC1918 hosts as plain HTTP automatically);
+  the token GET carries `service=repsy` and ggcr's OWN scope (`repository:<repo>/<image>:push,pull`
+  or `:pull`), never the challenge's constant `repository:*:pull` — confirmed with `crane -v`'s
+  request trace.
+- **H2** (the push wire sequence): confirmed, and MORE DETAILED than the plan's own guess —
+  `crane -v push` traced live shows `GET https://.../v2/` (TLS attempt, fails) → `GET http://.../v2/`
+  (`401`) → `GET .../v2/token` (`200`) → **`HEAD` the MANIFEST by tag first** (an existence check the
+  plan's own H2 did not call out) → `HEAD` BOTH blobs in parallel → only the MISSING ones get
+  `POST`/`PATCH`/`PUT ?digest=` → `PUT` the manifest. No `mount=`/`from=` in this harness (never a
+  cross-repo `MountableLayer`, confirmed by source and by the trace).
+- **H3** (a byte-identical manifest re-PUT with `allowOverride:true` succeeds, no duplicate rows):
+  confirmed live (`registry-rules.spec.ts`'s R6/R9) — a re-PUT of the identical bytes under an
+  existing tag with overriding allowed answers `201`, and every `ok`-expected catalog scenario's own
+  publish-side raw probe (the SAME re-PUT pattern) passed across two full suite runs.
+- **H4** (`GET manifests/<tag>` serves exact bytes + exact media type, no charset suffix): confirmed
+  — `afterSuccessfulRoundTrip` asserts `Content-Type` equals the pushed manifest media type
+  (`.split(';')[0]`, defensively) and the served body's sha256 equals the published one, on every
+  successful catalog scenario.
+- **H5** (`crane pull --format=oci` writes an `index.json` whose digest matches, and matching blob
+  files): confirmed — `resolve`'s `readResolvedImage` verifies the resolved manifest blob's OWN
+  sha256 against its filename on every consume, and `expectResolvedContent` (the shared loop) compares
+  that against the published digest on every successful round trip.
+- **H6** (token-ro/token-other-repo: token-hop `200`, first WRITE `401`; crane fails cleanly, no
+  hang): confirmed — `registry-rules.spec.ts`'s R3, and the catalog's own `token-ro`/`token-other-repo`
+  scenarios via the real client (`crane push` exit 1, no prompt, well within the timeout).
+- **H7** (anonymous-public consume works with an anonymous Bearer token; anonymous publish fails at
+  the token hop, no prompt): confirmed — `anonymous-public`'s `crane pull` succeeds; `anonymous-private`/
+  `anonymous-public`'s own publish attempts both fail cleanly (`crane push` exit 1).
+- **H8** (`no-override`: `crane push` fails, the seeded tag is unchanged, the refused push's OWN
+  blobs are present): confirmed live — R6.
+- **H9** (`override`: the new digest is served; the OLD digest's pullability, left open by the plan
+  pending a live check): confirmed the new digest is served (R6); the OLD digest turned out to be
+  **UNPULLABLE** — **B2 (RPS-1216)** (R7).
+- **H10** (`HEAD` vs. `GET` by digest): confirmed — `HEAD` by digest is `404` even right after a
+  `GET` by that same digest served `200` — **B1 (RPS-1215)** (R8). Notably, `crane digest <ref>@sha256:<digest>`
+  (which is a `HEAD` under the hood) does **NOT** itself fail: ggcr's own `remote.Head` falls back to
+  a `GET` when the `HEAD` fails (confirmed live, `crane`'s own stderr: `"HEAD request failed, falling
+back on GET"`), so B1 is invisible to `crane digest`'s own exit code — only a raw `HEAD` (or a
+  client without that specific fallback) observes it. The "D3" real-client test pins BOTH facts.
+- **H11** (timing fits the 120s test timeout): confirmed — the whole 29-test catalog completed in
+  ~7-8s total wall time across 12 parallel workers, both full runs.
+- **H12** (running the whole `docker` suite twice without resetting the stack): confirmed — both
+  runs passed identically (29/29, the same 4 tests showing their expected `test.fail` glyph), no
+  leftover-state interference.
+- **H13** (an unsupported manifest `Content-Type` → 500, after the `Image` row was already created):
+  confirmed live — `text/plain` with an otherwise-valid manifest body answers a flat
+  `500 {"errors":[{"code":"UNKNOWN",...,"detail":"errorOccurred"}]}`, not a `4xx` — **B4 (RPS-1110, pre-existing -- see below)**
+  (R5). A config blob missing `os`/`architecture` answers the same flat `500` — **B5 (RPS-1116, pre-existing -- see below)** (R12).
+- **H14** (`Seeder.cleanup()` on a docker repo with images/tags/layers succeeds; a sweep afterwards
+  lists nothing): confirmed — every catalog scenario's own repo (images, tags, layers included)
+  deleted cleanly in `afterEach`, and `./run.sh sweep --dry-run` found nothing left behind after a
+  full suite run.
+
+### Backend bug candidates found while reading, and confirmed live (do not fix here)
+
+- **B1 (filed as [RPS-1215](https://zyfera.atlassian.net/browse/RPS-1215))** — `HEAD` a manifest by
+  digest answers `404` for a manifest a `GET` of that SAME digest serves fine (distribution spec:
+  "HEAD MUST be identical to GET without the body"). `AbstractDockerManifestCheckProtocolMethodHandler`'s
+  `findTagAndManifest` only ever resolves a TAG row, never a digest — `AbstractDockerProtocolTxFacade`'s
+  own `resolveManifestDigest` (which GET uses) does both. Confirmed live: `tests/docker/registry-rules
+.spec.ts`'s R8 (raw) and `tests/docker/publish-consume.spec.ts`'s D3 (`crane digest <ref>@sha256:<digest>`
+  — masked by ggcr's own HEAD→GET fallback, see "H10" above, so a raw `HEAD` is what actually exposes it).
+- **B2 (filed as [RPS-1216](https://zyfera.atlassian.net/browse/RPS-1216))** — Overriding a tag
+  (`allowOverride: true`) makes the PREVIOUS manifest unpullable BY DIGEST, even though nothing ever
+  explicitly deleted it: the tag's one `Manifest` row is reused in place (`ManifestTxService`'s
+  `findOrCreateManifest`/`updateManifestProperties`), so the row's own digest simply becomes the NEW
+  one. Confirmed live: `registry-rules.spec.ts`'s R7 — `GET manifests/sha256:<old digest>` is `200`
+  right after the first push, then `404` right after an accepted override of the same tag.
+- **B3** — _Not reproduced_ (time-boxed, per the plan). Pushing the SAME already-existing digest
+  under a SECOND tag (`registry-rules.spec.ts`'s R9) was probed: both tags still resolve with a
+  plain `GET`, byte-identical, right after. Since the digest (and therefore the manifest bytes) is
+  identical either way, a byte-comparison alone cannot distinguish "one shared row, re-parented" from
+  "each tag has its own row" — the plan's own suggested deeper repro (deleting one tag, checking
+  whether the other breaks) was left unexplored, as the plan explicitly allows. Not filed; flagged
+  here as an open question for whoever picks this up next, not a confirmed bug.
+- **B4 (pre-existing story, [RPS-1110](https://zyfera.atlassian.net/browse/RPS-1110) — commented with
+  this live evidence, not a new ticket)** — An unknown manifest `Content-Type` (anything outside the
+  5 known docker/OCI types) answers a flat `500 UNKNOWN`, not a `4xx`: `saveManifest`'s `switch`
+  throws a bare `IllegalArgumentException("unsupportedMediaType")`, which has no `ErrorHandler`
+  mapping. The repo's `Image` row for that image name is ALSO already created by this point
+  (`findOrCreateImage` runs before the `Content-Type` switch), so even the failed attempt leaves
+  a row behind. Confirmed live: `registry-rules.spec.ts`'s R5.
+- **B5 (pre-existing story, [RPS-1116](https://zyfera.atlassian.net/browse/RPS-1116) — commented with
+  this live evidence, not a new ticket)** — A config blob missing BOTH `os` and `architecture`
+  crashes the manifest push with the same flat `500`: `extractPlatform`'s `org.json`
+  `getString("os")`/`getString("architecture")` throws a bare `JSONException`, also unmapped. Low
+  real-world impact (every real client always sends both), but the same class of bug as B4.
+  Confirmed live: `registry-rules.spec.ts`'s R12.
+- **B6** — _Not a bug, a protocol-inherent design point, flagged for the coordinator's awareness
+  only_ — a refused manifest push (403/404/400/500 alike) leaves any blobs it uploaded JUST BEFORE
+  the refusal stored, with `Layer` rows, and no GC path except deleting the whole image/tag (the
+  `DELETE /api/docker/images/{repo}/{image}` /`.../tags/{tag}` routes). This is inherent to the
+  Registry v2 wire protocol itself (blobs always go up before the manifest that references them can
+  even be validated) — not something the Docker protocol implementation could avoid without
+  deviating from the spec. Confirmed live, `registry-rules.spec.ts`'s R6 (`expectNothingStored`
+  deliberately does NOT assert the refused blobs are absent, for exactly this reason).
+
 ## Remote hardening
 
 On a `remote` target (`target.isRemote`, see `src/target.ts`), `AUTH_THROTTLE_MAX_FAILURES` cannot
@@ -838,7 +1065,8 @@ real shared remote. Both are called out in the plan as later, "remote hardening"
 ./run.sh test --protocol npm
 ./run.sh test --protocol cargo
 ./run.sh test --protocol nuget
-./run.sh test --protocol skeleton,maven,npm,cargo,nuget
+./run.sh test --protocol docker
+./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker
 ./run.sh test --grep '@smoke'
 ./run.sh test -b             # rebuild the runner image(s) first (Dockerfile/lockfile changed)
 ./run.sh local down
@@ -846,7 +1074,7 @@ real shared remote. Both are called out in the plan as later, "remote hardening"
 ```
 
 `run.sh test` accepts `--target local|remote|ci` and `--protocol a,b` (a comma-separated list of
-runner services: `skeleton`, `maven`, `npm`, `cargo`, `nuget`). Reports land under `e2e/test-results/` (JUnit
+runner services: `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`). Reports land under `e2e/test-results/` (JUnit
 XML) and
 `e2e/playwright-report/` (HTML) — one `run.sh test` invocation covering several `--protocol` services
 overwrites that JUnit file per service, so diff/compare a single protocol's run in isolation
@@ -908,6 +1136,8 @@ pnpm exec prettier --check .
 ./run.sh test --protocol cargo   # again — proves run isolation for cargo too
 ./run.sh test --protocol nuget
 ./run.sh test --protocol nuget   # again — proves run isolation for nuget too
+./run.sh test --protocol docker -b  # -b the first time: builds the docker runner image
+./run.sh test --protocol docker  # again — proves run isolation for docker too
 ./run.sh test                    # the skeleton project
 ./run.sh sweep --dry-run         # before tearing down: confirms nothing was left behind
 ./run.sh local down
@@ -917,8 +1147,11 @@ After a run, confirm no `e2e-*` repos or users remain: `GET /api/repos/{repoType
 `RepoType` and `GET /api/users` should list none (`./run.sh sweep --all --dry-run` does this for
 you). A meaningfulness check for the maven catalog: temporarily flip one scenario's expectation in
 `catalog.ts` (e.g. `token-expired`'s publish to `'ok'`, or `redeploy-snapshots-off`'s), confirm
-`./run.sh test --protocol maven --grep <id>` fails, then restore it. `./run.sh sweep --dry-run` lists
-any `e2e-*` leftovers without deleting them.
+`./run.sh test --protocol maven --grep <id>` fails, then restore it (this was also re-run once for
+the docker protocol specifically, flipping `token-expired`'s `publish` to `'ok'`: `./run.sh test
+--protocol docker --grep token-expired` failed as expected, with `crane push`'s own raw-probe status
+`401` reported against the flipped `'ok'` expectation). `./run.sh sweep --dry-run` lists any `e2e-*`
+leftovers without deleting them.
 
 The npm suite's `'ok'`-expected scenarios currently report as an _expected_ failure
 (`test.fail`, RPS-1205 — see "npm runner" above), not a plain pass: Playwright's list reporter still
@@ -926,4 +1159,5 @@ prints a `✘` for each (something inside the test body did throw, which is exac
 is watching for), but the run's own summary line and exit code both say "passed"/`0` — treat those
 two as authoritative over the per-line glyphs. Likewise for the cargo suite's `no-override`/
 `override` scenarios (`knownPublishSideEffect`, "H1" above) and its two dedicated hyphen tests ("H2"
-above): all `test.fail`-routed, all counted as "passed".
+above), and the docker suite's four `test.fail`-routed registry-rules tests (R5/B4, R7/B2, R8/B1,
+R12/B5 — "H9"/"H10"/"H13" above): all counted as "passed", not a plain pass line.

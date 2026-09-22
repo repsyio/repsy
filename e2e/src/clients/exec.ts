@@ -37,6 +37,9 @@ export interface RunOptions {
   redact?: readonly string[];
   /** Used as the attachment name on failure; defaults to `command`. */
   label?: string;
+  /** Piped to the process's stdin (e.g. `crane auth login --password-stdin`'s secret) -- never
+   *  logged or attached, unlike argv/output, since it is never part of either. */
+  input?: string;
 }
 
 export interface RunResult {
@@ -103,6 +106,7 @@ export async function run(
     env: opts.env,
     timeout: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     reject: false,
+    ...(opts.input !== undefined ? { input: opts.input } : {}),
   });
 
   const stdout = redact(result.stdout ?? '', secrets);

@@ -58,5 +58,9 @@ export default defineConfig({
       name: 'nuget',
       testMatch: 'nuget/**/*.spec.ts',
     },
+    {
+      name: 'docker',
+      testMatch: 'docker/**/*.spec.ts',
+    },
   ],
 });
