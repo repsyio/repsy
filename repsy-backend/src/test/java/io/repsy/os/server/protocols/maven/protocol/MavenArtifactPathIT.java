@@ -263,9 +263,15 @@ class MavenArtifactPathIT extends AbstractIntegrationTest {
         "com/acme/lib/1.0-SNAPSHOT/lib-2.0-SNAPSHOT.jar",
         "com/acme/lib/1.0-SNAPSHOT/lib-2.0-20260921.101010-1.jar",
         "com/acme/lib/1.0-SNAPSHOT/lob-1.0-SNAPSHOT.jar",
-        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOTX.jar"
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOTX.jar",
+        // RPS-1183: the checksum of a refused path is refused like its file.
+        "io/stray.txt.sha1",
+        "com/acme/lib/1.0/other-1.0.jar.sha1",
+        "com/acme/lib/1.0-SNAPSHOT/lib-2.0-SNAPSHOT.jar.sha1"
       })
-  @DisplayName("a path outside the artifact layout is refused with 400 and nothing is stored")
+  @DisplayName(
+      "a path outside the artifact layout, and a checksum of it, is refused with 400 and nothing is"
+          + " stored")
   void pathsOutsideTheLayoutAreRefusedAndNothingIsStored(final String path) throws Exception {
     final var repo = this.mavenRepo();
     final var admin = this.admin();

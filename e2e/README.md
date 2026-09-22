@@ -196,7 +196,12 @@ What the server does, per rule (all pinned above or in `tests/maven/upload-rules
   the deploy, whether the version is new or already exists (RPS-1174). The other kind keeps working.
 - **Metadata**: the version-level snapshot `maven-metadata.xml` is judged by its `<version>` (RPS-1176:
   refused under `snapshots: false`, accepted under `releases: false`); the artifact-level file lists
-  both kinds and is never judged; checksum files (`.sha1`/`.md5`) carry no kind and are never judged.
+  both kinds and is never judged. A checksum (`.sha1`/`.md5`/`.sha256`/`.sha512`) is judged by the
+  file it belongs to (RPS-1183): the layout check (`400 invalidArtifactPath`), the kind switches and
+  the override rule apply to it as to that file, so it no longer creates the directory of a version
+  whose file is refused. A metadata checksum holds a hash, not XML, so it is judged by its
+  directory: `g/a/<X-SNAPSHOT>/maven-metadata.xml.sha1` is a snapshot; the artifact-level and
+  group-level ones are not judged.
 - **`allowOverride: false`** refuses re-uploading a file that already exists
   (`403 artifactOverrideIsProhibited`) and never judges metadata. A normal SNAPSHOT redeploy writes
   new timestamped files and re-uploads the metadata, so it **succeeds** under `allowOverride: false`

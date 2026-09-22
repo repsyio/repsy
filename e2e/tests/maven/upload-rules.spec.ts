@@ -36,6 +36,12 @@
  *    and keeps being stored. A file of a `SNAPSHOT` directory must also carry that directory's
  *    artifactId and base version, literal or timestamped: `lib-2.0-SNAPSHOT.jar` or
  *    `other-1.0-SNAPSHOT.jar` in `lib/1.0-SNAPSHOT/` is refused the same way (RPS-1184).
+ *  - A checksum (`.sha1`/`.md5`/`.sha256`/`.sha512`) is judged by the file it belongs to: it is
+ *    refused for a path outside the layout (400 `invalidArtifactPath`) or for a switched-off kind
+ *    (403), and stores nothing, where it used to be stored and create the directory of a version
+ *    whose file was refused (RPS-1183). A metadata checksum is judged by its directory only, as
+ *    its body is a hash: `g/a/<X-SNAPSHOT>/maven-metadata.xml.sha1` is a snapshot, the
+ *    artifact-level and group-level ones are not judged.
  *  - A POM signature (`<pom>.asc`) is verified before it is stored, so a refused one answers 422
  *    `artifactSignatureNotVerified` and changes nothing: no file, no row, no other version and no
  *    metadata is removed, and the `.asc` itself is not stored (RPS-1186). It used to be stored
@@ -321,7 +327,10 @@ test.describe('maven upload rules (raw HTTP)', () => {
       const snapshotDir = versionDir(layout.groupId, ARTIFACT_ID, SNAPSHOT);
       const stray = [
         'io/stray.txt',
+        // RPS-1183: the checksum of a path outside the layout is refused like its file.
+        'io/stray.txt.sha1',
         `${releaseDir}/other-${RELEASE}.jar`,
+        `${releaseDir}/other-${RELEASE}.jar.sha1`,
         `${releaseDir}/${ARTIFACT_ID}-9.9.jar`,
         // No extension at all.
         `${releaseDir}/${ARTIFACT_ID}-${RELEASE}`,
@@ -366,6 +375,8 @@ test.describe('maven upload rules (raw HTTP)', () => {
         // Not the literal marker, and not a timestamp.
         `${snapshotDir}/${ARTIFACT_ID}-1.0-SNAPSHOTX.jar`,
         `${snapshotDir}/${ARTIFACT_ID}-1.0-20260101-000000-1.jar`,
+        // RPS-1183: the checksum of such a file is refused like the file.
+        `${snapshotDir}/${ARTIFACT_ID}-2.0-SNAPSHOT.jar.sha1`,
       ];
       const admin = adminCredential();
 
@@ -378,6 +389,83 @@ test.describe('maven upload rules (raw HTTP)', () => {
       }
 
       expect(await repoTree(layout.repoName)).toEqual(before);
+    },
+  );
+
+  test(
+    'a checksum is judged by the file it belongs to (RPS-1183)',
+    { tag: ['@settings', '@negative', '@snapshot'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder);
+      await seedBothKinds(layout);
+      const admin = adminCredential();
+      const before = await repoTree(layout.repoName);
+      const newReleaseDir = versionDir(layout.groupId, ARTIFACT_ID, '3.5');
+      const snapshotDir = versionDir(layout.groupId, ARTIFACT_ID, SNAPSHOT);
+      const [secondPom] = snapshotDeployFiles(layout, SECOND_BUILD);
+
+      // releases:false refuses the checksum of a new release, and does not create its directory.
+      await seeder.setSettings(layout.repoName, {
+        privateRepo: true,
+        allowOverride: true,
+        releases: false,
+        snapshots: true,
+      });
+      const newRelease = `${newReleaseDir}/${ARTIFACT_ID}-3.5.jar.sha1`;
+      expectPut(
+        await layout.put(newRelease, 'da39', TEXT),
+        403,
+        'releaseVersionsAreProhibited',
+        'checksum of a new release',
+      );
+      for (const path of [newRelease, `${newReleaseDir}/`]) {
+        const res = await rawGet(layout.repoName, admin, path);
+        expect(res.status, `GET ${path} answered ${res.status}`).toBe(404);
+      }
+
+      // snapshots:false refuses the checksums of a snapshot, at file and at version level. The
+      // artifact-level metadata checksum lists both kinds and is not judged.
+      await seeder.setSettings(layout.repoName, {
+        privateRepo: true,
+        allowOverride: true,
+        releases: true,
+        snapshots: false,
+      });
+      const refused = 'snapshotVersionsAreProhibited';
+      expectPut(
+        await layout.put(`${secondPom[0]}.sha1`, 'da39', TEXT),
+        403,
+        refused,
+        'checksum of a snapshot pom',
+      );
+      expectPut(
+        await layout.put(`${snapshotDir}/maven-metadata.xml.sha1`, 'da39', TEXT),
+        403,
+        refused,
+        'checksum of the version-level snapshot metadata',
+      );
+      const artifactChecksum = `${artifactDir(layout.groupId, ARTIFACT_ID)}/maven-metadata.xml.sha1`;
+      expectPut(
+        await layout.put(artifactChecksum, 'da39', TEXT),
+        200,
+        undefined,
+        'checksum of the artifact-level metadata',
+      );
+      expect(await repoTree(layout.repoName)).toEqual({
+        ...before,
+        [artifactChecksum]: sha256Hex('da39'),
+      });
+
+      // With both kinds on again, a checksum may come before its file: nothing is refused for it.
+      await seeder.setSettings(layout.repoName, {
+        privateRepo: true,
+        allowOverride: true,
+        releases: true,
+        snapshots: true,
+      });
+      const jar = `${versionDir(layout.groupId, ARTIFACT_ID, '3.6')}/${ARTIFACT_ID}-3.6.jar`;
+      expectPut(await layout.put(`${jar}.sha1`, 'da39', TEXT), 200, undefined, 'checksum first');
+      expectPut(await layout.put(jar, 'jar 3.6', OCTET), 200, undefined, 'its file');
     },
   );
 

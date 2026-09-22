@@ -84,9 +84,14 @@ import org.springframework.core.io.Resource;
  *
  * <p>A stored POM that declares another groupId than its path's is not registered (RPS-1193). The
  * facade refuses such a POM before it is stored; the skip stays for one stored before that.
+ *
+ * <p>A checksum is judged by the file it belongs to: its layout check, version type and override
+ * rule are those of that file. A metadata checksum, whose body is a hash, is judged by its
+ * directory alone (RPS-1183). Before, every checksum was let through unjudged.
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Maven ArtifactServiceImpl version-type rules (RPS-1174, RPS-1176, RPS-1182)")
+@DisplayName(
+    "Maven ArtifactServiceImpl version-type rules (RPS-1174, RPS-1176, RPS-1182, RPS-1183)")
 class ArtifactServiceImplTest {
 
   private static final String SNAPSHOT_JAR =
@@ -97,7 +102,6 @@ class ArtifactServiceImplTest {
   private static final String SNAPSHOT_VERSION_METADATA =
       "com/acme/lib/1.0-SNAPSHOT/maven-metadata.xml";
   private static final String RELEASE_VERSION_METADATA = "com/acme/lib/1.0/maven-metadata.xml";
-  private static final String METADATA_FILE = "maven-metadata.xml";
 
   private static final String GROUP_METADATA =
       """
@@ -235,9 +239,9 @@ class ArtifactServiceImplTest {
   }
 
   private MutablePair<ArtifactDeployType, ArtifactVersionType> classify(
-      final RepoInfo repo, final String xml) throws Exception {
+      final RepoInfo repo, final String path, final String body) throws Exception {
     return this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
-        repo, xml.getBytes(StandardCharsets.UTF_8), METADATA_FILE);
+        repo, body.getBytes(StandardCharsets.UTF_8), StoragePath.of(repo.getId(), path));
   }
 
   @Test
@@ -246,7 +250,7 @@ class ArtifactServiceImplTest {
     final var id = UUID.randomUUID();
     final var repo = repo(id, false, false, true);
 
-    final var result = this.classify(repo, GROUP_METADATA);
+    final var result = this.classify(repo, GROUP_METADATA_PATH, GROUP_METADATA);
 
     assertThat(result).isEqualTo(pair(null, PLUGIN));
     assertThatCode(
@@ -265,7 +269,7 @@ class ArtifactServiceImplTest {
     final var xml = VERSION_METADATA.formatted("1.0-SNAPSHOT");
 
     final var refusing = repo(id, true, false, true);
-    final var result = this.classify(refusing, xml);
+    final var result = this.classify(refusing, SNAPSHOT_VERSION_METADATA, xml);
 
     assertThat(result).isEqualTo(pair(null, SNAPSHOT));
     assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(refusing, result, path))
@@ -285,7 +289,7 @@ class ArtifactServiceImplTest {
     final var xml = VERSION_METADATA.formatted("1.0");
 
     final var refusing = repo(id, false, true, true);
-    final var result = this.classify(refusing, xml);
+    final var result = this.classify(refusing, RELEASE_VERSION_METADATA, xml);
 
     assertThat(result).isEqualTo(pair(null, RELEASE));
     assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(refusing, result, path))
@@ -303,7 +307,7 @@ class ArtifactServiceImplTest {
     final var id = UUID.randomUUID();
     final var repo = repo(id, false, false, true);
 
-    final var result = this.classify(repo, ARTIFACT_METADATA_MIXED);
+    final var result = this.classify(repo, ARTIFACT_METADATA, ARTIFACT_METADATA_MIXED);
 
     assertThat(result).isEqualTo(pair(null, null));
     assertThatCode(
@@ -315,15 +319,55 @@ class ArtifactServiceImplTest {
   }
 
   @Test
-  @DisplayName("a metadata checksum is stored without parsing the file")
+  @DisplayName("an artifact-level metadata checksum is stored without parsing the file")
   void metadataChecksumIsStoredWithoutParsing() throws Exception {
     final var repo = repo(UUID.randomUUID(), false, false, true);
 
-    final var result =
-        this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
-            repo, "garbage".getBytes(StandardCharsets.UTF_8), METADATA_FILE + ".sha1");
+    final var result = this.classify(repo, ARTIFACT_METADATA + ".sha1", "garbage");
 
     assertThat(result).isEqualTo(pair(null, null));
+  }
+
+  @Test
+  @DisplayName(
+      "a version-level snapshot metadata checksum is judged as a snapshot by its directory")
+  void versionLevelMetadataChecksumIsJudgedAsASnapshotByItsDirectory() throws Exception {
+    final var id = UUID.randomUUID();
+    final var path = StoragePath.of(id, SNAPSHOT_VERSION_METADATA + ".sha1");
+
+    final var refusing = repo(id, true, false, true);
+    final var result = this.classify(refusing, SNAPSHOT_VERSION_METADATA + ".sha1", "garbage");
+
+    assertThat(result).isEqualTo(pair(null, SNAPSHOT));
+    assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(refusing, result, path))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("snapshotVersionsAreProhibited");
+    assertThatCode(
+            () ->
+                this.artifactService.checkDeploymentRules(repo(id, true, true, true), result, path))
+        .doesNotThrowAnyException();
+  }
+
+  @ParameterizedTest(name = "{0} is not judged")
+  @ValueSource(
+      strings = {
+        "com/acme/maven-metadata.xml.sha1",
+        "com/acme/lib/maven-metadata.xml.sha1",
+        "com/acme/lib/maven-metadata.xml.md5",
+        "com/acme/lib/1.0/maven-metadata.xml.sha1"
+      })
+  @DisplayName("the other metadata checksums are not judged, the file being a hash (RPS-1183)")
+  void otherMetadataChecksumsAreNotJudged(final String path) throws Exception {
+    final var id = UUID.randomUUID();
+    final var repo = repo(id, false, false, true);
+
+    final var result = this.classify(repo, path, "garbage");
+
+    assertThat(result).isEqualTo(pair(null, null));
+    assertThatCode(
+            () -> this.artifactService.checkDeploymentRules(repo, result, StoragePath.of(id, path)))
+        .doesNotThrowAnyException();
+    verifyNoInteractions(this.artifactRepository, this.artifactVersionRepository);
   }
 
   @Test
@@ -375,10 +419,14 @@ class ArtifactServiceImplTest {
         "com/acme/lib/1.0-SNAPSHOT/b-1.0-SNAPSHOT.jar",
         "com/acme/lib/1.0-SNAPSHOT/lib-2.0-SNAPSHOT.jar",
         "com/acme/lib/1.0-SNAPSHOT/lib-2.0-20260921.101010-1.pom",
-        "com/acme/lib/1.0-SNAPSHOT/lob-1.0-SNAPSHOT.jar"
+        "com/acme/lib/1.0-SNAPSHOT/lob-1.0-SNAPSHOT.jar",
+        "io/stray.txt.sha1",
+        "com/acme/lib/1.0/other-1.0.jar.sha1",
+        "com/acme/lib/1.0-SNAPSHOT/lib-2.0-SNAPSHOT.jar.sha1"
       })
   @DisplayName(
-      "a path outside the artifact layout is refused before any query (RPS-1182, RPS-1184)")
+      "a path outside the artifact layout is refused before any query, a checksum of it too"
+          + " (RPS-1182, RPS-1183, RPS-1184)")
   void refusesAPathOutsideTheArtifactLayoutBeforeAnyQuery(final String path) {
     final var id = UUID.randomUUID();
 
@@ -408,9 +456,20 @@ class ArtifactServiceImplTest {
     "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1-sources.jar, SNAPSHOT",
     "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar, SNAPSHOT",
     "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT-sources.jar, SNAPSHOT",
-    "com/acme/lib/1.0-beta-SNAPSHOT/lib-1.0-beta-20260921.101010-1.jar, SNAPSHOT"
+    "com/acme/lib/1.0-beta-SNAPSHOT/lib-1.0-beta-20260921.101010-1.jar, SNAPSHOT",
+    "com/acme/lib/1.0/lib-1.0.jar.sha1, RELEASE",
+    "com/acme/lib/1.0/lib-1.0.jar.md5, RELEASE",
+    "com/acme/lib/1.0/lib-1.0.jar.sha256, RELEASE",
+    "com/acme/lib/1.0/lib-1.0.jar.sha512, RELEASE",
+    "com/acme/lib/1.0/lib-1.0.pom.sha1, RELEASE",
+    "com/acme/lib/1.0/lib-1.0.jar.asc.sha1, RELEASE",
+    "com/acme/lib/1.0/lib-1.0.module.sha512, RELEASE",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.jar.sha1, SNAPSHOT",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar.md5, SNAPSHOT"
   })
-  @DisplayName("the files real Maven, Gradle and sbt clients send are classified (RPS-1182)")
+  @DisplayName(
+      "the files real Maven, Gradle and sbt clients send are classified, checksums by their file"
+          + " (RPS-1182, RPS-1183)")
   void classifiesTheFilesRealClientsSend(final String path, final ArtifactVersionType versionType) {
     final var id = UUID.randomUUID();
 
@@ -422,18 +481,53 @@ class ArtifactServiceImplTest {
   }
 
   @Test
-  @DisplayName("a checksum is not classified, whether or not its path is a Maven path (RPS-1182)")
-  void checksumOfAnArtifactIsNotClassified() {
+  @DisplayName("a checksum of a kind that is switched off is refused like the file it belongs to")
+  void checksumOfARefusedKindIsRefusedByTheVersionTypeRule() {
     final var id = UUID.randomUUID();
+    final var releasesOff = repo(id, false, true, true);
+    final var release = StoragePath.of(id, "com/acme/lib/3.5/lib-3.5.jar.sha1");
 
-    for (final var path : List.of("com/acme/lib/1.0/lib-1.0.jar.sha256", "io/stray.txt.sha1")) {
-      assertThat(
-              this.artifactService.getDeployAndVersionType(
-                  repo(id, true, true, true), StoragePath.of(id, path)))
-          .as(path)
-          .isEqualTo(pair(null, null));
-    }
-    verifyNoInteractions(this.artifactRepository, this.artifactVersionRepository);
+    final var releaseResult = this.artifactService.getDeployAndVersionType(releasesOff, release);
+
+    assertThat(releaseResult).isEqualTo(pair(NEW, RELEASE));
+    assertThatThrownBy(
+            () -> this.artifactService.checkDeploymentRules(releasesOff, releaseResult, release))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("releaseVersionsAreProhibited");
+
+    final var snapshotsOff = repo(id, true, false, true);
+    final var snapshot =
+        StoragePath.of(id, "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.pom.sha1");
+
+    final var snapshotResult = this.artifactService.getDeployAndVersionType(snapshotsOff, snapshot);
+
+    assertThat(snapshotResult).isEqualTo(pair(NEW, SNAPSHOT));
+    assertThatThrownBy(
+            () -> this.artifactService.checkDeploymentRules(snapshotsOff, snapshotResult, snapshot))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("snapshotVersionsAreProhibited");
+  }
+
+  @Test
+  @DisplayName("a checksum is an override only when the checksum file itself already exists")
+  void checksumOfAnExistingVersionIsOnlyAnOverrideWhenTheChecksumExists() {
+    final var id = UUID.randomUUID();
+    final var repo = repo(id, true, true, false);
+    final var path = StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.sha1");
+    final var pair = this.artifactService.getDeployAndVersionType(repo, path);
+
+    assertThatCode(() -> this.artifactService.checkDeploymentRules(repo, pair, path))
+        .doesNotThrowAnyException();
+    verify(this.artifactRepository, never())
+        .existsByRepoIdAndArtifactNameAndGroupNameAndArtifactVersionsVersionName(
+            any(), any(), any(), any());
+
+    when(this.storageStrategy.get(path, "mvn"))
+        .thenReturn(Optional.of(new ByteArrayResource(new byte[] {1})));
+
+    assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(repo, pair, path))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("artifactOverrideIsProhibited");
   }
 
   private static StoragePath pathOf(final String relativePath) {

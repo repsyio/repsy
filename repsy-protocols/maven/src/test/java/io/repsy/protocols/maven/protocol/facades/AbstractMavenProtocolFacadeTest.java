@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -27,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -66,6 +68,9 @@ import org.springframework.core.io.Resource;
  *
  * <p>RPS-1193: a POM whose groupId is not the one of its path was stored and answered 200 but never
  * registered. It is refused before it is stored now, like a malformed one.
+ *
+ * <p>RPS-1183: a checksum is judged by the file it belongs to, so one of a refused kind is refused
+ * before it is stored; a metadata checksum is classified by its path, its body being a hash.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractMavenProtocolFacade upload")
@@ -386,7 +391,7 @@ class AbstractMavenProtocolFacadeTest {
     final var metadata = "<metadata/>";
     requestFor(path);
     when(this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
-            any(), any(byte[].class), anyString()))
+            any(), any(byte[].class), any(StoragePath.class)))
         .thenReturn(new MutablePair<>(ArtifactDeployType.NEW, ArtifactVersionType.RELEASE));
     storageReportsUsage(metadata.length());
     when(this.storageService.getResource(anyString(), any(StoragePath.class)))
@@ -396,6 +401,48 @@ class AbstractMavenProtocolFacadeTest {
 
     assertThat(this.stored).singleElement().isEqualTo(metadata.getBytes(UTF_8));
     verify(this.artifactService).createOrUpdateArtifact(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("hands a metadata checksum to the metadata classifier with its path, unparsed")
+  void passesAMetadataChecksumToTheMetadataClassifierWithItsPath() throws Exception {
+    final var path = "com/example/lib/1.0-SNAPSHOT/maven-metadata.xml.sha1";
+    final var hash = "da39a3ee5e6b4b0d3255bfef95601890afd80709";
+    requestFor(path);
+    when(this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
+            any(), any(byte[].class), any(StoragePath.class)))
+        .thenReturn(new MutablePair<>(null, ArtifactVersionType.SNAPSHOT));
+    storageReportsUsage(hash.length());
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(hash.getBytes(UTF_8)));
+
+    upload(hash);
+
+    final var storagePath = ArgumentCaptor.forClass(StoragePath.class);
+    verify(this.artifactService)
+        .getDeployAndVersionTypesByMetadataTypeFiles(
+            any(), eq(hash.getBytes(UTF_8)), storagePath.capture());
+    assertThat(storagePath.getValue().getRelativePath().getPath()).isEqualTo(path);
+    verify(this.artifactService, never()).getDeployAndVersionType(any(), any());
+    assertThat(this.stored).singleElement().isEqualTo(hash.getBytes(UTF_8));
+  }
+
+  @Test
+  @DisplayName("stores nothing and reports no usage for a checksum whose kind is refused")
+  void storesNothingForAChecksumWhoseKindIsRefused() {
+    requestFor("com/example/lib/1.0/lib-1.0.jar.sha1");
+    deployIsAllowed();
+    doThrow(new AccessNotAllowedException("releaseVersionsAreProhibited"))
+        .when(this.artifactService)
+        .checkDeploymentRules(any(), any(), any());
+
+    assertThatThrownBy(() -> upload("da39a3ee5e6b4b0d3255bfef95601890afd80709"))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("releaseVersionsAreProhibited");
+
+    verifyNoInteractions(this.storageService);
+    verify(this.artifactService, never()).createOrUpdateArtifact(any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
   }
 
   @Test

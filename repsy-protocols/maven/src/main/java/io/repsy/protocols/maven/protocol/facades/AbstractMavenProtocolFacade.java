@@ -71,7 +71,9 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * only when present). A POM is parsed, and refused if its groupId is not the one of its path,
    * before it is stored. A POM signature ({@code .pom.asc}) is verified against the stored POM
    * before it is stored, so a refused one never reaches the repo and takes nothing else with it: an
-   * existing version, its previous signature and its {@code signed} flag are left as they were.
+   * existing version, its previous signature and its {@code signed} flag are left as they were. A
+   * checksum is judged by the file it belongs to, so it is refused, and nothing is stored, when
+   * that file would be (RPS-1183).
    */
   @Override
   public void upload(
@@ -93,7 +95,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       content = inputStream.readAllBytes();
       artifactPair =
           this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
-              repoInfo, content, fileName);
+              repoInfo, content, storagePath);
     }
 
     this.artifactService.checkDeploymentRules(repoInfo, artifactPair, storagePath);
