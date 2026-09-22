@@ -1027,6 +1027,43 @@ predicted**; none required a workaround or a routing-around hook.
   (`isolatedWorkDir`/`nugetEnv`), and two full 27-test runs (12 parallel workers each) both passed
   with no flakiness or leftover-state failures.
 
+### NuGet protocol-specific suite (step 5e, RPS-294)
+
+`tests/nuget/protocol-specific.spec.ts`, ported from `repsy-cloud`'s own e2e harness
+(`protocols/nuget/unlist`/`relist`/`search`/the "explicitly older version" case of
+`multi_version` — read-only reference material, never a target this repo modifies) into real
+`dotnet` binaries and hand-built `World`s, this harness's own conventions — never that harness's
+own `npx tsx subprocess`/`shelljs` structure. Every test uses a fresh `token-rw` deploy-token
+credential built by hand, exactly like the Cargo protocol-specific suite above.
+
+- **Unlist/relist** (`DELETE`/`POST /<repo>/v3/package/<idLower>/<verLower>`,
+  `AbstractNuGetUnlistProtocolMethodHandler`/`AbstractNuGetRelistProtocolMethodHandler`,
+  `permission: WRITE` both ways — NuGet's own `PackagePublish/2.0.0` convention, never the
+  non-standard `PackageDelete/2.0.0` service the service index also advertises): confirmed live —
+  `DELETE` → `204`, the registration leaf's `listed` flips to `false`; `POST` → `200`, flips it back
+  to `true`. Real NuGet semantics: unlisted != deleted, so the flat `v3/package/<id>/index.json`
+  container keeps serving the version regardless of its `listed` state, and a fresh real `dotnet
+restore` of the exact unlisted version still succeeds end to end (not just a raw probe).
+- **Search/autocomplete** (`GET /<repo>/v3/search`/`v3/autocomplete`, `permission: READ`): confirmed
+  live over raw HTTP — search answers `{"totalHits":N,"data":[{"id","version","registration",...}]}`
+  (`NuGetSearchResponse`/`NuGetSearchData`, `data[].id` the lowercased stored spelling, matched
+  case-insensitively, same H8 fact as the rest of this runner's suite); autocomplete answers
+  `{"totalHits":N,"data":["<idLower>",...]}` (`NuGetAutocompleteResponse`), bare id strings. Both
+  routes work fine over raw HTTP — see the next point for why a real client still can't reach them.
+- **`dotnet package search` (RPS-1213 live evidence, not a new bug)**: running a real `dotnet package
+search <id> --source repsy --configfile <cfg>` against a package this suite had just published and
+  proven searchable over raw HTTP (previous point) does NOT crash and does NOT exit non-zero — exit
+  `0`, stdout reads `error: The source does not have a Search service!` and no results are returned.
+  This is one more piece of live evidence for H6/RPS-1213's already-documented root cause
+  (NuGet.Client's `ServiceTypes.cs` never resolves the bare `SearchQueryService/3.0.0` `@type` this
+  server's service index advertises, only the `-beta`/`3.4.0` spellings), now confirmed with the real
+  command's own failure shape rather than the service-index evidence alone — pinned with
+  `test.fail()` referencing RPS-1213, not a new placeholder.
+- **Explicitly older version restores**: publishing version B after version A, then explicitly
+  restoring A (`renderConsumerProject`/`nuget.resolve` always pin an exact bracketed
+  `Version="[<version>]"`) returns exactly A's bytes, never B's — confirmed live, no "latest wins"
+  behaviour leaks into an explicit restore.
+
 ## Docker runner
 
 `runners/docker.Dockerfile` copies the single static `crane` binary (go-containerregistry v0.22.1,
