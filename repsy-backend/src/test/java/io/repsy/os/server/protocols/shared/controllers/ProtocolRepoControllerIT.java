@@ -143,6 +143,21 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
         .formatted(privateRepo, allowOverride, releases, snapshots, securityScanEnabled);
   }
 
+  /** {@link #settingsBody} with every field set to {@code value}, except {@code omittedField}. */
+  private static String settingsBodyWithout(final String omittedField, final boolean value) {
+    final var fields = new HashMap<String, Boolean>();
+    fields.put("privateRepo", value);
+    fields.put("allowOverride", value);
+    fields.put("releases", value);
+    fields.put("snapshots", value);
+    fields.put("securityScanEnabled", value);
+    fields.remove(omittedField);
+
+    return fields.entrySet().stream()
+        .map(entry -> "\"%s\":%s".formatted(entry.getKey(), entry.getValue()))
+        .collect(Collectors.joining(",", "{", "}"));
+  }
+
   private static String repoUrl(final Repo repo, final String suffix) {
     return "/api/repos/" + repo.getName() + suffix;
   }
@@ -1423,6 +1438,9 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   @DisplayName("/api/repos/{repoName}/settings")
   class Settings {
 
+    private static final List<String> SETTINGS_FIELDS =
+        List.of("privateRepo", "allowOverride", "releases", "snapshots", "securityScanEnabled");
+
     private Map<String, Object> settingsOf(final Repo repo) throws Exception {
       return dataObject(
           expectSuccess(
@@ -1521,24 +1539,131 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       }
     }
 
-    @Test
-    @DisplayName("PUT {} resets booleans to false and leaves releases/snapshots unset")
-    void emptyBodyResetsSettings() throws Exception {
+    private void assertOtherFieldsEqual(
+        final Map<String, Object> settings, final String changedField, final boolean otherValue) {
+      for (final var other : SETTINGS_FIELDS) {
+        if (!other.equals(changedField)) {
+          assertThat(settings).containsEntry(other, otherValue);
+        }
+      }
+    }
+
+    static Stream<Arguments> settingsFieldsWithInitialValues() {
+      return SETTINGS_FIELDS.stream()
+          .flatMap(field -> Stream.of(Arguments.of(field, true), Arguments.of(field, false)));
+    }
+
+    @ParameterizedTest(name = "{0} initial={1}")
+    @MethodSource("settingsFieldsWithInitialValues")
+    @DisplayName("a field omitted from the PUT body keeps its current value; the rest are applied")
+    void omittedFieldIsLeftUnchanged(final String field, final boolean initial) throws Exception {
       final var repo = ProtocolRepoControllerIT.this.seedMaven();
+      this.updateSettings(repo, settingsBody(initial, initial, initial, initial, initial));
+
+      this.updateSettings(repo, settingsBodyWithout(field, !initial));
+
+      final var settings = this.settingsOf(repo);
+      assertThat(settings).containsEntry(field, initial);
+      this.assertOtherFieldsEqual(settings, field, !initial);
+
+      final var row = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
+      assertThat(row.getReleases()).isNotNull();
+      assertThat(row.getSnapshots()).isNotNull();
+      if (field.equals("releases")) {
+        assertThat(row.getReleases()).isEqualTo(initial);
+      }
+      if (field.equals("snapshots")) {
+        assertThat(row.getSnapshots()).isEqualTo(initial);
+      }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+        strings = {"privateRepo", "allowOverride", "releases", "snapshots", "securityScanEnabled"})
+    @DisplayName("an explicit false for one field is applied although every other field is omitted")
+    void explicitFalseIsApplied(final String field) throws Exception {
+      final var repo = ProtocolRepoControllerIT.this.seedMaven();
+      this.updateSettings(repo, settingsBody(true, true, true, true, true));
+
+      this.updateSettings(repo, "{\"%s\":false}".formatted(field));
+
+      final var settings = this.settingsOf(repo);
+      assertThat(settings).containsEntry(field, false);
+      this.assertOtherFieldsEqual(settings, field, true);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+        strings = {"privateRepo", "allowOverride", "releases", "snapshots", "securityScanEnabled"})
+    @DisplayName("an explicit true for one field is applied although every other field is omitted")
+    void explicitTrueIsApplied(final String field) throws Exception {
+      final var repo = ProtocolRepoControllerIT.this.seedMaven();
+      this.updateSettings(repo, settingsBody(false, false, false, false, false));
+
+      this.updateSettings(repo, "{\"%s\":true}".formatted(field));
+
+      final var settings = this.settingsOf(repo);
+      assertThat(settings).containsEntry(field, true);
+      this.assertOtherFieldsEqual(settings, field, false);
+    }
+
+    @Test
+    @DisplayName("PUT {} changes nothing: every field, including releases/snapshots, is untouched")
+    void emptyBodyChangesNothing() throws Exception {
+      final var repo = ProtocolRepoControllerIT.this.seedMaven();
+      this.updateSettings(repo, settingsBody(true, false, true, false, true));
+      final var before = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
 
       this.updateSettings(repo, "{}");
 
-      // releases and snapshots are nullable tri-state columns, and null fields are omitted from
-      // the JSON.
+      assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName())).isEqualTo(before);
       assertThat(this.settingsOf(repo))
-          .containsOnlyKeys("privateRepo", "allowOverride", "searchable", "securityScanEnabled")
-          .containsEntry("privateRepo", false)
+          .containsOnlyKeys(SETTINGS_KEYS)
+          .containsEntry("privateRepo", true)
           .containsEntry("allowOverride", false)
-          .containsEntry("searchable", false)
+          .containsEntry("releases", true)
+          .containsEntry("snapshots", false)
+          .containsEntry("securityScanEnabled", true);
+    }
+
+    @Test
+    @DisplayName("an explicit JSON null is treated like an omitted field and changes nothing")
+    void explicitNullIsLeftUnchanged() throws Exception {
+      final var repo = ProtocolRepoControllerIT.this.seedMaven();
+      this.updateSettings(repo, settingsBody(true, false, true, false, true));
+      final var before = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
+
+      this.updateSettings(repo, "{\"privateRepo\":null,\"releases\":null}");
+
+      assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName())).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("a partial PUT on a non-Maven repo leaves its creation defaults untouched")
+    void partialPutOnNonMavenRepo() throws Exception {
+      final var repo =
+          ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("npmset"));
+      assertThat(this.settingsOf(repo))
+          .containsEntry("privateRepo", false)
+          .containsEntry("allowOverride", true)
+          .containsEntry("releases", true)
+          .containsEntry("snapshots", true)
+          .containsEntry("securityScanEnabled", true);
+
+      this.updateSettings(repo, "{\"securityScanEnabled\":false}");
+
+      assertThat(this.settingsOf(repo))
+          .containsEntry("privateRepo", false)
+          .containsEntry("allowOverride", true)
+          .containsEntry("releases", true)
+          .containsEntry("snapshots", true)
           .containsEntry("securityScanEnabled", false);
       final var row = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
-      assertThat(row.getReleases()).isNull();
-      assertThat(row.getSnapshots()).isNull();
+      assertThat(row.isPrivateRepo()).isFalse();
+      assertThat(row.isAllowOverride()).isTrue();
+      assertThat(row.getReleases()).isTrue();
+      assertThat(row.getSnapshots()).isTrue();
+      assertThat(row.isSecurityScanEnabled()).isFalse();
     }
 
     @Test
