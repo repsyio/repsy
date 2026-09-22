@@ -77,6 +77,18 @@
  *    runner" section. Docker is never added to `maven-releases-off`/`maven-snapshots-off`/
  *    `redeploy-*-off`/`snapshot-*` (it has no releases/snapshots rule, or a SNAPSHOT-file concept, at
  *    all -- `releases`/`snapshots` repo settings are never read by the Docker protocol).
+ *  - helm (step 4b) runs the shared catalog TWICE, once per protocol Repsy implements on the same
+ *    port (`helm`: OCI distribution-spec; `helm-classic`: the ChartMuseum protocol,
+ *    `clients/helm.ts`/`clients/helm-classic.ts`'s file headers) -- both need
+ *    `expectByProtocol: { publish: 'conflict' }` on `no-override`: confirmed live, a real `409`
+ *    with an OCI `DENIED`/`chartAlreadyExists` body (OCI) or the panel `chartAlreadyExists` envelope
+ *    (classic), from `ItemAlreadyExistException` in each mode's own override check. `override`
+ *    needs no data change: both modes' shared `expect` of `ok` already matches. Like docker, helm is
+ *    never added to `maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/`snapshot-*`: it has
+ *    no releases/snapshots rule at all (grep-confirmed: no Helm code reads either repo setting).
+ *    Auth is a single-hop Basic challenge for BOTH modes (confirmed live, `helm-raw.ts`'s file
+ *    header) -- unlike Docker's two-hop token exchange -- so every auth scenario's shared `expect`
+ *    (pinned by maven) already matches for helm/helm-classic too, with no override needed.
  *
  * `versionType` matters only to the maven adapter today; other protocols ignore it once they exist.
  */
@@ -172,9 +184,15 @@ export const SCENARIOS: readonly Scenario[] = [
     // cargo bullet. nuget: a REAL 409 ("conflict") -- the first protocol in this harness to use
     // that outcome for real, see the file-level comment's nuget bullet. docker: the SAME 403
     // ("packageOverrideDisabled") as the shared pin, no override needed -- see the file-level
-    // comment's docker bullet.
+    // comment's docker bullet. helm/helm-classic: a REAL 409 ("conflict") in both modes -- see the
+    // file-level comment's helm bullet.
     expect: { publish: 'forbidden', consume: 'ok' },
-    expectByProtocol: { cargo: { publish: 'rejected' }, nuget: { publish: 'conflict' } },
+    expectByProtocol: {
+      cargo: { publish: 'rejected' },
+      nuget: { publish: 'conflict' },
+      helm: { publish: 'conflict' },
+      'helm-classic': { publish: 'conflict' },
+    },
   },
   {
     id: 'override',

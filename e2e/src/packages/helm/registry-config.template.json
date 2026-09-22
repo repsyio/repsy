@@ -1,0 +1,5 @@
+{
+  "auths": {
+    "{{{registryHost}}}": { "auth": "{{{authBase64}}}" }
+  }
+}

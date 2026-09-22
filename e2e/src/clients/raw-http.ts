@@ -71,6 +71,30 @@ export function msgIdOf(body: Buffer): string | undefined {
   }
 }
 
+/**
+ * `{"errors":[{"code","message","detail"}]}` -- `OciErrorBodyAdvice`'s envelope (RPS-1039, "Docker
+ * and Helm OCI endpoints"), distinct from Repsy's own `msgId` envelope `msgIdOf` reads. Moved here
+ * (step 4b, RPS-294) from `docker-raw.ts` so the Helm OCI adapter can share it without importing
+ * docker's own module; `docker-raw.ts` re-exports it so nothing there changes shape.
+ * `undefined` when the body is not that shape (e.g. a bodyless 401/400).
+ */
+export function ociErrorOf(
+  body: Buffer,
+): { code: string; message: string; detail?: unknown } | undefined {
+  try {
+    const parsed = JSON.parse(body.toString('utf8')) as {
+      errors?: { code?: unknown; message?: unknown; detail?: unknown }[];
+    };
+    const first = parsed.errors?.[0];
+    if (!first || typeof first.code !== 'string' || typeof first.message !== 'string') {
+      return undefined;
+    }
+    return { code: first.code, message: first.message, detail: first.detail };
+  } catch {
+    return undefined;
+  }
+}
+
 /** `withBackoff429` speaks in bare statuses; this keeps the whole response of the final attempt. */
 export async function withBackoff429Response(
   attempt: () => Promise<RawResponse>,

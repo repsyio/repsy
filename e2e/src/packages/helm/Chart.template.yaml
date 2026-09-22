@@ -1,0 +1,5 @@
+apiVersion: v2
+name: {{{name}}}
+version: {{{version}}}
+description: e2e {{{name}}}@{{{version}}}
+type: application

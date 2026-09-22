@@ -58,6 +58,10 @@ const REPO_TYPE_BY_PROTOCOL: Record<string, RepoType> = {
   nuget: RepoType.NUGET,
   golang: RepoType.GOLANG,
   helm: RepoType.HELM,
+  // The classic (ChartMuseum-protocol) Helm adapter (step 4b): a SEPARATE protocol key so the
+  // shared catalog is run once per Helm mode (`helm.ts`/`helm-classic.ts`'s file headers), but the
+  // same underlying `RepoType.HELM` repo -- Repsy implements both protocols on one repo/port.
+  'helm-classic': RepoType.HELM,
   ruby: RepoType.RUBY,
 };
 
