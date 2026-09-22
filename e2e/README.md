@@ -1506,6 +1506,16 @@ fetch (`oras`'s `Copy`) DOES resolve every blob a served manifest names, config 
 bug on every successful scenario, when it is actually this adapter needing to satisfy the CLIENT's
 own validation, which is stricter than the server's.
 
+### Helm protocol-specific suite (step 5h, RPS-294): already fully covered, nothing added
+
+Step 5h's own plan included a Helm alias-flow sub-scope (`helm repo add <alias> <repoUrl>` + `helm
+repo update` + `helm search repo <alias>/<chart>` + `helm pull <alias>/<chart> --version <v>`).
+Checked first, as instructed: `tests/helm/classic-publish-consume.spec.ts`'s existing "C1" test
+(added in this Helm runner step, "Scenario mapping onto the shared catalog" above) already drives
+this exact flow end to end, real `helm` binary, real `cm-push` by repo alias — so this sub-scope was
+skipped as already-covered rather than duplicated; see the PyPI protocol-specific suite section
+below for the step 5h work that WAS added (PyPI sdist support).
+
 ### Backend bug candidates found while reading and confirmed live (do not fix here)
 
 - **B-H1 (filed as [RPS-1217](https://zyfera.atlassian.net/browse/RPS-1217))** — `index.yaml`
@@ -1753,6 +1763,56 @@ download` in the catalog loop succeeds against pages carrying it.
   `addOrUpdateRelease`) throws a bare `IllegalStateException` in what reads as an unreachable branch;
   noted only, not independently confirmed live (no code path in this harness's own scenarios reaches
   it).
+
+### PyPI protocol-specific suite (step 5h, RPS-294)
+
+`tests/pypi/protocol-specific.spec.ts`, ported from `repsy-cloud`'s own e2e harness
+(`protocols/pypi/setup.template.py`'s `setup.py sdist bdist_wheel` + `util.ts`'s
+`pypiUpload`/`pypiInstall`, which upload a wheel AND an sdist together and never probe an
+sdist-only install — read-only reference material, never a target this repo modifies) into real
+`twine`/`pip` binaries and a hand-built repo+token layout, this harness's own conventions — never
+that harness's own `npx tsx subprocess`/`shelljs`/`setup.py` structure. Goes beyond repsy-cloud's
+own coverage: it publishes an sdist-ONLY package (no wheel sibling) and confirms live what a real
+`pip install`/`download` does when only a source archive exists — the exact question README.md's
+own H20 (PyPI runner section) left open ("dropped per the plan's own 'if time-boxed' escape
+hatch").
+
+`buildSdist` (`pypi-raw.ts`) hand-assembles the `.tar.gz` the same way `buildWheel` hand-assembles a
+wheel — `docker-image.ts`'s own ustar `buildTar` plus `zlib.gzipSync`, never `python -m build
+--sdist`/`setup.py sdist`/`setuptools` (this story's own "own the exact bytes" constraint, and
+`runners/pypi.Dockerfile` does not even install `setuptools`). Reading
+`PackageStorageUtils.checkArchiveFilename`/`AbstractPypiProtocolFacade.uploadPackage` first showed
+why no new server-side probing was needed: the upload grammar already accepts `.tar.gz` alongside
+`.whl`/`.zip`, and the handler never reads the form's `filetype`/`pyversion` fields at all — a wheel
+and an sdist take the identical server-side code path.
+
+- **A real `twine upload` of a hand-built sdist (no `setup.py`/`pyproject.toml` at all) publishes,
+  lists and downloads correctly**: confirmed live — exit `0` on the first attempt (twine's own
+  `pkginfo.SDist` metadata parser reads `PKG-INFO` directly and needs neither file); the served
+  project page carries the correct `href`/`#sha256=`, and `Requires-Python` (from `PKG-INFO`, via
+  twine's form) round-trips through the HTML escape/unescape exactly like a wheel's `METADATA`
+  header does.
+- **Pip cannot resolve a source-only package on this runner image — live-confirmed, not a Repsy
+  bug**: a plain `python3 -m pip download --no-deps --dest <dir> <name>==<version>` (deliberately
+  WITHOUT `--only-binary=:all:`, the flag the catalog loop's own `resolve()` always passes) against
+  an sdist-only package downloads the archive fine, then refuses to install it OUTRIGHT — `ERROR:
+... does not appear to be a Python project: neither 'setup.py' nor 'pyproject.toml' found`, exit
+  `1`, promptly, no hang, no build-isolation attempt at all. `buildSdist` (`pypi-raw.ts`)
+  deliberately never writes either file (this story's own "own the exact bytes, no setuptools"
+  constraint, the sdist analogue of `buildWheel` never invoking `setuptools`/`wheel`), and pip's own
+  legacy-vs-PEP-517 project-type detection runs BEFORE it would ever attempt a build — so this is an
+  even earlier, simpler failure than a build-isolation dependency fetch (this suite's own initial,
+  manual-probe prediction, corrected once the real suite ran — see the spec file's own header). Not
+  a Repsy bug — the server already serves the archive correctly (the previous test's own assertions
+  prove that); no real client in this harness ships a PEP 517 build backend, that was simply never
+  part of `pypi.Dockerfile`'s own toolchain, and this hand-built sdist was never meant to be
+  pip-installable from source in the first place. A failed resolve leaves nothing under `--dest`.
+
+The Helm alias-flow sub-scope originally planned alongside this PyPI work (`helm repo add` + `helm
+repo update` + `helm search repo` + `helm pull <alias>/<chart>`) turned out to be already fully
+covered by `tests/helm/classic-publish-consume.spec.ts`'s existing "C1" test (added in the Helm
+runner step) — checked first, confirmed by reading that file, so nothing new was added for Helm in
+this step; see the "Helm runner" section above for C1's own coverage.
 
 ## Go runner
 

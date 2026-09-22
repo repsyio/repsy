@@ -90,14 +90,32 @@
  *  - `releases`/`snapshots` repo settings are never read by any PyPI code (grep-confirmed): a
  *    `.dev0`/`a1`/`.post1` upload is accepted regardless of either switch (H23; `catalog.ts` never
  *    adds `pypi` to the maven/nuget-only `releases`/`snapshots` scenarios, same as docker/helm).
+ *  - Sdist support (step 5h, RPS-294): `PackageStorageUtils.ARCHIVE_UPLOAD_PATTERN` already accepts
+ *    `.tar.gz` alongside `.whl`/`.zip`, and nothing in `AbstractPypiProtocolFacade.uploadPackage`
+ *    (this file's header, above) reads `filetype`/`pyversion` at all -- a wheel and an sdist take the
+ *    IDENTICAL upload/download/project-page code path, confirmed live: a real `twine upload` of a
+ *    hand-built sdist (`buildSdist`, no `setup.py`/`pyproject.toml`) publishes exit 0 and lists
+ *    correctly on the project page. The interesting live fact is client-side, not server-side: this
+ *    harness's own `pypi` runner image installs only `pip`/`twine` (`runners/pypi.Dockerfile`'s own
+ *    header), no `setuptools`/`wheel`/`build`, and `buildSdist` itself never writes a `setup.py`/
+ *    `pyproject.toml` either -- so a `pip install`/`download` of a package that has ONLY this sdist
+ *    refuses OUTRIGHT, before ever attempting a build: confirmed live (running the real suite, not
+ *    just a manual probe -- see `tests/pypi/protocol-specific.spec.ts`'s own header for the earlier,
+ *    superseded prediction) -- `ERROR: ... does not appear to be a Python project: neither
+ *    'setup.py' nor 'pyproject.toml' found`, exit 1, promptly (no hang, no retry storm). Not a Repsy
+ *    bug: every real client here (helm/go/ruby/etc.) ships its OWN toolchain deliberately; pip's
+ *    build backend is simply not part of it, and this hand-built sdist was never meant to be
+ *    pip-installable from source, only to prove the SERVER'S upload/serve path is format-agnostic.
  */
 import { createHash } from 'node:crypto';
+import zlib from 'node:zlib';
 
 import { zipSync } from 'fflate';
 
 import { env } from '../env.js';
 import type { Scenario } from '../scenarios/types.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
+import { buildTar } from './docker-image.js';
 import {
   adminCredential,
   authHeader,
@@ -244,6 +262,69 @@ export function buildWheel(opts: {
     version: opts.version,
     distName: dist,
     filename: wheelFilename(opts.name, opts.version),
+    bytes,
+    sha256Hex: sha256Hex(bytes),
+    requiresPython,
+  };
+}
+
+export function sdistFilename(name: string, version: string): string {
+  return `${distName(name)}-${version}.tar.gz`;
+}
+
+/** A hand-built sdist (step 5h, RPS-294: `tests/pypi/protocol-specific.spec.ts`'s "sdist upload"
+ *  case) -- `docker-image.ts`'s own `buildTar` (a minimal ustar builder, no `tar`/`tar-stream`
+ *  dependency, the same one `helm-chart.ts`'s `buildChart` reuses) plus `zlib.gzipSync`,
+ *  deliberately never `python -m build --sdist`/`setup.py sdist`/`setuptools` -- this story's own
+ *  "own the exact bytes" constraint, mirroring `buildWheel` above. One top-level `<dist>-<version>/`
+ *  directory holding a `PKG-INFO` (the same headers `buildWheel`'s `METADATA` carries: twine's
+ *  `pkginfo.SDist` parses metadata straight off this file, no `setup.py`/`pyproject.toml` needed --
+ *  confirmed live, see this file's header) and a package dir with a marker file, so two publishes of
+ *  one coordinate never share content. No `setup.py` is included on purpose: confirmed live that a
+ *  real `twine upload` neither needs nor reads one, and its absence is exactly what makes a
+ *  subsequent `pip install`/`download` of this source-only package unable to build it (no PEP 517
+ *  backend and no legacy `setup.py` for pip to fall back to) -- the live fact
+ *  `tests/pypi/protocol-specific.spec.ts`'s "no build backend" test pins. */
+export interface BuiltSdist {
+  name: string;
+  version: string;
+  distName: string;
+  filename: string;
+  bytes: Buffer;
+  sha256Hex: string;
+  requiresPython: string;
+}
+
+export function buildSdist(opts: {
+  name: string;
+  version: string;
+  marker?: string;
+  requiresPython?: string;
+}): BuiltSdist {
+  const requiresPython = opts.requiresPython ?? '>=3.9';
+  const marker = opts.marker ?? `e2e ${opts.name}@${opts.version}`;
+  const dist = distName(opts.name);
+  const distDir = `${dist}-${opts.version}`;
+
+  const pkgInfoText =
+    'Metadata-Version: 2.1\n' +
+    `Name: ${opts.name}\n` +
+    `Version: ${opts.version}\n` +
+    `Summary: e2e ${opts.name}@${opts.version}\n` +
+    `Requires-Python: ${requiresPython}\n`;
+
+  const tar = buildTar([
+    { name: `${distDir}/PKG-INFO`, data: Buffer.from(pkgInfoText, 'utf8') },
+    { name: `${distDir}/${dist}/__init__.py`, data: Buffer.from('# e2e marker package\n', 'utf8') },
+    { name: `${distDir}/${dist}/e2e_marker.txt`, data: Buffer.from(`${marker}\n`, 'utf8') },
+  ]);
+  const bytes = Buffer.from(zlib.gzipSync(tar, { level: 6 }));
+
+  return {
+    name: opts.name,
+    version: opts.version,
+    distName: dist,
+    filename: sdistFilename(opts.name, opts.version),
     bytes,
     sha256Hex: sha256Hex(bytes),
     requiresPython,
