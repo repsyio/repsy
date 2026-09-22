@@ -805,16 +805,18 @@ name round-trips through the loop under a spelling the server itself never agree
 `tests/cargo/registry-rules.spec.ts`'s raw-HTTP test both pin this directly, through `test.fail()`.
 Filed as **RPS-1212**.
 
-### Cargo protocol-specific suite (step 5b, RPS-294)
+### Cargo protocol-specific suite (steps 5b/5c, RPS-294)
 
-`tests/cargo/protocol-specific.spec.ts` — "cargo A", ported from `repsy-cloud`'s own e2e harness
-(`protocols/cargo/library/test.ts`'s yank/unyank/search parts, `checksum/test.ts`,
-`multi_version/test.ts`; that harness is read-only reference material, never a target this repo
-modifies) into real `cargo` binaries + hand-built `World`s, exactly this harness's own conventions.
-"Cargo B" (`dependency_tree`/`platform_deps`/`workspace`) is a separate, later PR. Every test here
-uses a fresh `token-rw` deploy-token credential built by hand (not a catalog-loop scenario), and every
-crate name is underscore-only, routing around RPS-1212 above by construction rather than re-tripping
-it.
+`tests/cargo/protocol-specific.spec.ts`, ported from `repsy-cloud`'s own e2e harness (read-only
+reference material, never a target this repo modifies) into real `cargo` binaries + hand-built
+`World`-less crate layouts, exactly this harness's own conventions — never that harness's own `npx
+tsx subprocess`/`shelljs` structure. "Cargo A" (step 5b: `library/test.ts`'s yank/unyank/search parts,
+`checksum/test.ts`, `multi_version/test.ts`) uses a fresh `token-rw` deploy-token credential built by
+hand around `cargo.publish(world)`; "Cargo B" (step 5c: `dependency_tree`/`platform_deps`/`workspace`)
+adds crates with real inter-crate dependencies, published with the real `cargo publish` binary
+directly (no `cargo.publish(world)`/`packageCrate()` — see below). Every crate/workspace-member name
+in this file is underscore-only, routing around RPS-1212 above by construction rather than
+re-tripping it.
 
 - **Yank/unyank** (`DELETE`/`PUT /<repo>/api/v1/crates/<name>/<version>/(yank|unyank)`,
   `AbstractCargoYankProtocolMethodHandler`, `permission: WRITE`): confirmed live with the real `cargo
@@ -827,18 +829,39 @@ yank`/`cargo yank --undo` binaries — both exit `0`, the served sparse-index en
 - **Search** (`GET /<repo>/api/v1/crates?q=<query>`, `AbstractCargoSearchProtocolMethodHandler`,
   `permission: READ`): confirmed live with the real `cargo search --registry repsy` binary — exit `0`,
   stdout lists the crate, and the raw envelope (`{"crates":[...],"meta":{"total":N}}`) matches.
-- **Owners — `candidate (RPS-1239)`**: `GET/PUT/DELETE /<repo>/api/v1/crates/<name>/owners`
-  (`CargoOwnersProtocolMethodHandler` — defined directly in `repsy-backend`, unlike every other cargo
-  route, which extends a shared abstract class in `repsy-protocols/cargo`) answers **every** owners
-  request, even a GET, with a FIXED body (`{"ok":true,"msg":"Ownership is managed at the repository
-level in this registry"}`) and `permission: WRITE` even for the GET. There is no `users` array at
-  all. A real `cargo owner --list --registry repsy <crate>` therefore fails client-side ("missing
-  field `users`", exit `101`) even though the raw HTTP GET itself succeeds (`200`) — confirmed live,
-  filed as **RPS-1239**, pinned with `test.fail()`.
+- **Owners**: `GET/PUT/DELETE /<repo>/api/v1/crates/<name>/owners` (`CargoOwnersProtocolMethodHandler`
+  — defined directly in `repsy-backend`, unlike every other cargo route, which extends a shared
+  abstract class in `repsy-protocols/cargo`) answers **every** owners request, even a GET, with a
+  FIXED body (`{"ok":true,"msg":"Ownership is managed at the repository level in this registry"}`) and
+  `permission: WRITE` even for the GET. There is no `users` array at all. A real `cargo owner --list
+--registry repsy <crate>` therefore fails client-side ("missing field `users`", exit `101`) even
+  though the raw HTTP GET itself succeeds (`200`) — confirmed live, filed as **RPS-1239**, pinned with
+  `test.fail()`.
 - **Index `cksum` / multi-version**: confirmed live that a crate's served sparse-index `cksum` equals
   the sha256 of the raw-downloaded `.crate` bytes (and the adapter's own publish hash), and that two
   versions of one crate coexist independently — distinct `cksum`s, distinct downloaded bytes, both
   present in the index simultaneously.
+- **Real inter-crate dependencies need an ONLINE `cargo publish`, not `packageCrate()`'s offline
+  `cargo package`**: `clients/cargo.ts`'s own `packageCrate()` runs `cargo package --no-verify
+--offline` for the catalog loop's dependency-free marker crate — confirmed live that this FAILS
+  ("no matching package named ... found ... offline mode ... can sometimes cause surprising
+  resolution failures") the moment a crate declares a real dependency on another crate already
+  published to the same repo. A plain `cargo publish --registry repsy --no-verify --allow-dirty`
+  (online, no separate `cargo package` step at all) resolves the dependency against the registry and
+  succeeds. `tests/cargo/protocol-specific.spec.ts`'s own `publishRealCrate()` helper uses this form
+  directly — `clients/cargo.ts` itself is untouched (the catalog loop's own dependency-free path never
+  needed to change).
+- **Dependency tree** (leaf → mid → root, each declaring a Repsy-registry dependency on the previous):
+  confirmed live that publishing leaf-first works end to end, and that a same-registry dependency's
+  served `deps` entry carries a `req` containing the exact dependency version and has **no
+  `"registry"` field at all** — real Cargo's own manifest/publish serialization for a same-registry
+  dependency, not a Repsy-specific behaviour.
+- **Platform-specific dependency**: a `[target.'cfg(unix)'.dependencies]` entry publishes and is
+  served with a `target` field on its `deps` entry containing `cfg(unix)`, confirmed live.
+- **Workspace**: a 3-member workspace (utils → core → app, each `cargo publish --package <member>`
+  from the workspace root, no compilation anywhere — the runner image ships no gcc/build-essential)
+  publishes cleanly member-by-member in dependency order; each member's served `deps` correctly names
+  every crate it depends on.
 
 ## NuGet runner
 
