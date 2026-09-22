@@ -89,6 +89,15 @@
  *    Auth is a single-hop Basic challenge for BOTH modes (confirmed live, `helm-raw.ts`'s file
  *    header) -- unlike Docker's two-hop token exchange -- so every auth scenario's shared `expect`
  *    (pinned by maven) already matches for helm/helm-classic too, with no override needed.
+ *  - pypi (step 4c) also needs NO data changes here, same reasoning as docker: `no-override`'s 403
+ *    ("fileAlreadyExists", `AccessNotAllowedException` from `AbstractPypiProtocolFacade
+ *    .checkOverridePermission`) matches the shared maven pin byte-for-byte, confirmed live -- see
+ *    `pypi-raw.ts`'s file header. Auth is a single-hop Basic challenge (`PypiAuthPreProcessor`), and
+ *    a read-only deploy token attempting a WRITE is the same flat 401 every other protocol's shared
+ *    `expect` already pins (confirmed live), so no auth scenario needs a pypi override either. pypi
+ *    is never added to `maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/`snapshot-*`: the
+ *    `releases`/`snapshots` repo settings are never read by any PyPI code at all (grep-confirmed,
+ *    and confirmed live: a `.dev0`/`a1`/`.post1` upload succeeds regardless of either switch).
  *
  * `versionType` matters only to the maven adapter today; other protocols ignore it once they exist.
  */
@@ -185,7 +194,8 @@ export const SCENARIOS: readonly Scenario[] = [
     // that outcome for real, see the file-level comment's nuget bullet. docker: the SAME 403
     // ("packageOverrideDisabled") as the shared pin, no override needed -- see the file-level
     // comment's docker bullet. helm/helm-classic: a REAL 409 ("conflict") in both modes -- see the
-    // file-level comment's helm bullet.
+    // file-level comment's helm bullet. pypi: the SAME 403 ("fileAlreadyExists") as the shared pin,
+    // no override needed -- see the file-level comment's pypi bullet.
     expect: { publish: 'forbidden', consume: 'ok' },
     expectByProtocol: {
       cargo: { publish: 'rejected' },

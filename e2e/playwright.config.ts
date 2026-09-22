@@ -59,6 +59,10 @@ export default defineConfig({
       testMatch: 'nuget/**/*.spec.ts',
     },
     {
+      name: 'pypi',
+      testMatch: 'pypi/**/*.spec.ts',
+    },
+    {
       name: 'docker',
       testMatch: 'docker/**/*.spec.ts',
     },
