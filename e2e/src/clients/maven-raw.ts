@@ -22,6 +22,12 @@
  * look at what a (refused) deploy did or did not leave in the repository, always with the admin
  * credential so the look never depends on the scenario's own (often deliberately broken) one.
  *
+ * The protocol-agnostic pieces (`RawResponse`, the admin credential, the Basic `Authorization`
+ * header builder, `sha256Hex`, the 429-backoff response wrapper) moved to `clients/raw-http.ts`
+ * (step 3a, RPS-294), so a second protocol's own raw-HTTP client (`npm-raw.ts`) does not have to
+ * depend on this maven-specific module; they are re-exported here under their original names so
+ * every existing import of this file keeps working unchanged.
+ *
  * Layout facts these helpers rely on, all probed against a running instance:
  *  - a directory (`g/a/`, `g/a/<version>/`) answers 200 with an HTML listing of `<a href>` entries
  *    (sub-directories end in `/`, the parent link is `../`) and 404 when nothing lives under it, so
@@ -31,31 +37,18 @@
  *    artifact-level `g/a/maven-metadata.xml` (a `<versions>` list, no `<version>` of its own); a
  *    release deploy writes the artifact-level file only.
  */
-import { createHash } from 'node:crypto';
-
 import { env } from '../env.js';
-import { withBackoff429 } from '../scenarios/remote-throttle.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
+import {
+  adminCredential,
+  authHeader,
+  msgIdOf,
+  type RawResponse,
+  sha256Hex,
+  withBackoff429Response,
+} from './raw-http.js';
 
-/** The harness's admin credential, for looking at a repo regardless of the scenario's credential. */
-export function adminCredential(): MaterializedCredential {
-  return { transport: 'basic', username: env.adminUsername, password: env.adminPassword };
-}
-
-/** An `Authorization` header for a Basic credential; none at all for `anonymous`. */
-export function authHeader(credential: MaterializedCredential): Record<string, string> {
-  if (credential.transport !== 'basic') {
-    return {};
-  }
-  const basic = Buffer.from(`${credential.username ?? ''}:${credential.password ?? ''}`).toString(
-    'base64',
-  );
-  return { Authorization: `Basic ${basic}` };
-}
-
-export function sha256Hex(bytes: Uint8Array | string): string {
-  return createHash('sha256').update(bytes).digest('hex');
-}
+export { adminCredential, authHeader, sha256Hex, type RawResponse };
 
 /** A scenario's `groupId:artifactId` package name, split. */
 export function splitPackageName(packageName: string): [string, string] {
@@ -100,22 +93,6 @@ function url(repoName: string, relPath: string): string {
   return `${env.repoBaseUrl}/${repoName}/${relPath}`;
 }
 
-export interface RawResponse {
-  status: number;
-  /** The server's error `msgId` when the body is its JSON error envelope, else `undefined`. */
-  msgId?: string;
-  body: Buffer;
-}
-
-function msgIdOf(body: Buffer): string | undefined {
-  try {
-    const parsed = JSON.parse(body.toString('utf8')) as { msgId?: unknown };
-    return typeof parsed.msgId === 'string' ? parsed.msgId : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 /**
  * A raw PUT. `contentType` is mandatory on purpose: without one the body is consumed as form data
  * before the handler sees it and the server answers 400, hiding the status the caller wants to pin.
@@ -148,16 +125,6 @@ export async function rawGet(
     const bytes = Buffer.from(await res.arrayBuffer());
     return { status: res.status, msgId: msgIdOf(bytes), body: bytes };
   });
-}
-
-/** `withBackoff429` speaks in bare statuses; this keeps the whole response of the final attempt. */
-async function withBackoff429Response(attempt: () => Promise<RawResponse>): Promise<RawResponse> {
-  let last: RawResponse | undefined;
-  await withBackoff429(async () => {
-    last = await attempt();
-    return last.status;
-  });
-  return last as RawResponse;
 }
 
 /** The entries of a directory listing page (`../` excluded); sub-directories end in `/`. */

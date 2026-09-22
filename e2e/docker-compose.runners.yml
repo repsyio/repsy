@@ -77,6 +77,23 @@ services:
       - ./playwright-report:/app/playwright-report
       - maven_m2_shared:/app/.maven-shared-m2
 
+  npm:
+    <<: *runner-common
+    build:
+      context: .
+      dockerfile: runners/npm.Dockerfile
+    environment:
+      <<: *runner-environment
+    volumes:
+      # No shared/named cache volume: the npm test packages are dependency-free on purpose (they
+      # must never let `npm install` reach the real npmjs.org for anything), so there is nothing
+      # third-party to warm a cache with, unlike maven's shared .m2 tail repo.
+      - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
+      - ./src:/app/src
+      - ./tests:/app/tests:ro
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+
 volumes:
   # Named (not bind-mounted): holds only downloaded third-party Maven plugins/dependencies, so it
   # persists across `run.sh test` invocations without leaving anything in the working tree.

@@ -97,7 +97,16 @@ export interface Scenario {
    * scenario's own attempt is a first deploy of a version that does not exist yet.
    */
   reuseCoordinates?: boolean;
+  /** The shared, maven-pinned expectation. A protocol whose real behaviour differs overrides it
+   *  via `expectByProtocol`, never by editing this field. */
   expect: ScenarioExpectation;
+  /**
+   * A per-protocol override of `expect`, keyed by `adapter.protocol` (e.g. `'npm'`). Lets a later
+   * protocol (Cargo, NuGet, ...) pin its own real, probed status for a scenario whose outcome
+   * differs from maven's, without touching the shared `expect` every other protocol still reads.
+   * Read through `expectationFor`, never directly.
+   */
+  expectByProtocol?: Partial<Record<string, Partial<ScenarioExpectation>>>;
   /**
    * Restricts a scenario to specific protocols (lower-case runner/service names, e.g. `'maven'`).
    * Left out, the scenario applies to every protocol whose adapter registers support for it.
@@ -108,4 +117,15 @@ export interface Scenario {
 /** Every scenario in the shared catalog, filtered to the ones `protocol` applies to. */
 export function scenariosFor(catalog: readonly Scenario[], protocol: string): Scenario[] {
   return catalog.filter((scenario) => !scenario.protocols || scenario.protocols.includes(protocol));
+}
+
+/**
+ * `scenario`'s expectation for `protocol`: the shared, maven-pinned `expect`, with any
+ * `expectByProtocol[protocol]` override merged on top (a scenario needing no override for a given
+ * protocol, which is every scenario for npm in this step, has none). The scenario loop and the
+ * world fixture's "does this scenario need a pre-publish" check both read through this, never
+ * `scenario.expect` directly, so a later protocol can differ without touching the shared field.
+ */
+export function expectationFor(scenario: Scenario, protocol: string): ScenarioExpectation {
+  return { ...scenario.expect, ...scenario.expectByProtocol?.[protocol] };
 }

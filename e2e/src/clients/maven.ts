@@ -60,10 +60,10 @@ import { fileURLToPath } from 'node:url';
 import mustache from 'mustache';
 
 import { env } from '../env.js';
+import type { AdapterResult } from '../scenarios/adapter.js';
 import { withBackoff429 } from '../scenarios/remote-throttle.js';
 import { outcomeForStatus } from '../scenarios/types.js';
-import type { MaterializedCredential, World } from '../scenarios/world.js';
-import { registerSeedPublisher } from '../scenarios/world.js';
+import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
 import { isolatedWorkDir, run } from './exec.js';
 import {
   authHeader,
@@ -87,22 +87,9 @@ const SHARED_M2_DIR =
   process.env.MAVEN_SHARED_REPO_DIR ?? path.join(os.tmpdir(), 'repsy-e2e-maven-m2');
 const WARM_MARKER = path.join(SHARED_M2_DIR, '.e2e-warm');
 
-export interface AdapterResult {
-  outcome: import('../scenarios/types.js').Outcome;
-  httpStatus: number;
-  clientExitCode: number;
-  /** The (redacted) command line `mvn` ran, useful in assertion failure messages. */
-  command: string;
-  /**
-   * sha256 of the jar this call handled: for `publish`, the jar `mvn` built and deployed (every
-   * deploy packs a fresh random marker, so two deploys never share a digest); for `resolve`, the
-   * jar that landed in the clean local repository. Comparing the two proves the consumer got the
-   * very bytes that were deployed, not merely "some jar". `undefined` when there was no such file.
-   */
-  contentSha256?: string;
-  /** `resolve` only: the file name of that jar (a timestamped name for a SNAPSHOT). */
-  resolvedFile?: string;
-}
+/** Re-exported so nothing importing `AdapterResult` from this module (its original home) breaks;
+ *  the type itself now lives in `scenarios/adapter.ts`, generalised for every protocol. */
+export type { AdapterResult };
 
 function credentialView(credential: MaterializedCredential): Record<string, unknown> {
   return {
@@ -454,8 +441,11 @@ function escapeRegExp(text: string): string {
  * (`reuseCoordinates`). Only the real client runs: the raw probe of `publish` would leave an extra POM
  * behind that a later "nothing changed" comparison has no use for. The client exiting 0 means every
  * PUT of the deploy was accepted.
+ *
+ * Exported (instead of self-registering into the old `registerSeedPublisher` registry, gone as of
+ * step 3a) so `maven-adapter.ts` can wire it up as `ProtocolAdapter.seedPublish` directly.
  */
-registerSeedPublisher('maven', async (world: World) => {
+export async function seedPublish(world: World): Promise<SeedResult> {
   const deployed = await deploy(world);
   if (deployed.exitCode !== 0) {
     throw new Error(
@@ -465,4 +455,4 @@ registerSeedPublisher('maven', async (world: World) => {
     );
   }
   return { contentSha256: deployed.contentSha256 };
-});
+}
