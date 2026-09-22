@@ -10,3 +10,8 @@ playwright-report
 # `{ { { name } } }`, breaking the template (every other package template under src/packages/ is
 # a file type prettier has no parser for at all, so this is the one that needs an explicit entry).
 src/packages/helm/Chart.template.yaml
+# Same reason as src/packages/helm/Chart.template.yaml above: a hand-built .gem's metadata.gz is
+# gzipped YAML (ruby-raw.ts's buildGem/GemspecParser's file headers), and this template's
+# triple-mustache placeholders (`{{{name}}}`) would be mangled by prettier's YAML parser the same
+# way.
+src/packages/ruby/metadata.template.yaml

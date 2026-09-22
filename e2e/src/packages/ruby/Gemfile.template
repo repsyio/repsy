@@ -1,0 +1,3 @@
+source "{{{repoUrl}}}" do
+  gem "{{{name}}}", "= {{{version}}}"
+end

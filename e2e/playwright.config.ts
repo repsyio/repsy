@@ -78,5 +78,9 @@ export default defineConfig({
       name: 'golang',
       testMatch: 'golang/**/*.spec.ts',
     },
+    {
+      name: 'ruby',
+      testMatch: 'ruby/**/*.spec.ts',
+    },
   ],
 });

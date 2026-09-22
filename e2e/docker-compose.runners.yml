@@ -216,6 +216,25 @@ services:
       - ./test-results:/app/test-results
       - ./playwright-report:/app/playwright-report
 
+  ruby:
+    <<: *runner-common
+    build:
+      context: .
+      dockerfile: runners/ruby.Dockerfile
+      args:
+        RUBY_VERSION: '4.0.7'
+    environment:
+      <<: *runner-environment
+    volumes:
+      # No shared/named cache volume, same reasoning as npm's/cargo's/nuget's/docker's/helm's/pypi's/
+      # golang's: this harness's gem is dependency-free and hand-built (never `gem build`), so
+      # `bundle install`/`gem push` never fetch a third-party dependency to cache.
+      - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
+      - ./src:/app/src
+      - ./tests:/app/tests:ro
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+
 volumes:
   # Named (not bind-mounted): holds only downloaded third-party Maven plugins/dependencies, so it
   # persists across `run.sh test` invocations without leaving anything in the working tree.
