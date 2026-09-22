@@ -174,6 +174,28 @@ services:
       - ./test-results:/app/test-results
       - ./playwright-report:/app/playwright-report
 
+  pypi:
+    <<: *runner-common
+    build:
+      context: .
+      dockerfile: runners/pypi.Dockerfile
+      args:
+        PYTHON_VERSION: '3.14.7'
+        PIP_VERSION: '26.2.1'
+        TWINE_VERSION: '7.0.0'
+    environment:
+      <<: *runner-environment
+    volumes:
+      # No shared/named cache volume, same reasoning as npm's/cargo's/nuget's/docker's/helm's: this
+      # harness's wheel is dependency-free and hand-built (never `python -m build`), so `pip
+      # download`/`twine upload` never fetch anything third-party to cache. No daemon/socket either --
+      # twine/pip are pure HTTP clients (clients/pypi.ts's file header).
+      - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
+      - ./src:/app/src
+      - ./tests:/app/tests:ro
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+
 volumes:
   # Named (not bind-mounted): holds only downloaded third-party Maven plugins/dependencies, so it
   # persists across `run.sh test` invocations without leaving anything in the working tree.

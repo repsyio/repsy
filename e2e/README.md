@@ -27,8 +27,11 @@ token-exchange auth model instead of Basic-per-request, and the first with a dae
 independent wire protocols on the same port for the same package format — OCI distribution-spec
 (`helmAdapter`, `clients/helm.ts`) and the classic ChartMuseum protocol (`helmClassicAdapter`,
 `clients/helm-classic.ts`) — so the shared catalog runs TWICE, once per mode, inside one runner/
-project (see "Helm runner" below). Every other protocol (pypi, golang, ruby) replicates the same
-model in later steps; nothing about the model itself is maven-specific.
+project (see "Helm runner" below). This is **step 4c ("pypi")**: a seventh worked example, the PyPI
+(Python Package Index) client adapter and runner — real `twine upload`/`pip download` against a
+hand-built wheel, a single-hop Basic auth model like maven/npm/cargo/nuget/helm, and a real,
+per-FILENAME override rule (see "PyPI runner" below). Every other protocol (golang, ruby) replicates
+the same model in later steps; nothing about the model itself is maven-specific.
 
 ## Rules
 
@@ -50,10 +53,10 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 ```
 e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example
-  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm"
+  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi"
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres:18 + Repsy, started/stopped by `run.sh local up|down`
-  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm"
+  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven; see "Adding a protocol adapter" below
   runners/npm.Dockerfile       # + nothing else: npm ships with the node:24 base already
@@ -61,6 +64,7 @@ e2e/
   runners/nuget.Dockerfile     # + a pinned .NET SDK, copied in from the official Ubuntu-noble SDK image
   runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image; no daemon, no socket
   runners/helm.Dockerfile      # + the static `helm` binary + the cm-push plugin installed at build time; no daemon, no socket
+  runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time
   runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
   src/
     env.ts                     # typed config from env/.env
@@ -102,6 +106,8 @@ e2e/
       helm-raw.ts                     # raw HTTP for BOTH Helm protocols: OCI manifest/blob PUT/GET/HEAD + classic index/chart/upload/delete
       helm.ts                         # the OCI client + helmAdapter: publish()/resolve()/seedPublish(), helm push/pull --plain-http
       helm-classic.ts                  # the classic (ChartMuseum) client + helmClassicAdapter: helm cm-push / pull --repo
+      pypi-raw.ts                     # pypi-specific raw POST/GET (upload/simple page/root index/download), buildWheel (fflate)
+      pypi.ts                          # the pypi client + pypiAdapter: publish()/resolve()/seedPublish(), python3 -m twine/pip
     packages/
       maven/                     # mustache templates of the tiny jar project + settings.xml
       npm/                       # mustache templates of the tiny package.json/index.js + .npmrc
@@ -109,6 +115,7 @@ e2e/
       nuget/                     # mustache templates of nuget.config + the consumer .csproj (the .nupkg itself is built in code, see nuget-raw.ts)
       docker/                    # config.template.json (DOCKER_CONFIG auths entry; the image itself is built in code, see docker-image.ts)
       helm/                      # Chart.template.yaml + registry-config.template.json (HELM_REGISTRY_CONFIG auths entry)
+      # no packages/pypi/: the wheel is built entirely in code (line-based text), see pypi-raw.ts's buildWheel
   tests/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe
     maven/
@@ -132,6 +139,9 @@ e2e/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
       classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
       registry-rules.spec.ts           # raw-HTTP pins R1-R14 for BOTH modes: single-hop Basic auth, blob/manifest rules, override, tags/list, classic upload/delete/index shape
+    pypi/
+      publish-consume.spec.ts   # registerPublishConsumeLoop(pypiAdapter) + a real pip-install and a mixed-case/dotted-name real-client test
+      registry-rules.spec.ts    # raw-HTTP pins of the override/version/digest rules, root-index shape, HEAD, 307 redirect, no releases/snapshots rule
 ```
 
 ## Setup
@@ -1274,6 +1284,201 @@ oci://...@sha256:<digest>` if that were expected to work; not otherwise exercise
 - **B-H8** (observation) — `index.yaml`'s `digest` field carries a `sha256:` prefix, whereas a real
   `helm repo index` emits bare hex. Low impact: neither `helm repo add`/`update`/`pull`/`install`
   verify it against anything. Confirmed live: `registry-rules.spec.ts`'s R13.
+
+## PyPI runner
+
+`runners/pypi.Dockerfile` copies a pinned CPython (`python:3.14.7-slim-bookworm`'s
+`/usr/local/bin/python3.14` + `/usr/local/lib/python3.14` + `libpython3.14.so.1.0`) in from that
+official image rather than installing Debian bookworm's own `python3` package (3.11, not pinned to
+this story) — the same "copy the toolchain, not the whole image" approach as
+cargo.Dockerfile's Rust toolchain / nuget.Dockerfile's .NET SDK. The extra runtime `.so` deps CPython
+needs beyond what `node:24-bookworm-slim` already carries were found by `ldd`-ing every stdlib
+extension module under `lib-dynload/` and cross-checking against a bare `node:24-bookworm-slim`
+container's own `dpkg -l`/`ldconfig -p` (not copied from a generic "python runtime-deps" list): only
+`ca-certificates libssl3 libsqlite3-0 libreadline8 libncursesw6 libgdbm6` were missing
+(`libbz2`/`libdb5.3`/`libffi8`/`liblzma5`/`libuuid1`/`zlib1g`/`libtinfo6` are already part of the base
+image's own dependency closure) — confirmed live, the image built and `python3 -c "import ssl,
+hashlib, zlib, bz2, lzma, sqlite3, ctypes, uuid"` succeeded on the FIRST attempt with exactly that
+list (H24). `pip==26.2.1`/`twine==7.0.0` are installed once at build time into that same interpreter.
+`clients/pypi.ts` builds a wheel directly with `fflate` (`pypi-raw.ts`'s `buildWheel` — **no `python
+-m build`/`setuptools`/`wheel`**: a zip with a package dir + marker file, a `.dist-info/METADATA`
+carrying only the headers twine 7's `packaging.metadata.parse_email` recognizes, a minimal `WHEEL`,
+and a `RECORD` covering every other entry) and runs the real `twine`/`pip` binaries, always as
+`python3 -m twine`/`python3 -m pip`, never the console scripts:
+
+- **`publish`**: `python3 -m twine upload --non-interactive --disable-progress-bar --repository-url
+<repoBaseUrl>/<repo>/ <wheel>` against the pre-built wheel — no packaging step to precede it, the
+  bytes are already on disk. `TWINE_USERNAME`/`TWINE_PASSWORD` carry the credential's
+  username/secret for both `token`- and `password`-kind credentials (a token's username is ignored
+  server-side either way); `anonymous` leaves both env vars UNSET entirely, which makes twine's own
+  `--non-interactive` preflight fail client-side (`NonInteractive: Credential not found for
+username.`, exit 1) BEFORE any HTTP request — confirmed live, H4.
+- **`resolve`**: `python3 -m pip download --no-deps --only-binary=:all: --no-cache-dir --dest <dir>
+<name>==<version>`, with `PIP_INDEX_URL` carrying URL-embedded, percent-encoded Basic credentials
+  (`PIP_CONFIG_FILE=/dev/null` so no config file anywhere is ever read). `pip` leaves the wheel under
+  `--dest` with its exact original filename (never unpacked), so `AdapterResult.contentSha256` is the
+  sha256 of that WHOLE file, exactly like nuget's `.nupkg`/cargo's `.crate`.
+- **A real override rule, with the SAME 403 maven already pins**: `AbstractPypiProtocolFacade
+.checkOverridePermission` refuses `!allowOverride && isPackageFileExist(...)` with `403
+fileAlreadyExists` — matching the shared catalog's `forbidden` pin byte-for-byte, no
+  `expectByProtocol` override needed (confirmed live, like docker's/helm's own `no-override`
+  bullets). The rule is per FILENAME, not per declared version (see the P3 bug candidate below).
+- **The publish-side raw probe IS a byte-identical re-POST** of the exact wheel the client just
+  uploaded (the maven/npm/nuget pattern, unlike cargo's prerelease-sibling workaround): every
+  `ok`-expected scenario runs with `allowOverride: true` (the fixture default), so the re-POST is an
+  accepted, identical replacement; `no-override` gets the same `403` the client got.
+- **The consume-side raw probe** is a project-page `GET` (`/<repo>/simple/<name>/`), mirroring
+  nuget's flat-version-list-GET / cargo's sparse-index-GET reasoning: every consume expectation in
+  the catalog is an authn/authz outcome, and this GET never touches the (possibly P3/P4/P5-affected)
+  archive bytes.
+- **Fingerprint** (`ProtocolAdapter.fingerprint`/`expectNothingStored`): scoped to the one package a
+  scenario's publish targets, like nuget's/cargo's — the project-page body hash (`undefined` when the
+  package does not exist at all) plus every listed file's downloaded content hash.
+- **No `knownConsumeFailure`/`knownPublishSideEffect`**: none of the confirmed bug candidates (P1-P6
+  below) are reachable through the catalog loop's own scenarios (real `twine`/`pip` always send a
+  matching filename/version/digest), so no routing-around hook is needed — checked live, not assumed.
+
+```bash
+./run.sh test --protocol pypi
+```
+
+### Scenario mapping onto the shared catalog
+
+Every catalog scenario that is not maven/nuget-restricted applies to pypi unchanged, with the SAME
+`unauthorized`/`ok`/`forbidden` buckets maven already pins — `PypiAuthPreProcessor` throws the same
+flat `401` + `WWW-Authenticate: Basic` challenge for every authn/authz failure (no separate
+"forbidden" outcome), and `no-override`'s `403 fileAlreadyExists` matches the shared pin exactly. pypi
+is never added to `maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/`snapshot-*`: the
+`releases`/`snapshots` repo settings are never read by any PyPI code at all (grep-confirmed across
+both `repsy-protocols/pypi` and `repsy-backend/.../protocols/pypi`, and confirmed live — H23:
+`.dev0`/`a1`/`.post1` versions all publish and serve fine regardless of either switch). No data
+changes were needed in `catalog.ts` beyond the file-header/inline-comment bullets documenting this
+(same as docker's/helm's own "no data change needed" bullets) — verified live, not assumed.
+
+`registry-rules.spec.ts` additionally pins: a read-only token's flat 401 (not 403) with the same
+token still able to read (H5); a non-multipart POST answering 404 `unknownPath` and a multipart POST
+missing the `content` part answering a bodyless 400 (H11); the no-trailing-slash upload URL spelling
+being accepted (H12); invalid archive filenames refused with 400; the 307 redirect to a normalized,
+trailing-slashed project page (H14); `HEAD` answering 200 unconditionally (RPS-1226, an observation);
+a pre-release/dev/post version publishing fine under `releases:false`/`snapshots:false` (H23); and an
+unknown package/file 404ing. It also pins five backend bugs found while reading the server source and
+confirmed live (see below), each via `test.fail()`.
+
+### H1-H24, confirmed live
+
+Every hypothesis below was probed against a running instance (`./run.sh local up`) before being
+pinned — first with raw `curl`/Node `fetch` probes and a throwaway `python:3.14.7-slim-bookworm`
+container (`docker run --network host`), then with the real `twine`/`pip` binaries inside the built
+`pypi` runner container. H1-H4 gated the whole design and were probed FIRST, before any adapter code
+was written.
+
+- **H1** (twine accepts the real, unknown-field-carrying form; Repsy accepts it): confirmed live, on
+  the FIRST attempt — a real `twine upload` of a hand-built wheel against a fresh repo answered `200`,
+  twine exit `0`, even with `:action`/`protocol_version`/etc. in the form (Jackson 3's
+  `FAIL_ON_UNKNOWN_PROPERTIES` defaults to `false`, as the plan predicted from source).
+- **H2** (`pip download` with URL-embedded Basic credentials fetches the wheel from a PRIVATE repo,
+  byte-identical): confirmed live — the downloaded file's sha256 matched the uploaded one exactly.
+- **H3** (twine streams bytes verbatim): confirmed live — an admin raw download right after upload
+  (and after a real `pip download`) both sha256-match the original hand-built bytes exactly.
+- **H4** (anonymous fails client-side before any request; pip exits promptly against a private repo
+  with no creds): confirmed live — `twine upload` with no `TWINE_USERNAME`/`PASSWORD` and
+  `--non-interactive` prints `NonInteractive: Credential not found for username.` and exits 1; `pip
+download` with no creds against a private repo exits 1 promptly (`ERROR: Could not find a version
+that satisfies the requirement ...`), no hang, no retry storm.
+- **H5** (`token-ro` publish is a flat 401, not 403; the same token can still read): confirmed live —
+  `401` + `WWW-Authenticate: Basic realm="Repsy Managed Repository"` + the panel's `unAuthorized`
+  envelope on publish; `200` on the project-page read with the identical token.
+- **H6** (`no-override`: real twine gets 403, raw re-POST gets the same, fingerprint unchanged):
+  confirmed live.
+- **H7** (`override`: 200, stored bytes AND sidecar replaced; a follow-up `pip download` returns the
+  NEW bytes): confirmed live.
+- **H8** (the served `href` names exactly ONE repo segment, the RPS-1205 analogue does NOT
+  reproduce): confirmed live — `http://localhost:9090/<repo>/<name>/-/<file>`, never a doubled or
+  cloud-layout segment.
+- **H9** (`data-requires-python=">=3.9"` renders HTML-escaped and pip accepts it): confirmed live —
+  `&gt;=3.9` in the served HTML, unescaped back to `>=3.9` by `parseSimplePage`, and every real `pip
+download` in the catalog loop succeeds against pages carrying it.
+- **H10** (running the suite twice without resetting the stack, both green): confirmed — two
+  consecutive `./run.sh test --protocol pypi` runs both passed 29/29 with no stack reset in between.
+- **H11** (a non-multipart POST is 404 `unknownPath`, not 400; a multipart POST missing `content` is
+  a bodyless 400): confirmed live, exactly as the plan predicted from source (no handler at all
+  matches a non-multipart POST, so the router's own catch-all 404 fires, not the upload handler's).
+- **H12** (`POST /<repo>` with no trailing slash accepted like `POST /<repo>/`; `POST /<repo>/simple`
+  404s `unknownPath`): confirmed live — see RPS-1222 below for why this matters.
+- **H13** (the root `/simple/` index has malformed hrefs and no `text/html` content type): confirmed,
+  and with an EXTRA quirk beyond the plan's own prediction — the response's `Content-Type` is
+  `application/json`, not merely "unset"/defaulted, despite the body being HTML (RPS-1221 below).
+- **H14** (a non-normalized/no-trailing-slash name 307-redirects to the normalized page): confirmed
+  live, both via a raw probe and inside a real-client dedicated test (`publish-consume.spec.ts`'s
+  H21 test).
+- **H15** (a version/filename mismatch bypasses `allowOverride: false`): confirmed live — see
+  RPS-1223.
+- **H16** (`badVersionString` leaves an orphaned, downloadable file+sidecar): confirmed live — see
+  P4/RPS-1124.
+- **H17** (a missing `sha256_digest` is a 500; a wrong one is served as-is): confirmed live — see
+  RPS-1224/RPS-1225.
+- **H18** (`HEAD` of a never-published path is 200): confirmed live — see RPS-1226 (observation).
+- **H19** (a real `pip install --no-index --find-links ... --target ...` succeeds and the marker
+  survives): confirmed live — `publish-consume.spec.ts`'s dedicated test; the RECORD/WHEEL metadata
+  this harness writes is well-formed enough for pip's own installer, not merely for twine's
+  `parse_email`.
+- **H20** (mixed wheel+sdist upload ordering): NOT built — dropped per the plan's own "if
+  time-boxed, drop the sdist entirely" escape hatch; only a wheel fixture exists in this step, so
+  `buildSdist`/`src/packages/pypi/` were never created. `twine`'s own `_find_dists`
+  wheel-before-sdist ordering is documented in `pypi-raw.ts`'s file header from source, but not
+  independently exercised by a dedicated test.
+- **H21** (mixed-case/dotted package name round trip): confirmed live — `publish-consume.spec.ts`'s
+  dedicated test: a real `twine upload` under `E2E.<runid>.MixedCase`, a raw non-normalized `GET`
+  307-redirecting to the normalized page, and a real `pip download` of the same raw name resolving to
+  the exact published bytes (pip canonicalizes the requirement name itself before requesting).
+- **H22** (negative scenarios in parallel stay under the auth throttle): confirmed — two full
+  parallel (12-worker) catalog runs both passed with no 429 observed.
+- **H23** (no releases/snapshots rule): confirmed live — `registry-rules.spec.ts`'s dedicated test:
+  `1.0.0`/`1.0.0a1`/`1.0.0.post1`/`1.0.0.dev0` all publish and serve fine under
+  `releases:false, snapshots:false`.
+- **H24** (the runner image's stdlib import check passes with the derived apt list): confirmed live
+  on the FIRST build attempt — see this section's opening paragraph for the exact package list and
+  how it was derived (`ldd` against a live container, not a generic runtime-deps list).
+
+### Backend bug candidates found while reading and confirmed live (do not fix here)
+
+- **RPS-1221** — `packages.ftl` (the root `/simple/` index, rendered by
+  `PypiSimpleHandlerPreProcessor`) hard-codes cloud-layout hrefs, `/pypi/<repoName>/simple/<name>/`,
+  that 404 on Repsy OS's single-tenant layout (the real, working path is `/<repoName>/simple/<name>/`
+  — no `/pypi/` prefix at all here). A second, narrower quirk found only by probing live (not
+  predicted by the plan): the response's own `Content-Type` is `application/json`, not `text/html`,
+  despite the body being this same malformed HTML. Low impact — `pip install`/`download` never fetch
+  the root page, only `/simple/<project>/` — but a real PEP 503 spec violation. Confirmed live:
+  `registry-rules.spec.ts`'s root-index test.
+- **RPS-1222** — The panel's own PyPI config screen (`pypi-config.component.ts`) tells users to
+  set `.pypirc`'s `repository=${baseUrl}/${repoName}/simple`, but the upload handler only matches the
+  repo ROOT (`POST /<repo>/` or `/<repo>`) — a `twine upload -r <that source>` built from the panel's
+  OWN instructions 404s with `unknownPath`. Confirmed live: `registry-rules.spec.ts`'s
+  no-trailing-slash/`P2` test.
+- **RPS-1223** — `checkOverridePermission`/`isPackageFileExist` compares the FORM `version`
+  field against the version RE-EXTRACTED from the archive FILENAME (`isFileBelongsRelease`), not the
+  filename directly — a form `version` that does not match the filename's own encoded version makes
+  an existing file overwritable even under `allowOverride: false`, bypassing the rule entirely.
+  Confirmed live: `registry-rules.spec.ts`'s override test (same filename, mismatched declared
+  version, `allowOverride: false`, `200` instead of the expected `403`).
+- **P4** (storage-before-DB — the RPS-1124 family already open for cargo/nuget; comment there, not a
+  new ticket) — `AbstractPypiStorageService.writePackageArchive` (the archive file AND its `.sha256`
+  sidecar) runs BEFORE `PypiPackageServiceImpl.addOrUpdateRelease`, where `ReleaseVersion.of(form
+.version)` can still throw `badVersionString`. A validation failure after the storage write leaves an
+  orphaned, directly-downloadable archive+sidecar with no DB row and no project-page entry at all.
+  Confirmed live: `registry-rules.spec.ts`'s badVersionString test.
+- **RPS-1224 / RPS-1225** — The `.sha256` sidecar is the client-sent `sha256_digest` form field stored
+  VERBATIM, never recomputed or verified against the actual uploaded bytes
+  (`uploadForm.getSha256_digest().getBytes()`). A MISSING digest crashes with an unhandled NPE
+  (`500`, confirmed live — RPS-1224); a WRONG digest is silently served to every consumer as if
+  correct (confirmed live — RPS-1225). Confirmed: `registry-rules.spec.ts`'s two digest tests.
+- **RPS-1226** (observation, not routed around — nothing in the catalog loop's own scenarios
+  depends on `HEAD` meaning "exists") — `HEAD` on ANY path under a pypi repo answers `200`,
+  unconditionally; existence is never checked. Confirmed live: `registry-rules.spec.ts`'s HEAD test.
+- **P7** (observation, no test) — `PypiPackageServiceImpl.updateRelease` (read while investigating
+  `addOrUpdateRelease`) throws a bare `IllegalStateException` in what reads as an unreachable branch;
+  noted only, not independently confirmed live (no code path in this harness's own scenarios reaches
+  it).
 
 ## Remote hardening
 

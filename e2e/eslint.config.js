@@ -63,6 +63,7 @@ export default tseslint.config(
             'expectPut',
             'expectPublish',
             'expectOci',
+            'expectMsgId',
           ],
         },
       ],
