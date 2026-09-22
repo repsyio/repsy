@@ -30,8 +30,14 @@ independent wire protocols on the same port for the same package format — OCI 
 project (see "Helm runner" below). This is **step 4c ("pypi")**: a seventh worked example, the PyPI
 (Python Package Index) client adapter and runner — real `twine upload`/`pip download` against a
 hand-built wheel, a single-hop Basic auth model like maven/npm/cargo/nuget/helm, and a real,
-per-FILENAME override rule (see "PyPI runner" below). Every other protocol (golang, ruby) replicates
-the same model in later steps; nothing about the model itself is maven-specific.
+per-FILENAME override rule (see "PyPI runner" below). This is **step 4d ("golang")**: an eighth
+worked example, the Go module proxy (GOPROXY protocol) client adapter and runner — the first
+protocol in this harness with NO official publisher at all (Repsy is push-only; the only documented
+way in is a single `curl -T`), so `publish`/`seedPublish` drive real `curl` while `resolve` drives
+the real `go` toolchain, and the first protocol whose consume side needs its own in-process HTTPS
+terminator (`clients/golang-tls-shim.ts`) because the `go` command refuses outright to pass
+credentials to a plain-http `GOPROXY` URL (see "Go runner" below). Every other protocol (ruby)
+replicates the same model in later steps; nothing about the model itself is maven-specific.
 
 ## Rules
 
@@ -53,10 +59,10 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 ```
 e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example
-  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi"
+  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang"
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres:18 + Repsy, started/stopped by `run.sh local up|down`
-  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi"
+  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven; see "Adding a protocol adapter" below
   runners/npm.Dockerfile       # + nothing else: npm ships with the node:24 base already
@@ -65,6 +71,7 @@ e2e/
   runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image; no daemon, no socket
   runners/helm.Dockerfile      # + the static `helm` binary + the cm-push plugin installed at build time; no daemon, no socket
   runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time
+  runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
   runners/entrypoint.sh         # regenerates the API client, then runs Playwright for one project
   src/
     env.ts                     # typed config from env/.env
@@ -108,6 +115,9 @@ e2e/
       helm-classic.ts                  # the classic (ChartMuseum) client + helmClassicAdapter: helm cm-push / pull --repo
       pypi-raw.ts                     # pypi-specific raw POST/GET (upload/simple page/root index/download), buildWheel (fflate)
       pypi.ts                          # the pypi client + pypiAdapter: publish()/resolve()/seedPublish(), python3 -m twine/pip
+      golang-raw.ts                     # golang-specific raw PUT/GET (@v/list, @latest, .info/.mod/.zip), buildModuleZip (fflate), dirhashHash1
+      golang-tls-shim.ts                 # in-process HTTPS reverse proxy for a credentialed consume (a real `go` refuses plain-http creds)
+      golang.ts                          # the golang client + golangAdapter: publish()/resolve()/seedPublish(), real curl -T / go mod download
     packages/
       maven/                     # mustache templates of the tiny jar project + settings.xml
       npm/                       # mustache templates of the tiny package.json/index.js + .npmrc
@@ -116,6 +126,7 @@ e2e/
       docker/                    # config.template.json (DOCKER_CONFIG auths entry; the image itself is built in code, see docker-image.ts)
       helm/                      # Chart.template.yaml + registry-config.template.json (HELM_REGISTRY_CONFIG auths entry)
       # no packages/pypi/: the wheel is built entirely in code (line-based text), see pypi-raw.ts's buildWheel
+      golang/                    # go.template.mod + hello.template.go (rendered into the zip in code) + consumer-go.template.mod/consumer-main.template.go
   tests/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe
     maven/
@@ -142,6 +153,9 @@ e2e/
     pypi/
       publish-consume.spec.ts   # registerPublishConsumeLoop(pypiAdapter) + a real pip-install and a mixed-case/dotted-name real-client test
       registry-rules.spec.ts    # raw-HTTP pins of the override/version/digest rules, root-index shape, HEAD, 307 redirect, no releases/snapshots rule
+    golang/
+      publish-consume.spec.ts   # registerPublishConsumeLoop(golangAdapter) + go-get-build-run, plain-http-creds-refused, dirhash cross-check, mixed-case and wire-trace real-client tests
+      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, upload URL spellings, sha256, immutability, zip validation, @v/list/@latest, sumdb, HEAD, delete+reupload) + G1/G2/G10 candidates
 ```
 
 ## Setup
@@ -1480,6 +1494,192 @@ download` in the catalog loop succeeds against pages carrying it.
   noted only, not independently confirmed live (no code path in this harness's own scenarios reaches
   it).
 
+## Go runner
+
+Go is the first protocol in this harness with **no official publisher at all**:
+`repsy-protocols/golang/README.md`'s "Uploading a Module" section is explicit that Repsy is a push
+registry ("Repsy does not run `go mod` commands. You build the zip locally and upload it with a
+single `curl`"), and the panel's own `golang-config.component.ts` teaches the identical incantation.
+So `clients/golang.ts`'s `publish`/`seedPublish` drive the REAL `curl` binary directly, and there is
+no companion raw-HTTP probe the way pypi's/nuget's/cargo's `publish()` needs one: `curl -w
+'%{http_code}'` already reports the raw HTTP status (confirmed live: `--fail-with-body` still writes
+the response body to `-o` and prints the status code on a 4xx/5xx, curl exit `22`). `resolve` drives
+the REAL `go` toolchain (`go mod download -json`), the consume side every protocol in this harness
+gets.
+
+Every module zip is hand-built (`golang-raw.ts`'s `buildModuleZip`, `fflate` — never `go build`/
+`go mod`), rendered from `go.template.mod`/`hello.template.go` with a fresh random marker packed into
+`hello.go`/`e2e-marker.txt`. There is deliberately **no redeploy/prerelease-sibling trick** the way
+cargo's adapter needs one: version immutability is unconditional (`allowOverride` is never read
+anywhere in either Go package, grep-confirmed), so `no-override`/`override` both simply pin a real
+`409` in `catalog.ts` and every scenario's own `publish()` call already IS the real, final attempt.
+
+The decisive design fact, read from `cmd/go/internal/web/http.go` and confirmed live BEFORE any
+adapter code was written (H3): a real `go` command refuses outright to pass Basic credentials to an
+explicit `http://` `GOPROXY` URL (`refusing to pass credentials to insecure URL: ...`, client-side,
+before any request), while the exact same credentials work over `https://` (H4). Since this harness's
+own stack is plain HTTP, a credentialed consume needs an in-process HTTPS terminator in front of it —
+`clients/golang-tls-shim.ts`'s `ensureTlsShim()`, a lazily started, per-worker-process Node
+`https.createServer` reverse proxy bound to `127.0.0.1:0`, trusted via `SSL_CERT_FILE` alone (no
+`--ca`, confirmed live/H4) pointed at a throwaway certificate/key `runners/golang.Dockerfile` generates
+ONCE at build time with Go's own `crypto/tls/generate_cert.go`. An anonymous consume, or one already
+against `https://` (a remote target), never needs the shim at all (H2).
+
+```bash
+./run.sh test --protocol golang -b   # -b the first time: builds the golang runner image
+```
+
+### Scenario mapping onto the shared catalog
+
+Every catalog scenario that is not maven/nuget-restricted applies to golang unchanged, with the SAME
+`unauthorized`/`ok` buckets maven already pins — `GolangAuthComponent` is a bare `ProtocolAuthService`
+subclass with no overrides, so every auth outcome (a read-only token's flat 401 on WRITE, an expired/
+revoked/rotated/wrong-repo token, a wrong password, anonymous-on-private) matches byte-for-byte,
+confirmed live. The ONE data change needed: `no-override`/`override` both get `expectByProtocol: {
+golang: { publish: 'conflict' } }` — a REAL, UNCONDITIONAL `409` (`goModuleVersionAlreadyExists`),
+confirmed live, since `allowOverride` is never read at all (so, like cargo's own deliberate note,
+`override: true` does NOT make a redeploy succeed for golang either). golang is never added to
+`maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/`snapshot-*`: it has no releases/snapshots
+rule at all (grep-confirmed: no Go code reads either repo setting) and no SNAPSHOT-file concept.
+
+`registry-rules.spec.ts` additionally pins (raw HTTP, no `curl`/`go` client): the read-only-token auth
+matrix (R1); every accepted upload-URL spelling — no suffix, `.zip`, and even `.mod` with a zip body,
+G6 (R2); `Content-Sha256` verified when present (case-insensitively), ignored when absent (R3);
+immutability + no storage side effect under BOTH `allowOverride` settings (R4/H9); zip-validation
+errors leaving nothing stored (R5); `@v/list`'s real-semver sort and empty-body-for-unknown-module
+shape (R8); `@latest`'s DB-backed highest-version selection (R9); a malformed module path's bodyless
+400 (R11); `sumdb/supported` 404ing on both ports (R12/G9); over-long module-path/version refusal
+(R13); a deleted version's clean re-upload, never a `410` (R14/RPS-1230); `HEAD` always 404ing,
+the opposite of pypi's always-200 quirk (R15/H17); and that `releases`/`snapshots` are never read
+(R16). Three backend bug candidates are pinned with `test.fail()` (G1/G2/G10, below).
+
+### H1-H20, confirmed live
+
+Every hypothesis below was probed against a running instance (`./run.sh local up`) with raw
+`curl`/Node `fetch` and a throwaway `golang:1.27.1-bookworm` container (`docker run --network host`)
+BEFORE any adapter code was written — H1-H4 and H12 gated the whole design.
+
+- **H1** (Repsy is push-only: a raw PUT of a hand-built zip lands `.mod`/`.zip`/`.info` and
+  `@v/list` lists it; nothing contacts an upstream): confirmed live on the FIRST attempt.
+- **H2** (`go mod download -json` against a public repo, no credentials, no shim, succeeds; `Zip`
+  bytes sha256 equal the uploaded ones; `Dir/e2e-marker.txt` exists; `Sum`/`GoModSum` equal the TS
+  dirhash reference): confirmed live — see `publish-consume.spec.ts`'s dedicated cross-check test.
+- **H3** (a credentialed `http://` `GOPROXY` fails client-side, exit 1, "refusing to pass
+  credentials to insecure URL"): confirmed live, gating the whole TLS-shim design (see "Go runner"
+  above) — also pinned as a real-client test, `publish-consume.spec.ts`'s plain-http-creds test.
+- **H4** (through the shim, the same command succeeds on a PRIVATE repo with `SSL_CERT_FILE` alone,
+  no `--ca`; both `user:password` and `token:<deploy-token>` work): confirmed live.
+- **H5** (`/usr/local/go` copied into `node:24-bookworm-slim` runs `go version`/`go mod download`/
+  `go build` with no extra apt packages beyond `curl ca-certificates`; `go run generate_cert.go`
+  works at build time): confirmed live — `runners/golang.Dockerfile` built clean on the first
+  attempt.
+- **H6** (`go get`, then `go build`, then running the binary, prints the marker): confirmed live —
+  `publish-consume.spec.ts`'s dedicated test.
+- **H7** (no toolchain download attempt, no sumdb traffic): not independently wire-traced, but
+  inferred with high confidence from `GOTOOLCHAIN=local` (a version mismatch would fail loudly, and
+  none did across the whole suite) and `GONOSUMDB=e2e.repsy.test` plus the module domain's own
+  non-resolution (the `.test` TLD never dials out at all) — no test failed in a way a toolchain/sumdb
+  fetch attempt would produce (timeout/DNS error), across two full local runs.
+- **H8/H19** (the wire sequence for an exact-version consume includes `.info`, `.mod` and `.zip`):
+  confirmed live — `publish-consume.spec.ts`'s TLS-shim wire-trace test asserts all three routes were
+  requested for one `go mod download`.
+- **H9** (a duplicate PUT is refused with 409 under both `allowOverride` settings; stored files
+  unchanged): confirmed live — `registry-rules.spec.ts`'s R4 test.
+- **H10** (every negative scenario fails the client promptly, no retry storm): confirmed — the whole
+  negative-scenario `test.describe` block (parallel, 12 workers) completed in under a second per
+  scenario across two full runs, and `go` itself has no built-in HTTP retry logic.
+- **H11** (`Seeder.cleanup()` deletes a Go repo holding modules/versions; a sweep afterwards lists
+  nothing): confirmed by construction — every test in this suite ran under the shared `seeder`
+  fixture and left no `e2e-*` repos behind (checked with `./run.sh sweep --all --dry-run` after the
+  full verification run, see "Verification" below).
+- **H12** (the `fflate` zip, no directory entries, passes both Go's entry-prefix check and its unzip
+  check): confirmed live — the very first raw PUT/`go mod download` round trip succeeded.
+- **H13** (Repsy's `.info` `Time` parses into a real instant): confirmed live —
+  `afterSuccessfulRoundTrip`'s check runs on every `ok`/`ok` catalog scenario.
+- **H14** (the panel's literal curl, no `Content-Type`, is accepted): confirmed live while probing
+  R2/R3 — every raw upload in this suite that omits `Content-Type` still succeeds; the adapter itself
+  sends one explicitly regardless (this file's header, the maven-adapter lesson).
+- **H15** (parallel workers each start their own shim on an ephemeral port; two consecutive full
+  `--protocol golang` runs are green without a stack reset): confirmed — both runs passed 35/35 with
+  no port conflict and no stack reset in between.
+- **H16** (`v0.<secs>.<seq>` is accepted by both Repsy and Go; `@latest` returns it when it is the
+  only version): confirmed live.
+- **H17** (what the router answers to `HEAD .../@v/<v>.info`): confirmed live — `404`, not pypi's
+  `200` (see R15 above; neither protocol method handler lists `HEAD` among its supported methods, so
+  the router has nothing to dispatch to).
+- **H18** (a mixed-case module path real round trip): confirmed live —
+  `publish-consume.spec.ts`'s dedicated test: a real `go mod download -json` of a module path with a
+  mixed-case last segment succeeds and reports back the ORIGINAL (not lower-cased) path in its own
+  `Path` field.
+- **H20** (`go mod download -json` on a 401 prints a JSON object with `Error` and exits 1): confirmed
+  live — the plain-http-creds test's own `Error` field, and every negative catalog scenario's `resolve`
+  step parses a JSON object with no `Zip` field on a 401.
+
+### Backend bug candidates found while reading and confirmed live (do not fix here)
+
+- **RPS-1227** — `AbstractGoProtocolFacade.upload` never validates the version string against
+  Go's own semver grammar at all: `banana` is accepted (`200`), stored immutably and listed by
+  `@v/list`, even though it is not a valid Go semver string a real `go` command's own parser would
+  ever produce or accept. Confirmed live: `registry-rules.spec.ts`'s non-semver test (`test.fail()`).
+- **RPS-1228** — `GoModFileValidator` never compares the go.mod `module` directive against the
+  URL's own module path: a zip whose go.mod names a COMPLETELY DIFFERENT module still uploads
+  successfully under the URL's path. A real `go get` of that path then fails once it validates the
+  downloaded go.mod against the path it asked for. Confirmed live: `registry-rules.spec.ts`'s
+  mismatch test (`test.fail()`).
+- **RPS-1231** (observation only, not wire-observable, no test) — `GoModuleHashCalculator`'s
+  stored `h1:` hashes are NOT `golang.org/x/mod/sumdb/dirhash.Hash1`-compatible: the real algorithm's
+  inner line is `"%x  %s\n"` (hex digest, TWO spaces, then the file/entry name, entries sorted by
+  NAME alone before the lines are built — confirmed live by reproducing a real `go mod download
+-json`'s own `Sum`/`GoModSum` byte-for-byte, see H2/`dirhashHash1`), while
+  `GoModuleHashCalculator.hashMod`/`hashZip` build `"<name>:<hex>\n"` (colon, name FIRST, and for the
+  zip hash, sort the already-built lines rather than the entry names — which reorders differently
+  whenever two entries' hex digests collide in sort order with their names). Not independently
+  observable over the wire: `GoModuleVersionListItem` (the panel API DTO) exposes no hash field at
+  all, and the `go` command never reads Repsy's own stored hash, only computes its own from the
+  downloaded bytes — noted here from source for the coordinator's own report, not asserted by any
+  test in this harness.
+- **G4** (observation only, not independently wire-forced, no test; commented on
+  [RPS-1124](https://zyfera.atlassian.net/browse/RPS-1124) rather than filed as its own ticket, since
+  that story's own title already names Go) — the DB row commits BEFORE the three storage writes in
+  `AbstractGoProtocolFacade.upload` (`goModuleService.publishModule` runs first, then
+  `writeModFile`/`writeInputStreamToPath`/`writeInfoFile`) — the inverse of cargo's own RPS-1124
+  storage-before-DB ordering.
+- **G5** (architectural observation from source, not independently forced live; mentioned in the same
+  [RPS-1124](https://zyfera.atlassian.net/browse/RPS-1124) comment as G4, same root cause) —
+  `@v/list` and `@latest` read DIFFERENT sources of truth: `handleVersionList` lists the STORAGE
+  directory, `handleLatestVersion` reads the DB (`findLatestPublishedVersion`). Every scenario this
+  harness's own catalog exercises keeps both in sync (a successful upload always writes both), so this
+  was not independently forced out of sync live.
+- **G6** (not a defect — documented, deliberate behavior, no ticket filed) — `PUT .../@v/<v>.mod`/
+  `.info` is silently treated as a `.zip` upload: only the
+  LAST path segment's known extension is stripped to find the version, nothing else looks at the
+  suffix. Confirmed live: `registry-rules.spec.ts`'s upload-URL-spellings test (R2) — not routed
+  around with `test.fail()` since this is documented, deliberate behavior (`GoVersionUtils
+.extractVersionFromPath`'s own javadoc), not a defect the catalog loop needs to work around.
+- **RPS-1229** (same family as RPS-1214/RPS-1222, docs bugs on other protocols) — the panel's
+  own documented `go env -w GOPROXY="<scheme>://user:pass@..."` incantation
+  (`golang-config.component.ts`) cannot work AT ALL on a plain-http deployment: the `go` command
+  itself refuses to send it (H3). Confirmed live: `publish-consume.spec.ts`'s dedicated test.
+- **RPS-1230** — the `410 Gone`/`GoVersionGoneException` path is DEAD: grep-confirmed nothing
+  in either Go package ever throws it (the `deleted` column `V0002__Golang_Protocol.sql` created has
+  no entity field reading it). Deleting a version through the panel API removes it OUTRIGHT (DB row
+  and all three storage files), and re-uploading the exact same version afterwards succeeds cleanly
+  with a fresh `200`, never a `410`. Confirmed live: `registry-rules.spec.ts`'s R14 test.
+- **G9** (not a defect — the observed status is correct on both ports, just by two unrelated code
+  paths, no ticket filed) — `sumdb/supported` 404s on BOTH the API port (`GolangModuleController
+.checkSumdbSupported`, deliberate — the doc comment says so) and the protocol port (the `go` command's
+  own probe lands on the download handler and 404s by a plain storage-miss, purely by accident — a
+  different code path producing the same status). Confirmed live: `registry-rules.spec.ts`'s R12
+  test.
+- **RPS-1232** — module paths are LOWER-CASED for storage/lookup (`AbstractGoProtocolFacade
+.upload`'s `normalizedPath`/`AbstractGoProtocolFacade.decodePath`), so a mixed-case upload is stored
+  under the SAME module as its lower-case spelling, even though real Go treats module paths as
+  case-SENSITIVE identity. Confirmed live twice: a raw-HTTP collision test (`registry-rules.spec.ts`,
+  `test.fail()`) and a real-client round trip showing the mixed-case path still resolves through the
+  lower-cased storage (`publish-consume.spec.ts`'s H18 test — NOT `test.fail()`-pinned there, since a
+  real `go get` succeeding is itself the correct, desired behavior; only the raw-HTTP "are these two
+  DISTINCT modules" test is pinned as a candidate).
+
 ## Remote hardening
 
 On a `remote` target (`target.isRemote`, see `src/target.ts`), `AUTH_THROTTLE_MAX_FAILURES` cannot
@@ -1499,6 +1699,12 @@ Untested by this step (no remote instance to test against): a preflight check th
 login and refuses to run if the run prefix already exists, and never touching anything global on a
 real shared remote. Both are called out in the plan as later, "remote hardening" work.
 
+**golang-specific**: a remote target whose `REPSY_REPO_BASE_URL` is already `https://` needs no TLS
+shim at all (`golang-tls-shim.ts`'s `needsTlsShim` — credentials embed directly into that URL). A
+remote target that is plain `http://` with an UNTRUSTED certificate is unsupported for golang: Go has
+no per-request "skip TLS verification" knob for a `GOPROXY` URL the way `curl -k`/`--insecure` does,
+so there is no equivalent of `REPSY_E2E_INSECURE_REGISTRY` this protocol could honour.
+
 ## Running
 
 ```bash
@@ -1511,7 +1717,9 @@ real shared remote. Both are called out in the plan as later, "remote hardening"
 ./run.sh test --protocol nuget
 ./run.sh test --protocol docker
 ./run.sh test --protocol helm   # runs BOTH Helm modes (OCI + classic/ChartMuseum) from one runner
-./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm
+./run.sh test --protocol pypi
+./run.sh test --protocol golang
+./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang
 ./run.sh test --grep '@smoke'
 ./run.sh test -b             # rebuild the runner image(s) first (Dockerfile/lockfile changed)
 ./run.sh local down
@@ -1519,7 +1727,8 @@ real shared remote. Both are called out in the plan as later, "remote hardening"
 ```
 
 `run.sh test` accepts `--target local|remote|ci` and `--protocol a,b` (a comma-separated list of
-runner services: `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`, `helm`). Reports land under `e2e/test-results/` (JUnit
+runner services: `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`).
+Reports land under `e2e/test-results/` (JUnit
 XML) and
 `e2e/playwright-report/` (HTML) — one `run.sh test` invocation covering several `--protocol` services
 overwrites that JUnit file per service, so diff/compare a single protocol's run in isolation
@@ -1585,6 +1794,11 @@ pnpm exec prettier --check .
 ./run.sh test --protocol docker  # again — proves run isolation for docker too
 ./run.sh test --protocol helm -b    # -b the first time: builds the helm runner image
 ./run.sh test --protocol helm    # again — proves run isolation for helm too (both modes)
+./run.sh test --protocol pypi
+./run.sh test --protocol pypi    # again — proves run isolation for pypi too
+./run.sh test --protocol golang -b  # -b the first time: builds the golang runner image
+./run.sh test --protocol golang  # again — proves run isolation for golang too (H15)
+./run.sh test --protocol maven,npm,cargo,nuget,docker,helm,pypi -b  # regression: every protocol before golang stays green
 ./run.sh test                    # the skeleton project
 ./run.sh sweep --dry-run         # before tearing down: confirms nothing was left behind
 ./run.sh local down
@@ -1600,8 +1814,11 @@ the docker protocol specifically, flipping `token-expired`'s `publish` to `'ok'`
 `401` reported against the flipped `'ok'` expectation; and once for helm, adding a temporary
 `expectByProtocol: { helm: { publish: 'ok' } }` to `token-expired` — `./run.sh test --protocol helm
 --grep "helm > token-expired"` failed as expected, `helm push`'s own raw-probe status `401` against
-the flipped `'ok'` expectation, then reverted). `./run.sh sweep --dry-run` lists any `e2e-*`
-leftovers without deleting them.
+the flipped `'ok'` expectation, then reverted; and once for golang, adding a temporary
+`expectByProtocol: { golang: { publish: 'ok' } }` to `token-expired` — `./run.sh test --protocol
+golang --grep token-expired` failed as expected (`Error: expected "ok", got "unauthorized" (http 401;
+curl/go exit 22; curl ... -u <token>:*** -T module.zip ...)`), then reverted, `git diff` confirmed
+clean). `./run.sh sweep --dry-run` lists any `e2e-*` leftovers without deleting them.
 
 The npm suite's `'ok'`-expected scenarios currently report as an _expected_ failure
 (`test.fail`, RPS-1205 — see "npm runner" above), not a plain pass: Playwright's list reporter still
@@ -1610,6 +1827,8 @@ is watching for), but the run's own summary line and exit code both say "passed"
 two as authoritative over the per-line glyphs. Likewise for the cargo suite's `no-override`/
 `override` scenarios (`knownPublishSideEffect`, "H1" above) and its two dedicated hyphen tests ("H2"
 above), the docker suite's four `test.fail`-routed registry-rules tests (R5/B4, R7/B2, R8/B1,
-R12/B5 — "H9"/"H10"/"H13" above), and the helm suite's five `test.fail`-routed tests (HL1/B-H4,
-HL2/B-H3, HL4/B-H1, HL5/B-H2, R8/B-H3 — "Helm runner" above): all counted as "passed", not a plain
-pass line.
+R12/B5 — "H9"/"H10"/"H13" above), the helm suite's five `test.fail`-routed tests (HL1/B-H4,
+HL2/B-H3, HL4/B-H1, HL5/B-H2, R8/B-H3 — "Helm runner" above), the pypi suite's six `test.fail`-routed
+registry-rules tests (RPS-1221/1222/1223/1224/1225, P4/RPS-1124 — "PyPI runner" above), and the golang
+suite's three `test.fail`-routed registry-rules tests (candidates G1/G2/G10 — "Go runner" above): all
+counted as "passed", not a plain pass line.

@@ -317,6 +317,40 @@ export class PanelApi {
   async deletePgpPublicKey(repoName: string, id: string): Promise<void> {
     await this.client.keyStoreController.deleteMavenPgpPublicKey({ repoName, publicKeyId: id });
   }
+
+  /**
+   * Deletes one Go module version (`DELETE /api/go/modules/{repoName}/versions?modulePath=&
+   * version=`, step 4d/RPS-294 R14/G8). Called directly with `fetch`, like {@link
+   * listDeployTokensPage}: the generated client is not worth wiring in for a single query-param
+   * endpoint no other part of this harness needs.
+   */
+  async deleteGolangModuleVersion(
+    repoName: string,
+    modulePath: string,
+    version: string,
+  ): Promise<void> {
+    const url = new URL(`${this.baseUrl}/api/go/modules/${encodeURIComponent(repoName)}/versions`);
+    url.searchParams.set('modulePath', modulePath);
+    url.searchParams.set('version', version);
+
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: { Authorization: this.authorization() },
+    });
+    if (!res.ok) {
+      throw new ApiError(
+        { method: 'DELETE', url: url.toString() },
+        {
+          status: res.status,
+          statusText: res.statusText,
+          url: url.toString(),
+          ok: false,
+          body: null,
+        },
+        `deleteGolangModuleVersion failed with status ${res.status}`,
+      );
+    }
+  }
 }
 
 const DEFAULT_TOKEN_LIST_PAGE_SIZE = 20;
