@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemListItem;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemNameProjection;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGem;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,6 +33,23 @@ public interface RubyGemRepository extends JpaRepository<RubyGem, UUID> {
   Optional<RubyGem> findByRepoIdAndName(UUID repoId, String name);
 
   boolean existsByRepoIdAndName(UUID repoId, String name);
+
+  /**
+   * Inserts the gem unless one with the same (repo, name) already exists. It does not raise the
+   * unique-index violation, which would abort the caller's PostgreSQL transaction.
+   *
+   * @return 1 when the row was inserted, 0 when it already existed
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+          insert into "public"."ruby_gem" ("id", "repo_id", "name", "latest", "created_at")
+            values (:id, :repoId, :name, :latest, :now)
+            on conflict do nothing
+          """,
+      nativeQuery = true)
+  int insertIfAbsent(UUID id, UUID repoId, String name, String latest, Instant now);
 
   @Query(
       """
