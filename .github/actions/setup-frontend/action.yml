@@ -31,7 +31,9 @@ runs:
       with:
         node-version: ${{ inputs.node-version }}
 
-    # The one place the pnpm version lives: bump the literal below and every workflow follows.
+    # The one place the workflows' pnpm version lives: bump the literal below and every workflow
+    # follows. The Dockerfile's frontend-build stage pins the same version (corepack prepare
+    # pnpm@...), so bump that literal in the same change.
     # It is a literal on purpose. SonarCloud (githubactions:S8543) reads the version off this line,
     # so an input or a variable would look unpinned. --ignore-scripts is githubactions:S6505.
     # Not the "packageManager" field of package.json: with it, pnpm 12 rewrites pnpm-lock.yaml

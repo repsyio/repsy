@@ -19,40 +19,30 @@ import { map, Observable } from 'rxjs';
 
 import { PagedModelUserResponse, UserCreateForm, UserResponse, UserUpdateForm } from '../../../../../generated/api';
 import { UserControllerService } from '../../../../../generated/api';
-import { AuthService } from '../../../../auth/pages/service/auth.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class UserService {
-  constructor(
-    private readonly userControllerService: UserControllerService,
-    private readonly authService: AuthService,
-  ) {}
-
-  private get authorizationHeader(): string {
-    return `Bearer ${this.authService.accessToken}`;
-  }
+  constructor(private readonly userControllerService: UserControllerService) {}
 
   public listUsers(search?: string, page?: number, size?: number): Observable<PagedModelUserResponse> {
-    return this.userControllerService
-      .listUsers(this.authorizationHeader, search, page, size)
-      .pipe(map((r) => r.data!));
+    return this.userControllerService.listUsers(search, page, size).pipe(map((r) => r.data!));
   }
 
   public createUser(form: UserCreateForm): Observable<UserResponse> {
-    return this.userControllerService.createUser(this.authorizationHeader, form).pipe(map((r) => r.data!));
+    return this.userControllerService.createUser(form).pipe(map((r) => r.data!));
   }
 
   public updateUser(userId: string, form: UserUpdateForm): Observable<UserResponse> {
-    return this.userControllerService.updateUser(this.authorizationHeader, userId, form).pipe(map((r) => r.data!));
+    return this.userControllerService.updateUser(userId, form).pipe(map((r) => r.data!));
   }
 
   public deleteUser(userId: string): Observable<void> {
-    return this.userControllerService.deleteUser(this.authorizationHeader, userId).pipe(map(() => undefined));
+    return this.userControllerService.deleteUser(userId).pipe(map(() => undefined));
   }
 
   public resetPassword(userId: string): Observable<string> {
-    return this.userControllerService.resetPassword(this.authorizationHeader, userId).pipe(map((r) => r.data!));
+    return this.userControllerService.resetPassword(userId).pipe(map((r) => r.data!));
   }
 }

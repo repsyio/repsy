@@ -13,65 +13,33 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-// Test-only helper shared by the specs of the services that build an `Authorization` header from `AuthService`
-// (profile, user, usage, security). This file is not a spec, and nothing under src/app imports it, so it is never
-// part of the application bundle.
+// Test-only helper shared by the specs of the panel services (profile, user, usage, security). The `Authorization`
+// header is set once by `HttpHeadersInterceptor`, so a service must not build or pass one itself. This file is not a
+// spec, and nothing under src/app imports it, so it is never part of the application bundle.
 
 import { firstValueFrom, Observable, of } from 'rxjs';
 
 import { restResponse } from '../../pages/repository/testing/protocol-service-spec-helpers';
 
-/** The slice of `AuthService` those services read: the token, which the spec changes between calls. */
-export interface FakeAuthService {
-  accessToken: string | null;
-  updateLoginInfo: jasmine.Spy;
-}
-
-export function fakeAuthService(accessToken: string | null = 'access-token'): FakeAuthService {
-  return { accessToken, updateLoginInfo: jasmine.createSpy('updateLoginInfo') };
-}
-
-export interface AuthorizationHeaderOptions {
-  authService: () => FakeAuthService;
-  /** The generated-client method that takes the header as its first argument. */
+export interface NoAuthorizationHeaderOptions {
+  /** The generated-client method the call reaches. */
   api: () => jasmine.Spy;
   /** Any call of the service that reaches {@link api}. */
   invoke: () => Observable<unknown>;
 }
 
-/** Registers how the header is built: from the token at call time, and what it becomes without a token. */
-export function describeAuthorizationHeader(options: AuthorizationHeaderOptions): void {
-  const { authService, api, invoke } = options;
-
-  async function headerOfNextCall(): Promise<unknown> {
-    api().calls.reset();
-    api().and.returnValue(of(restResponse({})));
-    await firstValueFrom(invoke());
-    return api().calls.mostRecent().args[0];
-  }
+/** Registers that the service hands the generated client no `Authorization` value, whatever the session state. */
+export function describeNoAuthorizationHeader(options: NoAuthorizationHeaderOptions): void {
+  const { api, invoke } = options;
 
   describe('authorization header', () => {
-    it('is the access token as a bearer credential', async () => {
-      authService().accessToken = 'token-1';
+    it('is not passed to the generated client, the http-headers interceptor sets it', async () => {
+      api().and.returnValue(of(restResponse({})));
 
-      expect(await headerOfNextCall()).toBe('Bearer token-1');
-    });
+      await firstValueFrom(invoke());
 
-    it('reads the access token again on every call', async () => {
-      authService().accessToken = 'token-1';
-      expect(await headerOfNextCall()).toBe('Bearer token-1');
-
-      authService().accessToken = 'token-2';
-
-      expect(await headerOfNextCall()).toBe('Bearer token-2');
-    });
-
-    // Current behaviour, pinned on purpose: a signed-out call sends the literal "Bearer null" instead of leaving the
-    // header out (the http-headers interceptor already sets it when a session exists). RPS-1161 tracks the fix.
-    it('is the literal "Bearer null" while signed out (pinned defect, RPS-1161)', async () => {
-      authService().accessToken = null;
-
-      expect(await headerOfNextCall()).toBe('Bearer null');
+      const args: unknown[] = api().calls.mostRecent().args;
+      expect(args.filter((a) => typeof a === 'string' && /^bearer\b/i.test(a))).toEqual([]);
     });
   });
 }

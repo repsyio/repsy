@@ -15,13 +15,20 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
 
 import { environment } from '../../../../../../../environments/environment';
-import { VersionSecuritySummary } from '../../../../../../../generated/api';
+import {
+  NuGetDeletedItem,
+  NuGetPackageInfo,
+  NuGetVersionListItem,
+  RepoPermissionInfo,
+  VersionSecuritySummary,
+} from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -33,13 +40,9 @@ import { ToastService } from '../../../../../shared/components/toast/toast.servi
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { SecurityService } from '../../../../security/service/security.service';
 import { NugetConfigComponent } from '../../config/nuget-config.component';
-import { NugetDeletedItem } from '../../dto/nuget-deleted-item';
-import { NugetPackageInfo } from '../../dto/nuget-package-info';
-import { NugetVersionListItem } from '../../dto/nuget-version-list-item';
 import { NugetService } from '../../service/nuget.service';
 
 @Component({
@@ -67,9 +70,9 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
   public pageSize = 10;
   public error: string;
   public packageId: string;
-  public pkg: NugetPackageInfo;
-  public versions: NugetVersionListItem[] = [];
-  public pagedData = new PagedData<NugetVersionListItem>();
+  public pkg: NuGetPackageInfo;
+  public versions: NuGetVersionListItem[] = [];
+  public pagedData = new PagedData<NuGetVersionListItem>();
   public activeRepo: RepoPermissionInfo;
   public readonly baseUrl: string;
   public readonly username: string;
@@ -92,10 +95,10 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.nugetService.repoChanges.subscribe((repo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.packageId = this.route.snapshot.paramMap.get('packageId');
         this.fetchVersions();
         this.fetchSecuritySummary();
@@ -126,7 +129,7 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
     this.showConfig = open;
   }
 
-  public deleteVersion(version: NugetVersionListItem): void {
+  public deleteVersion(version: NuGetVersionListItem): void {
     const isLastVersion = this.pagedData.page.totalElements === 1;
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
@@ -136,13 +139,14 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
       action
         .then((deletedItem) => {
           this.toastService.show('Version deleted successfully', 'success');
-          if (isLastVersion || deletedItem === NugetDeletedItem.PACKAGE) {
+          if (isLastVersion || deletedItem === NuGetDeletedItem.Package) {
             this.router.navigate(['..'], { relativeTo: this.route });
           } else {
             this.fetchVersions();
           }
         })
-        .catch((err: string) => this.toastService.show(err, 'error'))
+        // The error interceptor has already shown the failure to the user.
+        .catch(() => undefined)
         .finally(() => {
           this.loading = false;
         });
@@ -162,9 +166,9 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
         this.versions = pagedData.content;
         this.error = null;
       })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
+      // The error interceptor has already toasted the failure; keep the message for the page.
+      .catch((err: HttpErrorResponse) => {
+        this.error = err.error?.text ?? 'Error Occurred';
       })
       .finally(() => {
         this.loading = false;

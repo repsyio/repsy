@@ -24,12 +24,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # No generator jar cache here: this job never had one. Everything else is what the "Repsy
-      # frontend" job in pr-checks.yml sets up.
+      # The generator jar is cached like in the "Repsy frontend" job in pr-checks.yml (same path and
+      # key, so it hits the entry openapi-generator-cache.yml seeds from main). Everything else is
+      # what that job sets up too.
       - name: Set up the frontend
         uses: ./.github/actions/setup-frontend
         with:
-          cache-generator-jar: "false"
+          cache-generator-jar: "true"
 
       - name: Unit tests
         run: |

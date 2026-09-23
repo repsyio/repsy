@@ -22,17 +22,10 @@ import {
   UserResponse,
   UserUpdateForm,
 } from '../../../../../generated/api';
-import { AuthService } from '../../../../auth/pages/service/auth.service';
-import {
-  describeAuthorizationHeader,
-  FakeAuthService,
-  fakeAuthService,
-} from '../../../shared/testing/authorization-header-spec-helpers';
+import { describeNoAuthorizationHeader } from '../../../shared/testing/authorization-header-spec-helpers';
 import { CallCase, describeCalls, restResponse } from '../../repository/testing/protocol-service-spec-helpers';
 import { UserService } from './user.service';
 
-const TOKEN = 'access-token';
-const BEARER = `Bearer ${TOKEN}`;
 const USER: UserResponse = {
   id: 'user-1',
   username: 'alice',
@@ -49,7 +42,6 @@ const UPDATE_FORM: UserUpdateForm = { username: 'bobby', role: 'USER' };
 
 describe('UserService', () => {
   let api: jasmine.SpyObj<UserControllerService>;
-  let authService: FakeAuthService;
   let service: UserService;
 
   beforeEach(() => {
@@ -60,12 +52,8 @@ describe('UserService', () => {
       'deleteUser',
       'resetPassword',
     ]);
-    authService = fakeAuthService(TOKEN);
     TestBed.configureTestingModule({
-      providers: [
-        { provide: UserControllerService, useValue: api },
-        { provide: AuthService, useValue: authService },
-      ],
+      providers: [{ provide: UserControllerService, useValue: api }],
     });
     service = TestBed.inject(UserService);
   });
@@ -75,7 +63,7 @@ describe('UserService', () => {
       name: 'listUsers with a search, a page and a size',
       invoke: (s) => s.listUsers('ali', 1, 10),
       api: () => api.listUsers,
-      args: [BEARER, 'ali', 1, 10],
+      args: ['ali', 1, 10],
       response: restResponse(PAGE),
       expected: PAGE,
     },
@@ -83,7 +71,7 @@ describe('UserService', () => {
       name: 'listUsers without filters',
       invoke: (s) => s.listUsers(),
       api: () => api.listUsers,
-      args: [BEARER, undefined, undefined, undefined],
+      args: [undefined, undefined, undefined],
       response: restResponse(PAGE),
       expected: PAGE,
     },
@@ -91,7 +79,7 @@ describe('UserService', () => {
       name: 'createUser',
       invoke: (s) => s.createUser(CREATE_FORM),
       api: () => api.createUser,
-      args: [BEARER, CREATE_FORM],
+      args: [CREATE_FORM],
       response: restResponse(USER),
       expected: USER,
     },
@@ -99,7 +87,7 @@ describe('UserService', () => {
       name: 'updateUser',
       invoke: (s) => s.updateUser('user-1', UPDATE_FORM),
       api: () => api.updateUser,
-      args: [BEARER, 'user-1', UPDATE_FORM],
+      args: ['user-1', UPDATE_FORM],
       response: restResponse(USER),
       expected: USER,
     },
@@ -107,7 +95,7 @@ describe('UserService', () => {
       name: 'deleteUser',
       invoke: (s) => s.deleteUser('user-1'),
       api: () => api.deleteUser,
-      args: [BEARER, 'user-1'],
+      args: ['user-1'],
       response: restResponse(undefined),
       expected: undefined,
     },
@@ -115,15 +103,14 @@ describe('UserService', () => {
       name: 'resetPassword',
       invoke: (s) => s.resetPassword('user-1'),
       api: () => api.resetPassword,
-      args: [BEARER, 'user-1'],
+      args: ['user-1'],
       response: restResponse('generated-password'),
       expected: 'generated-password',
     },
   ];
   describeCalls(() => service, cases);
 
-  describeAuthorizationHeader({
-    authService: () => authService,
+  describeNoAuthorizationHeader({
     api: () => api.listUsers,
     invoke: () => service.listUsers(),
   });
