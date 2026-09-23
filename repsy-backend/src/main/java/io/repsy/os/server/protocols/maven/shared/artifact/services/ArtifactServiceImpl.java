@@ -929,18 +929,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     var hasSources = false;
     var hasDocuments = false;
 
-    for (final var item : itemsInVersionDir) {
-      if (item.isDirectory()) {
-        continue;
-      }
-
-      final var relativePath = versionPath + "/" + item.getName();
-
-      // Files.walk also lists the files of nested directories, which are not files of this version.
-      if (!item.getPath().replace("\\", "/").endsWith("/" + relativePath)) {
-        continue;
-      }
-
+    for (final var relativePath : this.filesOfVersionDir(versionPath, itemsInVersionDir)) {
       hasSources = hasSources || ArtifactUtils.isClassifierJar(relativePath, SOURCES_CLASSIFIER);
       hasDocuments =
           hasDocuments || ArtifactUtils.isClassifierJar(relativePath, JAVADOC_CLASSIFIER);
@@ -952,6 +941,25 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     if (pomModel != null) {
       this.setVersionPropertiesByPomModel(pomModel, artifactVersion);
     }
+  }
+
+  /**
+   * The repo-relative paths of the files that sit directly in the version directory. Directories
+   * are skipped, and so are the files of nested directories, which {@code Files.walk} also lists
+   * but which are not files of this version.
+   */
+  private List<String> filesOfVersionDir(
+      final String versionPath, final List<StorageItemInfo> itemsInVersionDir) {
+
+    return itemsInVersionDir.stream()
+        .filter(item -> !item.isDirectory())
+        .filter(
+            item ->
+                item.getPath()
+                    .replace("\\", "/")
+                    .endsWith("/" + versionPath + "/" + item.getName()))
+        .map(item -> versionPath + "/" + item.getName())
+        .toList();
   }
 
   private void setVersionPropertiesByPomModel(

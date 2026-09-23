@@ -103,6 +103,8 @@ class MavenArtifactStorageResolverTest {
     assertThat(this.resolver().resolve(this.repoId, "mvn", "com.acme:lib", "1.0-SNAPSHOT"))
         .isEmpty();
     verify(this.storageStrategy, never())
-        .get(argThat(path -> path != null && path.getRelativePath().getPath().endsWith(".jar")), any());
+        .get(
+            argThat(path -> path != null && path.getRelativePath().getPath().endsWith(".jar")),
+            any());
   }
 }
