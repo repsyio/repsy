@@ -42,6 +42,7 @@ import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
@@ -114,6 +115,10 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    * apply to its {@code .sha1}, {@code .md5}, {@code .sha256} and {@code .sha512} alike (RPS-1183).
    * Otherwise a checksum would create the directory of a version whose file is refused.
    *
+   * <p>A groupId, artifactId or version longer than the columns it is registered in is refused the
+   * same way, with {@code groupIdTooLong}, {@code artifactIdTooLong} or {@code mavenVersionTooLong}
+   * (RPS-1138), instead of failing the row insert after the file was stored.
+   *
    * @throws BadRequestException {@code invalidArtifactPath} if the path does not parse to a GAV
    */
   @Override
@@ -129,6 +134,8 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
           storagePath.getRelativePath().getPath());
       throw new BadRequestException("invalidArtifactPath");
     }
+
+    MavenPublishLimits.checkCoordinates(gav);
 
     return gav.isSnapshot() ? SNAPSHOT : RELEASE;
   }
@@ -244,6 +251,9 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
 
     if (this.checkExtractedInfos(pomModel, gav, storagePath, repo)) {
       assert gav != null;
+      // After the checks above, which read the parent: an over-long descriptive value is dropped
+      // rather than failing the row insert (RPS-1138).
+      MavenPublishLimits.dropOverLongFields(pomModel);
       this.createOrUpdateArtifactByPomFile(repo, gav, versionPath, pomModel);
     }
   }
@@ -894,13 +904,21 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     return null;
   }
 
+  /** The plugin prefix of the POM's artifactId, or {@code null} if it is longer than its column. */
+  private static @Nullable String pluginPrefix(final Model pomModel) {
+
+    return MavenPublishLimits.dropIfTooLong(
+        ArtifactUtils.getPrefixFromArtifactId(pomModel.getArtifactId()),
+        MavenPublishLimits.MAX_PREFIX_LENGTH);
+  }
+
   private void setArtifactProperties(final Model pomModel, final Artifact artifact) {
 
     artifact.setName(pomModel.getName());
     artifact.setPackaging(pomModel.getPackaging());
 
     if (ArtifactUtils.artifactIsPlugin(pomModel)) {
-      artifact.setPrefix(ArtifactUtils.getPrefixFromArtifactId(pomModel.getArtifactId()));
+      artifact.setPrefix(pluginPrefix(pomModel));
       artifact.setPlugin(true);
     }
   }
@@ -976,7 +994,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
         pomModel.getModules() != null && !pomModel.getModules().isEmpty());
 
     if (ArtifactUtils.artifactIsPlugin(pomModel)) {
-      artifactVersion.setPrefix(ArtifactUtils.getPrefixFromArtifactId(pomModel.getArtifactId()));
+      artifactVersion.setPrefix(pluginPrefix(pomModel));
     }
 
     if (pomModel.getParent() != null) {

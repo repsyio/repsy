@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.maven.shared.artifact.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -55,28 +56,31 @@ public class Artifact {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private Repo repo;
 
-  @Column(name = "group_name", nullable = false)
+  @Column(name = "group_name", nullable = false, length = MavenPublishLimits.MAX_GROUP_ID_LENGTH)
   private String groupName;
 
-  @Column(name = "artifact_name", nullable = false)
+  @Column(
+      name = "artifact_name",
+      nullable = false,
+      length = MavenPublishLimits.MAX_ARTIFACT_ID_LENGTH)
   private String artifactName;
 
-  @Column(name = "latest")
+  @Column(name = "latest", length = MavenPublishLimits.MAX_VERSION_LENGTH)
   private String latest;
 
-  @Column(name = "release")
+  @Column(name = "release", length = MavenPublishLimits.MAX_VERSION_LENGTH)
   private String release;
 
-  @Column(name = "name")
+  @Column(name = "name", length = MavenPublishLimits.MAX_NAME_LENGTH)
   private String name;
 
-  @Column(name = "prefix", length = 150)
+  @Column(name = "prefix", length = MavenPublishLimits.MAX_PREFIX_LENGTH)
   private String prefix;
 
   @Column(name = "plugin", nullable = false)
   private boolean plugin;
 
-  @Column(name = "packaging", length = 50)
+  @Column(name = "packaging", length = MavenPublishLimits.MAX_PACKAGING_LENGTH)
   private String packaging;
 
   @Column(name = "created_at")

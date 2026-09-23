@@ -186,6 +186,25 @@ class AbstractMavenProtocolFacadeTest {
   }
 
   @Test
+  @DisplayName("stores nothing and reports no usage for a POM whose packaging is over-long")
+  void rejectsAPomWithAnOverLongPackagingBeforeStoringIt() {
+    requestFor(POM_PATH);
+    deployIsAllowed();
+
+    assertThatThrownBy(
+            () ->
+                upload(
+                    VALID_POM.replace(
+                        "</project>", "<packaging>" + "p".repeat(51) + "</packaging></project>")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("pomPackagingTooLong");
+
+    verify(this.storageService, never()).writeInputStreamToPath(any(), any(), anyString());
+    verify(this.artifactService, never()).createOrUpdateArtifact(any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+  }
+
+  @Test
   @DisplayName("stores a POM that inherits its groupId from the parent of its own group")
   void storesAPomWithAnInheritedGroupId() throws Exception {
     final var inherited =
