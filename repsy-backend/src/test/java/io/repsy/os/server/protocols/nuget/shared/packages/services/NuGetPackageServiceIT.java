@@ -23,6 +23,7 @@ import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
+import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
@@ -32,6 +33,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -166,6 +168,56 @@ class NuGetPackageServiceIT extends AbstractIntegrationTest {
 
     assertThat(this.packageRowIds(repoInfo, PACKAGE_ID)).hasSize(1);
     assertThat(this.packageService.getVersions(repoInfo, PACKAGE_ID)).hasSize(2);
+  }
+
+  /**
+   * RPS-1130: the flat-container version list and the registration leaves used to keep {@code
+   * publishedAt desc} order, the order their repository queries return. A backport published after
+   * a newer release (1.0.5 after 2.0.0) sorted before the release it precedes, which is the reverse
+   * of what NuGet expects: registration leaves are documented in ascending version order and
+   * clients binary-search over a page's {@code lower}/{@code upper} bounds.
+   */
+  @Test
+  @DisplayName("orders versions ascending even when a backport is published after a newer release")
+  void ordersVersionsAscendingRegardlessOfPublishOrder() {
+    final var repoInfo = this.seedNuGetRepo();
+
+    this.publish(repoInfo, "2.0.0", nuspec("2.0.0", NO_DEPENDENCIES));
+    this.publish(repoInfo, "1.0.0", nuspec("1.0.0", NO_DEPENDENCIES));
+    // The backport: published last (so newest by publishedAt), but its version sorts between the
+    // two releases published before it.
+    this.publish(repoInfo, "1.0.5", nuspec("1.0.5", NO_DEPENDENCIES));
+
+    assertThat(this.packageService.getVersions(repoInfo, PACKAGE_ID))
+        .containsExactly("1.0.0", "1.0.5", "2.0.0");
+    assertThat(this.packageService.getAllVersionInfos(repoInfo, PACKAGE_ID))
+        .extracting(NuGetVersionInfo::version)
+        .containsExactly("1.0.0", "1.0.5", "2.0.0");
+  }
+
+  /**
+   * RPS-1130: registration leaves are cut into pages of 64 ({@code REGISTRATION_PAGE_SIZE}), and
+   * each page's {@code lower}/{@code upper} bounds only describe a contiguous version range when
+   * the full list is sorted before it is chunked. This pushes more than one page's worth of
+   * versions, published in the exact reverse of version order, so a fix that happened to work only
+   * because publish order and version order coincided would not pass.
+   */
+  @Test
+  @DisplayName("keeps a package with more than 64 versions in ascending order")
+  void ordersMoreThanAPageOfVersionsAscending() {
+    final var repoInfo = this.seedNuGetRepo();
+
+    for (var patch = 70; patch >= 0; patch--) {
+      this.publish(repoInfo, "1.0." + patch, nuspec("1.0." + patch, NO_DEPENDENCIES));
+    }
+
+    final var expected = IntStream.rangeClosed(0, 70).mapToObj(patch -> "1.0." + patch).toList();
+
+    assertThat(this.packageService.getVersions(repoInfo, PACKAGE_ID))
+        .containsExactlyElementsOf(expected);
+    assertThat(this.packageService.getAllVersionInfos(repoInfo, PACKAGE_ID))
+        .extracting(NuGetVersionInfo::version)
+        .containsExactlyElementsOf(expected);
   }
 
   @Test
