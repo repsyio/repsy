@@ -17,12 +17,14 @@ package io.repsy.os.server.protocols.golang.shared.go_module.repositories;
 
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleListItem;
 import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -31,6 +33,24 @@ import org.springframework.stereotype.Repository;
 public interface GoModuleRepository extends JpaRepository<GoModule, UUID> {
 
   Optional<GoModule> findByRepoIdAndModulePath(UUID repoId, String modulePath);
+
+  /**
+   * Inserts the module unless one with the same (repo, path) already exists. It does not raise the
+   * unique-index violation, which would abort the caller's PostgreSQL transaction and, for a
+   * concurrent first upload of a new module, turn a valid upload into a false conflict.
+   *
+   * @return 1 when the row was inserted, 0 when it already existed
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+          insert into "public"."go_module" ("id", "repo_id", "module_path", "created_at")
+            values (:id, :repoId, :modulePath, :now)
+            on conflict do nothing
+          """,
+      nativeQuery = true)
+  int insertIfAbsent(UUID id, UUID repoId, String modulePath, Instant now);
 
   @Query(
       """

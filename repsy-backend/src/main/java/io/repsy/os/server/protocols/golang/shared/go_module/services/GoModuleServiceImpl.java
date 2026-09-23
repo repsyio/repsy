@@ -15,8 +15,10 @@
  */
 package io.repsy.os.server.protocols.golang.shared.go_module.services;
 
+import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.GoModuleInfo;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem;
 import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule;
@@ -24,10 +26,15 @@ import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModuleVer
 import io.repsy.os.server.protocols.golang.shared.go_module.mappers.GoModuleMapper;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleRepository;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleVersionRepository;
+import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
+import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.protocols.golang.shared.module.services.GoModuleFilesWriter;
 import io.repsy.protocols.golang.shared.module.services.GoModuleService;
 import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -35,6 +42,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -46,36 +54,32 @@ import org.springframework.transaction.annotation.Transactional;
 @NullMarked
 public class GoModuleServiceImpl implements GoModuleService<UUID> {
 
+  /** The unique index on (module, version), created in {@code V0002__Golang_Protocol.sql}. */
+  private static final String VERSION_UNIQUE_CONSTRAINT = "ux_go_module_version__module_id_version";
+
   private final RepoRepository repoRepository;
   private final GoModuleRepository goModuleRepository;
   private final GoModuleVersionRepository goModuleVersionRepository;
   private final GoModuleMapper goModuleMapper;
 
   @Override
-  @Transactional
-  public void publishModule(
+  @Transactional(rollbackFor = IOException.class)
+  public BaseUsages publishModule(
       final BaseRepoInfo<UUID> repoInfo,
       final String modulePath,
       final String version,
       final @Nullable String goVersion,
       final String modHash,
-      final String zipHash) {
+      final String zipHash,
+      final GoModuleFilesWriter filesWriter)
+      throws IOException {
 
     final var repo =
         this.repoRepository
             .findById(repoInfo.getStorageKey())
             .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
 
-    final var goModule =
-        this.goModuleRepository
-            .findByRepoIdAndModulePath(repo.getId(), modulePath)
-            .orElseGet(
-                () -> {
-                  final var newModule = new GoModule();
-                  newModule.setRepo(repo);
-                  newModule.setModulePath(modulePath);
-                  return this.goModuleRepository.save(newModule);
-                });
+    final var goModule = this.findOrCreateModule(repo, modulePath);
 
     final var versionExists =
         this.goModuleVersionRepository
@@ -92,7 +96,46 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
     moduleVersion.setGoVersion(goVersion);
     moduleVersion.setModHash(modHash);
     moduleVersion.setZipHash(zipHash);
-    this.goModuleVersionRepository.save(moduleVersion);
+
+    // Flush so a unique-index conflict (a concurrent upload of the same version) fails here, before
+    // any file is written. The transaction, and the row lock it holds, stays open while the files
+    // are written, so a losing upload waits for the winner instead of replacing its files.
+    try {
+      this.goModuleVersionRepository.saveAndFlush(moduleVersion);
+    } catch (final DataIntegrityViolationException e) {
+      // Only that index means the version exists. Any other violation is not the client's
+      // conflict, so it is left to surface as the server error it is.
+      if (!ConstraintViolations.violatesConstraint(e, VERSION_UNIQUE_CONSTRAINT)) {
+        throw e;
+      }
+
+      throw new ItemAlreadyExistException("goModuleVersionAlreadyExists");
+    }
+
+    return filesWriter.write();
+  }
+
+  /**
+   * Returns the module row, inserting it when this is the first version of the module path.
+   *
+   * <p>The insert skips a row that already exists instead of failing on the unique index: on
+   * PostgreSQL a failed statement aborts the transaction, which also holds the version row and the
+   * file writes. When a concurrent first upload has inserted the module but not committed yet, the
+   * statement waits for it, and then finds the committed row.
+   */
+  private GoModule findOrCreateModule(final Repo repo, final String modulePath) {
+    final var existing =
+        this.goModuleRepository.findByRepoIdAndModulePath(repo.getId(), modulePath);
+    if (existing.isPresent()) {
+      return existing.get();
+    }
+
+    this.goModuleRepository.insertIfAbsent(
+        UuidCreator.getTimeOrderedEpoch(), repo.getId(), modulePath, Instant.now());
+
+    return this.goModuleRepository
+        .findByRepoIdAndModulePath(repo.getId(), modulePath)
+        .orElseThrow(() -> new ItemNotFoundException("moduleNotFound"));
   }
 
   @Override
