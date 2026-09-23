@@ -23,8 +23,10 @@
  * file header and `README.md`'s "PyPI runner" section for the raw evidence and every H-number these
  * tests reference).
  *
- * Six backend bug candidates were found and confirmed live while building this suite (none fixed
- * here -- each is now its own Jira story, per this repo's e2e process):
+ * Six backend bug candidates were found and confirmed live while building this suite, each filed as
+ * its own Jira story per this repo's e2e process. RPS-1223/RPS-1224/RPS-1225 are now FIXED (see
+ * `AbstractPypiProtocolFacade.uploadPackage`/`AbstractPypiStorageService`) and their tests below pin
+ * the corrected behaviour; the rest are still open:
  *  - **RPS-1221**: the root `/simple/` index (`packages.ftl`) hard-codes cloud-layout
  *    `/pypi/<repo>/simple/<name>/` hrefs that 404 on Repsy OS's single-tenant layout; the response's
  *    own `Content-Type` is `application/json` despite an HTML body. Harmless to a real `pip` loop
@@ -32,15 +34,19 @@
  *  - **RPS-1222**: the panel's own PyPI config screen tells users
  *    `repository=${baseUrl}/${repoName}/simple` for `.pypirc`, but the upload handler only matches
  *    the repo ROOT -- `twine upload -r <that source>` 404s (`unknownPath`).
- *  - **RPS-1223**: `checkOverridePermission` compares the FORM `version` against the version
- *    RE-EXTRACTED from the filename, not the filename itself -- a mismatched form `version` makes an
- *    existing file overwritable even under `allowOverride: false`.
+ *  - **RPS-1223** (fixed): `checkOverridePermission` used to compare the FORM `version` against the
+ *    version RE-EXTRACTED from the filename instead of the filename itself, so a mismatched form
+ *    `version` made an existing file overwritable even under `allowOverride: false`. `isPackageFileExist`
+ *    is now decided by the filename alone.
  *  - **P4**: storage-before-DB (the RPS-1124 family already open for cargo/nuget; commented there, not
  *    a new ticket): `writePackageArchive` runs before `ReleaseVersion.of(form.version)` can still
  *    throw `badVersionString`, leaving an orphaned, downloadable archive+sidecar with no DB row.
- *  - **RPS-1224/RPS-1225**: the `.sha256` sidecar is the client-sent `sha256_digest` VERBATIM, never
- *    recomputed or verified -- a missing digest is an unhandled `500` (RPS-1224), a wrong one is
- *    silently served to every consumer (RPS-1225).
+ *  - **RPS-1224/RPS-1225** (fixed): the `.sha256` sidecar used to be the client-sent `sha256_digest`
+ *    VERBATIM, never recomputed or verified -- a missing digest used to be an unhandled `500`
+ *    (RPS-1224), a wrong one used to be silently served to every consumer (RPS-1225). The facade now
+ *    rejects a missing digest with `400 sha256DigestMissing`, computes the SHA-256 of the actual
+ *    uploaded bytes, rejects a mismatch with `400 sha256DigestMismatch` (case-insensitively), and
+ *    stores/serves only the server-computed, lowercased value -- all before any storage write.
  *  - **RPS-1226** (observation, not routed around -- nothing in the catalog loop depends on
  *    `HEAD` meaning anything): `HEAD` on any path under a pypi repo answers `200`, existence never
  *    checked.
@@ -241,8 +247,8 @@ test.describe('pypi registry rules (raw HTTP)', () => {
   );
 
   test(
-    'override is refused per FILENAME under allowOverride:false, and a form version that does ' +
-      'not match the filename’s own version bypasses that check (RPS-1223)',
+    'override is refused per FILENAME under allowOverride:false, regardless of what the form ' +
+      'version says (RPS-1223)',
     { tag: ['@settings', '@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'override');
@@ -278,11 +284,9 @@ test.describe('pypi registry rules (raw HTTP)', () => {
         'the refused override left the stored bytes alone',
       ).toBe(builtA.sha256Hex);
 
-      // RPS-1223: the SAME filename, but a form `version` that does not match the version
-      // encoded in that filename -- `isFileBelongsRelease` then reports "no, this file does not
-      // belong to that (mismatched) release", so `isPackageFileExist` returns false and the
-      // "already exists" check never fires, even though the exact same storage path is about to be
-      // overwritten.
+      // RPS-1223 (fixed): the SAME filename, but a form `version` that does not match the
+      // version encoded in that filename. `isPackageFileExist` is now decided by the filename
+      // alone, so this no longer bypasses the "already exists" check.
       const builtBypass = buildWheel({
         name: layout.packageName,
         version: `${version}.post9`,
@@ -303,13 +307,6 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       });
       const bypassBytes = Buffer.from(await bypassRes.arrayBuffer());
 
-      test.fail(
-        true,
-        'RPS-1223: checkOverridePermission/isPackageFileExist compares the FORM version ' +
-          'against the version re-extracted from the filename, not the filename itself -- a form ' +
-          'version that does not match the filename’s own version makes an existing file ' +
-          'overwritable even under allowOverride: false',
-      );
       expectMsgId({ status: bypassRes.status, body: bypassBytes }, 403, 'fileAlreadyExists');
     },
   );
@@ -354,8 +351,7 @@ test.describe('pypi registry rules (raw HTTP)', () => {
   );
 
   test(
-    'a missing sha256_digest crashes the upload with an unhandled 500 instead of a validation ' +
-      'error (RPS-1224)',
+    'a missing sha256_digest is refused with 400 sha256DigestMissing (RPS-1224)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'digestmissing');
@@ -374,42 +370,44 @@ test.describe('pypi registry rules (raw HTTP)', () => {
         headers: authHeader(admin),
         body: missingForm,
       });
+      const missingBytes = Buffer.from(await missingRes.arrayBuffer());
 
-      test.fail(
-        true,
-        'RPS-1224: a missing sha256_digest crashes writePackageArchive with an unhandled ' +
-          'NPE (uploadForm.getSha256_digest().getBytes()), answering 500 instead of a 4xx ' +
-          'validation error',
-      );
-      expect(missingRes.status, 'a missing sha256_digest is a client error, not a 500').not.toBe(
-        500,
-      );
+      expectMsgId({ status: missingRes.status, body: missingBytes }, 400, 'sha256DigestMissing');
     },
   );
 
   test(
-    'the sha256_digest sidecar is stored/served verbatim, never recomputed or verified against ' +
-      'the actual uploaded bytes (RPS-1225)',
+    'a wrong sha256_digest is refused with 400 sha256DigestMismatch, and a correct upload’s ' +
+      'served hash is the server-computed digest of the actual bytes, not the client value (RPS-1225)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'digestwrong');
       const admin = adminCredential();
 
+      // A digest that does not match the uploaded bytes is now rejected outright, not silently
+      // stored and served back verbatim.
       const wrong = buildWheel({ name: layout.packageName, version: '1.0.0' });
       const wrongRes = await rawUpload(layout.repoName, admin, wrong, { sha256Digest: 'deadbeef' });
-      expectMsgId(wrongRes, 200, undefined);
+      expectMsgId(wrongRes, 400, 'sha256DigestMismatch');
 
-      const simpleRes = await rawGetSimplePage(layout.repoName, admin, wrong.name);
+      const wrongDl = await rawDownload(layout.repoName, admin, wrong.name, wrong.filename);
+      expect(wrongDl.status, 'the rejected upload left nothing downloadable').toBe(404);
+
+      // A correct upload is unaffected, and the served #sha256= is the server's own computation
+      // over the actual bytes (proven separately from the client's own claim by sending it
+      // uppercase here -- the server must normalize it, not echo it).
+      const correct = buildWheel({ name: layout.packageName, version: '2.0.0' });
+      const correctRes = await rawUpload(layout.repoName, admin, correct, {
+        sha256Digest: correct.sha256Hex.toUpperCase(),
+      });
+      expectMsgId(correctRes, 200, undefined);
+
+      const simpleRes = await rawGetSimplePage(layout.repoName, admin, correct.name);
       const links = parseSimplePage(simpleRes.body);
-      const link = links.find((l) => l.filename === wrong.filename);
-
-      test.fail(
-        true,
-        'RPS-1225: the .sha256 sidecar is the client-sent digest VERBATIM, never ' +
-          'recomputed or verified against the actual uploaded bytes -- a wrong digest is served to ' +
-          'every consumer as if it were correct',
+      const link = links.find((l) => l.filename === correct.filename);
+      expect(link?.sha256, 'the served hash matches the real uploaded bytes, lowercased').toBe(
+        correct.sha256Hex,
       );
-      expect(link?.sha256, 'the served hash matches the real uploaded bytes').toBe(wrong.sha256Hex);
     },
   );
 

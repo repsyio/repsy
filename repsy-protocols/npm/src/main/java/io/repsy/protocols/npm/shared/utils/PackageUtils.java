@@ -192,33 +192,47 @@ public final class PackageUtils {
   }
 
   /**
-   * we need registry name to identify the registry - from
-   * //localhost:9002/npm/username/@foo/demo/-/@foo/demo-0.2.1.tgz - to
-   * //localhost:9002/npm/username/repoName/@foo/demo/-/demo-0.2.1.tgz
+   * Normalizes a published version's {@code dist.tarball} without assuming any particular registry
+   * URL layout.
+   *
+   * <p>The client (npm itself) already computes a servable path, so this only rebuilds the filename
+   * after the last {@code /-/} segment from the version's own {@code name} and {@code version} and
+   * leaves everything before it untouched. That is a no-op for an already-correct URL, and it still
+   * strips a scope a client duplicated into the filename (e.g. {@code /-/@foo/demo-0.2.1.tgz}
+   * becomes {@code /-/demo-0.2.1.tgz}). A URL with no {@code /-/} is left alone.
    */
-  public static void fixTarballUrl(final Map<String, Object> version, final String registryName)
-      throws URISyntaxException {
+  public static void fixTarballUrl(final Map<String, Object> version) throws URISyntaxException {
 
     final var dist = (Map<String, String>) version.get("dist");
-    final var tarballUri = dist.get("tarball");
-    final var uri = new URI(tarballUri);
-    final var stringBuilder = new StringBuilder();
-    final var arr = uri.getRawPath().split("/", -1);
-    final var scopeNameIndex = 6;
+    final var uri = new URI(dist.get("tarball"));
+    final var rawPath = uri.getRawPath();
 
-    for (int i = 1; i < arr.length; i++) {
-      if (i == scopeNameIndex) { // remove scopeName from filename
-        continue;
-      }
+    final var idx = rawPath.lastIndexOf("/-/");
 
-      stringBuilder.append("/").append(arr[i]);
-
-      if (i == 2) { // right after tenantName
-        stringBuilder.append("/").append(registryName);
-      }
+    if (idx < 0) {
+      return; // nothing recognisable to fix; leave the client's URL alone
     }
 
-    dist.put("tarball", uri.getScheme() + "://" + uri.getAuthority() + stringBuilder);
+    final var packageName = (String) version.get("name");
+    final var versionName = (String) version.get("version");
+    final var fileName =
+        PackageUtils.getTarballFilename(PackageUtils.bareName(packageName), versionName);
+
+    dist.put(
+        "tarball",
+        uri.getScheme()
+            + "://"
+            + uri.getAuthority()
+            + rawPath.substring(0, idx)
+            + "/-/"
+            + fileName);
+  }
+
+  private static String bareName(final String packageName) {
+
+    final var slash = packageName.indexOf('/');
+
+    return slash < 0 ? packageName : packageName.substring(slash + 1);
   }
 
   public static String getFormattedCurrentTime() {
@@ -289,7 +303,7 @@ public final class PackageUtils {
 
     payload.put("description", version.getOrDefault("description", ""));
     payload.put("homepage", version.getOrDefault("homepage", ""));
-    payload.put("keywords", version.getOrDefault("keywords", new String[] {}));
+    payload.put("keywords", version.getOrDefault("keywords", new ArrayList<String>()));
     payload.put("license", version.getOrDefault("license", ""));
     payload.put("readme", version.getOrDefault("readme", ""));
     payload.put("readmeFilename", version.getOrDefault("readmeFilename", ""));

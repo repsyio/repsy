@@ -33,7 +33,6 @@ import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import io.repsy.os.shared.error_handling.exceptions.InvalidPagingParameterException;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
-import io.repsy.protocols.golang.shared.exceptions.GoVersionGoneException;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -460,24 +459,6 @@ public class ErrorHandler {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .contentType(MediaType.APPLICATION_JSON)
         .body(this.resp.error(messageText, ex.getMessage()));
-  }
-
-  @ExceptionHandler(GoVersionGoneException.class)
-  @Nullable ResponseEntity<RestResponse<String>> handleException(
-      final @NonNull GoVersionGoneException ex,
-      final @NonNull HttpServletRequest request,
-      final @Nullable HttpServletResponse response) {
-
-    if (response == null) {
-      log.debug("Go version gone", ex);
-      return null;
-    }
-
-    log.info(exceptionToString(ex, request));
-
-    return ResponseEntity.status(HttpStatus.GONE)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(this.resp.error("versionGone", ex.getMessage()));
   }
 
   @ExceptionHandler(NoResourceFoundException.class)

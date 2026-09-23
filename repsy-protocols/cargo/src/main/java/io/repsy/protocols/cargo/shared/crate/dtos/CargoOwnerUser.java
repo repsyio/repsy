@@ -13,12 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.golang.shared.exceptions;
+package io.repsy.protocols.cargo.shared.crate.dtos;
 
-/** Thrown when a Go module version has been deleted and the client should receive 410 Gone. */
-public class GoVersionGoneException extends RuntimeException {
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
-  public GoVersionGoneException(final String version) {
-    super("Go module version has been deleted: " + version);
-  }
-}
+/**
+ * One entry of a {@code cargo owner --list} response, shaped after crates.io's {@code User}: {@code
+ * id: u32, login: String, name: Option<String>}. Unknown extra fields are ignored by the real
+ * client, but these three are read.
+ */
+@NullMarked
+public record CargoOwnerUser(int id, String login, @Nullable String name) {}

@@ -324,8 +324,8 @@ export async function rawGetManifest(
   };
 }
 
-/** `HEAD /v2/<repo>/<image>/manifests/<ref>` -- see this file's header: a HEAD by digest is `404`
- *  even for a manifest a GET-by-digest serves fine (RPS-1215). */
+/** `HEAD /v2/<repo>/<image>/manifests/<ref>` -- mirrors GET for both a tag and a digest reference
+ *  (RPS-1215, fixed). */
 export async function rawHeadManifest(
   repoName: string,
   credential: MaterializedCredential,

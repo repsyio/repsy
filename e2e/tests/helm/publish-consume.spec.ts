@@ -21,17 +21,19 @@
  * itself cannot exercise, numbered "HL" per the plan:
  *
  *  - "HL1" `helm registry login --password-stdin` writes the exact `config.json` shape
- *    `renderHelmRegistryConfig` renders by hand, fronts a working `helm push`; and documents
- *    **B-H4** (candidate): the SAME login with a WRONG password also reports success (confirmed
- *    live -- the ping's token endpoint is Docker's own, and issues an anonymous token before any
- *    credential is checked, see `helm-raw.ts`'s file header) -- but the push it then fronts still
- *    fails, so this adapter never trusts `helm registry login`'s own exit code for an `Outcome`.
- *  - "HL2" `helm pull oci://.../<chart>` with NO `--version` fails (**B-H3**: no `tags/list`
- *    route); the same pull WITH an exact `--version` succeeds (control).
- *  - "HL4" cross-mode (**B-H1**): an OCI-pushed chart's version appears in `index.yaml`, but
- *    `helm pull --repo <url> <chart> --version <v>` (the classic route) 404s for it.
- *  - "HL5" (**B-H2**): an accepted OCI override with different chart bytes leaves `index.yaml`'s
- *    `digest` field at the OLD layer digest.
+ *    `renderHelmRegistryConfig` renders by hand, fronts a working `helm push`; and confirms
+ *    **RPS-1220** stays fixed: the SAME login with a WRONG password now genuinely fails (the
+ *    token endpoint is Docker's own -- see `helm-raw.ts`'s file header -- and now validates an
+ *    OAuth2 password-grant form body the same way it validates a Basic header), and the push it
+ *    fronts fails too.
+ *  - "HL2" `helm pull oci://.../<chart>` with NO `--version` succeeds, resolving the latest
+ *    version via `GET .../tags/list` (**B-H3**, fixed by RPS-1219); the same pull WITH an exact
+ *    `--version` also succeeds (control).
+ *  - "HL4" cross-mode (**B-H1**, fixed by RPS-1217): an OCI-pushed chart's version appears in
+ *    `index.yaml`, and `helm pull --repo <url> <chart> --version <v>` (the classic route)
+ *    downloads it too, via the classic-to-OCI-blob fallback.
+ *  - "HL5" (**B-H2**, fixed by RPS-1218): an accepted OCI override with different chart bytes
+ *    updates `index.yaml`'s `digest` field to the NEW layer digest.
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -61,8 +63,8 @@ registerPublishConsumeLoop(helmAdapter);
 
 test(
   'helm > HL1: helm registry login --password-stdin writes the same config.json shape as ' +
-    'renderHelmRegistryConfig, and fronts a working push; a wrong password also reports success ' +
-    '(candidate B-H4) but the push it fronts still fails',
+    'renderHelmRegistryConfig, and fronts a working push; a wrong password now genuinely fails ' +
+    'the login (RPS-1220) and the push it fronts fails too',
   { tag: ['@smoke'] },
   async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.HELM, { privateRepo: true });
@@ -119,11 +121,9 @@ test(
       0,
     );
 
-    // Candidate B-H4, confirmed live: a login with a WRONG password still reports success (the
-    // ping's token endpoint is Docker's own and issues an anonymous token before any credential is
-    // checked -- see helm-raw.ts's file header). Documented as an expected failure here, not
-    // silently accepted: if this ever starts genuinely refusing a wrong password, this test should
-    // start failing so it gets noticed.
+    // RPS-1220: a login with a WRONG password now genuinely fails -- the ping's token endpoint is
+    // Docker's own, and it now validates a grant_type=password form body the same way it validates
+    // a Basic header (see helm-raw.ts's file header).
     const { home: badHome, work: badWork } = await isolatedWorkDir(`helm-hl1-bad-${seeder.runId}`);
     const badLoginResult = await run(
       'helm',
@@ -144,12 +144,6 @@ test(
         input: 'not-the-real-token\n',
       },
     );
-    test.fail(
-      true,
-      'RPS-1220 (B-H4): helm registry login reports success even with a WRONG password -- the ' +
-        "ping's token endpoint is Docker's own and issues an anonymous token before any credential " +
-        "is checked (helm-raw.ts). This is a Docker-provider bug surfacing through Helm's login flow.",
-    );
     expect(badLoginResult.exitCode, 'a login with a wrong password should fail').not.toBe(0);
 
     // The push it fronts still fails for real (the actual write request IS credential-checked).
@@ -163,8 +157,8 @@ test(
 );
 
 test(
-  'helm > HL2: helm pull without --version fails (candidate B-H3, no tags/list); the same pull ' +
-    'with an exact --version succeeds',
+  'helm > HL2: helm pull without --version succeeds (via tags/list); the same pull with an ' +
+    'exact --version also succeeds',
   { tag: ['@smoke'] },
   async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.HELM, { privateRepo: true });
@@ -197,11 +191,6 @@ test(
       ['pull', ociChartRef(repo.name, chart), '--destination', noVersionDir, ...plainHttpFlag()],
       { cwd: work, env: helmEnv(home), timeoutMs: 30_000, label: 'helm-hl2-pull-noversion' },
     );
-    test.fail(
-      true,
-      'RPS-1219 (B-H3): helm pull with no --version calls GET tags/list to resolve the latest ' +
-        'version, but Repsy has no such handler (404 NAME_UNKNOWN) -- confirmed live.',
-    );
     expect(noVersionResult.exitCode, 'pull without --version should succeed').toBe(0);
 
     const exactDir = path.join(work, 'pulled-exact');
@@ -224,8 +213,8 @@ test(
 );
 
 test(
-  'helm > HL4: an OCI-pushed chart appears in index.yaml (candidate B-H1) but is not downloadable ' +
-    'through the classic route',
+  'helm > HL4: an OCI-pushed chart appears in index.yaml and is downloadable through the classic ' +
+    'route',
   { tag: ['@settings'] },
   async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.HELM, { privateRepo: true });
@@ -269,22 +258,22 @@ test(
         version,
         '--destination',
         pulledClassicDir,
+        // The repo is privateRepo: true; a classic `helm pull --repo` sends no credentials of its
+        // own (unlike helm-classic.ts's adapter, which always appends these for the same reason),
+        // so index.yaml's own fetch would 401 without them.
+        '--username',
+        credential.username ?? '',
+        '--password',
+        credential.password ?? '',
       ],
       { cwd: work, env: helmEnv(home), timeoutMs: 30_000, label: 'helm-hl4-pull-classic' },
-    );
-    test.fail(
-      true,
-      'RPS-1217 (B-H1): index.yaml lists every OCI-pushed chart version at ' +
-        'charts/<name>-<version>.tgz, but the classic download route only ever reads the classic ' +
-        'storage path, which an OCI-only publish never wrote -- confirmed live (404 chartNotFound).',
     );
     expect(pullResult.exitCode, 'a classic pull of an OCI-only chart should succeed').toBe(0);
   },
 );
 
 test(
-  'helm > HL5: an accepted OCI override with different bytes leaves index.yaml digest stale ' +
-    '(candidate B-H2)',
+  "helm > HL5: an accepted OCI override with different bytes updates index.yaml's digest",
   { tag: ['@settings'] },
   async ({ seeder }) => {
     // A freshly created repo's own default is allowOverride: true.
@@ -327,12 +316,6 @@ test(
 
     const indexRes = await rawGetIndex(repo.name, credential);
     const entry = indexEntry(parseIndex(indexRes.body.toString('utf8')), chart, version);
-    test.fail(
-      true,
-      'RPS-1218 (B-H2): an accepted OCI override updates only the manifest row -- the chart ' +
-        "VERSION row (and therefore index.yaml's digest field) stays at the OLD layer digest -- " +
-        'confirmed live.',
-    );
     expect(entry?.digest, "index.yaml's digest should follow the override").toBe(second.tgzDigest);
   },
 );

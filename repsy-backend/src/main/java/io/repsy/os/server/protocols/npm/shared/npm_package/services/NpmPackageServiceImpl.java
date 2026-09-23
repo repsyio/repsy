@@ -43,7 +43,7 @@ import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.utils.PackageUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.time.Instant;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -474,48 +474,49 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
 
   private void addKeywords(final Map<String, Object> version, final PackageVersion packageVersion) {
 
-    final var keywords = (ArrayList<String>) version.get("keywords");
+    if (!(version.get("keywords") instanceof final Collection<?> keywords) || keywords.isEmpty()) {
+      return;
+    }
 
-    if (keywords != null && !keywords.isEmpty()) {
-      PackageKeyword packageKeyword;
+    PackageKeyword packageKeyword;
 
-      for (final var keyword : keywords) {
-        if (keyword.isEmpty()) {
-          continue;
-        }
-
-        packageKeyword = new PackageKeyword();
-        packageKeyword.setKeyword(keyword);
-        packageKeyword.setPackageVersion(packageVersion);
-        packageKeyword.setCreatedAt(Instant.now());
-
-        this.packageKeywordRepository.save(packageKeyword);
+    for (final var raw : keywords) {
+      if (!(raw instanceof final String keyword) || keyword.isEmpty()) {
+        continue;
       }
+
+      packageKeyword = new PackageKeyword();
+      packageKeyword.setKeyword(keyword);
+      packageKeyword.setPackageVersion(packageVersion);
+      packageKeyword.setCreatedAt(Instant.now());
+
+      this.packageKeywordRepository.save(packageKeyword);
     }
   }
 
   private void addMaintainers(
       final Map<String, Object> version, final PackageVersion packageVersion) {
 
-    final var maintainers = (ArrayList<Map<String, String>>) version.get("maintainers");
+    if (!(version.get("maintainers") instanceof final Collection<?> maintainers)
+        || maintainers.isEmpty()) {
+      return;
+    }
 
-    if (maintainers != null && !maintainers.isEmpty()) {
-      PackageMaintainer packageMaintainer;
+    PackageMaintainer packageMaintainer;
 
-      for (final var maintainer : maintainers) {
-        if (maintainer.isEmpty()) {
-          continue;
-        }
-
-        packageMaintainer = new PackageMaintainer();
-        packageMaintainer.setPackageVersion(packageVersion);
-        packageMaintainer.setName(maintainer.get(NpmConstants.NAME));
-        packageMaintainer.setEmail(maintainer.get(NpmConstants.EMAIL));
-        packageMaintainer.setUrl(maintainer.get(NpmConstants.URL));
-        packageMaintainer.setCreatedAt(Instant.now());
-
-        this.packageMaintainerRepository.save(packageMaintainer);
+    for (final var raw : maintainers) {
+      if (!(raw instanceof final Map<?, ?> maintainer) || maintainer.isEmpty()) {
+        continue;
       }
+
+      packageMaintainer = new PackageMaintainer();
+      packageMaintainer.setPackageVersion(packageVersion);
+      packageMaintainer.setName((String) maintainer.get(NpmConstants.NAME));
+      packageMaintainer.setEmail((String) maintainer.get(NpmConstants.EMAIL));
+      packageMaintainer.setUrl((String) maintainer.get(NpmConstants.URL));
+      packageMaintainer.setCreatedAt(Instant.now());
+
+      this.packageMaintainerRepository.save(packageMaintainer);
     }
   }
 

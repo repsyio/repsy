@@ -113,9 +113,36 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var storagePath =
         StoragePath.of(repoInfo.getStorageKey(), HelmConstants.CHARTS_PATH + "/" + filename);
-    return this.helmStorageService
-        .getResource(storagePath, repoInfo.getName())
+    final var classic = this.helmStorageService.getResource(storagePath, repoInfo.getName());
+    if (classic.isPresent()) {
+      return classic.get();
+    }
+
+    // A chart published only through the OCI route stores its archive as the chart layer, under
+    // oci/blobs/<digest>, never under charts/ — the same fallback deleteChartFile already makes
+    // (AbstractHelmStorageService#deleteChartFile). Without it, an OCI-only chart is listed in
+    // index.yaml but 404s on the classic download route (RPS-1217).
+    return this.findChartByArchiveFileName(repoInfo, filename)
+        .flatMap(
+            chart ->
+                this.helmStorageService.getBlob(
+                    repoInfo.getStorageKey(), chart.digest(), repoInfo.getName()))
         .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+  }
+
+  /**
+   * Resolves {@code <name>-<version>.tgz} back to the chart row it names. A chart name may itself
+   * contain hyphens, so splitting the filename on the last {@code -} is ambiguous; matching against
+   * the rows instead is correct by construction, using exactly the relation {@link #generateIndex}
+   * used to build the URL in the first place.
+   */
+  private Optional<HelmChartInfo> findChartByArchiveFileName(
+      final BaseRepoInfo<ID> repoInfo, final String filename) {
+    return this.chartService.findAllByRepoId(repoInfo.getId()).stream()
+        .filter(
+            chart ->
+                filename.equals(chart.name() + "-" + chart.version() + HelmConstants.TGZ_EXTENSION))
+        .findFirst();
   }
 
   @Override
@@ -311,6 +338,13 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
   }
 
   @Override
+  public Optional<HelmChartInfo> findChartByNameAndVersion(
+      final ProtocolContext context, final String name, final String version) {
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    return this.chartService.findOptionalByNameAndVersion(repoInfo.getId(), name, version);
+  }
+
+  @Override
   public HelmOciBlobInfo findOrCreateBlob(final HelmOciBlobForm form, final ID repoId) {
     return this.ociBlobService.findOrCreate(form, repoId);
   }
@@ -337,7 +371,16 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
   @Override
   public HelmOciTagListDto listTags(final ProtocolContext context, final String name) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var tags = this.ociManifestService.listTagsByName(repoInfo.getId(), name);
+    // listTagsByName's references include pushes by digest (sha256:...), which the distribution
+    // spec's tags/list must not return, and are ordered newest-first, where the spec wants
+    // lexical order. The filtering/sorting stays here rather than in OciManifestService because
+    // the panel (HelmApiFacade) calls listTagsByName directly and relies on its raw, unfiltered,
+    // createdAt-desc output (see HelmOciManifestNameRepairServiceIT).
+    final var tags =
+        this.ociManifestService.listTagsByName(repoInfo.getId(), name).stream()
+            .filter(reference -> !reference.startsWith(HelmConstants.SHA256_PREFIX))
+            .sorted()
+            .toList();
     return HelmOciTagListDto.builder().name(name).tags(tags).build();
   }
 }

@@ -16,11 +16,9 @@
 package io.repsy.os.server.protocols.docker.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
-import io.repsy.os.server.protocols.docker.shared.utils.PathParserUtils;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
 import io.repsy.protocols.docker.protocol.handlers.AbstractDockerManifestCheckProtocolMethodHandler;
-import io.repsy.protocols.docker.shared.utils.BaseParsedPath;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -36,10 +34,5 @@ public class DockerManifestCheckProtocolMethodHandler
       final DockerProtocolFacade<UUID> dockerFacade,
       final DockerProtocolProvider provider) {
     super(basePathParser, dockerFacade, provider);
-  }
-
-  @Override
-  public BaseParsedPath parseForManifest(final String servletPath, final String fileName) {
-    return PathParserUtils.parseForManifest(servletPath, fileName);
   }
 }
