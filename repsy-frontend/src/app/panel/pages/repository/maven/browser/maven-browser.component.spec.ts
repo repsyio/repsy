@@ -95,6 +95,21 @@ describe('MavenBrowserComponent', () => {
       expect(component.repoUrl).toBe(`${environment.repoBaseUrl}/other-repo/`);
     });
 
+    it('forgets what next would have gone forward to when another repository is selected', () => {
+      open();
+      component.go(dir('org/'));
+      component.prev();
+      expect(component.forwardStack.length).toBe(1);
+
+      repoChanges.next(permission('other-repo'));
+      mavenService.getPathContent.calls.reset();
+      component.next();
+
+      expect(component.forwardStack).toEqual([]);
+      expect(paths()).toEqual(['/']);
+      expect(mavenService.getPathContent).not.toHaveBeenCalled();
+    });
+
     it('ignores an empty repository value', () => {
       repoChanges.next(null);
 
@@ -152,6 +167,29 @@ describe('MavenBrowserComponent', () => {
       expect(paths()).toEqual(['/', '/org/']);
       expect(component.forwardStack.map((d) => d.path)).toEqual(['/org/acme/']);
       expect(mavenService.getPathContent).toHaveBeenCalledWith('/org/');
+    });
+
+    it('go into a directory after going back drops the directories next would have returned to', () => {
+      component.go(dir('org/'));
+      component.go(dir('acme/'));
+      component.go(dir('../'));
+      expect(component.forwardStack.length).toBe(1);
+
+      component.go(dir('com/'));
+
+      expect(paths()).toEqual(['/', '/org/', '/org/com/']);
+      expect(component.forwardStack).toEqual([]);
+    });
+
+    it('goToDir drops the directories next would have returned to', () => {
+      component.go(dir('org/'));
+      component.go(dir('acme/'));
+      component.prev();
+      expect(component.forwardStack.length).toBe(1);
+
+      component.goToDir(component.directoryStack[0]);
+
+      expect(component.forwardStack).toEqual([]);
     });
 
     it('go on a file requests a download token for its full path', () => {

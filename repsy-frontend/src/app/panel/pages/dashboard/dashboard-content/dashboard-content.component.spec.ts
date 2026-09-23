@@ -14,7 +14,7 @@
 /// limitations under the License.
 
 import { ChangeDetectorRef } from '@angular/core';
-import { of, Subject } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
 import { ProfileInfo, ProtocolRepoControllerService, RepoListInfo, RepoType } from '../../../../../generated/api';
 import { ProfileService } from '../../profile/service/profile.service';
@@ -173,6 +173,29 @@ describe('DashboardContentComponent', () => {
         'repo-4',
         'repo-3',
       ]);
+    });
+
+    it('handles a type that cannot be listed: no unhandled error, the other types still show', async () => {
+      infos = { NPM: [repo('an-npm', '2026-02-01T00:00:00Z')] };
+      repoService.getInfo.and.callFake(((type: RepoType) =>
+        type === RepoType.Maven ? throwError(() => new Error('boom')) : of({ data: infos[type] })) as never);
+      // RxJS reports an unhandled subscriber error asynchronously, and Jasmine fails the spec on it.
+      const unhandled: unknown[] = [];
+      const onError = (event: ErrorEvent): void => {
+        unhandled.push(event.error);
+        event.preventDefault();
+      };
+      window.addEventListener('error', onError);
+
+      try {
+        const component = create();
+        await new Promise<void>((resolve) => setTimeout(resolve));
+
+        expect(unhandled).toEqual([]);
+        expect(component.repoListInfos.map((r) => r.name)).toEqual(['an-npm']);
+      } finally {
+        window.removeEventListener('error', onError);
+      }
     });
 
     it('is empty when there are no repositories at all', () => {

@@ -19,6 +19,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { BehaviorSubject, of } from 'rxjs';
 
+import { environment } from '../../../../../../../environments/environment';
 import { ReleaseDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
@@ -149,5 +150,14 @@ describe('PypiPackagesVersionDetailComponent description', () => {
     const el = render('  \n\n ', 'text/markdown');
 
     expect(el.querySelector('[data-testid="readme"]')).toBeNull();
+  });
+
+  it('shows an install command for the package and version being viewed, not a placeholder', () => {
+    const el = render('desc', 'text/markdown');
+
+    expect(el.textContent).toContain(
+      `pip install acme-lib==1.2.3 --extra-index-url ${environment.repoBaseUrl}/pypi-repo/simple`,
+    );
+    expect(el.textContent).not.toContain('hello-world');
   });
 });
