@@ -15,7 +15,10 @@
  */
 package io.repsy.os.server.protocols.npm.shared.npm_package.services;
 
+import com.github.f4b6a3.uuid.UuidCreator;
+import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.server.protocols.npm.shared.constants.NpmConstants;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageDistributionTagListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageInfo;
@@ -34,23 +37,24 @@ import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageK
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageMaintainerRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
 import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
-import io.repsy.protocols.npm.shared.npm_package.dtos.BasePackageInfo;
-import io.repsy.protocols.npm.shared.npm_package.dtos.BasePackageVersionInfo;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.utils.PackageUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.io.IOException;
+import java.net.URISyntaxException;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.util.Pair;
@@ -64,6 +68,10 @@ import org.springframework.transaction.annotation.Transactional;
 @NullMarked
 public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
 
+  private static final String PACKAGE_VERSION_ALREADY_EXISTS = "packageVersionAlreadyExists";
+  private static final String VERSION_UNIQUE_CONSTRAINT =
+      "ux_npm_package_version__package_id_version";
+
   private final RepoRepository repoRepository;
   private final NpmPackageRepository npmPackageRepository;
   private final PackageVersionRepository packageVersionRepository;
@@ -72,37 +80,160 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
   private final PackageKeywordRepository packageKeywordRepository;
   private final NpmPackageConverter npmPackageConverter;
 
-  @Transactional
+  @Transactional(rollbackFor = {IOException.class, URISyntaxException.class})
   @Override
-  public void addPackage(
+  public BaseUsages publishVersion(
       final BaseRepoInfo<UUID> repoInfo,
-      final @Nullable String scope,
-      final String name,
-      final Map<String, Object> payload)
-      throws ClassCastException {
+      final @Nullable String scopeName,
+      final String packageName,
+      final String versionName,
+      final Map<String, Object> payload,
+      final VersionWriter writer)
+      throws IOException, URISyntaxException {
 
-    final var repo =
-        this.repoRepository
-            .findById(repoInfo.getStorageKey())
-            .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
+    final PublishKind kind;
+
+    try {
+      final var repo =
+          this.repoRepository
+              .findById(repoInfo.getStorageKey())
+              .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.REPO_NOT_FOUND));
+
+      kind =
+          this.recordVersion(
+              repo, scopeName, packageName, versionName, payload, repoInfo.isAllowOverride());
+
+      // Flush so a unique-index conflict fails here, before any file is written. The transaction,
+      // and the package row it holds locked, stays open while the files are written, so a
+      // concurrent publish of the package waits for this one instead of replacing its files.
+      this.packageVersionRepository.flush();
+    } catch (final DataIntegrityViolationException e) {
+      // Only that index means the version exists. Any other violation is not the client's
+      // conflict, so it is left to surface as the server error it is.
+      if (!ConstraintViolations.violatesConstraint(e, VERSION_UNIQUE_CONSTRAINT)) {
+        throw e;
+      }
+
+      throw new AccessNotAllowedException(PACKAGE_VERSION_ALREADY_EXISTS);
+    }
+
+    return writer.write(kind);
+  }
+
+  /**
+   * Writes the rows of the version, taking the package row with a lock, and tells what it did.
+   *
+   * <p>The lock serialises the publishes of one package. That matters beyond the version row: every
+   * publish rewrites the package's one metadata file from what it read, so two publishes of
+   * different versions would otherwise lose one of them.
+   */
+  private PublishKind recordVersion(
+      final Repo repo,
+      final @Nullable String scopeName,
+      final String packageName,
+      final String versionName,
+      final Map<String, Object> payload,
+      final boolean allowOverride) {
+
+    final var repoId = repo.getId();
+    final var existing =
+        this.npmPackageRepository.findWithLockByRepoIdAndScopeAndName(
+            repoId, scopeName, packageName);
+
+    if (existing.isPresent()) {
+      return this.recordVersionOf(existing.get(), versionName, payload, allowOverride);
+    }
+
+    // Skips the insert when a concurrent first publish of the package has done it, instead of
+    // failing on the unique index: on PostgreSQL a failed statement aborts the transaction, which
+    // also holds the file write. The statement waits for that publish to finish, and then finds
+    // the committed package.
+    final var inserted =
+        this.npmPackageRepository.insertIfAbsent(
+            UuidCreator.getTimeOrderedEpoch(),
+            repoId,
+            scopeName,
+            packageName,
+            versionName,
+            Instant.now());
+
+    final var npmPackage =
+        this.npmPackageRepository
+            .findWithLockByRepoIdAndScopeAndName(repoId, scopeName, packageName)
+            .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.PACKAGE_NOT_FOUND));
+
+    if (inserted == 0) {
+      return this.recordVersionOf(npmPackage, versionName, payload, allowOverride);
+    }
+
+    this.addNewVersion(npmPackage, versionName, payload, true);
+
+    return PublishKind.NEW_PACKAGE;
+  }
+
+  private PublishKind recordVersionOf(
+      final NpmPackage npmPackage,
+      final String versionName,
+      final Map<String, Object> payload,
+      final boolean allowOverride) {
+
+    final var existing =
+        this.packageVersionRepository.findByNpmPackageIdAndVersion(npmPackage.getId(), versionName);
+
+    if (existing.isEmpty()) {
+      this.addNewVersion(npmPackage, versionName, payload, false);
+      return PublishKind.NEW_VERSION;
+    }
+
+    if (!allowOverride) {
+      throw new AccessNotAllowedException(PACKAGE_VERSION_ALREADY_EXISTS);
+    }
+
+    this.replaceVersion(
+        existing.get(), PackageUtils.extractVersionFromPayload(payload).getSecond());
+
+    return PublishKind.REPLACES_VERSION;
+  }
+
+  private void addNewVersion(
+      final NpmPackage npmPackage,
+      final String versionName,
+      final Map<String, Object> payload,
+      final boolean firstVersion) {
 
     final var distTag = PackageUtils.extractFirstDistTagFromPayload(payload);
+    final var versionData = PackageUtils.extractVersionFromPayload(payload).getSecond();
+    final var packageVersion = this.addVersion(versionData, versionName, npmPackage);
 
-    final var versionPair = PackageUtils.extractVersionFromPayload(payload);
+    this.addMaintainers(versionData, packageVersion);
+    this.addKeywords(versionData, packageVersion);
 
-    final var npmPackage = this.addPackage(scope, name, distTag.getValue(), repo);
+    final var isLatestTag = distTag.getKey().equals(NpmConstants.LATEST);
 
-    final var packageVersion =
-        this.addVersion(versionPair.getSecond(), versionPair.getFirst(), npmPackage);
-
-    this.addMaintainers(versionPair.getSecond(), packageVersion);
-    this.addKeywords(versionPair.getSecond(), packageVersion);
-
-    if (!distTag.getKey().equals(NpmConstants.LATEST)) {
+    // The first version of a package is its latest, whatever tag it is published under. The
+    // package row was inserted with that version as its latest.
+    if (firstVersion && !isLatestTag) {
       this.addDistTag(npmPackage.getId(), packageVersion, NpmConstants.LATEST);
     }
 
     this.addDistTag(npmPackage.getId(), packageVersion, distTag.getKey());
+
+    if (!firstVersion && isLatestTag) {
+      npmPackage.setLatest(packageVersion.getVersion());
+      this.npmPackageRepository.save(npmPackage);
+    }
+  }
+
+  private void replaceVersion(final PackageVersion version, final Map<String, Object> versionData) {
+
+    this.populatePackageVersionFromMetadata(version, versionData);
+    this.packageVersionRepository.save(version);
+
+    this.packageMaintainerRepository.deleteAllMaintainersOfVersion(version.getId());
+    this.packageKeywordRepository.deleteAllKeywordsOfVersion(version.getId());
+
+    this.addMaintainers(versionData, version);
+    this.addKeywords(versionData, version);
   }
 
   @Override
@@ -112,20 +243,6 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
     final var npmPackage = this.findPackageByRepoIdAndScopeAndName(repoId, scopeName, packageName);
 
     return this.npmPackageConverter.toPackageInfo(npmPackage, npmPackage.getRepo());
-  }
-
-  @Override
-  public Optional<BasePackageInfo<UUID>> getPackageInfoByRepoIdAndScopeAndName(
-      final UUID repoId, final @Nullable String scopeName, final String packageName) {
-
-    final var repo =
-        this.repoRepository
-            .findById(repoId)
-            .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.REPO_NOT_FOUND));
-
-    return this.npmPackageRepository
-        .findByRepoIdAndScopeAndName(repoId, scopeName, packageName)
-        .map(pkg -> this.npmPackageConverter.toPackageInfo(pkg, repo));
   }
 
   @Transactional
@@ -145,70 +262,6 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
     return this.packageVersionRepository.findByNpmPackageId(packageId).stream()
         .map(PackageVersion::getVersion)
         .toList();
-  }
-
-  @Transactional
-  @Override
-  public void addVersionToPackage(final UUID packageId, final Map<String, Object> payload) {
-
-    final var npmPackage =
-        this.npmPackageRepository
-            .findById(packageId)
-            .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.PACKAGE_NOT_FOUND));
-
-    final var distTag = PackageUtils.extractFirstDistTagFromPayload(payload);
-
-    final var versionPair = PackageUtils.extractVersionFromPayload(payload);
-
-    final var packageVersion =
-        this.addVersion(versionPair.getSecond(), distTag.getValue(), npmPackage);
-
-    this.addKeywords(versionPair.getSecond(), packageVersion);
-    this.addMaintainers(versionPair.getSecond(), packageVersion);
-    this.addDistTag(npmPackage.getId(), packageVersion, distTag.getKey());
-
-    if (distTag.getKey().equals(NpmConstants.LATEST)) {
-      npmPackage.setLatest(packageVersion.getVersion());
-      this.npmPackageRepository.save(npmPackage);
-    }
-  }
-
-  @Override
-  public Optional<BasePackageVersionInfo<UUID>> findOptPackageVersionByPackageIdAndVersion(
-      final UUID packageId, final String versionName) {
-
-    final var pkg =
-        this.npmPackageRepository
-            .findById(packageId)
-            .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.PACKAGE_NOT_FOUND));
-
-    return this.packageVersionRepository
-        .findByNpmPackageIdAndVersion(packageId, versionName)
-        .map(pkv -> this.npmPackageConverter.toPackageVersionInfo(pkv, pkg));
-  }
-
-  @Transactional
-  @Override
-  public void updateVersionFromMetadata(
-      final UUID repoId,
-      final @Nullable String scopeName,
-      final String packageName,
-      final String versionName,
-      final Map<String, Object> metadata) {
-
-    final var npmPackage = this.findPackageByRepoIdAndScopeAndName(repoId, scopeName, packageName);
-
-    final var version =
-        this.findPackageVersionByPackageIdAndVersion(npmPackage.getId(), versionName);
-
-    this.populatePackageVersionFromMetadata(version, metadata);
-    this.packageVersionRepository.save(version);
-
-    this.packageMaintainerRepository.deleteAllMaintainersOfVersion(version.getId());
-    this.packageKeywordRepository.deleteAllKeywordsOfVersion(version.getId());
-
-    this.addMaintainers(metadata, version);
-    this.addKeywords(metadata, version);
   }
 
   @Transactional
@@ -518,23 +571,6 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
 
       this.packageMaintainerRepository.save(packageMaintainer);
     }
-  }
-
-  private NpmPackage addPackage(
-      final @Nullable String scopeName,
-      final String packageName,
-      final String latest,
-      final Repo repo) {
-
-    final var npmPackage = new NpmPackage();
-
-    npmPackage.setScope(scopeName);
-    npmPackage.setName(packageName);
-    npmPackage.setLatest(latest);
-    npmPackage.setRepo(repo);
-    npmPackage.setCreatedAt(Instant.now());
-
-    return this.npmPackageRepository.save(npmPackage);
   }
 
   private PackageVersion addVersion(

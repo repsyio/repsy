@@ -61,6 +61,31 @@ public interface NpmStorageService {
       Map<String, Object> payload, Path packageBasePath, UUID repoId, String repoName)
       throws IOException, URISyntaxException;
 
+  /**
+   * Reads the stored package metadata as it is, so a publish that fails can put it back.
+   *
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the package has no
+   *     metadata
+   */
+  byte[] readMetadataBytes(UUID repoId, String repoName, Path packageBasePath) throws IOException;
+
+  /**
+   * Removes what a publish that failed part-way left of a version it was adding: its tarball, and
+   * the package metadata, which is put back to {@code previousMetadata} or, for a package the
+   * publish was creating, removed. A file the publish never got to write is skipped.
+   *
+   * @param previousMetadata the metadata as {@link #readMetadataBytes} returned it before the
+   *     publish, or {@code null} when the package did not exist
+   */
+  void discardPublishedVersion(
+      UUID repoId,
+      String repoName,
+      Path packageBasePath,
+      String packageName,
+      String versionName,
+      byte @Nullable [] previousMetadata)
+      throws IOException;
+
   long deletePackage(UUID repoId, Path packageBasePath);
 
   Pair<String, Long> deletePackageVersion(

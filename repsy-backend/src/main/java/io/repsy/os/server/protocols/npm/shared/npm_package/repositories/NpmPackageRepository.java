@@ -17,6 +17,8 @@ package io.repsy.os.server.protocols.npm.shared.npm_package.repositories;
 
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.NpmPackage;
+import jakarta.persistence.LockModeType;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
@@ -24,6 +26,8 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -36,6 +40,32 @@ public interface NpmPackageRepository extends JpaRepository<NpmPackage, UUID> {
 
   Optional<NpmPackage> findByRepoIdAndScopeAndName(
       UUID repoId, @Nullable String scopeName, String packageName);
+
+  /**
+   * Same as {@link #findByRepoIdAndScopeAndName}, holding a row lock until the transaction ends, so
+   * publishes of one package run one after another.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  Optional<NpmPackage> findWithLockByRepoIdAndScopeAndName(
+      UUID repoId, @Nullable String scopeName, String packageName);
+
+  /**
+   * Inserts the package unless it exists. A row a concurrent transaction has inserted but not
+   * committed yet makes the statement wait for that transaction, and then insert nothing.
+   *
+   * @return 1 when the package was inserted, 0 when it existed
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+          insert into "public"."npm_package" ("id", "repo_id", "scope", "name", "latest", "created_at")
+            values (:id, :repoId, cast(:scope as varchar(214)), :name, :latest, :now)
+            on conflict do nothing
+          """,
+      nativeQuery = true)
+  int insertIfAbsent(
+      UUID id, UUID repoId, @Nullable String scope, String name, String latest, Instant now);
 
   @Query(
       """
