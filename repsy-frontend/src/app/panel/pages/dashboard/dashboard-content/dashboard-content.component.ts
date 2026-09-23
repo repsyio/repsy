@@ -70,11 +70,9 @@ export class DashboardContentComponent {
     private readonly profileService: ProfileService,
     private readonly cdRef: ChangeDetectorRef,
   ) {
-    this.usageService
-      .getTotalUsage()
-      .subscribe((usage) => {
-        Object.assign(this.usage, usage);
-      });
+    this.usageService.getTotalUsage().subscribe((usage) => {
+      Object.assign(this.usage, usage);
+    });
 
     this.profileService.get().subscribe((profile) => {
       this.isAdmin = profile.role === 'ADMIN';
@@ -188,12 +186,17 @@ export class DashboardContentComponent {
           );
         }),
       )
-      .subscribe((updatedRepos) => {
-        this.repoListInfos = this.repoListInfos
-          .concat(updatedRepos)
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-          .slice(0, 6);
-        this.cdRef.markForCheck();
+      .subscribe({
+        next: (updatedRepos) => {
+          this.repoListInfos = this.repoListInfos
+            .concat(updatedRepos)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 6);
+          this.cdRef.markForCheck();
+        },
+        // The HTTP error interceptor already shows the failure; a type that cannot be listed just
+        // contributes no recent repositories, and must not become an unhandled RxJS error.
+        error: () => {},
       });
   }
 

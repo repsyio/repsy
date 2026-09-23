@@ -155,38 +155,64 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
 
     final var zipHash = GoModuleHashCalculator.hashZip(spool.openStream());
 
-    this.goModuleService.publishModule(
-        repoInfo,
-        decodedPath,
-        version,
-        GoVersionUtils.extractGoVersionFromMod(modContent),
-        GoModuleHashCalculator.hashMod(modContent),
-        zipHash);
-
     // The DB key is the case-preserved decoded path; the on-disk storage key is its !-escaped,
     // all-lower-case form (RPS-1232), so storage never has to rely on a case-sensitive filesystem.
     final var escapedPath = GoVersionUtils.escapeModulePath(decodedPath);
 
-    final var modUsages = this.writeModFile(repoInfo, escapedPath, version, modContent);
+    // The version row is written first and stays uncommitted while the files are written
+    // (RPS-1124), so a failed or losing upload never leaves storage and the database disagreeing.
+    final var usages =
+        this.goModuleService.publishModule(
+            repoInfo,
+            decodedPath,
+            version,
+            GoVersionUtils.extractGoVersionFromMod(modContent),
+            GoModuleHashCalculator.hashMod(modContent),
+            zipHash,
+            () -> this.storeFiles(repoInfo, escapedPath, version, modContent, spool));
 
-    final var zipStoragePath =
-        StoragePath.of(
-            repoInfo.getStorageKey(),
-            this.goStorageService.getModuleZipRelativePath(escapedPath, version));
-    final BaseUsages zipUsages;
-    try (final var zipStream = spool.openStream()) {
-      zipUsages =
-          this.goStorageService.writeInputStreamToPath(
-              zipStoragePath, zipStream, repoInfo.getName());
-    }
-
-    final var infoUsages = this.writeInfoFile(repoInfo, escapedPath, version);
-
-    final var totalDiskUsage =
-        modUsages.getDiskUsage() + zipUsages.getDiskUsage() + infoUsages.getDiskUsage();
     context.addProperty(ARTIFACT_NAME, decodedPath);
     context.addProperty(ARTIFACT_VERSION, version);
-    context.addProperty(USAGES, BaseUsages.ofDisk(totalDiskUsage));
+    context.addProperty(USAGES, usages);
+  }
+
+  /**
+   * Writes the {@code .mod}, {@code .zip} and {@code .info} files of a new version. Go versions are
+   * immutable, so the version is always new and whatever this leaves behind on failure is removed:
+   * the row is rolled back with the failure, so a partly written version would be orphaned files.
+   */
+  private BaseUsages storeFiles(
+      final BaseRepoInfo<I> repoInfo,
+      final String escapedPath,
+      final String version,
+      final byte[] modContent,
+      final SpooledUpload spool)
+      throws IOException {
+
+    try {
+      final var modUsages = this.writeModFile(repoInfo, escapedPath, version, modContent);
+
+      final var zipStoragePath =
+          StoragePath.of(
+              repoInfo.getStorageKey(),
+              this.goStorageService.getModuleZipRelativePath(escapedPath, version));
+      final BaseUsages zipUsages;
+      try (final var zipStream = spool.openStream()) {
+        zipUsages =
+            this.goStorageService.writeInputStreamToPath(
+                zipStoragePath, zipStream, repoInfo.getName());
+      }
+
+      final var infoUsages = this.writeInfoFile(repoInfo, escapedPath, version);
+
+      return BaseUsages.ofDisk(
+          modUsages.getDiskUsage() + zipUsages.getDiskUsage() + infoUsages.getDiskUsage());
+    } catch (final IOException | RuntimeException e) {
+      this.goStorageService.deleteVersionFiles(
+          StoragePath.of(repoInfo.getStorageKey(), PATH_SEPARATOR + escapedPath + "/@v/" + version),
+          repoInfo.getName());
+      throw e;
+    }
   }
 
   /**

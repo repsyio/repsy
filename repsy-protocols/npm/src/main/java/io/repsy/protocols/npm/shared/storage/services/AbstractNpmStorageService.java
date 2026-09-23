@@ -258,6 +258,53 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
   }
 
   @Override
+  public byte[] readMetadataBytes(
+      final UUID repoId, final String repoName, final Path packageBasePath) throws IOException {
+
+    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
+    final var resource =
+        this.getResource(StoragePath.of(repoId, metadataPath.toString()), repoName);
+
+    try (final var inputStream = resource.getInputStream()) {
+      return inputStream.readAllBytes();
+    }
+  }
+
+  @Override
+  public void discardPublishedVersion(
+      final UUID repoId,
+      final String repoName,
+      final Path packageBasePath,
+      final String packageName,
+      final String versionName,
+      final byte @Nullable [] previousMetadata)
+      throws IOException {
+
+    final var tarballPath =
+        packageBasePath.resolve(PackageUtils.getTarballFilename(packageName, versionName));
+    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
+    final var metadataStoragePath = StoragePath.of(repoId, metadataPath.toString());
+
+    this.deleteIfPresent(StoragePath.of(repoId, tarballPath.toString()), repoName);
+
+    if (previousMetadata == null) {
+      this.deleteIfPresent(metadataStoragePath, repoName);
+      return;
+    }
+
+    try (final var inputStream = new ByteArrayInputStream(previousMetadata)) {
+      this.storageStrategy.write(repoName, metadataStoragePath, inputStream);
+    }
+  }
+
+  private void deleteIfPresent(final StoragePath storagePath, final String repoName) {
+
+    if (this.storageStrategy.get(storagePath, repoName).isPresent()) {
+      this.storageStrategy.delete(storagePath);
+    }
+  }
+
+  @Override
   public long deletePackage(final UUID repoId, final Path packageBasePath) {
 
     final var storagePath = StoragePath.of(repoId, packageBasePath.toString());

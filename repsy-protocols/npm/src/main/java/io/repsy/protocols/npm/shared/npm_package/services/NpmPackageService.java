@@ -15,13 +15,14 @@
  */
 package io.repsy.protocols.npm.shared.npm_package.services;
 
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.npm.shared.npm_package.dtos.BasePackageInfo;
-import io.repsy.protocols.npm.shared.npm_package.dtos.BasePackageVersionInfo;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -29,31 +30,57 @@ import org.springframework.data.util.Pair;
 
 public interface NpmPackageService<ID> {
 
-  void addPackage(
-      BaseRepoInfo<ID> repoInfo,
+  /**
+   * Records the published version and, while that write is still open, stores its files through
+   * {@code writer}.
+   *
+   * <p>The rows are written first (and flushed, so a unique-index conflict surfaces here) and the
+   * files second, inside one transaction that holds the package row locked. So a publish that the
+   * database rejects never touches storage, a concurrent publish of the same package waits for the
+   * winner instead of replacing its files or the package metadata it just wrote, and a publish
+   * whose files cannot be written leaves no rows behind.
+   *
+   * @param payload the publish body as the client sent it; {@code writer} may still change it
+   * @return the usages reported by {@code writer}
+   * @throws io.repsy.core.error_handling.exceptions.AccessNotAllowedException when the version
+   *     exists and the repo does not allow overrides
+   */
+  @NonNull BaseUsages publishVersion(
+      @NonNull BaseRepoInfo<ID> repoInfo,
       @Nullable String scopeName,
       @NonNull String packageName,
-      @NonNull Map<String, Object> payload);
+      @NonNull String versionName,
+      @NonNull Map<String, Object> payload,
+      @NonNull VersionWriter writer)
+      throws IOException, URISyntaxException;
+
+  /** What a publish does to the rows, and so to the files {@link VersionWriter} has to write. */
+  enum PublishKind {
+    /** The package did not exist: its first version, and the package itself, are new. */
+    NEW_PACKAGE,
+    /** The package existed and gains a version. */
+    NEW_VERSION,
+    /** The version already existed and is being replaced. */
+    REPLACES_VERSION
+  }
+
+  /** Stores the files of a version whose rows {@link #publishVersion} has just written. */
+  @FunctionalInterface
+  interface VersionWriter {
+
+    /**
+     * Writes the files of the version.
+     *
+     * @param kind what the publish adds. A writer that fails must not delete files it did not
+     *     create, so it leaves the files of {@link PublishKind#REPLACES_VERSION} alone.
+     */
+    @NonNull BaseUsages write(@NonNull PublishKind kind) throws IOException, URISyntaxException;
+  }
 
   BasePackageInfo<ID> getPackage(
       UUID storageKey, @Nullable String scopeName, @NonNull String packageName);
 
-  @NonNull Optional<BasePackageInfo<ID>> getPackageInfoByRepoIdAndScopeAndName(
-      @NonNull UUID repoUuid, @Nullable String scopeName, @NonNull String packageName);
-
   void deletePackage(ID id);
-
-  void addVersionToPackage(@NonNull ID packageId, @NonNull Map<String, Object> payload);
-
-  @NonNull Optional<BasePackageVersionInfo<ID>> findOptPackageVersionByPackageIdAndVersion(
-      @NonNull ID packageId, @NonNull String versionName);
-
-  void updateVersionFromMetadata(
-      UUID storageKey,
-      @Nullable String scopeName,
-      @NonNull String packageName,
-      String versionName,
-      @NonNull Map<String, Object> payload);
 
   void handleDeprecations(
       UUID storageKey,
