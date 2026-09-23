@@ -53,6 +53,9 @@ class AuthFailureThrottleTest {
   private static final long WINDOW_SECONDS = 60;
   private static final String CLIENT = "203.0.113.7";
   private static final String OTHER_CLIENT = "203.0.113.8";
+  private static final String IPV6_CLIENT = "2001:db8:1234:5678::1";
+  private static final String IPV6_CLIENT_SAME_NETWORK = "2001:db8:1234:5678:ffff::2";
+  private static final String IPV6_CLIENT_OTHER_NETWORK = "2001:db8:1234:9999::1";
 
   private final AtomicLong nanos = new AtomicLong();
 
@@ -201,6 +204,36 @@ class AuthFailureThrottleTest {
     this.advance(Duration.ofSeconds(WINDOW_SECONDS));
     assertThat(this.throttle.isSaturated()).isFalse();
     assertThatCode(this.throttle::checkAllowed).doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("throttles two IPv6 addresses of the same /64 network together")
+  void ipv6SameNetworkSharesTheCount() {
+    requestFrom(IPV6_CLIENT);
+    this.fail(MAX_FAILURES);
+
+    requestFrom(IPV6_CLIENT_SAME_NETWORK);
+    assertThatThrownBy(this.throttle::checkAllowed).isInstanceOf(TooManyRequestsException.class);
+  }
+
+  @Test
+  @DisplayName("does not share the count between two different IPv6 /64 networks")
+  void ipv6DifferentNetworksAreCountedApart() {
+    requestFrom(IPV6_CLIENT);
+    this.fail(MAX_FAILURES);
+
+    requestFrom(IPV6_CLIENT_OTHER_NETWORK);
+    assertThatCode(this.throttle::checkAllowed).doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("logs the full IPv6 address of a blocked client, not only its throttled network")
+  void ipv6LogsTheFullAddress() {
+    requestFrom(IPV6_CLIENT);
+    this.fail(MAX_FAILURES);
+
+    assertThat(this.logs.list).hasSize(1);
+    assertThat(this.logs.list.getFirst().getFormattedMessage()).contains(IPV6_CLIENT);
   }
 
   @Test
