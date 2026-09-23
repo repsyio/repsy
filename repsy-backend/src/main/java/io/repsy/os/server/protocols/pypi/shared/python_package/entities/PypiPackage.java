@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.pypi.shared.python_package.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.protocols.pypi.shared.utils.PypiPublishLimits;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -56,16 +57,16 @@ public class PypiPackage {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private Repo repo;
 
-  @Column(name = "name", nullable = false)
+  @Column(name = "name", nullable = false, length = PypiPublishLimits.MAX_NAME_LENGTH)
   private String name;
 
-  @Column(name = "normalized_name", nullable = false)
+  @Column(name = "normalized_name", nullable = false, length = PypiPublishLimits.MAX_NAME_LENGTH)
   private String normalizedName;
 
-  @Column(name = "stable_version")
+  @Column(name = "stable_version", length = PypiPublishLimits.MAX_VERSION_LENGTH)
   private String stableVersion;
 
-  @Column(name = "latest_version")
+  @Column(name = "latest_version", length = PypiPublishLimits.MAX_VERSION_LENGTH)
   private String latestVersion;
 
   @CreationTimestamp

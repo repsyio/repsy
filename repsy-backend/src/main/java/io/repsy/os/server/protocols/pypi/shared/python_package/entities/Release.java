@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.pypi.shared.python_package.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.protocols.pypi.shared.utils.PypiPublishLimits;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -55,7 +56,7 @@ public class Release {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private PypiPackage pypiPackage;
 
-  @Column(name = "version")
+  @Column(name = "version", length = PypiPublishLimits.MAX_VERSION_LENGTH)
   private String version;
 
   @Column(name = "final_release")
@@ -70,28 +71,32 @@ public class Release {
   @Column(name = "dev_release")
   private boolean devRelease;
 
-  @Column(name = "requires_python")
+  @Column(name = "requires_python", length = PypiPublishLimits.MAX_REQUIRES_PYTHON_LENGTH)
   private String requiresPython;
 
+  // Unbounded (text) in both PostgreSQL and H2, so no length guard applies (RPS-1137).
   @Column(name = "summary")
   private String summary;
 
-  @Column(name = "home_page")
+  @Column(name = "home_page", length = PypiPublishLimits.MAX_HOME_PAGE_LENGTH)
   private String homePage;
 
-  @Column(name = "author")
+  @Column(name = "author", length = PypiPublishLimits.MAX_AUTHOR_LENGTH)
   private String author;
 
-  @Column(name = "author_email")
+  @Column(name = "author_email", length = PypiPublishLimits.MAX_AUTHOR_EMAIL_LENGTH)
   private String authorEmail;
 
-  @Column(name = "license")
+  @Column(name = "license", length = PypiPublishLimits.MAX_LICENSE_LENGTH)
   private String license;
 
+  // Unbounded (text) in both PostgreSQL and H2, so no length guard applies (RPS-1137).
   @Column(name = "description")
   private String description;
 
-  @Column(name = "description_content_type")
+  @Column(
+      name = "description_content_type",
+      length = PypiPublishLimits.MAX_DESCRIPTION_CONTENT_TYPE_LENGTH)
   private String descriptionContentType;
 
   @CreationTimestamp

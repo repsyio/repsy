@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.pypi.shared.python_package.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.protocols.pypi.shared.utils.PypiPublishLimits;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -48,9 +49,9 @@ public class ReleaseClassifier {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private Release release;
 
-  @Column(name = "classifier", nullable = false)
+  @Column(name = "classifier", nullable = false, length = PypiPublishLimits.MAX_CLASSIFIER_LENGTH)
   private String classifier;
 
-  @Column(name = "value", nullable = false)
+  @Column(name = "value", nullable = false, length = PypiPublishLimits.MAX_CLASSIFIER_LENGTH)
   private String value;
 }
