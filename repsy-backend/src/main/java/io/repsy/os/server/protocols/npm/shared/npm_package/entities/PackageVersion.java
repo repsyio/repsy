@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.npm.shared.npm_package.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -56,37 +57,37 @@ public class PackageVersion {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private NpmPackage npmPackage;
 
-  @Column(name = "version", nullable = false)
+  @Column(name = "version", nullable = false, length = NpmPublishLimits.MAX_VERSION_LENGTH)
   private String version;
 
-  @Column(name = "author_name")
+  @Column(name = "author_name", length = NpmPublishLimits.MAX_AUTHOR_NAME_LENGTH)
   private String authorName;
 
-  @Column(name = "author_email")
+  @Column(name = "author_email", length = NpmPublishLimits.MAX_AUTHOR_EMAIL_LENGTH)
   private String authorEmail;
 
-  @Column(name = "author_url")
+  @Column(name = "author_url", length = NpmPublishLimits.MAX_AUTHOR_URL_LENGTH)
   private String authorUrl;
 
-  @Column(name = "bugs_url")
+  @Column(name = "bugs_url", length = NpmPublishLimits.MAX_BUGS_URL_LENGTH)
   private String bugsUrl;
 
-  @Column(name = "bugs_email")
+  @Column(name = "bugs_email", length = NpmPublishLimits.MAX_BUGS_EMAIL_LENGTH)
   private String bugsEmail;
 
   @Column(name = "description")
   private String description;
 
-  @Column(name = "homepage")
+  @Column(name = "homepage", length = NpmPublishLimits.MAX_HOMEPAGE_LENGTH)
   private String homepage;
 
-  @Column(name = "license")
+  @Column(name = "license", length = NpmPublishLimits.MAX_LICENSE_LENGTH)
   private String license;
 
-  @Column(name = "repository_type")
+  @Column(name = "repository_type", length = NpmPublishLimits.MAX_REPOSITORY_TYPE_LENGTH)
   private String repositoryType;
 
-  @Column(name = "repository_url")
+  @Column(name = "repository_url", length = NpmPublishLimits.MAX_REPOSITORY_URL_LENGTH)
   private String repositoryUrl;
 
   @Column(name = "deprecated")

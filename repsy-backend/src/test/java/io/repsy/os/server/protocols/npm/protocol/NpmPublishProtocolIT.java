@@ -20,6 +20,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
+import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageKeywordListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageMaintainerListItem;
@@ -157,6 +158,60 @@ class NpmPublishProtocolIT extends AbstractIntegrationTest {
             .content(
                 this.publishBody(
                     packageName, version, tarballUrl, tarballBytes, keywords, maintainers)));
+  }
+
+  /**
+   * Builds a publish body giving full control over the top-level {@code name}/{@code _id}, the
+   * dist-tags map and the single version's own fields, for the RPS-1207 and RPS-1136 tests below,
+   * which need a body that a real client would never send.
+   */
+  private byte[] rawPublishBody(
+      final @Nullable String bodyName,
+      final @Nullable String bodyId,
+      final Map<String, String> distTags,
+      final String versionName,
+      final Map<String, Object> versionExtra) {
+
+    final var dist = new LinkedHashMap<String, Object>();
+    dist.put("tarball", "http://h:9090/repo/pkg/-/pkg-" + versionName + ".tgz");
+
+    final var versionMetadata = new LinkedHashMap<String, Object>(versionExtra);
+    versionMetadata.putIfAbsent("version", versionName);
+    versionMetadata.put("dist", dist);
+
+    final var tarball = "tarball bytes".getBytes(StandardCharsets.UTF_8);
+    final var body = new LinkedHashMap<String, Object>();
+    if (bodyName != null) {
+      body.put("name", bodyName);
+    }
+    if (bodyId != null) {
+      body.put("_id", bodyId);
+    }
+    body.put("dist-tags", distTags);
+    body.put("versions", Map.of(versionName, versionMetadata));
+    body.put(
+        "_attachments",
+        Map.of(
+            "pkg-" + versionName + ".tgz",
+            Map.of(
+                "content_type",
+                "application/octet-stream",
+                "data",
+                Base64.getEncoder().encodeToString(tarball),
+                "length",
+                tarball.length)));
+
+    return this.objectMapper.writeValueAsBytes(body);
+  }
+
+  private MockHttpServletResponse rawPublish(
+      final Repo repo, final String packagePath, final byte[] body) throws Exception {
+
+    return this.protocol(
+        put(PUBLISH_PATH, repo.getName(), packagePath)
+            .header(AUTHORIZATION, this.adminProtocolBearerToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body));
   }
 
   @SuppressWarnings("unchecked")
@@ -424,6 +479,238 @@ class NpmPublishProtocolIT extends AbstractIntegrationTest {
           .isEqualTo(200);
       assertThat(NpmPublishProtocolIT.this.maintainerNamesOf(repo, pkg, "1.0.0"))
           .containsExactlyInAnyOrder("second-maintainer");
+    }
+  }
+
+  @Nested
+  @DisplayName("RPS-1207: publish body identity vs. the URL")
+  class PackageNameMismatch {
+
+    @Test
+    @DisplayName("refuses a body whose top-level name does not match the URL's package")
+    void refusesMismatchedName() throws Exception {
+      final var repo = NpmPublishProtocolIT.this.npmRepo();
+      final var pkg = "rps1207-name";
+      final var body =
+          NpmPublishProtocolIT.this.rawPublishBody(
+              "not-" + pkg,
+              pkg,
+              Map.of("latest", "1.0.0"),
+              "1.0.0",
+              new LinkedHashMap<>(Map.of("name", pkg)));
+
+      final var response = NpmPublishProtocolIT.this.rawPublish(repo, pkg, body);
+
+      assertThat(response.getStatus()).isEqualTo(400);
+      assertThat(JsonPath.<String>read(response.getContentAsString(), "$.msgId"))
+          .isEqualTo("packageNameMismatch");
+    }
+
+    @Test
+    @DisplayName("refuses a body whose _id does not match the URL's package")
+    void refusesMismatchedId() throws Exception {
+      final var repo = NpmPublishProtocolIT.this.npmRepo();
+      final var pkg = "rps1207-id";
+      final var body =
+          NpmPublishProtocolIT.this.rawPublishBody(
+              pkg,
+              "not-" + pkg,
+              Map.of("latest", "1.0.0"),
+              "1.0.0",
+              new LinkedHashMap<>(Map.of("name", pkg)));
+
+      final var response = NpmPublishProtocolIT.this.rawPublish(repo, pkg, body);
+
+      assertThat(response.getStatus()).isEqualTo(400);
+      assertThat(JsonPath.<String>read(response.getContentAsString(), "$.msgId"))
+          .isEqualTo("packageNameMismatch");
+    }
+
+    @Test
+    @DisplayName("refuses a body whose versions[*].name does not match the URL's package")
+    void refusesMismatchedVersionName() throws Exception {
+      final var repo = NpmPublishProtocolIT.this.npmRepo();
+      final var pkg = "rps1207-version-name";
+      final var body =
+          NpmPublishProtocolIT.this.rawPublishBody(
+              pkg,
+              pkg,
+              Map.of("latest", "1.0.0"),
+              "1.0.0",
+              new LinkedHashMap<>(Map.of("name", "not-" + pkg)));
+
+      final var response = NpmPublishProtocolIT.this.rawPublish(repo, pkg, body);
+
+      assertThat(response.getStatus()).isEqualTo(400);
+      assertThat(JsonPath.<String>read(response.getContentAsString(), "$.msgId"))
+          .isEqualTo("packageNameMismatch");
+    }
+
+    @Test
+    @DisplayName("accepts a body whose name, _id and versions[*].name all match the URL")
+    void acceptsMatchingBody() throws Exception {
+      final var repo = NpmPublishProtocolIT.this.npmRepo();
+      final var pkg = "rps1207-matching";
+      final var body =
+          NpmPublishProtocolIT.this.rawPublishBody(
+              pkg,
+              pkg,
+              Map.of("latest", "1.0.0"),
+              "1.0.0",
+              new LinkedHashMap<>(Map.of("name", pkg)));
+
+      final var response = NpmPublishProtocolIT.this.rawPublish(repo, pkg, body);
+
+      assertThat(response.getStatus()).isEqualTo(200);
+    }
+  }
+
+  @Nested
+  @DisplayName("RPS-1136: over-long publish metadata")
+  class OverLongMetadata {
+
+    private String repeat(final char c, final int length) {
+      return String.valueOf(c).repeat(length);
+    }
+
+    @Test
+    @DisplayName("refuses an over-long scope, naming the field")
+    void refusesOverLongScope() throws Exception {
+      final var repo = NpmPublishProtocolIT.this.npmRepo();
+      final var scope = this.repeat('s', 215);
+      final var pkg = "@" + scope + "/demo";
+      final var body =
+          NpmPublishProtocolIT.this.rawPublishBody(
+              pkg,
+              pkg,
+              Map.of("latest", "1.0.0"),
+              "1.0.0",
+              new LinkedHashMap<>(Map.of("name", pkg)));
+
+      final var response = NpmPublishProtocolIT.this.rawPublish(repo, pkg, body);
+
+      assertThat(response.getStatus()).isEqualTo(400);
+      assertThat(JsonPath.<String>read(response.getContentAsString(), "$.msgId"))
+          .isEqualTo("packageScopeTooLong");
+    }
+
+    @Test
+    @DisplayName("refuses an over-long package name, naming the field")
+    void refusesOverLongName() throws Exception {
+      final var repo = NpmPublishProtocolIT.this.npmRepo();
+      final var pkg = this.repeat('n', 215);
+      final var body =
+          NpmPublishProtocolIT.this.rawPublishBody(
+              pkg,
+              pkg,
+              Map.of("latest", "1.0.0"),
+              "1.0.0",
+              new LinkedHashMap<>(Map.of("name", pkg)));
+
+      final var response = NpmPublishProtocolIT.this.rawPublish(repo, pkg, body);
+
+      assertThat(response.getStatus()).isEqualTo(400);
+      assertThat(JsonPath.<String>read(response.getContentAsString(), "$.msgId"))
+          .isEqualTo("packageNameTooLong");
+    }
+
+    @Test
+    @DisplayName("refuses an over-long but syntactically valid version, naming the field")
+    void refusesOverLongVersion() throws Exception {
+      final var repo = NpmPublishProtocolIT.this.npmRepo();
+      final var pkg = "rps1136-version";
+      // Syntactically valid semver (a long pre-release identifier), and over 128 characters.
+      final var version = "1.0.0-" + this.repeat('a', 130);
+      final var body =
+          NpmPublishProtocolIT.this.rawPublishBody(
+              pkg,
+              pkg,
+              Map.of("latest", version),
+              version,
+              new LinkedHashMap<>(Map.of("name", pkg)));
+
+      final var response = NpmPublishProtocolIT.this.rawPublish(repo, pkg, body);
+
+      assertThat(response.getStatus()).isEqualTo(400);
+      assertThat(JsonPath.<String>read(response.getContentAsString(), "$.msgId"))
+          .isEqualTo("packageVersionTooLong");
+    }
+
+    @Test
+    @DisplayName("refuses an over-long dist-tag name, naming the field")
+    void refusesOverLongDistTagName() throws Exception {
+      final var repo = NpmPublishProtocolIT.this.npmRepo();
+      final var pkg = "rps1136-dist-tag";
+      final var tag = this.repeat('t', 256);
+      final var body =
+          NpmPublishProtocolIT.this.rawPublishBody(
+              pkg, pkg, Map.of(tag, "1.0.0"), "1.0.0", new LinkedHashMap<>(Map.of("name", pkg)));
+
+      final var response = NpmPublishProtocolIT.this.rawPublish(repo, pkg, body);
+
+      assertThat(response.getStatus()).isEqualTo(400);
+      assertThat(JsonPath.<String>read(response.getContentAsString(), "$.msgId"))
+          .isEqualTo("distTagNameTooLong");
+    }
+
+    @Test
+    @DisplayName("drops an over-long homepage silently, keeping the rest of the publish")
+    void dropsOverLongHomepage() throws Exception {
+      final var repo = NpmPublishProtocolIT.this.npmRepo();
+      final var pkg = "rps1136-homepage";
+      final var versionExtra = new LinkedHashMap<String, Object>();
+      versionExtra.put("name", pkg);
+      versionExtra.put("homepage", this.repeat('h', 256));
+      final var body =
+          NpmPublishProtocolIT.this.rawPublishBody(
+              pkg, pkg, Map.of("latest", "1.0.0"), "1.0.0", versionExtra);
+
+      final var response = NpmPublishProtocolIT.this.rawPublish(repo, pkg, body);
+
+      assertThat(response.getStatus()).isEqualTo(200);
+      assertThat(NpmPublishProtocolIT.this.versionEntity(repo, null, pkg, "1.0.0").getHomepage())
+          .isNull();
+    }
+
+    @Test
+    @DisplayName("drops only the over-long keyword, keeping the rest of the array")
+    void dropsOnlyOverLongKeyword() throws Exception {
+      final var repo = NpmPublishProtocolIT.this.npmRepo();
+      final var pkg = "rps1136-keyword";
+      final var tarball = "tarball bytes".getBytes(StandardCharsets.UTF_8);
+      final var url =
+          "http://localhost:9090/" + repo.getName() + "/" + pkg + "/-/" + pkg + "-1.0.0.tgz";
+      final var longKeyword = this.repeat('k', 256);
+
+      final var response =
+          NpmPublishProtocolIT.this.publish(
+              repo, pkg, pkg, "1.0.0", url, tarball, List.of("alpha", longKeyword, "beta"), null);
+
+      assertThat(response.getStatus()).isEqualTo(200);
+      assertThat(NpmPublishProtocolIT.this.keywordsOf(repo, pkg, "1.0.0"))
+          .containsExactlyInAnyOrder("alpha", "beta");
+    }
+
+    @Test
+    @DisplayName("drops the whole maintainer entry when its name is over-long (NOT NULL column)")
+    void dropsWholeMaintainerEntryForOverLongName() throws Exception {
+      final var repo = NpmPublishProtocolIT.this.npmRepo();
+      final var pkg = "rps1136-maintainer";
+      final var tarball = "tarball bytes".getBytes(StandardCharsets.UTF_8);
+      final var url =
+          "http://localhost:9090/" + repo.getName() + "/" + pkg + "/-/" + pkg + "-1.0.0.tgz";
+      final var maintainers =
+          List.of(
+              Map.of("name", "ok-maintainer"),
+              Map.of("name", this.repeat('m', 256), "email", "x@example.test"));
+
+      final var response =
+          NpmPublishProtocolIT.this.publish(
+              repo, pkg, pkg, "1.0.0", url, tarball, null, maintainers);
+
+      assertThat(response.getStatus()).isEqualTo(200);
+      assertThat(NpmPublishProtocolIT.this.maintainerNamesOf(repo, pkg, "1.0.0"))
+          .containsExactly("ok-maintainer");
     }
   }
 }

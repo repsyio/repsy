@@ -23,6 +23,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
+import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
 import io.repsy.protocols.npm.shared.utils.PackageUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -56,6 +57,9 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final String packageName,
       final Map<String, Object> payload)
       throws IOException {
+
+    PackageUtils.checkPackageNameMatchesUrl(payload, scopeName, packageName);
+
     if (PackageUtils.isMetadataHasDeprecatedVersions(payload)) {
       this.deprecate(context, scopeName, packageName, payload);
     } else {
@@ -294,6 +298,14 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
       final var versionName = PackageUtils.extractVersionNameFromPayload(payload);
 
+      // Guard every length-limited value before anything is written (RPS-1136): a publish this
+      // refuses leaves no orphan tarball, and one it lets through never fails the row insert.
+      NpmPublishLimits.checkScopeAndName(scopeName, packageName);
+      NpmPublishLimits.checkVersion(versionName);
+      NpmPublishLimits.checkDistTags(payload);
+      NpmPublishLimits.dropOverLongFields(
+          PackageUtils.extractVersionFromPayload(payload).getSecond());
+
       var usages = BaseUsages.builder().build();
 
       if (packageOptional.isEmpty()) {
@@ -361,6 +373,6 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
   }
 
   private String buildArtifactName(final @Nullable String scopeName, final String packageName) {
-    return scopeName == null ? packageName : "@" + scopeName + "/" + packageName;
+    return PackageUtils.buildFullName(scopeName, packageName);
   }
 }

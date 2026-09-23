@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.npm.shared.npm_package.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -50,13 +51,13 @@ public class PackageMaintainer {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private PackageVersion packageVersion;
 
-  @Column(name = "name", nullable = false)
+  @Column(name = "name", nullable = false, length = NpmPublishLimits.MAX_MAINTAINER_NAME_LENGTH)
   private String name;
 
-  @Column(name = "email")
+  @Column(name = "email", length = NpmPublishLimits.MAX_MAINTAINER_EMAIL_LENGTH)
   private String email;
 
-  @Column(name = "url")
+  @Column(name = "url", length = NpmPublishLimits.MAX_MAINTAINER_URL_LENGTH)
   private String url;
 
   @CreationTimestamp

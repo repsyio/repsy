@@ -15,8 +15,6 @@
  */
 package io.repsy.protocols.npm.shared.utils;
 
-import com.vdurmont.semver4j.Semver;
-import com.vdurmont.semver4j.SemverException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import java.io.IOException;
 import java.net.URI;
@@ -32,6 +30,7 @@ import lombok.experimental.UtilityClass;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.data.util.Pair;
 import tools.jackson.core.JacksonException;
@@ -183,11 +182,9 @@ public final class PackageUtils {
     final var version =
         ((Map<String, Object>) payload.get(NpmConstants.VERSIONS)).entrySet().iterator().next();
     final var versionName = version.getKey();
-    try {
-      new Semver(versionName, Semver.SemverType.NPM);
-    } catch (final SemverException e) {
-      throw new BadRequestException("invalidPackageVersion");
-    }
+
+    NpmSemver.parse(versionName); // throws BadRequestException("invalidPackageVersion")
+
     return versionName;
   }
 
@@ -233,6 +230,51 @@ public final class PackageUtils {
     final var slash = packageName.indexOf('/');
 
     return slash < 0 ? packageName : packageName.substring(slash + 1);
+  }
+
+  /** The full package name a URL's scope and package name denote, e.g. {@code @scope/name}. */
+  public static String buildFullName(final @Nullable String scopeName, final String packageName) {
+
+    return scopeName == null ? packageName : "@" + scopeName + "/" + packageName;
+  }
+
+  /**
+   * Refuses a publish or deprecate body whose declared identity is not the package the URL was PUT
+   * to. {@code AbstractNpmProtocolFacade.publish} used to register and store a package entirely
+   * from the URL's {@code scopeName}/{@code packageName}; the body's own {@code name}, {@code _id}
+   * and each {@code versions[*].name} were never compared against it, so a client could publish
+   * content under one name whose served metadata claimed a different one (RPS-1207, the same class
+   * of gap RPS-1193 closed for a Maven POM's groupId).
+   *
+   * <p>Only fields that are present and are a {@code String} are compared; a payload missing a
+   * field entirely is not refused for it.
+   *
+   * @throws BadRequestException With the fixed {@code packageNameMismatch} id.
+   */
+  public static void checkPackageNameMatchesUrl(
+      final Map<String, Object> payload,
+      final @Nullable String scopeName,
+      final String packageName) {
+
+    final var expected = PackageUtils.buildFullName(scopeName, packageName);
+
+    PackageUtils.checkNameMatches(expected, payload.get(NpmConstants.NAME));
+    PackageUtils.checkNameMatches(expected, payload.get(NpmConstants.ID));
+
+    if (payload.get(NpmConstants.VERSIONS) instanceof final Map<?, ?> versions) {
+      for (final var entry : versions.values()) {
+        if (entry instanceof final Map<?, ?> version) {
+          PackageUtils.checkNameMatches(expected, version.get(NpmConstants.NAME));
+        }
+      }
+    }
+  }
+
+  private static void checkNameMatches(final String expected, final @Nullable Object actual) {
+
+    if (actual instanceof final String name && !expected.equals(name)) {
+      throw new BadRequestException("packageNameMismatch");
+    }
   }
 
   public static String getFormattedCurrentTime() {
@@ -335,14 +377,15 @@ public final class PackageUtils {
       return "";
     }
 
-    String latestVersion = "0.0.1";
-    Semver semver;
+    String latestVersion = null;
+    NpmSemver latestSemver = null;
 
     for (final var key : versions.keySet()) {
-      semver = new Semver(key, Semver.SemverType.NPM);
+      final var semver = NpmSemver.parse(key);
 
-      if (semver.isGreaterThan(latestVersion)) {
-        latestVersion = semver.getValue();
+      if (latestSemver == null || semver.compareTo(latestSemver) > 0) {
+        latestSemver = semver;
+        latestVersion = key;
       }
     }
 

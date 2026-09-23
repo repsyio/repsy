@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.npm.shared.npm_package.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -56,13 +57,13 @@ public class NpmPackage {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private Repo repo;
 
-  @Column(name = "scope", length = 214)
+  @Column(name = "scope", length = NpmPublishLimits.MAX_SCOPE_LENGTH)
   private String scope;
 
-  @Column(name = "name", nullable = false, length = 214)
+  @Column(name = "name", nullable = false, length = NpmPublishLimits.MAX_NAME_LENGTH)
   private String name;
 
-  @Column(name = "latest")
+  @Column(name = "latest", length = NpmPublishLimits.MAX_VERSION_LENGTH)
   private String latest;
 
   @CreationTimestamp

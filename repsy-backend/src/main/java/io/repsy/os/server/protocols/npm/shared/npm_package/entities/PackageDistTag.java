@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.npm.shared.npm_package.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -50,7 +51,7 @@ public class PackageDistTag {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private PackageVersion packageVersion;
 
-  @Column(name = "tag_name", nullable = false)
+  @Column(name = "tag_name", nullable = false, length = NpmPublishLimits.MAX_DIST_TAG_LENGTH)
   private String tagName;
 
   @CreationTimestamp
