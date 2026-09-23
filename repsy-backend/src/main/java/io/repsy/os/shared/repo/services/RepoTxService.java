@@ -15,6 +15,7 @@
  */
 package io.repsy.os.shared.repo.services;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.generated.model.RepoListInfo;
@@ -27,9 +28,11 @@ import io.repsy.os.shared.repo.mappers.RepoConverter;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.repo.utils.RepoUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +47,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class RepoTxService {
+
+  /**
+   * Repo types whose publish path actually consults the {@code releases}/{@code snapshots} settings
+   * (RPS-1210): Maven ({@link
+   * io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactServiceImpl}) and NuGet
+   * ({@code NuGetPackageUtils}) gate a version's upload on them. Every other repo type stores and
+   * exposes the fields but never reads them, which silently misleads an operator into thinking they
+   * restricted publishing when they did not.
+   */
+  private static final Set<RepoType> RELEASES_SNAPSHOTS_SUPPORTED_TYPES =
+      EnumSet.of(RepoType.MAVEN, RepoType.NUGET);
 
   private final @NonNull RepoConverter repoConverter;
   private final @NonNull RepoRepository repoRepository;
@@ -101,11 +115,16 @@ public class RepoTxService {
 
   /**
    * Applies the given settings; a field that is null (absent from the request) is left as it is.
+   *
+   * @throws BadRequestException {@code releasesSnapshotsUnsupported} if {@code releases} or {@code
+   *     snapshots} is present for a repo type whose publish path does not consult them (RPS-1210)
    */
   @Transactional
   public void updateSettings(final @NonNull UUID repoId, final @NonNull RepoSettingsForm settings) {
 
     final var repo = this.findRepoById(repoId);
+
+    this.rejectReleasesSnapshotsForUnsupportedType(repo, settings);
 
     if (settings.getPrivateRepo() != null) {
       repo.setPrivateRepo(settings.getPrivateRepo());
@@ -157,10 +176,12 @@ public class RepoTxService {
 
   public @NonNull RepoSettingsInfo getRepoSettings(final @NonNull UUID repoId) {
     final var repoInfo = this.getRepo(repoId);
+    final var supportsReleasesSnapshots =
+        RELEASES_SNAPSHOTS_SUPPORTED_TYPES.contains(repoInfo.getType());
     return RepoSettingsInfo.builder()
         .privateRepo(repoInfo.isPrivateRepo())
-        .releases(repoInfo.getReleases())
-        .snapshots(repoInfo.getSnapshots())
+        .releases(supportsReleasesSnapshots ? repoInfo.getReleases() : null)
+        .snapshots(supportsReleasesSnapshots ? repoInfo.getSnapshots() : null)
         .searchable(repoInfo.isSearchable())
         .allowOverride(repoInfo.isAllowOverride())
         .securityScanEnabled(repoInfo.isSecurityScanEnabled())
@@ -197,6 +218,15 @@ public class RepoTxService {
    */
   public @NonNull Optional<Long> findDiskUsageForUpdate(final @NonNull UUID repoId) {
     return this.repoRepository.findDiskUsageByIdForUpdate(repoId);
+  }
+
+  private void rejectReleasesSnapshotsForUnsupportedType(
+      final @NonNull Repo repo, final @NonNull RepoSettingsForm settings) {
+    final var touchesReleasesSnapshots =
+        settings.getReleases() != null || settings.getSnapshots() != null;
+    if (touchesReleasesSnapshots && !RELEASES_SNAPSHOTS_SUPPORTED_TYPES.contains(repo.getType())) {
+      throw new BadRequestException("releasesSnapshotsUnsupported");
+    }
   }
 
   private @NonNull Repo findRepoOrThrowException(final @NonNull Optional<Repo> repoOptional) {
