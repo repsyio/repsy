@@ -22,6 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 @DisplayName("GoVersionUtils")
 class GoVersionUtilsTest {
@@ -69,5 +70,53 @@ class GoVersionUtilsTest {
     final var version = "1".repeat(GoVersionUtils.MAX_GO_VERSION_LENGTH + 1);
 
     assertThat(GoVersionUtils.extractGoVersionFromMod(goMod("go " + version))).isNull();
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "v0.0.1",
+        "v1.2.3",
+        "v1.2.3+incompatible",
+        "v2.0.0",
+        "v1.0.0-20240101120000-0123456789ab",
+        "v1.0.0-beta.1",
+        "v1.0.0-rc1+build.5"
+      })
+  @DisplayName(
+      "isValidSemver() accepts real Go semver strings, including build metadata and"
+          + " pseudo-versions (RPS-1227)")
+  void isValidSemverAcceptsRealGoVersions(final String version) {
+    assertThat(GoVersionUtils.isValidSemver(version)).isTrue();
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "banana",
+        "1.0.0",
+        "v1.0",
+        "v1.0.0.0",
+        "v01.0.0",
+        "v1.0.0-",
+        "v1.0.0+",
+        "",
+        "vv1.0.0"
+      })
+  @DisplayName("isValidSemver() rejects anything that is not a well-formed Go semver string")
+  void isValidSemverRejectsInvalidVersions(final String version) {
+    assertThat(GoVersionUtils.isValidSemver(version)).isFalse();
+  }
+
+  @Test
+  @DisplayName(
+      "COMPARATOR compares a 25-digit numeric field without overflowing (regression for the"
+          + " Long.parseLong overflow)")
+  void comparatorHandlesArbitrarilyLongNumericFieldsWithoutOverflow() {
+    final var huge = "v" + "1".repeat(25) + ".0.0";
+
+    assertThat(GoVersionUtils.COMPARATOR.compare(huge, "v9.9.9")).isPositive();
+    assertThat(GoVersionUtils.COMPARATOR.compare("v9.9.9", huge)).isNegative();
+    assertThat(GoVersionUtils.COMPARATOR.compare(huge, huge)).isZero();
   }
 }

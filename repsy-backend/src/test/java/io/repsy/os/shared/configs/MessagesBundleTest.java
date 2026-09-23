@@ -89,7 +89,6 @@ class MessagesBundleTest {
         "moduleVersionsFetched",
         "moduleDeleted",
         "moduleVersionDeleted",
-        "versionGone",
         // NuGet
         "nugetPackagesFetched",
         "nugetPackageFetched",
