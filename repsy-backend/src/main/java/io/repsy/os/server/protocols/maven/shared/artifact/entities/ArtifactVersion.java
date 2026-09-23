@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.maven.shared.artifact.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -63,34 +64,36 @@ public class ArtifactVersion {
   @Column(name = "version_name", nullable = false, length = 500)
   private String versionName;
 
-  @Column(name = "name")
+  @Column(name = "name", length = MavenPublishLimits.MAX_NAME_LENGTH)
   private String name;
 
   @Column(name = "description", columnDefinition = "text")
   private String description;
 
-  @Column(name = "prefix", length = 150)
+  @Column(name = "prefix", length = MavenPublishLimits.MAX_PREFIX_LENGTH)
   private String prefix;
 
-  @Column(name = "url")
+  @Column(name = "url", length = MavenPublishLimits.MAX_URL_LENGTH)
   private String url;
 
-  @Column(name = "organization", length = 150)
+  @Column(name = "organization", length = MavenPublishLimits.MAX_ORGANIZATION_LENGTH)
   private String organization;
 
-  @Column(name = "packaging", length = 50)
+  @Column(name = "packaging", length = MavenPublishLimits.MAX_PACKAGING_LENGTH)
   private String packaging;
 
-  @Column(name = "source_code_url")
+  @Column(name = "source_code_url", length = MavenPublishLimits.MAX_URL_LENGTH)
   private String sourceCodeUrl;
 
-  @Column(name = "parent_artifact_name")
+  @Column(name = "parent_artifact_name", length = MavenPublishLimits.MAX_PARENT_COORDINATE_LENGTH)
   private String parentArtifactName;
 
-  @Column(name = "parent_artifact_version")
+  @Column(
+      name = "parent_artifact_version",
+      length = MavenPublishLimits.MAX_PARENT_COORDINATE_LENGTH)
   private String parentArtifactVersion;
 
-  @Column(name = "parent_artifact_group")
+  @Column(name = "parent_artifact_group", length = MavenPublishLimits.MAX_PARENT_COORDINATE_LENGTH)
   private String parentArtifactGroup;
 
   @Column(name = "has_documents", nullable = false)

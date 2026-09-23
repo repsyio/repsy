@@ -19,6 +19,7 @@ import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import io.repsy.protocols.docker.shared.utils.DockerConstants;
 import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
 import io.repsy.protocols.helm.shared.utils.HelmConstants;
+import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
 import io.repsy.protocols.pypi.shared.utils.PypiPublishLimits;
 import java.util.ArrayList;
@@ -30,12 +31,12 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * The limits the Helm, Cargo, Go (RPS-1072), npm (RPS-1136), Docker (RPS-1139) and PyPI (RPS-1137)
- * publish paths hold pushed metadata to, set against the columns Flyway creates. A limit is only a
- * guard if the column really is that long, so this reads {@code information_schema} and reports
- * every limit that has drifted from its column, for PostgreSQL and for H2, whose scripts differ
- * (Cargo's {@code links}, author and category are {@code text} in PostgreSQL and {@code
- * varchar(255)} in H2).
+ * The limits the Helm, Cargo, Go (RPS-1072), npm (RPS-1136), Docker (RPS-1139), PyPI (RPS-1137) and
+ * Maven (RPS-1138) publish paths hold pushed metadata to, set against the columns Flyway creates. A
+ * limit is only a guard if the column really is that long, so this reads {@code information_schema}
+ * and reports every limit that has drifted from its column, for PostgreSQL and for H2, whose
+ * scripts differ (Cargo's {@code links}, author and category are {@code text} in PostgreSQL and
+ * {@code varchar(255)} in H2).
  *
  * <p>It covers the limits of the constants above, not the {@code @Column} annotations of the
  * entities, which RPS-1133 compares with the schema.
@@ -552,6 +553,148 @@ final class PublishGuardLimits {
             PypiPublishLimits.MAX_VERSION_LENGTH,
             "vulnerability_scan",
             "artifact_version"));
+
+    // Maven (RPS-1138). The version is held to the width of maven_artifact.latest / release (255),
+    // below version_name (500), so it is "within" there.
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_GROUP_ID_LENGTH",
+            MavenPublishLimits.MAX_GROUP_ID_LENGTH,
+            "maven_artifact",
+            "group_name"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_ARTIFACT_ID_LENGTH",
+            MavenPublishLimits.MAX_ARTIFACT_ID_LENGTH,
+            "maven_artifact",
+            "artifact_name"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_VERSION_LENGTH",
+            MavenPublishLimits.MAX_VERSION_LENGTH,
+            "maven_artifact",
+            "latest"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_VERSION_LENGTH",
+            MavenPublishLimits.MAX_VERSION_LENGTH,
+            "maven_artifact",
+            "release"));
+    limits.add(
+        within(
+            "MavenPublishLimits.MAX_VERSION_LENGTH",
+            MavenPublishLimits.MAX_VERSION_LENGTH,
+            "maven_artifact_version",
+            "version_name"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_NAME_LENGTH",
+            MavenPublishLimits.MAX_NAME_LENGTH,
+            "maven_artifact",
+            "name"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_PREFIX_LENGTH",
+            MavenPublishLimits.MAX_PREFIX_LENGTH,
+            "maven_artifact",
+            "prefix"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_PACKAGING_LENGTH",
+            MavenPublishLimits.MAX_PACKAGING_LENGTH,
+            "maven_artifact",
+            "packaging"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_NAME_LENGTH",
+            MavenPublishLimits.MAX_NAME_LENGTH,
+            "maven_artifact_version",
+            "name"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_PREFIX_LENGTH",
+            MavenPublishLimits.MAX_PREFIX_LENGTH,
+            "maven_artifact_version",
+            "prefix"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_URL_LENGTH",
+            MavenPublishLimits.MAX_URL_LENGTH,
+            "maven_artifact_version",
+            "url"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_ORGANIZATION_LENGTH",
+            MavenPublishLimits.MAX_ORGANIZATION_LENGTH,
+            "maven_artifact_version",
+            "organization"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_PACKAGING_LENGTH",
+            MavenPublishLimits.MAX_PACKAGING_LENGTH,
+            "maven_artifact_version",
+            "packaging"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_URL_LENGTH",
+            MavenPublishLimits.MAX_URL_LENGTH,
+            "maven_artifact_version",
+            "source_code_url"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_PARENT_COORDINATE_LENGTH",
+            MavenPublishLimits.MAX_PARENT_COORDINATE_LENGTH,
+            "maven_artifact_version",
+            "parent_artifact_name"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_PARENT_COORDINATE_LENGTH",
+            MavenPublishLimits.MAX_PARENT_COORDINATE_LENGTH,
+            "maven_artifact_version",
+            "parent_artifact_version"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_PARENT_COORDINATE_LENGTH",
+            MavenPublishLimits.MAX_PARENT_COORDINATE_LENGTH,
+            "maven_artifact_version",
+            "parent_artifact_group"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_LICENSE_NAME_LENGTH",
+            MavenPublishLimits.MAX_LICENSE_NAME_LENGTH,
+            "maven_version_license",
+            "name"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_LICENSE_URL_LENGTH",
+            MavenPublishLimits.MAX_LICENSE_URL_LENGTH,
+            "maven_version_license",
+            "url"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_DEVELOPER_NAME_LENGTH",
+            MavenPublishLimits.MAX_DEVELOPER_NAME_LENGTH,
+            "maven_version_developer",
+            "name"));
+    limits.add(
+        exact(
+            "MavenPublishLimits.MAX_DEVELOPER_EMAIL_LENGTH",
+            MavenPublishLimits.MAX_DEVELOPER_EMAIL_LENGTH,
+            "maven_version_developer",
+            "email"));
+    limits.add(
+        within(
+            "MavenPublishLimits.MAX_VERSION_LENGTH",
+            MavenPublishLimits.MAX_VERSION_LENGTH,
+            "vulnerability_scan",
+            "artifact_version"));
+    // The scan row's name is "<groupId>:<artifactId>".
+    limits.add(
+        within(
+            "MavenPublishLimits.MAX_GROUP_ID_LENGTH + 1 + MAX_ARTIFACT_ID_LENGTH",
+            MavenPublishLimits.MAX_GROUP_ID_LENGTH + 1 + MavenPublishLimits.MAX_ARTIFACT_ID_LENGTH,
+            "vulnerability_scan",
+            "artifact_name"));
 
     return limits;
   }

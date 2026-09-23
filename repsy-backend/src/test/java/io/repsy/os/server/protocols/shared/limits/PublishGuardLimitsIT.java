@@ -26,7 +26,8 @@ import org.junit.jupiter.api.Test;
  * PyPI (RPS-1137) publish paths hold pushed metadata to equal to the PostgreSQL columns Flyway
  * creates. It only reads {@code information_schema}, so it commits no rows.
  */
-@DisplayName("Helm, Cargo, Go, npm, Docker and PyPI publish limits against the PostgreSQL schema")
+@DisplayName(
+    "Helm, Cargo, Go, npm, Docker, PyPI and Maven publish limits against the PostgreSQL schema")
 class PublishGuardLimitsIT extends AbstractIntegrationTest {
 
   @Test

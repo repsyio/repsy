@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.maven.shared.artifact.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -47,10 +48,10 @@ public class VersionDeveloper {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private ArtifactVersion artifactVersion;
 
-  @Column(name = "name", nullable = false)
+  @Column(name = "name", nullable = false, length = MavenPublishLimits.MAX_DEVELOPER_NAME_LENGTH)
   private String name;
 
-  @Column(name = "email")
+  @Column(name = "email", length = MavenPublishLimits.MAX_DEVELOPER_EMAIL_LENGTH)
   private String email;
 
   /**

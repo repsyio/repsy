@@ -1122,6 +1122,143 @@ class ArtifactServiceImplTest {
     assertThat(version.isHasSources()).isFalse();
   }
 
+  @ParameterizedTest(name = "{0} is refused with {1}")
+  @CsvSource({
+    "GROUP, groupIdTooLong",
+    "ARTIFACT, artifactIdTooLong",
+    "VERSION, mavenVersionTooLong",
+    "SNAPSHOT_BASE_VERSION, mavenVersionTooLong"
+  })
+  @DisplayName("refuses a path whose coordinates do not fit their columns (RPS-1138)")
+  void refusesOverLongCoordinates(final String which, final String messageId) {
+    final var id = UUID.randomUUID();
+    final var tooLong = "a".repeat(256);
+    final var path =
+        switch (which) {
+          case "GROUP" -> tooLong + "/lib/1.0/lib-1.0.jar";
+          case "ARTIFACT" -> "com/acme/" + tooLong + "/1.0/" + tooLong + "-1.0.jar";
+          case "VERSION" -> "com/acme/lib/" + tooLong + "/lib-" + tooLong + ".jar";
+          default ->
+              "com/acme/lib/" + tooLong + "-SNAPSHOT/lib-" + tooLong + "-20260921.101010-1.jar";
+        };
+
+    assertThatThrownBy(
+            () ->
+                this.artifactService.getVersionType(
+                    repo(id, true, true, true), StoragePath.of(id, path)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage(messageId);
+
+    verifyNoInteractions(this.artifactRepository, this.artifactVersionRepository);
+  }
+
+  @Test
+  @DisplayName("accepts coordinates exactly as long as their columns (RPS-1138)")
+  void acceptsCoordinatesAtTheLimit() {
+    final var id = UUID.randomUUID();
+    final var limit = "a".repeat(255);
+    final var path = "com/" + limit + "/1.0/" + limit + "-1.0.jar";
+
+    assertThat(
+            this.artifactService.getVersionType(
+                repo(id, true, true, true), StoragePath.of(id, path)))
+        .isEqualTo(RELEASE);
+  }
+
+  @Test
+  @DisplayName("registers a POM with its over-long descriptive values dropped (RPS-1138)")
+  void registersAPomWithOverLongDescriptiveValuesDropped() {
+    final var id = UUID.randomUUID();
+    final var long255 = "x".repeat(256);
+    this.stubRepo(id);
+    when(this.artifactUpsertHelper.insertArtifact(any(Artifact.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(this.storageStrategy.listStorageItems(any(StoragePath.class))).thenReturn(List.of());
+
+    final var pom =
+        """
+        <project><modelVersion>4.0.0</modelVersion><groupId>com.acme</groupId>
+          <artifactId>lib</artifactId><version>1.0</version>
+          <name>%1$s</name><url>%1$s</url>
+          <organization><name>%1$s</name></organization><scm><url>%1$s</url></scm>
+          <parent><groupId>com.acme</groupId><artifactId>par</artifactId>
+            <version>%1$s</version></parent>
+          <licenses><license><name>Apache-2.0</name><url>%1$s</url></license>
+            <license><name>%1$s</name></license></licenses>
+          <developers><developer><name>Jane</name><email>%1$s</email></developer>
+            <developer><email>nameless@acme.com</email></developer></developers>
+        </project>"""
+            .formatted(long255);
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom"),
+        new ByteArrayResource(pom.getBytes(UTF_8)));
+
+    final var artifact = ArgumentCaptor.forClass(Artifact.class);
+    verify(this.artifactUpsertHelper).insertArtifact(artifact.capture());
+    assertThat(artifact.getValue().getName()).isNull();
+
+    final var version = ArgumentCaptor.forClass(ArtifactVersion.class);
+    final var model = ArgumentCaptor.forClass(org.apache.maven.model.Model.class);
+    verify(this.artifactUpsertHelper)
+        .insertArtifactVersion(version.capture(), model.capture(), any());
+
+    assertThat(version.getValue().getName()).isNull();
+    assertThat(version.getValue().getUrl()).isNull();
+    assertThat(version.getValue().getOrganization()).isNull();
+    assertThat(version.getValue().getSourceCodeUrl()).isNull();
+    assertThat(version.getValue().getParentArtifactGroup()).isNull();
+    assertThat(version.getValue().getParentArtifactName()).isNull();
+    assertThat(version.getValue().getParentArtifactVersion()).isNull();
+    assertThat(model.getValue().getLicenses())
+        .singleElement()
+        .satisfies(
+            license -> {
+              assertThat(license.getName()).isEqualTo("Apache-2.0");
+              assertThat(license.getUrl()).isNull();
+            });
+    assertThat(model.getValue().getDevelopers())
+        .singleElement()
+        .satisfies(
+            developer -> {
+              assertThat(developer.getName()).isEqualTo("Jane");
+              assertThat(developer.getEmail()).isNull();
+            });
+  }
+
+  @Test
+  @DisplayName("registers a plugin whose prefix is longer than its column without one (RPS-1138)")
+  void registersAPluginWithoutAnOverLongPrefix() {
+    final var id = UUID.randomUUID();
+    final var artifactId = "a".repeat(160) + "-maven-plugin";
+    this.stubRepo(id);
+    when(this.artifactUpsertHelper.insertArtifact(any(Artifact.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(this.storageStrategy.listStorageItems(any(StoragePath.class))).thenReturn(List.of());
+
+    final var pom =
+        """
+        <project><modelVersion>4.0.0</modelVersion><groupId>com.acme</groupId>\
+        <artifactId>%1$s</artifactId><version>1.0</version><packaging>maven-plugin</packaging>\
+        </project>"""
+            .formatted(artifactId);
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/" + artifactId + "/1.0/" + artifactId + "-1.0.pom"),
+        new ByteArrayResource(pom.getBytes(UTF_8)));
+
+    final var artifact = ArgumentCaptor.forClass(Artifact.class);
+    verify(this.artifactUpsertHelper).insertArtifact(artifact.capture());
+    assertThat(artifact.getValue().isPlugin()).isTrue();
+    assertThat(artifact.getValue().getPrefix()).isNull();
+
+    final var version = ArgumentCaptor.forClass(ArtifactVersion.class);
+    verify(this.artifactUpsertHelper).insertArtifactVersion(version.capture(), any(), any());
+    assertThat(version.getValue().getPrefix()).isNull();
+  }
+
   private Resource stubStoredPom(final String relativePath) {
     final Resource pom = new ByteArrayResource("<project/>".getBytes(StandardCharsets.UTF_8));
     when(this.storageStrategy.get(pathOf(relativePath), eq("mvn"))).thenReturn(Optional.of(pom));

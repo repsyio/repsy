@@ -30,7 +30,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * (RPS-1072). npm's tables are identical in both databases (RPS-1136), and so are Docker's
  * (RPS-1139, RPS-1140) and PyPI's (RPS-1137).
  */
-@DisplayName("Helm, Cargo, Go, npm, Docker and PyPI publish limits against the H2 schema")
+@DisplayName("Helm, Cargo, Go, npm, Docker, PyPI and Maven publish limits against the H2 schema")
 class H2PublishGuardLimitsIT extends H2IntegrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;

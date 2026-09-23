@@ -24,6 +24,7 @@ import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import io.repsy.protocols.maven.shared.utils.MavenUploadLimits;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
@@ -159,7 +160,8 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    *
    * <p>The same holds for a POM whose declared groupId (its own, else its parent's) is not the
    * group of its path: it would be stored and served but never registered, so it is refused with
-   * {@code pomGroupIdMismatch} before it is stored (RPS-1193).
+   * {@code pomGroupIdMismatch} before it is stored (RPS-1193), and so is one whose packaging is
+   * longer than its column, with {@code pomPackagingTooLong} (RPS-1138).
    */
   private BaseUsages writeValidatedPom(
       final String repoName, final StoragePath storagePath, final InputStream inputStream)
@@ -173,6 +175,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       }
 
       ArtifactUtils.checkPomGroupIdMatchesPath(model, storagePath.getRelativePath().getPath());
+      MavenPublishLimits.checkPackaging(model);
 
       try (final var pomStream = pom.openStream()) {
         return this.mavenStorageService.writeInputStreamToPath(storagePath, pomStream, repoName);
