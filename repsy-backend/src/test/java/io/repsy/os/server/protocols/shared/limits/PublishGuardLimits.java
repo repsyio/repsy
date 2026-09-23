@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.shared.limits;
 
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
+import io.repsy.protocols.docker.shared.utils.DockerConstants;
 import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
 import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
@@ -28,11 +29,11 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * The limits the Helm, Cargo, Go (RPS-1072) and npm (RPS-1136) publish paths hold pushed metadata
- * to, set against the columns Flyway creates. A limit is only a guard if the column really is that
- * long, so this reads {@code information_schema} and reports every limit that has drifted from its
- * column, for PostgreSQL and for H2, whose scripts differ (Cargo's {@code links}, author and
- * category are {@code text} in PostgreSQL and {@code varchar(255)} in H2).
+ * The limits the Helm, Cargo, Go (RPS-1072), npm (RPS-1136) and Docker (RPS-1139) publish paths
+ * hold pushed metadata to, set against the columns Flyway creates. A limit is only a guard if the
+ * column really is that long, so this reads {@code information_schema} and reports every limit that
+ * has drifted from its column, for PostgreSQL and for H2, whose scripts differ (Cargo's {@code
+ * links}, author and category are {@code text} in PostgreSQL and {@code varchar(255)} in H2).
  *
  * <p>It covers the limits of the constants above, not the {@code @Column} annotations of the
  * entities, which RPS-1133 compares with the schema.
@@ -269,9 +270,10 @@ final class PublishGuardLimits {
             "npm_package",
             "name"));
     // npm_package.latest and npm_package_version.version are held to the version guard (128),
-    // below the columns' actual varchar(255), so that every version accepted also fits
-    // vulnerability_scan.artifact_version (varchar(128)) without narrowing that shared column
-    // here; RPS-1140 is free to widen it independently.
+    // below the columns' actual varchar(255). vulnerability_scan.artifact_version was widened to
+    // 512 by RPS-1140, so this cap is no longer needed to fit the scan row; it is left at 128
+    // deliberately (RPS-1140 widens the shared column, it does not force any protocol's own
+    // constant up), and can be raised independently later.
     limits.add(
         within(
             "NpmPublishLimits.MAX_VERSION_LENGTH",
@@ -374,6 +376,78 @@ final class PublishGuardLimits {
             NpmPublishLimits.MAX_MAINTAINER_URL_LENGTH,
             "npm_package_maintainer",
             "url"));
+
+    limits.add(
+        exact(
+            "DockerConstants.MAX_IMAGE_NAME_LENGTH",
+            DockerConstants.MAX_IMAGE_NAME_LENGTH,
+            "docker_image",
+            "name"));
+    limits.add(
+        exact(
+            "DockerConstants.MAX_REFERENCE_LENGTH",
+            DockerConstants.MAX_REFERENCE_LENGTH,
+            "docker_tag",
+            "name"));
+    limits.add(
+        exact(
+            "DockerConstants.MAX_MEDIA_TYPE_LENGTH",
+            DockerConstants.MAX_MEDIA_TYPE_LENGTH,
+            "docker_tag",
+            "media_type"));
+    limits.add(
+        exact(
+            "DockerConstants.MAX_PLATFORM_LENGTH",
+            DockerConstants.MAX_PLATFORM_LENGTH,
+            "docker_tag",
+            "platform"));
+    limits.add(
+        exact(
+            "DockerConstants.MAX_PLATFORM_LENGTH",
+            DockerConstants.MAX_PLATFORM_LENGTH,
+            "docker_tag_platform",
+            "platform"));
+    limits.add(
+        exact(
+            "DockerConstants.MAX_REFERENCE_LENGTH",
+            DockerConstants.MAX_REFERENCE_LENGTH,
+            "docker_manifest",
+            "name"));
+    limits.add(
+        exact(
+            "DockerConstants.MAX_PLATFORM_LENGTH",
+            DockerConstants.MAX_PLATFORM_LENGTH,
+            "docker_manifest",
+            "platform"));
+    limits.add(
+        exact(
+            "DockerConstants.MAX_MEDIA_TYPE_LENGTH",
+            DockerConstants.MAX_MEDIA_TYPE_LENGTH,
+            "docker_manifest",
+            "media_type"));
+    limits.add(
+        exact(
+            "DockerConstants.MAX_MEDIA_TYPE_LENGTH",
+            DockerConstants.MAX_MEDIA_TYPE_LENGTH,
+            "docker_manifest",
+            "config_media_type"));
+
+    // The image name and reference (tag or digest) are also measured against the scan row they
+    // are copied into (RPS-1140): both fit comfortably within vulnerability_scan.artifact_name /
+    // artifact_version (widened to 512), so this is "within", not "exact" like Go's module path
+    // (whose own constant was chosen to equal the old artifact_name width).
+    limits.add(
+        within(
+            "DockerConstants.MAX_IMAGE_NAME_LENGTH",
+            DockerConstants.MAX_IMAGE_NAME_LENGTH,
+            "vulnerability_scan",
+            "artifact_name"));
+    limits.add(
+        within(
+            "DockerConstants.MAX_REFERENCE_LENGTH",
+            DockerConstants.MAX_REFERENCE_LENGTH,
+            "vulnerability_scan",
+            "artifact_version"));
 
     return limits;
   }

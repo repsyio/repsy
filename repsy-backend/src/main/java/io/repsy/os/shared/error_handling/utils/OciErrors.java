@@ -46,6 +46,11 @@ public final class OciErrors {
       Map.ofEntries(
           Map.entry("chartNameMismatch", OciErrorCode.NAME_INVALID),
           Map.entry("manifestNameTooLong", OciErrorCode.NAME_INVALID),
+          Map.entry("dockerImageNameInvalid", OciErrorCode.NAME_INVALID),
+          Map.entry("dockerReferenceInvalid", OciErrorCode.TAG_INVALID),
+          Map.entry("dockerDigestInvalid", OciErrorCode.DIGEST_INVALID),
+          Map.entry("dockerMediaTypeTooLong", OciErrorCode.MANIFEST_INVALID),
+          Map.entry("dockerPlatformTooLong", OciErrorCode.MANIFEST_INVALID),
           Map.entry("manifestInvalidJson", OciErrorCode.MANIFEST_INVALID),
           Map.entry("manifestLayersMissing", OciErrorCode.MANIFEST_INVALID),
           Map.entry("manifestLayerInvalid", OciErrorCode.MANIFEST_INVALID),

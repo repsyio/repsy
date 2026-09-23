@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.docker.shared.tag.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
 import io.repsy.os.server.protocols.docker.shared.layer.entities.Layer;
+import io.repsy.protocols.docker.shared.utils.DockerConstants;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -59,19 +60,19 @@ public class Manifest {
   @Column(nullable = false)
   private Integer version;
 
-  @Column(name = "name", nullable = false)
+  @Column(name = "name", nullable = false, length = DockerConstants.MAX_REFERENCE_LENGTH)
   private String name;
 
-  @Column(name = "platform", nullable = false)
+  @Column(name = "platform", nullable = false, length = DockerConstants.MAX_PLATFORM_LENGTH)
   private String platform;
 
   @Column(name = "digest", nullable = false)
   private String digest;
 
-  @Column(name = "media_type", nullable = false)
+  @Column(name = "media_type", nullable = false, length = DockerConstants.MAX_MEDIA_TYPE_LENGTH)
   private String mediaType;
 
-  @Column(name = "config_media_type")
+  @Column(name = "config_media_type", length = DockerConstants.MAX_MEDIA_TYPE_LENGTH)
   private String configMediaType;
 
   @Column(name = "config_digest")

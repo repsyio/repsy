@@ -26,6 +26,7 @@ import io.repsy.protocols.docker.shared.tag.dtos.Config;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestInfo;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestLayer;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestList;
+import io.repsy.protocols.docker.shared.tag.dtos.ManifestListManifest;
 import java.util.List;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.lang3.StringUtils;
@@ -97,6 +98,9 @@ public final class DockerManifestValidator {
     if (config == null || StringUtils.isBlank(config.getDigest())) {
       throw new BadRequestException("manifestConfigMissing");
     }
+
+    // RPS-1139: the config's own mediaType is stored in docker_manifest.config_media_type.
+    DockerPushGuards.rejectMediaTypeTooLong(config.getMediaType());
   }
 
   private static void validateLayers(final @Nullable List<ManifestLayer> layers) {
@@ -120,6 +124,21 @@ public final class DockerManifestValidator {
     }
 
     validateSchemaVersion(index.getSchemaVersion(), SCHEMA_VERSION_2);
+
+    // RPS-1139: the index's own mediaType, and each child entry's mediaType and platform string,
+    // are what AbstractDockerProtocolTxFacade stores in docker_tag/docker_manifest for a
+    // multi-platform push.
+    DockerPushGuards.rejectMediaTypeTooLong(index.getMediaType());
+    manifests.forEach(DockerManifestValidator::validateManifestListEntry);
+  }
+
+  private static void validateManifestListEntry(final ManifestListManifest entry) {
+
+    DockerPushGuards.rejectMediaTypeTooLong(entry.getMediaType());
+
+    if (entry.getPlatform() != null) {
+      DockerPushGuards.rejectPlatformTooLong(entry.getPlatform().toString());
+    }
   }
 
   /**
