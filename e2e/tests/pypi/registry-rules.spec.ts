@@ -29,9 +29,12 @@
  * `PypiPackageServiceImpl.getPackageList`/`packages.ftl`/`PypiSimpleHandlerPreProcessor`,
  * `AbstractPypiHeadProtocolMethodHandler`) and their tests below pin the corrected behaviour; the
  * rest are still open:
- *  - **RPS-1222**: the panel's own PyPI config screen tells users
+ *  - **RPS-1222** (fixed): the panel's own PyPI config screen used to tell users
  *    `repository=${baseUrl}/${repoName}/simple` for `.pypirc`, but the upload handler only matches
- *    the repo ROOT -- `twine upload -r <that source>` 404s (`unknownPath`).
+ *    the repo ROOT -- `twine upload -r <that source>` 404s (`unknownPath`). The panel now omits the
+ *    `/simple` suffix from the `repository=` line (`pypi-config.component.ts`); `/simple` remains the
+ *    correct, read-only "simple index" path (used for `pip`'s `--extra-index-url`), so `POST` there
+ *    still 404s by design, unrelated to the panel copy fix.
  *  - **RPS-1223** (fixed): `checkOverridePermission` used to compare the FORM `version` against the
  *    version RE-EXTRACTED from the filename instead of the filename itself, so a mismatched form
  *    `version` made an existing file overwritable even under `allowOverride: false`. `isPackageFileExist`
@@ -160,7 +163,7 @@ test.describe('pypi registry rules (raw HTTP)', () => {
 
   test(
     'POST /<repo> without a trailing slash is accepted like POST /<repo>/; POST /<repo>/simple ' +
-      '404s, contradicting the panel’s own .pypirc instructions (RPS-1222, H12)',
+      'still 404s by design -- the panel no longer instructs that URL (RPS-1222, H12)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'notrailingslash');
@@ -183,10 +186,14 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       const bytes = Buffer.from(await res.arrayBuffer());
       expectMsgId({ status: res.status, body: bytes }, 200, undefined);
 
-      // RPS-1222: the panel's config screen tells users to point `.pypirc`'s `repository` at
-      // `<baseUrl>/<repo>/simple` -- but that is exactly the URL a real `twine upload -r <source>`
-      // built from it would POST to, and it 404s.
-      const panelInstructedUrl = `${env.repoBaseUrl}/${layout.repoName}/simple`;
+      // RPS-1222 (fixed): the panel's config screen used to point `.pypirc`'s `repository` at
+      // `<baseUrl>/<repo>/simple` -- exactly the URL a real `twine upload -r <source>` built from it
+      // would POST to, which 404s. The panel now omits the `/simple` suffix (`repository=<baseUrl>/
+      // <repo>`, matching `noSlashUrl` above), so a user following the CURRENT instructions never
+      // hits this path. `/simple` itself remains the read-only "simple index" route (used for `pip`'s
+      // `--extra-index-url`, see `installation` in `pypi-packages-version-detail.component.ts`), so
+      // `POST` there is correctly refused -- this is no longer a bug, just documented behaviour.
+      const simpleIndexUrl = `${env.repoBaseUrl}/${layout.repoName}/simple`;
       const built2 = buildWheel({
         name: layout.packageName,
         version: pypiAdapter.version('release'),
@@ -197,19 +204,13 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       form2.append('requires_python', built2.requiresPython);
       form2.append('sha256_digest', built2.sha256Hex);
       form2.append('content', new Blob([new Uint8Array(built2.bytes)]), built2.filename);
-      const panelRes = await fetch(panelInstructedUrl, {
+      const simpleRes = await fetch(simpleIndexUrl, {
         method: 'POST',
         headers: authHeader(admin),
         body: form2,
       });
-      const panelBytes = Buffer.from(await panelRes.arrayBuffer());
-      test.fail(
-        true,
-        'RPS-1222: the panel’s own PyPI config screen instructs `.pypirc`’s `repository` to ' +
-          'be `<baseUrl>/<repo>/simple`, which the upload handler (repo ROOT only) refuses with ' +
-          '404 unknownPath -- following the panel’s own instructions literally breaks `twine upload`',
-      );
-      expectMsgId({ status: panelRes.status, body: panelBytes }, 200, undefined);
+      const simpleBytes = Buffer.from(await simpleRes.arrayBuffer());
+      expectMsgId({ status: simpleRes.status, body: simpleBytes }, 404, 'unknownPath');
     },
   );
 
