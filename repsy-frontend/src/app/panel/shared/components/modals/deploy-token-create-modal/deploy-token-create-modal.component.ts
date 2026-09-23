@@ -15,7 +15,7 @@
 ///
 
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { ReactiveFormsModule } from '@angular/forms';
 import moment, { Moment } from 'moment';
 import { finalize } from 'rxjs/operators';
@@ -63,7 +63,7 @@ export class DeployTokenCreateModalComponent implements OnInit {
       username: ['', [Validators.minLength(3), Validators.maxLength(25), Validators.pattern(/^[a-z0-9_\-]+$/)]],
       description: ['', [Validators.maxLength(500)]],
       readOnly: [false],
-      expirationDate: [],
+      expirationDate: [null, [this.expirationDateRangeValidator()]],
     });
   }
 
@@ -87,14 +87,14 @@ export class DeployTokenCreateModalComponent implements OnInit {
   }
 
   createToken(): void {
-    this.loading = true;
-    this.form.disable();
-
     const payload: DeployTokenForm | null = this.preparePayload();
 
     if (payload === null) {
       return;
     }
+
+    this.loading = true;
+    this.form.disable();
 
     this.protocolDeployTokenControllerService
       .createDeployToken(this.repoName, payload)
@@ -133,7 +133,6 @@ export class DeployTokenCreateModalComponent implements OnInit {
 
       if (!expiration.isValid() || expiration.isSameOrBefore(now) || expiration.isAfter(maxAllowedDate)) {
         this.toastService.show('Expiration date must be between tomorrow and one year from today.', 'error');
-        this.form.enable();
         return null;
       }
 
@@ -149,6 +148,26 @@ export class DeployTokenCreateModalComponent implements OnInit {
       minute: now.minute(),
       second: now.second(),
       millisecond: now.millisecond(),
+    };
+  }
+
+  private expirationDateRangeValidator(): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = control.value;
+
+      if (!value) {
+        return null;
+      }
+
+      if (!moment.utc(value, 'YYYY-MM-DD', true).isValid()) {
+        return { dateInvalid: true };
+      }
+
+      if (value < this.minDate || value > this.maxDate) {
+        return { dateOutOfRange: true };
+      }
+
+      return null;
     };
   }
 
