@@ -18,6 +18,7 @@ package io.repsy.protocols.golang.shared.utils;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -37,6 +38,48 @@ class GoVersionUtilsTest {
   @DisplayName("decodeModulePath() turns Go's !x escapes into uppercase letters")
   void decodesUppercaseEscapes(final String encoded, final String expected) {
     assertThat(GoVersionUtils.decodeModulePath(encoded)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "github.com/BurntSushi/toml, github.com/!burnt!sushi/toml",
+    "github.com/google/uuid, github.com/google/uuid",
+    "'', ''",
+    "ABC, !a!b!c"
+  })
+  @DisplayName(
+      "escapeModulePath() turns upper-case letters into !x escapes (RPS-1232), the exact inverse of"
+          + " decodeModulePath()")
+  void escapesUppercaseLetters(final String decoded, final String expected) {
+    assertThat(GoVersionUtils.escapeModulePath(decoded)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "github.com/BurntSushi/toml",
+        "github.com/google/uuid",
+        "example.com/Foo/Bar",
+        "example.com/e2e-mixed"
+      })
+  @DisplayName(
+      "escapeModulePath() and decodeModulePath() round-trip: escaping never needs a"
+          + " case-sensitive filesystem, and decoding it back recovers the original path (RPS-1232)")
+  void escapeAndDecodeRoundTrip(final String decoded) {
+    final var escaped = GoVersionUtils.escapeModulePath(decoded);
+
+    assertThat(escaped).isEqualTo(escaped.toLowerCase(Locale.ROOT));
+    assertThat(GoVersionUtils.decodeModulePath(escaped)).isEqualTo(decoded);
+  }
+
+  @Test
+  @DisplayName(
+      "escapeModulePath() is the identity for an already all-lower-case path (RPS-1232): a module"
+          + " stored before this encoding was introduced keeps its storage path unchanged")
+  void escapeIsIdentityForLowerCasePaths() {
+    final var lowerCasePath = "github.com/burntsushi/toml";
+
+    assertThat(GoVersionUtils.escapeModulePath(lowerCasePath)).isEqualTo(lowerCasePath);
   }
 
   private static byte[] goMod(final String goDirective) {

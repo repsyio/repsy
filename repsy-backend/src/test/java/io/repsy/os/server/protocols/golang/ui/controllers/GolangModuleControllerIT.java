@@ -230,7 +230,7 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .header(AUTHORIZATION, token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.content", hasSize(1)))
-        .andExpect(jsonPath("$.data.content[0].modulePath").value(UPPERCASE_MODULE.toLowerCase()));
+        .andExpect(jsonPath("$.data.content[0].modulePath").value(UPPERCASE_MODULE));
 
     this.mockMvc
         .perform(

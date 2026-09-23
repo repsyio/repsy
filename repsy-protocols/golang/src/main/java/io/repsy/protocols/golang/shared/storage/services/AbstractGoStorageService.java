@@ -40,6 +40,12 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
 
   private final StorageStrategy storageStrategy;
 
+  /**
+   * {@code modulePath} must already be the module's on-disk storage form: the !-escaped,
+   * all-lower-case encoding from {@code GoVersionUtils.escapeModulePath} (RPS-1232), not the
+   * decoded, case-preserved path the database keys modules by. The caller is responsible for that
+   * conversion; this method only builds the relative path.
+   */
   @Override
   public String getModuleZipRelativePath(final String modulePath, final String version) {
     return "/" + modulePath + "/@v/" + version + ZIP_EXTENSION;

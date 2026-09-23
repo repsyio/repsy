@@ -30,7 +30,6 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -187,15 +186,14 @@ class GolangUploadMetadataLengthIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("measures the module path as it is stored, decoded and lower-cased")
+  @DisplayName("measures the module path as it is stored: decoded and case-preserved (RPS-1232)")
   void measuresTheNormalizedModulePath() throws Exception {
     final var repo = this.goRepo();
     // Six "!a" escapes stand for six upper-case letters, so the URL is 518 characters long and the
-    // path stored, once decoded and lower-cased, 512.
+    // path stored, once decoded (case-preserved, no longer lower-cased), is 512.
     final var head = modulePathOfLength(GoVersionUtils.MAX_MODULE_PATH_LENGTH - 7);
     final var encoded = head + "/" + "!a".repeat(6);
     final var decoded = head + "/" + "A".repeat(6);
-    final var stored = decoded.toLowerCase(Locale.ROOT);
 
     final var response =
         this.upload(repo, encoded, VERSION, moduleZip(decoded, VERSION, goMod(decoded, "1.21")));
@@ -203,7 +201,7 @@ class GolangUploadMetadataLengthIT extends AbstractIntegrationTest {
     assertThat(decoded).hasSize(GoVersionUtils.MAX_MODULE_PATH_LENGTH);
     assertThat(encoded.length()).isGreaterThan(GoVersionUtils.MAX_MODULE_PATH_LENGTH);
     assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(200);
-    assertThat(this.storedVersion(repo)).containsEntry("module_path", stored);
+    assertThat(this.storedVersion(repo)).containsEntry("module_path", decoded);
   }
 
   @Test
