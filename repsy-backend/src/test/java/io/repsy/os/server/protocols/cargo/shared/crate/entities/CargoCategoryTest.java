@@ -13,38 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.docker.shared.image.entities;
+package io.repsy.os.server.protocols.cargo.shared.crate.entities;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.repsy.os.shared.entities.AbstractEntityIdentityTest;
-import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class ImageTest extends AbstractEntityIdentityTest<Image> {
+class CargoCategoryTest extends AbstractEntityIdentityTest<CargoCategory> {
 
   @Override
-  protected Image newEntity(final UUID id) {
-    final var image = new Image();
-    image.setId(id);
-    image.setName("library/alpine");
-    image.setDigest("sha256:aaaa");
-    return image;
+  protected CargoCategory newEntity(final UUID id) {
+    final var cargoCategory = new CargoCategory();
+    cargoCategory.setId(id);
+    cargoCategory.setCategory("parsing");
+    return cargoCategory;
   }
 
   @Override
-  protected void changeState(final Image image) {
-    image.setName("library/busybox");
-    image.setSize(42);
-    image.setDigest("sha256:bbbb");
-    image.setLastUpdatedAt(Instant.now());
+  protected void changeState(final CargoCategory cargoCategory) {
+    cargoCategory.setCategory("encoding");
   }
 
   @Override
-  protected Image newProxy(final UUID id) {
-    return new Image() {
+  protected CargoCategory newProxy(final UUID id) {
+    return new CargoCategory() {
       @Override
       public UUID getId() {
         return id;
@@ -53,17 +48,17 @@ class ImageTest extends AbstractEntityIdentityTest<Image> {
   }
 
   @Override
-  protected void assignId(final Image image, final UUID id) {
-    image.setId(id);
+  protected void assignId(final CargoCategory cargoCategory, final UUID id) {
+    cargoCategory.setId(id);
   }
 
   @Test
-  @DisplayName("Hashing and printing an image never touch its tags or repo")
+  @DisplayName("Hashing and printing a cargo category never touch its lazy associations")
   void hashCodeAndToStringSkipAssociations() {
-    final var image = this.newEntity(UUID.randomUUID());
-    image.setTags(new UntouchableSet<>());
+    final var cargoCategory = this.newEntity(UUID.randomUUID());
+    cargoCategory.setCrates(new UntouchableSet<>());
 
-    assertThat(image.hashCode()).isEqualTo(Image.class.hashCode());
-    assertThat(image.toString()).doesNotContain("tags=", "repo=");
+    assertThat(cargoCategory.hashCode()).isEqualTo(CargoCategory.class.hashCode());
+    assertThat(cargoCategory.toString()).doesNotContain("crates=");
   }
 }

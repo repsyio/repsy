@@ -31,10 +31,10 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.hibernate.annotations.OnDelete;
@@ -47,8 +47,6 @@ import org.jspecify.annotations.Nullable;
 @Table(name = "cargo_crate")
 @NoArgsConstructor
 @ToString(exclude = {"repo", "crateIndexes", "crateMetas", "authors", "keywords", "categories"})
-@EqualsAndHashCode(
-    exclude = {"repo", "crateIndexes", "crateMetas", "authors", "keywords", "categories"})
 public class CargoCrate {
 
   @Id
@@ -120,4 +118,32 @@ public class CargoCrate {
       joinColumns = @JoinColumn(name = "crate_id"),
       inverseJoinColumns = @JoinColumn(name = "category_id"))
   private @NonNull Set<CargoCategory> categories = new HashSet<>();
+
+  /**
+   * Identifier-based equality: two cargo crates are equal when they are the same instance or carry
+   * the same non-null id. One that has not been persisted yet has no id and equals only itself.
+   * {@code getId()} is used on both sides so a Hibernate proxy is compared by its real id.
+   */
+  @Override
+  public boolean equals(final Object o) {
+    if (this == o) {
+      return true;
+    }
+
+    if (!(o instanceof final CargoCrate other)) {
+      return false;
+    }
+
+    return this.getId() != null && Objects.equals(this.getId(), other.getId());
+  }
+
+  /**
+   * Constant on purpose: the id is assigned on persist and the other columns can change on flush,
+   * so a hash derived from them would move a cargo crate held in a {@code HashSet} into the wrong
+   * bucket. It also keeps the lazy associations out of the hash.
+   */
+  @Override
+  public int hashCode() {
+    return CargoCrate.class.hashCode();
+  }
 }

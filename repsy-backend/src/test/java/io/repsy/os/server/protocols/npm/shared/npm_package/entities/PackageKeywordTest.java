@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.docker.shared.image.entities;
+package io.repsy.os.server.protocols.npm.shared.npm_package.entities;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,28 +23,25 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class ImageTest extends AbstractEntityIdentityTest<Image> {
+class PackageKeywordTest extends AbstractEntityIdentityTest<PackageKeyword> {
 
   @Override
-  protected Image newEntity(final UUID id) {
-    final var image = new Image();
-    image.setId(id);
-    image.setName("library/alpine");
-    image.setDigest("sha256:aaaa");
-    return image;
+  protected PackageKeyword newEntity(final UUID id) {
+    final var packageKeyword = new PackageKeyword();
+    packageKeyword.setId(id);
+    packageKeyword.setKeyword("http");
+    return packageKeyword;
   }
 
   @Override
-  protected void changeState(final Image image) {
-    image.setName("library/busybox");
-    image.setSize(42);
-    image.setDigest("sha256:bbbb");
-    image.setLastUpdatedAt(Instant.now());
+  protected void changeState(final PackageKeyword packageKeyword) {
+    packageKeyword.setKeyword("https");
+    packageKeyword.setCreatedAt(Instant.now());
   }
 
   @Override
-  protected Image newProxy(final UUID id) {
-    return new Image() {
+  protected PackageKeyword newProxy(final UUID id) {
+    return new PackageKeyword() {
       @Override
       public UUID getId() {
         return id;
@@ -53,17 +50,16 @@ class ImageTest extends AbstractEntityIdentityTest<Image> {
   }
 
   @Override
-  protected void assignId(final Image image, final UUID id) {
-    image.setId(id);
+  protected void assignId(final PackageKeyword packageKeyword, final UUID id) {
+    packageKeyword.setId(id);
   }
 
   @Test
-  @DisplayName("Hashing and printing an image never touch its tags or repo")
+  @DisplayName("Hashing and printing a package keyword never touch its lazy associations")
   void hashCodeAndToStringSkipAssociations() {
-    final var image = this.newEntity(UUID.randomUUID());
-    image.setTags(new UntouchableSet<>());
+    final var packageKeyword = this.newEntity(UUID.randomUUID());
 
-    assertThat(image.hashCode()).isEqualTo(Image.class.hashCode());
-    assertThat(image.toString()).doesNotContain("tags=", "repo=");
+    assertThat(packageKeyword.hashCode()).isEqualTo(PackageKeyword.class.hashCode());
+    assertThat(packageKeyword.toString()).doesNotContain("packageVersion=");
   }
 }

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.docker.shared.entities;
+package io.repsy.os.shared.entities;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,9 +24,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Contract for the identifier-based {@code equals}/{@code hashCode} of the Docker JPA entities: the
- * id decides equality, the mutable state never does, and a hash-based collection stays consistent
- * when the id is assigned or the state changes after an entity was added.
+ * Contract for the identifier-based {@code equals}/{@code hashCode} of the JPA entities: the id
+ * decides equality, the mutable state never does, and a hash-based collection stays consistent when
+ * the id is assigned or the state changes after an entity was added.
  */
 public abstract class AbstractEntityIdentityTest<T> {
 
