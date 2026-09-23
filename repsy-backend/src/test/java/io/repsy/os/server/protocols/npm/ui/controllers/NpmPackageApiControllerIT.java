@@ -29,22 +29,26 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageDistTagRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
+import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.os.server.protocols.npm.ui.facades.NpmApiFacade;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
+import io.repsy.protocols.npm.shared.utils.NpmConstants;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,6 +74,7 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
   @Autowired private RequestMappingHandlerMapping handlerMapping;
   @Autowired private RepoTxService repoTxService;
   @Autowired private NpmApiFacade npmApiFacade;
+  @Autowired private NpmStorageService npmStorageService;
   @Autowired private NpmPackageRepository npmPackageRepository;
   @Autowired private PackageVersionRepository packageVersionRepository;
   @Autowired private PackageDistTagRepository packageDistTagRepository;
@@ -299,6 +304,32 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
           .andExpect(jsonPath("$.data.scopeName").value("tools"))
           .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
           .andExpect(jsonPath("$.data.description").value("integration fixture"));
+    }
+
+    @Test
+    @DisplayName(
+        "renders without a README, instead of 500ing, when metadata.json has no entry for a"
+            + " version that still exists in the DB (RPS-1143)")
+    void rendersWithoutReadmeWhenMetadataHasNoEntryForTheDbVersion() throws Exception {
+      final var packageBasePath = npmStorageService.getPackageBasePath(null, "plain-package");
+      final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
+      final var storagePath = StoragePath.of(repo.getId(), metadataPath.toString());
+
+      final var metadata = npmStorageService.getMetadata(storagePath, repoName);
+      @SuppressWarnings("unchecked")
+      final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
+      // Simulates a storage/DB mismatch: the "1.0.0" version row still exists in the DB (used by
+      // the assertions below), but its metadata.json entry -- and with it any readme -- is gone.
+      versions.remove("1.0.0");
+      npmStorageService.writeMetadataToFile(repoName, metadata, storagePath);
+
+      NpmPackageApiControllerIT.this
+          .perform(get("/api/npm/packages/{repo}/plain-package/versions/1.0.0", repoName))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.msgId").value("packageVersionFetched"))
+          .andExpect(jsonPath("$.data.packageName").value("plain-package"))
+          .andExpect(jsonPath("$.data.versionName").value("1.0.0"))
+          .andExpect(jsonPath("$.data.readme").doesNotExist());
     }
 
     @Test

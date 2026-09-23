@@ -32,6 +32,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.function.Function;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
@@ -63,7 +64,7 @@ public interface NpmPackageConverter {
       final List<PackageKeywordListItem> keywords,
       final List<PackageMaintainerListItem> maintainers,
       final List<PackageDistributionTagListItem> distributionTags,
-      final String readmeFileContent) {
+      final @Nullable String readmeFileContent) {
 
     return PackageVersionDetail.builder()
         .id(packageVersionInfo.getId())

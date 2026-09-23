@@ -17,7 +17,6 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 
 import { MarkdownComponent } from '../../../../shared/components/markdown/markdown.component';
-import { getRepoDomain } from '../../docker/docker-repo-util';
 
 @Component({
   selector: 'app-npm-config',
@@ -58,33 +57,45 @@ export class NpmConfigComponent implements OnInit, OnChanges {
   }
 
   private updateMarkdown(): void {
+    // A trailing slash matters here: npm matches a //host[:port]/path/:_authToken key against the
+    // registry URL by the longest //host[:port]/path/ prefix (see the npmrc scoping rules,
+    // https://docs.npmjs.com/cli/v11/configuring-npm/npmrc). Without it, the auth key in
+    // getDeployTokenAuthInfo() never matches this registry URL and every request goes out
+    // unauthenticated (RPS-1206).
+    const registryUrl = `${this.baseUrl}/${this.repoName}/`;
+
     this.markdown = `
 Either public or private, you must authenticate to publish packages to your registry. Authentication is also
 required to install packages from private registries;
 
 \`\`\`bash
-npm login --registry ${this.baseUrl}/${this.repoName}
+npm login --registry ${registryUrl}
 \`\`\`
 
-${this.deployToken ? this.getDeployTokenAuthInfo() : ''}
+${this.deployToken ? this.getDeployTokenAuthInfo(registryUrl) : ''}
 
 To use your registry only for scoped packages, for each different scope, you should configure npm to use your
 registry for all operations related to that scope;
 
 \`\`\`bash
-npm config set ${this.scopeName ? this.scopeName : '<scope_name>'}:registry ${this.baseUrl}/${this.repoName}
+npm config set ${this.scopeName ? this.scopeName : '<scope_name>'}:registry ${registryUrl}
 \`\`\`
 
 And to use your registry as the main registry;
 
 \`\`\`bash
-npm config set registry ${this.baseUrl}/${this.repoName}
+npm config set registry ${registryUrl}
 \`\`\`
 
 That is all, now you can start using your registry.`;
   }
 
-  private getDeployTokenAuthInfo(): string {
+  private getDeployTokenAuthInfo(registryUrl: string): string {
+    // Derived from the same registryUrl (and so the same baseUrl) as the registry lines above,
+    // not from a different source -- otherwise the host here can silently drift from the one npm
+    // actually connects to (RPS-1206).
+    const registryHostAndPath = registryUrl.replace(/^https?:\/\//, '');
+
     return `
 <small>***username:*** ${this.username} or ANY\\_USERNAME <br> ***password:*** YOUR\\_DEPLOY\\_TOKEN</small>
 
@@ -104,7 +115,7 @@ touch $HOME/.npmrc
 Then, add the following line to your ___.npmrc___ file
 
 \`\`\`bash
-//${getRepoDomain()}/npm/:_authToken=<YOUR_DEPLOY_TOKEN>
+//${registryHostAndPath}:_authToken=<YOUR_DEPLOY_TOKEN>
 \`\`\`
 `;
   }

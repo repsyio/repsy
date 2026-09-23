@@ -1016,7 +1016,7 @@ paths:
     get:
       tags:
         - npm-package-api-controller
-      operationId: getVersion
+      operationId: getNpmPackageVersion
       parameters:
         - name: packageName
           in: path
@@ -1039,7 +1039,7 @@ paths:
     delete:
       tags:
         - npm-package-api-controller
-      operationId: deleteVersion
+      operationId: deleteNpmPackageVersion
       parameters:
         - name: packageName
           in: path
@@ -1295,7 +1295,7 @@ paths:
     get:
       tags:
         - npm-package-api-controller
-      operationId: listVersions
+      operationId: listNpmPackageVersions
       parameters:
         - name: packageName
           in: path
@@ -1372,7 +1372,7 @@ paths:
     get:
       tags:
         - npm-package-api-controller
-      operationId: listTags
+      operationId: listNpmPackageTags
       parameters:
         - name: packageName
           in: path
@@ -2730,7 +2730,7 @@ paths:
     delete:
       tags:
         - helm-chart-controller
-      operationId: deleteHelmChart
+      operationId: deleteHelmChartVersion
       parameters: []
       responses:
         '200':

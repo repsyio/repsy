@@ -91,7 +91,7 @@ export class HelmService {
 
   public deleteChart(name: string, version: string): Observable<void> {
     return this.helmChartControllerService
-      .deleteHelmChart(this.repoName, name, version)
+      .deleteHelmChartVersion(this.repoName, name, version)
       .pipe(map(() => undefined));
   }
 

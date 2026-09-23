@@ -144,7 +144,12 @@ export class NpmService {
           this.repoName,
           version || undefined,
         )
-      : this.npmPackageApiControllerService.listVersions(packageName, pageable, this.repoName, version || undefined);
+      : this.npmPackageApiControllerService.listNpmPackageVersions(
+          packageName,
+          pageable,
+          this.repoName,
+          version || undefined,
+        );
     return call.pipe(
       map(
         (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<PackageVersionListItem>,
@@ -155,7 +160,7 @@ export class NpmService {
   public fetchPackageTags(packageName: string, scopeName: string): Observable<PackageDistributionTagMapListItem[]> {
     const call = scopeName
       ? this.npmPackageApiControllerService.listNpmScopedPackageTags(scopeName, packageName, this.repoName)
-      : this.npmPackageApiControllerService.listTags(packageName, this.repoName);
+      : this.npmPackageApiControllerService.listNpmPackageTags(packageName, this.repoName);
     return call.pipe(map((r) => r.data ?? []));
   }
 
@@ -171,7 +176,7 @@ export class NpmService {
           versionName,
           this.repoName,
         )
-      : this.npmPackageApiControllerService.getVersion(packageName, versionName, this.repoName);
+      : this.npmPackageApiControllerService.getNpmPackageVersion(packageName, versionName, this.repoName);
     return call.pipe(map((r) => r.data as unknown as PackageVersionDetail));
   }
 
@@ -190,7 +195,7 @@ export class NpmService {
           versionName,
           this.repoName,
         )
-      : this.npmPackageApiControllerService.deleteVersion(packageName, versionName, this.repoName);
+      : this.npmPackageApiControllerService.deleteNpmPackageVersion(packageName, versionName, this.repoName);
     return call.pipe(map(() => undefined));
   }
 }
