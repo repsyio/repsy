@@ -383,8 +383,6 @@ test.describe('docker registry rules (raw HTTP)', () => {
       await seeder.setSettings(layout.repoName, {
         privateRepo: true,
         allowOverride: false,
-        releases: true,
-        snapshots: true,
       });
 
       const refused = await rawPushImage(layout, admin, 'tag1', 'v2');
@@ -410,8 +408,6 @@ test.describe('docker registry rules (raw HTTP)', () => {
       await seeder.setSettings(layout.repoName, {
         privateRepo: true,
         allowOverride: true,
-        releases: true,
-        snapshots: true,
       });
       const allowed = await rawPushImage(layout, admin, 'tag1', 'v3');
       expect(allowed.manifestRes.status, 'accepted once allowOverride is on').toBe(201);

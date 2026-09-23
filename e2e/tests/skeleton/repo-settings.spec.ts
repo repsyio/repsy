@@ -88,18 +88,30 @@ async function expectReleasesSnapshotsUnsupported(promise: Promise<void>): Promi
   });
 }
 
-test('a settings PUT rejects releases/snapshots for a repo type that does not consult them (RPS-1210)', async ({
-  seeder,
-  panelApi,
-}) => {
-  const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
+for (const repoType of [
+  RepoType.NPM,
+  RepoType.PYPI,
+  RepoType.DOCKER,
+  RepoType.CARGO,
+  RepoType.GOLANG,
+  RepoType.HELM,
+  RepoType.RUBY,
+]) {
+  test(`a settings PUT rejects releases/snapshots for a repo type that does not consult them (RPS-1210, ${repoType})`, async ({
+    seeder,
+    panelApi,
+  }) => {
+    const repo = await seeder.createRepo(repoType, { privateRepo: true });
 
-  await expectReleasesSnapshotsUnsupported(panelApi.updateSettings(repo.name, { releases: false }));
-  await expectReleasesSnapshotsUnsupported(
-    panelApi.updateSettings(repo.name, { snapshots: false }),
-  );
+    await expectReleasesSnapshotsUnsupported(
+      panelApi.updateSettings(repo.name, { releases: false }),
+    );
+    await expectReleasesSnapshotsUnsupported(
+      panelApi.updateSettings(repo.name, { snapshots: false }),
+    );
 
-  const settings = await panelApi.getSettings(repo.name);
-  expect(settings.releases).toBeUndefined();
-  expect(settings.snapshots).toBeUndefined();
-});
+    const settings = await panelApi.getSettings(repo.name);
+    expect(settings.releases).toBeUndefined();
+    expect(settings.snapshots).toBeUndefined();
+  });
+}

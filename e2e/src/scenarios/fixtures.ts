@@ -236,8 +236,14 @@ export const test = base.extend<Fixtures>({
       await seeder.setSettings(repo.name, {
         privateRepo: scenario.repo.privateRepo,
         allowOverride: scenario.repo.allowOverride ?? true,
-        releases: scenario.repo.releases ?? true,
-        snapshots: scenario.repo.snapshots ?? true,
+        // RPS-1210: only Maven and NuGet consult releases/snapshots; the settings PUT refuses them
+        // (400 releasesSnapshotsUnsupported) for every other repo type.
+        ...(supportsVersionAllowance(repoType)
+          ? {
+              releases: scenario.repo.releases ?? true,
+              snapshots: scenario.repo.snapshots ?? true,
+            }
+          : {}),
       });
 
       return world;
@@ -246,5 +252,10 @@ export const test = base.extend<Fixtures>({
     await use(factory);
   },
 });
+
+/** The repo types whose publish path reads the `releases`/`snapshots` settings (RPS-1210). */
+function supportsVersionAllowance(repoType: RepoType): boolean {
+  return repoType === RepoType.MAVEN || repoType === RepoType.NUGET;
+}
 
 export { expect } from '@playwright/test';

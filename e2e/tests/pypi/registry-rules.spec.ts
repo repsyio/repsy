@@ -261,8 +261,6 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       await seeder.setSettings(layout.repoName, {
         privateRepo: true,
         allowOverride: false,
-        releases: true,
-        snapshots: true,
       });
 
       const filename = wheelFilename(layout.packageName, version);
@@ -513,16 +511,14 @@ test.describe('pypi registry rules (raw HTTP)', () => {
   );
 
   test(
-    'a pre-release/dev/post version publishes and is servable regardless of the repo’s ' +
-      'releases/snapshots settings (H23)',
+    'a pre-release/dev/post version publishes and is servable regardless of version kind: ' +
+      'releases/snapshots are not pypi repo settings (the settings PUT refuses them, RPS-1210) (H23)',
     { tag: ['@settings'] },
     async ({ seeder }) => {
       const repo = await seeder.createRepo(RepoType.PYPI, { privateRepo: true });
       await seeder.setSettings(repo.name, {
         privateRepo: true,
         allowOverride: true,
-        releases: false,
-        snapshots: false,
       });
       const admin = adminCredential();
       const name = `e2e-${seeder.runId}-norulesetting`;

@@ -134,8 +134,6 @@ test.describe('cargo registry rules (raw HTTP)', () => {
       await seeder.setSettings(layout.repoName, {
         privateRepo: true,
         allowOverride: false,
-        releases: true,
-        snapshots: true,
       });
 
       const indexBefore = await rawGetIndex(layout.repoName, admin, layout.packageName);
@@ -201,8 +199,6 @@ test.describe('cargo registry rules (raw HTTP)', () => {
       await seeder.setSettings(layout.repoName, {
         privateRepo: true,
         allowOverride: false,
-        releases: true,
-        snapshots: true,
       });
 
       const v2 = cargoAdapter.version('release');

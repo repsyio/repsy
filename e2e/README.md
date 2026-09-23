@@ -1711,8 +1711,8 @@ token still able to read (H5); a non-multipart POST answering 404 `unknownPath` 
 missing the `content` part answering a bodyless 400 (H11); the no-trailing-slash upload URL spelling
 being accepted (H12); invalid archive filenames refused with 400; the 307 redirect to a normalized,
 trailing-slashed project page (H14); `HEAD` mirroring `GET`'s status instead of answering 200
-unconditionally (RPS-1226, fixed); a pre-release/dev/post version publishing fine under
-`releases:false`/`snapshots:false` (H23); and an unknown package/file 404ing. It also pins backend
+unconditionally (RPS-1226, fixed); a pre-release/dev/post version publishing fine
+(H23; `releases`/`snapshots` cannot be switched off on PyPI since RPS-1210); and an unknown package/file 404ing. It also pins backend
 bugs found while reading the server source and confirmed live (see below), most via `test.fail()`.
 
 ### H1-H24, confirmed live
@@ -1785,8 +1785,9 @@ download` in the catalog loop succeeds against pages carrying it.
 - **H22** (negative scenarios in parallel stay under the auth throttle): confirmed — two full
   parallel (12-worker) catalog runs both passed with no 429 observed.
 - **H23** (no releases/snapshots rule): confirmed live — `registry-rules.spec.ts`'s dedicated test:
-  `1.0.0`/`1.0.0a1`/`1.0.0.post1`/`1.0.0.dev0` all publish and serve fine under
-  `releases:false, snapshots:false`.
+  `1.0.0`/`1.0.0a1`/`1.0.0.post1`/`1.0.0.dev0` all publish and serve fine; since RPS-1210
+  `releases`/`snapshots` cannot be switched off on a PyPI repo at all (the settings PUT answers 400
+  `releasesSnapshotsUnsupported`, pinned in `skeleton/repo-settings.spec.ts`).
 - **H24** (the runner image's stdlib import check passes with the derived apt list): confirmed live
   on the FIRST build attempt — see this section's opening paragraph for the exact package list and
   how it was derived (`ldd` against a live container, not a generic runtime-deps list).
@@ -2245,7 +2246,7 @@ adapter code was written.
   includes `/versions`.
 - **H19** (a yanked version cannot be re-pushed even under `allowOverride:true`; a panel-deleted
   version can): confirmed live — `registry-rules.spec.ts`'s yank test and panel-delete test.
-- **H20** (`1.0.0.pre1`/`2.0.0.beta`-style versions publish under `releases:false, snapshots:false`):
+- **H20** (`1.0.0.pre1`/`2.0.0.beta`-style versions publish; `releases`/`snapshots` are refused on a Ruby repo since RPS-1210):
   confirmed live — `registry-rules.spec.ts`'s R15 test; Ruby has no release/snapshot repo-setting
   concept at all (grep-confirmed).
 
