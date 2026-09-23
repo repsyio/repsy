@@ -70,6 +70,19 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   @NonNull List<UUID> lockIdsByRole(@NonNull @Param("role") UserRole role);
 
   /**
+   * Locks the user row for {@code id} until the surrounding transaction ends and reports whether it
+   * is still there (RPS-1152, same idiom as {@link #lockIdsByRole}). Login and refresh-token
+   * issuance take this lock right before the refresh-token row referencing the user is written, so
+   * a user deletion that raced the password or refresh-token check either waits for that
+   * transaction to finish, or has already committed and leaves nothing here to find — the request
+   * then fails with an authentication error instead of racing a foreign-key violation on the
+   * insert.
+   */
+  @Lock(LockModeType.PESSIMISTIC_READ)
+  @Query("select u.id from User u where u.id = :id")
+  @NonNull Optional<UUID> lockUserId(@NonNull @Param("id") UUID id);
+
+  /**
    * Swaps a user's password hash only while it still holds {@code oldHash}, so a password change
    * that committed in the meantime is never overwritten by a re-hash of the old password. Written
    * as a bulk update because a full-row entity save would also write back every stale column.

@@ -80,6 +80,13 @@ public class AuthUserService {
     // Publish login event for lastLoginAt update
     this.eventPublisher.publishEvent(new UserLoginEvent(user.getUsername()));
 
+    // Locks the user row so a deletion racing this request either waits for the refresh token to
+    // be written, or has already committed and is caught here, instead of a foreign-key violation
+    // surfacing from the insert (RPS-1152).
+    if (!this.userTxService.lockUserExists(user.getId())) {
+      throw new UnAuthorizedException(INVALID_CREDENTIALS);
+    }
+
     return this.loginInfoFactory.create(user, Instant.now().truncatedTo(ChronoUnit.SECONDS));
   }
 
@@ -97,6 +104,13 @@ public class AuthUserService {
 
     // The tokens' own expiry is capped at the session end; this guards it independently.
     if (!Instant.now().isBefore(claims.sessionStart().plus(AuthUtils.TIMEOUT_SESSION))) {
+      throw new UnAuthorizedException(REFRESH_TOKEN_EXPIRED);
+    }
+
+    // Locks the user row so a deletion racing this request either waits for the refresh token to
+    // be written, or has already committed and is caught here, instead of a foreign-key violation
+    // surfacing from the insert (RPS-1152).
+    if (!this.userTxService.lockUserExists(user.getId())) {
       throw new UnAuthorizedException(REFRESH_TOKEN_EXPIRED);
     }
 
