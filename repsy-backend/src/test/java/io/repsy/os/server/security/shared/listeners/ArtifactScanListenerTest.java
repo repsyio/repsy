@@ -160,6 +160,46 @@ class ArtifactScanListenerTest {
   }
 
   @Test
+  @DisplayName(
+      "logs at INFO and skips recordScanFailure when the scan row is gone because the repo was"
+          + " deleted mid-scan")
+  void skipsFailureRecordingWhenScanRowIsGone() {
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(false);
+    doThrow(new ItemNotFoundException("vulnerabilityScanNotFound")).when(this.scanner).scan(any());
+
+    assertThatCode(() -> this.listener.handleArtifactPushed(this.dockerEvent()))
+        .doesNotThrowAnyException();
+
+    verify(this.scanTxService, never()).recordScanFailure(any(), any());
+    assertThat(this.logAppender.list)
+        .noneMatch(logEvent -> logEvent.getLevel().isGreaterOrEqual(Level.WARN))
+        .anyMatch(
+            logEvent ->
+                logEvent.getLevel() == Level.INFO
+                    && logEvent.getFormattedMessage().contains("scan row no longer exists"));
+  }
+
+  @Test
+  @DisplayName(
+      "still records a failure and logs at ERROR for any other ItemNotFoundException from the"
+          + " scanner")
+  void recordsFailureForOtherItemNotFoundExceptions() {
+    this.givenDockerScanIsQueued();
+    this.givenDockerRepo(false);
+    doThrow(new ItemNotFoundException("artifactNotFound")).when(this.scanner).scan(any());
+
+    this.listener.handleArtifactPushed(this.dockerEvent());
+
+    verify(this.scanTxService).recordScanFailure(SCAN_ID, "artifactNotFound");
+    assertThat(this.logAppender.list)
+        .anyMatch(
+            logEvent ->
+                logEvent.getLevel() == Level.ERROR
+                    && logEvent.getFormattedMessage().contains("Vulnerability scan failed"));
+  }
+
+  @Test
   @DisplayName("scans a public Docker repo without a registry token")
   void scansPublicDockerRepoWithoutToken() {
     this.givenDockerScanIsQueued();
