@@ -17,13 +17,10 @@ package io.repsy.protocols.maven.shared.artifact.services.contracts;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
-import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
-import java.io.IOException;
-import org.apache.commons.lang3.tuple.MutablePair;
-import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
 @NullMarked
@@ -38,8 +35,7 @@ public interface ArtifactService<ID> {
    * @throws BadRequestException {@code invalidArtifactPath} when the path is not a Maven 2 artifact
    *     path (metadata is not judged here)
    */
-  MutablePair<ArtifactDeployType, ArtifactVersionType> getDeployAndVersionType(
-      BaseRepoInfo<ID> repoInfo, StoragePath storagePath);
+  ArtifactVersionType getVersionType(BaseRepoInfo<ID> repoInfo, StoragePath storagePath);
 
   /**
    * Classifies an upload of a {@code maven-metadata.xml}, of one of its checksums or of its {@code
@@ -47,13 +43,18 @@ public interface ArtifactService<ID> {
    * is judged by its directory: a file of a {@code SNAPSHOT} version directory is a snapshot, any
    * other level is not judged (RPS-1183, RPS-1185).
    */
-  MutablePair<ArtifactDeployType, ArtifactVersionType> getDeployAndVersionTypesByMetadataTypeFiles(
-      BaseRepoInfo<ID> repoInfo, byte[] content, StoragePath storagePath)
-      throws IOException, XmlPullParserException;
+  @Nullable ArtifactVersionType getVersionTypeByMetadataTypeFiles(
+      BaseRepoInfo<ID> repoInfo, byte[] content, StoragePath storagePath);
 
+  /**
+   * Refuses an upload that the repo settings do not allow.
+   *
+   * @param versionType what the classification above returned; {@code null} for a file that carries
+   *     no version type, which the {@code releases} and {@code snapshots} rule does not judge
+   */
   void checkDeploymentRules(
       BaseRepoInfo<ID> repoInfo,
-      MutablePair<ArtifactDeployType, ArtifactVersionType> artifactPair,
+      @Nullable ArtifactVersionType versionType,
       StoragePath storagePath);
 
   void createOrUpdateArtifact(

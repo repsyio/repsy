@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Arrays;
-import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
@@ -54,10 +53,25 @@ public class ArtifactUtils {
   private static final String SNAPSHOT_SUFFIX = "SNAPSHOT";
   private static final String SNAPSHOT_MARKER = "(SNAPSHOT|\\d{8}\\.\\d{6}-\\d+)[.-]";
 
-  public static boolean containsIgnoreCase(final String str, final String subString) {
+  /**
+   * Tells whether a file is the {@code jar} of the given classifier, for example {@code sources} or
+   * {@code javadoc}. The file is parsed like any other Maven path, so only the classifier of its
+   * own GAV counts: an artifactId such as {@code foo-sources}, a checksum and a signature of the
+   * jar (which are not the jar) and a file that is not in the Maven layout are all {@code false}
+   * (RPS-1198). The classifier is compared exactly, like Maven Resolver does.
+   *
+   * @param relativePath the path of the file inside the repo, {@code
+   *     <group>/<artifactId>/<version>/<file>}
+   */
+  public static boolean isClassifierJar(final String relativePath, final String classifier) {
 
-    return str.toLowerCase(Locale.getDefault())
-        .contains(subString.toLowerCase(Locale.getDefault()));
+    final var gav = convertPathToGav(relativePath);
+
+    return gav != null
+        && !gav.isHash()
+        && !gav.isSignature()
+        && classifier.equals(gav.getClassifier())
+        && "jar".equals(gav.getExtension());
   }
 
   /**
@@ -185,9 +199,12 @@ public class ArtifactUtils {
     return org.apache.maven.artifact.ArtifactUtils.isSnapshot(versionName);
   }
 
-  @Nullable
-  public static Metadata readMetadata(final byte[] content)
-      throws IOException, XmlPullParserException {
+  /**
+   * Parses a {@code maven-metadata.xml}. Never returns {@code null}: content that cannot be parsed
+   * is refused with the unchecked {@link BadRequestException} {@code malformedMetadataFile}, so a
+   * caller that wants a fallback instead has to catch that exception (RPS-1180).
+   */
+  public static Metadata readMetadata(final byte[] content) {
 
     final var reader = new MetadataXpp3Reader();
 
@@ -369,9 +386,9 @@ public class ArtifactUtils {
    * Metadata.getPlugins()} never returns {@code null}: it creates an empty list on first access, so
    * the presence of at least one plugin is what makes the file plugin metadata.
    */
-  public static boolean isPluginMetadata(final @Nullable Metadata metadata) {
+  public static boolean isPluginMetadata(final Metadata metadata) {
 
-    return metadata != null && !metadata.getPlugins().isEmpty();
+    return !metadata.getPlugins().isEmpty();
   }
 
   /**
@@ -380,9 +397,9 @@ public class ArtifactUtils {
    * {@code <version>} element; the artifact-level file lists every version and the group-level file
    * lists plugins, and neither has one.
    */
-  public static boolean isVersionLevelMetadata(final @Nullable Metadata metadata) {
+  public static boolean isVersionLevelMetadata(final Metadata metadata) {
 
-    return metadata != null && metadata.getVersion() != null && !metadata.getVersion().isBlank();
+    return metadata.getVersion() != null && !metadata.getVersion().isBlank();
   }
 
   /**

@@ -20,7 +20,6 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.protocol.facades.contracts.MavenProtocolFacade;
-import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
@@ -35,7 +34,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Model;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
@@ -70,16 +68,16 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
   /**
    * Stores a file and registers it. A path outside the Maven layout is refused inside {@code
-   * getDeployAndVersionType}, before {@code checkDeploymentRules} and {@code store}, so nothing is
-   * written and the {@code usages} context property is never set (the usage post-processor reads it
-   * only when present). A POM is parsed, and refused if its groupId is not the one of its path,
-   * before it is stored. A POM signature ({@code .pom.asc}) is verified against the stored POM
-   * before it is stored, so a refused one never reaches the repo and takes nothing else with it: an
-   * existing version, its previous signature and its {@code signed} flag are left as they were. A
-   * checksum is judged by the file it belongs to, so it is refused, and nothing is stored, when
-   * that file would be (RPS-1183). A metadata signature ({@code maven-metadata.xml.asc}) is stored
-   * unparsed and unverified, judged like a metadata checksum (RPS-1185). A POM, its signature and
-   * its checksum are told by the file name, never by the directory (RPS-1196).
+   * getVersionType}, before {@code checkDeploymentRules} and {@code store}, so nothing is written
+   * and the {@code usages} context property is never set (the usage post-processor reads it only
+   * when present). A POM is parsed, and refused if its groupId is not the one of its path, before
+   * it is stored. A POM signature ({@code .pom.asc}) is verified against the stored POM before it
+   * is stored, so a refused one never reaches the repo and takes nothing else with it: an existing
+   * version, its previous signature and its {@code signed} flag are left as they were. A checksum
+   * is judged by the file it belongs to, so it is refused, and nothing is stored, when that file
+   * would be (RPS-1183). A metadata signature ({@code maven-metadata.xml.asc}) is stored unparsed
+   * and unverified, judged like a metadata checksum (RPS-1185). A POM, its signature and its
+   * checksum are told by the file name, never by the directory (RPS-1196).
    *
    * <p>A metadata-family file and a POM signature are read fully into memory, and a POM is spooled
    * to a temporary file, before anything about them is parsed or stored; each is capped by {@link
@@ -98,18 +96,17 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     byte[] content = null;
 
     final var fileName = storagePath.getRelativePath().getFileName();
-    final MutablePair<ArtifactDeployType, ArtifactVersionType> artifactPair;
+    final @Nullable ArtifactVersionType versionType;
 
     if (ArtifactUtils.isFileSuitableForGavExtraction(fileName)) {
-      artifactPair = this.artifactService.getDeployAndVersionType(repoInfo, storagePath);
+      versionType = this.artifactService.getVersionType(repoInfo, storagePath);
     } else {
       content = readBoundedMetadata(inputStream, contentLength);
-      artifactPair =
-          this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
-              repoInfo, content, storagePath);
+      versionType =
+          this.artifactService.getVersionTypeByMetadataTypeFiles(repoInfo, content, storagePath);
     }
 
-    this.artifactService.checkDeploymentRules(repoInfo, artifactPair, storagePath);
+    this.artifactService.checkDeploymentRules(repoInfo, versionType, storagePath);
 
     if (content == null && ArtifactUtils.isPomSignature(storagePath)) {
       // A signature is well below 1 KB, and it is read once here to be verified and then stored.

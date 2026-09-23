@@ -35,7 +35,6 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StoragePath;
-import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
@@ -48,7 +47,6 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import org.apache.commons.lang3.tuple.MutablePair;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -148,8 +146,7 @@ class AbstractMavenProtocolFacadeTest {
   }
 
   private void deployIsAllowed() {
-    when(this.artifactService.getDeployAndVersionType(any(), any()))
-        .thenReturn(new MutablePair<>(ArtifactDeployType.NEW, ArtifactVersionType.RELEASE));
+    when(this.artifactService.getVersionType(any(), any())).thenReturn(ArtifactVersionType.RELEASE);
   }
 
   private void upload(final String body) throws Exception {
@@ -232,7 +229,7 @@ class AbstractMavenProtocolFacadeTest {
     final var order = inOrder(this.storageService, this.artifactService);
     order
         .verify(this.artifactService)
-        .checkDeploymentRules(any(), any(MutablePair.class), any(StoragePath.class));
+        .checkDeploymentRules(any(), any(ArtifactVersionType.class), any(StoragePath.class));
     order
         .verify(this.storageService)
         .writeInputStreamToPath(any(StoragePath.class), any(), anyString());
@@ -294,7 +291,7 @@ class AbstractMavenProtocolFacadeTest {
     final var order = inOrder(this.storageService, this.artifactService);
     order
         .verify(this.artifactService)
-        .checkDeploymentRules(any(), any(MutablePair.class), any(StoragePath.class));
+        .checkDeploymentRules(any(), any(ArtifactVersionType.class), any(StoragePath.class));
     order
         .verify(this.artifactService)
         .verifySignature(any(), any(StoragePath.class), verified.capture());
@@ -466,7 +463,7 @@ class AbstractMavenProtocolFacadeTest {
   @DisplayName("refuses a path outside the artifact layout before checking rules or storing it")
   void refusesANonArtifactPathBeforeStoringIt() {
     requestFor("io/stray.txt");
-    when(this.artifactService.getDeployAndVersionType(any(), any()))
+    when(this.artifactService.getVersionType(any(), any()))
         .thenThrow(new BadRequestException("invalidArtifactPath"));
 
     assertThatThrownBy(() -> upload("hello"))
@@ -485,9 +482,9 @@ class AbstractMavenProtocolFacadeTest {
     final var path = "com/example/lib/maven-metadata.xml";
     final var metadata = "<metadata/>";
     requestFor(path);
-    when(this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
+    when(this.artifactService.getVersionTypeByMetadataTypeFiles(
             any(), any(byte[].class), any(StoragePath.class)))
-        .thenReturn(new MutablePair<>(ArtifactDeployType.NEW, ArtifactVersionType.RELEASE));
+        .thenReturn(ArtifactVersionType.RELEASE);
     storageReportsUsage(metadata.length());
     when(this.storageService.getResource(anyString(), any(StoragePath.class)))
         .thenReturn(new ByteArrayResource(metadata.getBytes(UTF_8)));
@@ -504,9 +501,9 @@ class AbstractMavenProtocolFacadeTest {
     final var path = "com/example/lib/1.0-SNAPSHOT/maven-metadata.xml.sha1";
     final var hash = "da39a3ee5e6b4b0d3255bfef95601890afd80709";
     requestFor(path);
-    when(this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
+    when(this.artifactService.getVersionTypeByMetadataTypeFiles(
             any(), any(byte[].class), any(StoragePath.class)))
-        .thenReturn(new MutablePair<>(null, ArtifactVersionType.SNAPSHOT));
+        .thenReturn(ArtifactVersionType.SNAPSHOT);
     storageReportsUsage(hash.length());
     when(this.storageService.getResource(anyString(), any(StoragePath.class)))
         .thenReturn(new ByteArrayResource(hash.getBytes(UTF_8)));
@@ -515,10 +512,9 @@ class AbstractMavenProtocolFacadeTest {
 
     final var storagePath = ArgumentCaptor.forClass(StoragePath.class);
     verify(this.artifactService)
-        .getDeployAndVersionTypesByMetadataTypeFiles(
-            any(), eq(hash.getBytes(UTF_8)), storagePath.capture());
+        .getVersionTypeByMetadataTypeFiles(any(), eq(hash.getBytes(UTF_8)), storagePath.capture());
     assertThat(storagePath.getValue().getRelativePath().getPath()).isEqualTo(path);
-    verify(this.artifactService, never()).getDeployAndVersionType(any(), any());
+    verify(this.artifactService, never()).getVersionType(any(), any());
     assertThat(this.stored).singleElement().isEqualTo(hash.getBytes(UTF_8));
   }
 
@@ -547,9 +543,9 @@ class AbstractMavenProtocolFacadeTest {
       throws Exception {
     final var path = "com/example/lib/1.0-SNAPSHOT/maven-metadata.xml.asc";
     requestFor(path);
-    when(this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
+    when(this.artifactService.getVersionTypeByMetadataTypeFiles(
             any(), any(byte[].class), any(StoragePath.class)))
-        .thenReturn(new MutablePair<>(null, ArtifactVersionType.SNAPSHOT));
+        .thenReturn(ArtifactVersionType.SNAPSHOT);
     storageReportsUsage(ARMORED_SIGNATURE.length());
     when(this.storageService.getResource(anyString(), any(StoragePath.class)))
         .thenReturn(new ByteArrayResource(ARMORED_SIGNATURE.getBytes(UTF_8)));
@@ -558,10 +554,10 @@ class AbstractMavenProtocolFacadeTest {
 
     final var storagePath = ArgumentCaptor.forClass(StoragePath.class);
     verify(this.artifactService)
-        .getDeployAndVersionTypesByMetadataTypeFiles(
+        .getVersionTypeByMetadataTypeFiles(
             any(), eq(ARMORED_SIGNATURE.getBytes(UTF_8)), storagePath.capture());
     assertThat(storagePath.getValue().getRelativePath().getPath()).isEqualTo(path);
-    verify(this.artifactService, never()).getDeployAndVersionType(any(), any());
+    verify(this.artifactService, never()).getVersionType(any(), any());
     verify(this.artifactService, never()).verifySignature(any(), any(), any());
     assertThat(this.stored).singleElement().isEqualTo(ARMORED_SIGNATURE.getBytes(UTF_8));
   }
@@ -570,9 +566,9 @@ class AbstractMavenProtocolFacadeTest {
   @DisplayName("stores nothing and reports no usage for a metadata signature whose kind is refused")
   void storesNothingForAMetadataSignatureWhoseKindIsRefused() throws Exception {
     requestFor("com/example/lib/1.0-SNAPSHOT/maven-metadata.xml.asc");
-    when(this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
+    when(this.artifactService.getVersionTypeByMetadataTypeFiles(
             any(), any(byte[].class), any(StoragePath.class)))
-        .thenReturn(new MutablePair<>(null, ArtifactVersionType.SNAPSHOT));
+        .thenReturn(ArtifactVersionType.SNAPSHOT);
     doThrow(new AccessNotAllowedException("snapshotVersionsAreProhibited"))
         .when(this.artifactService)
         .checkDeploymentRules(any(), any(), any());
@@ -631,9 +627,9 @@ class AbstractMavenProtocolFacadeTest {
     final var path = "com/example/lib/maven-metadata.xml";
     final var body = filler(MavenUploadLimits.MAX_METADATA_BYTES);
     requestFor(path);
-    when(this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
+    when(this.artifactService.getVersionTypeByMetadataTypeFiles(
             any(), any(byte[].class), any(StoragePath.class)))
-        .thenReturn(new MutablePair<>(ArtifactDeployType.NEW, ArtifactVersionType.RELEASE));
+        .thenReturn(ArtifactVersionType.RELEASE);
     storageReportsUsage(body.length());
     when(this.storageService.getResource(anyString(), any(StoragePath.class)))
         .thenReturn(new ByteArrayResource(body.getBytes(UTF_8)));
@@ -656,8 +652,7 @@ class AbstractMavenProtocolFacadeTest {
         .hasMessage("mavenMetadataTooLarge");
 
     verifyNoInteractions(this.storageService);
-    verify(this.artifactService, never())
-        .getDeployAndVersionTypesByMetadataTypeFiles(any(), any(), any());
+    verify(this.artifactService, never()).getVersionTypeByMetadataTypeFiles(any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
   }
 

@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.security.shared.resolvers;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
@@ -33,7 +34,6 @@ import org.apache.maven.artifact.repository.metadata.SnapshotVersion;
 import org.apache.maven.artifact.repository.metadata.Versioning;
 import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.index.artifact.M2GavCalculator;
-import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -156,7 +156,10 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
   private static @Nullable Metadata readMetadataQuietly(final @NonNull Resource resource) {
     try (final var inputStream = resource.getInputStream()) {
       return ArtifactUtils.readMetadata(inputStream.readAllBytes());
-    } catch (final IOException | XmlPullParserException exception) {
+    } catch (final IOException | BadRequestException exception) {
+      // readMetadata refuses unparsable content with the unchecked BadRequestException
+      // (malformedMetadataFile), which is not an IOException: it has to be caught here too, or a
+      // corrupt stored file answers the download with a 400 instead of the fallback (RPS-1180).
       log.warn("Failed to read snapshot metadata at {}: {}", resource, exception.getMessage());
       return null;
     }
