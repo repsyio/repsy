@@ -1,5 +1,6 @@
-<div class="relative">
+<div data-testid="sort-selector" class="relative">
   <button
+    data-testid="sort-selector-toggle"
     (click)="toggleDropdown($event)"
     type="button"
     class="flex h-[40px] w-full min-w-[113px] items-center justify-between gap-2 rounded-lg border border-[#404141] bg-[#101112] px-4 text-[14px] text-white hover:border-white"
@@ -25,6 +26,7 @@
   </button>
   @if (isOpen) {
     <div
+      data-testid="sort-selector-menu"
       [appOutSideClick]="isOpen"
       (outSideClick)="isOpen = false"
       class="absolute top-[44px] right-0 z-1 w-full rounded-lg border border-[#404141] bg-[#101112]"
@@ -32,6 +34,7 @@
     >
       @for (option of options; track option.name; let i = $index) {
         <button
+          [attr.data-testid]="'sort-option-' + option.name"
           type="button"
           [ngClass]="{ 'rounded-t-lg': i === 0, 'rounded-b-lg': i === options.length - 1 }"
           class="flex w-full items-center rounded-t-lg px-4 py-2 text-[14px] text-white hover:bg-[#2D2C2C]"

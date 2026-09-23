@@ -1,3 +1,5 @@
 @if (note) {
-  <span class="text-[12px]" [class.text-error-400]="failed" [class.text-info-400]="!failed">{{ note }}</span>
+  <span data-testid="rescan-note" class="text-[12px]" [class.text-error-400]="failed" [class.text-info-400]="!failed">{{
+    note
+  }}</span>
 }
