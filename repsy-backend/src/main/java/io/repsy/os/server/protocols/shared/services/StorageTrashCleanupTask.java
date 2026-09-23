@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.shared.services;
 
+import io.repsy.libs.storage.core.dtos.TrashCleanupResult;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -73,10 +74,30 @@ public class StorageTrashCleanupTask {
     this.storageStrategiesByRepoType.forEach(
         (repoType, strategy) -> {
           try {
-            strategy.clearTrash();
+            final var unused =
+                strategy
+                    .clearTrash()
+                    .whenComplete((result, error) -> this.report(repoType, result, error));
           } catch (final RuntimeException e) {
             log.warn("could not trigger the trash cleanup of {} storage", repoType, e);
           }
         });
+  }
+
+  private void report(
+      final @NonNull String repoType,
+      final @NonNull TrashCleanupResult result,
+      final Throwable error) {
+    if (error != null) {
+      log.warn("trash cleanup of {} storage failed", repoType, error);
+      return;
+    }
+
+    log.info(
+        "cleared {} storage trash: {} directories, {} files, {} bytes freed",
+        repoType,
+        result.directoriesDeleted(),
+        result.filesDeleted(),
+        result.bytesFreed());
   }
 }

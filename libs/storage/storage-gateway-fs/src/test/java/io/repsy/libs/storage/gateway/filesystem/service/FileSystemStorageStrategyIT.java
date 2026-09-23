@@ -22,6 +22,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
+import io.repsy.libs.storage.core.dtos.TrashCleanupResult;
 import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import io.repsy.libs.storage.core.exceptions.IsADirectoryException;
 import java.io.ByteArrayInputStream;
@@ -468,17 +469,17 @@ class FileSystemStorageStrategyIT {
   }
 
   @Nested
-  @DisplayName("deleteDirectory() / delete()")
-  class DeleteDirectory {
+  @DisplayName("delete()")
+  class Delete {
 
     @Test
-    @DisplayName("moves the target into trashPath")
-    void moveTargetToTrashWhenDeletingDirectory() throws Exception {
+    @DisplayName("moves a single file into trashPath")
+    void moveFileToTrashWhenDeletingFile() throws Exception {
       final var key = UUID.randomUUID();
       FileSystemStorageStrategyIT.this.seedFile(key + "/file.txt", "data");
       final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "file.txt");
 
-      FileSystemStorageStrategyIT.this.strategy.deleteDirectory(sp);
+      FileSystemStorageStrategyIT.this.strategy.delete(sp);
 
       // original file no longer exists at basePath
       assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/file.txt"))
@@ -495,15 +496,27 @@ class FileSystemStorageStrategyIT {
     }
 
     @Test
-    @DisplayName("delete() delegates to deleteDirectory() when given a file path")
-    void delegateToDeleteDirectoryWhenDeleteIsCalled() throws Exception {
+    @DisplayName("moves a whole directory into trashPath, keeping its contents")
+    void moveDirectoryToTrashWhenDeletingDirectory() throws Exception {
       final var key = UUID.randomUUID();
-      FileSystemStorageStrategyIT.this.seedFile(key + "/x.txt", "x");
-      final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "x.txt");
+      FileSystemStorageStrategyIT.this.seedFile(key + "/sub/a.txt", "a");
+      FileSystemStorageStrategyIT.this.seedFile(key + "/sub/b.txt", "b");
+      final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "sub");
 
       FileSystemStorageStrategyIT.this.strategy.delete(sp);
 
-      assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/x.txt")).doesNotExist();
+      assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/sub")).doesNotExist();
+      try (var stream = Files.walk(trashPath)) {
+        var trashEntries =
+            stream
+                .filter(
+                    p ->
+                        p.getFileName().toString().equals("a.txt")
+                            || p.getFileName().toString().equals("b.txt"))
+                .toList();
+
+        assertThat(trashEntries).hasSize(2);
+      }
     }
   }
 
@@ -626,8 +639,10 @@ class FileSystemStorageStrategyIT {
     @DisplayName("does nothing when trash directory does not exist")
     void doNothingWhenTrashDirectoryDoesNotExist() {
       // trashPath was never created — should not throw
-      strategy.clearTrash();
+      final var result = strategy.clearTrash().join();
+
       assertThat(trashPath).doesNotExist();
+      assertThat(result).isEqualTo(TrashCleanupResult.EMPTY);
     }
 
     @Test
@@ -649,10 +664,14 @@ class FileSystemStorageStrategyIT {
       Files.createDirectories(oldDir);
       Files.createDirectories(newDir);
 
-      localStrategy.clearTrash();
+      final var result = localStrategy.clearTrash().join();
 
       assertThat(oldDir).doesNotExist();
       assertThat(newDir).exists();
+      // one date directory removed, no files in it, so no bytes freed
+      assertThat(result.directoriesDeleted()).isEqualTo(1);
+      assertThat(result.filesDeleted()).isZero();
+      assertThat(result.bytesFreed()).isZero();
     }
 
     @Test
@@ -670,8 +689,8 @@ class FileSystemStorageStrategyIT {
               FileSystemStorageStrategyIT.this.trashPath.resolve(
                   LocalDate.now(ZoneId.systemDefault()).minusDays(2).toString()));
 
-      localStrategy.deleteDirectory(FileSystemStorageStrategyIT.this.storagePath(key, "file.txt"));
-      localStrategy.clearTrash();
+      localStrategy.delete(FileSystemStorageStrategyIT.this.storagePath(key, "file.txt"));
+      localStrategy.clearTrash().join();
 
       assertThat(oldDir).doesNotExist();
       try (var stream = Files.walk(FileSystemStorageStrategyIT.this.trashPath)) {
@@ -693,10 +712,11 @@ class FileSystemStorageStrategyIT {
                   LocalDate.now(ZoneId.systemDefault()).minusDays(30).toString()));
 
       // the shared strategy keeps seven days
-      FileSystemStorageStrategyIT.this.strategy.clearTrash();
+      final var result = FileSystemStorageStrategyIT.this.strategy.clearTrash().join();
 
       assertThat(insideRetention).exists();
       assertThat(outsideRetention).doesNotExist();
+      assertThat(result.directoriesDeleted()).isEqualTo(1);
     }
 
     @Test
@@ -709,7 +729,7 @@ class FileSystemStorageStrategyIT {
               FileSystemStorageStrategyIT.this.trashPath.resolve(
                   LocalDate.now(ZoneId.systemDefault()).minusDays(30).toString()));
 
-      FileSystemStorageStrategyIT.this.strategy.clearTrash();
+      FileSystemStorageStrategyIT.this.strategy.clearTrash().join();
 
       assertThat(stray).exists();
       assertThat(old).doesNotExist();
@@ -728,9 +748,32 @@ class FileSystemStorageStrategyIT {
               LocalDate.now(ZoneId.systemDefault()).minusDays(1).toString());
       Files.createDirectories(yesterdayDir);
 
-      localStrategy.clearTrash();
+      localStrategy.clearTrash().join();
 
       assertThat(yesterdayDir).doesNotExist();
+    }
+
+    @Test
+    @DisplayName("counts the files and bytes it actually removed from an old date directory")
+    void countsFilesAndBytesFreedFromRemovedDirectory() throws Exception {
+      final var localStrategy =
+          new FileSystemStorageStrategy(
+              FileSystemStorageStrategyIT.this.basePath.toString(),
+              FileSystemStorageStrategyIT.this.trashPath.toString(),
+              Duration.ofDays(1));
+      final var oldDate = LocalDate.now(ZoneId.systemDefault()).minusDays(2).toString();
+      final var oldDir = FileSystemStorageStrategyIT.this.trashPath.resolve(oldDate);
+      Files.createDirectories(oldDir.resolve("nested"));
+      Files.writeString(oldDir.resolve("a.txt"), "12345"); // 5 bytes
+      Files.writeString(oldDir.resolve("nested/b.txt"), "1234567"); // 7 bytes
+
+      final var result = localStrategy.clearTrash().join();
+
+      // the date directory itself + the nested subdirectory
+      assertThat(result.directoriesDeleted()).isEqualTo(2);
+      assertThat(result.filesDeleted()).isEqualTo(2);
+      assertThat(result.bytesFreed()).isEqualTo(12L);
+      assertThat(oldDir).doesNotExist();
     }
   }
 

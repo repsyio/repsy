@@ -54,7 +54,7 @@ public abstract class AbstractDockerStorageService<ID> implements DockerStorageS
   @Override
   public void deleteRepo(final UUID repoUuid) {
     final var storagePath = StoragePath.of(repoUuid);
-    this.storageStrategy.deleteDirectory(storagePath);
+    this.storageStrategy.delete(storagePath);
   }
 
   @Override
@@ -173,6 +173,6 @@ public abstract class AbstractDockerStorageService<ID> implements DockerStorageS
   @Override
   public void clearTrash() {
 
-    this.storageStrategy.clearTrash();
+    final var unused = this.storageStrategy.clearTrash();
   }
 }

@@ -87,7 +87,7 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
 
   @Override
   public void deleteDirectory(final StoragePath storagePath) {
-    this.storageStrategy.deleteDirectory(storagePath);
+    this.storageStrategy.delete(storagePath);
   }
 
   @Override
@@ -140,6 +140,6 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
   @Override
   public void deleteRepo(final UUID repoUuid) {
     final var storagePath = StoragePath.of(repoUuid);
-    this.storageStrategy.deleteDirectory(storagePath);
+    this.storageStrategy.delete(storagePath);
   }
 }

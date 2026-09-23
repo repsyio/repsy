@@ -67,7 +67,7 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
 
     final var usage = this.storageStrategy.calculatePathUsage(storagePath);
 
-    this.storageStrategy.deleteDirectory(storagePath);
+    this.storageStrategy.delete(storagePath);
 
     return usage;
   }
@@ -223,7 +223,7 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
   @Override
   public void deleteRepo(final UUID repoUuid) {
     final var storagePath = StoragePath.of(repoUuid);
-    this.storageStrategy.deleteDirectory(storagePath);
+    this.storageStrategy.delete(storagePath);
   }
 
   @Override
@@ -235,7 +235,7 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
   @Override
   public void clearTrash() {
 
-    this.storageStrategy.clearTrash();
+    final var unused = this.storageStrategy.clearTrash();
   }
 
   @Override

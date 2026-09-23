@@ -113,7 +113,7 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
       final var crateUsage = this.storageStrategy.calculatePathUsage(crateStoragePath);
       final var indexUsage = this.storageStrategy.getFileUsage(indexStoragePath, repoName);
 
-      this.storageStrategy.deleteDirectory(crateStoragePath);
+      this.storageStrategy.delete(crateStoragePath);
       this.storageStrategy.delete(indexStoragePath);
 
       return crateUsage + indexUsage;
@@ -163,7 +163,7 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
   @Override
   public void deleteRepo(final UUID repoUuid) {
     final var storagePath = StoragePath.of(repoUuid);
-    this.storageStrategy.deleteDirectory(storagePath);
+    this.storageStrategy.delete(storagePath);
   }
 
   private Path getIndexPath(final String name) {
