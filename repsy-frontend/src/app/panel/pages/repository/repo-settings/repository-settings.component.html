@@ -2,8 +2,8 @@
   <app-spinner />
 } @else {
   @if (repositorySettings || mavenRepositorySettings) {
-    <div class="space-y-[24px]" animate.enter="fade-in-down">
-      <h2 class="text-[14px] text-[#9FA0A0]">Repository Settings</h2>
+    <div data-testid="settings-page" class="space-y-[24px]" animate.enter="fade-in-down">
+      <h2 data-testid="settings-title" class="text-[14px] text-[#9FA0A0]">Repository Settings</h2>
 
       <div>
         <app-visibility
@@ -57,7 +57,7 @@
       <div><app-delete-repo [repoType]="repoType" [activeRepository]="activeRepository" /></div>
     </div>
   } @else {
-    <div animate.enter="fade-in-up" class="p-8 text-center">
+    <div data-testid="settings-not-found" animate.enter="fade-in-up" class="p-8 text-center">
       <img
         class="mx-auto mb-[70px]"
         ngSrc="/assets/images/hippo-empty.svg"

@@ -1,4 +1,4 @@
-<section id="version-allowence" class="mt-[-100px] pt-[100px]">
+<section data-testid="settings-allowance" id="version-allowence" class="mt-[-100px] pt-[100px]">
   <h3 class="w-full rounded-t-[12px] border border-[#404141] bg-[#101112] p-[24px] font-medium text-[#FDFDFD]">
     <a [routerLink]="[]" fragment="version-allowence"> Version Allowance </a>
   </h3>
@@ -6,6 +6,7 @@
     class="flex flex-col gap-4 rounded-b-[12px] border-r border-b border-l border-[#404141] bg-[#101112] p-[24px] sm:flex-row sm:gap-10"
   >
     <app-selector
+      data-testid="settings-allowance-selector"
       class="min-w-[150px]"
       [(selectedOption)]="selectedOption"
       [options]="repoOptions"
@@ -13,7 +14,7 @@
     />
 
     <div class="flex h-full flex-col justify-end text-[13px]">
-      <p class="text-[#9FA0A0]">
+      <p data-testid="settings-allowance-hint" class="text-[#9FA0A0]">
         @if (selectedOption === 'snapshots') {
           This repository supports only deploy of &nbsp;<span class="font-bold text-white">"Snapshot"</span> package
           type

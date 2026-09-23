@@ -4,6 +4,7 @@
 >
   @if (isAdmin) {
     <button
+      data-testid="dashboard-create-repo"
       (click)="openCreateRepo()"
       class="repsy-btn-confirm flex h-[40px] w-auto items-center gap-2 px-4 text-[14px] font-bold transition-all"
     >
@@ -16,7 +17,7 @@
 </div>
 
 <!-- Cards Grid -->
-<div animate.enter="fade-in-down" class="space-y-[16px]">
+<div data-testid="dashboard-cards" animate.enter="fade-in-down" class="space-y-[16px]">
   <!-- Welcome Card + (Total Disk Usage & Security Overview stacked) & Repository Card -->
   <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
     <!-- Welcome Card -->

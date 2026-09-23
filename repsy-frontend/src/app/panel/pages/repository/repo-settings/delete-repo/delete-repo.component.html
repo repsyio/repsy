@@ -1,4 +1,4 @@
-<section id="delete-repository" class="mt-[-100px] pt-[100px]">
+<section data-testid="settings-delete-repo" id="delete-repository" class="mt-[-100px] pt-[100px]">
   <h3
     class="w-full rounded-t-[12px] border border-[#e8546a] border-b-[#404141] bg-[#101112] p-[24px] font-medium text-[#FDFDFD]"
   >
@@ -8,6 +8,13 @@
     <p class="mb-[24px] text-[14px] text-[#FDFDFD]">
       This action irreversible and will delete repository and all artifacts contained by the repository.
     </p>
-    <button class="repsy-btn-danger w-full sm:w-auto" (click)="deleteRepo()" [disabled]="loading">Delete</button>
+    <button
+      data-testid="settings-delete-repo-submit"
+      class="repsy-btn-danger w-full sm:w-auto"
+      (click)="deleteRepo()"
+      [disabled]="loading"
+    >
+      Delete
+    </button>
   </div>
 </section>

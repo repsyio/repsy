@@ -1,16 +1,22 @@
 <section class="space-y-[24px]">
   <!-- Header -->
   <div [ngClass]="{ 'pointer-events-none opacity-50 select-none': operationLock }" class="flex flex-col gap-4">
-    <h2 class="text-[14px] text-[#9FA0A0]">User Management</h2>
+    <h2 data-testid="user-title" class="text-[14px] text-[#9FA0A0]">User Management</h2>
 
     <!-- Search, Refresh and Create Button -->
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex items-center gap-3">
         <!-- Search Bar -->
-        <app-searchbox placeholder="Search username" (filter)="search($event)" class="w-full sm:max-w-[320px]" />
+        <app-searchbox
+          data-testid="user-search"
+          placeholder="Search username"
+          (filter)="search($event)"
+          class="w-full sm:max-w-[320px]"
+        />
 
         <!-- Refresh Button -->
         <button
+          data-testid="user-refresh"
           (click)="refreshPage()"
           class="hover:text-secondary-500 flex h-[40px] w-[40px] flex-shrink-0 items-center justify-center text-neutral-200"
           title="Refresh"
@@ -34,6 +40,7 @@
 
       <!-- Create Button -->
       <button
+        data-testid="user-create"
         (click)="createUser()"
         class="repsy-btn-confirm flex h-[44px] w-full items-center justify-center gap-2 px-6 text-[15px] font-bold transition-all sm:w-auto"
       >
@@ -62,26 +69,37 @@
 
       <!-- User Table (Desktop) -->
       <div
+        data-testid="user-table"
         animate.enter="fade-in-down"
         class="hidden rounded-b-[12px] border border-neutral-400 bg-neutral-500 lg:block"
       >
         @for (user of users; track user.id; let i = $index) {
-          <div>
+          <div [attr.data-testid]="'user-row-' + user.username">
             <div
               animate.enter="fade-in-down"
               [ngClass]="{ 'rounded-b-[12px]': i === users.length - 1 }"
               class="grid grid-cols-[1fr_1fr_1fr_1fr_80px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
             >
               <!-- Username -->
-              <app-tooltip class="text-secondary-500" [text]="user.username | ellipsis" [textHover]="user.username" />
+              <app-tooltip
+                data-testid="row-username"
+                class="text-secondary-500"
+                [text]="user.username | ellipsis"
+                [textHover]="user.username"
+              />
 
               <!-- Role -->
-              <span [ngClass]="getRoleBadgeClass(user.role)" class="inline-block w-fit rounded-full px-3 py-1 text-xs">
+              <span
+                data-testid="row-role"
+                [ngClass]="getRoleBadgeClass(user.role)"
+                class="inline-block w-fit rounded-full px-3 py-1 text-xs"
+              >
                 {{ user.role }}
               </span>
 
               <!-- Created Date -->
               <app-tooltip
+                data-testid="row-created"
                 class="text-secondary-500"
                 [text]="timeAgo(user.createdAt)"
                 [textHover]="user.createdAt | date: 'medium'"
@@ -90,6 +108,7 @@
 
               <!-- Last Login -->
               <app-tooltip
+                data-testid="row-last-login"
                 class="text-secondary-500"
                 [text]="timeAgo(user.lastLoginAt)"
                 [textHover]="user.lastLoginAt ? (user.lastLoginAt | date: 'medium') : 'Never logged in'"
@@ -100,6 +119,7 @@
               <div class="flex items-center justify-end gap-2">
                 <!-- Reset Password Button -->
                 <button
+                  data-testid="row-reset-password"
                   (click)="resetPassword(user)"
                   [disabled]="operationLock"
                   class="hover:text-warning-500 text-neutral-200"
@@ -124,8 +144,9 @@
                 </button>
 
                 <!-- Dropdown Menu (Edit & Delete) -->
-                <app-dropdown>
+                <app-dropdown data-testid="row-menu">
                   <button
+                    data-testid="row-edit"
                     (click)="editUser(user)"
                     [disabled]="operationLock"
                     class="flex w-full items-center gap-2 px-4 py-2 text-neutral-200 hover:bg-[#2D2C2C]"
@@ -155,6 +176,7 @@
                   </button>
 
                   <button
+                    data-testid="row-delete"
                     (click)="deleteUser(user)"
                     [disabled]="operationLock"
                     class="text-error-500 flex w-full items-center gap-2 px-4 py-2 hover:bg-[#2D2C2C]"
@@ -173,119 +195,125 @@
       </div>
 
       <!-- User List (Mobile) -->
-      @for (user of users; track user.id; let i = $index) {
-        <div animate.enter="fade-in-down" class="lg:hidden">
-          <div
-            class="hover:border-secondary-500 relative flex flex-col gap-2 rounded-[12px] border border-neutral-400 bg-neutral-500 p-4 hover:bg-[#1D1C1C]"
-          >
-            <!-- Actions (Top Right) -->
-            <div class="flex items-center justify-end gap-2">
-              <!-- Reset Password Button -->
-              <button
-                (click)="resetPassword(user)"
-                [disabled]="operationLock"
-                class="hover:text-warning-500 text-neutral-200"
-                title="Reset password"
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  stroke-width="2"
-                >
-                  <!-- Lock body -->
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <!-- Lock shackle -->
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  <!-- Refresh arrow -->
-                  <path d="M12 15v4m0 0l-2-2m2 2l2-2" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-              </button>
-
-              <!-- Dropdown Menu -->
-              <app-dropdown>
+      <div data-testid="user-cards">
+        @for (user of users; track user.id; let i = $index) {
+          <div [attr.data-testid]="'user-card-' + user.username" animate.enter="fade-in-down" class="lg:hidden">
+            <div
+              class="hover:border-secondary-500 relative flex flex-col gap-2 rounded-[12px] border border-neutral-400 bg-neutral-500 p-4 hover:bg-[#1D1C1C]"
+            >
+              <!-- Actions (Top Right) -->
+              <div class="flex items-center justify-end gap-2">
+                <!-- Reset Password Button -->
                 <button
-                  (click)="editUser(user)"
+                  data-testid="row-reset-password"
+                  (click)="resetPassword(user)"
                   [disabled]="operationLock"
-                  class="flex w-full items-center gap-2 px-4 py-2 text-neutral-200 hover:bg-[#2D2C2C]"
+                  class="hover:text-warning-500 text-neutral-200"
+                  title="Reset password"
                 >
                   <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 18 18"
-                    fill="none"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
                     stroke="currentColor"
+                    fill="none"
                     xmlns="http://www.w3.org/2000/svg"
+                    stroke-width="2"
                   >
-                    <path
-                      d="M8.25 3H3C2.60218 3 2.22064 3.15804 1.93934 3.43934C1.65804 3.72064 1.5 4.10218 1.5 4.5V15C1.5 15.3978 1.65804 15.7794 1.93934 16.0607C2.22064 16.342 2.60218 16.5 3 16.5H13.5C13.8978 16.5 14.2794 16.342 14.5607 16.0607C14.842 15.7794 15 15.3978 15 15V9.75"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                    <path
-                      d="M13.875 1.87502C14.1734 1.57665 14.5791 1.40918 15.0008 1.40918C15.4225 1.40918 15.8282 1.57665 16.1266 1.87502C16.4249 2.17339 16.5924 2.57909 16.5924 3.00077C16.5924 3.42245 16.4249 3.82815 16.1266 4.12652L9.00078 11.2523L6.00078 12.0015L6.75003 9.00152L13.875 1.87502Z"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
+                    <!-- Lock body -->
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <!-- Lock shackle -->
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    <!-- Refresh arrow -->
+                    <path d="M12 15v4m0 0l-2-2m2 2l2-2" stroke-linecap="round" stroke-linejoin="round" />
                   </svg>
-                  Edit
                 </button>
 
-                <button
-                  (click)="deleteUser(user)"
-                  [disabled]="operationLock"
-                  class="text-error-500 flex w-full items-center gap-2 px-4 py-2 hover:bg-[#2D2C2C]"
-                >
-                  <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
-                  Delete
-                </button>
-              </app-dropdown>
-            </div>
+                <!-- Dropdown Menu -->
+                <app-dropdown data-testid="row-menu">
+                  <button
+                    data-testid="row-edit"
+                    (click)="editUser(user)"
+                    [disabled]="operationLock"
+                    class="flex w-full items-center gap-2 px-4 py-2 text-neutral-200 hover:bg-[#2D2C2C]"
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 18 18"
+                      fill="none"
+                      stroke="currentColor"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M8.25 3H3C2.60218 3 2.22064 3.15804 1.93934 3.43934C1.65804 3.72064 1.5 4.10218 1.5 4.5V15C1.5 15.3978 1.65804 15.7794 1.93934 16.0607C2.22064 16.342 2.60218 16.5 3 16.5H13.5C13.8978 16.5 14.2794 16.342 14.5607 16.0607C14.842 15.7794 15 15.3978 15 15V9.75"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                      <path
+                        d="M13.875 1.87502C14.1734 1.57665 14.5791 1.40918 15.0008 1.40918C15.4225 1.40918 15.8282 1.57665 16.1266 1.87502C16.4249 2.17339 16.5924 2.57909 16.5924 3.00077C16.5924 3.42245 16.4249 3.82815 16.1266 4.12652L9.00078 11.2523L6.00078 12.0015L6.75003 9.00152L13.875 1.87502Z"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                    Edit
+                  </button>
 
-            <div class="space-y-2">
-              <div class="flex justify-between gap-2">
-                <span class="text-neutral-200">Username: </span>
-                <span class="text-secondary-500">{{ user.username }}</span>
+                  <button
+                    data-testid="row-delete"
+                    (click)="deleteUser(user)"
+                    [disabled]="operationLock"
+                    class="text-error-500 flex w-full items-center gap-2 px-4 py-2 hover:bg-[#2D2C2C]"
+                  >
+                    <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+                    Delete
+                  </button>
+                </app-dropdown>
               </div>
-              <div class="flex justify-between gap-2">
-                <span class="text-neutral-200">Role: </span>
-                <span
-                  [ngClass]="getRoleBadgeClass(user.role)"
-                  class="inline-block w-fit rounded-full px-3 py-1 text-xs"
-                >
-                  {{ user.role }}
-                </span>
-              </div>
-              <div class="flex justify-between gap-2">
-                <span class="text-neutral-200">Created: </span>
-                <span class="text-secondary-500 break-all">
-                  {{ user.createdAt | date: 'medium' }} {{ '(' + timeAgo(user.createdAt) + ')' }}
-                </span>
-              </div>
-              <div class="flex justify-between gap-2">
-                <span class="text-neutral-200">Last Login: </span>
-                <span class="text-secondary-500 break-all">
-                  @if (user.lastLoginAt) {
-                    {{ user.lastLoginAt | date: 'medium' }} {{ '(' + timeAgo(user.lastLoginAt) + ')' }}
-                  } @else {
-                    <span class="text-neutral-400 italic">Never logged in</span>
-                  }
-                </span>
+
+              <div class="space-y-2">
+                <div class="flex justify-between gap-2">
+                  <span class="text-neutral-200">Username: </span>
+                  <span data-testid="row-username" class="text-secondary-500">{{ user.username }}</span>
+                </div>
+                <div class="flex justify-between gap-2">
+                  <span class="text-neutral-200">Role: </span>
+                  <span
+                    data-testid="row-role"
+                    [ngClass]="getRoleBadgeClass(user.role)"
+                    class="inline-block w-fit rounded-full px-3 py-1 text-xs"
+                  >
+                    {{ user.role }}
+                  </span>
+                </div>
+                <div class="flex justify-between gap-2">
+                  <span class="text-neutral-200">Created: </span>
+                  <span data-testid="row-created" class="text-secondary-500 break-all">
+                    {{ user.createdAt | date: 'medium' }} {{ '(' + timeAgo(user.createdAt) + ')' }}
+                  </span>
+                </div>
+                <div class="flex justify-between gap-2">
+                  <span class="text-neutral-200">Last Login: </span>
+                  <span data-testid="row-last-login" class="text-secondary-500 break-all">
+                    @if (user.lastLoginAt) {
+                      {{ user.lastLoginAt | date: 'medium' }} {{ '(' + timeAgo(user.lastLoginAt) + ')' }}
+                    } @else {
+                      <span class="text-neutral-400 italic">Never logged in</span>
+                    }
+                  </span>
+                </div>
               </div>
             </div>
+            @if (i !== users.length - 1) {
+              <div class="px-2 py-4">
+                <div class="h-[1px] bg-neutral-400"></div>
+              </div>
+            }
           </div>
-          @if (i !== users.length - 1) {
-            <div class="px-2 py-4">
-              <div class="h-[1px] bg-neutral-400"></div>
-            </div>
-          }
-        </div>
-      }
+        }
+      </div>
 
       <!-- Pagination -->
       <app-pagination
@@ -297,7 +325,7 @@
   } @else {
     <!-- Empty State -->
     <img class="mx-auto" ngSrc="/assets/images/hippo-empty.svg" priority alt="hippo-empty" height="150" width="300" />
-    <div class="mx-auto mt-4 text-center">
+    <div data-testid="user-empty" class="mx-auto mt-4 text-center">
       <p class="text-[14px] text-[#9FA0A0]">No users found,</p>
       <p class="mt-2 text-[14px] text-[#9FA0A0]">create your first user to get started!</p>
     </div>
