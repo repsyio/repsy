@@ -326,10 +326,6 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
 
     final var metadata = ArtifactUtils.readMetadata(metadataResource.getContentAsByteArray());
 
-    if (metadata == null) {
-      throw new IOException();
-    }
-
     final var versioning = metadata.getVersioning();
 
     versioning.getVersions().remove(versionName);

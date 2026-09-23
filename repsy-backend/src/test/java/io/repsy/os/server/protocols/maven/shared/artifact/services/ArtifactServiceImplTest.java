@@ -15,11 +15,10 @@
  */
 package io.repsy.os.server.protocols.maven.shared.artifact.services;
 
-import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType.NEW;
-import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType.REDEPLOY;
 import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.PLUGIN;
 import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.RELEASE;
 import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.SNAPSHOT;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -36,6 +35,7 @@ import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
+import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
@@ -51,7 +51,6 @@ import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierSe
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
-import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -59,13 +58,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.apache.commons.lang3.tuple.MutablePair;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -157,11 +157,6 @@ class ArtifactServiceImplTest {
         .build();
   }
 
-  private static MutablePair<ArtifactDeployType, ArtifactVersionType> pair(
-      final ArtifactDeployType deployType, final ArtifactVersionType versionType) {
-    return new MutablePair<>(deployType, versionType);
-  }
-
   private Artifact stubArtifact(final UUID repoId) {
     final var artifact = new Artifact();
     artifact.setId(UUID.randomUUID());
@@ -180,17 +175,38 @@ class ArtifactServiceImplTest {
   }
 
   @Test
-  @DisplayName("a timestamped snapshot file of an existing version is a snapshot redeploy")
-  void classifiesAnExistingSnapshotFileAsSnapshotRedeploy() {
+  @DisplayName("classifying an upload reads the path only, it queries no artifact or version")
+  void classificationQueriesNoArtifactOrVersion() {
     final var id = UUID.randomUUID();
-    final var artifact = this.stubArtifact(id);
-    this.stubVersion(artifact, "1.0-SNAPSHOT", true);
+    final var repo = repo(id, true, true, true);
 
-    final var result =
-        this.artifactService.getDeployAndVersionType(
-            repo(id, true, true, true), StoragePath.of(id, SNAPSHOT_JAR));
+    assertThat(this.artifactService.getVersionType(repo, StoragePath.of(id, SNAPSHOT_JAR)))
+        .isEqualTo(SNAPSHOT);
+    assertThat(this.artifactService.getVersionType(repo, StoragePath.of(id, RELEASE_JAR)))
+        .isEqualTo(RELEASE);
+    assertThat(
+            this.artifactService.getVersionType(
+                repo, StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc")))
+        .isEqualTo(RELEASE);
 
-    assertThat(result).isEqualTo(pair(REDEPLOY, SNAPSHOT));
+    verifyNoInteractions(this.artifactRepository, this.artifactVersionRepository);
+  }
+
+  @ParameterizedTest(name = "{0} is refused with both kinds off")
+  @ValueSource(strings = {RELEASE_JAR, SNAPSHOT_JAR, "com/acme/lib/1.0/lib-1.0.pom"})
+  @DisplayName("a repo with releases and snapshots both off refuses every version (RPS-1181)")
+  void bothKindsOffRefusesEveryVersion(final String path) {
+    final var id = UUID.randomUUID();
+    final var repo = repo(id, false, false, true);
+    final var storagePath = StoragePath.of(id, path);
+    final var versionType = this.artifactService.getVersionType(repo, storagePath);
+    final var expected =
+        versionType == SNAPSHOT ? "snapshotVersionsAreProhibited" : "releaseVersionsAreProhibited";
+
+    assertThatThrownBy(
+            () -> this.artifactService.checkDeploymentRules(repo, versionType, storagePath))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage(expected);
   }
 
   @Test
@@ -200,8 +216,7 @@ class ArtifactServiceImplTest {
     final var repo = repo(id, true, false, true);
     final var path = StoragePath.of(id, SNAPSHOT_JAR);
 
-    assertThatThrownBy(
-            () -> this.artifactService.checkDeploymentRules(repo, pair(REDEPLOY, SNAPSHOT), path))
+    assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(repo, SNAPSHOT, path))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("snapshotVersionsAreProhibited");
   }
@@ -213,8 +228,7 @@ class ArtifactServiceImplTest {
     final var repo = repo(id, false, true, true);
     final var path = StoragePath.of(id, RELEASE_JAR);
 
-    assertThatThrownBy(
-            () -> this.artifactService.checkDeploymentRules(repo, pair(REDEPLOY, RELEASE), path))
+    assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(repo, RELEASE, path))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("releaseVersionsAreProhibited");
   }
@@ -226,8 +240,7 @@ class ArtifactServiceImplTest {
     final var repo = repo(id, false, true, true);
     final var path = StoragePath.of(id, SNAPSHOT_JAR);
 
-    assertThatCode(
-            () -> this.artifactService.checkDeploymentRules(repo, pair(REDEPLOY, SNAPSHOT), path))
+    assertThatCode(() -> this.artifactService.checkDeploymentRules(repo, SNAPSHOT, path))
         .doesNotThrowAnyException();
   }
 
@@ -240,15 +253,14 @@ class ArtifactServiceImplTest {
     when(this.storageStrategy.get(path, "mvn"))
         .thenReturn(Optional.of(new ByteArrayResource(new byte[] {1})));
 
-    assertThatThrownBy(
-            () -> this.artifactService.checkDeploymentRules(repo, pair(REDEPLOY, SNAPSHOT), path))
+    assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(repo, SNAPSHOT, path))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("artifactOverrideIsProhibited");
   }
 
-  private MutablePair<ArtifactDeployType, ArtifactVersionType> classify(
+  private @Nullable ArtifactVersionType classify(
       final RepoInfo repo, final String path, final String body) throws Exception {
-    return this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
+    return this.artifactService.getVersionTypeByMetadataTypeFiles(
         repo, body.getBytes(StandardCharsets.UTF_8), StoragePath.of(repo.getId(), path));
   }
 
@@ -260,7 +272,7 @@ class ArtifactServiceImplTest {
 
     final var result = this.classify(repo, GROUP_METADATA_PATH, GROUP_METADATA);
 
-    assertThat(result).isEqualTo(pair(null, PLUGIN));
+    assertThat(result).isEqualTo(PLUGIN);
     assertThatCode(
             () ->
                 this.artifactService.checkDeploymentRules(
@@ -279,7 +291,7 @@ class ArtifactServiceImplTest {
     final var refusing = repo(id, true, false, true);
     final var result = this.classify(refusing, SNAPSHOT_VERSION_METADATA, xml);
 
-    assertThat(result).isEqualTo(pair(null, SNAPSHOT));
+    assertThat(result).isEqualTo(SNAPSHOT);
     assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(refusing, result, path))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("snapshotVersionsAreProhibited");
@@ -299,7 +311,7 @@ class ArtifactServiceImplTest {
     final var refusing = repo(id, false, true, true);
     final var result = this.classify(refusing, RELEASE_VERSION_METADATA, xml);
 
-    assertThat(result).isEqualTo(pair(null, RELEASE));
+    assertThat(result).isEqualTo(RELEASE);
     assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(refusing, result, path))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("releaseVersionsAreProhibited");
@@ -317,7 +329,7 @@ class ArtifactServiceImplTest {
 
     final var result = this.classify(repo, ARTIFACT_METADATA, ARTIFACT_METADATA_MIXED);
 
-    assertThat(result).isEqualTo(pair(null, null));
+    assertThat(result).isNull();
     assertThatCode(
             () ->
                 this.artifactService.checkDeploymentRules(
@@ -333,7 +345,7 @@ class ArtifactServiceImplTest {
 
     final var result = this.classify(repo, ARTIFACT_METADATA + ".sha1", "garbage");
 
-    assertThat(result).isEqualTo(pair(null, null));
+    assertThat(result).isNull();
   }
 
   @Test
@@ -346,7 +358,7 @@ class ArtifactServiceImplTest {
     final var refusing = repo(id, true, false, true);
     final var result = this.classify(refusing, SNAPSHOT_VERSION_METADATA + ".sha1", "garbage");
 
-    assertThat(result).isEqualTo(pair(null, SNAPSHOT));
+    assertThat(result).isEqualTo(SNAPSHOT);
     assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(refusing, result, path))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("snapshotVersionsAreProhibited");
@@ -364,7 +376,7 @@ class ArtifactServiceImplTest {
 
     final var result = this.classify(repo, ARTIFACT_METADATA + ".asc", ARMORED_SIGNATURE);
 
-    assertThat(result).isEqualTo(pair(null, null));
+    assertThat(result).isNull();
     assertThatCode(
             () ->
                 this.artifactService.checkDeploymentRules(
@@ -385,7 +397,7 @@ class ArtifactServiceImplTest {
     final var result =
         this.classify(refusing, SNAPSHOT_VERSION_METADATA + ".asc", ARMORED_SIGNATURE);
 
-    assertThat(result).isEqualTo(pair(null, SNAPSHOT));
+    assertThat(result).isEqualTo(SNAPSHOT);
     assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(refusing, result, path))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("snapshotVersionsAreProhibited");
@@ -399,7 +411,6 @@ class ArtifactServiceImplTest {
   @DisplayName("a metadata signature is neither verified nor registered (RPS-1185)")
   void metadataSignatureIsNeitherVerifiedNorRegistered() {
     final var id = UUID.randomUUID();
-    this.stubRepo(id);
 
     this.artifactService.createOrUpdateArtifact(
         repo(id, true, true, true),
@@ -407,6 +418,7 @@ class ArtifactServiceImplTest {
         new ByteArrayResource(ARMORED_SIGNATURE.getBytes(StandardCharsets.UTF_8)));
 
     verifyNoInteractions(
+        this.repoRepository,
         this.pgpVerifierService,
         this.keyStoreService,
         this.artifactRepository,
@@ -435,7 +447,7 @@ class ArtifactServiceImplTest {
 
     final var result = this.classify(repo, path, "garbage");
 
-    assertThat(result).isEqualTo(pair(null, null));
+    assertThat(result).isNull();
     assertThatCode(
             () -> this.artifactService.checkDeploymentRules(repo, result, StoragePath.of(id, path)))
         .doesNotThrowAnyException();
@@ -452,13 +464,13 @@ class ArtifactServiceImplTest {
     assertThatThrownBy(
             () ->
                 this.artifactService.checkDeploymentRules(
-                    repo(id, true, false, true), pair(null, SNAPSHOT), noGav))
+                    repo(id, true, false, true), SNAPSHOT, noGav))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("snapshotVersionsAreProhibited");
     assertThatCode(
             () ->
                 this.artifactService.checkDeploymentRules(
-                    repo(id, true, true, true), pair(null, SNAPSHOT), noGav))
+                    repo(id, true, true, true), SNAPSHOT, noGav))
         .doesNotThrowAnyException();
   }
 
@@ -471,7 +483,7 @@ class ArtifactServiceImplTest {
             () ->
                 this.artifactService.checkDeploymentRules(
                     repo(id, true, false, true),
-                    pair(null, SNAPSHOT),
+                    SNAPSHOT,
                     StoragePath.of(id, SNAPSHOT_VERSION_METADATA)))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("snapshotVersionsAreProhibited");
@@ -504,7 +516,7 @@ class ArtifactServiceImplTest {
 
     assertThatThrownBy(
             () ->
-                this.artifactService.getDeployAndVersionType(
+                this.artifactService.getVersionType(
                     repo(id, true, true, true), StoragePath.of(id, path)))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("invalidArtifactPath");
@@ -546,10 +558,9 @@ class ArtifactServiceImplTest {
     final var id = UUID.randomUUID();
 
     final var result =
-        this.artifactService.getDeployAndVersionType(
-            repo(id, true, true, true), StoragePath.of(id, path));
+        this.artifactService.getVersionType(repo(id, true, true, true), StoragePath.of(id, path));
 
-    assertThat(result).isEqualTo(pair(NEW, versionType));
+    assertThat(result).isEqualTo(versionType);
   }
 
   @Test
@@ -559,9 +570,9 @@ class ArtifactServiceImplTest {
     final var releasesOff = repo(id, false, true, true);
     final var release = StoragePath.of(id, "com/acme/lib/3.5/lib-3.5.jar.sha1");
 
-    final var releaseResult = this.artifactService.getDeployAndVersionType(releasesOff, release);
+    final var releaseResult = this.artifactService.getVersionType(releasesOff, release);
 
-    assertThat(releaseResult).isEqualTo(pair(NEW, RELEASE));
+    assertThat(releaseResult).isEqualTo(RELEASE);
     assertThatThrownBy(
             () -> this.artifactService.checkDeploymentRules(releasesOff, releaseResult, release))
         .isInstanceOf(AccessNotAllowedException.class)
@@ -571,9 +582,9 @@ class ArtifactServiceImplTest {
     final var snapshot =
         StoragePath.of(id, "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.pom.sha1");
 
-    final var snapshotResult = this.artifactService.getDeployAndVersionType(snapshotsOff, snapshot);
+    final var snapshotResult = this.artifactService.getVersionType(snapshotsOff, snapshot);
 
-    assertThat(snapshotResult).isEqualTo(pair(NEW, SNAPSHOT));
+    assertThat(snapshotResult).isEqualTo(SNAPSHOT);
     assertThatThrownBy(
             () -> this.artifactService.checkDeploymentRules(snapshotsOff, snapshotResult, snapshot))
         .isInstanceOf(AccessNotAllowedException.class)
@@ -586,9 +597,9 @@ class ArtifactServiceImplTest {
     final var id = UUID.randomUUID();
     final var repo = repo(id, true, true, false);
     final var path = StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.sha1");
-    final var pair = this.artifactService.getDeployAndVersionType(repo, path);
+    final var versionType = this.artifactService.getVersionType(repo, path);
 
-    assertThatCode(() -> this.artifactService.checkDeploymentRules(repo, pair, path))
+    assertThatCode(() -> this.artifactService.checkDeploymentRules(repo, versionType, path))
         .doesNotThrowAnyException();
     verify(this.artifactRepository, never())
         .existsByRepoIdAndArtifactNameAndGroupNameAndArtifactVersionsVersionName(
@@ -597,7 +608,7 @@ class ArtifactServiceImplTest {
     when(this.storageStrategy.get(path, "mvn"))
         .thenReturn(Optional.of(new ByteArrayResource(new byte[] {1})));
 
-    assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(repo, pair, path))
+    assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(repo, versionType, path))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("artifactOverrideIsProhibited");
   }
@@ -610,11 +621,6 @@ class ArtifactServiceImplTest {
   @DisplayName("marks the version signed without verifying the signature again (RPS-1186)")
   void markSignedWithoutVerifyingAgain() {
     final var id = UUID.randomUUID();
-    final var repo = new Repo();
-    repo.setId(id);
-    repo.setName("mvn");
-    when(this.repoRepository.findByNameAndType("mvn", RepoType.MAVEN))
-        .thenReturn(Optional.of(repo));
     final var artifact = this.stubArtifact(id);
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
@@ -627,18 +633,13 @@ class ArtifactServiceImplTest {
 
     assertThat(version.isSigned()).isTrue();
     verify(this.artifactVersionRepository).save(version);
-    verifyNoInteractions(this.pgpVerifierService, this.keyStoreService);
+    verifyNoInteractions(this.repoRepository, this.pgpVerifierService, this.keyStoreService);
   }
 
   @Test
   @DisplayName("answers itemNotFound for a POM signature whose version is not registered")
   void markSignedAnswersItemNotFoundForANonLayoutPath() {
     final var id = UUID.randomUUID();
-    final var repo = new Repo();
-    repo.setId(id);
-    repo.setName("mvn");
-    when(this.repoRepository.findByNameAndType("mvn", RepoType.MAVEN))
-        .thenReturn(Optional.of(repo));
 
     assertThatThrownBy(
             () ->
@@ -649,7 +650,7 @@ class ArtifactServiceImplTest {
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("itemNotFound");
 
-    verifyNoInteractions(this.pgpVerifierService);
+    verifyNoInteractions(this.repoRepository, this.pgpVerifierService);
   }
 
   @Test
@@ -777,11 +778,6 @@ class ArtifactServiceImplTest {
   @DisplayName("stores no signature mark for a version that is not registered (RPS-1191)")
   void markSignedAnswersArtifactVersionNotFoundWhenTheVersionIsNotRegistered() {
     final var id = UUID.randomUUID();
-    final var repo = new Repo();
-    repo.setId(id);
-    repo.setName("mvn");
-    when(this.repoRepository.findByNameAndType("mvn", RepoType.MAVEN))
-        .thenReturn(Optional.of(repo));
     this.stubVersion(this.stubArtifact(id), "1.0", false);
 
     assertThatThrownBy(
@@ -794,6 +790,7 @@ class ArtifactServiceImplTest {
         .hasMessage("artifactVersionNotFound");
 
     verify(this.artifactVersionRepository, never()).save(any());
+    verifyNoInteractions(this.repoRepository);
   }
 
   private static final String POM_OF_GROUP =
@@ -887,7 +884,6 @@ class ArtifactServiceImplTest {
   @DisplayName("ignores a jar of an artifactId containing \".pom\" (RPS-1196)")
   void createOrUpdateArtifactIgnoresAJarOfAnArtifactIdContainingPom() {
     final var id = UUID.randomUUID();
-    this.stubRepo(id);
 
     this.artifactService.createOrUpdateArtifact(
         repo(id, true, true, true),
@@ -895,14 +891,16 @@ class ArtifactServiceImplTest {
         new ByteArrayResource(new byte[] {'P', 'K', 3, 4, 0, 0}));
 
     verifyNoInteractions(
-        this.artifactRepository, this.artifactVersionRepository, this.artifactUpsertHelper);
+        this.repoRepository,
+        this.artifactRepository,
+        this.artifactVersionRepository,
+        this.artifactUpsertHelper);
   }
 
   @Test
   @DisplayName("ignores maven-metadata.xml of an artifactId containing \".pom\" (RPS-1196)")
   void createOrUpdateArtifactIgnoresMetadataOfAnArtifactIdContainingPom() {
     final var id = UUID.randomUUID();
-    this.stubRepo(id);
 
     this.artifactService.createOrUpdateArtifact(
         repo(id, true, true, true),
@@ -910,14 +908,16 @@ class ArtifactServiceImplTest {
         new ByteArrayResource(ARTIFACT_METADATA_MIXED.getBytes(StandardCharsets.UTF_8)));
 
     verifyNoInteractions(
-        this.artifactRepository, this.artifactVersionRepository, this.artifactUpsertHelper);
+        this.repoRepository,
+        this.artifactRepository,
+        this.artifactVersionRepository,
+        this.artifactUpsertHelper);
   }
 
   @Test
   @DisplayName("ignores the metadata signature of an artifactId containing \".pom\" (RPS-1196)")
   void createOrUpdateArtifactIgnoresAMetadataSignatureOfAnArtifactIdContainingPom() {
     final var id = UUID.randomUUID();
-    this.stubRepo(id);
 
     this.artifactService.createOrUpdateArtifact(
         repo(id, true, true, true),
@@ -925,7 +925,7 @@ class ArtifactServiceImplTest {
         new ByteArrayResource(ARMORED_SIGNATURE.getBytes(StandardCharsets.UTF_8)));
 
     verify(this.artifactVersionRepository, never()).save(any());
-    verifyNoInteractions(this.artifactRepository, this.artifactUpsertHelper);
+    verifyNoInteractions(this.repoRepository, this.artifactRepository, this.artifactUpsertHelper);
   }
 
   @Test
@@ -950,6 +950,176 @@ class ArtifactServiceImplTest {
     verify(this.artifactUpsertHelper)
         .insertArtifactVersion(
             argThat(version -> "1.0".equals(version.getVersionName())), any(), any());
+  }
+
+  @ParameterizedTest(name = "{0} does not load the repo row")
+  @ValueSource(
+      strings = {
+        RELEASE_JAR,
+        "com/acme/lib/1.0/lib-1.0-sources.jar",
+        "com/acme/lib/1.0/lib-1.0.jar.sha1",
+        "com/acme/lib/1.0/lib-1.0.pom.sha1",
+        "com/acme/lib/1.0/lib-1.0.jar.asc",
+        ARTIFACT_METADATA
+      })
+  @DisplayName("a file that registers nothing does not load the repo row (RPS-1179)")
+  void aFileThatRegistersNothingDoesNotLoadTheRepo(final String path) {
+    final var id = UUID.randomUUID();
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, path),
+        new ByteArrayResource(new byte[] {1}));
+
+    verifyNoInteractions(
+        this.repoRepository,
+        this.artifactRepository,
+        this.artifactVersionRepository,
+        this.artifactUpsertHelper);
+  }
+
+  @Test
+  @DisplayName("a POM still needs its repo row and answers repoNotFound without it (RPS-1179)")
+  void aPomOfAMissingRepoAnswersRepoNotFound() {
+    final var id = UUID.randomUUID();
+    when(this.repoRepository.findByNameAndType("mvn", RepoType.MAVEN)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                this.artifactService.createOrUpdateArtifact(
+                    repo(id, true, true, true),
+                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom"),
+                    new ByteArrayResource(POM_OF_GROUP.formatted("").getBytes(UTF_8))))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("repoNotFound");
+  }
+
+  private static StorageItemInfo file(final String physicalPath) {
+    return StorageItemInfo.builder()
+        .name(physicalPath.substring(physicalPath.lastIndexOf('/') + 1))
+        .directory(false)
+        .path(physicalPath)
+        .build();
+  }
+
+  /** Registers the POM of {@code versionPath}, with the version directory holding {@code items}. */
+  private ArtifactVersion registerPomWithFiles(
+      final String versionPath, final String artifactId, final List<StorageItemInfo> items) {
+    final var id = UUID.randomUUID();
+    this.stubRepo(id);
+    when(this.artifactUpsertHelper.insertArtifact(any(Artifact.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(this.storageStrategy.listStorageItems(any(StoragePath.class))).thenReturn(items);
+
+    final var pom =
+        """
+        <project><modelVersion>4.0.0</modelVersion><groupId>com.acme</groupId>\
+        <artifactId>%s</artifactId><version>1.0</version></project>"""
+            .formatted(artifactId);
+    final var pomPath = versionPath + "/" + artifactId + "-1.0.pom";
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, pomPath),
+        new ByteArrayResource(pom.getBytes(UTF_8)));
+
+    final var captor = ArgumentCaptor.forClass(ArtifactVersion.class);
+    verify(this.artifactUpsertHelper).insertArtifactVersion(captor.capture(), any(), any());
+
+    return captor.getValue();
+  }
+
+  @Test
+  @DisplayName("an artifactId that contains -sources does not flag sources or documents (RPS-1198)")
+  void anArtifactIdContainingSourcesDoesNotFlagSources() {
+    final var dir = "/data/storage/8c4f/com/acme/foo-sources/1.0/";
+
+    final var version =
+        this.registerPomWithFiles(
+            "com/acme/foo-sources/1.0",
+            "foo-sources",
+            List.of(
+                file(dir + "foo-sources-1.0.pom"),
+                file(dir + "foo-sources-1.0.jar"),
+                file(dir + "foo-sources-1.0.jar.sha1")));
+
+    assertThat(version.isHasSources()).isFalse();
+    assertThat(version.isHasDocuments()).isFalse();
+  }
+
+  @Test
+  @DisplayName("an artifactId that contains -javadoc does not flag documents (RPS-1198)")
+  void anArtifactIdContainingJavadocDoesNotFlagDocuments() {
+    final var dir = "/data/storage/8c4f/com/acme/lib-javadoc/1.0/";
+
+    final var version =
+        this.registerPomWithFiles(
+            "com/acme/lib-javadoc/1.0",
+            "lib-javadoc",
+            List.of(file(dir + "lib-javadoc-1.0.pom"), file(dir + "lib-javadoc-1.0.jar")));
+
+    assertThat(version.isHasDocuments()).isFalse();
+    assertThat(version.isHasSources()).isFalse();
+  }
+
+  @Test
+  @DisplayName("a sources jar and a javadoc jar flag the version (RPS-1198)")
+  void aRealSourcesAndJavadocJarFlagTheVersion() {
+    final var dir = "/data/storage/8c4f/com/acme/lib/1.0/";
+
+    final var version =
+        this.registerPomWithFiles(
+            "com/acme/lib/1.0",
+            "lib",
+            List.of(
+                file(dir + "lib-1.0.pom"),
+                file(dir + "lib-1.0.jar"),
+                file(dir + "lib-1.0-sources.jar"),
+                file(dir + "lib-1.0-javadoc.jar")));
+
+    assertThat(version.isHasSources()).isTrue();
+    assertThat(version.isHasDocuments()).isTrue();
+  }
+
+  @Test
+  @DisplayName("the checksum or signature of a sources jar alone does not flag the version")
+  void aChecksumOrSignatureOfASourcesJarAloneDoesNotFlagTheVersion() {
+    final var dir = "/data/storage/8c4f/com/acme/lib/1.0/";
+
+    final var version =
+        this.registerPomWithFiles(
+            "com/acme/lib/1.0",
+            "lib",
+            List.of(
+                file(dir + "lib-1.0.pom"),
+                file(dir + "lib-1.0-sources.jar.sha1"),
+                file(dir + "lib-1.0-sources.jar.asc"),
+                file(dir + "lib-1.0-javadoc.jar.md5")));
+
+    assertThat(version.isHasSources()).isFalse();
+    assertThat(version.isHasDocuments()).isFalse();
+  }
+
+  @Test
+  @DisplayName("a storage directory named -sources and nested directories do not flag the version")
+  void aStorageDirectoryOrNestedFileDoesNotFlagTheVersion() {
+    final var dir = "/data/repos-sources/8c4f/com/acme/lib/1.0/";
+
+    final var version =
+        this.registerPomWithFiles(
+            "com/acme/lib/1.0",
+            "lib",
+            List.of(
+                file(dir + "lib-1.0.pom"),
+                file(dir + "lib-1.0.jar"),
+                StorageItemInfo.builder()
+                    .name("x-sources")
+                    .directory(true)
+                    .path(dir + "x-sources")
+                    .build(),
+                file(dir + "x-sources/a/lib-1.0-sources.jar")));
+
+    assertThat(version.isHasSources()).isFalse();
   }
 
   private Resource stubStoredPom(final String relativePath) {

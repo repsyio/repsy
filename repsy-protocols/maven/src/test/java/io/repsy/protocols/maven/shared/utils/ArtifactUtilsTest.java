@@ -72,7 +72,7 @@ class ArtifactUtilsTest {
       </metadata>""";
 
   private static Metadata metadata(final String xml) throws Exception {
-    return Objects.requireNonNull(ArtifactUtils.readMetadata(xml.getBytes(UTF_8)));
+    return ArtifactUtils.readMetadata(xml.getBytes(UTF_8));
   }
 
   @Test
@@ -83,7 +83,6 @@ class ArtifactUtilsTest {
     assertThat(ArtifactUtils.isPluginMetadata(metadata(ARTIFACT_METADATA))).isFalse();
     assertThat(ArtifactUtils.isPluginMetadata(metadata(VERSION_METADATA))).isFalse();
     assertThat(ArtifactUtils.isPluginMetadata(metadata(GROUP_METADATA))).isTrue();
-    assertThat(ArtifactUtils.isPluginMetadata(null)).isFalse();
   }
 
   @Test
@@ -97,7 +96,6 @@ class ArtifactUtilsTest {
             ArtifactUtils.isVersionLevelMetadata(
                 metadata("<metadata><version> </version></metadata>")))
         .isFalse();
-    assertThat(ArtifactUtils.isVersionLevelMetadata(null)).isFalse();
   }
 
   @Test
@@ -110,6 +108,40 @@ class ArtifactUtilsTest {
         .isInstanceOf(BadRequestException.class)
         .hasMessage("malformedMetadataFile")
         .satisfies(e -> assertThat(e.toString()).doesNotContain(secret));
+  }
+
+  @ParameterizedTest(name = "{0} is a {1} jar")
+  @CsvSource({
+    "com/acme/lib/1.0/lib-1.0-sources.jar, sources",
+    "com/acme/lib/1.0/lib-1.0-javadoc.jar, javadoc",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1-sources.jar, sources",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT-javadoc.jar, javadoc"
+  })
+  @DisplayName("tells the jar of a classifier by the classifier of its own GAV (RPS-1198)")
+  void isClassifierJarTellsTheJarOfAClassifier(final String path, final String classifier) {
+    assertThat(ArtifactUtils.isClassifierJar(path, classifier)).isTrue();
+  }
+
+  @ParameterizedTest(name = "{0} is not a {1} jar")
+  @CsvSource({
+    "com/acme/foo-sources/1.0/foo-sources-1.0.jar, sources",
+    "com/acme/foo-sources/1.0/foo-sources-1.0.pom, sources",
+    "com/acme/foo-sources/1.0/foo-sources-1.0-sources.pom, sources",
+    "com/acme/lib-javadoc/1.0/lib-javadoc-1.0.jar, javadoc",
+    "com/acme/lib/1.0/lib-1.0.jar, sources",
+    "com/acme/lib/1.0/lib-1.0-sources.jar, javadoc",
+    "com/acme/lib/1.0/lib-1.0-Sources.jar, sources",
+    "com/acme/lib/1.0/lib-1.0-my-sources.jar, sources",
+    "com/acme/lib/1.0/lib-1.0-sources.jar.sha1, sources",
+    "com/acme/lib/1.0/lib-1.0-sources.jar.md5, sources",
+    "com/acme/lib/1.0/lib-1.0-sources.jar.asc, sources",
+    "com/acme/lib/1.0/lib-1.0-sources.zip, sources",
+    "com/acme/lib/1.0/stray.txt, sources"
+  })
+  @DisplayName(
+      "a substring, a checksum, a signature or another extension is no such jar (RPS-1198)")
+  void isClassifierJarRefusesEverythingElse(final String path, final String classifier) {
+    assertThat(ArtifactUtils.isClassifierJar(path, classifier)).isFalse();
   }
 
   @Test

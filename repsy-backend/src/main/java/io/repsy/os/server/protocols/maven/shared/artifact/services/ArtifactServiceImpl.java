@@ -15,7 +15,6 @@
  */
 package io.repsy.os.server.protocols.maven.shared.artifact.services;
 
-import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType.REDEPLOY;
 import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.PLUGIN;
 import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.RELEASE;
 import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.SNAPSHOT;
@@ -40,7 +39,6 @@ import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
-import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
@@ -54,7 +52,6 @@ import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.tuple.MutablePair;
 import org.apache.maven.artifact.repository.metadata.SnapshotVersion;
 import org.apache.maven.artifact.repository.metadata.Versioning;
 import org.apache.maven.index.artifact.Gav;
@@ -77,8 +74,8 @@ import org.springframework.transaction.annotation.Transactional;
 @NullMarked
 public class ArtifactServiceImpl implements ArtifactService<UUID> {
 
-  private static final String SOURCES_SUFFIX = "-sources";
-  private static final String JAVADOC_SUFFIX = "-javadoc";
+  private static final String SOURCES_CLASSIFIER = "sources";
+  private static final String JAVADOC_CLASSIFIER = "javadoc";
   private static final String METADATA_FILENAME = "maven-metadata.xml";
   private static final String POM_SUFFIX = ".pom";
   private static final String SIGNED_POM_SUFFIX = ".asc";
@@ -120,11 +117,9 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    * @throws BadRequestException {@code invalidArtifactPath} if the path does not parse to a GAV
    */
   @Override
-  public MutablePair<@Nullable ArtifactDeployType, @Nullable ArtifactVersionType>
-      getDeployAndVersionType(
-          final BaseRepoInfo<UUID> baseRepoInfo, final StoragePath storagePath) {
+  public ArtifactVersionType getVersionType(
+      final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath) {
 
-    final var repoInfo = (RepoInfo) baseRepoInfo;
     final var gav = ArtifactUtils.getGavByFile(storagePath);
 
     if (gav == null) {
@@ -135,8 +130,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       throw new BadRequestException("invalidArtifactPath");
     }
 
-    return new MutablePair<>(
-        this.getDeployTypeByGav(repoInfo, gav), gav.isSnapshot() ? SNAPSHOT : RELEASE);
+    return gav.isSnapshot() ? SNAPSHOT : RELEASE;
   }
 
   /**
@@ -144,8 +138,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    * g/a/<baseVersion>/} file of a snapshot deploy) is judged, by its own {@code <version>}, exactly
    * like the artifact files of that directory. The artifact-level and group-level files index
    * versions of both kinds, and the files of the version they describe were judged by their own
-   * GAV, so no version-type rule applies to them. No deploy type is returned for metadata: {@code
-   * checkDeploymentRules} does not read it.
+   * GAV, so no version-type rule applies to them.
    *
    * <p>A metadata checksum or signature ({@code .asc}) holds a hash or armored text, not XML, so it
    * is never parsed and carries no {@code <version>}. Its version-level file is recognised by its
@@ -154,33 +147,25 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    * (RPS-1183, RPS-1185).
    */
   @Override
-  public MutablePair<@Nullable ArtifactDeployType, @Nullable ArtifactVersionType>
-      getDeployAndVersionTypesByMetadataTypeFiles(
-          final BaseRepoInfo<UUID> baseRepoInfo,
-          final byte[] content,
-          final StoragePath storagePath)
-          throws IOException, XmlPullParserException {
+  public @Nullable ArtifactVersionType getVersionTypeByMetadataTypeFiles(
+      final BaseRepoInfo<UUID> repoInfo, final byte[] content, final StoragePath storagePath) {
 
     final var relativePath = storagePath.getRelativePath();
     final var fileName = relativePath.getFileName();
 
     if (holdsNoXml(fileName)) {
-      return new MutablePair<>(
-          null,
-          ArtifactUtils.isSnapshotVersionDirectoryFile(relativePath.getPath()) ? SNAPSHOT : null);
+      return ArtifactUtils.isSnapshotVersionDirectoryFile(relativePath.getPath()) ? SNAPSHOT : null;
     }
 
-    // readMetadata throws for malformed content, it never returns null.
-    final var metadata = Objects.requireNonNull(ArtifactUtils.readMetadata(content));
+    final var metadata = ArtifactUtils.readMetadata(content);
 
     if (ArtifactUtils.isVersionLevelMetadata(metadata)) {
-      return new MutablePair<>(
-          null, ArtifactUtils.isSnapshot(metadata.getVersion()) ? SNAPSHOT : RELEASE);
+      return ArtifactUtils.isSnapshot(metadata.getVersion()) ? SNAPSHOT : RELEASE;
     }
 
     // Artifact-level and group-level metadata index versions of both kinds. The files of the
     // version they describe were judged by their own GAV, so no rule applies to them.
-    return new MutablePair<>(null, ArtifactUtils.isPluginMetadata(metadata) ? PLUGIN : null);
+    return ArtifactUtils.isPluginMetadata(metadata) ? PLUGIN : null;
   }
 
   /** A metadata checksum holds a hash and a metadata signature armored text: neither is XML. */
@@ -203,17 +188,17 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    */
   @Override
   public void checkDeploymentRules(
-      final BaseRepoInfo<UUID> baseRepoInfo,
-      final MutablePair<ArtifactDeployType, ArtifactVersionType> artifactPair,
+      final BaseRepoInfo<UUID> repoInfo,
+      final @Nullable ArtifactVersionType versionType,
       final StoragePath storagePath) {
 
     final var gav = ArtifactUtils.getGavByFile(storagePath);
 
     if (gav != null) {
-      this.checkAllowOverride(baseRepoInfo, gav, storagePath);
+      this.checkAllowOverride(repoInfo, gav, storagePath);
     }
 
-    this.checkVersionTypeRules(baseRepoInfo, artifactPair.getValue());
+    this.checkVersionTypeRules(repoInfo, versionType);
   }
 
   /**
@@ -231,6 +216,20 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   public void createOrUpdateArtifact(
       final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath, final Resource resource) {
 
+    // Cannot create artifact for signed files. The signature itself was verified before it was
+    // stored (see verifySignature), so here it only marks the version signed. It is looked up by
+    // the repo's storage key, so it does not need the repo row.
+    if (ArtifactUtils.isPomSignature(storagePath)) {
+      this.processSignedFileProcess(storagePath, repoInfo.getStorageKey());
+      return;
+    }
+
+    // A jar, a classifier file, a checksum or a metadata file registers nothing. Nothing below is
+    // loaded for them, so a normal `mvn deploy` does not pay a repo query per file (RPS-1179).
+    if (!ArtifactUtils.isPomToParse(storagePath)) {
+      return;
+    }
+
     final var repo =
         this.repoRepository
             .findByNameAndType(repoInfo.getName(), RepoType.MAVEN)
@@ -239,17 +238,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     final var fullPath = storagePath.getPath().replace("\\", "/");
     final var versionPath =
         fullPath.substring(fullPath.indexOf("/") + 1, fullPath.lastIndexOf("/"));
-
-    // Cannot create artifact for signed files. The signature itself was verified before it was
-    // stored (see verifySignature), so here it only marks the version signed.
-    if (ArtifactUtils.isPomSignature(storagePath)) {
-      this.processSignedFileProcess(storagePath, repo);
-      return;
-    }
-
-    if (!ArtifactUtils.isPomToParse(storagePath)) {
-      return;
-    }
 
     final var gav = ArtifactUtils.convertPathToGav(storagePath.getRelativePath().getPath());
     final var pomModel = ArtifactUtils.readModel(resource);
@@ -546,10 +534,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
 
     final var repo = artifact.getRepo();
 
-    if (this.versionTypeNotMatched(repo, gav.isSnapshot())) {
-      throw new AccessNotAllowedException("versionTypeNotMatched");
-    }
-
     final var storagePath = StoragePath.of(artifact.getRepo().getId(), versionPath);
 
     final var version = new ArtifactVersion();
@@ -560,12 +544,8 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     version.setType(gav.isSnapshot() ? SNAPSHOT : RELEASE);
     version.setVersionName(gav.isSnapshot() ? gav.getBaseVersion() : gav.getVersion());
 
-    final var filesInVersionDir =
-        this.storageStrategy.listStorageItems(storagePath).stream()
-            .map(StorageItemInfo::getPath)
-            .toList();
-
-    this.setVersionProperties(filesInVersionDir, pomModel, version);
+    this.setVersionProperties(
+        versionPath, this.storageStrategy.listStorageItems(storagePath), pomModel, version);
 
     try {
       this.artifactUpsertHelper.insertArtifactVersion(version, pomModel, artifact);
@@ -605,7 +585,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     this.updateArtifactVersion(repo, existingVersion, versionPath, pomModel);
   }
 
-  private void processSignedFileProcess(final StoragePath storagePath, final Repo repo) {
+  private void processSignedFileProcess(final StoragePath storagePath, final UUID repoId) {
 
     final var nonSignedStoragePath = this.getNonSignedStoragePath(storagePath);
 
@@ -616,12 +596,12 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       throw new ItemNotFoundException("itemNotFound");
     }
 
-    this.markArtifactSigned(repo, gav);
+    this.markArtifactSigned(repoId, gav);
   }
 
-  private void markArtifactSigned(final Repo repo, final Gav gav) {
+  private void markArtifactSigned(final UUID repoId, final Gav gav) {
 
-    final var artifactVersion = this.findArtifactVersion(repo.getId(), gav);
+    final var artifactVersion = this.findArtifactVersion(repoId, gav);
 
     // verifySignature refuses a signature without a registered version before it is stored, so
     // this is a defensive check for a version that vanished in between.
@@ -697,24 +677,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     return artifactVersionOptional.orElse(null);
   }
 
-  private ArtifactDeployType getDeployTypeByGav(final RepoInfo repoInfo, final Gav gav) {
-
-    final var artifact =
-        this.getArtifact(repoInfo.getStorageKey(), gav.getArtifactId(), gav.getGroupId());
-
-    if (artifact == null) {
-      return ArtifactDeployType.NEW;
-    }
-
-    final var artifactVersion = this.getArtifactVersionByGav(artifact.getId(), gav);
-
-    if (artifactVersion == null) {
-      return ArtifactDeployType.NEW;
-    } else {
-      return REDEPLOY;
-    }
-  }
-
   private void checkVersionTypeRules(
       final BaseRepoInfo<UUID> repoInfo, final @Nullable ArtifactVersionType versionType) {
 
@@ -733,10 +695,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       final Repo repo, final Gav gav, final @Nullable Model pomModel) {
 
     final var artifact = new Artifact();
-
-    if (this.versionTypeNotMatched(repo, gav.isSnapshot())) {
-      throw new AccessNotAllowedException("versionTypeNotMatched");
-    }
 
     artifact.setArtifactName(gav.getArtifactId());
     artifact.setGroupName(gav.getGroupId());
@@ -779,10 +737,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     }
 
     return this.updateArtifactProperties(existing, pomModel);
-  }
-
-  private boolean versionTypeNotMatched(final Repo repo, final boolean snapshot) {
-    return snapshot != repo.getSnapshots() && !(repo.getSnapshots() && repo.getReleases());
   }
 
   private boolean checkExtractedInfos(
@@ -883,13 +837,12 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
 
     final var versionStoragePath = StoragePath.of(repo.getId(), versionPath);
 
-    final var filesInVersionDir =
-        this.storageStrategy.listStorageItems(versionStoragePath).stream()
-            .map(StorageItemInfo::getPath)
-            .toList();
-
     // update artifact version properties
-    this.setVersionProperties(filesInVersionDir, pomModel, artifactVersion);
+    this.setVersionProperties(
+        versionPath,
+        this.storageStrategy.listStorageItems(versionStoragePath),
+        pomModel,
+        artifactVersion);
 
     this.versionDeveloperRepository.deleteAllByArtifactVersionId(artifactVersion.getId());
     this.versionLicenseRepository.deleteAllByArtifactVersionId(artifactVersion.getId());
@@ -930,10 +883,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
 
     final var versionMetadata = ArtifactUtils.readMetadata(resource.getContentAsByteArray());
 
-    if (versionMetadata == null) {
-      throw new IOException();
-    }
-
     final var snapshotVersions = versionMetadata.getVersioning().getSnapshotVersions();
 
     for (final SnapshotVersion sv : snapshotVersions) {
@@ -956,22 +905,34 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     }
   }
 
+  /**
+   * Sets the flags that depend on the files of the version directory and, when a POM was parsed,
+   * the ones that depend on it. A version has sources (or documents) when a file of the directory
+   * is the {@code jar} whose own classifier is exactly {@code sources} (or {@code javadoc}). It
+   * used to be any stored path containing {@code -sources} (or {@code -javadoc}), and the paths are
+   * the physical ones, so an artifactId such as {@code foo-sources}, a checksum or a signature of a
+   * sources jar, or a storage directory of that name flagged every version (RPS-1198).
+   *
+   * <p>Only the files directly in the version directory count. The flags are only recomputed when a
+   * POM of the version is stored, so a sources or javadoc jar uploaded after the POM is not
+   * reflected until the POM is stored again.
+   *
+   * @param versionPath the version directory inside the repo, {@code
+   *     <group>/<artifactId>/<version>}
+   */
   private void setVersionProperties(
-      final List<String> fileNamesInVersionDir,
+      final String versionPath,
+      final List<StorageItemInfo> itemsInVersionDir,
       final @Nullable Model pomModel,
       final ArtifactVersion artifactVersion) {
 
     var hasSources = false;
     var hasDocuments = false;
 
-    for (final var fileName : fileNamesInVersionDir) {
-      if (!hasSources) {
-        hasSources = ArtifactUtils.containsIgnoreCase(fileName, SOURCES_SUFFIX);
-      }
-
-      if (!hasDocuments) {
-        hasDocuments = ArtifactUtils.containsIgnoreCase(fileName, JAVADOC_SUFFIX);
-      }
+    for (final var relativePath : this.filesOfVersionDir(versionPath, itemsInVersionDir)) {
+      hasSources = hasSources || ArtifactUtils.isClassifierJar(relativePath, SOURCES_CLASSIFIER);
+      hasDocuments =
+          hasDocuments || ArtifactUtils.isClassifierJar(relativePath, JAVADOC_CLASSIFIER);
     }
 
     artifactVersion.setHasSources(hasSources);
@@ -980,6 +941,25 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     if (pomModel != null) {
       this.setVersionPropertiesByPomModel(pomModel, artifactVersion);
     }
+  }
+
+  /**
+   * The repo-relative paths of the files that sit directly in the version directory. Directories
+   * are skipped, and so are the files of nested directories, which {@code Files.walk} also lists
+   * but which are not files of this version.
+   */
+  private List<String> filesOfVersionDir(
+      final String versionPath, final List<StorageItemInfo> itemsInVersionDir) {
+
+    return itemsInVersionDir.stream()
+        .filter(item -> !item.isDirectory())
+        .filter(
+            item ->
+                item.getPath()
+                    .replace("\\", "/")
+                    .endsWith("/" + versionPath + "/" + item.getName()))
+        .map(item -> versionPath + "/" + item.getName())
+        .toList();
   }
 
   private void setVersionPropertiesByPomModel(
