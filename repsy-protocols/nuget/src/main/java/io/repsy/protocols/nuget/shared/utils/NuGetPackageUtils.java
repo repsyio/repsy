@@ -105,6 +105,14 @@ public final class NuGetPackageUtils {
   /** The {@code icon_url}, {@code license_url}, {@code project_url} and {@code repository_url}. */
   public static final int MAX_URL_LENGTH = 512;
 
+  /**
+   * Upper bound the search and autocomplete endpoints clamp {@code take} to (nuget.org's own
+   * convention: a request for more gets this many results instead of an error). Large enough for
+   * any real client page, small enough that one request cannot read a whole repo's package listing
+   * into memory.
+   */
+  public static final int MAX_SEARCH_TAKE = 1000;
+
   private static final Pattern NUGET_ID_PATTERN =
       Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$");
   private static final Pattern NUGET_VERSION_PATTERN =
@@ -226,6 +234,35 @@ public final class NuGetPackageUtils {
       sb.append(i < components.length ? components[i] : "0");
     }
     return sb.toString();
+  }
+
+  /**
+   * Parses the {@code skip} or {@code take} query parameter of the search and autocomplete
+   * endpoints, defaulting to {@code defaultValue} when the client left it out. A value that is not
+   * a non-negative integer — non-numeric, decimal, negative, or one that overflows {@code int} — is
+   * a client error and throws {@link IllegalArgumentException} instead of letting {@link
+   * Integer#parseInt} throw {@link NumberFormatException} out to a handler's catch-all, which would
+   * answer 500 and log it as a server error.
+   */
+  public static int parseNonNegativeParam(
+      final @Nullable String value, final int defaultValue, final String paramName) {
+
+    if (value == null) {
+      return defaultValue;
+    }
+
+    final int parsed;
+    try {
+      parsed = Integer.parseInt(value);
+    } catch (final NumberFormatException e) {
+      throw new IllegalArgumentException("'" + paramName + "' is not a valid integer: " + value, e);
+    }
+
+    if (parsed < 0) {
+      throw new IllegalArgumentException("'" + paramName + "' must not be negative: " + value);
+    }
+
+    return parsed;
   }
 
   public static @Nullable String extractXmlTag(final String xml, final String tagName) {

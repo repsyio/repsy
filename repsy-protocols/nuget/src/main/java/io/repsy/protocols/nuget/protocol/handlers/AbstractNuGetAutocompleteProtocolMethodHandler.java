@@ -20,6 +20,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
+import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -28,7 +29,6 @@ import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -91,21 +91,22 @@ public abstract class AbstractNuGetAutocompleteProtocolMethodHandler
       final var takeStr = request.getParameter("take");
       final var prerelease = "true".equalsIgnoreCase(request.getParameter("prerelease"));
 
-      final var skip = parseOrDefault(skipStr, 0);
-      final var take = parseOrDefault(takeStr, 20);
+      final var skip = NuGetPackageUtils.parseNonNegativeParam(skipStr, 0, "skip");
+      final var take =
+          Math.min(
+              NuGetPackageUtils.parseNonNegativeParam(takeStr, 20, "take"),
+              NuGetPackageUtils.MAX_SEARCH_TAKE);
 
       final var results =
           this.facade.autocomplete(context, q != null ? q : "", id, skip, take, prerelease);
 
       return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(results);
+    } catch (final IllegalArgumentException | ArithmeticException e) {
+      log.debug("NuGet autocomplete: invalid paging parameter: {}", e.getMessage());
+      return ResponseEntity.badRequest().build();
     } catch (final Exception e) {
       log.error("NuGet autocomplete failed", e);
       return ResponseEntity.internalServerError().build();
     }
-  }
-
-  private static int parseOrDefault(final @Nullable String value, final int defaultValue) {
-
-    return value != null ? Integer.parseInt(value) : defaultValue;
   }
 }

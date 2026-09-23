@@ -22,23 +22,33 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.protocols.nuget.protocol.handlers.AbstractNuGetAutocompleteProtocolMethodHandler;
+import io.repsy.protocols.nuget.protocol.handlers.AbstractNuGetSearchProtocolMethodHandler;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.time.Instant;
 import java.util.List;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
@@ -54,11 +64,18 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * <p>The version a package is found under, and the order of its version list, follow NuGet's
  * version order, not the publish order: a backport published after a newer release is not the
  * latest version (RPS-1066).
+ *
+ * <p>{@code skip} and {@code take} used to be parsed with {@code Integer.parseInt} inside a
+ * catch-all: a malformed value answered 500 with an ERROR stack trace instead of 400, and {@code
+ * take} had no upper bound, so a client could read a whole repo's package listing in one request
+ * (RPS-1120). {@link ParameterValidation} pins the fix for both {@code /v3/search} and {@code
+ * /v3/autocomplete}.
  */
 @DisplayName("NuGet wire protocol search")
 class NuGetSearchProtocolIT extends AbstractIntegrationTest {
 
   private static final String SEARCH_PATH = "/{repo}/v3/search";
+  private static final String AUTOCOMPLETE_PATH = "/{repo}/v3/autocomplete";
   private static final int PACKAGE_COUNT = 25;
 
   @Autowired private NuGetPackageRepository nugetPackageRepository;
@@ -91,8 +108,12 @@ class NuGetSearchProtocolIT extends AbstractIntegrationTest {
   }
 
   private ResultActions search(final String query) throws Exception {
+    return this.request(SEARCH_PATH, query);
+  }
+
+  private ResultActions request(final String path, final String query) throws Exception {
     final AbstractMockHttpServletRequestBuilder<?> request =
-        get(SEARCH_PATH + query, this.repo.getName())
+        get(path + query, this.repo.getName())
             .header(AUTHORIZATION, this.adminProtocolBearerToken());
 
     return this.mockMvc.perform(request.with(protocolPort()));
@@ -150,12 +171,9 @@ class NuGetSearchProtocolIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("treats a negative skip as the start of the results")
+  @DisplayName("answers 400 for a negative skip instead of silently clamping it (RPS-1120)")
   void negativeSkip() throws Exception {
-    this.search("?q=&skip=-4&take=10")
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.totalHits").value(PACKAGE_COUNT))
-        .andExpect(jsonPath("$.data[*].id", contains(this.packageIds.subList(0, 10).toArray())));
+    this.search("?q=&skip=-4&take=10").andExpect(status().isBadRequest());
   }
 
   @Test
@@ -219,5 +237,107 @@ class NuGetSearchProtocolIT extends AbstractIntegrationTest {
         .andExpect(jsonPath("$.data[*].version", contains("3.0.0-beta")))
         .andExpect(
             jsonPath("$.data[0].versions[*].version", contains("3.0.0-beta", "1.1.0", "1.0.0")));
+  }
+
+  private static Stream<Arguments> endpoints() {
+    return Stream.of(Arguments.of(SEARCH_PATH), Arguments.of(AUTOCOMPLETE_PATH));
+  }
+
+  /**
+   * RPS-1120: {@code skip} and {@code take} were parsed with {@code Integer.parseInt} inside a
+   * catch-all, so a malformed value answered 500 with an ERROR stack trace, and {@code take} had no
+   * upper bound. Covers both {@code /v3/search} and {@code /v3/autocomplete}, since both handlers
+   * shared the same bug.
+   */
+  @Nested
+  @DisplayName("skip and take validation")
+  class ParameterValidation {
+
+    private final ListAppender<ILoggingEvent> logs = new ListAppender<>();
+    private final Logger searchLogger =
+        (Logger) LoggerFactory.getLogger(AbstractNuGetSearchProtocolMethodHandler.class);
+    private final Logger autocompleteLogger =
+        (Logger) LoggerFactory.getLogger(AbstractNuGetAutocompleteProtocolMethodHandler.class);
+
+    @BeforeEach
+    void captureLogs() {
+      this.logs.start();
+      this.searchLogger.addAppender(this.logs);
+      this.autocompleteLogger.addAppender(this.logs);
+    }
+
+    @AfterEach
+    void stopCapturingLogs() {
+      this.searchLogger.detachAppender(this.logs);
+      this.autocompleteLogger.detachAppender(this.logs);
+    }
+
+    @ParameterizedTest(name = "{0}?skip=abc")
+    @MethodSource("io.repsy.os.server.protocols.nuget.protocol.NuGetSearchProtocolIT#endpoints")
+    @DisplayName("answers 400 for a non-numeric skip, without an ERROR log")
+    void nonNumericSkip(final String path) throws Exception {
+      NuGetSearchProtocolIT.this
+          .request(path, "?q=&skip=abc&take=10")
+          .andExpect(status().isBadRequest());
+      this.assertNoErrorLogged();
+    }
+
+    @ParameterizedTest(name = "{0}?take=1.5")
+    @MethodSource("io.repsy.os.server.protocols.nuget.protocol.NuGetSearchProtocolIT#endpoints")
+    @DisplayName("answers 400 for a decimal take, without an ERROR log")
+    void decimalTake(final String path) throws Exception {
+      NuGetSearchProtocolIT.this
+          .request(path, "?q=&skip=0&take=1.5")
+          .andExpect(status().isBadRequest());
+      this.assertNoErrorLogged();
+    }
+
+    @ParameterizedTest(name = "{0}?take=99999999999")
+    @MethodSource("io.repsy.os.server.protocols.nuget.protocol.NuGetSearchProtocolIT#endpoints")
+    @DisplayName("answers 400 for a take that overflows int, without an ERROR log")
+    void overflowingTake(final String path) throws Exception {
+      NuGetSearchProtocolIT.this
+          .request(path, "?q=&skip=0&take=99999999999")
+          .andExpect(status().isBadRequest());
+      this.assertNoErrorLogged();
+    }
+
+    @ParameterizedTest(name = "{0}?take=-1")
+    @MethodSource("io.repsy.os.server.protocols.nuget.protocol.NuGetSearchProtocolIT#endpoints")
+    @DisplayName("answers 400 for a negative take, without an ERROR log")
+    void negativeTake(final String path) throws Exception {
+      NuGetSearchProtocolIT.this
+          .request(path, "?q=&skip=0&take=-1")
+          .andExpect(status().isBadRequest());
+      this.assertNoErrorLogged();
+    }
+
+    @ParameterizedTest(name = "{0}?take=2000000000")
+    @MethodSource("io.repsy.os.server.protocols.nuget.protocol.NuGetSearchProtocolIT#endpoints")
+    @DisplayName("clamps a huge valid take instead of answering an error")
+    void hugeTakeIsClampedNotRejected(final String path) throws Exception {
+      NuGetSearchProtocolIT.this
+          .request(path, "?q=&skip=0&take=2000000000")
+          .andExpect(status().isOk());
+      this.assertNoErrorLogged();
+    }
+
+    @Test
+    @DisplayName(
+        "autocomplete answers 400, not 500, when skip + take overflows int even though take is"
+            + " clamped and both values are individually valid")
+    void autocompleteSkipPlusTakeOverflow() throws Exception {
+      // take is clamped to 1000 before it reaches the service, so a huge take alone cannot
+      // overflow skip + take there. skip is not capped, so a skip near Integer.MAX_VALUE still
+      // can, combined with any take above 0.
+      NuGetSearchProtocolIT.this
+          .request(AUTOCOMPLETE_PATH, "?q=&skip=2147483647&take=1")
+          .andExpect(status().isBadRequest());
+      this.assertNoErrorLogged();
+    }
+
+    private void assertNoErrorLogged() {
+      Assertions.assertThat(this.logs.list).noneMatch(event -> event.getLevel() == Level.ERROR);
+    }
   }
 }

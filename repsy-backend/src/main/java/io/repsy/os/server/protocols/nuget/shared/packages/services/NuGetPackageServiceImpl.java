@@ -246,7 +246,10 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       return List.of();
     }
 
-    final var pageable = Pageable.ofSize(Math.max(skip + take, 1));
+    // skip is not capped, so even a capped take can still overflow int here (e.g. skip near
+    // Integer.MAX_VALUE); addExact turns that into an ArithmeticException the handler maps to 400
+    // instead of silently wrapping to a negative page size.
+    final var pageable = Pageable.ofSize(Math.max(Math.addExact(skip, take), 1));
     return this.packageRepository
         .findByRepoIdAndPackageIdStartingWithIgnoreCase(repoInfo.getId(), query, pageable)
         .stream()
