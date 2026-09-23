@@ -112,6 +112,49 @@ class AbstractPypiStorageServiceTest {
   }
 
   @Nested
+  @DisplayName("discardArchive() (RPS-1124)")
+  class DiscardArchiveTests {
+
+    private static final String ARCHIVE_PATH = REPO_ID + "/" + NORMALIZED_NAME + "/" + FILENAME;
+    private static final String DIGEST_PATH = ARCHIVE_PATH + ".sha256";
+
+    @Test
+    @DisplayName("deletes the archive and its digest when both are there")
+    void deletesBothFiles() {
+      when(storageStrategy.get(any(StoragePath.class), eq(REPO_NAME)))
+          .thenReturn(Optional.of(new ByteArrayResource(new byte[] {1})));
+
+      service.discardArchive(REPO_ID, REPO_NAME, NORMALIZED_NAME, FILENAME);
+
+      verify(storageStrategy).delete(path(ARCHIVE_PATH));
+      verify(storageStrategy).delete(path(DIGEST_PATH));
+    }
+
+    @Test
+    @DisplayName("deletes only what exists: a write that failed before the digest has no digest")
+    void deletesOnlyTheFileThatExists() {
+      when(storageStrategy.get(path(ARCHIVE_PATH), eq(REPO_NAME)))
+          .thenReturn(Optional.of(new ByteArrayResource(new byte[] {1})));
+      when(storageStrategy.get(path(DIGEST_PATH), eq(REPO_NAME))).thenReturn(Optional.empty());
+
+      service.discardArchive(REPO_ID, REPO_NAME, NORMALIZED_NAME, FILENAME);
+
+      verify(storageStrategy).delete(path(ARCHIVE_PATH));
+      verify(storageStrategy, never()).delete(path(DIGEST_PATH));
+    }
+
+    @Test
+    @DisplayName("does nothing when the write failed before it created any file")
+    void doesNothingWhenNothingWasWritten() {
+      when(storageStrategy.get(any(StoragePath.class), eq(REPO_NAME))).thenReturn(Optional.empty());
+
+      service.discardArchive(REPO_ID, REPO_NAME, NORMALIZED_NAME, FILENAME);
+
+      verify(storageStrategy, never()).delete(any(StoragePath.class));
+    }
+  }
+
+  @Nested
   @DisplayName("deleteRelease() still filters by isFileBelongsRelease")
   class DeleteReleaseTests {
 

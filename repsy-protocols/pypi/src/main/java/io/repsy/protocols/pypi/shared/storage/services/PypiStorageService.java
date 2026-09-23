@@ -49,6 +49,12 @@ public interface PypiStorageService<ID> {
 
   boolean isPackageFileExist(UUID repoId, String normalizedName, String filename);
 
+  /**
+   * Removes one archive file and its digest, whichever of the two exists. Used to take back the
+   * partly written files of an upload that failed.
+   */
+  void discardArchive(UUID repoId, String repoName, String normalizedName, String filename);
+
   BaseUsages writePackageArchive(
       UUID repoId, String repoName, PackageUploadForm uploadForm, MultipartFile file)
       throws IOException;

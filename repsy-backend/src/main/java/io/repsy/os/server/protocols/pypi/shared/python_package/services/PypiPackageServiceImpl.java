@@ -17,9 +17,11 @@ package io.repsy.os.server.protocols.pypi.shared.python_package.services;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import com.github.f4b6a3.uuid.UuidCreator;
 import freemarker.template.Configuration;
 import freemarker.template.TemplateException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.ReleaseDetail;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PackageInfo;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.PypiPackage;
@@ -88,31 +90,40 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
   }
 
   @Override
-  @Transactional
-  public void addOrUpdateRelease(
+  @Transactional(rollbackFor = IOException.class)
+  public BaseUsages publishRelease(
+      final BaseRepoInfo<UUID> repoInfo,
+      final PackageUploadForm uploadForm,
+      final ReleaseFileWriter fileWriter)
+      throws IOException {
+
+    this.addOrUpdateRelease(repoInfo, uploadForm);
+
+    // Flush so a rejection by the database fails here, before the file is written. The
+    // transaction, and the package row lock it holds, stays open while the file is written, so a
+    // concurrent upload of the package waits for this one instead of racing it on the file.
+    this.pypiPackageRepository.flush();
+
+    return fileWriter.write();
+  }
+
+  private void addOrUpdateRelease(
       final BaseRepoInfo<UUID> repoInfo, final PackageUploadForm uploadForm) {
 
     final var releaseVersion = ReleaseVersion.of(uploadForm.getVersion());
 
-    final var packageOptional =
-        this.pypiPackageRepository.findByRepoIdAndNormalizedName(
-            repoInfo.getStorageKey(), uploadForm.getNormalizedName());
-
     final var pythonPypiPackage =
-        packageOptional.orElseGet(
-            () -> this.addPackage(repoInfo.getStorageKey(), uploadForm.getName()));
+        this.lockOrCreatePackage(
+            repoInfo.getStorageKey(), uploadForm.getName(), uploadForm.getNormalizedName());
 
     final var existingReleaseOpt =
         this.releaseRepository.findByPypiPackageIdAndVersion(
             pythonPypiPackage.getId(), releaseVersion.getVersion());
 
-    final Release release;
-
     if (existingReleaseOpt.isPresent()) {
-      release = existingReleaseOpt.get();
-      this.updateRelease(release, uploadForm, releaseVersion);
+      this.updateRelease(existingReleaseOpt.get(), uploadForm, releaseVersion);
     } else {
-      release = this.addRelease(uploadForm, releaseVersion, pythonPypiPackage);
+      final var release = this.addRelease(uploadForm, releaseVersion, pythonPypiPackage);
       this.addReleaseClassifiers(uploadForm, release);
       this.addReleaseProjectURLs(uploadForm, release);
     }
@@ -261,23 +272,35 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
     return this.releaseRepository.countAllByPypiPackageId(packageId) == 0;
   }
 
-  private PypiPackage addPackage(final UUID repoId, final String packageName) {
+  /**
+   * Returns the package row, locked until the transaction ends, inserting it first when this is the
+   * first upload of the package name.
+   *
+   * <p>The lock is what makes uploads of one package take turns, so the release row (a first upload
+   * of a version) and the archive (an upload of a file) each have one writer at a time. The insert
+   * skips a row that already exists instead of failing on the unique index, because on PostgreSQL a
+   * failed statement aborts the transaction.
+   */
+  private PypiPackage lockOrCreatePackage(
+      final UUID repoId, final String packageName, final String normalizedName) {
 
-    final var repo =
-        this.repoRepository
-            .findById(repoId)
-            .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
+    final var existing =
+        this.pypiPackageRepository.findLockedByRepoIdAndNormalizedName(repoId, normalizedName);
 
-    final var pythonPypiPackage = new PypiPackage();
+    if (existing.isPresent()) {
+      return existing.get();
+    }
 
-    pythonPypiPackage.setName(packageName);
-    pythonPypiPackage.setNormalizedName(PackageUtils.normalizePackageName(packageName));
-    pythonPypiPackage.setRepo(repo);
-    pythonPypiPackage.setCreatedAt(Instant.now());
+    if (!this.repoRepository.existsById(repoId)) {
+      throw new ItemNotFoundException("repoNotFound");
+    }
 
-    this.pypiPackageRepository.save(pythonPypiPackage);
+    this.pypiPackageRepository.insertIfAbsent(
+        UuidCreator.getTimeOrderedEpoch(), repoId, packageName, normalizedName, Instant.now());
 
-    return pythonPypiPackage;
+    return this.pypiPackageRepository
+        .findLockedByRepoIdAndNormalizedName(repoId, normalizedName)
+        .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
   }
 
   private void updateRelease(
