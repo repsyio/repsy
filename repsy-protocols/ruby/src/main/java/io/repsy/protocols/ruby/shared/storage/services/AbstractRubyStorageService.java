@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Paths;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
@@ -34,8 +33,6 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
 
   private static final String GEMS_PATH = "gems";
   private static final String DEFAULT_PLATFORM = "ruby";
-
-  private static final Pattern VERSION_START = Pattern.compile("-(?=\\d)");
 
   private final StorageStrategy storageStrategy;
 
@@ -56,8 +53,13 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
   }
 
   @Override
-  public Resource getGem(final UUID repoId, final String repoName, final String filename) {
-    final var gemName = extractGemName(filename);
+  public Resource getGem(
+      final UUID repoId,
+      final String repoName,
+      final String gemName,
+      final String version,
+      final String platform) {
+    final var filename = buildFilename(gemName, version, platform);
     final var gemPath = Paths.get(GEMS_PATH, gemName, filename);
     final var storagePath = StoragePath.of(repoId, gemPath.toString());
 
@@ -121,12 +123,5 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
     return DEFAULT_PLATFORM.equals(platform)
         ? String.format("%s-%s.gem", gemName, version)
         : String.format("%s-%s-%s.gem", gemName, version, platform);
-  }
-
-  private static String extractGemName(final String filename) {
-    final var noExt =
-        filename.endsWith(".gem") ? filename.substring(0, filename.length() - 4) : filename;
-    final var matcher = VERSION_START.matcher(noExt);
-    return matcher.find() ? noExt.substring(0, matcher.start()) : noExt;
   }
 }

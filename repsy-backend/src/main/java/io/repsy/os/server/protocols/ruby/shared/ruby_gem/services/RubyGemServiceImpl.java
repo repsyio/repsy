@@ -39,12 +39,15 @@ import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemVersionsEntry;
 import io.repsy.protocols.ruby.shared.gem.services.RubyGemProtocolService;
+import io.repsy.protocols.ruby.shared.storage.services.AbstractRubyStorageService;
 import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
+import io.repsy.protocols.ruby.shared.utils.GemFilenameCandidates;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -90,6 +93,48 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
             .orElseThrow(() -> new ItemNotFoundException(GEM_NOT_FOUND));
     final var rows = this.versionRepository.findAllCompactByGemId(gem.getId());
     return this.toCompactEntries(rows);
+  }
+
+  @Override
+  public Optional<GemCompactEntry> findByGemFilename(
+      final BaseRepoInfo<UUID> repoInfo, final String filename) {
+    for (final var candidate : GemFilenameCandidates.split(filename)) {
+      final var match =
+          this.gemRepository
+              .findByRepoIdAndName(repoInfo.getId(), candidate.name())
+              .flatMap(gem -> this.findMatchingVersion(gem.getId(), filename));
+      if (match.isPresent()) {
+        return match;
+      }
+    }
+    return Optional.empty();
+  }
+
+  private Optional<GemCompactEntry> findMatchingVersion(final UUID gemId, final String filename) {
+    return this.versionRepository.findAllCompactByGemId(gemId).stream()
+        .filter(
+            row ->
+                filename.equals(
+                    AbstractRubyStorageService.buildFilename(
+                        row.getGemName(), row.getVersion(), row.getPlatform())))
+        .findFirst()
+        .map(this::toSpecsEntry);
+  }
+
+  @Override
+  public boolean gemNameExists(final BaseRepoInfo<UUID> repoInfo, final String gemName) {
+    return this.gemRepository.existsByRepoIdAndName(repoInfo.getId(), gemName);
+  }
+
+  @Override
+  public boolean hasNonYankedVersion(
+      final BaseRepoInfo<UUID> repoInfo, final String gemName, final String version) {
+    return this.gemRepository
+        .findByRepoIdAndName(repoInfo.getId(), gemName)
+        .map(
+            gem ->
+                this.versionRepository.existsByGemIdAndVersionAndYankedFalse(gem.getId(), version))
+        .orElse(false);
   }
 
   @Override

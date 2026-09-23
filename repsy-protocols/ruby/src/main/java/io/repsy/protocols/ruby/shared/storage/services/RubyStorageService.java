@@ -32,7 +32,7 @@ public interface RubyStorageService {
       String platform,
       InputStream gem);
 
-  Resource getGem(UUID repoId, String repoName, String filename);
+  Resource getGem(UUID repoId, String repoName, String gemName, String version, String platform);
 
   long deleteGem(UUID repoId, String repoName, String gemName, String version, String platform);
 

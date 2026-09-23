@@ -29,6 +29,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.protocols.ruby.shared.gem.dtos.GemCompactEntry;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
 import io.repsy.protocols.ruby.shared.gem.services.RubyGemProtocolService;
 import io.repsy.protocols.ruby.shared.storage.services.RubyStorageService;
@@ -39,6 +40,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPOutputStream;
@@ -51,6 +55,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractRubyProtocolFacade publishGem")
@@ -250,5 +256,92 @@ class AbstractRubyProtocolFacadeTest {
           .isSameAs(failure)
           .hasSuppressedException(cleanupFailure);
     }
+  }
+
+  private static GemCompactEntry entry(
+      final String name, final String version, final String platform, final boolean yanked) {
+    return GemCompactEntry.builder()
+        .gemName(name)
+        .version(version)
+        .platform(platform)
+        .checksum("abc123")
+        .yanked(yanked)
+        .createdAt(Instant.parse("2026-01-01T00:00:00Z"))
+        .runtimeDependencies(List.of())
+        .build();
+  }
+
+  @Test
+  @DisplayName(
+      "downloadGem() resolves a hyphen-digit gem name against the DB, never re-derives it from"
+          + " the filename (RPS-1236)")
+  void downloadGemResolvesHyphenDigitNameFromTheDb() {
+    final var resource = new ByteArrayResource(new byte[] {1, 2, 3});
+    when(this.gemService.findByGemFilename(any(), eq("x-2fa-1.0.0.gem")))
+        .thenReturn(Optional.of(entry("x-2fa", "1.0.0", "ruby", false)));
+    when(this.storageService.getGem(REPO_ID, REPO_NAME, "x-2fa", "1.0.0", "ruby"))
+        .thenReturn(resource);
+
+    final Resource downloaded = this.facade.downloadGem(this.context, "x-2fa-1.0.0.gem");
+
+    assertThat(downloaded).isSameAs(resource);
+    verify(this.storageService).getGem(REPO_ID, REPO_NAME, "x-2fa", "1.0.0", "ruby");
+  }
+
+  @Test
+  @DisplayName("downloadGem() throws gemNotFound when the filename resolves to nothing")
+  void downloadGemThrowsWhenUnresolved() {
+    when(this.gemService.findByGemFilename(any(), eq("missing-1.0.0.gem")))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> this.facade.downloadGem(this.context, "missing-1.0.0.gem"))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessageContaining("gemNotFound");
+
+    verify(this.storageService, never()).getGem(any(), any(), any(), any(), any());
+  }
+
+  @Test
+  @DisplayName(
+      "downloadGem() serves the file of a yanked version: yank only unpublishes from the index"
+          + " (RPS-1238)")
+  void downloadGemServesAYankedVersionsFile() {
+    final var resource = new ByteArrayResource(new byte[] {1, 2, 3});
+    when(this.gemService.findByGemFilename(any(), eq("demo-1.2.3.gem")))
+        .thenReturn(Optional.of(entry("demo", "1.2.3", "ruby", true)));
+    when(this.storageService.getGem(REPO_ID, REPO_NAME, "demo", "1.2.3", "ruby"))
+        .thenReturn(resource);
+
+    final Resource downloaded = this.facade.downloadGem(this.context, "demo-1.2.3.gem");
+
+    assertThat(downloaded).isSameAs(resource);
+  }
+
+  @Test
+  @DisplayName("gemExists() delegates to the service's cheap existence check")
+  void gemExistsDelegates() {
+    when(this.gemService.gemNameExists(any(), eq("demo"))).thenReturn(true);
+
+    assertThat(this.facade.gemExists(this.context, "demo")).isTrue();
+  }
+
+  @Test
+  @DisplayName("gemFileExists() reflects whether the filename resolves")
+  void gemFileExistsReflectsResolution() {
+    when(this.gemService.findByGemFilename(any(), eq("demo-1.0.0.gem")))
+        .thenReturn(Optional.of(entry("demo", "1.0.0", "ruby", false)));
+    when(this.gemService.findByGemFilename(any(), eq("missing-1.0.0.gem")))
+        .thenReturn(Optional.empty());
+
+    assertThat(this.facade.gemFileExists(this.context, "demo-1.0.0.gem")).isTrue();
+    assertThat(this.facade.gemFileExists(this.context, "missing-1.0.0.gem")).isFalse();
+  }
+
+  @Test
+  @DisplayName("gemspecExists() delegates to the service's non-yanked-version check")
+  void gemspecExistsDelegates() {
+    when(this.gemService.hasNonYankedVersion(any(), eq("demo"), eq("1.0.0"))).thenReturn(true);
+
+    assertThat(this.facade.gemspecExists(this.context, "demo", "1.0.0")).isTrue();
   }
 }

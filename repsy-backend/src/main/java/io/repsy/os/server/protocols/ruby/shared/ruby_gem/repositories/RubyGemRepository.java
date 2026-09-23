@@ -31,6 +31,8 @@ public interface RubyGemRepository extends JpaRepository<RubyGem, UUID> {
 
   Optional<RubyGem> findByRepoIdAndName(UUID repoId, String name);
 
+  boolean existsByRepoIdAndName(UUID repoId, String name);
+
   @Query(
       """
       select g.name as name
