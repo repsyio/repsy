@@ -39,6 +39,15 @@ export function rescanTitle(status: ScanStatus | null | undefined): string {
   return hasRescanFailed(status) ? 'Last rescan failed. Showing the last completed scan.' : '';
 }
 
+/** Tooltip for a version that has no completed scan, so nothing but its first scan's state can be shown. */
+export function firstScanTitle(status: ScanStatus | null | undefined): string {
+  if (isRescanInProgress(status)) {
+    return 'The first scan is in progress.';
+  }
+
+  return hasRescanFailed(status) ? 'The first scan failed.' : '';
+}
+
 /**
  * Text for a recent scan whose newest scan is not completed, or an empty string when there is
  * nothing to flag. A version that never completed a scan has no earlier result to show, so it

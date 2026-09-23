@@ -86,6 +86,7 @@ export class GolangModuleVersionListComponent implements OnDestroy {
   public readonly username: string;
 
   private readonly repositoryChanges$: Subscription;
+  private securitySummarySubscription?: Subscription;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -117,6 +118,7 @@ export class GolangModuleVersionListComponent implements OnDestroy {
 
   public ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
+    this.securitySummarySubscription?.unsubscribe();
   }
 
   public loadPage(pageNum: number): void {
@@ -195,11 +197,14 @@ export class GolangModuleVersionListComponent implements OnDestroy {
   }
 
   private fetchSecuritySummary(): void {
-    this.securityService.getVersionSecuritySummary(this.activeRepo.repoName, this.modulePath).subscribe({
-      next: (summary) => {
-        this.securitySummary = summary;
-      },
-      error: () => {},
-    });
+    this.securitySummarySubscription?.unsubscribe();
+    this.securitySummarySubscription = this.securityService
+      .watchVersionSecuritySummary(this.activeRepo.repoName, this.modulePath)
+      .subscribe({
+        next: (summary) => {
+          this.securitySummary = summary;
+        },
+        error: () => {},
+      });
   }
 }

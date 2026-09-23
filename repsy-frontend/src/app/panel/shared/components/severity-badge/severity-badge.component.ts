@@ -19,12 +19,12 @@ import { Component, Input } from '@angular/core';
 
 import { ScanStatus, Severity } from '../../../../../generated/api';
 import {
+  firstScanTitle,
   isRescanInProgress,
   rescanCountsTitle,
   rescanTitle,
   unscannedCountsTitle,
 } from '../../util/rescan-status.util';
-
 
 const SEVERITY_CLASSES: Record<string, string> = {
   [Severity.Critical]: 'border-error-600 bg-error-900 text-error-400',
@@ -80,9 +80,14 @@ export class SeverityBadgeComponent {
 
   /** Tooltip of the whole badge while no severity exists yet, naming every unscanned version. */
   public get unscannedTitle(): string {
-    return this.isFirstScanInProgress || this.isFirstScanFailed
-      ? unscannedCountsTitle(this.unscannedInProgressCount, this.unscannedFailedCount)
-      : '';
+    if (!this.isFirstScanInProgress && !this.isFirstScanFailed) {
+      return '';
+    }
+
+    // A single version knows its own scan status, a roll-up only counts its unscanned versions.
+    return (
+      firstScanTitle(this.scanStatus) || unscannedCountsTitle(this.unscannedInProgressCount, this.unscannedFailedCount)
+    );
   }
 
   /**
@@ -90,14 +95,17 @@ export class SeverityBadgeComponent {
    * built from, that is versions being rescanned and versions that have no completed scan yet.
    */
   public get rescanTitle(): string {
+    // Without a completed scan there is no last known severity for the icon to qualify.
+    if (!this.scanned) {
+      return '';
+    }
+
     const parts = [
       rescanTitle(this.scanStatus) || rescanCountsTitle(this.rescanInProgressCount, this.rescanFailedCount),
     ];
 
-    if (this.scanned) {
-      const unscanned = unscannedCountsTitle(this.unscannedInProgressCount, this.unscannedFailedCount);
-      parts.push(unscanned && `${unscanned} Not included in the severity shown.`);
-    }
+    const unscanned = unscannedCountsTitle(this.unscannedInProgressCount, this.unscannedFailedCount);
+    parts.push(unscanned && `${unscanned} Not included in the severity shown.`);
 
     return parts.filter(Boolean).join(' ');
   }
@@ -123,7 +131,9 @@ export class SeverityBadgeComponent {
       return SEVERITY_CLASSES[Severity.Unknown];
     }
 
-    return this.severity ? (SEVERITY_CLASSES[this.severity] ?? SEVERITY_CLASSES[Severity.Unknown]) : SEVERITY_CLASSES[Severity.Unknown];
+    return this.severity
+      ? (SEVERITY_CLASSES[this.severity] ?? SEVERITY_CLASSES[Severity.Unknown])
+      : SEVERITY_CLASSES[Severity.Unknown];
   }
 
   public get label(): string {
@@ -139,6 +149,8 @@ export class SeverityBadgeComponent {
       return 'Scan failed';
     }
 
-    return this.severity ? (SEVERITY_LABELS[this.severity] ?? SEVERITY_LABELS[Severity.Unknown]) : SEVERITY_LABELS[Severity.Unknown];
+    return this.severity
+      ? (SEVERITY_LABELS[this.severity] ?? SEVERITY_LABELS[Severity.Unknown])
+      : SEVERITY_LABELS[Severity.Unknown];
   }
 }

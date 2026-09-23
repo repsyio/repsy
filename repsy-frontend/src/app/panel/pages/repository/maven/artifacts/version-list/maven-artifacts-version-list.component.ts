@@ -87,6 +87,7 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
   ];
 
   private readonly repositoryChanges$: Subscription;
+  private securitySummarySubscription?: Subscription;
 
   constructor(
     private readonly authService: AuthService,
@@ -114,6 +115,7 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
 
   public ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
+    this.securitySummarySubscription?.unsubscribe();
   }
 
   public loadPage(pageNum: number): void {
@@ -202,8 +204,9 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
   }
 
   private fetchSecuritySummary(): void {
-    this.securityService
-      .getVersionSecuritySummary(this.activeRepo.repoName, `${this.groupName}:${this.artifactName}`)
+    this.securitySummarySubscription?.unsubscribe();
+    this.securitySummarySubscription = this.securityService
+      .watchVersionSecuritySummary(this.activeRepo.repoName, `${this.groupName}:${this.artifactName}`)
       .subscribe({
         next: (summary) => {
           this.securitySummary = summary;

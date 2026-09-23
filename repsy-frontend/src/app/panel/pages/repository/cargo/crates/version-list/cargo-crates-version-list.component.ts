@@ -21,11 +21,7 @@ import { Subscription } from 'rxjs';
 import { finalize, switchMap } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import {
-  CrateVersionListItem,
-  RepoPermissionInfo,
-  VersionSecuritySummary,
-} from '../../../../../../../generated/api';
+import { CrateVersionListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -84,9 +80,11 @@ export class CargoCratesVersionListComponent implements OnDestroy {
     { name: 'Oldest', column: 'createdAt', type: 'ASC' },
   ];
   private readonly repositoryChanges$: Subscription;
+  private securitySummarySubscription?: Subscription;
 
   public ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
+    this.securitySummarySubscription?.unsubscribe();
   }
 
   constructor(
@@ -203,11 +201,14 @@ export class CargoCratesVersionListComponent implements OnDestroy {
   }
 
   private fetchSecuritySummary(): void {
-    this.securityService.getVersionSecuritySummary(this.activeRepo.repoName, this.packageName).subscribe({
-      next: (summary) => {
-        this.securitySummary = summary;
-      },
-      error: () => {},
-    });
+    this.securitySummarySubscription?.unsubscribe();
+    this.securitySummarySubscription = this.securityService
+      .watchVersionSecuritySummary(this.activeRepo.repoName, this.packageName)
+      .subscribe({
+        next: (summary) => {
+          this.securitySummary = summary;
+        },
+        error: () => {},
+      });
   }
 }

@@ -13,7 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-import { TestBed } from '@angular/core/testing';
+import { discardPeriodicTasks, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { firstValueFrom, Observable, of } from 'rxjs';
 
 import {
@@ -157,6 +157,71 @@ describe('SecurityService', () => {
     },
   ];
   describeCalls(() => service, cases);
+
+  describe('the watch calls fetch the summary again while a scan is unfinished', () => {
+    const SCANNING_VERSION = { '1.0.0': { scanned: false, findingCount: 0, latestScanStatus: 'RUNNING' } };
+    const SCANNING_REPO = { [REPO]: { scanned: false, unscannedInProgressCount: 1 } };
+
+    const watchCalls: {
+      name: string;
+      api: () => jasmine.Spy;
+      watch: () => Observable<unknown>;
+      scanning: unknown;
+      done: unknown;
+    }[] = [
+      {
+        name: 'watchSecuritySummary',
+        api: () => vulnerabilityApi.getSecuritySummary,
+        watch: () => service.watchSecuritySummary([REPO]),
+        scanning: SCANNING_REPO,
+        done: SUMMARY,
+      },
+      {
+        name: 'watchVersionSecuritySummary',
+        api: () => vulnerabilityApi.getVersionSecuritySummary,
+        watch: () => service.watchVersionSecuritySummary(REPO, ARTIFACT),
+        scanning: SCANNING_VERSION,
+        done: VERSION_SUMMARY,
+      },
+      {
+        name: 'watchArtifactSecuritySummary',
+        api: () => vulnerabilityApi.getArtifactSecuritySummary,
+        watch: () => service.watchArtifactSecuritySummary(REPO),
+        scanning: SCANNING_VERSION,
+        done: VERSION_SUMMARY,
+      },
+    ];
+
+    for (const c of watchCalls) {
+      it(`${c.name} polls until nothing is in progress, then stops`, fakeAsync(() => {
+        c.api().and.returnValues(of(restResponse(c.scanning)), of(restResponse(c.done)));
+        const seen: unknown[] = [];
+        let completed = false;
+
+        c.watch().subscribe({ next: (s) => seen.push(s), complete: () => (completed = true) });
+
+        expect(seen).toEqual([c.scanning]);
+        tick(10_000);
+        expect(seen).toEqual([c.scanning, c.done]);
+        expect(completed).toBeTrue();
+        tick(600_000);
+        expect(c.api()).toHaveBeenCalledTimes(2);
+      }));
+
+      it(`${c.name} stops polling when unsubscribed`, fakeAsync(() => {
+        c.api().and.returnValue(of(restResponse(c.scanning)));
+
+        const subscription = c.watch().subscribe();
+        tick(10_000);
+        expect(c.api()).toHaveBeenCalledTimes(2);
+
+        subscription.unsubscribe();
+        tick(600_000);
+        expect(c.api()).toHaveBeenCalledTimes(2);
+        discardPeriodicTasks();
+      }));
+    }
+  });
 
   describe('the maps default to an empty object when the response has no data', () => {
     const emptyMapCalls: { name: string; api: () => jasmine.Spy; invoke: () => Observable<unknown> }[] = [
