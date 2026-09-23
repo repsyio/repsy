@@ -18,7 +18,7 @@ package io.repsy.protocols.golang.shared.utils;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
-import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.util.zip.ZipInputStream;
 import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
@@ -39,18 +39,19 @@ public class GoModuleZipReader {
   public static final long MAX_GO_MOD_BYTES = 16L * 1024 * 1024;
 
   /**
-   * Returns the content of {@code <modulePath>@<version>/go.mod} in {@code zipContent}.
+   * Returns the content of {@code <modulePath>@<version>/go.mod} in {@code zipContent}, which is
+   * closed once the entry is found (or the zip is exhausted).
    *
    * @throws BadRequestException {@code goModNotFoundInZip} if the zip has no such entry, {@code
    *     goModTooLarge} if it inflates past {@link #MAX_GO_MOD_BYTES}
    */
   @SneakyThrows
   public static byte[] extractGoMod(
-      final byte[] zipContent, final String modulePath, final String version) {
+      final InputStream zipContent, final String modulePath, final String version) {
 
     final var entryName = modulePath + "@" + version + "/go.mod";
 
-    try (final var zis = new ZipInputStream(new ByteArrayInputStream(zipContent))) {
+    try (final var zis = new ZipInputStream(zipContent)) {
       var entry = zis.getNextEntry();
 
       while (entry != null) {

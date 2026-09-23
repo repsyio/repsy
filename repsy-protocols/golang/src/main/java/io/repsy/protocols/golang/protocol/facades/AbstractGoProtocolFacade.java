@@ -32,8 +32,11 @@ import io.repsy.protocols.golang.shared.utils.GoModuleHashCalculator;
 import io.repsy.protocols.golang.shared.utils.GoModuleZipReader;
 import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -44,6 +47,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @NullMarked
 public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I> {
@@ -65,11 +69,20 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
 
   private final GoStorageService<I> goStorageService;
   private final GoModuleService<I> goModuleService;
+  private final long maxModuleZipBytes;
 
+  /**
+   * @param maxModuleZipBytes The largest module zip an upload may carry. The body is a raw request
+   *     body, which no multipart limit applies to, so a larger one is refused with 413 instead of
+   *     being held whole in memory or spooled to disk without bound (RPS-1119).
+   */
   protected AbstractGoProtocolFacade(
-      final GoStorageService<I> goStorageService, final GoModuleService<I> goModuleService) {
+      final GoStorageService<I> goStorageService,
+      final GoModuleService<I> goModuleService,
+      final long maxModuleZipBytes) {
     this.goStorageService = goStorageService;
     this.goModuleService = goModuleService;
+    this.maxModuleZipBytes = maxModuleZipBytes;
   }
 
   @Override
@@ -88,6 +101,13 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     return this.getResourceWithLegacyFallback(repoInfo, path);
   }
 
+  /**
+   * Spools the module zip to a temporary file instead of holding it whole in memory (RPS-1119):
+   * {@code go.mod} is read out of it, it is hashed, and it is copied to storage, each from its own
+   * pass over the spooled file. The module path and version are validated against the URL before
+   * any of the body is read (RPS-1072), so a request that was always going to be refused is refused
+   * without spooling it.
+   */
   @Override
   @SneakyThrows
   public void upload(
@@ -107,12 +127,33 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
 
     rejectInvalidIdentifiers(decodedPath, version);
 
-    final var content = inputStream.readAllBytes();
+    // A client that declares an oversized body is refused before any of it is read.
+    if (contentLength > this.maxModuleZipBytes) {
+      throw new MaxUploadSizeExceededException(this.maxModuleZipBytes);
+    }
 
-    verifySha256(content, (String) context.getContextMap().get(CONTENT_SHA256_KEY));
+    try (final var spool = SpooledUpload.spool(inputStream, this.maxModuleZipBytes)) {
+      this.uploadSpooled(context, repoInfo, decodedPath, version, spool);
+    } catch (final EntryTooLargeException e) {
+      // The body was chunked or understated its length, and outgrew the limit while it was read.
+      throw new MaxUploadSizeExceededException(this.maxModuleZipBytes, e);
+    }
+  }
 
-    final var modContent = GoModuleZipReader.extractGoMod(content, decodedPath, version);
+  private void uploadSpooled(
+      final ProtocolContext context,
+      final BaseRepoInfo<I> repoInfo,
+      final String decodedPath,
+      final String version,
+      final SpooledUpload spool)
+      throws IOException {
+
+    verifySha256(spool.sha256Hex(), (String) context.getContextMap().get(CONTENT_SHA256_KEY));
+
+    final var modContent = GoModuleZipReader.extractGoMod(spool.openStream(), decodedPath, version);
     GoModFileValidator.validate(modContent, decodedPath);
+
+    final var zipHash = GoModuleHashCalculator.hashZip(spool.openStream());
 
     this.goModuleService.publishModule(
         repoInfo,
@@ -120,7 +161,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
         version,
         GoVersionUtils.extractGoVersionFromMod(modContent),
         GoModuleHashCalculator.hashMod(modContent),
-        GoModuleHashCalculator.hashZip(content));
+        zipHash);
 
     // The DB key is the case-preserved decoded path; the on-disk storage key is its !-escaped,
     // all-lower-case form (RPS-1232), so storage never has to rely on a case-sensitive filesystem.
@@ -132,9 +173,12 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
         StoragePath.of(
             repoInfo.getStorageKey(),
             this.goStorageService.getModuleZipRelativePath(escapedPath, version));
-    final var zipUsages =
-        this.goStorageService.writeInputStreamToPath(
-            zipStoragePath, new ByteArrayInputStream(content), repoInfo.getName());
+    final BaseUsages zipUsages;
+    try (final var zipStream = spool.openStream()) {
+      zipUsages =
+          this.goStorageService.writeInputStreamToPath(
+              zipStoragePath, zipStream, repoInfo.getName());
+    }
 
     final var infoUsages = this.writeInfoFile(repoInfo, escapedPath, version);
 
@@ -295,13 +339,11 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     return GoVersionUtils.escapeModulePath(GoVersionUtils.decodeModulePath(encoded));
   }
 
-  @SneakyThrows
-  private static void verifySha256(final byte[] content, final @Nullable String expected) {
+  private static void verifySha256(final String computedHex, final @Nullable String expected) {
     if (expected == null) {
       return;
     }
-    final var computed = GoModuleHashCalculator.computeSha256Hex(content);
-    if (!computed.equals(expected.toLowerCase(Locale.ROOT))) {
+    if (!computedHex.equals(expected.toLowerCase(Locale.ROOT))) {
       throw new BadRequestException("sha256Mismatch");
     }
   }

@@ -77,6 +77,12 @@ multiport:
     9443: ""
 
 repsy:
+  golang:
+    # Largest module zip a `go` client may publish. The zip is the raw request body, which the
+    # multipart limits above do not apply to, so a larger one is answered with 413 payloadTooLarge.
+    # 500MB matches MaxZipFile in golang.org/x/mod/zip, the limit the go tool itself puts on a
+    # module zip, so no zip the toolchain would build or accept is ever refused by it (RPS-1119).
+    max-module-zip-size: ${GO_MAX_MODULE_ZIP_SIZE:500MB}
   ruby:
     # Largest gem a `gem push` may carry. The gem is the raw request body, which the multipart
     # limits above do not apply to, so a larger one is answered with 413 payloadTooLarge.
