@@ -27,6 +27,7 @@ import {
 } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
+import { reservedRepoNameValidator } from '../../../../shared/util/reserved-repo-names';
 
 @Component({
   selector: 'app-repo-info',
@@ -54,6 +55,7 @@ export class RepoInfoComponent implements OnInit {
         Validators.required,
         Validators.maxLength(25),
         Validators.pattern(/^[a-zA-Z0-9_][a-zA-Z0-9_\-]*$/),
+        reservedRepoNameValidator(),
       ]),
     });
 

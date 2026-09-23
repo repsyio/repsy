@@ -92,6 +92,8 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String REPO_NOT_FOUND_TEXT = "Repository not found";
   private static final String REPO_EXISTS_TEXT = "The repository exists. Please try another name.";
+  private static final String REPO_NAME_RESERVED_TEXT =
+      "This name is reserved for the panel. Please try another name.";
   private static final String UNAUTHORIZED_TEXT = "The user has logged in but has no permissions.";
   private static final String ACCESS_NOT_ALLOWED_TEXT = "Access isn't allowed.";
   private static final String SESSION_EXPIRED_TEXT = "Session expired.";
@@ -205,6 +207,15 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
   private static void expectRepoExists(final ResultActions result) throws Exception {
     expectError(result, HttpStatus.CONFLICT, "repoExists", "repoExists", REPO_EXISTS_TEXT);
+  }
+
+  private static void expectRepoNameReserved(final ResultActions result) throws Exception {
+    expectError(
+        result,
+        HttpStatus.BAD_REQUEST,
+        "repoNameReserved",
+        "repoNameReserved",
+        REPO_NAME_RESERVED_TEXT);
   }
 
   private static void expectUnauthorized(final ResultActions result) throws Exception {
@@ -844,6 +855,35 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           "Repo created.");
 
       assertThat(ProtocolRepoControllerIT.this.reloadRepo(name).getName()).hasSize(25);
+    }
+
+    @ParameterizedTest(name = "\"{0}\"")
+    @ValueSource(
+        strings = {
+          "login",
+          "profile",
+          "repositories",
+          "users",
+          "security",
+          "not-found",
+          "api",
+          "assets",
+          "LOGIN",
+          "Users"
+        })
+    @DisplayName(
+        "returns 400 repoNameReserved for a name reserved by the panel's routes, creating nothing"
+            + " (RPS-1158)")
+    void rejectsReservedName(final String name) throws Exception {
+      final var dirsBefore = directoryCount(RepoType.MAVEN);
+
+      expectRepoNameReserved(
+          ProtocolRepoControllerIT.this.perform(
+              json(post("/api/repos/MAVEN"), createBody(name))
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
+
+      assertThat(ProtocolRepoControllerIT.this.repoRepository.findByName(name)).isEmpty();
+      assertThat(directoryCount(RepoType.MAVEN)).isEqualTo(dirsBefore);
     }
 
     @Test
@@ -2176,6 +2216,39 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
       final var mixed = "Mixed_Case-" + randomTag();
       this.rename(ProtocolRepoControllerIT.this.reloadRepo(longName), mixed);
       assertThat(ProtocolRepoControllerIT.this.reloadRepo(mixed).getName()).isEqualTo(mixed);
+    }
+
+    @ParameterizedTest(name = "\"{0}\"")
+    @ValueSource(
+        strings = {
+          "login",
+          "profile",
+          "repositories",
+          "users",
+          "security",
+          "not-found",
+          "api",
+          "assets",
+          "SECURITY",
+          "Not-Found"
+        })
+    @DisplayName(
+        "returns 400 repoNameReserved when renaming to a name reserved by the panel's routes"
+            + " (RPS-1158)")
+    void rejectsReservedName(final String name) throws Exception {
+      final var repo = ProtocolRepoControllerIT.this.seedMaven();
+      final var before = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
+
+      expectError(
+          ProtocolRepoControllerIT.this.perform(
+              json(patch(repoUrl(repo, "/name")), nameBody(name))
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
+          HttpStatus.BAD_REQUEST,
+          "repoNameReserved",
+          "repoNameReserved",
+          REPO_NAME_RESERVED_TEXT);
+
+      assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName())).isEqualTo(before);
     }
 
     @Test

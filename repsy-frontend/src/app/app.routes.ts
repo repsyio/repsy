@@ -30,6 +30,10 @@ import { SecurityComponent } from './panel/pages/security/security.component';
 import { UserManagementComponent } from './panel/pages/user/user-management/user-management.component';
 import { PanelLayoutComponent } from './panel/shared/layout/panel-layout.component';
 
+// RPS-1158: the fixed top-level routes below (plus 'api', 'assets' and 'favicon.ico', served by
+// the API port ahead of the SPA) are reserved and cannot be used as a repository name. Keep
+// panel/shared/util/reserved-repo-names.ts and the backend's
+// io.repsy.os.shared.repo.utils.RepoUtils.RESERVED_REPO_NAMES in sync with this list.
 export const routes: Routes = [
   {
     path: 'login',

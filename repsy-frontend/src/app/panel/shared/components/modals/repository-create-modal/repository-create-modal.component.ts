@@ -26,6 +26,7 @@ import {
   RepoType as ApiRepoType,
 } from '../../../../../../generated/api';
 import { RepoType } from '../../../dto/repo/repo-type';
+import { reservedRepoNameValidator } from '../../../util/reserved-repo-names';
 import { SelectorComponent } from '../../selector/selector.component';
 import { ToastService } from '../../toast/toast.service';
 import { ToggleComponent } from '../../toggle/toggle.component';
@@ -71,7 +72,15 @@ export class RepositoryCreateModalComponent implements OnInit {
     }
 
     this.form = this.fb.group({
-      name: ['', [Validators.required, Validators.maxLength(25), Validators.pattern(/^[a-zA-Z0-9_][a-zA-Z0-9_\-]*$/)]],
+      name: [
+        '',
+        [
+          Validators.required,
+          Validators.maxLength(25),
+          Validators.pattern(/^[a-zA-Z0-9_][a-zA-Z0-9_\-]*$/),
+          reservedRepoNameValidator(),
+        ],
+      ],
       privateRepo: [true],
       description: ['', [Validators.maxLength(500)]],
     });

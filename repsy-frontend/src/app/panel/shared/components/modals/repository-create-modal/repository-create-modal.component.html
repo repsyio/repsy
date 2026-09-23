@@ -58,6 +58,8 @@
               <p animate.enter="fade-in-up">• Should be maximum 25 characters</p>
             } @else if (form.get('name').errors?.['pattern'] && form.get('name').touched) {
               <p animate.enter="fade-in-up">• Should contain only letters, numbers, - and _, and not start with -</p>
+            } @else if (form.get('name').errors?.['reservedName'] && form.get('name').touched) {
+              <p animate.enter="fade-in-up">• This name is reserved for the panel. Please try another name.</p>
             }
           </div>
         </div>

@@ -20,6 +20,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.generated.model.RepoListInfo;
 import io.repsy.os.generated.model.RepoSettingsForm;
 import io.repsy.os.generated.model.RepoSettingsInfo;
+import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.mappers.RepoConverter;
@@ -34,6 +35,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,7 +55,7 @@ public class RepoTxService {
       final boolean privateRepo,
       final @Nullable String description) {
 
-    RepoUtils.validateRepoName(name);
+    RepoUtils.validateNewRepoName(name);
 
     this.checkIfRepoExists(name);
 
@@ -67,7 +69,7 @@ public class RepoTxService {
     repo.setSecurityScanEnabled(true);
     repo.setType(repoType);
 
-    this.repoRepository.save(repo);
+    this.saveOrThrowIfNameTaken(repo);
     return this.mapToRepoInfo(repo);
   }
 
@@ -135,7 +137,7 @@ public class RepoTxService {
       final @NonNull String newRepoName,
       final @NonNull RepoType repoType) {
 
-    RepoUtils.validateRepoName(newRepoName);
+    RepoUtils.validateNewRepoName(newRepoName);
 
     final var repo =
         this.findRepoOrThrowException(this.repoRepository.findByNameAndType(repoName, repoType));
@@ -143,7 +145,7 @@ public class RepoTxService {
     this.checkIfRepoExists(newRepoName);
 
     repo.setName(newRepoName);
-    this.repoRepository.save(repo);
+    this.saveOrThrowIfNameTaken(repo);
   }
 
   @Transactional
@@ -216,6 +218,25 @@ public class RepoTxService {
   private void checkIfRepoExists(final @NonNull String name) {
     if (this.repoRepository.existsByName(name)) {
       throw new ItemAlreadyExistException("repoExists");
+    }
+  }
+
+  /**
+   * Saves the repo, flushing so a unique-index violation surfaces here rather than at the
+   * transaction's commit. {@link #checkIfRepoExists} is a check-then-write and cannot close a race
+   * between two callers choosing the same free name: the loser still reaches the {@code
+   * ux_repo__name} index, but gets the specific {@code repoExists} 409 instead of falling through
+   * to the generic {@code DataIntegrityViolationException} handling in {@code ErrorHandler} (RPS-
+   * 1134).
+   */
+  private void saveOrThrowIfNameTaken(final @NonNull Repo repo) {
+    try {
+      this.repoRepository.saveAndFlush(repo);
+    } catch (final DataIntegrityViolationException e) {
+      if (ConstraintViolations.violatesConstraint(e, "ux_repo__name")) {
+        throw new ItemAlreadyExistException("repoExists");
+      }
+      throw e;
     }
   }
 }

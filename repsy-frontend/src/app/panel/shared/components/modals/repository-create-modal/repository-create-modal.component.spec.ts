@@ -55,4 +55,20 @@ describe('RepositoryCreateModalComponent name validation', () => {
     expect(isValid('my repo')).toBeFalse();
     expect(isValid('my@repo')).toBeFalse();
   });
+
+  // RPS-1158: reserved names collide with the panel's fixed top-level routes.
+  it('rejects a name reserved by the panel routes, case-insensitively', () => {
+    expect(isValid('login')).toBeFalse();
+    expect(component.form.get('name').errors?.['reservedName']).toBeTruthy();
+
+    expect(isValid('Repositories')).toBeFalse();
+    expect(component.form.get('name').errors?.['reservedName']).toBeTruthy();
+
+    expect(isValid('FAVICON.ICO')).toBeFalse();
+    expect(component.form.get('name').errors?.['reservedName']).toBeTruthy();
+  });
+
+  it('accepts a name that is not reserved', () => {
+    expect(isValid('login-service')).toBeTrue();
+  });
 });
