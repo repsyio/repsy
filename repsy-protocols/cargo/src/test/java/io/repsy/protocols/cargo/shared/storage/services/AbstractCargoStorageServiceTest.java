@@ -29,6 +29,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -105,7 +106,12 @@ class AbstractCargoStorageServiceTest {
 
       final var usages =
           service.writeCrateAndIndex(
-              REPO_ID, REPO_NAME, "serde", "1.0.0", crateBytes, "{\"vers\":\"1.0.0\"}");
+              REPO_ID,
+              REPO_NAME,
+              "serde",
+              "1.0.0",
+              new ByteArrayInputStream(crateBytes),
+              "{\"vers\":\"1.0.0\"}");
 
       assertThat(usages.getDiskUsage()).isEqualTo(120);
       assertThat(written[0]).containsExactly(crateBytes);
@@ -131,7 +137,8 @@ class AbstractCargoStorageServiceTest {
       when(storageStrategy.append(eq(REPO_NAME), any(StoragePath.class), any(byte[].class)))
           .thenReturn(BaseUsages.ofDisk(1));
 
-      service.writeCrateAndIndex(REPO_ID, REPO_NAME, crateName, "0.1.0", new byte[0], "{}");
+      service.writeCrateAndIndex(
+          REPO_ID, REPO_NAME, crateName, "0.1.0", new ByteArrayInputStream(new byte[0]), "{}");
 
       verify(storageStrategy).append(eq(REPO_NAME), path(REPO_ID + "/" + indexPath), any());
     }

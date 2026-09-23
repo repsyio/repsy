@@ -23,13 +23,23 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.List;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 @NullMarked
 public interface CargoCrateService<ID> {
 
-  void publish(BaseRepoInfo<ID> repoInfo, CratePublishRequest request);
+  /** Publishes without an edition (RPS-1141): kept for callers that have none to report. */
+  default void publish(final BaseRepoInfo<ID> repoInfo, final CratePublishRequest request) {
+    this.publish(repoInfo, request, null);
+  }
+
+  /**
+   * @param edition The {@code edition} key the crate's {@code Cargo.toml} declares, or {@code null}
+   *     when it has none or the value did not fit {@code cargo_crate_meta.edition} (RPS-1141).
+   */
+  void publish(BaseRepoInfo<ID> repoInfo, CratePublishRequest request, @Nullable String edition);
 
   void yank(BaseRepoInfo<ID> repoInfo, String name, String vers);
 

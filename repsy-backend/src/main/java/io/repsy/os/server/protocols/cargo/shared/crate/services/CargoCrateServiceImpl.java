@@ -83,7 +83,10 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
 
   @Override
   @Transactional
-  public void publish(final BaseRepoInfo<UUID> repoInfo, final CratePublishRequest request) {
+  public void publish(
+      final BaseRepoInfo<UUID> repoInfo,
+      final CratePublishRequest request,
+      final @Nullable String edition) {
 
     final var repo = this.findRepoById(repoInfo.getId());
     final var normalizedName = CrateUtils.normalizeCrateName(request.name());
@@ -111,7 +114,7 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
     this.crateRepository.save(crate);
 
     this.createCrateIndex(crate, request);
-    this.createCrateMeta(crate, request);
+    this.createCrateMeta(crate, request, edition);
   }
 
   @Override
@@ -313,7 +316,8 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
         hasAlias ? dep.name() : null);
   }
 
-  private void createCrateMeta(final CargoCrate crate, final CratePublishRequest request) {
+  private void createCrateMeta(
+      final CargoCrate crate, final CratePublishRequest request, final @Nullable String edition) {
 
     final var meta = new CargoCrateMeta();
 
@@ -323,6 +327,7 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
     meta.setLicense(request.license());
     meta.setLicenseFile(request.licenseFile());
     meta.setDocumentation(request.documentation());
+    meta.setEdition(edition);
     meta.setRustVersion(request.rustVersion());
     meta.setDownloads(0L);
     meta.setCreatedAt(Instant.now());
