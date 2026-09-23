@@ -27,10 +27,10 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.Security;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -60,8 +60,9 @@ public class PGPVerifierService {
   private static final int PGP_BUFFER_SIZE = 4_096;
   private static final String PRIVATE_KEY_ARMOR_HEADER = "-----BEGIN PGP PRIVATE KEY BLOCK-----";
   private static final int MAX_USER_ID_LENGTH = 255;
-  private static final @NonNull Set<String> KEY_SERVERS =
-      Set.of(
+  // Order matters (RPS-1194): tried in this order, ubuntu's keyserver first, then openpgp.org.
+  private static final @NonNull List<String> KEY_SERVERS =
+      List.of(
           "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x%s",
           "https://keys.openpgp.org/pks/lookup?op=get&search=0x%s");
 
@@ -74,7 +75,9 @@ public class PGPVerifierService {
    * custom key-server hosts, then the two hardcoded default key servers.
    *
    * @throws SignatureNotVerifiedException {@code artifactSignatureNotVerified} when {@code
-   *     signedFile} is not a parseable OpenPGP signature, or does not verify against {@code file}
+   *     signedFile} is not a parseable OpenPGP signature, does not verify against {@code file}, or
+   *     verifies against a key (or its primary key) that is revoked or was expired at the
+   *     signature's creation time (RPS-1202)
    * @throws ItemNotFoundException when no source in {@code sources} (nor the default servers) has
    *     the signer's public key
    */
@@ -103,7 +106,7 @@ public class PGPVerifierService {
         throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
       }
 
-      final var publicKey =
+      final var matchedKey =
           this.getPublicKey(signature.getKeyID(), sources)
               .orElseThrow(
                   () ->
@@ -111,7 +114,10 @@ public class PGPVerifierService {
                           "no public key found with Id %s"
                               .formatted(String.format(KEY_ID_FORMAT, signature.getKeyID()))));
 
-      signature.init(new JcaPGPContentVerifierBuilderProvider().setProvider("BC"), publicKey);
+      this.checkKeyValidity(matchedKey, signature.getCreationTime());
+
+      signature.init(
+          new JcaPGPContentVerifierBuilderProvider().setProvider("BC"), matchedKey.signingKey());
 
       final var buffer = new byte[PGP_BUFFER_SIZE];
 
@@ -132,8 +138,8 @@ public class PGPVerifierService {
     }
   }
 
-  private @NonNull Optional<PGPPublicKey> getPublicKey(
-      final long keyId, @Nullable final PublicKeySources sources) throws PGPException, IOException {
+  private @NonNull Optional<MatchedKey> getPublicKey(
+      final long keyId, @Nullable final PublicKeySources sources) {
 
     final var keyIdHex = String.format(KEY_ID_FORMAT, keyId);
 
@@ -165,7 +171,7 @@ public class PGPVerifierService {
    * before any key server is asked. A key that fails to parse is a stored row that was valid at
    * registration time, so it is logged and skipped rather than allowed to break the whole lookup.
    */
-  private @NonNull Optional<PGPPublicKey> findInRegisteredKeys(
+  private @NonNull Optional<MatchedKey> findInRegisteredKeys(
       @Nullable final PublicKeySources sources, final long keyId) {
 
     if (sources == null || sources.registeredArmoredKeys().isEmpty()) {
@@ -189,9 +195,8 @@ public class PGPVerifierService {
     return Optional.empty();
   }
 
-  private @NonNull Optional<PGPPublicKey> findInCustomHosts(
-      final @Nullable List<String> hosts, final @NonNull String keyIdHex, final long keyId)
-      throws PGPException, IOException {
+  private @NonNull Optional<MatchedKey> findInCustomHosts(
+      final @Nullable List<String> hosts, final @NonNull String keyIdHex, final long keyId) {
 
     if (hosts == null || hosts.isEmpty()) {
       return Optional.empty();
@@ -236,8 +241,8 @@ public class PGPVerifierService {
     throw new PGPException("PGPSignature is not found");
   }
 
-  private @NonNull Optional<PGPPublicKey> fetchKeyFromServer(
-      final @NonNull String serverUrl, final long keyId) throws PGPException, IOException {
+  private @NonNull Optional<MatchedKey> fetchKeyFromServer(
+      final @NonNull String serverUrl, final long keyId) {
 
     final var keyData =
         this.webClient
@@ -252,21 +257,111 @@ public class PGPVerifierService {
             .onErrorReturn("")
             .block();
 
-    if (keyData != null && keyData.contains("-----BEGIN PGP PUBLIC KEY BLOCK-----")) {
-      return this.parsePublicKey(keyData, keyId);
+    if (keyData == null || !keyData.contains("-----BEGIN PGP PUBLIC KEY BLOCK-----")) {
+      return Optional.empty();
     }
 
-    return Optional.empty();
+    try {
+      return this.parsePublicKey(keyData, keyId);
+    } catch (final PGPException | IOException | RuntimeException exception) {
+      // RPS-1194: a key server can answer something that isn't a valid armored key (a proxy error
+      // page, a truncated block). That must be treated the same as "this server does not have the
+      // key" so the loop tries the next one, not as an infrastructure failure of the whole upload.
+      log.warn(
+          "the key server at {} answered a key that could not be parsed. Cause: {}",
+          serverUrl,
+          exception.toString());
+      return Optional.empty();
+    }
   }
 
-  private @NonNull Optional<PGPPublicKey> parsePublicKey(
+  private @NonNull Optional<MatchedKey> parsePublicKey(
       final @NonNull String keyData, final long keyId) throws PGPException, IOException {
 
     try (final var ds = getDecoderStream(new ByteArrayInputStream(keyData.getBytes(UTF_8)))) {
       final var collection = new PGPPublicKeyRingCollection(ds, new JcaKeyFingerprintCalculator());
+      final var key = collection.getPublicKey(keyId);
 
-      return Optional.ofNullable(collection.getPublicKey(keyId));
+      if (key == null) {
+        return Optional.empty();
+      }
+
+      final var ring = collection.getPublicKeyRing(keyId);
+      final var primary = ring != null ? ring.getPublicKey() : key;
+
+      return Optional.of(new MatchedKey(key, primary));
     }
+  }
+
+  /**
+   * A key that matched a signature's key id, alongside the primary key of the ring it came from
+   * (RPS-1202): {@code signingKey} itself when it already is the primary, otherwise the primary key
+   * of the ring {@code signingKey} is a subkey of. Both are checked for revocation, since a subkey
+   * can be revoked directly or through its primary key being revoked.
+   */
+  private record MatchedKey(@NonNull PGPPublicKey signingKey, @NonNull PGPPublicKey primaryKey) {}
+
+  /**
+   * Refuses a signature made with, or verified against, a key that is revoked or was expired at
+   * {@code signatureCreationTime} (RPS-1202). Checked here, once a key has actually been matched by
+   * id, regardless of whether it came from a registered key or a key server: an invalid key is a
+   * definite refusal (422 {@code artifactSignatureNotVerified}), not a reason to keep looking,
+   * since further sources would only ever answer with the same key material for that id.
+   *
+   * <p>BouncyCastle's {@link PGPPublicKey#hasRevocation()} reports that a revocation signature
+   * packet is present, not that the packet is itself a genuine signature by the key's owner; a
+   * known limitation, see the PR description.
+   */
+  private void checkKeyValidity(
+      final @NonNull MatchedKey matchedKey, final @NonNull Date signatureCreationTime) {
+
+    this.checkNotRevoked(matchedKey);
+    checkNotExpired(matchedKey.signingKey(), signatureCreationTime);
+  }
+
+  private void checkNotRevoked(final @NonNull MatchedKey matchedKey) {
+
+    final var signingKey = matchedKey.signingKey();
+    final var primaryKey = matchedKey.primaryKey();
+
+    if (signingKey.hasRevocation()) {
+      log.warn("the signing key {} carries a revocation", keyIdHex(signingKey));
+      throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
+    }
+
+    if (primaryKey.getKeyID() != signingKey.getKeyID() && primaryKey.hasRevocation()) {
+      log.warn(
+          "the primary key {} of signing key {} carries a revocation",
+          keyIdHex(primaryKey),
+          keyIdHex(signingKey));
+      throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
+    }
+  }
+
+  private static void checkNotExpired(
+      final @NonNull PGPPublicKey signingKey, final @NonNull Date signatureCreationTime) {
+
+    final var validSeconds = signingKey.getValidSeconds();
+    if (validSeconds <= 0) {
+      return; // 0 means the key never expires.
+    }
+
+    final var creationTime = signingKey.getCreationTime();
+    final var expiryTime = new Date(creationTime.getTime() + validSeconds * 1000L);
+
+    if (signatureCreationTime.before(creationTime) || signatureCreationTime.after(expiryTime)) {
+      log.warn(
+          "the signing key {} had expired ({} - {}) by the signature's creation time {}",
+          keyIdHex(signingKey),
+          creationTime,
+          expiryTime,
+          signatureCreationTime);
+      throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
+    }
+  }
+
+  private static @NonNull String keyIdHex(final @NonNull PGPPublicKey key) {
+    return String.format(KEY_ID_FORMAT, key.getKeyID());
   }
 
   /**
