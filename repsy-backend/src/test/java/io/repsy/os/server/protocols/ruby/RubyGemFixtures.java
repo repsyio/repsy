@@ -114,6 +114,45 @@ public final class RubyGemFixtures {
     return output.toByteArray();
   }
 
+  /**
+   * Like {@link #gem(String, String)}, with a single runtime dependency of the given name and
+   * {@code >= x} requirement, in place of the fixed {@code rack}/{@code rake} pair (RPS-1135).
+   */
+  public static byte[] gemWithDependency(
+      final String name,
+      final String version,
+      final String dependencyName,
+      final String dependencyRequirement)
+      throws IOException {
+    final var metadata =
+        """
+        name: "%s"
+        version:
+          version: "%s"
+        platform: "ruby"
+        description: fixture
+        authors:
+        - "Alice"
+        dependencies:
+        - name: "%s"
+          type: runtime
+          requirement:
+            requirements:
+            - - ">="
+              - version: "%s"
+        """
+            .formatted(name, version, dependencyName, dependencyRequirement);
+    final var output = new ByteArrayOutputStream();
+
+    try (var tar = new TarArchiveOutputStream(output)) {
+      add(tar, "metadata.gz", gzip(metadata.getBytes(StandardCharsets.UTF_8)));
+      add(tar, "data.tar.gz", gzip(new byte[0]));
+      tar.finish();
+    }
+
+    return output.toByteArray();
+  }
+
   private static byte[] gzip(final byte[] bytes) throws IOException {
     final var output = new ByteArrayOutputStream();
 
