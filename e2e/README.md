@@ -685,8 +685,10 @@ work directory (`clients/exec.ts`) and runs the real `cargo` binary:
   builds the crate, which needs `rustc` and a linker — a build is the toolchain's concern, not the
   registry's, and this harness's crates are dependency-free and never need to actually compile.
   `CARGO_PUBLISH_TIMEOUT=30` bounds cargo's own post-publish index poll (default 60s) — confirmed
-  live, an underscore-named crate's poll resolves on its first attempt (well under a second), so
-  nothing here relies on the longer default (see "H2" below for the one case that does hit it).
+  live, an underscore-named crate's poll resolves on its first attempt (well under a second). A
+  hyphenated crate's poll used to burn the whole 30s window before RPS-1212 was fixed (see "H2"
+  below); now it also resolves on its first attempt, so nothing here relies on the longer default
+  any more — the lower bound is kept as a safety margin, not because anything still needs it.
 - **`resolve`**: a fresh, separate work directory (fresh `CARGO_HOME` too) with a minimal consumer
   crate (`[dependencies] <name> = { version = "=<version>", registry = "repsy" }`, an empty
   `src/lib.rs` — cargo refuses a package with no targets at all) and a plain `cargo fetch`. The
@@ -812,10 +814,18 @@ cargo fetch (dependency "e2e-<runid>-hyphen") -> exit 101, "error: no matching p
 
 This is why the catalog loop's own crate names are underscore-only (`cargoAdapter.packageName`,
 `cargo-raw.ts`'s `crateName` — never `scenarios/coordinates.ts`'s hyphenated `slugify`): a hyphenated
-name round-trips through the loop under a spelling the server itself never agrees to serve back.
-`tests/cargo/publish-consume.spec.ts`'s dedicated real-client test and
-`tests/cargo/registry-rules.spec.ts`'s raw-HTTP test both pin this directly, through `test.fail()`.
-Filed as **RPS-1212**.
+name used to round-trip through the loop under a spelling the server itself never agreed to serve
+back. Filed as **RPS-1212**.
+
+**Fixed**: `CargoCrateConverter.toCrateIndexEntry` now maps the served entry's `name` from
+`CargoCrate.originalName` (already persisted at publish time, unused by the converter until now)
+instead of the normalised lookup key. Lookup stays spelling-insensitive (both the hyphenated and the
+normalised spelling still answer `200`), but the served entry's identity is now stable and always
+names the spelling the crate was actually published under. `cargo publish` of a hyphenated crate now
+confirms on its first post-publish poll (no more ~30s stall), and `cargo fetch` resolves it instead
+of refusing with "no matching package". `tests/cargo/publish-consume.spec.ts`'s dedicated real-client
+test and `tests/cargo/registry-rules.spec.ts`'s raw-HTTP test both assert this directly now (the
+`test.fail()` pins are gone).
 
 ### Cargo protocol-specific suite (steps 5b/5c, RPS-294)
 
@@ -841,14 +851,26 @@ yank`/`cargo yank --undo` binaries — both exit `0`, the served sparse-index en
 - **Search** (`GET /<repo>/api/v1/crates?q=<query>`, `AbstractCargoSearchProtocolMethodHandler`,
   `permission: READ`): confirmed live with the real `cargo search --registry repsy` binary — exit `0`,
   stdout lists the crate, and the raw envelope (`{"crates":[...],"meta":{"total":N}}`) matches.
-- **Owners**: `GET/PUT/DELETE /<repo>/api/v1/crates/<name>/owners` (`CargoOwnersProtocolMethodHandler`
-  — defined directly in `repsy-backend`, unlike every other cargo route, which extends a shared
-  abstract class in `repsy-protocols/cargo`) answers **every** owners request, even a GET, with a
-  FIXED body (`{"ok":true,"msg":"Ownership is managed at the repository level in this registry"}`) and
-  `permission: WRITE` even for the GET. There is no `users` array at all. A real `cargo owner --list
---registry repsy <crate>` therefore fails client-side ("missing field `users`", exit `101`) even
-  though the raw HTTP GET itself succeeds (`200`) — confirmed live, filed as **RPS-1239**, pinned with
-  `test.fail()`.
+- **Owners**: `GET/PUT/DELETE /<repo>/api/v1/crates/<name>/owners` used to be one handler
+  (`CargoOwnersProtocolMethodHandler` — defined directly in `repsy-backend`, unlike every other cargo
+  route, which extends a shared abstract class in `repsy-protocols/cargo`) answering **every** owners
+  request, even a GET, with a FIXED body
+  (`{"ok":true,"msg":"Ownership is managed at the repository level in this registry"}`) and
+  `permission: WRITE` even for the GET (which also meant `getProperties()` omitted `writeOperation`,
+  so PUT/DELETE skipped authentication entirely on a public repo). There was no `users` array at all,
+  so a real `cargo owner --list --registry repsy <crate>` failed client-side ("missing field `users`",
+  exit `101`) even though the raw HTTP GET itself succeeded (`200`) — confirmed live, filed as
+  **RPS-1239**.
+
+  **Fixed**: the route is split into `CargoOwnersListProtocolMethodHandler` (GET,
+  `permission: READ`) and `CargoOwnersModifyProtocolMethodHandler` (PUT/DELETE, `permission: WRITE`,
+  `writeOperation: true`). GET now answers the crates.io `{"users": [...]}` shape with a repo-level
+  synthetic owner (`{"id":0,"login":"<repoName>","name":"Ownership is managed at the repository level
+in this registry"}"}`, since Repsy has no ownership model finer than the repository); PUT/DELETE
+  keep the original `{"ok":true,"msg":"..."}` body, but are now real write operations that
+  authenticate even on a public repo — a permission-narrowing behavior change on what was previously
+  an (unauthenticated, no-op) "working" path. A real `cargo owner --list` now succeeds.
+
 - **Index `cksum` / multi-version**: confirmed live that a crate's served sparse-index `cksum` equals
   the sha256 of the raw-downloaded `.crate` bytes (and the adapter's own publish hash), and that two
   versions of one crate coexist independently — distinct `cksum`s, distinct downloaded bytes, both

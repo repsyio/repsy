@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.cargo.protocol.handlers;
+package io.repsy.protocols.cargo.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -28,24 +28,28 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Component;
 
-@Component
+/**
+ * {@code PUT}/{@code DELETE} {@code /api/v1/crates/{name}/owners}: {@code cargo owner --add}/{@code
+ * --remove}. Repsy has no ownership model finer than the repository itself, so these are no-ops
+ * that report success without changing anything — but they are still {@code writeOperation}s, so
+ * {@code CargoAuthPreProcessor} authenticates them even on a public repo instead of letting a
+ * mutating request through unauthenticated.
+ */
 @NullMarked
-public class CargoOwnersProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractCargoOwnersModifyProtocolMethodHandler
+    implements ProtocolMethodHandler {
 
   private static final Pattern OWNERS_PATTERN = Pattern.compile(".*/api/v1/crates/[^/]+/owners$");
 
   private final PathParser basePathParser;
 
-  public CargoOwnersProtocolMethodHandler(
-      @Qualifier("osCargoPathParser") final PathParser basePathParser,
-      final CargoProtocolProvider provider) {
+  protected AbstractCargoOwnersModifyProtocolMethodHandler(
+      final PathParser basePathParser, final CargoProtocolProvider provider) {
 
     this.basePathParser = basePathParser;
     provider.registerMethodHandler(this);
@@ -53,12 +57,12 @@ public class CargoOwnersProtocolMethodHandler implements ProtocolMethodHandler {
 
   @Override
   public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET, HttpMethod.PUT, HttpMethod.DELETE);
+    return List.of(HttpMethod.PUT, HttpMethod.DELETE);
   }
 
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE);
+    return Map.of("permission", Permission.WRITE, "writeOperation", true);
   }
 
   @Override
