@@ -26,6 +26,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
@@ -699,6 +700,21 @@ class ProtocolAuthServiceTest {
           .getAuthenticatedUserByUsername(anyString());
       verify(ProtocolAuthServiceTest.this.userTxService, never())
           .getUserByUsernameOptional(anyString());
+    }
+
+    /**
+     * RPS-1171: an unrecognized {@code authentication_type} claim is a credential problem, not a
+     * bad request. Every protocol that goes through this shared bearer path (Docker included) must
+     * answer it 401, not let {@link BadRequestException} propagate unhandled.
+     */
+    @Test
+    @DisplayName("an unrecognized authentication type is answered unAuthorized, not badRequest")
+    void unrecognizedAuthTypeIsUnauthorized() {
+      when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenThrow(new BadRequestException("invalidAuthType"));
+
+      assertUnauthorized(
+          () -> this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.READ));
     }
 
     @Test

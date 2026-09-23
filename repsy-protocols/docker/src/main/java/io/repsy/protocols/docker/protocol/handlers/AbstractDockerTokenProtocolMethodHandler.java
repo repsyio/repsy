@@ -18,6 +18,7 @@ package io.repsy.protocols.docker.protocol.handlers;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -132,7 +133,11 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
     } catch (final TooManyRequestsException e) {
       // 429 with Retry-After is the answer, not a 401 that makes the client log in again.
       throw e;
-    } catch (final Exception _) {
+    } catch (final UnAuthorizedException | ItemNotFoundException _) {
+      // authorizePublicRead deliberately answers a private repo with ItemNotFoundException
+      // ("repoNotFound", RPS-1165): the token endpoint must still refuse it with the same generic
+      // 401 an anonymous caller gets for a wrong scope, or the status code would give away that
+      // the repo exists.
       return this.buildUnauthorizedResponse();
     }
   }

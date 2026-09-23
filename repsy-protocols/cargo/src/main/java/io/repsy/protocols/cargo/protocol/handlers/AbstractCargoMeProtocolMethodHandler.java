@@ -18,6 +18,7 @@ package io.repsy.protocols.cargo.protocol.handlers;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 
+import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
@@ -113,7 +114,7 @@ public abstract class AbstractCargoMeProtocolMethodHandler implements ProtocolMe
     } catch (final TooManyRequestsException e) {
       // 429 with Retry-After is the answer, not a 401 that makes the client log in again.
       throw e;
-    } catch (final Exception e) {
+    } catch (final UnAuthorizedException e) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .header(WWW_AUTHENTICATE, WWW_AUTHENTICATE_VALUE)
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)

@@ -22,6 +22,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
@@ -153,7 +154,7 @@ class AbstractCargoMeProtocolMethodHandlerTest {
       final var request = new MockHttpServletRequest();
       request.addHeader(HttpHeaders.AUTHORIZATION, AUTH_HEADER);
       when(authenticator.authenticateAndCreateToken(AUTH_HEADER))
-          .thenThrow(new IllegalArgumentException("badCredentials"));
+          .thenThrow(new UnAuthorizedException("badCredentials"));
 
       final var result = handler.handle(meContext, request, new MockHttpServletResponse());
 
@@ -161,6 +162,24 @@ class AbstractCargoMeProtocolMethodHandlerTest {
       assertThat(result.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE))
           .isEqualTo(WWW_AUTHENTICATE_VALUE);
       assertThat(errorDetail(result)).isEqualTo("badCredentials");
+    }
+
+    /**
+     * RPS-1165: only a credential failure is answered as 401. Anything else (a database outage, a
+     * bug) must reach {@code ErrorHandler} so it is logged and answered 500, instead of looking
+     * like a wrong credential to the client.
+     */
+    @Test
+    @DisplayName("lets a non-authentication exception propagate instead of answering 401")
+    void propagatesNonAuthenticationException() {
+      final var request = new MockHttpServletRequest();
+      request.addHeader(HttpHeaders.AUTHORIZATION, AUTH_HEADER);
+      when(authenticator.authenticateAndCreateToken(AUTH_HEADER))
+          .thenThrow(new IllegalStateException("database is down"));
+
+      assertThatThrownBy(() -> handler.handle(meContext, request, new MockHttpServletResponse()))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("database is down");
     }
 
     @Test
