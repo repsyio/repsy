@@ -25,8 +25,8 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
-import { Converter } from 'showdown';
-import showdownHighlight from 'showdown-highlight';
+import hljs from 'highlight.js';
+import { Marked } from 'marked';
 
 /** Elements that fetch or embed remote content. They have no place in a panel-rendered README. */
 const REMOVED_ELEMENTS = 'source, video, audio, track, link, object, embed, iframe, area, noscript';
@@ -61,19 +61,13 @@ export class MarkdownComponent implements OnInit, AfterViewInit {
   @Input() public markdown: string;
   public markdownHtml: SafeHtml;
 
-  private readonly mdConverter: Converter;
+  // README files (RPS-1006) routinely use tables and strikethrough; gfm covers both. External
+  // links already get target="_blank" from restrictLink below, regardless of the renderer.
+  private readonly mdConverter: Marked = new Marked({ gfm: true });
 
   @ViewChild('container') containerRef: ElementRef;
 
-  constructor(private readonly sanitizer: DomSanitizer) {
-    this.mdConverter = new Converter({
-      extensions: showdownHighlight({}),
-      // README files (RPS-1006) routinely use tables, strikethrough and links out of the panel.
-      tables: true,
-      strikethrough: true,
-      openLinksInNewWindow: true,
-    });
-  }
+  constructor(private readonly sanitizer: DomSanitizer) {}
 
   ngOnInit(): void {
     this.markdownToHtml(this.markdown);
@@ -91,7 +85,8 @@ export class MarkdownComponent implements OnInit, AfterViewInit {
     // README content is written by the package publisher, so it must not make the viewer's browser
     // request a publisher-chosen host, nor link into the panel's own routes. Angular's sanitiser
     // below stays the last line of defence against script injection.
-    const html = this.restrictRemoteContent(this.mdConverter.makeHtml(markdown));
+    const rendered = this.mdConverter.parse(markdown, { async: false });
+    const html = this.restrictRemoteContent(rendered);
     const safeHtml = this.sanitizer.sanitize(SecurityContext.HTML, html);
     this.markdownHtml = this.sanitizer.bypassSecurityTrustHtml(safeHtml || '');
   }
@@ -111,6 +106,7 @@ export class MarkdownComponent implements OnInit, AfterViewInit {
     doc.querySelectorAll(REMOVED_ATTRIBUTES.map((name) => `[${name}]`).join(', ')).forEach((element) => {
       REMOVED_ATTRIBUTES.forEach((name) => element.removeAttribute(name));
     });
+    doc.querySelectorAll('pre code').forEach((code) => hljs.highlightElement(code as HTMLElement));
 
     return doc.body.innerHTML;
   }
