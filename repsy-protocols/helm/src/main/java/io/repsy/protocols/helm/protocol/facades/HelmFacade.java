@@ -61,6 +61,16 @@ public interface HelmFacade<ID> {
       ProtocolContext context, UUID uploadId, InputStream stream, long contentLength)
       throws IOException;
 
+  /**
+   * Reports how many bytes of the upload session are written so far, so a {@code PATCH} chunk's
+   * {@code Content-Range} can be checked against it and the upload-status endpoint can answer the
+   * running {@code Range}.
+   *
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException When no such upload
+   *     session exists
+   */
+  long getUploadSize(ProtocolContext context, UUID uploadId) throws IOException;
+
   HelmOciBlobInfo finalizeBlob(
       ProtocolContext context,
       UUID uploadId,

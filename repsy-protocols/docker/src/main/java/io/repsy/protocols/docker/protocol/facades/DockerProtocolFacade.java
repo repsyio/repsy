@@ -50,6 +50,16 @@ public interface DockerProtocolFacade<ID> {
   void verifyLayerDigest(ProtocolContext context, RelativePath relativePath, String digest)
       throws IOException;
 
+  /**
+   * Reports how many bytes of the upload session are written so far, so a {@code PATCH} chunk's
+   * {@code Content-Range} can be checked against it and the upload-status endpoint can answer the
+   * running {@code Range}.
+   *
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException When no such upload
+   *     session exists
+   */
+  long getUploadSize(ProtocolContext context, RelativePath relativePath) throws IOException;
+
   void finalizeLayerUpload(ProtocolContext context, RelativePath relativePath, LayerInfo layerInfo)
       throws IOException;
 

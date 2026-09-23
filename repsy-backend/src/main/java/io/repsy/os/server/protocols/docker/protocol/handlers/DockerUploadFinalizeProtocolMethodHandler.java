@@ -15,7 +15,6 @@
  */
 package io.repsy.os.server.protocols.docker.protocol.handlers;
 
-import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
@@ -37,11 +36,5 @@ public class DockerUploadFinalizeProtocolMethodHandler
       final LayerService<UUID> layerService,
       final DockerProtocolProvider provider) {
     super(basePathParser, dockerFacade, layerService, provider);
-  }
-
-  @Override
-  protected UUID getUploadUuid() {
-
-    return UuidCreator.getTimeOrderedEpoch();
   }
 }

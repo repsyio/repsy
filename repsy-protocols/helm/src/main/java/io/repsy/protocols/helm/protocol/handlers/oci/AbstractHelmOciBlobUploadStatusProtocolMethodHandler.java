@@ -13,18 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.docker.protocol.handlers;
+package io.repsy.protocols.helm.protocol.handlers.oci;
 
-import static io.repsy.protocols.docker.shared.utils.DockerProtocolHttpValues.DOCKER_UPLOAD_UUID;
-import static io.repsy.protocols.docker.shared.utils.DockerProtocolHttpValues.RANGE;
+import static io.repsy.protocols.helm.shared.utils.HelmOciHttpValues.DOCKER_UPLOAD_UUID;
+import static io.repsy.protocols.helm.shared.utils.HelmOciHttpValues.RANGE;
 import static org.springframework.http.HttpHeaders.LOCATION;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
-import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
-import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
+import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
+import io.repsy.protocols.helm.protocol.facades.HelmFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,6 +31,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
@@ -40,28 +40,27 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
- * Handles {@code GET}/{@code HEAD} {@code /v2/{name}/blobs/uploads/{uuid}} — how a client resumes
- * an interrupted upload: it answers {@code 204} with the {@code Range} of the bytes already
+ * Handles {@code GET}/{@code HEAD} {@code /v2/{repo}/{name}/blobs/uploads/{uuid}} — how a client
+ * resumes an interrupted upload: it answers {@code 204} with the {@code Range} of the bytes already
  * written, or a {@code 404} ({@code io.repsy.core.error_handling.exceptions.ItemNotFoundException}
  * propagated from the facade) when the session does not exist.
  */
 @NullMarked
-public abstract class AbstractDockerUploadStatusProtocolMethodHandler<ID>
+public abstract class AbstractHelmOciBlobUploadStatusProtocolMethodHandler<ID>
     implements ProtocolMethodHandler {
 
   private static final Pattern UPLOAD_STATUS_PATTERN =
       Pattern.compile("^/([^/]+)/blobs/uploads/([0-9a-fA-F-]{36})/?$");
 
   private final PathParser basePathParser;
-  private final DockerProtocolFacade<ID> dockerFacade;
+  private final HelmFacade<ID> helmFacade;
 
-  public AbstractDockerUploadStatusProtocolMethodHandler(
+  public AbstractHelmOciBlobUploadStatusProtocolMethodHandler(
       final PathParser basePathParser,
-      final DockerProtocolFacade<ID> dockerFacade,
-      final DockerProtocolProvider provider) {
+      final HelmFacade<ID> helmFacade,
+      final HelmProtocolProvider provider) {
     this.basePathParser = basePathParser;
-    this.dockerFacade = dockerFacade;
-
+    this.helmFacade = helmFacade;
     provider.registerMethodHandler(this);
   }
 
@@ -84,14 +83,12 @@ public abstract class AbstractDockerUploadStatusProtocolMethodHandler<ID>
       }
 
       final var parsedPathOpt =
-          AbstractDockerUploadStatusProtocolMethodHandler.this.basePathParser.parse(request);
+          AbstractHelmOciBlobUploadStatusProtocolMethodHandler.this.basePathParser.parse(request);
       if (parsedPathOpt.isEmpty()) {
         return Optional.empty();
       }
 
-      final var urlProperties = ProtocolContextUtils.getUrlProperties(parsedPathOpt.get());
-
-      final var relativePath = urlProperties.getRelativePath().getPath();
+      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
 
       if (!UPLOAD_STATUS_PATTERN.matcher(relativePath).matches()) {
         return Optional.empty();
@@ -108,41 +105,29 @@ public abstract class AbstractDockerUploadStatusProtocolMethodHandler<ID>
       final HttpServletResponse response)
       throws Exception {
 
-    final var urlProperties = ProtocolContextUtils.getUrlProperties(context);
-    final var relativePath = urlProperties.getRelativePath().getPath();
-
+    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
     final var matcher = UPLOAD_STATUS_PATTERN.matcher(relativePath);
 
     if (!matcher.matches()) {
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
     }
 
-    final var imageName = matcher.group(1);
-    final var sessionId = matcher.group(2);
-
-    final var uploadPath = new RelativePath("/blobs/" + sessionId);
+    final var uploadId = UUID.fromString(matcher.group(2));
 
     // Throws ItemNotFoundException when no such upload session exists, which ErrorHandler turns
     // into the 404 BLOB_UPLOAD_UNKNOWN the OCI distribution spec asks for.
-    final var uploadSize = this.dockerFacade.getUploadSize(context, uploadPath);
+    final var uploadSize = this.helmFacade.getUploadSize(context, uploadId);
 
-    final var location = this.getServletURILocation(context, imageName, sessionId);
+    final var location =
+        ServletUriComponentsBuilder.fromCurrentContextPath()
+            .path(request.getRequestURI())
+            .build()
+            .toUriString();
 
     return ResponseEntity.noContent()
         .header(LOCATION, location)
         .header(RANGE, "0-" + Math.max(uploadSize - 1, 0))
-        .header(DOCKER_UPLOAD_UUID, sessionId)
+        .header(DOCKER_UPLOAD_UUID, uploadId.toString())
         .build();
-  }
-
-  protected String getServletURILocation(
-      final ProtocolContext context, final String imageName, final String sessionId) {
-
-    final var urlProperties = ProtocolContextUtils.getUrlProperties(context);
-
-    return ServletUriComponentsBuilder.fromCurrentContextPath()
-        .path("/v2/{repoName}/{imageName}/blobs/uploads/{sessionId}")
-        .buildAndExpand(urlProperties.getRepoName(), imageName, sessionId)
-        .toUriString();
   }
 }

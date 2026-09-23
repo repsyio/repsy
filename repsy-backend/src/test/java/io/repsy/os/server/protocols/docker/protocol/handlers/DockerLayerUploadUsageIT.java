@@ -21,6 +21,8 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -137,6 +139,39 @@ class DockerLayerUploadUsageIT extends AbstractIntegrationTest {
             .getResponse();
     requireStatus(response, 202, "layer chunk upload");
     return response.getHeader("Range");
+  }
+
+  /** {@code PATCH}es one chunk with an explicit {@code Content-Range} header. */
+  private MockHttpServletResponse patchChunkWithContentRange(
+      final Repo repo,
+      final String uploadId,
+      final byte[] bytes,
+      final String range,
+      final String token)
+      throws Exception {
+    return this.mockMvc
+        .perform(
+            patch("/v2/{repo}/{image}/blobs/uploads/{id}", repo.getName(), IMAGE, uploadId)
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header("Content-Range", range)
+                .content(bytes)
+                .header(AUTHORIZATION, token)
+                .with(protocolPort()))
+        .andReturn()
+        .getResponse();
+  }
+
+  private MockHttpServletResponse uploadStatus(
+      final Repo repo, final String uploadId, final String method, final String token)
+      throws Exception {
+    final var builder =
+        "HEAD".equals(method)
+            ? head("/v2/{repo}/{image}/blobs/uploads/{id}", repo.getName(), IMAGE, uploadId)
+            : get("/v2/{repo}/{image}/blobs/uploads/{id}", repo.getName(), IMAGE, uploadId);
+    return this.mockMvc
+        .perform(builder.header(AUTHORIZATION, token).with(protocolPort()))
+        .andReturn()
+        .getResponse();
   }
 
   /** Finalizes the upload; {@code body} is empty when the bytes went up in earlier chunks. */
@@ -490,6 +525,84 @@ class DockerLayerUploadUsageIT extends AbstractIntegrationTest {
 
     assertThat(response.getStatus()).isEqualTo(400);
     assertThat(storageDirOf(repo).resolve("blobs").resolve(sha256(layer))).doesNotExist();
+  }
+
+  @Test
+  @DisplayName("a chunk whose Content-Range starts where the upload ends is appended as usual")
+  void contentRangeMatchingTheCurrentSizeIsAppended() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+    final var repo = this.dockerRepo();
+    final var first = layerBytes("first-range-".repeat(20));
+    final var second = layerBytes("second-range-".repeat(20));
+    final var layer = concat(List.of(first, second));
+    final var uploadId = this.startUpload(repo, token);
+    final var firstResponse =
+        this.patchChunkWithContentRange(repo, uploadId, first, "0-" + (first.length - 1), token);
+    requireStatus(firstResponse, 202, "first ranged chunk");
+
+    final var secondResponse =
+        this.patchChunkWithContentRange(
+            repo, uploadId, second, first.length + "-" + (first.length + second.length - 1), token);
+
+    requireStatus(secondResponse, 202, "second ranged chunk");
+    assertThat(secondResponse.getHeader("Range")).isEqualTo("0-" + (layer.length - 1));
+    this.finalizeUpload(repo, uploadId, sha256(layer), new byte[0], token);
+    assertThat(storageDirOf(repo).resolve("blobs").resolve(sha256(layer))).hasBinaryContent(layer);
+  }
+
+  @Test
+  @DisplayName(
+      "a chunk whose Content-Range does not start where the upload ends is refused with 416")
+  void contentRangeMismatchIsRefusedWith416() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+    final var repo = this.dockerRepo();
+    final var first = layerBytes("head-range-".repeat(20));
+    final var stray = layerBytes("stray-chunk-".repeat(20));
+    final var uploadId = this.startUpload(repo, token);
+    this.patchChunk(repo, uploadId, first, token);
+
+    // Claims to start at 0, but the upload already holds first.length bytes.
+    final var response =
+        this.patchChunkWithContentRange(repo, uploadId, stray, "0-" + (stray.length - 1), token);
+
+    assertThat(response.getStatus()).isEqualTo(416);
+    assertThat(response.getHeader("Range")).isEqualTo("0-" + (first.length - 1));
+    assertThat(response.getHeader("Docker-Upload-UUID")).isEqualTo(uploadId);
+    assertThat(response.getHeader("Location")).isNotBlank();
+    // No bytes were appended from the refused chunk.
+    assertThat(storageDirOf(repo).resolve("blobs").resolve(uploadId)).hasBinaryContent(first);
+  }
+
+  @Test
+  @DisplayName("the upload-status endpoint answers 204 with the running Range, on GET and HEAD")
+  void uploadStatusAnswersTheRunningRange() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+    final var repo = this.dockerRepo();
+    final var chunk = layerBytes("status-range-".repeat(20));
+    final var uploadId = this.startUpload(repo, token);
+    this.patchChunk(repo, uploadId, chunk, token);
+
+    final var getResponse = this.uploadStatus(repo, uploadId, "GET", token);
+    final var headResponse = this.uploadStatus(repo, uploadId, "HEAD", token);
+
+    assertThat(getResponse.getStatus()).isEqualTo(204);
+    assertThat(getResponse.getHeader("Range")).isEqualTo("0-" + (chunk.length - 1));
+    assertThat(getResponse.getHeader("Docker-Upload-UUID")).isEqualTo(uploadId);
+    assertThat(getResponse.getHeader("Location")).isNotBlank();
+    assertThat(headResponse.getStatus()).isEqualTo(204);
+    assertThat(headResponse.getHeader("Range")).isEqualTo("0-" + (chunk.length - 1));
+  }
+
+  @Test
+  @DisplayName("the upload-status endpoint answers 404 for an upload that was never started")
+  void uploadStatusAnswers404ForAnUnknownSession() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+    final var repo = this.dockerRepo();
+    final var unknownUploadId = "00000000-0000-0000-0000-000000000099";
+
+    final var response = this.uploadStatus(repo, unknownUploadId, "GET", token);
+
+    assertThat(response.getStatus()).isEqualTo(404);
   }
 
   private static byte[] concat(final List<byte[]> chunks) {

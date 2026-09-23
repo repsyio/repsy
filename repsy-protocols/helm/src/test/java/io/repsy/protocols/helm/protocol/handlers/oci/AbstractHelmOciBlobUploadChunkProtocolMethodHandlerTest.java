@@ -18,6 +18,8 @@ package io.repsy.protocols.helm.protocol.handlers.oci;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.libs.protocol.router.PathParser;
@@ -102,5 +104,74 @@ class AbstractHelmOciBlobUploadChunkProtocolMethodHandlerTest {
   @DisplayName("answers a range that starts and ends at zero for an upload with no bytes yet")
   void answersAWellFormedRangeForAnEmptyUpload() throws Exception {
     assertThat(this.rangeAfterChunkOfUploadSize(0)).isEqualTo("0-0");
+  }
+
+  @Test
+  @DisplayName("refuses a chunk whose Content-Range does not start at the current upload size")
+  void refusesAContentRangeThatDoesNotMatchTheCurrentSize() throws Exception {
+    final var repoInfo = new BaseRepoInfo<UUID>();
+    repoInfo.setName("charts");
+    final var context = new ProtocolContext();
+    context.addProperty(
+        "urlProperties",
+        BaseUrlParserProperties.<UUID, BaseRepoInfo<UUID>>builder()
+            .repoName("charts")
+            .relativePath(new RelativePath("/app/blobs/uploads/" + UPLOAD_ID))
+            .repoInfo(repoInfo)
+            .build());
+    when(this.helmFacade.getUploadSize(context, UPLOAD_ID)).thenReturn(100L);
+    final var request = new MockHttpServletRequest("PATCH", UPLOAD_URI);
+    request.setContent(new byte[64]);
+    request.addHeader("Content-Range", "0-63");
+
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+    final ResponseEntity<Object> response;
+    try {
+      response =
+          new TestHandler(this.basePathParser, this.helmFacade, this.provider)
+              .handle(context, request, new MockHttpServletResponse());
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+    }
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
+    assertThat(response.getHeaders().getFirst("Range")).isEqualTo("0-99");
+    assertThat(response.getHeaders().getFirst("Docker-Upload-UUID"))
+        .isEqualTo(UPLOAD_ID.toString());
+    verify(this.helmFacade, never()).uploadBlobChunk(any(), any(), any(), any(Long.class));
+  }
+
+  @Test
+  @DisplayName("appends the chunk when Content-Range starts where the upload currently ends")
+  void appendsWhenContentRangeMatchesTheCurrentSize() throws Exception {
+    final var repoInfo = new BaseRepoInfo<UUID>();
+    repoInfo.setName("charts");
+    final var context = new ProtocolContext();
+    context.addProperty(
+        "urlProperties",
+        BaseUrlParserProperties.<UUID, BaseRepoInfo<UUID>>builder()
+            .repoName("charts")
+            .relativePath(new RelativePath("/app/blobs/uploads/" + UPLOAD_ID))
+            .repoInfo(repoInfo)
+            .build());
+    when(this.helmFacade.getUploadSize(context, UPLOAD_ID)).thenReturn(100L);
+    when(this.helmFacade.uploadBlobChunk(eq(context), eq(UPLOAD_ID), any(), eq(64L)))
+        .thenReturn(164L);
+    final var request = new MockHttpServletRequest("PATCH", UPLOAD_URI);
+    request.setContent(new byte[64]);
+    request.addHeader("Content-Range", "100-163");
+
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+    final ResponseEntity<Object> response;
+    try {
+      response =
+          new TestHandler(this.basePathParser, this.helmFacade, this.provider)
+              .handle(context, request, new MockHttpServletResponse());
+    } finally {
+      RequestContextHolder.resetRequestAttributes();
+    }
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+    assertThat(response.getHeaders().getFirst("Range")).isEqualTo("0-163");
   }
 }

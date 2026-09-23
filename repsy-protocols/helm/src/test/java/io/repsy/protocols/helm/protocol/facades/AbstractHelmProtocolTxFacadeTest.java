@@ -172,6 +172,38 @@ class AbstractHelmProtocolTxFacadeTest {
   }
 
   @Nested
+  @DisplayName("getUploadSize()")
+  class GetUploadSize {
+
+    @Test
+    @DisplayName("reports the size of the bytes written so far")
+    void reportsTheWrittenSize() throws Exception {
+      AbstractHelmProtocolTxFacadeTest.this.uploadHolds(new byte[BLOB_SIZE]);
+
+      final var size =
+          AbstractHelmProtocolTxFacadeTest.this.facade.getUploadSize(
+              AbstractHelmProtocolTxFacadeTest.this.context, UPLOAD_ID);
+
+      assertThat(size).isEqualTo(BLOB_SIZE);
+    }
+
+    @Test
+    @DisplayName("refuses an upload session that was never written")
+    void refusesAMissingSession() {
+      when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.getBlob(
+              REPO_ID, UPLOAD_ID.toString(), REPO_NAME))
+          .thenReturn(Optional.empty());
+
+      assertThatThrownBy(
+              () ->
+                  AbstractHelmProtocolTxFacadeTest.this.facade.getUploadSize(
+                      AbstractHelmProtocolTxFacadeTest.this.context, UPLOAD_ID))
+          .isInstanceOf(ItemNotFoundException.class)
+          .hasMessage("blobNotFound");
+    }
+  }
+
+  @Nested
   @DisplayName("finalizeBlob()")
   class FinalizeBlob {
 

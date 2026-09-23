@@ -246,6 +246,15 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
   }
 
   @Override
+  public long getUploadSize(final ProtocolContext context, final UUID uploadId) throws IOException {
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    return this.helmStorageService
+        .getBlob(repoInfo.getStorageKey(), uploadId.toString(), repoInfo.getName())
+        .orElseThrow(() -> new ItemNotFoundException("blobNotFound"))
+        .contentLength();
+  }
+
+  @Override
   @SneakyThrows
   public HelmOciBlobInfo finalizeBlob(
       final ProtocolContext context,
