@@ -84,7 +84,13 @@ class PagingParameterInterceptorTest {
     return Stream.of(
         Arguments.of("0", "1", "0:1"),
         Arguments.of("3", "100", "3:100"),
-        Arguments.of("2147483647", "10", "2147483647:10"),
+        // page * size == Integer.MAX_VALUE exactly: the product does not exceed it, so this is
+        // still the boundary case for an individually valid, maximal page.
+        Arguments.of("2147483647", "1", "2147483647:1"),
+        // Large but non-overflowing: page * size stays well under Integer.MAX_VALUE (RPS-1150).
+        Arguments.of("1000000", "100", "1000000:100"),
+        // Just at the page*size==Integer.MAX_VALUE boundary for size=100.
+        Arguments.of("21474836", "100", "21474836:100"),
         Arguments.of("", "", "0:10"),
         Arguments.of(" ", " ", "0:10"));
   }
@@ -113,6 +119,28 @@ class PagingParameterInterceptorTest {
         Arguments.of("size", "-1"),
         Arguments.of("size", "101"),
         Arguments.of("size", "2147483648"));
+  }
+
+  @ParameterizedTest(name = "page={0}, size={1}")
+  @MethodSource("overflowingPaging")
+  @DisplayName(
+      "answers 400 validationError naming page when page * size overflows Integer.MAX_VALUE"
+          + " (RPS-1150)")
+  void rejectsOverflowingOffset(final String page, final String size) throws Exception {
+    this.mockMvc
+        .perform(get("/paged").param("page", page).param("size", size))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.msgId").value("validationError"))
+        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(jsonPath("$.data").value("page"));
+  }
+
+  static Stream<Arguments> overflowingPaging() {
+    return Stream.of(
+        // The exact reproduction from RPS-1150: both individually valid, product overflows.
+        Arguments.of("2147483647", "100"),
+        // Just one past the page*size==Integer.MAX_VALUE boundary for size=100.
+        Arguments.of("21474837", "100"));
   }
 
   @Test

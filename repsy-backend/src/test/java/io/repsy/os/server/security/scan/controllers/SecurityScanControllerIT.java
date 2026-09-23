@@ -1288,6 +1288,39 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
       assertPage(minSize, 1, 0, 3, 3);
     }
 
+    /**
+     * RPS-1150: {@code page * size} used to overflow {@code int} further down the JPA/Hibernate
+     * stack and surface as an unhandled 500. It must now be a 400 validation error naming page.
+     */
+    @Test
+    @DisplayName("returns 400 validationError naming page when page * size overflows int")
+    void overflowingPageTimesSizeIsAValidationError() throws Exception {
+      expectValidationError(
+          SecurityScanControllerIT.this.getScans(
+              SecurityScanControllerIT.this.seededAdminBearerToken(),
+              Map.of("page", String.valueOf(Integer.MAX_VALUE), "size", "100")),
+          "page");
+    }
+
+    /**
+     * RPS-1150: a page number that is large but whose product with size still fits an {@code int}
+     * is not the overflow bug and must keep answering normally, just with no matches.
+     */
+    @Test
+    @DisplayName("keeps answering 200 with an empty page for a large but non-overflowing page")
+    void largeNonOverflowingPageStillAnswersEmptyPage() throws Exception {
+      this.seedScans(1);
+      final var token = SecurityScanControllerIT.this.seededAdminBearerToken();
+
+      final var body =
+          expectScans(
+              SecurityScanControllerIT.this.getScans(
+                  token, Map.of("page", "1000000", "size", "100")));
+
+      assertThat(artifactVersions(body)).isEmpty();
+      assertPage(body, 100, 1000000, 1, 1);
+    }
+
     // -------------------------------------------------------------------------------------------
     // Query count (RPS-909)
     // -------------------------------------------------------------------------------------------

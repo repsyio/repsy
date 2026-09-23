@@ -27,6 +27,7 @@ import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.user.services.ReservedUsernameService;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.os.shared.utils.PagingOffsetValidator;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -69,6 +70,7 @@ final class UserController {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
+    PagingOffsetValidator.requireNoOffsetOverflow(page, size);
     final var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
     final var usersPage = this.userTxService.getAllUsers(search, pageable);
 

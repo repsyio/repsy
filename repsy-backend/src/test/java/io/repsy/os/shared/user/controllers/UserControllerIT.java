@@ -23,6 +23,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
@@ -42,6 +46,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
@@ -532,6 +537,70 @@ class UserControllerIT extends AbstractIntegrationTest {
           UserControllerIT.this.perform(
               get("/api/users").header(AUTHORIZATION, token).param("size", size)),
           "usersFetched");
+    }
+
+    /**
+     * RPS-1150: {@code page * size} used to overflow {@code int} further down the JPA/Hibernate
+     * stack and surface as an unhandled 500, logged at ERROR. It must now be a 400 validation
+     * error, with nothing logged above INFO.
+     */
+    @Test
+    @DisplayName(
+        "returns 400 validationError naming page, with no ERROR log, when page * size overflows"
+            + " Integer.MAX_VALUE")
+    void overflowingPageTimesSizeIsAValidationError() throws Exception {
+      final var token = UserControllerIT.this.adminBearerToken();
+      final var rootLogger = (Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+      final var logEvents = new ListAppender<ILoggingEvent>();
+      logEvents.start();
+      rootLogger.addAppender(logEvents);
+
+      try {
+        expectError(
+            UserControllerIT.this.perform(
+                get("/api/users")
+                    .header(AUTHORIZATION, token)
+                    .param("page", String.valueOf(Integer.MAX_VALUE))
+                    .param("size", "100")),
+            HttpStatus.BAD_REQUEST,
+            "validationError",
+            "page",
+            VALIDATION_TEXT);
+      } finally {
+        rootLogger.detachAppender(logEvents);
+        logEvents.stop();
+      }
+
+      assertThat(
+              logEvents.list.stream()
+                  .filter(event -> event.getLevel().isGreaterOrEqual(Level.ERROR))
+                  .map(ILoggingEvent::getFormattedMessage))
+          .isEmpty();
+    }
+
+    /**
+     * RPS-1150: a page number that is large but whose product with size still fits an {@code int}
+     * is not the overflow bug and must keep answering normally, just with no matches.
+     */
+    @Test
+    @DisplayName("keeps answering 200 with an empty page for a large but non-overflowing page")
+    void largeNonOverflowingPageStillAnswersEmptyPage() throws Exception {
+      final var token = UserControllerIT.this.adminBearerToken();
+
+      final var body =
+          expectSuccess(
+              UserControllerIT.this.perform(
+                  get("/api/users")
+                      .header(AUTHORIZATION, token)
+                      .param("page", "1000000")
+                      .param("size", "100")),
+              "usersFetched");
+
+      final List<Object> content = JsonPath.read(body, "$.data.content");
+      assertThat(content).isEmpty();
+      final Map<String, Object> page = JsonPath.read(body, "$.data.page");
+      assertThat(number(page.get("number"))).isEqualTo(1000000);
+      assertThat(number(page.get("size"))).isEqualTo(100);
     }
   }
 
