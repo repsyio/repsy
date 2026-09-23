@@ -77,6 +77,10 @@ public final class PypiPublishLimits {
   public static final int MAX_VERSION_LENGTH = 255;
   public static final int MAX_REQUIRES_PYTHON_LENGTH = 255;
 
+  // Reject: the uploaded archive's file name. It is not a column; it is the longest name a file
+  // system accepts, and it bounds the input of the version grammar that runs on the file name.
+  public static final int MAX_ARCHIVE_FILENAME_LENGTH = 255;
+
   // Drop (null): descriptive fields of pypi_release. summary/description need no constant here --
   // see the class Javadoc.
   public static final int MAX_HOME_PAGE_LENGTH = 255;
@@ -111,6 +115,19 @@ public final class PypiPublishLimits {
   public static void checkVersion(final @Nullable String version) {
     if (version != null && version.length() > MAX_VERSION_LENGTH) {
       throw new BadRequestException("pypiVersionTooLong");
+    }
+  }
+
+  /**
+   * Refuses an archive file name longer than {@link #MAX_ARCHIVE_FILENAME_LENGTH}. It runs before
+   * any archive grammar does: those patterns nest quantifiers, and the regex engine recurses once
+   * per repetition, so an unbounded name overflows the stack (a 500) instead of failing as a 400.
+   *
+   * @throws BadRequestException With {@code pypiArchiveFileNameTooLong}.
+   */
+  public static void checkArchiveFilename(final String filename) {
+    if (filename.length() > MAX_ARCHIVE_FILENAME_LENGTH) {
+      throw new BadRequestException("pypiArchiveFileNameTooLong");
     }
   }
 
