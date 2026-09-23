@@ -353,14 +353,21 @@ test.describe('nuget registry rules (raw HTTP)', () => {
         `${env.repoBaseUrl}/${repo.name}/v3/registration`,
       );
 
-      // RPS-1213 (fixed): NuGet.Client's ServiceTypes.cs (and the official docs) resolve
-      // "RegistrationsBaseUrl", "SearchQueryService" and "SearchAutocompleteService" as bare,
-      // unversioned types -- among other recognised spellings, e.g.
-      // "RegistrationsBaseUrl(/3.0.0-beta|/3.0.0-rc|/3.4.0|/3.6.0)". This server advertises the bare
-      // forms, which the client resolves and which make no claim beyond the base (3.0.0) semantics
-      // it actually implements (in particular, not "RegistrationsBaseUrl/3.6.0"'s SemVer2
-      // registration semantics). The invented "PackageDelete/2.0.0" is no longer advertised either
+      // RPS-1213/RPS-1240 (fixed): NuGet.Client's ServiceTypes.cs resolves "RegistrationsBaseUrl" as
+      // a bare, unversioned type (among "/Versioned", "/3.0.0-beta", "/3.0.0-rc", "/3.4.0",
+      // "/3.6.0"), but has NO bare form for search: SearchQueryService is only "/Versioned",
+      // "/3.4.0" or "/3.0.0-beta", SearchAutocompleteService only "/Versioned" or "/3.0.0-beta".
+      // This server therefore advertises the bare types (as the service-index docs list them) AND
+      // "/3.0.0-beta" for both, at the same URL -- the earliest recognised version, since nothing
+      // beyond the base semantics is implemented (not "RegistrationsBaseUrl/3.6.0"'s SemVer2
+      // registration semantics either). The invented "PackageDelete/2.0.0" is no longer advertised
       // -- unlist/relist live under PackagePublish/2.0.0's own PUT/DELETE, per the NuGet API docs.
+      expect(byType.get('SearchQueryService/3.0.0-beta')).toBe(
+        `${env.repoBaseUrl}/${repo.name}/v3/search`,
+      );
+      expect(byType.get('SearchAutocompleteService/3.0.0-beta')).toBe(
+        `${env.repoBaseUrl}/${repo.name}/v3/autocomplete`,
+      );
       expect(resources.map((r) => r.type)).toContain('SearchQueryService');
       expect(resources.map((r) => r.type)).toContain('SearchAutocompleteService');
       expect(resources.map((r) => r.type)).not.toContain('PackageDelete/2.0.0');
