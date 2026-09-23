@@ -1179,7 +1179,7 @@ class ArtifactServiceImplTest {
         """
         <project><modelVersion>4.0.0</modelVersion><groupId>com.acme</groupId>
           <artifactId>lib</artifactId><version>1.0</version>
-          <name>%1$s</name><url>%1$s</url><description>%2$s</description>
+          <name>%1$s</name><url>%1$s</url>
           <organization><name>%1$s</name></organization><scm><url>%1$s</url></scm>
           <parent><groupId>com.acme</groupId><artifactId>par</artifactId>
             <version>%1$s</version></parent>
@@ -1188,7 +1188,7 @@ class ArtifactServiceImplTest {
           <developers><developer><name>Jane</name><email>%1$s</email></developer>
             <developer><email>nameless@acme.com</email></developer></developers>
         </project>"""
-            .formatted(long255, "word ".repeat(400));
+            .formatted(long255);
 
     this.artifactService.createOrUpdateArtifact(
         repo(id, true, true, true),
@@ -1211,10 +1211,6 @@ class ArtifactServiceImplTest {
     assertThat(version.getValue().getParentArtifactGroup()).isNull();
     assertThat(version.getValue().getParentArtifactName()).isNull();
     assertThat(version.getValue().getParentArtifactVersion()).isNull();
-    assertThat(version.getValue().getDescription())
-        .hasSizeLessThanOrEqualTo(1024)
-        .startsWith("word word")
-        .endsWith("word");
     assertThat(model.getValue().getLicenses())
         .singleElement()
         .satisfies(

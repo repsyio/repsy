@@ -107,7 +107,7 @@ export class RepositoryBreadcrumbComponent implements OnInit, OnDestroy {
         continue;
       }
 
-      if (repoType === 'npm' && i === 2 && segments.at(-1)?.path !== 'settings') {
+      if (repoType === 'npm' && i === 1 && segments.at(-1)?.path !== 'settings') {
         path = `@${path}`;
       }
 

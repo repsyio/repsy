@@ -33,7 +33,7 @@ import org.jspecify.annotations.Nullable;
  * over-long one failed the row insert with SQLSTATE 22001, {@code ErrorHandler} (RPS-1012) turned
  * that into a generic 400 that named no field, and the file was already in storage.
  *
- * <p>Four policies apply, matching {@code NpmPublishLimits}, {@code PypiPublishLimits} and {@code
+ * <p>Three policies apply, matching {@code NpmPublishLimits}, {@code PypiPublishLimits} and {@code
  * DockerPushGuards}:
  *
  * <ul>
@@ -49,8 +49,6 @@ import org.jspecify.annotations.Nullable;
  *       over-long or missing. {@code maven_version_license.name} and {@code
  *       maven_version_developer.name} are {@code NOT NULL}, so unlike their url and email they
  *       cannot be nulled.
- *   <li><b>Cut</b> the free-text description at a word boundary, since a shortened description is
- *       still a description.
  * </ul>
  *
  * <p>The version is capped at {@link #MAX_VERSION_LENGTH} (255), below {@code
@@ -75,9 +73,6 @@ public final class MavenPublishLimits {
   public static final int MAX_ORGANIZATION_LENGTH = 150;
   public static final int MAX_PREFIX_LENGTH = 150;
   public static final int MAX_PARENT_COORDINATE_LENGTH = 255;
-
-  // Cut at a word boundary: maven_artifact_version.description.
-  public static final int MAX_DESCRIPTION_LENGTH = 1024;
 
   // Drop (null) or drop the whole entry: maven_version_license and maven_version_developer.
   public static final int MAX_LICENSE_NAME_LENGTH = 255;
@@ -132,7 +127,6 @@ public final class MavenPublishLimits {
 
     model.setName(dropIfTooLong(model.getName(), MAX_NAME_LENGTH));
     model.setUrl(dropIfTooLong(model.getUrl(), MAX_URL_LENGTH));
-    model.setDescription(cutAtWordBoundary(model.getDescription(), MAX_DESCRIPTION_LENGTH));
     model.setPackaging(dropIfTooLong(model.getPackaging(), MAX_PACKAGING_LENGTH));
 
     dropOverLongOrganization(model);
@@ -146,43 +140,6 @@ public final class MavenPublishLimits {
   public static @Nullable String dropIfTooLong(final @Nullable String value, final int maxLength) {
 
     return value != null && value.length() > maxLength ? null : value;
-  }
-
-  /**
-   * {@code value} cut to at most {@code maxLength} characters at the last whitespace before the
-   * limit, or at the limit itself when there is none. Trailing whitespace is removed, and a
-   * surrogate pair is never split.
-   */
-  public static @Nullable String cutAtWordBoundary(
-      final @Nullable String value, final int maxLength) {
-
-    if (value == null || value.length() <= maxLength) {
-      return value;
-    }
-
-    var end = maxLength;
-
-    if (Character.isHighSurrogate(value.charAt(end - 1))) {
-      end--;
-    }
-
-    if (!Character.isWhitespace(value.charAt(end))) {
-      final var lastSpace = lastWhitespaceBefore(value, end);
-      end = lastSpace > 0 ? lastSpace : end;
-    }
-
-    return value.substring(0, end).stripTrailing();
-  }
-
-  private static int lastWhitespaceBefore(final String value, final int end) {
-
-    for (var i = end - 1; i > 0; i--) {
-      if (Character.isWhitespace(value.charAt(i))) {
-        return i;
-      }
-    }
-
-    return -1;
   }
 
   private static void dropOverLongOrganization(final Model model) {

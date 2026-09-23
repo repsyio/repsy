@@ -52,9 +52,8 @@ import org.springframework.transaction.annotation.Transactional;
  * RPS-1138: a groupId, artifactId, version or POM packaging longer than its column used to fail the
  * row insert with SQLSTATE 22001, which answered a generic 400 naming no field after the file had
  * been stored. The coordinates and the packaging are refused with a 400 naming the field before
- * anything is stored; every descriptive value of the POM (name, url, description, organization, SCM
- * url, parent, license and developer fields) is dropped or cut instead, and the version is
- * registered.
+ * anything is stored; every descriptive value of the POM (name, url, organization, SCM url, parent,
+ * license and developer fields) is dropped instead, and the version is registered.
  *
  * <p>Runs without a test transaction, like {@link MavenPomGroupIdIT}: an accepted POM inserts its
  * artifact row in its own transaction, which cannot see an uncommitted repo row. It deletes the
@@ -246,13 +245,13 @@ class MavenPublishLimitsIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("registers a POM with every descriptive value over-long, dropping or cutting them")
+  @DisplayName("registers a POM with every descriptive value over-long, dropping them")
   void dropsOverLongDescriptiveValuesInsteadOfFailingTheInsert() throws Exception {
     final var repo = this.mavenRepo();
     final var admin = this.admin();
     final var extra =
         """
-        <name>%1$s</name><url>%1$s</url><description>%2$s</description>
+        <name>%1$s</name><url>%1$s</url>
         <organization><name>%1$s</name></organization><scm><url>%1$s</url></scm>
         <parent><groupId>com.acme</groupId><artifactId>par</artifactId><version>%1$s</version></parent>
         <licenses>
@@ -265,7 +264,7 @@ class MavenPublishLimitsIT extends AbstractIntegrationTest {
           <developer><name>%1$s</name></developer>
         </developers>
         """
-            .formatted(LONG, "word ".repeat(400));
+            .formatted(LONG);
     final var path = pomPath("com.acme", "lib", "1.0");
 
     this.uploadOk(repo, admin, path, pom("com.acme", "lib", "1.0", extra));
@@ -273,7 +272,7 @@ class MavenPublishLimitsIT extends AbstractIntegrationTest {
     final var version =
         this.jdbcTemplate.queryForMap(
             """
-            select v.id, v.name, v.url, v.organization, v.source_code_url, v.description,
+            select v.id, v.name, v.url, v.organization, v.source_code_url,
                    v.parent_artifact_group, v.parent_artifact_name, v.parent_artifact_version
               from maven_artifact_version v join maven_artifact a on a.id = v.artifact_id
              where a.repo_id = ?""",
@@ -286,7 +285,6 @@ class MavenPublishLimitsIT extends AbstractIntegrationTest {
         .containsEntry("parent_artifact_group", null)
         .containsEntry("parent_artifact_name", null)
         .containsEntry("parent_artifact_version", null);
-    assertThat((String) version.get("description")).hasSizeLessThanOrEqualTo(1024).endsWith("word");
 
     final var versionId = version.get("id");
     assertThat(

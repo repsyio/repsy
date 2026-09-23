@@ -111,7 +111,7 @@ class MavenPublishLimitsTest {
   void keepsWhatFits() {
     final var model =
         model(
-            "<name>n</name><url>u</url><description>d</description>"
+            "<name>n</name><url>u</url>"
                 + "<organization><name>o</name></organization><scm><url>s</url></scm>"
                 + "<parent><groupId>g</groupId><artifactId>pa</artifactId><version>1</version></parent>"
                 + "<licenses><license><name>l</name><url>lu</url></license></licenses>"
@@ -121,7 +121,6 @@ class MavenPublishLimitsTest {
 
     assertThat(model.getName()).isEqualTo("n");
     assertThat(model.getUrl()).isEqualTo("u");
-    assertThat(model.getDescription()).isEqualTo("d");
     assertThat(model.getOrganization().getName()).isEqualTo("o");
     assertThat(model.getScm().getUrl()).isEqualTo("s");
     assertThat(model.getParent()).isNotNull();
@@ -220,42 +219,5 @@ class MavenPublishLimitsTest {
     assertThat(MavenPublishLimits.dropIfTooLong(null, 3)).isNull();
     assertThat(MavenPublishLimits.dropIfTooLong("abc", 3)).isEqualTo("abc");
     assertThat(MavenPublishLimits.dropIfTooLong("abcd", 3)).isNull();
-  }
-
-  @Test
-  @DisplayName("cutAtWordBoundary keeps a description that fits, including null")
-  void cutKeepsWhatFits() {
-    assertThat(MavenPublishLimits.cutAtWordBoundary(null, 10)).isNull();
-    assertThat(MavenPublishLimits.cutAtWordBoundary("ten chars!", 10)).isEqualTo("ten chars!");
-  }
-
-  @Test
-  @DisplayName("cutAtWordBoundary cuts at the last whitespace before the limit")
-  void cutsAtTheLastWord() {
-    assertThat(MavenPublishLimits.cutAtWordBoundary("one two three four", 12)).isEqualTo("one two");
-    assertThat(MavenPublishLimits.cutAtWordBoundary("one two three four", 13))
-        .isEqualTo("one two three");
-  }
-
-  @Test
-  @DisplayName("cutAtWordBoundary keeps a word that ends exactly at the limit")
-  void keepsAWordEndingAtTheLimit() {
-    assertThat(MavenPublishLimits.cutAtWordBoundary("one two three", 7)).isEqualTo("one two");
-  }
-
-  @Test
-  @DisplayName("cutAtWordBoundary cuts hard at the limit when there is no whitespace")
-  void cutsHardWithoutWhitespace() {
-    assertThat(MavenPublishLimits.cutAtWordBoundary("abcdefghij", 4)).isEqualTo("abcd");
-  }
-
-  @Test
-  @DisplayName("cutAtWordBoundary never splits a surrogate pair")
-  void neverSplitsASurrogatePair() {
-    final var emoji = "\uD83D\uDE00";
-
-    assertThat(MavenPublishLimits.cutAtWordBoundary("ab" + emoji + emoji, 3)).isEqualTo("ab");
-    assertThat(MavenPublishLimits.cutAtWordBoundary("ab" + emoji + emoji, 4))
-        .isEqualTo("ab" + emoji);
   }
 }

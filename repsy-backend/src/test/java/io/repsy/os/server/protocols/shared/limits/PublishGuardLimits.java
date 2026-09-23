@@ -555,8 +555,7 @@ final class PublishGuardLimits {
             "artifact_version"));
 
     // Maven (RPS-1138). The version is held to the width of maven_artifact.latest / release (255),
-    // below version_name (500), so it is "within" there; the description is text in both databases,
-    // so its cap is only a policy ("within").
+    // below version_name (500), so it is "within" there.
     limits.add(
         exact(
             "MavenPublishLimits.MAX_GROUP_ID_LENGTH",
@@ -611,12 +610,6 @@ final class PublishGuardLimits {
             MavenPublishLimits.MAX_NAME_LENGTH,
             "maven_artifact_version",
             "name"));
-    limits.add(
-        within(
-            "MavenPublishLimits.MAX_DESCRIPTION_LENGTH",
-            MavenPublishLimits.MAX_DESCRIPTION_LENGTH,
-            "maven_artifact_version",
-            "description"));
     limits.add(
         exact(
             "MavenPublishLimits.MAX_PREFIX_LENGTH",

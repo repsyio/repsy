@@ -24,9 +24,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -39,7 +39,6 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "cargo_crate_index")
 @NoArgsConstructor
 @ToString(exclude = "crate")
-@EqualsAndHashCode(exclude = "crate")
 public class CargoCrateIndex {
 
   @Id
@@ -52,7 +51,7 @@ public class CargoCrateIndex {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private CargoCrate crate;
 
-  @Column(name = "name", nullable = false)
+  @Column(name = "name", nullable = false, columnDefinition = "text")
   private String name;
 
   @Column(name = "vers", nullable = false, length = CrateUtils.MAX_VERSION_LENGTH)
@@ -62,7 +61,7 @@ public class CargoCrateIndex {
   @Column(name = "deps", columnDefinition = "jsonb")
   private String deps;
 
-  @Column(name = "cksum", nullable = false)
+  @Column(name = "cksum", nullable = false, columnDefinition = "text")
   private String cksum;
 
   @JdbcTypeCode(SqlTypes.JSON)
@@ -77,7 +76,7 @@ public class CargoCrateIndex {
   private boolean yanked;
 
   // text in PostgreSQL, varchar(255) in H2: no length is stated, see CrateUtils.MAX_LINKS_LENGTH.
-  @Column(name = "links")
+  @Column(name = "links", columnDefinition = "text")
   private String links;
 
   @Column(name = "v", nullable = false)
@@ -85,4 +84,32 @@ public class CargoCrateIndex {
 
   @Column(name = "rust_version", length = CrateUtils.MAX_RUST_VERSION_LENGTH)
   private String rustVersion;
+
+  /**
+   * Identifier-based equality: two cargo crate indexs are equal when they are the same instance or
+   * carry the same non-null id. One that has not been persisted yet has no id and equals only
+   * itself. {@code getId()} is used on both sides so a Hibernate proxy is compared by its real id.
+   */
+  @Override
+  public boolean equals(final Object o) {
+    if (this == o) {
+      return true;
+    }
+
+    if (!(o instanceof final CargoCrateIndex other)) {
+      return false;
+    }
+
+    return this.getId() != null && Objects.equals(this.getId(), other.getId());
+  }
+
+  /**
+   * Constant on purpose: the id is assigned on persist and the other columns can change on flush,
+   * so a hash derived from them would move a cargo crate index held in a {@code HashSet} into the
+   * wrong bucket. It also keeps the lazy associations out of the hash.
+   */
+  @Override
+  public int hashCode() {
+    return CargoCrateIndex.class.hashCode();
+  }
 }

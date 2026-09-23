@@ -63,7 +63,9 @@ public class NpmPackage {
   @Column(name = "name", nullable = false, length = NpmPublishLimits.MAX_NAME_LENGTH)
   private String name;
 
-  @Column(name = "latest", length = NpmPublishLimits.MAX_VERSION_LENGTH)
+  // The column is varchar(255); a publish is held to the stricter
+  // NpmPublishLimits.MAX_VERSION_LENGTH.
+  @Column(name = "latest", length = 255)
   private String latest;
 
   @CreationTimestamp

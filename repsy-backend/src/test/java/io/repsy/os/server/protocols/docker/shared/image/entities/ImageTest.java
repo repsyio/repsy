@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.docker.shared.image.entities;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.server.protocols.docker.shared.entities.AbstractEntityIdentityTest;
+import io.repsy.os.shared.entities.AbstractEntityIdentityTest;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
