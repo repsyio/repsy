@@ -20,6 +20,7 @@ import static io.repsy.protocols.docker.shared.utils.DockerProtocolHttpValues.DO
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_LAYER;
 import static org.springframework.http.HttpHeaders.LOCATION;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
@@ -127,7 +128,7 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
     final var digest = request.getParameter("digest");
 
     if (digest == null) {
-      return ResponseEntity.badRequest().build();
+      throw new BadRequestException("digestMissing");
     }
 
     final var uploadPath = new RelativePath("/blobs/" + sessionId);

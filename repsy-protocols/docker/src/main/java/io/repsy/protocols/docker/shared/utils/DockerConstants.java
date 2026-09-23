@@ -28,4 +28,10 @@ public final class DockerConstants {
   public static final String SHA256_PREFIX = "sha256:";
   public static final String MANIFESTS = "manifests";
   public static final String BASIC_PREFIX = "Basic ";
+
+  /**
+   * The platform recorded for a manifest whose real platform is not known: an OCI artifact's config
+   * (RPS-1116) or an index entry pushed without a {@code platform} object (RPS-1117).
+   */
+  public static final String UNKNOWN_PLATFORM = "unknown";
 }

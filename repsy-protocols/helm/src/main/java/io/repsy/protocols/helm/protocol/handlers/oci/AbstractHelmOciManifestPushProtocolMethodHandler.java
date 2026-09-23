@@ -137,7 +137,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     final var mediaType = request.getContentType();
 
     if (mediaType == null) {
-      return ResponseEntity.badRequest().build();
+      throw new BadRequestException("manifestContentTypeMissing");
     }
 
     rejectOverLongIdentifiers(name, reference, mediaType);

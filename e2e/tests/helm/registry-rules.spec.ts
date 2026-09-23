@@ -232,11 +232,11 @@ test.describe('helm registry rules (raw HTTP)', () => {
         'tag1',
         Buffer.from('{}'),
       );
-      expect(
-        noContentType.status,
-        'no Content-Type -- a bare 400, no OCI envelope (candidate B-H7)',
-      ).toBe(400);
-      expect(ociErrorOf(noContentType.body), 'no OCI body on this one').toBeUndefined();
+      // Candidate B-H7 (RPS-1110, fixed): a missing Content-Type header now throws a
+      // BadRequestException, rendered as the OCI errors[] envelope like every other push failure,
+      // instead of a bare bodyless 400.
+      expectOci(noContentType, 400, 'MANIFEST_INVALID');
+      expect(ociErrorOf(noContentType.body)?.detail).toBe('manifestContentTypeMissing');
     },
   );
 

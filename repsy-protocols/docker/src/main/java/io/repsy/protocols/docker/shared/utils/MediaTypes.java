@@ -39,7 +39,7 @@ public final class MediaTypes {
       "application/vnd.docker.distribution.manifest.list.v2+json";
   public static final String DOCKER_LAYER = "application/vnd.docker.image.rootfs.diff.tar.gzip";
   private static final String OCI_CONTENT_DESCRIPTOR = "application/vnd.oci.descriptor.v1+json";
-  private static final String OCI_CONFIG_JSON = "application/vnd.oci.image.config.v1+json";
+  public static final String OCI_CONFIG_JSON = "application/vnd.oci.image.config.v1+json";
   private static final String OCI_LAYER = "application/vnd.oci.image.layer.v1.tar+gzip";
   private static final String OCI_LAYER_ZSTD = "application/vnd.oci.image.layer.v1.tar+zstd";
   private static final String OCI_UNCOMPRESSED_LAYER = "application/vnd.oci.image.layer.v1.tar";
@@ -48,8 +48,17 @@ public final class MediaTypes {
   private static final String DOCKER_UNCOMPRESSED_LAYER =
       "application/vnd.docker.image.rootfs.diff.tar";
   private static final String APPLICATION_JSON = "application/json";
+  private static final String WILDCARD = "*/*";
 
-  public static String getPreferredMediaType(final @Nullable List<String> acceptHeaders) {
+  /**
+   * Picks the manifest media type to answer a pull with. An absent (or empty) {@code Accept} header
+   * accepts anything, so it defaults to the common type; a header that is present but names none
+   * the registry serves is genuinely unacceptable (RPS-1110), not a silent default.
+   *
+   * @return {@code null} when {@code acceptHeaders} is non-empty and names no type this method
+   *     recognises
+   */
+  public static @Nullable String getPreferredMediaType(final @Nullable List<String> acceptHeaders) {
 
     if (CollectionUtils.isEmpty(acceptHeaders)) {
       return MediaTypes.DOCKER_MANIFEST_SCHEMA2;
@@ -65,12 +74,7 @@ public final class MediaTypes {
       return manifestType;
     }
 
-    final var jsonFallback = MediaTypes.findJsonFallback(acceptHeaders);
-    if (jsonFallback != null) {
-      return jsonFallback;
-    }
-
-    return MediaTypes.DOCKER_MANIFEST_SCHEMA2;
+    return MediaTypes.findJsonFallback(acceptHeaders);
   }
 
   public static boolean isIndex(final String type) {
@@ -101,10 +105,11 @@ public final class MediaTypes {
     return null;
   }
 
+  /** A generic JSON type, or an explicit wildcard, both accept whatever the registry prefers. */
   private static @Nullable String findJsonFallback(final List<String> acceptHeaders) {
 
     for (final var accept : acceptHeaders) {
-      if (APPLICATION_JSON.equals(accept)) {
+      if (APPLICATION_JSON.equals(accept) || WILDCARD.equals(accept)) {
         return MediaTypes.DOCKER_MANIFEST_SCHEMA2;
       }
     }

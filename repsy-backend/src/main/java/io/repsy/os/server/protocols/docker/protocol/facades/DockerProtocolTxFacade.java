@@ -32,7 +32,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -112,7 +111,7 @@ public class DockerProtocolTxFacade extends AbstractDockerProtocolTxFacade<UUID>
 
   @Override
   @Transactional(rollbackFor = IOException.class)
-  public @Nullable String saveManifest(
+  public String saveManifest(
       final ProtocolContext context, final BaseImageInfo<UUID> imageInfo, final ManifestForm form)
       throws IOException {
 

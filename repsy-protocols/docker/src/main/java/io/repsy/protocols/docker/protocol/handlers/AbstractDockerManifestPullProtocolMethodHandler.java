@@ -43,6 +43,7 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 
 @NullMarked
 public abstract class AbstractDockerManifestPullProtocolMethodHandler<ID>
@@ -126,7 +127,8 @@ public abstract class AbstractDockerManifestPullProtocolMethodHandler<ID>
     final var preferredMediaType = MediaTypes.getPreferredMediaType(acceptHeaders);
 
     if (preferredMediaType == null) {
-      return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).body("unsupportedMediaType");
+      throw new HttpMediaTypeNotAcceptableException(
+          "The Accept header names no manifest media type this repository serves.");
     }
 
     final var manifest =

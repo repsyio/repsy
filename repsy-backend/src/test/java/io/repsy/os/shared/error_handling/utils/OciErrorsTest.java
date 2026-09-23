@@ -80,6 +80,14 @@ class OciErrorsTest {
         Arguments.of("manifestReferenceTooLong", 400, MANIFEST_PATH, OciErrorCode.MANIFEST_INVALID),
         Arguments.of("manifestMediaTypeTooLong", 400, MANIFEST_PATH, OciErrorCode.MANIFEST_INVALID),
         Arguments.of("blobDigestUnsupported", 400, UPLOAD_PATH, OciErrorCode.DIGEST_INVALID),
+        Arguments.of(
+            "manifestMediaTypeUnsupported", 400, MANIFEST_PATH, OciErrorCode.MANIFEST_INVALID),
+        Arguments.of("manifestConfigInvalid", 400, MANIFEST_PATH, OciErrorCode.MANIFEST_INVALID),
+        Arguments.of(
+            "manifestSchemaVersionInvalid", 400, MANIFEST_PATH, OciErrorCode.MANIFEST_INVALID),
+        Arguments.of(
+            "manifestContentTypeMissing", 400, MANIFEST_PATH, OciErrorCode.MANIFEST_INVALID),
+        Arguments.of("digestMissing", 400, UPLOAD_PATH, OciErrorCode.UNSUPPORTED),
         Arguments.of("manifestNotFound", 404, MANIFEST_PATH, OciErrorCode.MANIFEST_UNKNOWN),
         Arguments.of("tagNotFound", 404, MANIFEST_PATH, OciErrorCode.MANIFEST_UNKNOWN),
         Arguments.of("imageNotFound", 404, MANIFEST_PATH, OciErrorCode.NAME_UNKNOWN),

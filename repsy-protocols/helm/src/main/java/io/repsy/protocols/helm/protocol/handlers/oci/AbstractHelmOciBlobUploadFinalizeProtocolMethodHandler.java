@@ -131,7 +131,7 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
     final var mediaType = request.getContentType();
 
     if (digest == null) {
-      return ResponseEntity.badRequest().build();
+      throw new BadRequestException("digestMissing");
     }
 
     // helm_oci_blob.digest holds "sha256:" and 64 hex characters, but BlobDigests also admits a
