@@ -47,6 +47,7 @@ public class HelmOciManifestService implements OciManifestService<UUID> {
         .findByRepoIdAndNameAndReference(repoId, form.getName(), form.getReference())
         .map(
             existing -> {
+              existing.setChartVersion(this.buildChartVersionStub(form));
               existing.setDigest(form.getDigest());
               existing.setMediaType(form.getMediaType());
               existing.setContent(form.getContent());
@@ -103,18 +104,21 @@ public class HelmOciManifestService implements OciManifestService<UUID> {
     final var repo = new Repo();
     repo.setId(repoId);
 
-    final var chartVersion = new HelmChartVersion();
-    chartVersion.setId(form.getChartId());
-
     final var manifest = new HelmOciManifest();
     manifest.setRepo(repo);
-    manifest.setChartVersion(chartVersion);
+    manifest.setChartVersion(this.buildChartVersionStub(form));
     manifest.setName(form.getName());
     manifest.setReference(form.getReference());
     manifest.setDigest(form.getDigest());
     manifest.setMediaType(form.getMediaType());
     manifest.setContent(form.getContent());
     return manifest;
+  }
+
+  private HelmChartVersion buildChartVersionStub(final HelmOciManifestForm form) {
+    final var chartVersion = new HelmChartVersion();
+    chartVersion.setId(form.getChartId());
+    return chartVersion;
   }
 
   private ManifestDetail toDetail(final HelmOciManifest manifest) {
