@@ -110,6 +110,18 @@ public class UserTxService {
     return this.userRepository.existsByUsername(username);
   }
 
+  /**
+   * Locks the user row for {@code userId} until the caller's transaction ends and tells whether it
+   * is still there (RPS-1152). Call it inside the caller's own transaction, right before an
+   * operation that would otherwise write a row referencing the user after it has already been
+   * deleted: a concurrent deletion then either waits for this transaction to finish, or has already
+   * committed and leaves nothing here to find.
+   */
+  @Transactional
+  public boolean lockUserExists(final @NonNull UUID userId) {
+    return this.userRepository.lockUserId(userId).isPresent();
+  }
+
   @Transactional
   public void updateUsername(final @NonNull UUID userId, final @NonNull String newUsername) {
     final var user = this.findUserById(userId);
