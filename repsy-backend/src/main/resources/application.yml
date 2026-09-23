@@ -87,6 +87,14 @@ repsy:
     # Largest gem a `gem push` may carry. The gem is the raw request body, which the multipart
     # limits above do not apply to, so a larger one is answered with 413 payloadTooLarge.
     max-gem-size: ${RUBY_MAX_GEM_SIZE:500MB}
+  cargo:
+    # Largest .crate a `cargo publish` may carry. Its length is a field inside Cargo's own wire
+    # format rather than an HTTP header, so it is checked as soon as that field is read, before the
+    # crate itself is spooled to disk; a larger one is answered with a Cargo-shaped 413. crates.io
+    # itself defaults to 10MB, tuned for its own storage costs across the whole public registry;
+    # Repsy is self-hosted, so an operator publishing larger internal crates (vendored native
+    # libraries, generated bindings) can raise this without a rebuild (RPS-1119).
+    max-crate-size: ${CARGO_MAX_CRATE_SIZE:100MB}
   ssl:
     api:
       enabled: ${API_SSL_ENABLED:false}

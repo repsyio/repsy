@@ -25,7 +25,6 @@ import io.repsy.protocols.cargo.shared.crate.services.SemverComparator;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -36,7 +35,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
-import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -58,10 +56,23 @@ public class CrateUtils {
   /**
    * The largest {@code Cargo.toml} a crate may carry, in bytes. A real manifest is a few kilobytes,
    * and even one that lists thousands of features stays far below this; the limit only has to stop
-   * a decompression bomb, which the tar header size lets {@link #isLib(byte[])} refuse before it
-   * inflates any of it.
+   * a decompression bomb, which the tar header size lets {@link #inspectCrate(InputStream)} refuse
+   * before it inflates any of it.
    */
   public static final long MAX_CARGO_TOML_BYTES = 10 * MEBIBYTE;
+
+  /**
+   * The largest publish-metadata JSON a request may carry, in bytes (RPS-1119). A real {@code cargo
+   * publish} metadata document is a few kilobytes even for a crate with a long dependency list;
+   * this only has to stop a client-declared length that would otherwise be cast straight into an
+   * {@code int} and read into memory unbounded.
+   */
+  public static final long MAX_METADATA_JSON_BYTES = 5 * MEBIBYTE;
+
+  /** {@code cargo_crate_meta.edition}: a longer value is dropped rather than refused (RPS-1141). */
+  private static final int MAX_EDITION_LENGTH = 10;
+
+  private static final Pattern EDITION_LINE = Pattern.compile("^edition\\s*=\\s*\"([^\"]*)\"");
 
   private static final int TWO = 2;
   private static final int THREE = 3;
@@ -398,19 +409,43 @@ public class CrateUtils {
         request.features2());
   }
 
+  /**
+   * Reads the publish-metadata JSON that precedes the {@code .crate} in Cargo's wire format: a
+   * little-endian {@code u32} length, then that many bytes of JSON. The length is a value the
+   * client sent and is capped at {@link #MAX_METADATA_JSON_BYTES} before it is cast to an {@code
+   * int} and read, so a malicious or corrupt length can neither wrap negative nor force an
+   * unbounded read into memory (RPS-1119). A body that ends before the declared length is refused
+   * rather than silently parsed from a short buffer.
+   */
   public static CratePublishRequest getPublishRequest(
       final InputStream inputStream, final ObjectMapper objectMapper) throws IOException {
 
     final var jsonLength = CrateUtils.readU32LittleEndian(inputStream);
+
+    if (jsonLength > MAX_METADATA_JSON_BYTES) {
+      throw new IllegalArgumentException(
+          "the crate's metadata JSON must be at most %d MiB"
+              .formatted(MAX_METADATA_JSON_BYTES / MEBIBYTE));
+    }
+
     final var jsonBytes = inputStream.readNBytes((int) jsonLength);
+
+    if (jsonBytes.length != jsonLength) {
+      throw new IllegalArgumentException("the crate's metadata JSON is shorter than declared");
+    }
+
     return objectMapper.readValue(jsonBytes, CratePublishRequest.class);
   }
 
-  public static byte[] getCrateBytes(final InputStream inputStream) throws IOException {
+  /**
+   * Reads the length prefix (a little-endian {@code u32}) that precedes the {@code .crate} bytes in
+   * Cargo's wire format. The length is untrusted client input; the caller checks it against the
+   * configured maximum crate size and then spools exactly this many bytes, instead of casting it
+   * straight to an {@code int} and reading it all into memory (RPS-1119).
+   */
+  public static long readCrateLength(final InputStream inputStream) throws IOException {
 
-    final var crateLength = CrateUtils.readU32LittleEndian(inputStream);
-
-    return inputStream.readNBytes((int) crateLength);
+    return CrateUtils.readU32LittleEndian(inputStream);
   }
 
   public static Comparator<CrateVersionListItem> resolveVersionSort(final Pageable pageable) {
@@ -432,11 +467,25 @@ public class CrateUtils {
     return comparator;
   }
 
-  @SneakyThrows
-  public static boolean isLib(final byte[] crateBytes) {
-    try (final var tar =
-        new TarArchiveInputStream(
-            new GzipCompressorInputStream(new ByteArrayInputStream(crateBytes)))) {
+  /** Whether the crate has a library target, and the edition its manifest declares, if any. */
+  public record CrateInspection(boolean hasLib, @Nullable String edition) {}
+
+  /**
+   * Makes one pass over the spooled {@code .crate} tarball, reading whichever of the two entries it
+   * needs to answer both {@link CrateInspection#hasLib()} (an {@code src/lib.rs}, or a {@code
+   * [lib]} table in {@code Cargo.toml}) and {@link CrateInspection#edition()} (the {@code edition}
+   * key of {@code Cargo.toml}'s {@code [package]} table, RPS-1141). Only the first {@code
+   * Cargo.toml} whose {@code [package]} table declares an edition is used, which is the crate's own
+   * manifest: it is written before any nested one a vendored path dependency might carry. An
+   * edition over {@link #MAX_EDITION_LENGTH} characters (the column's width) is dropped rather than
+   * refused, the same way the descriptive metadata in {@link
+   * #dropOverLongMetadata(CratePublishRequest)} is.
+   */
+  public static CrateInspection inspectCrate(final InputStream crateStream) throws IOException {
+    try (final var tar = new TarArchiveInputStream(new GzipCompressorInputStream(crateStream))) {
+
+      var hasLib = false;
+      String edition = null;
 
       TarArchiveEntry entry;
 
@@ -444,18 +493,68 @@ public class CrateUtils {
         final var entryName = entry.getName();
 
         if (entryName.endsWith("/src/lib.rs")) {
-          return true;
+          hasLib = true;
         }
 
         if (entryName.endsWith("/Cargo.toml")) {
           final var toml = new String(readCargoToml(tar, entry), StandardCharsets.UTF_8);
+
           if (toml.lines().anyMatch(line -> line.trim().equals("[lib]"))) {
-            return true;
+            hasLib = true;
+          }
+
+          if (edition == null) {
+            edition = extractEdition(toml);
           }
         }
       }
-      return false;
+      return new CrateInspection(hasLib, edition);
     }
+  }
+
+  /** Reads the {@code edition} key of the manifest's {@code [package]} table, if it has one. */
+  private static @Nullable String extractEdition(final String toml) {
+
+    var inPackageTable = false;
+
+    for (final var rawLine : toml.lines().toList()) {
+      final var line = rawLine.trim();
+
+      if (isTableHeader(line)) {
+        inPackageTable = "[package]".equals(line);
+        continue;
+      }
+
+      if (!inPackageTable) {
+        continue;
+      }
+
+      final var edition = matchEditionValue(line);
+
+      if (edition != null) {
+        return trimToColumnWidth(edition);
+      }
+    }
+
+    return null;
+  }
+
+  private static boolean isTableHeader(final String line) {
+    return line.startsWith("[") && line.endsWith("]");
+  }
+
+  private static @Nullable String matchEditionValue(final String line) {
+    final var matcher = EDITION_LINE.matcher(line);
+    return matcher.find() ? matcher.group(1) : null;
+  }
+
+  private static @Nullable String trimToColumnWidth(final String edition) {
+    if (edition.length() > MAX_EDITION_LENGTH) {
+      log.warn("Skipping edition: longer than {} characters", MAX_EDITION_LENGTH);
+      return null;
+    }
+
+    return edition;
   }
 
   private static byte[] readCargoToml(final InputStream tar, final TarArchiveEntry entry)

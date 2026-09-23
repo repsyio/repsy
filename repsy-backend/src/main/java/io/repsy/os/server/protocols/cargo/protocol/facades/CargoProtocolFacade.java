@@ -20,7 +20,9 @@ import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.util.unit.DataSize;
 import tools.jackson.databind.ObjectMapper;
 
 @NullMarked
@@ -30,8 +32,9 @@ public class CargoProtocolFacade extends AbstractCargoProtocolFacade<UUID> {
   public CargoProtocolFacade(
       final CargoStorageService cargoStorageService,
       final CargoCrateService<UUID> cargoCrateService,
-      final ObjectMapper objectMapper) {
+      final ObjectMapper objectMapper,
+      @Value("${repsy.cargo.max-crate-size:100MB}") final DataSize maxCrateSize) {
 
-    super(cargoStorageService, cargoCrateService, objectMapper);
+    super(cargoStorageService, cargoCrateService, objectMapper, maxCrateSize.toBytes());
   }
 }

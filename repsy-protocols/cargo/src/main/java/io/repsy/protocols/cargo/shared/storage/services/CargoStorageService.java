@@ -17,6 +17,7 @@ package io.repsy.protocols.cargo.shared.storage.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
@@ -25,12 +26,16 @@ import org.springframework.core.io.Resource;
 @NullMarked
 public interface CargoStorageService {
 
+  /**
+   * Streams the crate into storage instead of taking it as an in-memory array (RPS-1119): {@code
+   * crateStream} is read to the end and closed by this call.
+   */
   BaseUsages writeCrateAndIndex(
       UUID repoId,
       String repoName,
       String crateName,
       String versionName,
-      byte[] crateBytes,
+      InputStream crateStream,
       String indexJsonLine)
       throws IOException;
 

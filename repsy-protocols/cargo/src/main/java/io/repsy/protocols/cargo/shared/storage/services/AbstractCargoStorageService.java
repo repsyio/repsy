@@ -22,6 +22,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -48,7 +49,7 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
       final String repoName,
       final String crateName,
       final String versionName,
-      final byte[] crateBytes,
+      final InputStream crateStream,
       final String indexJsonLine)
       throws IOException {
 
@@ -57,8 +58,8 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
     final var crateStoragePath = StoragePath.of(repoId, cratePath.toString());
 
     final BaseUsages crateUsages;
-    try (final var bis = new ByteArrayInputStream(crateBytes)) {
-      crateUsages = this.storageStrategy.write(repoName, crateStoragePath, bis);
+    try (crateStream) {
+      crateUsages = this.storageStrategy.write(repoName, crateStoragePath, crateStream);
     }
 
     final var indexPath = this.getIndexPath(crateName);

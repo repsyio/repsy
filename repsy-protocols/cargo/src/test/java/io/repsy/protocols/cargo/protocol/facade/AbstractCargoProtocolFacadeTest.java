@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -51,6 +52,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,6 +64,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.Resource;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -70,6 +73,7 @@ class AbstractCargoProtocolFacadeTest {
 
   private static final UUID REPO_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
   private static final String REPO_NAME = "cargo";
+  private static final long MAX_CRATE_BYTES = 10L * 1024 * 1024;
 
   @Mock private CargoStorageService storageService;
   @Mock private CargoCrateService<UUID> crateService;
@@ -88,7 +92,7 @@ class AbstractCargoProtocolFacadeTest {
   @BeforeEach
   @SuppressWarnings("unchecked")
   void setUp() {
-    facade = new TestFacade(storageService, crateService, objectMapper);
+    facade = new TestFacade(storageService, crateService, objectMapper, MAX_CRATE_BYTES);
     lenient().when(urlProps.getRepoInfo()).thenReturn(repoInfo);
     lenient().when(repoInfo.getStorageKey()).thenReturn(REPO_ID);
     lenient().when(repoInfo.getName()).thenReturn(REPO_NAME);
@@ -98,8 +102,12 @@ class AbstractCargoProtocolFacadeTest {
 
   static class TestFacade extends AbstractCargoProtocolFacade<UUID> {
 
-    TestFacade(final CargoStorageService s, final CargoCrateService<UUID> c, final ObjectMapper o) {
-      super(s, c, o);
+    TestFacade(
+        final CargoStorageService s,
+        final CargoCrateService<UUID> c,
+        final ObjectMapper o,
+        final long maxCrateBytes) {
+      super(s, c, o, maxCrateBytes);
     }
   }
 
@@ -167,6 +175,25 @@ class AbstractCargoProtocolFacadeTest {
     }
   }
 
+  /** A crate whose {@code Cargo.toml} holds exactly {@code manifestContent}. */
+  static byte[] crateWithManifest(final String manifestContent) {
+    try {
+      final var baos = new ByteArrayOutputStream();
+      try (final var gzip = new GzipCompressorOutputStream(baos);
+          final var tar = new TarArchiveOutputStream(gzip)) {
+        final var data = manifestContent.getBytes(StandardCharsets.UTF_8);
+        final var entry = new TarArchiveEntry("my_crate-1.0.0/Cargo.toml");
+        entry.setSize(data.length);
+        tar.putArchiveEntry(entry);
+        tar.write(data);
+        tar.closeArchiveEntry();
+      }
+      return baos.toByteArray();
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
   @Nested
   @DisplayName("publish()")
   class PublishTests {
@@ -188,10 +215,17 @@ class AbstractCargoProtocolFacadeTest {
 
       facade.publish(context("/api/v1/crates/new"), stream(publishPayload("{}", crateBytes)));
 
-      verify(crateService).publish(eq(repoInfo), any(CratePublishRequest.class));
+      verify(crateService).publish(eq(repoInfo), any(CratePublishRequest.class), any());
+      final var streamCaptor = ArgumentCaptor.forClass(InputStream.class);
       verify(storageService)
           .writeCrateAndIndex(
-              eq(REPO_ID), eq(REPO_NAME), eq("my_crate"), eq("1.0.0"), eq(crateBytes), any());
+              eq(REPO_ID),
+              eq(REPO_NAME),
+              eq("my_crate"),
+              eq("1.0.0"),
+              streamCaptor.capture(),
+              any());
+      assertThat(streamCaptor.getValue().readAllBytes()).isEqualTo(crateBytes);
     }
 
     @Test
@@ -228,7 +262,7 @@ class AbstractCargoProtocolFacadeTest {
       facade.publish(context("/api/v1/crates/new"), stream(publishPayload("{}", crateBytes)));
 
       final var captor = ArgumentCaptor.forClass(CratePublishRequest.class);
-      verify(crateService).publish(eq(repoInfo), captor.capture());
+      verify(crateService).publish(eq(repoInfo), captor.capture(), any());
       assertThat(captor.getValue().cksum()).isEqualTo(expectedCksum);
     }
 
@@ -264,7 +298,7 @@ class AbstractCargoProtocolFacadeTest {
           context("/api/v1/crates/new"), stream(publishPayload("{}", minimalCrateBytes())));
 
       final var captor = ArgumentCaptor.forClass(CratePublishRequest.class);
-      verify(crateService).publish(eq(repoInfo), captor.capture());
+      verify(crateService).publish(eq(repoInfo), captor.capture(), any());
       assertThat(captor.getValue().homepage()).isNull();
       assertThat(captor.getValue().authors()).containsExactly("Alice");
     }
@@ -457,6 +491,69 @@ class AbstractCargoProtocolFacadeTest {
       final var captor = ArgumentCaptor.forClass(Object.class);
       verify(objectMapper).writeValueAsString(captor.capture());
       assertThat(((CrateIndexEntry) captor.getValue()).deps()).isEmpty();
+    }
+
+    // ── Size limits and edition (RPS-1119, RPS-1141) ────────────────────────
+
+    @Test
+    @DisplayName("refuses a crate larger than the configured limit with nothing stored (413)")
+    void refusesOversizedCrate() throws Exception {
+      when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
+          .thenReturn(minimalRequest("my_crate", "1.0.0"));
+      final var oversizedCrate = new byte[(int) MAX_CRATE_BYTES + 1];
+
+      assertThatThrownBy(
+              () ->
+                  facade.publish(
+                      context("/api/v1/crates/new"), stream(publishPayload("{}", oversizedCrate))))
+          .isInstanceOf(MaxUploadSizeExceededException.class);
+
+      verifyNoInteractions(storageService, crateService);
+    }
+
+    @Test
+    @DisplayName("refuses a crate body that is shorter than its declared length")
+    void refusesShortCrateBody() throws Exception {
+      when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
+          .thenReturn(minimalRequest("my_crate", "1.0.0"));
+
+      final var fullPayload = publishPayload("{}", minimalCrateBytes());
+      // Truncate the body so it ends before the declared crate length is satisfied.
+      final var truncated = new byte[fullPayload.length - 1];
+      System.arraycopy(fullPayload, 0, truncated, 0, truncated.length);
+
+      assertThatThrownBy(() -> facade.publish(context("/api/v1/crates/new"), stream(truncated)))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("shorter than declared");
+
+      verifyNoInteractions(storageService, crateService);
+    }
+
+    @Test
+    @DisplayName("passes the crate's manifest edition through to the crate service")
+    void passesEditionThrough() throws Exception {
+      when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
+          .thenReturn(minimalRequest("my_crate", "1.0.0"));
+
+      final var crateBytes =
+          crateWithManifest("[package]\nname = \"my_crate\"\nedition = \"2021\"\n");
+
+      facade.publish(context("/api/v1/crates/new"), stream(publishPayload("{}", crateBytes)));
+
+      verify(crateService).publish(eq(repoInfo), any(CratePublishRequest.class), eq("2021"));
+    }
+
+    @Test
+    @DisplayName("passes a null edition through when the manifest declares none")
+    void passesNullEditionThroughWhenAbsent() throws Exception {
+      when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
+          .thenReturn(minimalRequest("my_crate", "1.0.0"));
+
+      final var crateBytes = crateWithManifest("[package]\nname = \"my_crate\"\n");
+
+      facade.publish(context("/api/v1/crates/new"), stream(publishPayload("{}", crateBytes)));
+
+      verify(crateService).publish(eq(repoInfo), any(CratePublishRequest.class), isNull());
     }
 
     // ── Validation ───────────────────────────────────────────────────────────

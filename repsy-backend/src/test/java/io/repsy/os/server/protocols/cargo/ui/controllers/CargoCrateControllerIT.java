@@ -111,7 +111,8 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
         repo.getName(),
         normalized,
         version,
-        ("crate-" + version).getBytes(java.nio.charset.StandardCharsets.UTF_8),
+        new java.io.ByteArrayInputStream(
+            ("crate-" + version).getBytes(java.nio.charset.StandardCharsets.UTF_8)),
         indexLine);
     this.crateService.publish(
         info,
@@ -162,7 +163,8 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
         repo.getName(),
         normalized,
         version,
-        ("crate-" + version).getBytes(java.nio.charset.StandardCharsets.UTF_8),
+        new java.io.ByteArrayInputStream(
+            ("crate-" + version).getBytes(java.nio.charset.StandardCharsets.UTF_8)),
         indexLine);
     this.crateService.publish(
         info,

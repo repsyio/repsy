@@ -18,6 +18,7 @@ package io.repsy.protocols.cargo.protocol.handlers;
 import static io.repsy.protocols.cargo.protocol.handlers.CargoHandlerTestSupport.context;
 import static io.repsy.protocols.cargo.protocol.handlers.CargoHandlerTestSupport.errorDetail;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -25,6 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.facades.contract.CargoProtocolFacade;
@@ -45,6 +47,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractCargoPublishProtocolMethodHandler")
@@ -144,8 +147,8 @@ class AbstractCargoPublishProtocolMethodHandlerTest {
     }
 
     @Test
-    @DisplayName("returns 400 with a cargo error body when publishing fails")
-    void returnsBadRequestOnError() throws IOException {
+    @DisplayName("returns 400 with a cargo error body on a deliberate validation failure")
+    void returnsBadRequestOnValidationFailure() throws IOException {
       final var ctx = context(PUBLISH_PATH);
       doThrow(new IllegalArgumentException("crateVersionAlreadyExists"))
           .when(facade)
@@ -157,6 +160,64 @@ class AbstractCargoPublishProtocolMethodHandlerTest {
 
       assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
       assertThat(errorDetail(result)).isEqualTo("crateVersionAlreadyExists");
+    }
+
+    @Test
+    @DisplayName("returns 400 with a cargo error body when the crate/version already exists")
+    void returnsBadRequestOnAlreadyExists() throws IOException {
+      final var ctx = context(PUBLISH_PATH);
+      doThrow(new ItemAlreadyExistException("crate `demo@1.0.0` already exists in this registry"))
+          .when(facade)
+          .publish(eq(ctx), any(InputStream.class));
+
+      final var result =
+          handler.handle(
+              ctx, new MockHttpServletRequest("PUT", PUBLISH_PATH), new MockHttpServletResponse());
+
+      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(errorDetail(result))
+          .isEqualTo("crate `demo@1.0.0` already exists in this registry");
+    }
+
+    @Test
+    @DisplayName("returns 413 with a cargo error body when the crate is too large (RPS-1119)")
+    void returnsPayloadTooLargeOnOversizedCrate() throws IOException {
+      final var ctx = context(PUBLISH_PATH);
+      doThrow(new MaxUploadSizeExceededException(100L))
+          .when(facade)
+          .publish(eq(ctx), any(InputStream.class));
+
+      final var result =
+          handler.handle(
+              ctx, new MockHttpServletRequest("PUT", PUBLISH_PATH), new MockHttpServletResponse());
+
+      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+      assertThat(errorDetail(result)).isEqualTo("the crate exceeds the maximum upload size");
+    }
+
+    /**
+     * RPS-1141: a genuine server fault must not be caught here and shown to the client with its raw
+     * message (which could carry SQL text, class names, or other internals) — it must propagate to
+     * {@code ErrorHandler}, which answers a generic 500 instead. Flip-and-fail check: widening the
+     * catch in {@code handle()} back to {@code Exception} makes this test fail, because the
+     * facade's exception would then be caught and turned into a 400 carrying its message.
+     */
+    @Test
+    @DisplayName("does not catch a genuine server exception, and does not leak its message")
+    void propagatesUnexpectedExceptionsInsteadOfLeakingThem() throws IOException {
+      final var ctx = context(PUBLISH_PATH);
+      final var sensitiveMessage =
+          "duplicate key value violates unique constraint \"cargo_crate_pkey\"";
+      doThrow(new RuntimeException(sensitiveMessage)).when(facade).publish(eq(ctx), any());
+
+      assertThatThrownBy(
+              () ->
+                  handler.handle(
+                      ctx,
+                      new MockHttpServletRequest("PUT", PUBLISH_PATH),
+                      new MockHttpServletResponse()))
+          .isInstanceOf(RuntimeException.class)
+          .hasMessageContaining(sensitiveMessage);
     }
   }
 }
