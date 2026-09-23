@@ -333,7 +333,7 @@ test.describe('nuget registry rules (raw HTTP)', () => {
 
   test(
     "service index is unauthenticated on a private repo and advertises this instance's own " +
-      'URLs, including non-standard @type strings the official client does not resolve (H6)',
+      'URLs, using @type strings the official client resolves (H6)',
     { tag: ['@auth'] },
     async ({ seeder }) => {
       const repo = await seeder.createRepo(RepoType.NUGET, { privateRepo: true });
@@ -349,22 +349,21 @@ test.describe('nuget registry rules (raw HTTP)', () => {
         `${env.repoBaseUrl}/${repo.name}/v3/package`,
       );
       expect(byType.get('PackagePublish/2.0.0')).toBe(`${env.repoBaseUrl}/${repo.name}/v3/package`);
-      expect(byType.get('RegistrationsBaseUrl/3.0.0')).toBe(
+      expect(byType.get('RegistrationsBaseUrl')).toBe(
         `${env.repoBaseUrl}/${repo.name}/v3/registration`,
       );
 
-      // RPS-1213: NuGet.Client's ServiceTypes.cs (and the official docs)
-      // only resolve "RegistrationsBaseUrl(/3.0.0-beta|/3.0.0-rc|/3.4.0|/3.6.0)",
-      // "SearchQueryService(/3.0.0-beta|/3.4.0)" and "SearchAutocompleteService(/3.0.0-beta)" -- the
-      // bare "/3.0.0" spelling this server advertises for the latter two is not one of them, and
-      // "PackageDelete/2.0.0" is not a NuGet service type at all (unlist/relist live under
-      // PackagePublish/2.0.0's own PUT/DELETE, per the NuGet API docs). This is why `dotnet package
-      // search`/registration-based commands are expected to fail against this server (see
-      // README.md's "H6") while `dotnet nuget push`/`dotnet restore` (PackageBaseAddress,
-      // PackagePublish) work fine -- confirmed live, not fixed here.
-      expect(resources.map((r) => r.type)).toContain('SearchQueryService/3.0.0');
-      expect(resources.map((r) => r.type)).toContain('SearchAutocompleteService/3.0.0');
-      expect(resources.map((r) => r.type)).toContain('PackageDelete/2.0.0');
+      // RPS-1213 (fixed): NuGet.Client's ServiceTypes.cs (and the official docs) resolve
+      // "RegistrationsBaseUrl", "SearchQueryService" and "SearchAutocompleteService" as bare,
+      // unversioned types -- among other recognised spellings, e.g.
+      // "RegistrationsBaseUrl(/3.0.0-beta|/3.0.0-rc|/3.4.0|/3.6.0)". This server advertises the bare
+      // forms, which the client resolves and which make no claim beyond the base (3.0.0) semantics
+      // it actually implements (in particular, not "RegistrationsBaseUrl/3.6.0"'s SemVer2
+      // registration semantics). The invented "PackageDelete/2.0.0" is no longer advertised either
+      // -- unlist/relist live under PackagePublish/2.0.0's own PUT/DELETE, per the NuGet API docs.
+      expect(resources.map((r) => r.type)).toContain('SearchQueryService');
+      expect(resources.map((r) => r.type)).toContain('SearchAutocompleteService');
+      expect(resources.map((r) => r.type)).not.toContain('PackageDelete/2.0.0');
     },
   );
 
