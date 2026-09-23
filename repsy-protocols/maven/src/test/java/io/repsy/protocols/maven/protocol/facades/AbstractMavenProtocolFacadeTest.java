@@ -379,6 +379,27 @@ class AbstractMavenProtocolFacadeTest {
 
   @Test
   @DisplayName(
+      "does not hand a dotted-classifier jar to the scanner (RPS-1187, won't-fix): the GAV"
+          + " calculator splits the tail at its first dot and mis-splits the classifier, but the"
+          + " wrong, non-null classifier still makes isScannableArtifact answer false, the same"
+          + " decision a correct split would give since the file is not a plain jar")
+  void doesNotExposeADottedClassifierJarToTheScanner() throws Exception {
+    final var path = "com/example/lib/1.0/lib-1.0-2.0.jar";
+    requestFor(path);
+    deployIsAllowed();
+    storageReportsUsage(3);
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(new byte[0]));
+
+    upload("jar");
+
+    assertThat(this.stored).singleElement().isEqualTo("jar".getBytes(UTF_8));
+    assertThat(this.context.<String>getProperty("artifactName")).isNull();
+    assertThat(this.context.<String>getProperty("artifactVersion")).isNull();
+  }
+
+  @Test
+  @DisplayName(
       "streams a jar of an artifactId containing \".pom\" straight to storage, never as a POM"
           + " (RPS-1196)")
   void streamsAJarOfAnArtifactIdContainingPomToStorage() throws Exception {

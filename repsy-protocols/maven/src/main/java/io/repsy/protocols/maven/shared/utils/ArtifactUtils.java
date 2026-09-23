@@ -24,6 +24,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -59,32 +60,35 @@ public class ArtifactUtils {
         .contains(subString.toLowerCase(Locale.getDefault()));
   }
 
+  /**
+   * Parses the basic GAV of a metadata-family path: {@code g/a/<version>/maven-metadata.xml*} for a
+   * {@code SNAPSHOT} version directory, the only shape a real client writes at version level
+   * (RPS-1195). Any other shape, including {@code g/a/maven-metadata.xml*} (artifact-level) and a
+   * hand-crafted {@code g/a/<release>/maven-metadata.xml*} (release version-level), cannot be told
+   * apart from path segments alone: a shorter groupId with a version segment looks exactly like a
+   * longer groupId without one. Such a path used to be parsed as if it always had a version, which
+   * shifted every field by one for the artifact-level case (RPS-1177); it now answers {@code null}
+   * instead, the documented gap for the release version-level case (RPS-1195).
+   *
+   * @param path A path a metadata-family file name ({@link #isMetadataFamilyFile}) was found at
+   */
   @Nullable
-  private static Gav convertPathToBasicGav(final String str) {
+  private static Gav convertPathToBasicGav(final String path) {
 
-    final var s = str.startsWith("/") ? str.substring(1) : str;
+    // group (>=1 segment) + artifactId + version, ahead of the file itself.
+    final var minSegmentsBeforeFile = 3;
 
-    final var vEndPos = s.lastIndexOf('/');
+    final var s = path.startsWith("/") ? path.substring(1) : path;
+    final var segments = s.split("/", -1);
+    final var fileIndex = segments.length - 1;
 
-    if (vEndPos == -1) {
+    if (fileIndex < minSegmentsBeforeFile || !segments[fileIndex - 1].endsWith(SNAPSHOT_SUFFIX)) {
       return null;
     }
 
-    final var aEndPos = s.lastIndexOf('/', vEndPos - 1);
-
-    if (aEndPos == -1) {
-      return null;
-    }
-
-    final var gEndPos = s.lastIndexOf('/', aEndPos - 1);
-
-    if (gEndPos == -1) {
-      return null;
-    }
-
-    final var groupId = s.substring(0, gEndPos).replace('/', '.');
-    final var artifactId = s.substring(gEndPos + 1, aEndPos);
-    final var version = s.substring(aEndPos + 1, vEndPos);
+    final var groupId = String.join(".", Arrays.asList(segments).subList(0, fileIndex - 2));
+    final var artifactId = segments[fileIndex - 2];
+    final var version = segments[fileIndex - 1];
 
     return new Gav(groupId, artifactId, version);
   }
@@ -160,8 +164,7 @@ public class ArtifactUtils {
 
   public static @Nullable Gav getGavByFile(final StoragePath storagePath) {
 
-    if (ArtifactUtils.containsIgnoreCase(
-        storagePath.getRelativePath().getPath(), METADATA_FILENAME)) {
+    if (ArtifactUtils.isMetadataFamilyFile(storagePath.getRelativePath().getFileName())) {
       return ArtifactUtils.convertPathToBasicGav(storagePath.getRelativePath().getPath());
     } else {
       return ArtifactUtils.convertPathToGav(storagePath.getRelativePath().getPath());
@@ -277,6 +280,24 @@ public class ArtifactUtils {
         && str.regionMatches(true, str.length() - suffix.length(), suffix, 0, suffix.length());
   }
 
+  private static boolean startsWithIgnoreCase(final String str, final String prefix) {
+    return str.length() >= prefix.length()
+        && str.regionMatches(true, 0, prefix, 0, prefix.length());
+  }
+
+  /**
+   * Tells the metadata family of a file by its name alone: {@code maven-metadata.xml} itself, or
+   * one of its checksums or its {@code .asc} signature ({@code maven-metadata.xml.<suffix>}),
+   * matched case-insensitively. An artifactId that merely contains the literal string, such as
+   * {@code maven-metadata.xml-plugin}, is not looked at: its file names start with {@code
+   * maven-metadata.xml-}, not {@code maven-metadata.xml.}, the same shape of fix RPS-1196 made for
+   * {@link #isPomFile} (RPS-1177).
+   */
+  public static boolean isMetadataFamilyFile(final String fileName) {
+    return fileName.equalsIgnoreCase(METADATA_FILENAME)
+        || startsWithIgnoreCase(fileName, METADATA_FILENAME + ".");
+  }
+
   /**
    * Tells a POM by its file name alone: it ends with {@code .pom} (any case). A checksum or an
    * {@code .asc} of it does not, and a directory or artifactId containing {@code .pom} is not
@@ -364,12 +385,17 @@ public class ArtifactUtils {
     return metadata != null && metadata.getVersion() != null && !metadata.getVersion().isBlank();
   }
 
+  /**
+   * Tells a checksum file by its suffix, matched case-sensitively like the M2 repository layout
+   * (Maven Resolver's and the GAV calculator's own {@code .md5}/{@code .sha1}/{@code .sha256}/
+   * {@code .sha512}): no real client sends an upper-case one, so {@code lib-1.0.jar.SHA1} is not a
+   * checksum file, consistent with the GAV calculator, which would not strip it either (RPS-1195).
+   */
   public static boolean isChecksumFile(final String fileName) {
 
     final var dotIndex = fileName.lastIndexOf('.');
 
-    return CHECKSUM_TYPES.contains(
-        ((dotIndex == -1) ? "" : fileName.substring(dotIndex)).toLowerCase(Locale.getDefault()));
+    return dotIndex != -1 && CHECKSUM_TYPES.contains(fileName.substring(dotIndex));
   }
 
   /**
@@ -378,12 +404,13 @@ public class ArtifactUtils {
    * Resolver and Gradle sign artifacts only), but Maven Central serves them and Nexus stores them
    * as a subordinate of the metadata, like a checksum. Its body is armored text, not XML, so it is
    * never parsed and is judged by its directory like a metadata checksum (RPS-1185). A checksum of
-   * it ({@code .asc.sha1}) is a checksum. The suffix is matched case-sensitively like {@link
-   * #isPomSignature}.
+   * it ({@code .asc.sha1}) is a checksum. Told by the file name alone, the same predicate as {@link
+   * #isMetadataFamilyFile}, plus the case-sensitive {@code .asc} suffix, like {@link
+   * #isPomSignature} (RPS-1177).
    */
   public static boolean isMetadataSignature(final String fileName) {
 
-    return containsIgnoreCase(fileName, METADATA_FILENAME) && fileName.endsWith(SIGNED_POM_SUFFIX);
+    return isMetadataFamilyFile(fileName) && fileName.endsWith(SIGNED_POM_SUFFIX);
   }
 
   /**
@@ -401,13 +428,13 @@ public class ArtifactUtils {
     return directoryIndex >= 0 && segments[directoryIndex].endsWith(SNAPSHOT_SUFFIX);
   }
 
+  /**
+   * Tells whether a file's GAV can be read straight from its path: any file outside the metadata
+   * family ({@link #isMetadataFamilyFile}), which is classified from its content instead
+   * (RPS-1177).
+   */
   public static boolean isFileSuitableForGavExtraction(final String fileName) {
 
-    // Condition for detection metadata files, their checksums and their signatures.
-    if (ArtifactUtils.containsIgnoreCase(fileName, METADATA_FILENAME)) {
-      return isSnapshot(fileName);
-    }
-
-    return true;
+    return !ArtifactUtils.isMetadataFamilyFile(fileName);
   }
 }

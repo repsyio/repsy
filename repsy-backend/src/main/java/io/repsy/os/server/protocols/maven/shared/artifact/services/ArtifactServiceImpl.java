@@ -525,7 +525,9 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
 
     final var storageFileName = storagePath.getRelativePath().getFileName();
 
-    if (storageFileName.contains(METADATA_FILENAME)) {
+    // A file name is only looked at by its own name, never a substring of it: an artifactId that
+    // happens to contain the literal "maven-metadata.xml" must not skip this check (RPS-1177).
+    if (ArtifactUtils.isMetadataFamilyFile(storageFileName)) {
       return;
     }
 

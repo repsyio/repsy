@@ -290,4 +290,51 @@ class MavenChecksumRulesIT extends AbstractIntegrationTest {
     assertThat(this.status(repo, admin, jar + ".md5")).isEqualTo(200);
     assertThat(stored(repo, jar + ".md5")).exists();
   }
+
+  /**
+   * Known, accepted gap (RPS-1195): a release version-level {@code maven-metadata.xml} checksum
+   * carries no {@code &lt;version&gt;} (its body is a hash) and its directory does not end with
+   * {@code SNAPSHOT}, so {@link
+   * io.repsy.protocols.maven.shared.utils.ArtifactUtils#isSnapshotVersionDirectoryFile} cannot tell
+   * it from an artifact-level checksum of an artifact literally named {@code 1.0}. It is accepted
+   * rather than fixed: telling the two apart would need reading the stored base {@code
+   * maven-metadata.xml} back from storage and parsing it for every checksum, which is a storage
+   * read (and an order dependence on the base file already being stored) this class does not
+   * otherwise need, and it conflicts with the delete-safety work landed alongside it. Maven itself
+   * never writes this shape (only a snapshot deploy writes version-level metadata), so only a
+   * hand-crafted PUT reaches it.
+   */
+  @Test
+  @DisplayName(
+      "known gap: a release version-level metadata checksum is not judged by the releases"
+          + " setting and still creates its directory (RPS-1195)")
+  void releaseVersionLevelMetadataChecksumIsAKnownGap() throws Exception {
+    final var repo = this.mavenRepo();
+    final var admin = this.admin();
+    this.settings(repo, admin, false, true, true);
+
+    final var path = LIB_DIR + "1.0/maven-metadata.xml.sha1";
+
+    assertThat(this.status(repo, admin, path)).isEqualTo(200);
+    assertThat(stored(repo, path)).exists();
+  }
+
+  @Test
+  @DisplayName(
+      "an upper-case checksum suffix on a metadata file is never treated as its checksum"
+          + " (RPS-1195): maven-metadata.xml.SHA1 is read as metadata content and rejected as"
+          + " malformed, instead of being judged by its directory like maven-metadata.xml.sha1")
+  void upperCaseMetadataChecksumSuffixIsReadAsMetadata() throws Exception {
+    final var repo = this.mavenRepo();
+    final var admin = this.admin();
+    this.settings(repo, admin, true, true, true);
+
+    expectError(
+        this.upload(repo, admin, ARTIFACT_METADATA + ".SHA1"),
+        HttpStatus.BAD_REQUEST,
+        "malformedMetadataFile",
+        "malformedMetadataFile",
+        "Metadata file is malformed or incomplete, please retry the deployment.");
+    assertThat(stored(repo, ARTIFACT_METADATA + ".SHA1")).doesNotExist();
+  }
 }
