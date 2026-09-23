@@ -95,7 +95,7 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
     final var storagePath = StoragePath.of(repoId, gemPath.toString());
 
     final var usage = this.storageStrategy.calculatePathUsage(storagePath);
-    this.storageStrategy.deleteDirectory(storagePath);
+    this.storageStrategy.delete(storagePath);
     return usage;
   }
 
@@ -115,7 +115,7 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
   @Override
   public void deleteRepo(final UUID repoId) {
     final var storagePath = StoragePath.of(repoId);
-    this.storageStrategy.deleteDirectory(storagePath);
+    this.storageStrategy.delete(storagePath);
   }
 
   public static String buildFilename(

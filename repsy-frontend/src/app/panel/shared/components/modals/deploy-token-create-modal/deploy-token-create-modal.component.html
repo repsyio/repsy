@@ -117,6 +117,13 @@
               type="date"
               class="h-[50px] w-full cursor-pointer rounded-lg border border-[#404141] bg-[#101112] bg-transparent px-4 text-[14px] text-white [color-scheme:dark] outline-none placeholder:text-[#9FA0A0] focus-within:border-[#FDFDFD]"
             />
+            <div class="text-body2 text-error min-h-7 pt-1">
+              @if (form.get('expirationDate').errors?.['dateOutOfRange'] && form.get('expirationDate').touched) {
+                <p animate.enter="fade-in-up">• Must be between tomorrow and one year from today</p>
+              } @else if (form.get('expirationDate').errors?.['dateInvalid'] && form.get('expirationDate').touched) {
+                <p animate.enter="fade-in-up">• Enter a valid date</p>
+              }
+            </div>
           </div>
         </div>
       </div>

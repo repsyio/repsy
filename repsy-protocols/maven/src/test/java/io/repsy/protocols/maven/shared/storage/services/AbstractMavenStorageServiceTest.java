@@ -103,7 +103,7 @@ class AbstractMavenStorageServiceTest {
     final var usage = this.storageService.deleteArtifactVersion(REPO_ID, GROUP, ARTIFACT, "1.0");
 
     assertThat(usage).isZero();
-    verify(this.storageStrategy, never()).deleteDirectory(any());
+    verify(this.storageStrategy, never()).delete(any());
     verify(this.storageStrategy, never()).calculatePathUsage(any());
   }
 
@@ -117,7 +117,7 @@ class AbstractMavenStorageServiceTest {
     final var usage = this.storageService.deleteArtifactVersion(REPO_ID, GROUP, ARTIFACT, "1.0");
 
     assertThat(usage).isEqualTo(4096L);
-    verify(this.storageStrategy).deleteDirectory(argThat(pathEndingWith("com/example/demo/1.0")));
+    verify(this.storageStrategy).delete(argThat(pathEndingWith("com/example/demo/1.0")));
   }
 
   @Test

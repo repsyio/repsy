@@ -177,7 +177,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
     final var storagePath = StoragePath.of(repoUuid, artifactPath.toString());
     final var usage = this.storageStrategy.calculatePathUsage(storagePath);
 
-    this.storageStrategy.deleteDirectory(storagePath);
+    this.storageStrategy.delete(storagePath);
 
     return usage;
   }
@@ -201,7 +201,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
 
     final var usage = this.storageStrategy.calculatePathUsage(storagePath);
 
-    this.storageStrategy.deleteDirectory(storagePath);
+    this.storageStrategy.delete(storagePath);
 
     return usage;
   }
@@ -250,7 +250,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
           StoragePath.of(repoUuid, groupPath.resolve(artifactName).normalize().toString());
 
       usage += this.storageStrategy.calculatePathUsage(artifactStoragePath);
-      this.storageStrategy.deleteDirectory(artifactStoragePath);
+      this.storageStrategy.delete(artifactStoragePath);
     }
 
     // Prune this group's own directory and its now-empty ancestors, stopping at the first one that
@@ -263,7 +263,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
         break;
       }
 
-      this.storageStrategy.deleteDirectory(sp);
+      this.storageStrategy.delete(sp);
     }
 
     return usage;
@@ -298,7 +298,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
   @Override
   public void deleteRepo(final UUID repoUuid) {
     final var storagePath = StoragePath.of(repoUuid);
-    this.storageStrategy.deleteDirectory(storagePath);
+    this.storageStrategy.delete(storagePath);
   }
 
   /**
@@ -527,6 +527,6 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
   @Override
   public void clearTrash() {
 
-    this.storageStrategy.clearTrash();
+    final var unused = this.storageStrategy.clearTrash();
   }
 }

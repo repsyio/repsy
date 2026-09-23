@@ -94,7 +94,13 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     this.createUser(this.username, UserRole.ADMIN);
 
     this.skewNanos.set(0);
-    doAnswer(invocation -> System.nanoTime() + this.skewNanos.get()).when(this.throttle).now();
+    // A fixed base plus a controlled skew, not System.nanoTime() plus the skew: the 20 failed
+    // checks a test drives each cost a real BCrypt verification, and on a loaded machine that can
+    // itself take more than a second, which would eat into the window this class advances by hand
+    // (RPS-1175). Capturing the base once and never reading the wall clock again makes every test
+    // here independent of how long those checks actually take.
+    final var base = System.nanoTime();
+    doAnswer(invocation -> base + this.skewNanos.get()).when(this.throttle).now();
   }
 
   private void advance(final Duration duration) {

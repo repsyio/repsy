@@ -2404,6 +2404,13 @@ XML) and
 overwrites that JUnit file per service, so diff/compare a single protocol's run in isolation
 (`--protocol maven` alone) rather than a combined one if you need its own report.
 
+`run.sh` creates `e2e/test-results/` and `e2e/playwright-report/` itself, as the invoking user, before
+any subcommand that starts a runner container (`test` and `sweep`; any new one must do the same via
+`ensure_runner_dirs`). The runners bind-mount both directories, and Docker would otherwise create a
+missing one as root, so the next runner (which runs as your uid) fails with `EACCES` writing its
+reports. If you already have root-owned ones from an older checkout, remove them once
+(`sudo rm -r test-results playwright-report`).
+
 Editing a test, a file under `src/`, or the openapi spec needs no image rebuild: both are
 bind-mounted into the runner container, which regenerates the API client on every start. Only a
 change to `runners/base.Dockerfile` or `pnpm-lock.yaml` needs `-b`.
