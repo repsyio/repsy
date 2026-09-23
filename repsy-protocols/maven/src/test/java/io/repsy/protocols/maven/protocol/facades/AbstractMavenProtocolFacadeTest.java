@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -44,6 +45,7 @@ import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -77,6 +79,9 @@ import org.springframework.core.io.Resource;
  * <p>RPS-1121: a metadata-family file, a POM signature and a POM are each capped ({@link
  * MavenUploadLimits}) before they are read whole or spooled, so an oversized one is refused with a
  * 400 and stores nothing.
+ *
+ * <p>RPS-1199: what can still fail after the store is the registration itself. A new POM (or POM
+ * signature) is taken back out of the repo and not charged then, a redeploy stays and is charged.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractMavenProtocolFacade upload")
@@ -739,5 +744,121 @@ class AbstractMavenProtocolFacadeTest {
     verify(this.storageService, never()).writeInputStreamToPath(any(), any(), anyString());
     verify(this.artifactService, never()).createOrUpdateArtifact(any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+  }
+
+  private void registrationFails() {
+    doThrow(new IllegalStateException("database is down"))
+        .when(this.artifactService)
+        .createOrUpdateArtifact(any(), any(), any());
+  }
+
+  private void pomIsNewInTheRepo(final boolean exists) {
+    when(this.storageService.exists(any(StoragePath.class), anyString())).thenReturn(exists);
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(VALID_POM.getBytes(UTF_8)));
+  }
+
+  @Test
+  @DisplayName(
+      "takes a new POM back out of the repo and charges nothing when its registration fails"
+          + " (RPS-1199)")
+  void takesBackANewPomWhoseRegistrationFails() {
+    requestFor(POM_PATH);
+    deployIsAllowed();
+    storageReportsUsage(VALID_POM.length());
+    pomIsNewInTheRepo(false);
+    registrationFails();
+
+    assertThatThrownBy(() -> upload(VALID_POM))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("database is down");
+
+    verify(this.storageService).deleteFile(argThat(path -> path.getPath().endsWith(POM_PATH)));
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+    assertThat(this.context.<String>getProperty("artifactName")).isNull();
+  }
+
+  @Test
+  @DisplayName(
+      "keeps a redeployed POM and charges what was written when its registration fails (RPS-1199)")
+  void keepsAndChargesARedeployedPomWhoseRegistrationFails() {
+    requestFor(POM_PATH);
+    deployIsAllowed();
+    storageReportsUsage(7);
+    pomIsNewInTheRepo(true);
+    registrationFails();
+
+    assertThatThrownBy(() -> upload(VALID_POM)).isInstanceOf(IllegalStateException.class);
+
+    verify(this.storageService, never()).deleteFile(any());
+    assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(7);
+  }
+
+  @Test
+  @DisplayName("charges a new POM it could not take back, and rethrows the registration failure")
+  void chargesANewPomThatCannotBeTakenBack() {
+    requestFor(POM_PATH);
+    deployIsAllowed();
+    storageReportsUsage(VALID_POM.length());
+    pomIsNewInTheRepo(false);
+    registrationFails();
+    doThrow(new UncheckedIOException(new IOException("trash is read-only")))
+        .when(this.storageService)
+        .deleteFile(any());
+
+    assertThatThrownBy(() -> upload(VALID_POM))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("database is down");
+
+    assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage())
+        .isEqualTo(VALID_POM.length());
+  }
+
+  @Test
+  @DisplayName("takes a new POM signature back out of the repo when its registration fails")
+  void takesBackANewPomSignatureWhoseRegistrationFails() {
+    requestFor(POM_PATH + ".asc");
+    deployIsAllowed();
+    storageReportsUsage(ARMORED_SIGNATURE.length());
+    when(this.storageService.exists(any(StoragePath.class), anyString())).thenReturn(false);
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(new byte[0]));
+    registrationFails();
+
+    assertThatThrownBy(() -> upload(ARMORED_SIGNATURE)).isInstanceOf(IllegalStateException.class);
+
+    verify(this.storageService).deleteFile(any());
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+  }
+
+  @Test
+  @DisplayName("never removes a file that has nothing to register, and charges it (RPS-1199)")
+  void neverTakesBackAJar() {
+    requestFor("com/example/lib/1.0/lib-1.0.jar");
+    deployIsAllowed();
+    storageReportsUsage(9);
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenThrow(new IllegalStateException("storage went away"));
+
+    assertThatThrownBy(() -> upload("jar bytes")).isInstanceOf(IllegalStateException.class);
+
+    verify(this.storageService, never()).exists(any(), anyString());
+    verify(this.storageService, never()).deleteFile(any());
+    assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(9);
+  }
+
+  @Test
+  @DisplayName("reports the usage of a POM that registered, and removes nothing (RPS-1199)")
+  void chargesARegisteredPom() throws Exception {
+    requestFor(POM_PATH);
+    deployIsAllowed();
+    storageReportsUsage(VALID_POM.length());
+    pomIsNewInTheRepo(false);
+
+    upload(VALID_POM);
+
+    verify(this.storageService, never()).deleteFile(any());
+    assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage())
+        .isEqualTo(VALID_POM.length());
   }
 }
