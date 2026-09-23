@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -93,12 +94,18 @@ class GoModuleZipReaderTest {
     return files;
   }
 
+  /** {@code GoModuleZipReader.extractGoMod} reads from a stream, not a byte array (RPS-1119). */
+  private static byte[] extractGoMod(
+      final byte[] zip, final String modulePath, final String version) {
+    return GoModuleZipReader.extractGoMod(new ByteArrayInputStream(zip), modulePath, version);
+  }
+
   @Test
   @DisplayName("returns the go.mod of the module")
   void returnsGoMod() {
     final var goMod = "module " + MODULE + "\n\ngo 1.23\n";
 
-    final var content = GoModuleZipReader.extractGoMod(zip(files(goMod)), MODULE, VERSION);
+    final var content = extractGoMod(zip(files(goMod)), MODULE, VERSION);
 
     assertThat(new String(content, StandardCharsets.UTF_8)).isEqualTo(goMod);
   }
@@ -106,7 +113,7 @@ class GoModuleZipReaderTest {
   @Test
   @DisplayName("returns an empty go.mod as empty content")
   void returnsEmptyGoMod() {
-    assertThat(GoModuleZipReader.extractGoMod(zip(files("")), MODULE, VERSION)).isEmpty();
+    assertThat(extractGoMod(zip(files("")), MODULE, VERSION)).isEmpty();
   }
 
   @Test
@@ -114,9 +121,9 @@ class GoModuleZipReaderTest {
   void acceptsGoModAtLimit() {
     final var goMod = goModOfSize(GoModuleZipReader.MAX_GO_MOD_BYTES);
 
-    assertThat(GoModuleZipReader.extractGoMod(zip(files(goMod)), MODULE, VERSION))
+    assertThat(extractGoMod(zip(files(goMod)), MODULE, VERSION))
         .hasSize((int) GoModuleZipReader.MAX_GO_MOD_BYTES);
-    assertThat(GoModuleZipReader.extractGoMod(storedZip(files(goMod)), MODULE, VERSION))
+    assertThat(extractGoMod(storedZip(files(goMod)), MODULE, VERSION))
         .hasSize((int) GoModuleZipReader.MAX_GO_MOD_BYTES);
   }
 
@@ -125,7 +132,7 @@ class GoModuleZipReaderTest {
   void refusesOversizedDeflatedGoMod() {
     final var bomb = zip(files(goModOfSize(GoModuleZipReader.MAX_GO_MOD_BYTES + 1)));
 
-    assertThatThrownBy(() -> GoModuleZipReader.extractGoMod(bomb, MODULE, VERSION))
+    assertThatThrownBy(() -> extractGoMod(bomb, MODULE, VERSION))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("goModTooLarge");
   }
@@ -135,7 +142,7 @@ class GoModuleZipReaderTest {
   void refusesOversizedStoredGoMod() {
     final var bomb = storedZip(files(goModOfSize(GoModuleZipReader.MAX_GO_MOD_BYTES + 1)));
 
-    assertThatThrownBy(() -> GoModuleZipReader.extractGoMod(bomb, MODULE, VERSION))
+    assertThatThrownBy(() -> extractGoMod(bomb, MODULE, VERSION))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("goModTooLarge");
   }
@@ -149,7 +156,7 @@ class GoModuleZipReaderTest {
     files.put(MODULE + "@v9.9.9/go.mod", goModOfSize(1L << 25));
     files.put(GO_MOD_ENTRY, "module " + MODULE + "\n");
 
-    final var content = GoModuleZipReader.extractGoMod(zip(files), MODULE, VERSION);
+    final var content = extractGoMod(zip(files), MODULE, VERSION);
 
     assertThat(new String(content, StandardCharsets.UTF_8)).isEqualTo("module " + MODULE + "\n");
   }
@@ -159,7 +166,7 @@ class GoModuleZipReaderTest {
   void reportsMissingGoMod() {
     final var files = Map.of(MODULE + "@" + VERSION + "/hello.go", "package hello\n");
 
-    assertThatThrownBy(() -> GoModuleZipReader.extractGoMod(zip(files), MODULE, VERSION))
+    assertThatThrownBy(() -> extractGoMod(zip(files), MODULE, VERSION))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("goModNotFoundInZip");
   }

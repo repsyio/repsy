@@ -20,15 +20,19 @@ import io.repsy.os.server.protocols.golang.shared.storage.services.GolangStorage
 import io.repsy.protocols.golang.protocol.facades.AbstractGoProtocolFacade;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.util.unit.DataSize;
 
 @Component
 @NullMarked
 public class GolangProtocolFacade extends AbstractGoProtocolFacade<UUID> {
 
   public GolangProtocolFacade(
-      final GolangStorageService golangStorageService, final GoModuleServiceImpl goModuleService) {
+      final GolangStorageService golangStorageService,
+      final GoModuleServiceImpl goModuleService,
+      @Value("${repsy.golang.max-module-zip-size:500MB}") final DataSize maxModuleZipSize) {
 
-    super(golangStorageService, goModuleService);
+    super(golangStorageService, goModuleService, maxModuleZipSize.toBytes());
   }
 }
