@@ -31,10 +31,10 @@ export class ByteFormatter {
       unit++;
     }
 
-    let rounded = parseFloat(value.toFixed(decimals));
+    let rounded = Number.parseFloat(value.toFixed(decimals));
     if (rounded >= BASE && unit < UNITS.length - 1) {
       // Rounding pushed the value up to the next unit boundary (e.g. 1023.999 K -> 1024 K).
-      rounded = parseFloat((value / BASE).toFixed(decimals));
+      rounded = Number.parseFloat((value / BASE).toFixed(decimals));
       unit++;
     }
 

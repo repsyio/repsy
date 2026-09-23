@@ -48,10 +48,20 @@ export class RubyService {
   }
 
   public getRepository(repoName: string): Observable<RepoPermissionInfo> {
+    this.resetActiveRepoIfChanged(repoName);
+
     return this.protocolRepoControllerService.getPermission(repoName).pipe(
       map((r) => r.data!),
       tap((info) => this.repoSubject.next(info)),
     );
+  }
+
+  private resetActiveRepoIfChanged(repoName: string): void {
+    if (this.repoSubject.getValue()?.repoName === repoName) {
+      return;
+    }
+
+    this.repoSubject.next(null);
   }
 
   public searchGems(
@@ -66,9 +76,7 @@ export class RubyService {
         this.repoName,
         search || undefined,
       )
-      .pipe(
-        map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GemListItem>),
-      );
+      .pipe(map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GemListItem>));
   }
 
   public fetchGemVersions(
@@ -87,8 +95,7 @@ export class RubyService {
       )
       .pipe(
         map(
-          (r) =>
-            ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GemVersionListItem>,
+          (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GemVersionListItem>,
         ),
       );
   }
