@@ -26,17 +26,17 @@
  * exact publish/download path shapes this depends on, all read from
  * `AbstractNpmProtocolFacade`/`AbstractNpmStorageService`/`PackageUtils`).
  *
- * `resolve`'s `Outcome` is derived from a raw packument GET instead: RPS-1205 makes `npm install`
- * fail to fetch the tarball for ANY published package on Repsy OS, which is a storage/path bug, not
- * an auth one, so only a GET that never touches the tarball can tell "the client failed because of
- * auth" from "the client failed because of RPS-1205" -- see `knownConsumeFailure` below, which is
- * what routes the scenario loop (`scenarios/loop.ts`) around exactly that known failure without
- * weakening the auth-outcome assertion itself.
+ * `resolve`'s `Outcome` is derived from a raw packument GET instead, so an authn/authz failure is
+ * never confused with a client-side/content failure -- a clean signal of authn/authz alone,
+ * independent of whatever the npm client itself does with the tarball. RPS-1205 (`npm install`
+ * failing to fetch the tarball for ANY published package on Repsy OS, a storage/path bug, not an
+ * auth one) is now fixed, so npm has no `knownConsumeFailure` and every scenario's full consume side
+ * -- client exit code and content equality included -- is asserted for real.
  *
  * Every publish/seed-publish writes a fresh random marker file into the package (the npm analogue of
  * `clients/maven.ts`'s jar resource marker), so two publishes of one coordinate never share content,
- * and a successful `npm install` (once RPS-1205 is fixed) can prove it got the very bytes that were
- * published by reading that file back out of `node_modules`.
+ * and a successful `npm install` can prove it got the very bytes that were published by reading that
+ * file back out of `node_modules`.
  *
  * Correction #3, the bounded version scheme (`0.<seconds since 2026-01-01Z>.<seq>`, since
  * `PackageUtils.extractVersionNameFromPayload` parses with semver4j 3.1.0, which stores parts as
@@ -55,7 +55,6 @@ import mustache from 'mustache';
 import { env } from '../env.js';
 import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { boundedSemverVersion, slugify } from '../scenarios/coordinates.js';
-import { expectationFor } from '../scenarios/types.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { MaterializedCredential, SeedResult, World } from '../scenarios/world.js';
 import { isolatedWorkDir, run } from './exec.js';
@@ -331,7 +330,7 @@ export async function resolve(world: World): Promise<AdapterResult> {
   );
 
   // The auth-only companion probe (see this file's header): a packument GET never touches the
-  // (possibly RPS-1205-broken) tarball path, so its status is a clean signal of authn/authz alone.
+  // tarball path, so its status is a clean signal of authn/authz alone.
   const rawRes = await rawGetPackument(world.repoName, world.credential, packageName);
   const resolved = await readInstalledMarker(work, packageName);
 
@@ -401,16 +400,7 @@ export const npmAdapter: ProtocolAdapter<NpmFingerprint> = {
   fingerprint,
   expectNothingStored,
 
-  /**
-   * RPS-1205 (plan section "Known critical fact"): `PackageUtils.fixTarballUrl` mis-rewrites the
-   * stored `dist.tarball` for Repsy OS's single-tenant layout, so `npm install` of any published
-   * package cannot fetch its tarball. Only the scenario's final client-exit-code/content-equality
-   * consume assertions are routed through `test.fail()` for this (see `scenarios/loop.ts`); the
-   * outcome itself (the raw packument-GET auth probe) is asserted for real, same as every other
-   * scenario.
-   */
-  knownConsumeFailure: (scenario) =>
-    expectationFor(scenario, 'npm').consume === 'ok'
-      ? 'RPS-1205: npm install cannot fetch the tarball (fixTarballUrl misrewrites the path for the OS single-tenant layout)'
-      : undefined,
+  // RPS-1205 (fixed): `PackageUtils.fixTarballUrl` no longer mis-rewrites `dist.tarball` for Repsy
+  // OS's single-tenant layout, so `npm install` fetches the tarball like any other protocol. npm has
+  // no `knownConsumeFailure` any more -- see maven's adapter, which never had one either.
 };

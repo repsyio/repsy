@@ -23,12 +23,12 @@
  * (see `ruby-raw.ts`'s file header and `README.md`'s "Ruby runner" section for the raw evidence and
  * every H/RB-number these tests reference).
  *
- * Backend bugs confirmed live while building this suite (none fixed here -- each is now its own
- * Jira story, per this repo's e2e process; RB-2/RB-7/RB-8 are source/observation notes with no
- * ticket, see README.md's "Ruby runner" section for why):
- *  - **RPS-1233**: `quick/Marshal.4.8/<name>-<version>.gemspec.rz` has no backend route at all (`404
- *    unknownPath`) -- breaks `gem install`/`gem fetch`, though NOT `bundle install` (H1, see
- *    `ruby-raw.ts`'s file header).
+ * Backend bugs confirmed live while building this suite (none fixed here except RPS-1233 -- each of
+ * the rest is now its own Jira story, per this repo's e2e process; RB-2/RB-7/RB-8 are
+ * source/observation notes with no ticket, see README.md's "Ruby runner" section for why):
+ *  - **RPS-1233** (fixed): `quick/Marshal.4.8/<name>-<version>.gemspec.rz` had no backend route at
+ *    all (`404 unknownPath`) -- broke `gem install`/`gem fetch`, though NOT `bundle install` (H1,
+ *    see `ruby-raw.ts`'s file header). A concrete `RubyGemspecHandler` now registers the route.
  *  - **RB-2** (observation): `/info/<gem>` never advertises `ruby:`/`rubygems:` requirement keys,
  *    even though `required_ruby_version` is parsed and stored.
  *  - **RPS-1234**: `specs.4.8.gz`/`latest_specs.4.8.gz`/`prerelease_specs.4.8.gz` are zlib-deflated
@@ -447,37 +447,29 @@ test.describe('ruby registry rules (raw HTTP)', () => {
     },
   );
 
-  test(
-    'quick/Marshal.4.8/*.gemspec.rz has no backend route at all (RPS-1233)',
-    { tag: ['@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'gemspecrz');
-      const admin = adminCredential();
-      await rawPublish(
-        layout.repoName,
-        admin,
-        (
-          await buildGem({
-            name: layout.packageName,
-            version: '1.0.0',
-          })
-        ).bytes,
-      );
+  test('quick/Marshal.4.8/*.gemspec.rz serves a deflated Marshal 4.8 gemspec (RPS-1233)', async ({
+    seeder,
+  }) => {
+    const layout = await newRepo(seeder, 'gemspecrz');
+    const admin = adminCredential();
+    await rawPublish(
+      layout.repoName,
+      admin,
+      (
+        await buildGem({
+          name: layout.packageName,
+          version: '1.0.0',
+        })
+      ).bytes,
+    );
 
-      const res = await rawGet(
-        layout.repoName,
-        admin,
-        gemspecRzRelPath(layout.packageName, '1.0.0'),
-      );
+    const res = await rawGet(layout.repoName, admin, gemspecRzRelPath(layout.packageName, '1.0.0'));
 
-      test.fail(
-        true,
-        'RPS-1233: no backend class extends AbstractRubyGemspecHandler -- the route falls through to ' +
-          'the router’s catch-all, 404 unknownPath',
-      );
-      expect(res.status, 'the gemspec.rz route is implemented').toBe(200);
-    },
-  );
+    expect(res.status, 'the gemspec.rz route is implemented').toBe(200);
+    const inflated = zlib.inflateSync(res.body);
+    expect(inflated.subarray(0, 2)).toEqual(Buffer.from([0x04, 0x08]));
+    expect(inflated.toString('latin1')).toContain(layout.packageName);
+  });
 
   test(
     'an unknown gem 404s; an empty repo’s /versions is just the preamble',

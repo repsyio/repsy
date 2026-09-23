@@ -28,10 +28,12 @@ import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmFacade;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
+import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
 import io.repsy.protocols.helm.shared.utils.HelmChartParser;
 import io.repsy.protocols.helm.shared.utils.HelmConstants;
+import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -161,6 +163,8 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
 
     this.requireMatchingChartName(name, metadata.getName());
 
+    this.checkChartOverride(context, repoInfo, metadata, layerDigest);
+
     final var chartForm =
         HelmChartForm.builder()
             .name(metadata.getName())
@@ -204,6 +208,45 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
         .header(DOCKER_CONTENT_DIGEST, manifestInfo.digest())
         .header(CONTENT_TYPE, mediaType)
         .build();
+  }
+
+  /**
+   * A real OCI push is two separate manifest-push requests hitting this same handler -- one by
+   * digest, one by the tag reference -- and {@code handle}'s own {@code checkManifest}-by-reference
+   * refusal only ever fires for the tag-referenced one (a fresh digest never already exists as its
+   * own reference). Without this, the digest-referenced request's own {@code findOrCreateChart}
+   * call would silently upsert the chart row even when the overall push is ultimately refused
+   * (RPS-1218's own upsert fix exposed this: the row's digest/size got updated by the by-digest
+   * sub-request before the by-tag sub-request's refusal ever ran). Checks the CHART's own (name,
+   * version) identity too, refusing only when it already exists with a DIFFERENT digest -- an
+   * identical re-push (the normal, successful two-step push's own second request) must stay a
+   * no-op, not a refusal.
+   */
+  private void checkChartOverride(
+      final ProtocolContext context,
+      final BaseRepoInfo<ID> repoInfo,
+      final HelmChartMetadata metadata,
+      final String layerDigest) {
+
+    final var existingChart =
+        this.helmFacade.findChartByNameAndVersion(
+            context, metadata.getName(), metadata.getVersion());
+    if (existingChart.isEmpty()) {
+      return;
+    }
+    if (existingChart.get().digest().equals(layerDigest)) {
+      return;
+    }
+    if (repoInfo.isAllowOverride()) {
+      return;
+    }
+
+    log.info(
+        "Chart {}:{} already exists in repo {}",
+        metadata.getName(),
+        metadata.getVersion(),
+        repoInfo.getName());
+    throw new ItemAlreadyExistException("chartAlreadyExists");
   }
 
   /**

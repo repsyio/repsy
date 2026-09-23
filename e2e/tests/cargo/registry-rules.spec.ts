@@ -302,8 +302,8 @@ test.describe('cargo registry rules (raw HTTP)', () => {
   );
 
   test(
-    'the sparse index serves a crate under its normalised name, whichever spelling it is ' +
-      'looked up by (RPS-1212)',
+    'the sparse index serves a crate under the name it was published under, whichever spelling ' +
+      'it is looked up by (RPS-1212)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const repo = await seeder.createRepo(RepoType.CARGO, { privateRepo: true });
@@ -328,14 +328,13 @@ test.describe('cargo registry rules (raw HTTP)', () => {
       expect(byHyphen.status, 'looked up by the published (hyphenated) spelling').toBe(200);
       expect(byUnderscore.status, 'looked up by the normalised spelling').toBe(200);
 
-      test.fail(
-        true,
-        `RPS-1212: the served index entry names "${underscoreName}" for a crate ` +
-          `published as "${hyphenName}" -- CrateUtils.normalizeCrateName is applied when the crate ` +
-          'is stored, so the entry never names the spelling it was actually published under',
-      );
+      // RPS-1212 (fixed): lookup stays spelling-insensitive (both requests above answered 200),
+      // but the served entry's identity is stable -- it always names the spelling the crate was
+      // actually published under, not the normalised lookup key.
       const entry = parseIndex(byHyphen.body)[0];
       expect(entry?.name).toBe(hyphenName);
+      const entryByUnderscore = parseIndex(byUnderscore.body)[0];
+      expect(entryByUnderscore?.name).toBe(hyphenName);
 
       // Downloadable under either spelling regardless (the download route normalises its own name
       // segment before looking the crate up).

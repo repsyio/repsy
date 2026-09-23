@@ -19,6 +19,7 @@ import static io.repsy.protocols.pypi.shared.utils.PackageUtils.parseUploadForm;
 
 import freemarker.template.TemplateException;
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
@@ -64,6 +65,13 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
     uploadForm.setNormalizedName(PackageUtils.normalizePackageName(uploadForm.getName()));
 
     PackageStorageUtils.checkArchiveFilename(file);
+    PackageStorageUtils.checkSha256Digest(uploadForm);
+
+    final var actualDigest = PackageStorageUtils.computeSha256(file);
+    if (!actualDigest.equalsIgnoreCase(uploadForm.getSha256_digest())) {
+      throw new BadRequestException("sha256DigestMismatch");
+    }
+    uploadForm.setSha256_digest(actualDigest);
 
     this.checkOverridePermission(repoInfo, uploadForm, file);
 
@@ -130,7 +138,6 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
         this.pypiStorageService.isPackageFileExist(
             repoInfo.getStorageKey(),
             uploadForm.getNormalizedName(),
-            uploadForm.getVersion(),
             Objects.requireNonNull(file.getOriginalFilename()));
 
     if (fileExists) {

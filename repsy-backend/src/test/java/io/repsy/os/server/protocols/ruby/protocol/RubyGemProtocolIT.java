@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.InflaterInputStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -218,6 +219,50 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
             .getContentAsString();
 
     assertThat(body).isEqualTo("Successfully yanked gem: pushed-gem (1.2.3)");
+  }
+
+  /**
+   * RPS-1233: {@code quick/Marshal.4.8/*.gemspec.rz} had no registered handler ({@link
+   * io.repsy.os.server.protocols.ruby.protocol.handlers.RubyGemspecHandler} was missing), so real
+   * {@code gem install}/{@code gem fetch} clients always 404'd fetching the quick gemspec.
+   */
+  @Test
+  @DisplayName("GET /{repo}/quick/Marshal.4.8/<gem>.gemspec.rz serves the deflated Marshal gemspec")
+  void servesGemspecRz() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    this.push(repo.getName(), gem("pushed-gem", "1.2.3"), this.adminProtocolBearerToken())
+        .andExpect(status().isOk());
+
+    final var body =
+        this.protocol(
+                get("/{repo}/quick/Marshal.4.8/pushed-gem-1.2.3.gemspec.rz", repo.getName())
+                    .header(AUTHORIZATION, this.adminProtocolBearerToken()))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    final byte[] inflated;
+    try (var inflater = new InflaterInputStream(new ByteArrayInputStream(body))) {
+      inflated = inflater.readAllBytes();
+    }
+    assertThat(inflated[0]).isEqualTo((byte) 0x04);
+    assertThat(inflated[1]).isEqualTo((byte) 0x08);
+    final var marshal = new String(inflated, StandardCharsets.ISO_8859_1);
+    assertThat(marshal).contains("pushed-gem").contains("1.2.3");
+  }
+
+  @Test
+  @DisplayName("GET .../quick/Marshal.4.8/<gem>.gemspec.rz of an unknown version is 404")
+  void gemspecRzOfAnUnknownVersionIsNotFound() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    this.push(repo.getName(), gem("pushed-gem", "1.2.3"), this.adminProtocolBearerToken())
+        .andExpect(status().isOk());
+
+    this.protocol(
+            get("/{repo}/quick/Marshal.4.8/pushed-gem-9.9.9.gemspec.rz", repo.getName())
+                .header(AUTHORIZATION, this.adminProtocolBearerToken()))
+        .andExpect(status().isNotFound());
   }
 
   @Test

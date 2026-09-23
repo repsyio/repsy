@@ -376,6 +376,96 @@ class AbstractHelmProtocolTxFacadeTest {
   }
 
   @Nested
+  @DisplayName("getChart()")
+  class GetChart {
+
+    private static final String FILENAME = "payments-1.0.0.tgz";
+
+    @Test
+    @DisplayName("returns the classic resource directly and never scans the chart rows")
+    void classicResourcePresentIsReturnedDirectly() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      final var classicResource = new ByteArrayResource(new byte[] {1, 2, 3});
+      when(it.helmStorageService.getResource(any(), eq(REPO_NAME)))
+          .thenReturn(Optional.of(classicResource));
+
+      final var result = it.facade.getChart(it.context, FILENAME);
+
+      assertThat(result).isSameAs(classicResource);
+      verify(it.helmStorageService, never()).getBlob(any(), any(), any());
+      verify(it.chartService, never()).findAllByRepoId(any());
+    }
+
+    @Test
+    @DisplayName(
+        "falls back to the OCI blob of the matching chart row when the classic file is absent")
+    void classicAbsentFallsBackToOciBlob() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      final var blobResource = new ByteArrayResource(new byte[] {4, 5, 6});
+      when(it.helmStorageService.getResource(any(), eq(REPO_NAME))).thenReturn(Optional.empty());
+      when(it.chartInfo.name()).thenReturn("payments");
+      when(it.chartInfo.version()).thenReturn("1.0.0");
+      when(it.chartInfo.digest()).thenReturn(DIGEST);
+      when(it.chartService.findAllByRepoId(REPO_ID)).thenReturn(List.of(it.chartInfo));
+      when(it.helmStorageService.getBlob(REPO_ID, DIGEST, REPO_NAME))
+          .thenReturn(Optional.of(blobResource));
+
+      final var result = it.facade.getChart(it.context, FILENAME);
+
+      assertThat(result).isSameAs(blobResource);
+      verify(it.helmStorageService).getBlob(REPO_ID, DIGEST, REPO_NAME);
+    }
+
+    @Test
+    @DisplayName("answers chartNotFound when no chart row matches the filename")
+    void classicAbsentNoMatchingRow() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      when(it.helmStorageService.getResource(any(), eq(REPO_NAME))).thenReturn(Optional.empty());
+      when(it.chartService.findAllByRepoId(REPO_ID)).thenReturn(List.of());
+
+      assertThatThrownBy(() -> it.facade.getChart(it.context, FILENAME))
+          .isInstanceOf(ItemNotFoundException.class)
+          .hasMessage("chartNotFound");
+    }
+
+    @Test
+    @DisplayName("answers chartNotFound when the matching row's blob is also absent")
+    void classicAbsentRowMatchesButBlobAbsent() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      when(it.helmStorageService.getResource(any(), eq(REPO_NAME))).thenReturn(Optional.empty());
+      when(it.chartInfo.name()).thenReturn("payments");
+      when(it.chartInfo.version()).thenReturn("1.0.0");
+      when(it.chartInfo.digest()).thenReturn(DIGEST);
+      when(it.chartService.findAllByRepoId(REPO_ID)).thenReturn(List.of(it.chartInfo));
+      when(it.helmStorageService.getBlob(REPO_ID, DIGEST, REPO_NAME)).thenReturn(Optional.empty());
+
+      assertThatThrownBy(() -> it.facade.getChart(it.context, FILENAME))
+          .isInstanceOf(ItemNotFoundException.class)
+          .hasMessage("chartNotFound");
+    }
+
+    @Test
+    @DisplayName(
+        "resolves a chart whose name itself contains hyphens, not a naive last-hyphen split")
+    void resolvesNameWithHyphens() throws Exception {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      final var blobResource = new ByteArrayResource(new byte[] {7, 8, 9});
+      final var hyphenatedChart = mock(HelmChartInfo.class);
+      when(it.helmStorageService.getResource(any(), eq(REPO_NAME))).thenReturn(Optional.empty());
+      when(hyphenatedChart.name()).thenReturn("my-chart-with-dashes");
+      when(hyphenatedChart.version()).thenReturn("1.2.3");
+      when(hyphenatedChart.digest()).thenReturn(DIGEST);
+      when(it.chartService.findAllByRepoId(REPO_ID)).thenReturn(List.of(hyphenatedChart));
+      when(it.helmStorageService.getBlob(REPO_ID, DIGEST, REPO_NAME))
+          .thenReturn(Optional.of(blobResource));
+
+      final var result = it.facade.getChart(it.context, "my-chart-with-dashes-1.2.3.tgz");
+
+      assertThat(result).isSameAs(blobResource);
+    }
+  }
+
+  @Nested
   @DisplayName("deleteChart()")
   class DeleteChart {
 
@@ -416,6 +506,37 @@ class AbstractHelmProtocolTxFacadeTest {
           .verify(AbstractHelmProtocolTxFacadeTest.this.chartFilesService)
           .deleteFiles(eq(REPO_ID), eq(REPO_ID), eq(REPO_NAME), any());
       assertThat(AbstractHelmProtocolTxFacadeTest.this.reportedUsage()).isEqualTo(-1234L);
+    }
+  }
+
+  @Nested
+  @DisplayName("listTags() (RPS-1219)")
+  class ListTags {
+
+    @Test
+    @DisplayName("excludes digest references and returns the rest lexically sorted")
+    void filtersDigestReferencesAndSortsLexically() {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      final var digestReference = "sha256:" + "a".repeat(64);
+      when(it.ociManifestService.listTagsByName(REPO_ID, "payments"))
+          .thenReturn(List.of("1.0.0", digestReference, "0.9.0"));
+
+      final var result = it.facade.listTags(it.context, "payments");
+
+      assertThat(result.getName()).isEqualTo("payments");
+      assertThat(result.getTags()).containsExactly("0.9.0", "1.0.0");
+    }
+
+    @Test
+    @DisplayName("answers an empty tag list, with the name still populated, for a chart with none")
+    void emptyForAChartWithNoManifests() {
+      final var it = AbstractHelmProtocolTxFacadeTest.this;
+      when(it.ociManifestService.listTagsByName(REPO_ID, "payments")).thenReturn(List.of());
+
+      final var result = it.facade.listTags(it.context, "payments");
+
+      assertThat(result.getName()).isEqualTo("payments");
+      assertThat(result.getTags()).isEmpty();
     }
   }
 }

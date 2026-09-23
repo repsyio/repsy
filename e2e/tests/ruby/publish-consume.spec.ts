@@ -22,13 +22,13 @@
  * exercise (every H/RB-number below was confirmed live before this file was written -- see
  * `README.md`'s "Ruby runner" section for the raw evidence):
  *
- *  - "gem install fails on the missing gemspec.rz route" (RPS-1233 via `gem`, `test.fail()`): unlike the
- *    catalog loop's own consumer (real `bundle install`, which never needs this route -- H1's
- *    refutation, `ruby-raw.ts`'s file header), a real `gem install` DOES need it and fails.
- *  - "gem fetch still fails" (RPS-1234 via `gem`, `test.fail()`): the specs.4.8.gz zlib/gzip
- *    mismatch itself is fixed (asserted directly in the test, not just via the exit code) -- but
- *    `gem fetch` needs the SAME missing gemspec.rz route as `gem install` above (RPS-1233, still
- *    open), so the command still does not exit 0; only the failure reason changed.
+ *  - "gem install succeeds using the quick/Marshal.4.8/*.gemspec.rz route" (RPS-1233, fixed, via
+ *    `gem`): unlike the catalog loop's own consumer (real `bundle install`, which never needs this
+ *    route -- H1's refutation, `ruby-raw.ts`'s file header), a real `gem install` DOES need it, and
+ *    a concrete `RubyGemspecHandler` now registers it.
+ *  - "gem fetch" (RPS-1234, fixed, via `gem`): the specs.4.8.gz zlib/gzip mismatch is fixed
+ *    (asserted directly, not just via the exit code) and, with RPS-1233 also now merged, the
+ *    shared gemspec.rz route it depends on is fixed too -- confirmed live below.
  *  - "anonymous gem push exits 1 promptly, no push request ever sent" (H4): the fixture's own
  *    fingerprint proves nothing was stored.
  *  - "gem yank with a RW token succeeds, and the yanked version is listed with a '-' prefix in
@@ -65,47 +65,46 @@ import { registerPublishConsumeLoop } from '../../src/scenarios/loop.js';
 
 registerPublishConsumeLoop(rubyAdapter);
 
+test('ruby > gem install succeeds using the quick/Marshal.4.8/*.gemspec.rz route (RPS-1233)', async ({
+  seeder,
+}) => {
+  const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: false });
+  const admin = adminCredential();
+  const name = `e2e_${seeder.runId}_geminstall`;
+  const version = rubyAdapter.version('release');
+
+  const built = await buildGem({ name, version });
+  const publishRes = await rawPublish(repo.name, admin, built.bytes);
+  expect(publishRes.status, 'seed publish').toBe(200);
+
+  const { home, work } = await isolatedWorkDir(`ruby-geminstall-${seeder.runId}`);
+  const result = await run(
+    'gem',
+    [
+      'install',
+      '--source',
+      `${env.repoBaseUrl}/${repo.name}`,
+      name,
+      '-v',
+      version,
+      '--no-document',
+    ],
+    { cwd: work, env: gemEnv(home, {}), timeoutMs: 60_000, label: 'ruby-geminstall' },
+  );
+
+  expect(result.exitCode, `gem install: ${result.command}`).toBe(0);
+
+  // A real gem install resolves the version via quick/Marshal.4.8/*.gemspec.rz, then writes the
+  // resolved spec under GEM_HOME/specifications -- confirms the route was actually exercised, not
+  // just that the process happened to exit 0.
+  const installedGemspec = path.join(home, 'gems', 'specifications', `${name}-${version}.gemspec`);
+  const stat = await fs.stat(installedGemspec);
+  expect(stat.isFile(), `installed gemspec at ${installedGemspec}`).toBe(true);
+});
+
 test(
-  'ruby > gem install fails on the missing quick/Marshal.4.8/*.gemspec.rz route (RPS-1233)',
-  { tag: ['@negative'] },
-  async ({ seeder }) => {
-    const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: false });
-    const admin = adminCredential();
-    const name = `e2e_${seeder.runId}_geminstall`;
-    const version = rubyAdapter.version('release');
-
-    const built = await buildGem({ name, version });
-    const publishRes = await rawPublish(repo.name, admin, built.bytes);
-    expect(publishRes.status, 'seed publish').toBe(200);
-
-    const { home, work } = await isolatedWorkDir(`ruby-geminstall-${seeder.runId}`);
-    const result = await run(
-      'gem',
-      [
-        'install',
-        '--source',
-        `${env.repoBaseUrl}/${repo.name}`,
-        name,
-        '-v',
-        version,
-        '--no-document',
-      ],
-      { cwd: work, env: gemEnv(home, {}), timeoutMs: 60_000, label: 'ruby-geminstall' },
-    );
-
-    test.fail(
-      true,
-      'RPS-1233: quick/Marshal.4.8/*.gemspec.rz has no backend route at all (404 unknownPath) -- a ' +
-        'real `gem install` (unlike bundle install, H1) needs it and fails',
-    );
-    expect(result.exitCode, `gem install: ${result.command}`).toBe(0);
-  },
-);
-
-test(
-  'ruby > gem fetch: specs.4.8.gz is real gzip now (RPS-1234, fixed), but the command still ' +
-    'fails on the missing gemspec.rz route (RPS-1233)',
-  { tag: ['@negative'] },
+  'ruby > gem fetch succeeds now that both specs.4.8.gz (RPS-1234) and gemspec.rz (RPS-1233) ' +
+    'are fixed',
   async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: false });
     const admin = adminCredential();
@@ -116,9 +115,8 @@ test(
     const publishRes = await rawPublish(repo.name, admin, built.bytes);
     expect(publishRes.status, 'seed publish').toBe(200);
 
-    // RPS-1234 is fixed: confirmed directly here (not just via `gem fetch`'s overall exit code,
-    // which depends on the separate, still-open bug below) -- the server now answers real gzip
-    // (RFC 1952): gunzipSync succeeds, inflateSync throws.
+    // RPS-1234 is fixed: confirmed directly here (not just via `gem fetch`'s overall exit code)
+    // -- the server now answers real gzip (RFC 1952): gunzipSync succeeds, inflateSync throws.
     const specsRes = await rawGet(repo.name, admin, specsRelPath());
     expect(specsRes.status, 'specs.4.8.gz is served').toBe(200);
     expect(() => zlib.inflateSync(specsRes.body)).toThrow();
@@ -132,14 +130,11 @@ test(
       { cwd: work, env: gemEnv(home, {}), timeoutMs: 60_000, label: 'ruby-gemfetch' },
     );
 
-    test.fail(
-      true,
-      'RPS-1233: `gem fetch` (like `gem install`, the test above) also needs ' +
-        'quick/Marshal.4.8/*.gemspec.rz, which still has no backend route (404 unknownPath) -- ' +
-        'confirmed live post-RPS-1234-fix: the failure moved from a gzip decompression error on ' +
-        'specs.4.8.gz to a 404 on gemspec.rz, so the command still does not exit 0',
-    );
     expect(result.exitCode, `gem fetch: ${result.command}`).toBe(0);
+
+    const fetchedGem = path.join(work, `${name}-${version}.gem`);
+    const stat = await fs.stat(fetchedGem);
+    expect(stat.isFile(), `fetched gem at ${fetchedGem}`).toBe(true);
   },
 );
 

@@ -30,7 +30,14 @@ public class GoModFileValidator {
   private static final Pattern MODULE_PATH =
       Pattern.compile("^module\\s+(\\S+)", Pattern.MULTILINE);
 
-  public static void validate(final byte[] content) {
+  /**
+   * Validates a {@code go.mod}'s content and, once it is otherwise well-formed, that its {@code
+   * module} directive names the same module the upload's URL path is for (RPS-1228). {@code
+   * expectedModulePath} is the URL's decoded module path, not the lower-cased one it is stored
+   * under: {@code GoModuleZipReader} already matches the zip's own entry prefix against that same
+   * decoded path, so both checks stay consistent with each other.
+   */
+  public static void validate(final byte[] content, final String expectedModulePath) {
     if (content.length == 0) {
       throw new BadRequestException("goModFileEmpty");
     }
@@ -42,6 +49,7 @@ public class GoModFileValidator {
     }
 
     validateModulePath(text);
+    validateDeclaredPath(text, expectedModulePath);
   }
 
   private static void validateModulePath(final String text) {
@@ -53,5 +61,24 @@ public class GoModFileValidator {
     if (!firstSegment.contains(".")) {
       throw new BadRequestException("goModInvalidModulePath");
     }
+  }
+
+  private static void validateDeclaredPath(final String text, final String expectedModulePath) {
+    final var matcher = MODULE_PATH.matcher(text);
+    if (!matcher.find()) {
+      return; // already refused above by MODULE_DIRECTIVE
+    }
+    final var declared = unquote(matcher.group(1));
+    if (!declared.equals(expectedModulePath)) {
+      throw new BadRequestException("goModModulePathMismatch");
+    }
+  }
+
+  /** {@code cmd/go}'s own parser accepts a quoted {@code module "example.com/foo"} directive. */
+  private static String unquote(final String value) {
+    if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+      return value.substring(1, value.length() - 1);
+    }
+    return value;
   }
 }

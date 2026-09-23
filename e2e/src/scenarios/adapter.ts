@@ -94,12 +94,12 @@ export interface ProtocolAdapter<F = unknown> {
 
   /**
    * A known, already-filed backend bug that makes this scenario's CONSUME side fail for reasons
-   * unrelated to the scenario itself (npm: RPS-1205, `fixTarballUrl` misrewriting the tarball path
-   * on Repsy OS's single-tenant layout). Returning a string routes the loop's final client-exit-code
+   * unrelated to the scenario itself. Returning a string routes the loop's final client-exit-code
    * and content-equality assertions on the consume side through `test.fail(true, <that string>)`
    * instead of weakening them; the earlier assertions (the publish-side pins, and the raw
-   * packument/status check on the consume side) are never affected. Maven has no such bug and
-   * leaves this out entirely.
+   * packument/status check on the consume side) are never affected. npm's RPS-1205 (`fixTarballUrl`
+   * misrewriting the tarball path on Repsy OS's single-tenant layout) is fixed, so no adapter
+   * currently implements this -- maven never had a bug here either.
    */
   knownConsumeFailure?(scenario: Scenario): string | undefined;
 
