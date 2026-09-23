@@ -21,11 +21,11 @@
  * itself cannot exercise, numbered "HL" per the plan:
  *
  *  - "HL1" `helm registry login --password-stdin` writes the exact `config.json` shape
- *    `renderHelmRegistryConfig` renders by hand, fronts a working `helm push`; and documents
- *    **B-H4** (candidate): the SAME login with a WRONG password also reports success (confirmed
- *    live -- the ping's token endpoint is Docker's own, and issues an anonymous token before any
- *    credential is checked, see `helm-raw.ts`'s file header) -- but the push it then fronts still
- *    fails, so this adapter never trusts `helm registry login`'s own exit code for an `Outcome`.
+ *    `renderHelmRegistryConfig` renders by hand, fronts a working `helm push`; and confirms
+ *    **RPS-1220** stays fixed: the SAME login with a WRONG password now genuinely fails (the
+ *    token endpoint is Docker's own -- see `helm-raw.ts`'s file header -- and now validates an
+ *    OAuth2 password-grant form body the same way it validates a Basic header), and the push it
+ *    fronts fails too.
  *  - "HL2" `helm pull oci://.../<chart>` with NO `--version` fails (**B-H3**: no `tags/list`
  *    route); the same pull WITH an exact `--version` succeeds (control).
  *  - "HL4" cross-mode (**B-H1**): an OCI-pushed chart's version appears in `index.yaml`, but
@@ -61,8 +61,8 @@ registerPublishConsumeLoop(helmAdapter);
 
 test(
   'helm > HL1: helm registry login --password-stdin writes the same config.json shape as ' +
-    'renderHelmRegistryConfig, and fronts a working push; a wrong password also reports success ' +
-    '(candidate B-H4) but the push it fronts still fails',
+    'renderHelmRegistryConfig, and fronts a working push; a wrong password now genuinely fails ' +
+    'the login (RPS-1220) and the push it fronts fails too',
   { tag: ['@smoke'] },
   async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.HELM, { privateRepo: true });
@@ -119,11 +119,9 @@ test(
       0,
     );
 
-    // Candidate B-H4, confirmed live: a login with a WRONG password still reports success (the
-    // ping's token endpoint is Docker's own and issues an anonymous token before any credential is
-    // checked -- see helm-raw.ts's file header). Documented as an expected failure here, not
-    // silently accepted: if this ever starts genuinely refusing a wrong password, this test should
-    // start failing so it gets noticed.
+    // RPS-1220: a login with a WRONG password now genuinely fails -- the ping's token endpoint is
+    // Docker's own, and it now validates a grant_type=password form body the same way it validates
+    // a Basic header (see helm-raw.ts's file header).
     const { home: badHome, work: badWork } = await isolatedWorkDir(`helm-hl1-bad-${seeder.runId}`);
     const badLoginResult = await run(
       'helm',
@@ -143,12 +141,6 @@ test(
         label: 'helm-hl1-bad-login',
         input: 'not-the-real-token\n',
       },
-    );
-    test.fail(
-      true,
-      'RPS-1220 (B-H4): helm registry login reports success even with a WRONG password -- the ' +
-        "ping's token endpoint is Docker's own and issues an anonymous token before any credential " +
-        "is checked (helm-raw.ts). This is a Docker-provider bug surfacing through Helm's login flow.",
     );
     expect(badLoginResult.exitCode, 'a login with a wrong password should fail').not.toBe(0);
 

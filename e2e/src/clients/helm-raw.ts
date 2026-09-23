@@ -38,13 +38,16 @@
  *    `/v2/` first. Confirmed live (H1, this file's `rawPing` re-export from `docker-raw.ts`): a real
  *    `helm registry login <host> --plain-http` is steered to DOCKER's `/v2/token` token endpoint, not
  *    to any Helm-specific check.
- *  - **B-H4 (candidate)**: confirmed live that `helm registry login` SUCCEEDS with a WRONG password.
- *    Docker's token endpoint answers the ping's own wildcard-pull-scope OAuth2 form POST (no
- *    `Authorization` header at all -- oras-go's `ForceAttemptOAuth2` path) with an ANONYMOUS token,
- *    200, before any credential is ever checked; `helm registry login` treats that 200 as success and
- *    writes the (wrong) credential into `HELM_REGISTRY_CONFIG` regardless. This is a Docker-provider
- *    bug that surfaces through Helm's login flow, not something in Helm's own auth code -- see
- *    `docker-raw.ts`'s own header for the token endpoint's behaviour in detail.
+ *  - **RPS-1220 (fixed)**: `helm registry login` used to SUCCEED with a WRONG password. Docker's
+ *    token endpoint answered the ping's own wildcard-pull-scope OAuth2 form POST (no `Authorization`
+ *    header at all -- oras-go's `ForceAttemptOAuth2` path) with an ANONYMOUS token, 200, before any
+ *    credential was ever checked; `helm registry login` treated that 200 as success and wrote the
+ *    (wrong) credential into `HELM_REGISTRY_CONFIG` regardless. The Docker token handler now
+ *    recognises a `grant_type=password` form body with no `Authorization` header and validates it
+ *    through the same credential check the Basic-header path uses, so a wrong password now answers
+ *    `401` and `helm registry login` genuinely fails. This was a Docker-provider bug that surfaced
+ *    through Helm's login flow, not something in Helm's own auth code -- see `docker-raw.ts`'s own
+ *    header for the token endpoint's behaviour in detail.
  *  - OCI blob upload (`AbstractHelmOciBlobUploadStart/Chunk/FinalizeProtocolMethodHandler`): `POST
  *    .../blobs/uploads/` writes nothing at all and answers `202` + an absolute `Location` +
  *    `Docker-Upload-UUID`; a `PATCH` appends and answers `202` + `Range`; the finalizing

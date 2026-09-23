@@ -172,7 +172,7 @@ test(
 );
 
 test(
-  'docker > D3: pull by digest and crane digest, incl. HEAD-by-digest (candidate B1)',
+  'docker > D3: pull by digest and crane digest, incl. HEAD-by-digest (RPS-1215, fixed)',
   { tag: ['@smoke'] },
   async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.DOCKER, { privateRepo: true });
@@ -222,7 +222,7 @@ test(
     );
     expect(pullResult.exitCode, `crane pull by digest: ${pullResult.command}`).toBe(0);
 
-    // GET by digest works (the raw layer, confirming B1 is scoped to HEAD only).
+    // GET by digest works (the raw layer).
     const getByDigest = await rawGetManifest(
       repo.name,
       credential,
@@ -231,37 +231,26 @@ test(
     );
     expect(getByDigest.status, 'GET by digest succeeds').toBe(200);
 
-    // Candidate B1, confirmed live (docker-raw.ts's file header): HEAD by digest is 404 even though
-    // GET by digest just served it above.
+    // RPS-1215 (fixed): HEAD by digest now mirrors GET (spec: "HEAD MUST mirror GET").
+    // AbstractDockerManifestCheckProtocolMethodHandler now resolves through the same
+    // dockerFacade.getManifest(...) GET uses, instead of a TAG-only lookup.
     const headByDigest = await rawHeadManifest(
       repo.name,
       credential,
       image,
       `sha256:${published.contentSha256}`,
     );
-    expect(
-      headByDigest.status,
-      'RPS-1215 (B1): HEAD by digest should mirror GET (spec: "HEAD MUST mirror GET"), ' +
-        'but AbstractDockerManifestCheckProtocolMethodHandler only ever resolves a TAG row, never a ' +
-        'digest -- a real `crane digest <ref>@sha256:<digest>` therefore also fails (exit 1), even ' +
-        'though `crane pull`/a raw GET of the very same digest just succeeded above',
-    ).toBe(404);
+    expect(headByDigest.status, 'HEAD by digest mirrors GET (RPS-1215)').toBe(200);
 
-    // B1 does NOT surface through the real client here: ggcr's own `remote.Head` (what `crane
-    // digest` calls) falls back to a GET when the HEAD fails (confirmed live: stderr shows "HEAD
-    // request failed, falling back on GET"), so `crane digest <ref>@sha256:<digest>` still succeeds
-    // -- the discrepancy is only visible to a caller that trusts HEAD's status code directly (the
-    // raw probe above, or any client without ggcr's specific fallback).
+    // A real `crane digest <ref>@sha256:<digest>` (ggcr's own `remote.Head`) now succeeds via the
+    // fixed HEAD route directly, not via its HEAD-then-GET fallback.
     const digestByDigestResult = await run('crane', ['digest', pullByDigestRef], {
       cwd: work,
       env: craneEnv(home),
       timeoutMs: 30_000,
       label: 'docker-d3-digest-by-digest',
     });
-    expect(
-      digestByDigestResult.exitCode,
-      'crane digest by digest succeeds anyway, via its own HEAD-then-GET fallback',
-    ).toBe(0);
+    expect(digestByDigestResult.exitCode, 'crane digest by digest succeeds (RPS-1215)').toBe(0);
   },
 );
 

@@ -1163,7 +1163,7 @@ read-only token's write refusal at the OPERATION hop, reads still working (R3); 
 blob upload, a wrong digest, and dedup (R4); manifest push validation — missing blobs, a wrong
 `sha256:` reference, an unknown `Content-Type` (R5, **B4**); the override rule and an orphaned blob
 after a refusal (R6); overriding a tag breaking the OLD manifest's pull-by-digest (R7, **B2**);
-`HEAD` vs. `GET` by digest (R8, **B1**); retagging the same digest under a second tag (R9); a
+`HEAD` vs. `GET` by digest (R8, **B1, fixed by RPS-1215**); retagging the same digest under a second tag (R9); a
 config blob missing `os`/`architecture` (R12, **B5**); a multi-arch index referencing a
 digest-pushed child (R13); and that even a PUBLIC repo still needs real credentials to WRITE,
 refused at the token hop with no OCI body at all (distinct from an operation-hop 401's Bearer
@@ -1214,12 +1214,22 @@ prediction, the actual observed behaviour is what got pinned, not the guess.
 - **H9** (`override`: the new digest is served; the OLD digest's pullability, left open by the plan
   pending a live check): confirmed the new digest is served (R6); the OLD digest turned out to be
   **UNPULLABLE** — **B2 (RPS-1216)** (R7).
-- **H10** (`HEAD` vs. `GET` by digest): confirmed — `HEAD` by digest is `404` even right after a
-  `GET` by that same digest served `200` — **B1 (RPS-1215)** (R8). Notably, `crane digest <ref>@sha256:<digest>`
-  (which is a `HEAD` under the hood) does **NOT** itself fail: ggcr's own `remote.Head` falls back to
-  a `GET` when the `HEAD` fails (confirmed live, `crane`'s own stderr: `"HEAD request failed, falling
-back on GET"`), so B1 is invisible to `crane digest`'s own exit code — only a raw `HEAD` (or a
-  client without that specific fallback) observes it. The "D3" real-client test pins BOTH facts.
+- **H10** (`HEAD` vs. `GET` by digest): confirmed live at the time — `HEAD` by digest was `404` even
+  right after a `GET` by that same digest served `200` — **B1, filed as
+  [RPS-1215](https://zyfera.atlassian.net/browse/RPS-1215) and since fixed** (R8). `HEAD` now
+  resolves through the same `dockerFacade.getManifest(...)` GET uses, for both a tag and a digest
+  reference, and mirrors GET's status/headers exactly. Fixing it surfaced one more, genuinely
+  separate, previously-masked bug: `AbstractDockerProtocolTxFacade#findPlatformManifests` (building
+  a manifest-list index) resolved each child by a digest-generated storage filename directly, which
+  only ever found a child that had ALSO been independently re-pushed under its own digest as a
+  distinct reference -- exactly what a real client's `HEAD`-then-fallback-`PUT` behavior used to do
+  as a side effect of B1 itself, masking this. A second, separate ordering bug in the same area
+  (`ManifestRepository#findByRepoIdAndImageIdAndDigestList`'s `.getFirst()`, after `ORDER BY
+createdAt DESC`, could pick a DB-only "this manifest is also part of that multi-platform tag"
+  tracking row over the original storage-backed one once a digest was shared by both) was fixed
+  alongside it, in the same PR. Both are covered by `DockerManifestCheckIT`/`DockerManifestPushIT`
+  and this suite's own "HD-1"/"docker-empty-base" (`tests/docker/protocol-specific.spec.ts`) and "D3"
+  (`tests/docker/publish-consume.spec.ts`) tests, all green.
 - **H11** (timing fits the 120s test timeout): confirmed — the whole 29-test catalog completed in
   ~7-8s total wall time across 12 parallel workers, both full runs.
 - **H12** (running the whole `docker` suite twice without resetting the stack): confirmed — both
@@ -1236,13 +1246,14 @@ back on GET"`), so B1 is invisible to `crane digest`'s own exit code — only a 
 
 ### Backend bug candidates found while reading, and confirmed live (do not fix here)
 
-- **B1 (filed as [RPS-1215](https://zyfera.atlassian.net/browse/RPS-1215))** — `HEAD` a manifest by
-  digest answers `404` for a manifest a `GET` of that SAME digest serves fine (distribution spec:
-  "HEAD MUST be identical to GET without the body"). `AbstractDockerManifestCheckProtocolMethodHandler`'s
-  `findTagAndManifest` only ever resolves a TAG row, never a digest — `AbstractDockerProtocolTxFacade`'s
-  own `resolveManifestDigest` (which GET uses) does both. Confirmed live: `tests/docker/registry-rules
-.spec.ts`'s R8 (raw) and `tests/docker/publish-consume.spec.ts`'s D3 (`crane digest <ref>@sha256:<digest>`
-  — masked by ggcr's own HEAD→GET fallback, see "H10" above, so a raw `HEAD` is what actually exposes it).
+- **B1 (filed as [RPS-1215](https://zyfera.atlassian.net/browse/RPS-1215), fixed)** — `HEAD` a
+  manifest by digest used to answer `404` for a manifest a `GET` of that SAME digest served fine
+  (distribution spec: "HEAD MUST be identical to GET without the body"). Fixed by making
+  `AbstractDockerManifestCheckProtocolMethodHandler` resolve through the same
+  `dockerFacade.getManifest(...)` GET uses, instead of the old tag-only `findTagAndManifest`
+  (removed, along with its one now-unreachable caller and its dead 404 branch). See "H10" above for
+  the two further, previously-masked bugs this fix's own live verification surfaced and fixed in the
+  same PR (a manifest-list's child-by-digest resolution, and a shared-digest row-ordering bug).
 - **B2 (filed as [RPS-1216](https://zyfera.atlassian.net/browse/RPS-1216))** — Overriding a tag
   (`allowOverride: true`) makes the PREVIOUS manifest unpullable BY DIGEST, even though nothing ever
   explicitly deleted it: the tag's one `Manifest` row is reused in place (`ManifestTxService`'s
@@ -1446,10 +1457,11 @@ stack (both from the host and inside the `helm` runner container), then with raw
 were probed first, as instructed.**
 
 - **H1** (does `helm registry login` fail with a WRONG password?): **the plan's own predicted
-  answer was right, confirmed live** — it does NOT fail. `helm registry login localhost:9090
---plain-http -u <user> --password-stdin` with an intentionally wrong secret still prints "Login
-  Succeeded", exit 0, and writes the (wrong) credential into `HELM_REGISTRY_CONFIG` regardless —
-  see **B-H4** below.
+  answer was right, confirmed live at the time** — it did NOT fail. `helm registry login
+localhost:9090 --plain-http -u <user> --password-stdin` with an intentionally wrong secret used to
+  print "Login Succeeded", exit 0, and write the (wrong) credential into `HELM_REGISTRY_CONFIG`
+  regardless — see **B-H4** below, now fixed by RPS-1220. A wrong password now genuinely fails the
+  login (and the push it fronts).
 - **H3** (`--plain-http` required for `localhost:9090`): confirmed — without it, `helm registry
 login`/`push`/`pull` all fail with `http: server gave HTTP response to HTTPS client`.
 - **H4** (`helm pull oci://... --version <exact>` succeeds against Repsy): confirmed, the gating
@@ -1538,19 +1550,24 @@ search`/`install`/`pull <repo>/<chart>`, or a raw `helm pull --repo`) 404s (`cha
   whenever `--version` is empty or a semver CONSTRAINT, so a real `helm pull`/`install`/`show
 oci://.../<chart>` without an EXACT version fails outright against Repsy. Confirmed live: "HL2",
   "R8".
-- **B-H4 (filed as [RPS-1220](https://zyfera.atlassian.net/browse/RPS-1220))** — Lives in the
-  DOCKER provider's token endpoint, surfaces through Helm's shared `/v2/` ping: `helm registry
-login` succeeds with a WRONG password. Docker's `/v2/token` answers the ping's own OAuth2-form
-  POST (no `Authorization` header at all — oras-go's `ForceAttemptOAuth2` path, requesting the
-  wildcard `repository:*:pull` scope) with an ANONYMOUS token, `200`, before any credential is ever
-  checked; `helm registry login` treats that `200` as success. Confirmed live: "HL1". The push/pull
-  REQUEST itself is still credential-checked for real (a wrong-password login still fronts a
-  failing push) — this only affects the login COMMAND's own reported success, never an actual
-  write/read.
-- **B-H5** (observation) — A manifest is only addressable by the exact reference it was pushed
-  under: `GET`/`HEAD` by digest of a tag-pushed manifest both `404`. Would affect `helm pull
-oci://...@sha256:<digest>` if that were expected to work; not otherwise exercised by any real
-  client flow this step drives.
+- **B-H4 (filed as [RPS-1220](https://zyfera.atlassian.net/browse/RPS-1220), fixed)** — Lived in the
+  DOCKER provider's token endpoint, surfaced through Helm's shared `/v2/` ping: `helm registry
+login` used to succeed with a WRONG password. Docker's `/v2/token` answered the ping's own
+  OAuth2-form POST (no `Authorization` header at all — oras-go's `ForceAttemptOAuth2` path,
+  requesting the wildcard `repository:*:pull` scope) with an ANONYMOUS token, `200`, before any
+  credential was ever checked; `helm registry login` treated that `200` as success. Fixed by adding
+  a `grant_type=password` branch (gated on `authHeader == null && formCredentials != null`, so the
+  existing anonymous/Basic-header paths are untouched) that authenticates the form's
+  username/password through the same check the Basic path uses. Confirmed live: "HL1", now genuinely
+  failing a wrong-password login (and the push it fronts).
+- **B-H5** (observation, resolved as a byproduct of RPS-1215) — used to note that a manifest was
+  only addressable by the exact reference it was pushed under (`GET`/`HEAD` by digest of a
+  tag-pushed manifest both `404`, affecting any future `helm pull oci://...@sha256:<digest>`).
+  RPS-1215's fix (Docker's shared `AbstractDockerManifestCheckProtocolMethodHandler`, which Helm
+  OCI rides) makes `HEAD`/`GET` by digest work for a tag-pushed manifest too — not independently
+  re-verified with a dedicated Helm-side test here (no real client flow this step drives needs it),
+  but the underlying mechanism is the same one `tests/docker/publish-consume.spec.ts`'s "D3" now
+  confirms green.
 - **B-H6** — Not exercised: a repro needs a real `helm push` to emit a `.prov` layer BEFORE the
   chart layer in one manifest, which was not confirmed to be producible with the harness's own
   chart fixture (no `.prov` file is ever generated here) — left as an open question, not a
@@ -2390,9 +2407,10 @@ prints a `✘` for each (something inside the test body did throw, which is exac
 is watching for), but the run's own summary line and exit code both say "passed"/`0` — treat those
 two as authoritative over the per-line glyphs. Likewise for the cargo suite's `no-override`/
 `override` scenarios (`knownPublishSideEffect`, "H1" above) and its two dedicated hyphen tests ("H2"
-above), the docker suite's four `test.fail`-routed registry-rules tests (R5/B4, R7/B2, R8/B1,
-R12/B5 — "H9"/"H10"/"H13" above), the helm suite's five `test.fail`-routed tests (HL1/B-H4,
-HL2/B-H3, HL4/B-H1, HL5/B-H2, R8/B-H3 — "Helm runner" above), the pypi suite's six `test.fail`-routed
+above), the docker suite's three remaining `test.fail`-routed registry-rules tests (R5/B4, R7/B2,
+R12/B5 — "H9"/"H13" above; R8/B1 is fixed by RPS-1215 and no longer routed this way), the helm
+suite's four remaining `test.fail`-routed tests (HL2/B-H3, HL4/B-H1, HL5/B-H2, R8/B-H3 — "Helm
+runner" above; HL1/B-H4 is fixed by RPS-1220 and no longer routed this way), the pypi suite's six `test.fail`-routed
 registry-rules tests (RPS-1221/1222/1223/1224/1225, P4/RPS-1124 — "PyPI runner" above), and the golang
 suite's three `test.fail`-routed registry-rules tests (candidates G1/G2/G10 — "Go runner" above): all
 counted as "passed", not a plain pass line.
