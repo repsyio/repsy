@@ -2,13 +2,20 @@
 
 <div
   [ngClass]="{ 'pointer-events-none opacity-50 select-none': loading || this.error }"
+  data-testid="pkg-toolbar"
   class="mb-7 flex flex-col flex-col-reverse items-start justify-between gap-4 md:items-start lg:flex-row lg:items-center"
 >
   <div class="flex w-full flex-col items-start gap-4 sm:w-auto sm:flex-row sm:items-center">
-    <app-searchbox class="w-full sm:max-w-[192px]" placeholder="image" (filter)="search($event)" />
+    <app-searchbox
+      data-testid="pkg-search"
+      class="w-full sm:max-w-[192px]"
+      placeholder="image"
+      (filter)="search($event)"
+    />
 
     <div class="flex w-full gap-2 sm:w-auto">
       <app-sort-selector
+        data-testid="pkg-sort"
         [(selectedOption)]="sortOption"
         [options]="sortOptions"
         (choose)="sort($event)"
@@ -16,6 +23,7 @@
       />
 
       <button
+        data-testid="pkg-refresh"
         (click)="refreshPage()"
         class="hover:text-secondary-500 flex h-[40px] w-[40px] items-center justify-center text-neutral-200"
       >
@@ -38,12 +46,13 @@
   </div>
 
   <div class="flex w-full items-center justify-end gap-2 sm:w-auto">
-    <button (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
+    <button data-testid="pkg-configure" (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
       <img ngSrc="/assets/icons/input/configure.svg" alt="configure" height="16" width="16" />
       Configure
     </button>
     @if (canManage) {
       <button
+        data-testid="pkg-settings"
         [disabled]="!activeRepo.canManage"
         [routerLink]="'/' + activeRepo.repoName + '/settings'"
         class="repsy-btn-ghost w-full sm:w-auto"
@@ -75,9 +84,18 @@
         </div>
 
         <!-- Image Table (Desktop) -->
-        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
+        <div
+          data-testid="pkg-list-table"
+          animate.enter="fade-in-down"
+          class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block"
+        >
           @for (image of images; track image.updatedAt; let i = $index) {
-            <div role="button" appKeyboardActivate [routerLink]="'/' + activeRepo.repoName + '/' + image.name">
+            <div
+              [attr.data-testid]="'pkg-list-row-' + image.name"
+              role="button"
+              appKeyboardActivate
+              [routerLink]="'/' + activeRepo.repoName + '/' + image.name"
+            >
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === images.length - 1 }"
@@ -87,12 +105,14 @@
                   <img ngSrc="/assets/icons/repo/monitor.svg" alt="monitor" height="18" width="18" />
                   <app-tooltip
                     class="text-[14px] text-[#FDFDFD]"
+                    data-testid="row-name"
                     [text]="image.name | ellipsis: 35"
                     [textHover]="image.name"
                   />
                 </div>
 
                 <app-package-security-badge
+                  data-testid="row-security"
                   repoType="docker"
                   [repoName]="activeRepo.repoName"
                   [artifactName]="image.name"
@@ -107,12 +127,14 @@
 
                 <app-tooltip
                   class="text-[14px] text-[#FDFDFD]"
+                  data-testid="row-digest"
                   [text]="image.digest | ellipsis: 20"
                   [textHover]="image.digest"
                 />
 
                 <app-tooltip
                   class="text-[14px] text-[#FDFDFD]"
+                  data-testid="row-updated"
                   [text]="timeAgo(image.updatedAt)"
                   [textHover]="image.updatedAt | date: 'medium'"
                   [always]="true"
@@ -120,13 +142,15 @@
 
                 <app-tooltip
                   class="text-right text-[14px] text-[#FDFDFD]"
+                  data-testid="row-size"
                   [text]="formatBytes(image.size) | ellipsis"
                   [textHover]="formatBytes(image.size)"
                 />
 
                 @if (activeRepo.canManage) {
-                  <app-dropdown>
+                  <app-dropdown data-testid="row-menu">
                     <button
+                      data-testid="row-delete"
                       (click)="deleteImage(image)"
                       [disabled]="loading"
                       class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
@@ -145,74 +169,82 @@
         </div>
 
         <!-- Image List (Mobile) -->
-        @for (image of images; track image.updatedAt; let i = $index) {
-          <div animate.enter="fade-in-down" class="lg:hidden">
-            <!-- Mobile Row -->
-            <div
-              animate.enter="fade-in-down"
-              class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
-              role="button"
-              appKeyboardActivate
-              [routerLink]="'/' + activeRepo.repoName + '/' + image.name"
-            >
-              @if (activeRepo.canManage) {
-                <app-dropdown class="relative left-4 ml-auto">
-                  <button
-                    (click)="deleteImage(image)"
-                    [disabled]="loading"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
-                  >
-                    <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
-                    Delete
-                  </button>
-                </app-dropdown>
+        <div data-testid="pkg-list-cards">
+          @for (image of images; track image.updatedAt; let i = $index) {
+            <div animate.enter="fade-in-down" class="lg:hidden">
+              <!-- Mobile Row -->
+              <div
+                animate.enter="fade-in-down"
+                class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+                [attr.data-testid]="'pkg-list-card-' + image.name"
+                role="button"
+                appKeyboardActivate
+                [routerLink]="'/' + activeRepo.repoName + '/' + image.name"
+              >
+                @if (activeRepo.canManage) {
+                  <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
+                    <button
+                      data-testid="row-delete"
+                      (click)="deleteImage(image)"
+                      [disabled]="loading"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                    >
+                      <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+                      Delete
+                    </button>
+                  </app-dropdown>
+                }
+
+                <div class="flex items-start gap-2 text-[14px] text-[#9FA0A0]">
+                  <img class="mt-[2px]" ngSrc="/assets/icons/repo/monitor.svg" alt="monitor" height="18" width="18" />
+                  <span data-testid="row-name" class="text-right break-all text-[#FDFDFD]">{{ image.name }}</span>
+                </div>
+
+                <div class="space-y-2">
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Security: </span>
+                    <app-package-security-badge
+                      data-testid="row-security"
+                      repoType="docker"
+                      [repoName]="activeRepo.repoName"
+                      [artifactName]="image.name"
+                      [packageRoute]="packageRoute(image)"
+                      [severity]="securitySummary[image.name]?.severity ?? null"
+                      [scanned]="securitySummary[image.name]?.scanned ?? false"
+                      [rescanInProgressCount]="securitySummary[image.name]?.rescanInProgressCount ?? 0"
+                      [rescanFailedCount]="securitySummary[image.name]?.rescanFailedCount ?? 0"
+                      [unscannedInProgressCount]="securitySummary[image.name]?.unscannedInProgressCount ?? 0"
+                      [unscannedFailedCount]="securitySummary[image.name]?.unscannedFailedCount ?? 0"
+                    />
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Digest: </span>
+                    <span data-testid="row-digest" class="text-right text-sm break-all text-[#FDFDFD]">
+                      {{ image.digest }}</span
+                    >
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Size: </span>
+                    <span data-testid="row-size" class="text-right text-sm break-all text-[#FDFDFD]">
+                      {{ formatBytes(image.size) }}</span
+                    >
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Last Updated: </span>
+                    <span data-testid="row-updated" class="text-right text-sm break-all text-[#FDFDFD]">
+                      {{ image.updatedAt | date: 'medium' }} {{ '(' + timeAgo(image.updatedAt) + ')' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              @if (i !== images.length - 1) {
+                <div class="px-2 py-4">
+                  <div class="h-[1px] bg-[#404141]"></div>
+                </div>
               }
-
-              <div class="flex items-start gap-2 text-[14px] text-[#9FA0A0]">
-                <img class="mt-[2px]" ngSrc="/assets/icons/repo/monitor.svg" alt="monitor" height="18" width="18" />
-                <span class="text-right break-all text-[#FDFDFD]">{{ image.name }}</span>
-              </div>
-
-              <div class="space-y-2">
-                <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Security: </span>
-                  <app-package-security-badge
-                    repoType="docker"
-                    [repoName]="activeRepo.repoName"
-                    [artifactName]="image.name"
-                    [packageRoute]="packageRoute(image)"
-                    [severity]="securitySummary[image.name]?.severity ?? null"
-                    [scanned]="securitySummary[image.name]?.scanned ?? false"
-                    [rescanInProgressCount]="securitySummary[image.name]?.rescanInProgressCount ?? 0"
-                    [rescanFailedCount]="securitySummary[image.name]?.rescanFailedCount ?? 0"
-                    [unscannedInProgressCount]="securitySummary[image.name]?.unscannedInProgressCount ?? 0"
-                    [unscannedFailedCount]="securitySummary[image.name]?.unscannedFailedCount ?? 0"
-                  />
-                </div>
-                <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Digest: </span>
-                  <span class="text-right text-sm break-all text-[#FDFDFD]"> {{ image.digest }}</span>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Size: </span>
-                  <span class="text-right text-sm break-all text-[#FDFDFD]"> {{ formatBytes(image.size) }}</span>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Last Updated: </span>
-                  <span class="text-right text-sm break-all text-[#FDFDFD]">
-                    {{ image.updatedAt | date: 'medium' }} {{ '(' + timeAgo(image.updatedAt) + ')' }}
-                  </span>
-                </div>
-              </div>
             </div>
-            @if (i !== images.length - 1) {
-              <div class="px-2 py-4">
-                <div class="h-[1px] bg-[#404141]"></div>
-              </div>
-            }
-          </div>
-        }
-
+          }
+        </div>
         <!-- pagination -->
         <app-pagination
           (pageNumChange)="loadPage($event)"
@@ -224,7 +256,7 @@
       <app-empty-list />
     }
   } @else {
-    <div animate.enter="fade-in-up" class="p-8 text-center">
+    <div data-testid="pkg-error" animate.enter="fade-in-up" class="p-8 text-center">
       <img
         class="mx-auto mb-[70px]"
         ngSrc="/assets/images/hippo-empty.svg"
@@ -232,7 +264,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p data-testid="pkg-error-message" class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
     </div>
   }
 }

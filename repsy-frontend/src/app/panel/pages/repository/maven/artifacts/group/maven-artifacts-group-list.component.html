@@ -2,13 +2,20 @@
 
 <div
   [ngClass]="{ 'pointer-events-none opacity-50 select-none': loading || this.error }"
+  data-testid="pkg-toolbar"
   class="mb-7 flex flex-col flex-col-reverse items-start justify-between gap-4 md:items-start xl:flex-row xl:items-center"
 >
   <div class="flex w-full flex-col items-start gap-4 sm:w-auto sm:flex-row sm:items-center">
-    <app-searchbox placeholder="group" (filter)="search($event)" class="w-full sm:max-w-[192px]" />
+    <app-searchbox
+      data-testid="pkg-search"
+      placeholder="group"
+      (filter)="search($event)"
+      class="w-full sm:max-w-[192px]"
+    />
 
     <div class="flex w-full gap-2 sm:w-auto">
       <app-sort-selector
+        data-testid="pkg-sort"
         [(selectedOption)]="sortOption"
         [options]="sortOptions"
         (choose)="sort($event)"
@@ -16,6 +23,7 @@
       />
 
       <button
+        data-testid="pkg-refresh"
         (click)="refreshPage()"
         class="hover:text-secondary-500 flex h-[40px] w-[40px] items-center justify-center text-neutral-200"
       >
@@ -38,17 +46,22 @@
   </div>
 
   <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-    <button [routerLink]="'/' + activeRepo.repoName + '/browser'" class="repsy-btn-ghost w-full sm:w-auto">
+    <button
+      data-testid="pkg-browse-files"
+      [routerLink]="'/' + activeRepo.repoName + '/browser'"
+      class="repsy-btn-ghost w-full sm:w-auto"
+    >
       <img ngSrc="/assets/icons/repo/file.svg" alt="configure" height="16" width="16" />
       Browse Files
     </button>
 
-    <button (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
+    <button data-testid="pkg-configure" (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
       <img ngSrc="/assets/icons/input/configure.svg" alt="configure" height="16" width="16" />
       Configure
     </button>
     @if (canManage) {
       <button
+        data-testid="pkg-settings"
         [disabled]="!activeRepo.canManage"
         [routerLink]="'/' + activeRepo.repoName + '/settings'"
         class="repsy-btn-ghost w-full sm:w-auto"
@@ -80,11 +93,13 @@
 
         <!-- Group Table (Desktop) -->
         <div
+          data-testid="pkg-list-table"
           animate.enter="fade-in-down"
           class="hidden rounded-b-[12px] border border-neutral-400 bg-neutral-500 lg:block"
         >
           @for (artifact of artifacts; track artifact.artifactName; let i = $index) {
             <div
+              [attr.data-testid]="'pkg-list-row-' + artifact.groupName + ':' + artifact.artifactName"
               role="button"
               appKeyboardActivate
               [routerLink]="
@@ -104,6 +119,7 @@
                 class="grid grid-cols-[2fr_1fr_1fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
                 <a
+                  data-testid="row-group-link"
                   class="group text-secondary-500 flex w-max gap-2"
                   [routerLink]="'/' + activeRepo.repoName + '/' + artifact.groupName"
                 >
@@ -130,6 +146,7 @@
                 </a>
 
                 <a
+                  data-testid="row-artifact-link"
                   class="group text-secondary-500 flex w-max gap-2"
                   [routerLink]="'/' + activeRepo.repoName + '/' + artifact.groupName + '/' + artifact.artifactName"
                 >
@@ -155,6 +172,7 @@
                 </a>
 
                 <a
+                  data-testid="row-latest-link"
                   class="group text-secondary-500 flex w-max gap-2"
                   [routerLink]="
                     '/' +
@@ -189,6 +207,7 @@
                 </a>
 
                 <app-tooltip
+                  data-testid="row-updated"
                   class="text-secondary-500 group-hover:underline"
                   [text]="timeAgo(artifact.lastUpdatedAt)"
                   [textHover]="artifact.lastUpdatedAt | date: 'medium'"
@@ -196,8 +215,9 @@
                 />
 
                 @if (activeRepo.canManage) {
-                  <app-dropdown>
+                  <app-dropdown data-testid="row-menu">
                     <button
+                      data-testid="row-delete"
                       (click)="deleteGroup(artifact)"
                       [disabled]="loading"
                       class="text-error-500 flex w-full items-center gap-2 px-4 py-2 hover:bg-[#2D2C2C]"
@@ -216,132 +236,145 @@
         </div>
 
         <!-- Group List (Mobile) -->
-        @for (artifact of artifacts; track artifact.artifactName; let i = $index) {
-          <div animate.enter="fade-in-down" class="lg:hidden">
-            <div
-              class="hover:border-secondary-500 relative flex flex-col gap-2 rounded-[12px] border border-neutral-400 bg-neutral-500 p-4 hover:bg-[#1D1C1C]"
-              role="button"
-              appKeyboardActivate
-              [routerLink]="
-                '/' +
-                activeRepo.repoName +
-                '/' +
-                artifact.groupName +
-                '/' +
-                artifact.artifactName +
-                '/' +
-                artifact.latest
-              "
-            >
-              @if (activeRepo.canManage) {
-                <app-dropdown class="relative left-4 ml-auto">
-                  <button
-                    (click)="deleteGroup(artifact)"
-                    [disabled]="loading"
-                    class="text-error-500 flex w-full items-center gap-2 px-4 py-2 hover:bg-[#2D2C2C]"
-                  >
-                    <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
-                    Delete
-                  </button>
-                </app-dropdown>
-              }
-
-              <a
-                class="group text-secondary-500 flex items-start gap-2"
-                [routerLink]="'/' + activeRepo.repoName + '/' + artifact.groupName"
+        <div data-testid="pkg-list-cards">
+          @for (artifact of artifacts; track artifact.artifactName; let i = $index) {
+            <div animate.enter="fade-in-down" class="lg:hidden">
+              <div
+                class="hover:border-secondary-500 relative flex flex-col gap-2 rounded-[12px] border border-neutral-400 bg-neutral-500 p-4 hover:bg-[#1D1C1C]"
+                [attr.data-testid]="'pkg-list-card-' + artifact.groupName + ':' + artifact.artifactName"
+                role="button"
+                appKeyboardActivate
+                [routerLink]="
+                  '/' +
+                  activeRepo.repoName +
+                  '/' +
+                  artifact.groupName +
+                  '/' +
+                  artifact.artifactName +
+                  '/' +
+                  artifact.latest
+                "
               >
-                <img class="mt-[2px]" ngSrc="/assets/icons/maven/group-id.svg" alt="group-id" height="18" width="18" />
-                <span class="text-right break-all group-hover:underline">{{ artifact.groupName }}</span>
-                <svg
-                  class="group-hover:text-secondary-500 mt-[2px] h-[14px] w-[14px] shrink-0 text-neutral-200"
-                  viewBox="0 0 14 14"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
+                @if (activeRepo.canManage) {
+                  <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
+                    <button
+                      data-testid="row-delete"
+                      (click)="deleteGroup(artifact)"
+                      [disabled]="loading"
+                      class="text-error-500 flex w-full items-center gap-2 px-4 py-2 hover:bg-[#2D2C2C]"
+                    >
+                      <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+                      Delete
+                    </button>
+                  </app-dropdown>
+                }
+
+                <a
+                  data-testid="row-group-link"
+                  class="group text-secondary-500 flex items-start gap-2"
+                  [routerLink]="'/' + activeRepo.repoName + '/' + artifact.groupName"
                 >
-                  <path
-                    d="M4.93386 4.13083L9.90503 4.13076M9.90503 4.13076L9.90503 9.03122M9.90503 4.13076L4.13032 9.90547"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
+                  <img
+                    class="mt-[2px]"
+                    ngSrc="/assets/icons/maven/group-id.svg"
+                    alt="group-id"
+                    height="18"
+                    width="18"
                   />
-                </svg>
-              </a>
+                  <span class="text-right break-all group-hover:underline">{{ artifact.groupName }}</span>
+                  <svg
+                    class="group-hover:text-secondary-500 mt-[2px] h-[14px] w-[14px] shrink-0 text-neutral-200"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M4.93386 4.13083L9.90503 4.13076M9.90503 4.13076L9.90503 9.03122M9.90503 4.13076L4.13032 9.90547"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </a>
 
-              <div class="space-y-2">
-                <div class="flex justify-between gap-2">
-                  <span class="text-neutral-200">Artifact name: </span>
-                  <a
-                    class="group text-secondary-500 flex gap-2"
-                    [routerLink]="'/' + activeRepo.repoName + '/' + artifact.groupName + '/' + artifact.artifactName"
-                  >
-                    <span class="text-right break-all group-hover:underline">{{ artifact.artifactName }}</span>
-                    <svg
-                      class="group-hover:text-secondary-500 mt-[2px] h-[14px] w-[14px] shrink-0 text-neutral-200"
-                      viewBox="0 0 14 14"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
+                <div class="space-y-2">
+                  <div class="flex justify-between gap-2">
+                    <span class="text-neutral-200">Artifact name: </span>
+                    <a
+                      data-testid="row-artifact-link"
+                      class="group text-secondary-500 flex gap-2"
+                      [routerLink]="'/' + activeRepo.repoName + '/' + artifact.groupName + '/' + artifact.artifactName"
                     >
-                      <path
-                        d="M4.93386 4.13083L9.90503 4.13076M9.90503 4.13076L9.90503 9.03122M9.90503 4.13076L4.13032 9.90547"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      />
-                    </svg>
-                  </a>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <span class="text-neutral-200">Latest: </span>
-                  <a
-                    class="group text-secondary-500 flex min-w-0 gap-2"
-                    [routerLink]="
-                      '/' +
-                      activeRepo.repoName +
-                      '/' +
-                      artifact.groupName +
-                      '/' +
-                      artifact.artifactName +
-                      '/' +
-                      artifact.latest
-                    "
-                  >
-                    <span class="text-right break-all group-hover:underline">
-                      {{ artifact.latest }}
+                      <span class="text-right break-all group-hover:underline">{{ artifact.artifactName }}</span>
+                      <svg
+                        class="group-hover:text-secondary-500 mt-[2px] h-[14px] w-[14px] shrink-0 text-neutral-200"
+                        viewBox="0 0 14 14"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M4.93386 4.13083L9.90503 4.13076M9.90503 4.13076L9.90503 9.03122M9.90503 4.13076L4.13032 9.90547"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </a>
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-neutral-200">Latest: </span>
+                    <a
+                      data-testid="row-latest-link"
+                      class="group text-secondary-500 flex min-w-0 gap-2"
+                      [routerLink]="
+                        '/' +
+                        activeRepo.repoName +
+                        '/' +
+                        artifact.groupName +
+                        '/' +
+                        artifact.artifactName +
+                        '/' +
+                        artifact.latest
+                      "
+                    >
+                      <span class="text-right break-all group-hover:underline">
+                        {{ artifact.latest }}
+                      </span>
+
+                      <svg
+                        class="group-hover:text-secondary-500 mt-[2px] h-[14px] w-[14px] shrink-0 text-neutral-200"
+                        viewBox="0 0 14 14"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M4.93386 4.13083L9.90503 4.13076M9.90503 4.13076L9.90503 9.03122M9.90503 4.13076L4.13032 9.90547"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </a>
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-neutral-200">Last Updated: </span>
+                    <span data-testid="row-updated" class="text-secondary-500 text-right break-all">
+                      {{ artifact.lastUpdatedAt | date: 'medium' }} {{ '(' + timeAgo(artifact.lastUpdatedAt) + ')' }}
                     </span>
-
-                    <svg
-                      class="group-hover:text-secondary-500 mt-[2px] h-[14px] w-[14px] shrink-0 text-neutral-200"
-                      viewBox="0 0 14 14"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M4.93386 4.13083L9.90503 4.13076M9.90503 4.13076L9.90503 9.03122M9.90503 4.13076L4.13032 9.90547"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      />
-                    </svg>
-                  </a>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <span class="text-neutral-200">Last Updated: </span>
-                  <span class="text-secondary-500 text-right break-all">
-                    {{ artifact.lastUpdatedAt | date: 'medium' }} {{ '(' + timeAgo(artifact.lastUpdatedAt) + ')' }}
-                  </span>
+                  </div>
                 </div>
               </div>
+              @if (i !== artifacts.length - 1) {
+                <div class="px-2 py-4">
+                  <div class="h-[1px] bg-neutral-400"></div>
+                </div>
+              }
             </div>
-            @if (i !== artifacts.length - 1) {
-              <div class="px-2 py-4">
-                <div class="h-[1px] bg-neutral-400"></div>
-              </div>
-            }
-          </div>
-        }
+          }
+        </div>
         <!-- Pagination -->
         <app-pagination
           (pageNumChange)="loadPage($event)"
@@ -353,7 +386,7 @@
       <app-empty-list />
     }
   } @else {
-    <div animate.enter="fade-in-up" class="p-8 text-center">
+    <div data-testid="pkg-error" animate.enter="fade-in-up" class="p-8 text-center">
       <img
         class="mx-auto mb-[70px]"
         ngSrc="/assets/images/hippo-empty.svg"
@@ -361,7 +394,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p data-testid="pkg-error-message" class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
     </div>
   }
 }
