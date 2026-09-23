@@ -49,7 +49,14 @@ public interface MavenStorageService<ID> {
 
   long deleteArtifactVersion(UUID repoUuid, String groupId, String artifactId, String versionName);
 
-  long deleteGroup(UUID repoUuid, String groupId);
+  /**
+   * Deletes only {@code artifactNames}' own {@code g/a} directories and this group's own
+   * group-level metadata files (e.g. a plugin-group {@code maven-metadata.xml}), then prunes this
+   * group's directory and any now-empty ancestor. Never deletes a subdirectory that was not passed
+   * in {@code artifactNames}, so a nested or sibling group sharing a path prefix (e.g. {@code
+   * com.acme.sub} next to {@code com.acme}) is left untouched (RPS-1190).
+   */
+  long deleteGroup(UUID repoUuid, String groupId, List<String> artifactNames);
 
   void deleteRepo(UUID repoUuid);
 
