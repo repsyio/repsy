@@ -28,6 +28,7 @@ import io.repsy.protocols.pypi.shared.python_package.services.PypiPackageService
 import io.repsy.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.protocols.pypi.shared.utils.PackageStorageUtils;
 import io.repsy.protocols.pypi.shared.utils.PackageUtils;
+import io.repsy.protocols.pypi.shared.utils.PypiPublishLimits;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.IOException;
@@ -63,6 +64,13 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
 
     final var uploadForm = parseUploadForm(parameterMap);
     uploadForm.setNormalizedName(PackageUtils.normalizePackageName(uploadForm.getName()));
+
+    // Guard every length-limited value before anything is written (RPS-1137): a publish this
+    // refuses leaves no orphan archive, and one it lets through never fails the row insert.
+    PypiPublishLimits.checkPackageName(uploadForm.getName());
+    PypiPublishLimits.checkVersion(uploadForm.getVersion());
+    PypiPublishLimits.checkRequiresPython(uploadForm.getRequires_python());
+    PypiPublishLimits.dropOverLongFields(uploadForm);
 
     PackageStorageUtils.checkArchiveFilename(file);
     PackageStorageUtils.checkSha256Digest(uploadForm);

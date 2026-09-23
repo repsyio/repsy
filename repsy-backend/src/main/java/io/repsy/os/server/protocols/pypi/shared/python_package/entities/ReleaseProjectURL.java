@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.pypi.shared.python_package.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.protocols.pypi.shared.utils.PypiPublishLimits;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -48,9 +49,10 @@ public class ReleaseProjectURL {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private Release release;
 
-  @Column(name = "label", nullable = false, length = 32)
+  @Column(name = "label", nullable = false, length = PypiPublishLimits.MAX_PROJECT_URL_LABEL_LENGTH)
   private String label;
 
+  // Unbounded (text) in both PostgreSQL and H2, so no length guard applies (RPS-1137).
   @Column(name = "url", nullable = false)
   private String url;
 }

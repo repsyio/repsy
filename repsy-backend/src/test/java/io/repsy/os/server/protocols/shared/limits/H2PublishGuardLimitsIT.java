@@ -28,9 +28,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * Flyway scripts create, so a value the code lets through is never refused by H2. Cargo's {@code
  * links}, author and category are {@code varchar(255)} here and {@code text} in PostgreSQL
  * (RPS-1072). npm's tables are identical in both databases (RPS-1136), and so are Docker's
- * (RPS-1139, RPS-1140).
+ * (RPS-1139, RPS-1140) and PyPI's (RPS-1137).
  */
-@DisplayName("Helm, Cargo, Go, npm and Docker publish limits against the H2 schema")
+@DisplayName("Helm, Cargo, Go, npm, Docker and PyPI publish limits against the H2 schema")
 class H2PublishGuardLimitsIT extends H2IntegrationTest {
 
   @Autowired private JdbcTemplate jdbcTemplate;

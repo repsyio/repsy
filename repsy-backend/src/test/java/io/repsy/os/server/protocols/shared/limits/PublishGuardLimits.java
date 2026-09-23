@@ -20,6 +20,7 @@ import io.repsy.protocols.docker.shared.utils.DockerConstants;
 import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
 import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
+import io.repsy.protocols.pypi.shared.utils.PypiPublishLimits;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,11 +30,12 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * The limits the Helm, Cargo, Go (RPS-1072), npm (RPS-1136) and Docker (RPS-1139) publish paths
- * hold pushed metadata to, set against the columns Flyway creates. A limit is only a guard if the
- * column really is that long, so this reads {@code information_schema} and reports every limit that
- * has drifted from its column, for PostgreSQL and for H2, whose scripts differ (Cargo's {@code
- * links}, author and category are {@code text} in PostgreSQL and {@code varchar(255)} in H2).
+ * The limits the Helm, Cargo, Go (RPS-1072), npm (RPS-1136), Docker (RPS-1139) and PyPI (RPS-1137)
+ * publish paths hold pushed metadata to, set against the columns Flyway creates. A limit is only a
+ * guard if the column really is that long, so this reads {@code information_schema} and reports
+ * every limit that has drifted from its column, for PostgreSQL and for H2, whose scripts differ
+ * (Cargo's {@code links}, author and category are {@code text} in PostgreSQL and {@code
+ * varchar(255)} in H2).
  *
  * <p>It covers the limits of the constants above, not the {@code @Column} annotations of the
  * entities, which RPS-1133 compares with the schema.
@@ -446,6 +448,108 @@ final class PublishGuardLimits {
         within(
             "DockerConstants.MAX_REFERENCE_LENGTH",
             DockerConstants.MAX_REFERENCE_LENGTH,
+            "vulnerability_scan",
+            "artifact_version"));
+
+    limits.add(
+        exact(
+            "PypiPublishLimits.MAX_NAME_LENGTH",
+            PypiPublishLimits.MAX_NAME_LENGTH,
+            "pypi_package",
+            "name"));
+    limits.add(
+        exact(
+            "PypiPublishLimits.MAX_NAME_LENGTH",
+            PypiPublishLimits.MAX_NAME_LENGTH,
+            "pypi_package",
+            "normalized_name"));
+    limits.add(
+        exact(
+            "PypiPublishLimits.MAX_VERSION_LENGTH",
+            PypiPublishLimits.MAX_VERSION_LENGTH,
+            "pypi_package",
+            "stable_version"));
+    limits.add(
+        exact(
+            "PypiPublishLimits.MAX_VERSION_LENGTH",
+            PypiPublishLimits.MAX_VERSION_LENGTH,
+            "pypi_package",
+            "latest_version"));
+    limits.add(
+        exact(
+            "PypiPublishLimits.MAX_VERSION_LENGTH",
+            PypiPublishLimits.MAX_VERSION_LENGTH,
+            "pypi_release",
+            "version"));
+    limits.add(
+        exact(
+            "PypiPublishLimits.MAX_REQUIRES_PYTHON_LENGTH",
+            PypiPublishLimits.MAX_REQUIRES_PYTHON_LENGTH,
+            "pypi_release",
+            "requires_python"));
+    limits.add(
+        exact(
+            "PypiPublishLimits.MAX_HOME_PAGE_LENGTH",
+            PypiPublishLimits.MAX_HOME_PAGE_LENGTH,
+            "pypi_release",
+            "home_page"));
+    limits.add(
+        exact(
+            "PypiPublishLimits.MAX_AUTHOR_LENGTH",
+            PypiPublishLimits.MAX_AUTHOR_LENGTH,
+            "pypi_release",
+            "author"));
+    limits.add(
+        exact(
+            "PypiPublishLimits.MAX_AUTHOR_EMAIL_LENGTH",
+            PypiPublishLimits.MAX_AUTHOR_EMAIL_LENGTH,
+            "pypi_release",
+            "author_email"));
+    limits.add(
+        exact(
+            "PypiPublishLimits.MAX_LICENSE_LENGTH",
+            PypiPublishLimits.MAX_LICENSE_LENGTH,
+            "pypi_release",
+            "license"));
+    limits.add(
+        exact(
+            "PypiPublishLimits.MAX_DESCRIPTION_CONTENT_TYPE_LENGTH",
+            PypiPublishLimits.MAX_DESCRIPTION_CONTENT_TYPE_LENGTH,
+            "pypi_release",
+            "description_content_type"));
+    limits.add(
+        exact(
+            "PypiPublishLimits.MAX_CLASSIFIER_LENGTH",
+            PypiPublishLimits.MAX_CLASSIFIER_LENGTH,
+            "pypi_release_classifier",
+            "classifier"));
+    limits.add(
+        exact(
+            "PypiPublishLimits.MAX_CLASSIFIER_LENGTH",
+            PypiPublishLimits.MAX_CLASSIFIER_LENGTH,
+            "pypi_release_classifier",
+            "value"));
+    limits.add(
+        exact(
+            "PypiPublishLimits.MAX_PROJECT_URL_LABEL_LENGTH",
+            PypiPublishLimits.MAX_PROJECT_URL_LABEL_LENGTH,
+            "pypi_release_project_url",
+            "label"));
+
+    // The package name and version are also measured against the scan row they are copied into
+    // (RPS-1140): both fit comfortably within vulnerability_scan.artifact_name (512) and
+    // artifact_version (widened to 512 by RPS-1140 specifically because pypi_release.version
+    // (255) did not fit the old 128), so this is "within", not "exact".
+    limits.add(
+        within(
+            "PypiPublishLimits.MAX_NAME_LENGTH",
+            PypiPublishLimits.MAX_NAME_LENGTH,
+            "vulnerability_scan",
+            "artifact_name"));
+    limits.add(
+        within(
+            "PypiPublishLimits.MAX_VERSION_LENGTH",
+            PypiPublishLimits.MAX_VERSION_LENGTH,
             "vulnerability_scan",
             "artifact_version"));
 
