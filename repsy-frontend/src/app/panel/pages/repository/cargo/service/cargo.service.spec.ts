@@ -59,14 +59,13 @@ describe('CargoService', () => {
     service = TestBed.inject(CargoService);
   });
 
-  // CargoService has no resetActiveRepoIfChanged, so this pins the current behaviour (RPS-1159).
   describeRepoSelection({
     service: () => service,
     getPermission: () => repoApi.getPermission,
     probe: (s) => s.deleteCrate(CRATE),
     probeApi: () => cargoApi.deleteCargoCrate,
     probeRepoArg: 1,
-    resetsOnChange: false,
+    resetsOnChange: true,
   });
 
   describe('with a selected repository', () => {

@@ -59,14 +59,13 @@ describe('RubyService', () => {
     service = TestBed.inject(RubyService);
   });
 
-  // RubyService has no resetActiveRepoIfChanged, so this pins the current behaviour (RPS-1159).
   describeRepoSelection({
     service: () => service,
     getPermission: () => repoApi.getPermission,
     probe: (s) => s.deleteGem(GEM),
     probeApi: () => rubyApi.deleteGem,
     probeRepoArg: 1,
-    resetsOnChange: false,
+    resetsOnChange: true,
   });
 
   describe('with a selected repository', () => {

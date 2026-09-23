@@ -15,22 +15,25 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Highlight } from 'ngx-highlightjs';
 import { Subscription } from 'rxjs';
 
 import { environment } from '../../../../../../../environments/environment';
+import {
+  NuGetDeletedItem,
+  NuGetDependencyInfo,
+  NuGetVersionInfo,
+  RepoPermissionInfo,
+} from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { MarkdownComponent } from '../../../../../shared/components/markdown/markdown.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
-import { NugetDeletedItem } from '../../dto/nuget-deleted-item';
-import { NugetDependencyInfo } from '../../dto/nuget-dependency-info';
-import { NugetVersionInfo } from '../../dto/nuget-version-info';
 import { NugetService } from '../../service/nuget.service';
 
 @Component({
@@ -57,7 +60,7 @@ export class NugetPackagesVersionDetailComponent implements OnDestroy {
   public packageReferenceCommand: string;
   public packageManagerCommand: string;
   public packageManagerCommandUrl: string;
-  public versionInfo: NugetVersionInfo;
+  public versionInfo: NuGetVersionInfo;
   public activeRepo: RepoPermissionInfo;
   private readonly repositoryChanges$: Subscription;
 
@@ -68,10 +71,10 @@ export class NugetPackagesVersionDetailComponent implements OnDestroy {
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
   ) {
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.nugetService.repoChanges.subscribe((repo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.loadVersion();
       }
     });
@@ -105,9 +108,9 @@ export class NugetPackagesVersionDetailComponent implements OnDestroy {
         this.versionInfo = versionInfo;
         this.error = null;
       })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
+      // The error interceptor has already toasted the failure; keep the message for the page.
+      .catch((err: HttpErrorResponse) => {
+        this.error = err.error?.text ?? 'Error Occurred';
       })
       .finally(() => {
         this.loading = false;
@@ -120,12 +123,13 @@ export class NugetPackagesVersionDetailComponent implements OnDestroy {
       this.nugetService
         .deletePackageVersion(this.packageId, this.versionName)
         .then((deletedItem) => {
-          const target = deletedItem === NugetDeletedItem.PACKAGE ? ['../..'] : ['..'];
+          const target = deletedItem === NuGetDeletedItem.Package ? ['../..'] : ['..'];
           this.router.navigate(target, { relativeTo: this.route }).then(() => {
             this.toastService.show('Version deleted successfully', 'success');
           });
         })
-        .catch((err: string) => this.toastService.show(err, 'error'))
+        // The error interceptor has already shown the failure to the user.
+        .catch(() => undefined)
         .finally(() => {
           this.loading = false;
         });
@@ -142,11 +146,11 @@ export class NugetPackagesVersionDetailComponent implements OnDestroy {
       .filter((item) => item.length > 0);
   }
 
-  public get dependenciesByFramework(): { framework: string; deps: NugetDependencyInfo[] }[] {
+  public get dependenciesByFramework(): { framework: string; deps: NuGetDependencyInfo[] }[] {
     if (!this.versionInfo?.dependencies?.length) {
       return [];
     }
-    const map = new Map<string, NugetDependencyInfo[]>();
+    const map = new Map<string, NuGetDependencyInfo[]>();
     for (const dep of this.versionInfo.dependencies) {
       const key = dep.targetFramework || 'All Frameworks';
       if (!map.has(key)) {

@@ -15,13 +15,14 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
 
 import { environment } from '../../../../../../../environments/environment';
-import { VersionSecuritySummary } from '../../../../../../../generated/api';
+import { NuGetPackageListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -35,11 +36,9 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { SecurityService } from '../../../../security/service/security.service';
 import { NugetConfigComponent } from '../../config/nuget-config.component';
-import { NugetPackageListItem } from '../../dto/nuget-package-list-item';
 import { NugetService } from '../../service/nuget.service';
 
 @Component({
@@ -69,8 +68,8 @@ export class NugetPackagesListComponent implements OnDestroy {
   public pageSize = 10;
   public searchText = '';
   public error: string;
-  public packages: NugetPackageListItem[] = [];
-  public pagedData = new PagedData<NugetPackageListItem>();
+  public packages: NuGetPackageListItem[] = [];
+  public pagedData = new PagedData<NuGetPackageListItem>();
   public activeRepo: RepoPermissionInfo;
   public securitySummary: Record<string, VersionSecuritySummary> = {};
   public readonly baseUrl: string;
@@ -93,10 +92,10 @@ export class NugetPackagesListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
-    this.activeRepo = new RepoPermissionInfo();
+    this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.nugetService.repoChanges.subscribe((repo) => {
       if (repo) {
-        this.activeRepo = Object.assign(new RepoPermissionInfo(), repo);
+        this.activeRepo = Object.assign({}, repo);
         this.fetchPackages();
         this.fetchSecuritySummary();
       }
@@ -127,7 +126,7 @@ export class NugetPackagesListComponent implements OnDestroy {
     this.fetchPackages();
   }
 
-  public deletePackage(pkg: NugetPackageListItem): void {
+  public deletePackage(pkg: NuGetPackageListItem): void {
     this.dangerModalService.show('Delete Package', 'Delete', () => {
       this.loading = true;
       this.nugetService
@@ -136,7 +135,8 @@ export class NugetPackagesListComponent implements OnDestroy {
           this.refreshPage();
           this.toastService.show('Package deleted successfully', 'success');
         })
-        .catch((err: string) => this.toastService.show(err, 'error'))
+        // The error interceptor has already shown the failure to the user.
+        .catch(() => undefined)
         .finally(() => {
           this.loading = false;
         });
@@ -152,9 +152,9 @@ export class NugetPackagesListComponent implements OnDestroy {
         this.packages = pagedData.content;
         this.error = null;
       })
-      .catch((err: string) => {
-        this.error = err;
-        this.toastService.show(err, 'error');
+      // The error interceptor has already toasted the failure; keep the message for the page.
+      .catch((err: HttpErrorResponse) => {
+        this.error = err.error?.text ?? 'Error Occurred';
       })
       .finally(() => {
         this.loading = false;
@@ -173,7 +173,7 @@ export class NugetPackagesListComponent implements OnDestroy {
     return moment(date).fromNow();
   }
 
-  public packageRoute(pkg: NugetPackageListItem): string {
+  public packageRoute(pkg: NuGetPackageListItem): string {
     return `/${this.activeRepo.repoName}/${pkg.packageId}`;
   }
 

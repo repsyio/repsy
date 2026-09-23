@@ -48,10 +48,20 @@ export class HelmService {
   }
 
   public getRepository(repoName: string): Observable<RepoPermissionInfo> {
+    this.resetActiveRepoIfChanged(repoName);
+
     return this.protocolRepoControllerService.getPermission(repoName).pipe(
       map((r) => r.data!),
       tap((info) => this.repoSubject.next(info)),
     );
+  }
+
+  private resetActiveRepoIfChanged(repoName: string): void {
+    if (this.repoSubject.getValue()?.repoName === repoName) {
+      return;
+    }
+
+    this.repoSubject.next(null);
   }
 
   public searchCharts(
@@ -72,21 +82,15 @@ export class HelmService {
   }
 
   public getChartVersions(name: string): Observable<HelmChartVersionItem[]> {
-    return this.helmChartControllerService
-      .getHelmChartVersions(this.repoName, name)
-      .pipe(map((r) => r.data ?? []));
+    return this.helmChartControllerService.getHelmChartVersions(this.repoName, name).pipe(map((r) => r.data ?? []));
   }
 
   public getChartDetail(name: string, version: string): Observable<HelmChartDetail> {
-    return this.helmChartControllerService
-      .getHelmChartDetail(this.repoName, name, version)
-      .pipe(map((r) => r.data!));
+    return this.helmChartControllerService.getHelmChartDetail(this.repoName, name, version).pipe(map((r) => r.data!));
   }
 
   public deleteAllVersions(name: string): Observable<void> {
-    return this.helmChartControllerService
-      .deleteAllHelmChartVersions(this.repoName, name)
-      .pipe(map(() => undefined));
+    return this.helmChartControllerService.deleteAllHelmChartVersions(this.repoName, name).pipe(map(() => undefined));
   }
 
   public deleteChart(name: string, version: string): Observable<void> {
@@ -96,9 +100,6 @@ export class HelmService {
   }
 
   public getOciTags(name: string): Observable<string[]> {
-    return this.helmChartControllerService
-      .getHelmChartOciTags(this.repoName, name)
-      .pipe(map((r) => r.data ?? []));
+    return this.helmChartControllerService.getHelmChartOciTags(this.repoName, name).pipe(map((r) => r.data ?? []));
   }
-
 }

@@ -18,11 +18,7 @@ import { firstValueFrom, of, throwError } from 'rxjs';
 
 import { LoginInfo, ProfileControllerService, ProfileInfo } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/service/auth.service';
-import {
-  describeAuthorizationHeader,
-  FakeAuthService,
-  fakeAuthService,
-} from '../../../shared/testing/authorization-header-spec-helpers';
+import { describeNoAuthorizationHeader } from '../../../shared/testing/authorization-header-spec-helpers';
 import {
   CallCase,
   describeCalls,
@@ -31,8 +27,6 @@ import {
 } from '../../repository/testing/protocol-service-spec-helpers';
 import { ProfileService } from './profile.service';
 
-const TOKEN = 'access-token';
-const BEARER = `Bearer ${TOKEN}`;
 const PROFILE: ProfileInfo = {
   id: 'user-1',
   username: 'alice',
@@ -45,7 +39,7 @@ const LOGIN_INFO: LoginInfo = { username: 'alice', token: 'new-token', refreshTo
 
 describe('ProfileService', () => {
   let api: jasmine.SpyObj<ProfileControllerService>;
-  let authService: FakeAuthService;
+  let authService: jasmine.SpyObj<AuthService>;
   let service: ProfileService;
 
   beforeEach(() => {
@@ -55,7 +49,7 @@ describe('ProfileService', () => {
       'updateUsername',
       'deleteProfile',
     ]);
-    authService = fakeAuthService(TOKEN);
+    authService = jasmine.createSpyObj<AuthService>('AuthService', ['updateLoginInfo']);
     TestBed.configureTestingModule({
       providers: [
         { provide: ProfileControllerService, useValue: api },
@@ -70,7 +64,7 @@ describe('ProfileService', () => {
       name: 'get',
       invoke: (s) => s.get(),
       api: () => api.getProfile,
-      args: [BEARER],
+      args: [],
       response: restResponse(PROFILE),
       expected: PROFILE,
     },
@@ -78,7 +72,7 @@ describe('ProfileService', () => {
       name: 'updatePassword',
       invoke: (s) => s.updatePassword('n3w-secret'),
       api: () => api.updatePassword,
-      args: [BEARER, { password: 'n3w-secret' }],
+      args: [{ password: 'n3w-secret' }],
       response: restResponse(LOGIN_INFO),
       expected: LOGIN_INFO,
     },
@@ -86,7 +80,7 @@ describe('ProfileService', () => {
       name: 'updateUsername',
       invoke: (s) => s.updateUsername('bob'),
       api: () => api.updateUsername,
-      args: [BEARER, { username: 'bob' }],
+      args: [{ username: 'bob' }],
       response: restResponse(LOGIN_INFO),
       expected: LOGIN_INFO,
     },
@@ -94,15 +88,14 @@ describe('ProfileService', () => {
       name: 'deleteAccount',
       invoke: (s) => s.deleteAccount(),
       api: () => api.deleteProfile,
-      args: [BEARER],
+      args: [],
       response: restResponse(undefined),
       expected: undefined,
     },
   ];
   describeCalls(() => service, cases);
 
-  describeAuthorizationHeader({
-    authService: () => authService,
+  describeNoAuthorizationHeader({
     api: () => api.getProfile,
     invoke: () => service.get(),
   });
