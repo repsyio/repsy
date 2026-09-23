@@ -30,11 +30,12 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -49,6 +50,10 @@ class AbstractDockerLayerDigestRoutingTest {
 
   private static final String SHA256 = "sha256:" + "ab".repeat(32);
   private static final String SHA512 = "sha512:" + "cd".repeat(64);
+
+  private static Stream<String> supportedDigests() {
+    return Stream.of(SHA256, SHA512);
+  }
 
   @Mock private PathParser basePathParser;
   @Mock private DockerProtocolFacade<UUID> dockerFacade;
@@ -90,7 +95,7 @@ class AbstractDockerLayerDigestRoutingTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {SHA256, SHA512})
+  @MethodSource("supportedDigests")
   @DisplayName("GET of a blob by a supported digest is routed to the pull handler")
   void pullRoutesSupportedDigests(final String digest) {
     this.basePathIs("/app/blobs/" + digest);
@@ -102,7 +107,7 @@ class AbstractDockerLayerDigestRoutingTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {SHA256, SHA512})
+  @MethodSource("supportedDigests")
   @DisplayName("HEAD of a blob by a supported digest is routed to the check handler")
   void checkRoutesSupportedDigests(final String digest) {
     this.basePathIs("/app/blobs/" + digest);

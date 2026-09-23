@@ -19,10 +19,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 @DisplayName("PathParserUtils")
 class PathParserUtilsTest {
@@ -31,8 +32,22 @@ class PathParserUtilsTest {
   private static final String SHA512 = "sha512:" + "cd".repeat(64);
   private static final String FILE_NAME = "some-storage-name";
 
+  private static Stream<String> supportedDigests() {
+    return Stream.of(SHA256, SHA512);
+  }
+
+  private static Stream<String> malformedDigests() {
+    return Stream.of(
+        "sha256:ab",
+        "sha512:cd",
+        "sha512:" + "cd".repeat(32),
+        "sha256:" + "ab".repeat(64),
+        "sha256:" + "zz".repeat(32),
+        "sha512:" + "zz".repeat(64));
+  }
+
   @ParameterizedTest
-  @ValueSource(strings = {SHA256, SHA512})
+  @MethodSource("supportedDigests")
   @DisplayName("a manifest digest reference is parsed to the digest itself, for either algorithm")
   void manifestByDigest(final String digest) {
     final var parsed =
@@ -54,7 +69,7 @@ class PathParserUtilsTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {SHA256, SHA512})
+  @MethodSource("supportedDigests")
   @DisplayName("a manifest digest reference is parsed the same with a query string")
   void manifestByDigestIgnoresQuery(final String digest) {
     final var parsed =
@@ -64,7 +79,7 @@ class PathParserUtilsTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {SHA256, SHA512})
+  @MethodSource("supportedDigests")
   @DisplayName("a blob digest is parsed to the digest itself, for either algorithm")
   void layerByDigest(final String digest) {
     final var parsed = PathParserUtils.parseForLayer("/v2/repo/image/blobs/" + digest, digest);
@@ -84,15 +99,7 @@ class PathParserUtilsTest {
   }
 
   @ParameterizedTest
-  @ValueSource(
-      strings = {
-        "sha256:" + "ab",
-        "sha512:" + "cd",
-        "sha512:" + "cd".repeat(32),
-        "sha256:" + "ab".repeat(64),
-        "sha256:" + "zz".repeat(32),
-        "sha512:" + "zz".repeat(64)
-      })
+  @MethodSource("malformedDigests")
   @DisplayName("a malformed digest reference is a bad request, not a tag")
   void malformedDigestIsRefused(final String digest) {
     assertThatThrownBy(
