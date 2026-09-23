@@ -49,6 +49,7 @@ import io.repsy.protocols.docker.shared.tag.dtos.ManifestListManifestInfo;
 import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
 import io.repsy.protocols.docker.shared.utils.DockerConstants;
+import io.repsy.protocols.docker.shared.utils.DockerPushGuards;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -398,7 +399,14 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
         throw new BadRequestException("manifestConfigInvalid");
       }
 
-      return os + "/" + architecture;
+      final var platform = os + "/" + architecture;
+
+      // RPS-1139: os/architecture come from the config blob, not the manifest JSON that
+      // DockerManifestValidator already checked, so the length is guarded here, before it reaches
+      // docker_manifest.platform.
+      DockerPushGuards.rejectPlatformTooLong(platform);
+
+      return platform;
     } catch (final JSONException _) {
       throw new BadRequestException("manifestConfigInvalid");
     }

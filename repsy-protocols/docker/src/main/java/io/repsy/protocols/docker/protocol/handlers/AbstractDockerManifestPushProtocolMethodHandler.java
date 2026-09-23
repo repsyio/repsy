@@ -34,6 +34,7 @@ import io.repsy.protocols.docker.shared.layer.services.AbstractDockerLayerRename
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
 import io.repsy.protocols.docker.shared.utils.DockerManifestValidator;
+import io.repsy.protocols.docker.shared.utils.DockerPushGuards;
 import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -124,6 +125,13 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
     if (contentType == null) {
       throw new BadRequestException("manifestContentTypeMissing");
     }
+
+    // Before anything is looked up or written (RPS-1139): an over-long or grammatically invalid
+    // name, reference or Content-Type must never reach the docker_image / docker_tag insert and
+    // fail there with a generic, unnamed 400.
+    DockerPushGuards.rejectInvalidImageName(imageName);
+    DockerPushGuards.rejectInvalidReference(reference);
+    DockerPushGuards.rejectMediaTypeTooLong(contentType);
 
     final var manifestJson = this.getManifestJsonStr(context, request);
 

@@ -77,6 +77,9 @@ class DockerManifestPushIT extends AbstractIntegrationTest {
   private static final String CONFIG_INVALID = "manifestConfigInvalid";
   private static final String SCHEMA_VERSION_INVALID = "manifestSchemaVersionInvalid";
   private static final String MEDIA_TYPE_UNSUPPORTED = "manifestMediaTypeUnsupported";
+  private static final String IMAGE_NAME_INVALID = "dockerImageNameInvalid";
+  private static final String REFERENCE_INVALID = "dockerReferenceInvalid";
+  private static final String MEDIA_TYPE_TOO_LONG = "dockerMediaTypeTooLong";
 
   @Autowired private WebApplicationContext webApplicationContext;
   @Autowired private ImageRepository imageRepository;
@@ -230,10 +233,20 @@ class DockerManifestPushIT extends AbstractIntegrationTest {
   private MockHttpServletResponse putManifest(
       final Repo repo, final String reference, final String contentType, final String body)
       throws Exception {
+    return this.putManifest(repo, IMAGE, reference, contentType, body);
+  }
+
+  private MockHttpServletResponse putManifest(
+      final Repo repo,
+      final String image,
+      final String reference,
+      final String contentType,
+      final String body)
+      throws Exception {
     return MockMvcBuilders.webAppContextSetup(this.webApplicationContext)
         .build()
         .perform(
-            put("/v2/{repo}/{image}/manifests/{reference}", repo.getName(), IMAGE, reference)
+            put("/v2/{repo}/{image}/manifests/{reference}", repo.getName(), image, reference)
                 .contentType(contentType)
                 .content(body.getBytes(StandardCharsets.UTF_8))
                 .header(AUTHORIZATION, this.adminProtocolBearerToken())
@@ -245,9 +258,23 @@ class DockerManifestPushIT extends AbstractIntegrationTest {
   private void assertRejected(
       final MockHttpServletResponse response, final String msgId, final Repo repo)
       throws Exception {
+    this.assertRejected(response, msgId, "MANIFEST_INVALID", repo);
+  }
+
+  /**
+   * RPS-1139: the image name, reference/tag, and media type guards run before the image is created,
+   * so their rejection is asserted the same way but against the OCI error code the ticket names
+   * (NAME_INVALID, TAG_INVALID) rather than the default MANIFEST_INVALID fallback.
+   */
+  private void assertRejected(
+      final MockHttpServletResponse response,
+      final String msgId,
+      final String code,
+      final Repo repo)
+      throws Exception {
     assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(400);
     assertThat(response.getContentAsString())
-        .contains("\"code\":\"MANIFEST_INVALID\"")
+        .contains("\"code\":\"" + code + "\"")
         .contains("\"detail\":\"" + msgId + "\"");
     // Nothing of the rejected push is left behind: no image, no manifest file.
     assertThat(this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE)).isEmpty();
@@ -446,6 +473,65 @@ class DockerManifestPushIT extends AbstractIntegrationTest {
     final var response = this.putManifest(repo, "latest", "text/plain", "{}");
 
     this.assertRejected(response, MEDIA_TYPE_UNSUPPORTED, repo);
+  }
+
+  @Test
+  @DisplayName(
+      "an image name longer than docker_image.name is refused with NAME_INVALID before anything"
+          + " is created, not a generic 400 from the DB insert (RPS-1139)")
+  void imageNameTooLongIsRejected() throws Exception {
+    final var repo = this.dockerRepo();
+    final var longName = "a".repeat(256);
+
+    final var response = this.putManifest(repo, longName, "latest", OCI_MANIFEST, "{}");
+
+    this.assertRejected(response, IMAGE_NAME_INVALID, "NAME_INVALID", repo);
+  }
+
+  @Test
+  @DisplayName("an image name outside this registry's grammar is refused with NAME_INVALID")
+  void malformedImageNameIsRejected() throws Exception {
+    final var repo = this.dockerRepo();
+
+    final var response = this.putManifest(repo, "bad.name", "latest", OCI_MANIFEST, "{}");
+
+    this.assertRejected(response, IMAGE_NAME_INVALID, "NAME_INVALID", repo);
+  }
+
+  @Test
+  @DisplayName(
+      "a tag longer than the OCI grammar's 128 characters is refused with TAG_INVALID, before"
+          + " anything is created (RPS-1139)")
+  void referenceTooLongIsRejected() throws Exception {
+    final var repo = this.dockerRepo();
+    final var longTag = "a".repeat(129);
+
+    final var response = this.putManifest(repo, longTag, OCI_MANIFEST, "{}");
+
+    this.assertRejected(response, REFERENCE_INVALID, "TAG_INVALID", repo);
+  }
+
+  @Test
+  @DisplayName("a tag outside the OCI distribution grammar is refused with TAG_INVALID")
+  void malformedReferenceIsRejected() throws Exception {
+    final var repo = this.dockerRepo();
+
+    final var response = this.putManifest(repo, ".starts-with-dot", OCI_MANIFEST, "{}");
+
+    this.assertRejected(response, REFERENCE_INVALID, "TAG_INVALID", repo);
+  }
+
+  @Test
+  @DisplayName(
+      "a Content-Type longer than docker_tag.media_type is refused, instead of failing the insert"
+          + " (RPS-1139)")
+  void contentTypeTooLongIsRejected() throws Exception {
+    final var repo = this.dockerRepo();
+    final var longContentType = "application/" + "a".repeat(250);
+
+    final var response = this.putManifest(repo, "latest", longContentType, "{}");
+
+    this.assertRejected(response, MEDIA_TYPE_TOO_LONG, repo);
   }
 
   @Test

@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.docker.shared.tag.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.protocols.docker.shared.utils.DockerConstants;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -56,7 +57,7 @@ public class TagPlatform {
   @Column(nullable = false)
   private Integer version;
 
-  @Column(name = "platform", nullable = false)
+  @Column(name = "platform", nullable = false, length = DockerConstants.MAX_PLATFORM_LENGTH)
   private String platform;
 
   @Column(name = "created_at")

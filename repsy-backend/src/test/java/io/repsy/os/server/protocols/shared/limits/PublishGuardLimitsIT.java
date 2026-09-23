@@ -22,11 +22,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Keeps the limits the Helm, Cargo, Go (RPS-1072) and npm (RPS-1136) publish paths hold pushed
- * metadata to equal to the PostgreSQL columns Flyway creates. It only reads {@code
- * information_schema}, so it commits no rows.
+ * Keeps the limits the Helm, Cargo, Go (RPS-1072), npm (RPS-1136) and Docker (RPS-1139, RPS-1140)
+ * publish paths hold pushed metadata to equal to the PostgreSQL columns Flyway creates. It only
+ * reads {@code information_schema}, so it commits no rows.
  */
-@DisplayName("Helm, Cargo, Go and npm publish limits against the PostgreSQL schema")
+@DisplayName("Helm, Cargo, Go, npm and Docker publish limits against the PostgreSQL schema")
 class PublishGuardLimitsIT extends AbstractIntegrationTest {
 
   @Test

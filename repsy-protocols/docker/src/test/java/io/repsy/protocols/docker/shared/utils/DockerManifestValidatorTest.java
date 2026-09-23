@@ -301,4 +301,69 @@ class DockerManifestValidatorTest {
         .isInstanceOf(BadRequestException.class)
         .hasMessage("manifestMediaTypeUnsupported");
   }
+
+  private static String repeat(final char c, final int times) {
+    return String.valueOf(c).repeat(times);
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("imageManifestTypes")
+  @DisplayName(
+      "refuses a config mediaType longer than docker_manifest.config_media_type (RPS-1139)")
+  void refusesOverLongConfigMediaType(final String type) {
+    final var longMediaType = repeat('a', 256);
+    final var config =
+        "{\"mediaType\":\"" + longMediaType + "\",\"digest\":\"sha256:c\",\"size\":2}";
+
+    assertThatThrownBy(
+            () -> DockerManifestValidator.validate(type, image(config, "[" + LAYER + "]")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("dockerMediaTypeTooLong");
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("indexTypes")
+  @DisplayName("refuses an index mediaType longer than docker_tag.media_type (RPS-1139)")
+  void refusesOverLongIndexMediaType(final String type) {
+    final var longMediaType = repeat('a', 256);
+    final var body =
+        "{\"schemaVersion\":2,\"mediaType\":\""
+            + longMediaType
+            + "\",\"manifests\":["
+            + ENTRY
+            + "]}";
+
+    assertThatThrownBy(() -> DockerManifestValidator.validate(type, body))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("dockerMediaTypeTooLong");
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("indexTypes")
+  @DisplayName("refuses a child manifest mediaType longer than the column (RPS-1139)")
+  void refusesOverLongChildManifestMediaType(final String type) {
+    final var longMediaType = repeat('a', 256);
+    final var entry =
+        "{\"digest\":\"sha256:m\",\"size\":9,\"mediaType\":\"" + longMediaType + "\"}";
+
+    assertThatThrownBy(() -> DockerManifestValidator.validate(type, index("[" + entry + "]")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("dockerMediaTypeTooLong");
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("indexTypes")
+  @DisplayName("refuses an index entry platform whose os/architecture/variant is too long")
+  void refusesOverLongIndexEntryPlatform(final String type) {
+    final var longVariant = repeat('a', 256);
+    final var entry =
+        "{\"digest\":\"sha256:m\",\"size\":9,\"platform\":{\"architecture\":\"amd64\","
+            + "\"os\":\"linux\",\"variant\":\""
+            + longVariant
+            + "\"}}";
+
+    assertThatThrownBy(() -> DockerManifestValidator.validate(type, index("[" + entry + "]")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("dockerPlatformTooLong");
+  }
 }
