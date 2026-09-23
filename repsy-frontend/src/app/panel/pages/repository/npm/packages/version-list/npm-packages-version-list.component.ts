@@ -88,6 +88,7 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
   ];
 
   private readonly registryChanges$: Subscription;
+  private securitySummarySubscription?: Subscription;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -118,6 +119,7 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
 
   public ngOnDestroy(): void {
     this.registryChanges$.unsubscribe();
+    this.securitySummarySubscription?.unsubscribe();
   }
 
   public get securityArtifactName(): string {
@@ -222,11 +224,14 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
   }
 
   private fetchSecuritySummary(): void {
-    this.securityService.getVersionSecuritySummary(this.activeRegistry.repoName, this.securityArtifactName).subscribe({
-      next: (summary) => {
-        this.securitySummary = summary;
-      },
-      error: () => {},
-    });
+    this.securitySummarySubscription?.unsubscribe();
+    this.securitySummarySubscription = this.securityService
+      .watchVersionSecuritySummary(this.activeRegistry.repoName, this.securityArtifactName)
+      .subscribe({
+        next: (summary) => {
+          this.securitySummary = summary;
+        },
+        error: () => {},
+      });
   }
 }

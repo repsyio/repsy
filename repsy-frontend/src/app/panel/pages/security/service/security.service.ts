@@ -28,6 +28,7 @@ import {
   VersionSecuritySummary,
   VulnerabilityScanControllerService,
 } from '../../../../../generated/api';
+import { pollSecuritySummary } from '../../../shared/util/security-summary-poll.util';
 
 @Injectable({
   providedIn: 'root',
@@ -65,6 +66,24 @@ export class SecurityService {
 
   public getArtifactSecuritySummary(repoName: string): Observable<Record<string, VersionSecuritySummary>> {
     return this.vulnerabilityScanControllerService.getArtifactSecuritySummary(repoName).pipe(map((r) => r.data ?? {}));
+  }
+
+  /** The repository summary, fetched again while a scan of one of the repositories is unfinished. */
+  public watchSecuritySummary(repoNames?: string[]): Observable<Record<string, RepoSecuritySummary>> {
+    return pollSecuritySummary(() => this.getSecuritySummary(repoNames));
+  }
+
+  /** The per-version summary of an artifact, fetched again while a scan of one of its versions is unfinished. */
+  public watchVersionSecuritySummary(
+    repoName: string,
+    artifactName: string,
+  ): Observable<Record<string, VersionSecuritySummary>> {
+    return pollSecuritySummary(() => this.getVersionSecuritySummary(repoName, artifactName));
+  }
+
+  /** The per-artifact summary of a repository, fetched again while a scan of one of its artifacts is unfinished. */
+  public watchArtifactSecuritySummary(repoName: string): Observable<Record<string, VersionSecuritySummary>> {
+    return pollSecuritySummary(() => this.getArtifactSecuritySummary(repoName));
   }
 
   public getRepoSecurityDetail(repoName: string): Observable<RepoSecurityDetail> {

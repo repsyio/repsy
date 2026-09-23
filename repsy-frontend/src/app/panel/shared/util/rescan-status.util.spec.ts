@@ -16,6 +16,7 @@
 
 import { ScanStatus } from '../../../../generated/api';
 import {
+  firstScanTitle,
   hasRescanFailed,
   isRescanInProgress,
   recentScanNote,
@@ -68,6 +69,24 @@ describe('rescan status', () => {
     expect(recentScanNote(ScanStatus.Queued, false)).toBe('Queued...');
     expect(recentScanNote(ScanStatus.Running, false)).toBe('Scanning...');
     expect(recentScanNote(ScanStatus.Failed, false)).toBe('Failed');
+  });
+
+  describe('firstScanTitle', () => {
+    it('says the first scan is in progress while it is pending, queued or running', () => {
+      for (const status of [ScanStatus.Pending, ScanStatus.Queued, ScanStatus.Running]) {
+        expect(firstScanTitle(status)).toBe('The first scan is in progress.');
+      }
+    });
+
+    it('says the first scan failed', () => {
+      expect(firstScanTitle(ScanStatus.Failed)).toBe('The first scan failed.');
+    });
+
+    it('flags nothing for a completed or absent status', () => {
+      expect(firstScanTitle(ScanStatus.Completed)).toBe('');
+      expect(firstScanTitle(null)).toBe('');
+      expect(firstScanTitle(undefined)).toBe('');
+    });
   });
 
   describe('rescanCountsTitle', () => {

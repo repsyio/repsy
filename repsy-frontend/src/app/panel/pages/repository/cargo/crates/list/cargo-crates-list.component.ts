@@ -83,6 +83,7 @@ export class CargoCratesListComponent implements OnDestroy {
   public readonly username: string;
 
   private readonly repositoryChanges$: Subscription;
+  private securitySummarySubscription?: Subscription;
 
   constructor(
     private readonly authService: AuthService,
@@ -104,6 +105,7 @@ export class CargoCratesListComponent implements OnDestroy {
   }
   public ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
+    this.securitySummarySubscription?.unsubscribe();
   }
 
   public loadPage(pageNum: number): void {
@@ -182,11 +184,14 @@ export class CargoCratesListComponent implements OnDestroy {
   }
 
   private fetchSecuritySummary(): void {
-    this.securityService.getArtifactSecuritySummary(this.activeRepo.repoName).subscribe({
-      next: (summary) => {
-        this.securitySummary = summary;
-      },
-      error: () => {},
-    });
+    this.securitySummarySubscription?.unsubscribe();
+    this.securitySummarySubscription = this.securityService
+      .watchArtifactSecuritySummary(this.activeRepo.repoName)
+      .subscribe({
+        next: (summary) => {
+          this.securitySummary = summary;
+        },
+        error: () => {},
+      });
   }
 }

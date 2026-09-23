@@ -22,11 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import {
-  ReleaseListItem,
-  RepoPermissionInfo,
-  VersionSecuritySummary,
-} from '../../../../../../../generated/api';
+import { ReleaseListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -89,6 +85,7 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
   public readonly baseUrl: string;
   public readonly username: string;
   private readonly repositoryChanges$: Subscription;
+  private securitySummarySubscription?: Subscription;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -116,6 +113,7 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
 
   public ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
+    this.securitySummarySubscription?.unsubscribe();
   }
 
   public loadPage(pageNum: number): void {
@@ -196,11 +194,14 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
   }
 
   private fetchSecuritySummary(): void {
-    this.securityService.getVersionSecuritySummary(this.activeRepo.repoName, this.packageName).subscribe({
-      next: (summary) => {
-        this.securitySummary = summary;
-      },
-      error: () => {},
-    });
+    this.securitySummarySubscription?.unsubscribe();
+    this.securitySummarySubscription = this.securityService
+      .watchVersionSecuritySummary(this.activeRepo.repoName, this.packageName)
+      .subscribe({
+        next: (summary) => {
+          this.securitySummary = summary;
+        },
+        error: () => {},
+      });
   }
 }

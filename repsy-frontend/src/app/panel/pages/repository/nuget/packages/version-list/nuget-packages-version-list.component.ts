@@ -83,6 +83,7 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
     { name: 'Oldest', column: 'publishedAt', type: 'ASC' },
   ];
   private readonly repositoryChanges$: Subscription;
+  private securitySummarySubscription?: Subscription;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -108,6 +109,7 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
 
   public ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
+    this.securitySummarySubscription?.unsubscribe();
   }
 
   public sort(option: Sort): void {
@@ -184,11 +186,14 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
   }
 
   private fetchSecuritySummary(): void {
-    this.securityService.getVersionSecuritySummary(this.activeRepo.repoName, this.packageId).subscribe({
-      next: (summary) => {
-        this.securitySummary = summary;
-      },
-      error: () => {},
-    });
+    this.securitySummarySubscription?.unsubscribe();
+    this.securitySummarySubscription = this.securityService
+      .watchVersionSecuritySummary(this.activeRepo.repoName, this.packageId)
+      .subscribe({
+        next: (summary) => {
+          this.securitySummary = summary;
+        },
+        error: () => {},
+      });
   }
 }

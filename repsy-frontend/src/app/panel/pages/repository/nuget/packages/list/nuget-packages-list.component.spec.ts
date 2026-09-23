@@ -17,7 +17,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { fakeAsync, flushMicrotasks } from '@angular/core/testing';
 import moment from 'moment';
-import { BehaviorSubject, of, throwError } from 'rxjs';
+import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import { environment } from '../../../../../../../environments/environment';
 import { NuGetPackageListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
@@ -68,13 +68,13 @@ describe('NugetPackagesListComponent', () => {
     nugetService = jasmine.createSpyObj<NugetService>('NugetService', ['fetchRepositoryPackages', 'deletePackage'], {
       repoChanges,
     });
-    securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['getArtifactSecuritySummary']);
+    securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchArtifactSecuritySummary']);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModalService = new DangerModalService();
 
     nugetService.fetchRepositoryPackages.and.resolveTo(pageOf([item('Acme.Lib'), item('Acme.Web')], 3));
     nugetService.deletePackage.and.resolveTo(undefined);
-    securityService.getArtifactSecuritySummary.and.returnValue(of(SECURITY_SUMMARY));
+    securityService.watchArtifactSecuritySummary.and.returnValue(of(SECURITY_SUMMARY));
 
     component = new NugetPackagesListComponent(
       { username: 'alice' } as AuthService,
@@ -123,7 +123,7 @@ describe('NugetPackagesListComponent', () => {
     it('fetches the security summary of the repository', fakeAsync(() => {
       selectRepo();
 
-      expect(securityService.getArtifactSecuritySummary).toHaveBeenCalledOnceWith(REPO);
+      expect(securityService.watchArtifactSecuritySummary).toHaveBeenCalledOnceWith(REPO);
       expect(component.securitySummary).toEqual(SECURITY_SUMMARY);
     }));
 
@@ -140,7 +140,7 @@ describe('NugetPackagesListComponent', () => {
       selectRepo();
 
       expect(nugetService.fetchRepositoryPackages).toHaveBeenCalledTimes(2);
-      expect(securityService.getArtifactSecuritySummary).toHaveBeenCalledTimes(2);
+      expect(securityService.watchArtifactSecuritySummary).toHaveBeenCalledTimes(2);
     }));
 
     it('ignores an empty repository value', fakeAsync(() => {
@@ -174,7 +174,7 @@ describe('NugetPackagesListComponent', () => {
     }));
 
     it('keeps the previous security summary when it cannot be loaded', fakeAsync(() => {
-      securityService.getArtifactSecuritySummary.and.returnValue(throwError(() => new Error('boom')));
+      securityService.watchArtifactSecuritySummary.and.returnValue(throwError(() => new Error('boom')));
 
       selectRepo();
 
@@ -312,7 +312,44 @@ describe('NugetPackagesListComponent', () => {
       selectRepo();
 
       expect(nugetService.fetchRepositoryPackages).not.toHaveBeenCalled();
-      expect(securityService.getArtifactSecuritySummary).not.toHaveBeenCalled();
+      expect(securityService.watchArtifactSecuritySummary).not.toHaveBeenCalled();
+    }));
+
+    it('stops watching the security summary', fakeAsync(() => {
+      const watched = new Subject<Record<string, VersionSecuritySummary>>();
+      securityService.watchArtifactSecuritySummary.and.returnValue(watched);
+      selectRepo();
+      expect(watched.observed).toBeTrue();
+
+      component.ngOnDestroy();
+
+      expect(watched.observed).toBeFalse();
+    }));
+  });
+
+  describe('watching the security summary', () => {
+    it('shows every summary the watch emits', fakeAsync(() => {
+      const watched = new Subject<Record<string, VersionSecuritySummary>>();
+      securityService.watchArtifactSecuritySummary.and.returnValue(watched);
+      selectRepo();
+      const scanning = { 'Acme.Lib': { scanned: false, findingCount: 0 } as VersionSecuritySummary };
+
+      watched.next(scanning);
+      expect(component.securitySummary).toEqual(scanning);
+      watched.next(SECURITY_SUMMARY);
+      expect(component.securitySummary).toEqual(SECURITY_SUMMARY);
+    }));
+
+    it('drops the earlier watch when the summary is fetched again', fakeAsync(() => {
+      const first = new Subject<Record<string, VersionSecuritySummary>>();
+      const second = new Subject<Record<string, VersionSecuritySummary>>();
+      securityService.watchArtifactSecuritySummary.and.returnValues(first, second);
+
+      selectRepo();
+      selectRepo();
+
+      expect(first.observed).toBeFalse();
+      expect(second.observed).toBeTrue();
     }));
   });
 });

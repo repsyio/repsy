@@ -15,16 +15,13 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
+import { Subscription } from 'rxjs';
 import { finalize, map } from 'rxjs/operators';
 
-import {
-  ProtocolRepoControllerService,
-  RepoSecuritySummary,
-  RepoType as ApiRepoType,
-} from '../../../../generated/api';
+import { ProtocolRepoControllerService, RepoSecuritySummary, RepoType as ApiRepoType } from '../../../../generated/api';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../shared/components/ellipsis/ellipsis.pipe';
@@ -63,7 +60,7 @@ import { SecurityService } from '../security/service/security.service';
   ],
   templateUrl: './repository.component.html',
 })
-export class RepositoryComponent {
+export class RepositoryComponent implements OnDestroy {
   public pageNum = 0;
   public pageSize = 10;
   public repositories: RepoListItem[] = [];
@@ -91,6 +88,7 @@ export class RepositoryComponent {
   public securitySummary: Record<string, RepoSecuritySummary> = {};
 
   private pendingRepoFetches = 0;
+  private securitySummarySubscription?: Subscription;
 
   constructor(
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
@@ -107,6 +105,10 @@ export class RepositoryComponent {
 
     this.loadUserRole();
     this.filterRepos(this.repoOption);
+  }
+
+  public ngOnDestroy(): void {
+    this.securitySummarySubscription?.unsubscribe();
   }
 
   public loadPage(pageNum: number): void {
@@ -141,6 +143,7 @@ export class RepositoryComponent {
     this.repositories = [];
     this.filteredRepos = [];
     this.securitySummary = {};
+    this.securitySummarySubscription?.unsubscribe();
 
     this.loadAllRepos(option);
   }
@@ -220,16 +223,15 @@ export class RepositoryComponent {
       });
   }
 
-
-
-
   private fetchSecuritySummary(): void {
+    this.securitySummarySubscription?.unsubscribe();
+
     const repoNames = this.repositories.map((repo) => repo.name);
     if (repoNames.length === 0) {
       return;
     }
 
-    this.securityService.getSecuritySummary(repoNames).subscribe({
+    this.securitySummarySubscription = this.securityService.watchSecuritySummary(repoNames).subscribe({
       next: (summary) => {
         this.securitySummary = summary;
       },

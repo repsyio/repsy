@@ -82,6 +82,7 @@ export class NpmPackagesListComponent implements OnDestroy {
 
   public readonly username: string;
   private readonly registryChanges$: Subscription;
+  private securitySummarySubscription?: Subscription;
 
   constructor(
     private readonly npmService: NpmService,
@@ -105,6 +106,7 @@ export class NpmPackagesListComponent implements OnDestroy {
 
   public ngOnDestroy(): void {
     this.registryChanges$.unsubscribe();
+    this.securitySummarySubscription?.unsubscribe();
   }
 
   public loadPage(pageNum: number): void {
@@ -190,11 +192,14 @@ export class NpmPackagesListComponent implements OnDestroy {
   }
 
   private fetchSecuritySummary(): void {
-    this.securityService.getArtifactSecuritySummary(this.activeRegistry.repoName).subscribe({
-      next: (summary) => {
-        this.securitySummary = summary;
-      },
-      error: () => {},
-    });
+    this.securitySummarySubscription?.unsubscribe();
+    this.securitySummarySubscription = this.securityService
+      .watchArtifactSecuritySummary(this.activeRegistry.repoName)
+      .subscribe({
+        next: (summary) => {
+          this.securitySummary = summary;
+        },
+        error: () => {},
+      });
   }
 }
