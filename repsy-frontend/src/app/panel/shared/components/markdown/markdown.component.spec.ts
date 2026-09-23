@@ -53,6 +53,42 @@ describe('MarkdownComponent', () => {
     expect(link?.getAttribute('target')).toBe('_blank');
   });
 
+  it('renders an image', () => {
+    const el = render('![Repsy logo](data:image/gif;base64,R0lGODlhAQABAAAAACw=)');
+
+    expect(el.querySelector('img')?.getAttribute('src')).toBe('data:image/gif;base64,R0lGODlhAQABAAAAACw=');
+    expect(el.querySelector('img')?.getAttribute('alt')).toBe('Repsy logo');
+  });
+
+  it('renders GFM strikethrough', () => {
+    const el = render('~~deprecated~~ still here');
+
+    expect(el.querySelector('del')?.textContent).toBe('deprecated');
+  });
+
+  it('highlights a fenced code block with a known language', () => {
+    const el = render('```js\nconst x = 1;\n```\n');
+
+    const code = el.querySelector('pre code');
+    expect(code?.classList.contains('hljs')).toBeTrue();
+    expect(code?.classList.contains('language-js')).toBeTrue();
+    expect(code?.querySelector('[class^="hljs-"]')).not.toBeNull();
+  });
+
+  it('renders a large, pathological README within a time budget (anti-ReDoS regression)', () => {
+    // showdown's link/anchor handling (CVE-2024-1899, Dependabot alert 57) could hang the tab on a
+    // crafted README. This repeats link-like, unbalanced bracket sequences at scale alongside a
+    // large body of ordinary content; marked must not exhibit the same catastrophic backtracking.
+    const pathological = '[!['.repeat(20000) + '\n\n' + '# Heading\n\nSome ordinary paragraph text.\n\n'.repeat(2000);
+
+    const start = performance.now();
+    const el = render(pathological);
+    const elapsed = performance.now() - start;
+
+    expect(elapsed).toBeLessThan(5000);
+    expect(el.querySelectorAll('h1').length).toBeGreaterThan(0);
+  });
+
   it('strips script elements', () => {
     const el = render('Hello\n\n<script>window.__pwned = true</script>\n');
 
