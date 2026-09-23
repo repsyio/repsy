@@ -57,7 +57,9 @@ public class PackageVersion {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private NpmPackage npmPackage;
 
-  @Column(name = "version", nullable = false, length = NpmPublishLimits.MAX_VERSION_LENGTH)
+  // The column is varchar(255); a publish is held to the stricter
+  // NpmPublishLimits.MAX_VERSION_LENGTH.
+  @Column(name = "version", nullable = false, length = 255)
   private String version;
 
   @Column(name = "author_name", length = NpmPublishLimits.MAX_AUTHOR_NAME_LENGTH)
@@ -75,7 +77,7 @@ public class PackageVersion {
   @Column(name = "bugs_email", length = NpmPublishLimits.MAX_BUGS_EMAIL_LENGTH)
   private String bugsEmail;
 
-  @Column(name = "description")
+  @Column(name = "description", columnDefinition = "text")
   private String description;
 
   @Column(name = "homepage", length = NpmPublishLimits.MAX_HOMEPAGE_LENGTH)
@@ -93,7 +95,7 @@ public class PackageVersion {
   @Column(name = "deprecated")
   private boolean deprecated;
 
-  @Column(name = "deprecation_message")
+  @Column(name = "deprecation_message", columnDefinition = "text")
   private String deprecationMessage;
 
   @CreationTimestamp

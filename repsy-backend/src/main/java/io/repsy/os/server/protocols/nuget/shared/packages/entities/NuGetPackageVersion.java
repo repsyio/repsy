@@ -74,7 +74,7 @@ public class NuGetPackageVersion {
   private String title;
 
   @Nullable
-  @Column(name = "description", columnDefinition = "clob")
+  @Column(name = "description", columnDefinition = "text")
   private String description;
 
   // text in PostgreSQL and clob in H2: unbounded, and nothing cuts it before it is stored.
@@ -103,7 +103,7 @@ public class NuGetPackageVersion {
   private String repositoryUrl;
 
   @Nullable
-  @Column(name = "readme", columnDefinition = "clob")
+  @Column(name = "readme", columnDefinition = "text")
   private String readme;
 
   @Nullable

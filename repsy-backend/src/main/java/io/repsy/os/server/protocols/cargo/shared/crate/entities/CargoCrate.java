@@ -77,7 +77,7 @@ public class CargoCrate {
   private boolean hasLib;
 
   @Nullable
-  @Column(name = "description")
+  @Column(name = "description", columnDefinition = "text")
   private String description;
 
   @Nullable

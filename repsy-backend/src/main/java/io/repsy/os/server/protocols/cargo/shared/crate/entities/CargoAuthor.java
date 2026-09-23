@@ -44,7 +44,7 @@ public class CargoAuthor {
   private UUID id;
 
   // text in PostgreSQL, varchar(255) in H2: no length is stated, see CrateUtils.MAX_AUTHOR_LENGTH.
-  @Column(name = "author", nullable = false, unique = true)
+  @Column(name = "author", nullable = false, unique = true, columnDefinition = "text")
   private String author;
 
   @ManyToMany(mappedBy = "authors")

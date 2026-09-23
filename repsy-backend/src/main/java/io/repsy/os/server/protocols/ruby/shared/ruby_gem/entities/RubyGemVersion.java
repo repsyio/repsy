@@ -70,7 +70,7 @@ public class RubyGemVersion {
   @Column(name = "authors", length = GemspecParser.MAX_AUTHORS_LENGTH)
   private @Nullable String authors;
 
-  @Column(name = "description", columnDefinition = "TEXT")
+  @Column(name = "description", columnDefinition = "text")
   private @Nullable String description;
 
   @Column(name = "homepage", length = GemspecParser.MAX_HOMEPAGE_LENGTH)

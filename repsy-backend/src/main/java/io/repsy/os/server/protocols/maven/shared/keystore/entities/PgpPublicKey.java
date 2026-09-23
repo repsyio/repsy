@@ -60,7 +60,7 @@ public class PgpPublicKey {
   @Column(name = "key_id", nullable = false, length = 16)
   private String keyId;
 
-  @Column(name = "fingerprint", length = 64)
+  @Column(name = "fingerprint", nullable = false, length = 64)
   private String fingerprint;
 
   @Column(name = "user_id")

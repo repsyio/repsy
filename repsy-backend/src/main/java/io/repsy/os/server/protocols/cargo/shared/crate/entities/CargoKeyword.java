@@ -43,7 +43,7 @@ public class CargoKeyword {
   @Column(name = "id", columnDefinition = "uuid", nullable = false)
   private UUID id;
 
-  @Column(name = "keyword", nullable = false, unique = true)
+  @Column(name = "keyword", nullable = false, unique = true, columnDefinition = "text")
   private String keyword;
 
   @ManyToMany(mappedBy = "keywords")

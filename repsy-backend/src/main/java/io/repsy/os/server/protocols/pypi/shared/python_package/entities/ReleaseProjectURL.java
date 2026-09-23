@@ -53,6 +53,6 @@ public class ReleaseProjectURL {
   private String label;
 
   // Unbounded (text) in both PostgreSQL and H2, so no length guard applies (RPS-1137).
-  @Column(name = "url", nullable = false)
+  @Column(name = "url", nullable = false, columnDefinition = "text")
   private String url;
 }

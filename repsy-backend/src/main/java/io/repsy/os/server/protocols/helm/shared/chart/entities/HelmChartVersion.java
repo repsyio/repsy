@@ -68,7 +68,7 @@ public class HelmChartVersion {
   @Column(name = "version", nullable = false, length = HelmConstants.MAX_CHART_VERSION_LENGTH)
   private String version;
 
-  @Column(name = "description")
+  @Column(name = "description", columnDefinition = "text")
   private @Nullable String description;
 
   @Column(name = "app_version", length = HelmConstants.MAX_CHART_APP_VERSION_LENGTH)
