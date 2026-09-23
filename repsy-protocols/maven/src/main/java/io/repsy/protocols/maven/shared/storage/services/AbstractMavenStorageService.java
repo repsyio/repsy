@@ -62,6 +62,18 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
   private static final String METADATA_FILENAME = "maven-metadata.xml";
   private static final String ERR_ITEM_NOT_FOUND = "itemNotFound";
 
+  /**
+   * A stored {@code maven-metadata.xml.asc} and its own checksum siblings, in the order they are
+   * checked for and deleted when the metadata they sign is rewritten (RPS-1197).
+   */
+  private static final List<String> METADATA_SIGNATURE_FAMILY =
+      List.of(
+          METADATA_FILENAME + ".asc",
+          METADATA_FILENAME + ".asc.md5",
+          METADATA_FILENAME + ".asc.sha1",
+          METADATA_FILENAME + ".asc.sha256",
+          METADATA_FILENAME + ".asc.sha512");
+
   private final Configuration freeMarkerConfiguration;
   private final StorageStrategy storageStrategy;
 
@@ -179,6 +191,14 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
 
     final var versionPath = this.getPath(groupId, artifactId, versionName);
     final var storagePath = StoragePath.of(repoUuid, versionPath.toString());
+
+    if (!this.directoryExists(storagePath)) {
+      // An earlier partial delete or a manual cleanup can leave the DB row without a directory.
+      // Treat the delete as already done instead of failing on Files.move's NoSuchFileException;
+      // the caller still deletes the row and rewrites the metadata (RPS-1190).
+      return 0L;
+    }
+
     final var usage = this.storageStrategy.calculatePathUsage(storagePath);
 
     this.storageStrategy.deleteDirectory(storagePath);
@@ -186,36 +206,90 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
     return usage;
   }
 
+  private boolean directoryExists(final StoragePath storagePath) {
+
+    try {
+      this.storageStrategy.listDirectoryContents(storagePath);
+      return true;
+    } catch (final ItemNotFoundException e) {
+      return false;
+    }
+  }
+
+  /**
+   * Deletes only {@code artifactNames}' own {@code g/a} directories and this group's own
+   * group-level metadata files, then prunes this group's directory and any now-empty ancestor.
+   *
+   * <p>Let's say our package is {@code io.repsy.test}; the folder structure is
+   *
+   * <pre>
+   * - io
+   *   - fria
+   *     - ...
+   *   - repsy
+   *     - test
+   *       - ...
+   * </pre>
+   *
+   * Deleting only the artifact directories registered under {@code io/repsy/test} (never the whole
+   * {@code io/repsy/test} directory outright) keeps a nested or sibling group that shares the path
+   * prefix — for example {@code io.repsy.test.sub} — untouched even though its own directory sits
+   * inside this one (RPS-1190).
+   */
   @Override
-  public long deleteGroup(final UUID repoUuid, final String groupId) {
+  public long deleteGroup(
+      final UUID repoUuid, final String groupId, final List<String> artifactNames) {
 
     final var groupPaths = this.getPath(groupId);
-    final var storagePath = StoragePath.of(repoUuid, groupPaths[0].toString());
-    final var usage = this.storageStrategy.calculatePathUsage(storagePath);
+    final var groupPath = groupPaths[0];
 
-    // Let's say our package is io.repsy.test the folder structure is
-    // - io
-    //   - fria
-    //     - ...
-    //   - repsy
-    //     - test
-    //       - ...
-    // deleting /io/repsy/test is safe
+    var usage = this.deleteGroupLevelMetadataFiles(repoUuid, groupPath);
 
-    this.storageStrategy.deleteDirectory(storagePath);
+    for (final var artifactName : artifactNames) {
+      final var artifactStoragePath =
+          StoragePath.of(repoUuid, groupPath.resolve(artifactName).normalize().toString());
 
-    // index started from 1, because we already deleted the first path
-    for (int i = 1; i < groupPaths.length; i++) {
-      final var sp = StoragePath.of(repoUuid, groupPaths[i] + "/");
+      usage += this.storageStrategy.calculatePathUsage(artifactStoragePath);
+      this.storageStrategy.deleteDirectory(artifactStoragePath);
+    }
 
-      final var dirCount =
-          this.storageStrategy.listDirectoryContents(sp).stream()
-              .filter(StorageItemInfo::isDirectory)
-              .count();
+    // Prune this group's own directory and its now-empty ancestors, stopping at the first one that
+    // still has content — a nested sibling group's directory, or anything else this group's
+    // deletion has no business touching.
+    for (final var path : groupPaths) {
+      final var sp = StoragePath.of(repoUuid, path + "/");
 
-      if (dirCount == 0) {
-        this.storageStrategy.deleteDirectory(sp);
+      if (!this.storageStrategy.listDirectoryContents(sp).isEmpty()) {
+        break;
       }
+
+      this.storageStrategy.deleteDirectory(sp);
+    }
+
+    return usage;
+  }
+
+  /**
+   * Deletes a group-level {@code maven-metadata.xml} (a plugin-group listing) and its checksum
+   * siblings, if present directly in the group's own directory. Never looks inside a subdirectory,
+   * so an artifact's or a nested group's files are never considered here.
+   */
+  private long deleteGroupLevelMetadataFiles(final UUID repoUuid, final Path groupPath) {
+
+    final var groupStoragePath = StoragePath.of(repoUuid, groupPath + "/");
+
+    var usage = 0L;
+
+    for (final var item : this.storageStrategy.listDirectoryContents(groupStoragePath)) {
+      if (item.isDirectory() || !item.getName().startsWith(METADATA_FILENAME)) {
+        continue;
+      }
+
+      final var itemStoragePath =
+          StoragePath.of(repoUuid, groupPath.resolve(item.getName()).toString());
+
+      usage += item.getSize() == null ? 0L : item.getSize();
+      this.storageStrategy.delete(itemStoragePath);
     }
 
     return usage;
@@ -334,7 +408,52 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
 
       this.updateChecksumsOfMetadata(metadataStoragePath, artifactBasePath, repoName);
 
-      return usages;
+      // A stored maven-metadata.xml.asc signs the file this rewrite just replaced, so it no
+      // longer verifies; there is no way to re-sign it here. Delete it and its own checksum
+      // siblings rather than leave a signature that silently fails to verify (RPS-1197).
+      final var deletedSignatureBytes =
+          this.deleteStaleMetadataSignature(
+              Objects.requireNonNull(metadataStoragePath.getStorageKey()),
+              artifactBasePath,
+              repoName);
+
+      return BaseUsages.builder().diskUsage(usages.getDiskUsage() - deletedSignatureBytes).build();
+    }
+  }
+
+  /**
+   * Deletes a stored {@code maven-metadata.xml.asc} and its checksum siblings ({@code
+   * .asc.md5}/{@code .asc.sha1}/{@code .asc.sha256}/{@code .asc.sha512}) if present, after the
+   * metadata they sign was rewritten. Returns the total bytes freed, folded into the caller's usage
+   * delta (subtracted, same sign convention as the metadata rewrite itself).
+   */
+  private long deleteStaleMetadataSignature(
+      final UUID repoUuid, final Path artifactBasePath, final String repoName) {
+
+    var freedBytes = 0L;
+
+    for (final var fileName : METADATA_SIGNATURE_FAMILY) {
+      final var storagePath =
+          StoragePath.of(repoUuid, artifactBasePath.resolve(fileName).toString());
+
+      final var optionalResource = this.storageStrategy.get(storagePath, repoName);
+
+      if (optionalResource.isEmpty() || !optionalResource.get().exists()) {
+        continue;
+      }
+
+      freedBytes += this.contentLengthQuietly(optionalResource.get());
+      this.storageStrategy.delete(storagePath);
+    }
+
+    return freedBytes;
+  }
+
+  private long contentLengthQuietly(final Resource resource) {
+    try {
+      return resource.contentLength();
+    } catch (final IOException e) {
+      return 0L;
     }
   }
 

@@ -51,6 +51,13 @@ public class ArtifactDeletionComponent {
       final String versionName)
       throws IOException, XmlPullParserException {
 
+    // Confirms the requested version is real before any storage or DB mutation runs. Without this
+    // check, a version name that does not exist on an artifact that has exactly one real version
+    // reached hasOnlyOneVersion() as true and cascaded into deleteArtifact() (and potentially
+    // deleteGroup()), deleting the whole artifact instead of answering 404 (RPS-1190).
+    this.artifactService.requireArtifactVersion(
+        repoInfo.getStorageKey(), groupName, artifactName, versionName);
+
     if (this.artifactService.hasOnlyOneVersion(repoInfo.getStorageKey(), groupName, artifactName)) {
       // deleteArtifact() (and whatever it delegates to, e.g. deleteGroup()) publishes
       // ArtifactVersionDeletedEvent for every version it removes, which at this point is only
@@ -118,8 +125,13 @@ public class ArtifactDeletionComponent {
     final var artifacts = this.artifactService.getArtifacts(repoInfo.getStorageKey(), groupName);
     final var versionNamesByArtifact =
         this.collectVersionNamesByArtifact(repoInfo, groupName, artifacts);
+    final var artifactNames = artifacts.stream().map(Artifact::getArtifactName).toList();
 
-    final long usage = this.mavenStorageService.deleteGroup(repoInfo.getStorageKey(), groupName);
+    // Storage only removes this group's own artifact directories and group-level metadata files,
+    // never the whole group directory: a subdirectory belonging to a nested sibling group (e.g.
+    // com.acme.sub next to com.acme) must survive (RPS-1190).
+    final long usage =
+        this.mavenStorageService.deleteGroup(repoInfo.getStorageKey(), groupName, artifactNames);
 
     final BaseUsages usages = BaseUsages.builder().diskUsage(usage * -1L).build();
 

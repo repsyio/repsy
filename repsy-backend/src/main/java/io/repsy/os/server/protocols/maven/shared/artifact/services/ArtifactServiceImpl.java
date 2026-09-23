@@ -272,6 +272,32 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     return StoragePath.of(signedStoragePath.getStorageKey(), nonSignedFileName);
   }
 
+  /**
+   * Confirms the artifact and the version exist, without mutating anything. Called before any
+   * storage or DB deletion runs so a version name that does not exist fails with a 404 instead of
+   * being reached only after {@code hasOnlyOneVersion} has already routed the request into
+   * cascading deletes (RPS-1190).
+   *
+   * @throws ItemNotFoundException {@code artifactNotFound} or {@code artifactVersionNotFound}
+   */
+  public void requireArtifactVersion(
+      final UUID repoId,
+      final String groupName,
+      final String artifactName,
+      final String versionName) {
+
+    final var artifact =
+        this.artifactRepository
+            .findByRepoIdAndGroupNameAndArtifactName(repoId, groupName, artifactName)
+            .orElseThrow(() -> new ItemNotFoundException(ERR_ARTIFACT_NOT_FOUND));
+
+    if (this.artifactVersionRepository
+        .findByArtifactIdAndVersionName(artifact.getId(), versionName)
+        .isEmpty()) {
+      throw new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND);
+    }
+  }
+
   @Transactional
   public void deleteArtifact(final UUID repoId, final String groupName, final String artifactName) {
 
