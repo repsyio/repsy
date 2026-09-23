@@ -274,8 +274,6 @@ test.describe('helm registry rules (raw HTTP)', () => {
     await seeder.setSettings(layout.repoName, {
       privateRepo: true,
       allowOverride: false,
-      releases: true,
-      snapshots: true,
     });
 
     const second = await buildChart({ name: layout.chart, version: '0.1.0', marker: 'r5-v2' });

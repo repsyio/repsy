@@ -202,8 +202,6 @@ test.describe('golang registry rules (raw HTTP)', () => {
         await seeder.setSettings(layout.repoName, {
           privateRepo: true,
           allowOverride,
-          releases: true,
-          snapshots: true,
         });
         const admin = adminCredential();
 
@@ -555,16 +553,14 @@ test.describe('golang registry rules (raw HTTP)', () => {
   );
 
   test(
-    'releases/snapshots repo settings are never read: a module publishes regardless of either ' +
-      'switch (R16)',
+    'releases/snapshots are not go repo settings (the settings PUT refuses them, RPS-1210): a ' +
+      'module publishes regardless of version kind (R16)',
     { tag: ['@settings'] },
     async ({ seeder }) => {
       const repo = await seeder.createRepo(RepoType.GOLANG, { privateRepo: true });
       await seeder.setSettings(repo.name, {
         privateRepo: true,
         allowOverride: true,
-        releases: false,
-        snapshots: false,
       });
       const admin = adminCredential();
       const modulePath = `${MODULE_DOMAIN}/e2e-${seeder.runId}-norulesetting`;

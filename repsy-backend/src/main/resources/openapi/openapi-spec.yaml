@@ -3397,13 +3397,15 @@ components:
           type: boolean
           nullable: false
           description: >-
-            Maven only. When false, uploads of release versions are refused, including redeploys of
+            Maven and NuGet only; rejected with 400 releasesSnapshotsUnsupported for any other repo
+            type. When false, uploads of release versions are refused, including redeploys of
             release versions that already exist.
         snapshots:
           type: boolean
           nullable: false
           description: >-
-            Maven only. When false, uploads of snapshot versions are refused, including redeploys of
+            Maven and NuGet only; rejected with 400 releasesSnapshotsUnsupported for any other repo
+            type. When false, uploads of snapshot versions are refused, including redeploys of
             snapshot versions that already exist.
         securityScanEnabled:
           type: boolean
@@ -3854,13 +3856,13 @@ components:
         releases:
           type: boolean
           description: >-
-            Maven only. When false, uploads of release versions are refused, including redeploys of
-            release versions that already exist.
+            Maven and NuGet only; omitted for any other repo type. When false, uploads of release
+            versions are refused, including redeploys of release versions that already exist.
         snapshots:
           type: boolean
           description: >-
-            Maven only. When false, uploads of snapshot versions are refused, including redeploys of
-            snapshot versions that already exist.
+            Maven and NuGet only; omitted for any other repo type. When false, uploads of snapshot
+            versions are refused, including redeploys of snapshot versions that already exist.
         allowOverride:
           type: boolean
           nullable: false

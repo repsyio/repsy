@@ -1481,6 +1481,25 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     private static final List<String> SETTINGS_FIELDS =
         List.of("privateRepo", "allowOverride", "releases", "snapshots", "securityScanEnabled");
 
+    /**
+     * {@link #SETTINGS_KEYS} without {@code releases}/{@code snapshots}: what GET returns for a
+     * repo type whose publish path does not consult them (RPS-1210).
+     */
+    private static final String[] SETTINGS_KEYS_WITHOUT_RELEASES_SNAPSHOTS = {
+      "privateRepo", "allowOverride", "searchable", "securityScanEnabled"
+    };
+
+    /** Repo types other than Maven and NuGet, whose publish path never reads releases/snapshots. */
+    private static final List<RepoType> RELEASES_SNAPSHOTS_UNSUPPORTED_TYPES =
+        List.of(
+            RepoType.NPM,
+            RepoType.PYPI,
+            RepoType.DOCKER,
+            RepoType.CARGO,
+            RepoType.GOLANG,
+            RepoType.HELM,
+            RepoType.RUBY);
+
     private Map<String, Object> settingsOf(final Repo repo) throws Exception {
       return dataObject(
           expectSuccess(
@@ -1516,14 +1535,16 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns the settings of a private repo of any type")
+    @DisplayName(
+        "returns the settings of a private repo of any type, omitting releases/snapshots for a"
+            + " type that does not support them (RPS-1210)")
     void privateNonMavenRepo() throws Exception {
       final var repo =
           ProtocolRepoControllerIT.this.seedRepo(
               RepoType.DOCKER, uniqueRepoName("dkr"), true, null);
 
       assertThat(this.settingsOf(repo))
-          .containsOnlyKeys(SETTINGS_KEYS)
+          .containsOnlyKeys(SETTINGS_KEYS_WITHOUT_RELEASES_SNAPSHOTS)
           .containsEntry("privateRepo", true)
           .containsEntry("securityScanEnabled", true);
     }
@@ -1679,31 +1700,111 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("a partial PUT on a non-Maven repo leaves its creation defaults untouched")
+    @DisplayName(
+        "a partial PUT on a non-Maven/NuGet repo leaves its creation defaults untouched, and GET"
+            + " omits releases/snapshots although the row still carries their creation defaults"
+            + " (RPS-1210)")
     void partialPutOnNonMavenRepo() throws Exception {
       final var repo =
           ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("npmset"));
       assertThat(this.settingsOf(repo))
+          .doesNotContainKeys("releases", "snapshots")
           .containsEntry("privateRepo", false)
           .containsEntry("allowOverride", true)
-          .containsEntry("releases", true)
-          .containsEntry("snapshots", true)
           .containsEntry("securityScanEnabled", true);
 
       this.updateSettings(repo, "{\"securityScanEnabled\":false}");
 
       assertThat(this.settingsOf(repo))
+          .doesNotContainKeys("releases", "snapshots")
           .containsEntry("privateRepo", false)
           .containsEntry("allowOverride", true)
-          .containsEntry("releases", true)
-          .containsEntry("snapshots", true)
           .containsEntry("securityScanEnabled", false);
       final var row = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
       assertThat(row.isPrivateRepo()).isFalse();
       assertThat(row.isAllowOverride()).isTrue();
+      // Still true from createRepo's defaults: this endpoint never touched them, and the row keeps
+      // them even though the type does not expose them through settings any more.
       assertThat(row.getReleases()).isTrue();
       assertThat(row.getSnapshots()).isTrue();
       assertThat(row.isSecurityScanEnabled()).isFalse();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"NPM", "PYPI", "DOCKER", "CARGO", "GOLANG", "HELM", "RUBY"})
+    @DisplayName(
+        "PUT rejects releases/snapshots with 400 releasesSnapshotsUnsupported for a repo type"
+            + " whose publish path does not consult them, and changes nothing (RPS-1210)")
+    void rejectsReleasesSnapshotsForUnsupportedType(final RepoType repoType) throws Exception {
+      final var repo = ProtocolRepoControllerIT.this.seedRepo(repoType, uniqueRepoName("scoped"));
+      final var before = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
+
+      expectError(
+          ProtocolRepoControllerIT.this.perform(
+              json(put(repoUrl(repo, "/settings")), "{\"releases\":false}")
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
+          HttpStatus.BAD_REQUEST,
+          "releasesSnapshotsUnsupported",
+          "releasesSnapshotsUnsupported",
+          "The releases and snapshots settings only apply to Maven and NuGet repositories.");
+
+      expectError(
+          ProtocolRepoControllerIT.this.perform(
+              json(put(repoUrl(repo, "/settings")), "{\"snapshots\":false}")
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
+          HttpStatus.BAD_REQUEST,
+          "releasesSnapshotsUnsupported",
+          "releasesSnapshotsUnsupported",
+          "The releases and snapshots settings only apply to Maven and NuGet repositories.");
+
+      assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName())).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName(
+        "a PUT that changes another field alongside a rejected releases/snapshots field changes"
+            + " nothing at all (RPS-1210)")
+    void rejectedReleasesSnapshotsFieldBlocksTheWholeUpdate() throws Exception {
+      final var repo =
+          ProtocolRepoControllerIT.this.seedRepo(RepoType.NPM, uniqueRepoName("scopedall"));
+      final var before = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
+
+      expectError(
+          ProtocolRepoControllerIT.this.perform(
+              json(
+                      put(repoUrl(repo, "/settings")),
+                      "{\"securityScanEnabled\":false,\"releases\":false}")
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())),
+          HttpStatus.BAD_REQUEST,
+          "releasesSnapshotsUnsupported",
+          "releasesSnapshotsUnsupported",
+          "The releases and snapshots settings only apply to Maven and NuGet repositories.");
+
+      assertThat(ProtocolRepoControllerIT.this.reloadRepo(repo.getName())).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName(
+        "NuGet, like Maven, exposes and accepts releases/snapshots through settings (RPS-1210)")
+    void nuGetSupportsReleasesSnapshots() throws Exception {
+      final var repo =
+          ProtocolRepoControllerIT.this.seedRepo(RepoType.NUGET, uniqueRepoName("nugetset"));
+
+      assertThat(this.settingsOf(repo))
+          .containsOnlyKeys(SETTINGS_KEYS)
+          .containsEntry("releases", true)
+          .containsEntry("snapshots", true);
+
+      this.updateSettings(repo, "{\"releases\":false,\"snapshots\":false}");
+
+      assertThat(this.settingsOf(repo))
+          .containsEntry("releases", false)
+          .containsEntry("snapshots", false);
+      final var row = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
+      assertThat(row.getReleases()).isFalse();
+      assertThat(row.getSnapshots()).isFalse();
     }
 
     @Test

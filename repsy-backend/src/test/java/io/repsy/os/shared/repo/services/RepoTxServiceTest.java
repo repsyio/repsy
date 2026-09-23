@@ -15,6 +15,7 @@
  */
 package io.repsy.os.shared.repo.services;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -25,18 +26,22 @@ import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
+import io.repsy.os.generated.model.RepoSettingsForm;
+import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.mappers.RepoConverter;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.sql.SQLException;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -157,6 +162,192 @@ class RepoTxServiceTest {
           .hasMessage("repoExists");
 
       verify(RepoTxServiceTest.this.repoRepository, never()).save(any(Repo.class));
+    }
+  }
+
+  /**
+   * RPS-1210: {@code releases}/{@code snapshots} only apply where the publish path actually reads
+   * them (Maven and NuGet). Deterministic coverage of the rejection, without needing Postgres.
+   */
+  @Nested
+  @DisplayName("updateSettings")
+  class UpdateSettings {
+
+    private static Repo repoOfType(final RepoType type) {
+      final var repo = new Repo();
+      repo.setId(UUID.randomUUID());
+      repo.setType(type);
+      repo.setPrivateRepo(false);
+      repo.setAllowOverride(true);
+      repo.setReleases(true);
+      repo.setSnapshots(true);
+      repo.setSecurityScanEnabled(true);
+      return repo;
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"NPM", "PYPI", "DOCKER", "CARGO", "GOLANG", "HELM", "RUBY"})
+    @DisplayName("rejects a releases change for a type whose publish path never reads it")
+    void rejectsReleasesForUnsupportedType(final RepoType type) {
+      final var repo = repoOfType(type);
+      when(RepoTxServiceTest.this.repoRepository.findById(repo.getId()))
+          .thenReturn(Optional.of(repo));
+
+      final var settings = RepoSettingsForm.builder().releases(false).build();
+
+      assertThatThrownBy(
+              () -> RepoTxServiceTest.this.service.updateSettings(repo.getId(), settings))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("releasesSnapshotsUnsupported");
+
+      verify(RepoTxServiceTest.this.repoRepository, never()).save(any(Repo.class));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"NPM", "PYPI", "DOCKER", "CARGO", "GOLANG", "HELM", "RUBY"})
+    @DisplayName("rejects a snapshots change for a type whose publish path never reads it")
+    void rejectsSnapshotsForUnsupportedType(final RepoType type) {
+      final var repo = repoOfType(type);
+      when(RepoTxServiceTest.this.repoRepository.findById(repo.getId()))
+          .thenReturn(Optional.of(repo));
+
+      final var settings = RepoSettingsForm.builder().snapshots(false).build();
+
+      assertThatThrownBy(
+              () -> RepoTxServiceTest.this.service.updateSettings(repo.getId(), settings))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("releasesSnapshotsUnsupported");
+
+      verify(RepoTxServiceTest.this.repoRepository, never()).save(any(Repo.class));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"MAVEN", "NUGET"})
+    @DisplayName("applies releases/snapshots for a type whose publish path reads them")
+    void appliesReleasesSnapshotsForSupportedType(final RepoType type) {
+      final var repo = repoOfType(type);
+      when(RepoTxServiceTest.this.repoRepository.findById(repo.getId()))
+          .thenReturn(Optional.of(repo));
+
+      final var settings = RepoSettingsForm.builder().releases(false).snapshots(false).build();
+
+      RepoTxServiceTest.this.service.updateSettings(repo.getId(), settings);
+
+      assertThat(repo.getReleases()).isFalse();
+      assertThat(repo.getSnapshots()).isFalse();
+      verify(RepoTxServiceTest.this.repoRepository).save(repo);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"NPM", "PYPI", "DOCKER", "CARGO", "GOLANG", "HELM", "RUBY"})
+    @DisplayName(
+        "leaves an unsupported type's other fields alone if only releases/snapshots is set")
+    void doesNotTouchOtherFieldsWhenRejected(final RepoType type) {
+      final var repo = repoOfType(type);
+      when(RepoTxServiceTest.this.repoRepository.findById(repo.getId()))
+          .thenReturn(Optional.of(repo));
+
+      final var settings =
+          RepoSettingsForm.builder().securityScanEnabled(false).releases(false).build();
+
+      assertThatThrownBy(
+              () -> RepoTxServiceTest.this.service.updateSettings(repo.getId(), settings))
+          .isInstanceOf(BadRequestException.class);
+
+      assertThat(repo.isSecurityScanEnabled()).isTrue();
+      verify(RepoTxServiceTest.this.repoRepository, never()).save(any(Repo.class));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"NPM", "PYPI", "DOCKER", "CARGO", "GOLANG", "HELM", "RUBY"})
+    @DisplayName("an unsupported type still accepts a PUT that leaves releases/snapshots out")
+    void appliesOtherFieldsWhenReleasesSnapshotsOmitted(final RepoType type) {
+      final var repo = repoOfType(type);
+      when(RepoTxServiceTest.this.repoRepository.findById(repo.getId()))
+          .thenReturn(Optional.of(repo));
+
+      final var settings = RepoSettingsForm.builder().securityScanEnabled(false).build();
+
+      RepoTxServiceTest.this.service.updateSettings(repo.getId(), settings);
+
+      assertThat(repo.isSecurityScanEnabled()).isFalse();
+      verify(RepoTxServiceTest.this.repoRepository).save(repo);
+    }
+  }
+
+  /** RPS-1210: GET must mirror the same scope as the PUT rejection. */
+  @Nested
+  @DisplayName("getRepoSettings")
+  class GetRepoSettings {
+
+    private static Repo repoOfType(final RepoType type) {
+      final var repo = new Repo();
+      repo.setId(UUID.randomUUID());
+      repo.setType(type);
+      repo.setPrivateRepo(false);
+      repo.setAllowOverride(true);
+      repo.setReleases(true);
+      repo.setSnapshots(true);
+      repo.setSecurityScanEnabled(true);
+      return repo;
+    }
+
+    private static RepoInfo toRepoInfo(final Repo repo) {
+      return RepoInfo.builder()
+          .id(repo.getId())
+          .name("repo")
+          .type(repo.getType())
+          .privateRepo(repo.isPrivateRepo())
+          .allowOverride(repo.isAllowOverride())
+          .releases(repo.getReleases())
+          .snapshots(repo.getSnapshots())
+          .searchable(repo.isSearchable())
+          .securityScanEnabled(repo.isSecurityScanEnabled())
+          .build();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"NPM", "PYPI", "DOCKER", "CARGO", "GOLANG", "HELM", "RUBY"})
+    @DisplayName("nulls out releases/snapshots for a type whose publish path never reads them")
+    void nullsReleasesSnapshotsForUnsupportedType(final RepoType type) {
+      final var repo = repoOfType(type);
+      when(RepoTxServiceTest.this.repoRepository.findById(repo.getId()))
+          .thenReturn(Optional.of(repo));
+      when(RepoTxServiceTest.this.repoConverter.toRepoInfo(repo)).thenReturn(toRepoInfo(repo));
+
+      final var settings = RepoTxServiceTest.this.service.getRepoSettings(repo.getId());
+
+      assertThat(settings.getReleases()).isNull();
+      assertThat(settings.getSnapshots()).isNull();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(
+        value = RepoType.class,
+        names = {"MAVEN", "NUGET"})
+    @DisplayName("exposes releases/snapshots for a type whose publish path reads them")
+    void exposesReleasesSnapshotsForSupportedType(final RepoType type) {
+      final var repo = repoOfType(type);
+      when(RepoTxServiceTest.this.repoRepository.findById(repo.getId()))
+          .thenReturn(Optional.of(repo));
+      when(RepoTxServiceTest.this.repoConverter.toRepoInfo(repo)).thenReturn(toRepoInfo(repo));
+
+      final var settings = RepoTxServiceTest.this.service.getRepoSettings(repo.getId());
+
+      assertThat(settings.getReleases()).isTrue();
+      assertThat(settings.getSnapshots()).isTrue();
     }
   }
 }
