@@ -78,7 +78,9 @@
         (.dockerignore, .env.example, .prettierignore) have no counterpart in core-parent's default
         excludes, and node_modules/, src/api/generated/, test-results/ and playwright-report/ are
         generated or third-party content (all git-ignored, see e2e/.gitignore) that was never meant
-        to carry a licence header. Everything else under e2e/ (*.ts, Dockerfiles, run.sh, ...) is a
+        to carry a licence header. src/packages/ holds the template projects the adapters render and
+        publish (Cargo.toml, go.mod, Gemfile, ...): their content is what the client under test
+        sees, so it stays free of a header. Everything else under e2e/ (*.ts, Dockerfiles, run.sh, ...) is a
         source file and does carry one. combine.children="append" adds these to core-parent's list
         instead of replacing it, which is what a same-named <excludes> block does by default.
       -->
@@ -92,6 +94,7 @@
             <exclude>e2e/.prettierignore</exclude>
             <exclude>e2e/node_modules/**</exclude>
             <exclude>e2e/src/api/generated/**</exclude>
+            <exclude>e2e/src/packages/**</exclude>
             <exclude>e2e/test-results/**</exclude>
             <exclude>e2e/playwright-report/**</exclude>
           </excludes>
