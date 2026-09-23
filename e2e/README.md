@@ -169,8 +169,8 @@ e2e/
       publish-consume.spec.ts   # registerPublishConsumeLoop(golangAdapter) + go-get-build-run, plain-http-creds-refused, dirhash cross-check, mixed-case and wire-trace real-client tests
       registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, upload URL spellings, sha256, immutability, zip validation, @v/list/@latest, sumdb, HEAD, delete+reupload) + G1/G2/G10 candidates
     ruby/
-      publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install (RPS-1233, fixed)/gem-fetch (RPS-1234, test.fail), anonymous-push, yank (RPS-1235), USER-role-push, bundle-install-e2e real-client tests
-      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow, specs.4.8.gz zlib, gemspec.rz (RPS-1233, fixed), HEAD-always-200, platform gem, RPS-1236) + RPS-1234/RPS-1235/RPS-1236/RPS-1237 candidates
+      publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install (RPS-1233, fixed)/gem-fetch (RPS-1234, fixed), anonymous-push, yank (RPS-1235), USER-role-push, bundle-install-e2e real-client tests
+      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow, specs.4.8.gz gzip framing (RPS-1234, fixed), gemspec.rz (RPS-1233, fixed), HEAD-always-200, platform gem, RPS-1236) + RPS-1235/RPS-1236/RPS-1237 candidates
 ```
 
 ## Setup
@@ -2134,10 +2134,10 @@ real, exactly like maven/npm/pypi, per the plan's own explicit fallback instruct
 RPS-1233 was real (confirmed live, `registry-rules.spec.ts`'s R10 test) and broke `gem install
 --source .../gem/`; it is now fixed by a concrete `RubyGemspecHandler` that registers the route, and
 both `registry-rules.spec.ts`'s R10 test and `publish-consume.spec.ts`'s dedicated `gem install`
-real-client test assert the fixed behavior instead of pinning the failure. `gem fetch` still fails on
-a separate bug (RPS-1234, the zlib/gzip mismatch below) and stays pinned with `test.fail()` in
-`publish-consume.spec.ts` — neither `gem` subcommand routes through the catalog loop's own consumer
-(`bundle install`, per H1 above).
+real-client test assert the fixed behavior instead of pinning the failure. `gem fetch` shared the
+same route dependency plus its own separate bug (RPS-1234, the zlib/gzip mismatch below); both are
+now fixed and `publish-consume.spec.ts`'s dedicated `gem fetch` test asserts a real exit 0 — neither
+`gem` subcommand routes through the catalog loop's own consumer (`bundle install`, per H1 above).
 
 ### Scenario mapping onto the shared catalog
 
@@ -2161,8 +2161,9 @@ row-first ordering, re-verifying RPS-1060 still holds for Ruby (R4); malformed-g
 nothing stored (R6); the full yank flow — success, re-yank refusal, a read-only token/USER-role
 password both refused with 401 (`MANAGE` permission), a yanked version's `.gem` file 404ing, and a
 yanked version rejecting even an `allowOverride:true` re-push (R8); a panel-API delete (not a yank)
-allowing a clean re-publish (R5/R16); `specs.4.8.gz`'s zlib-not-gzip bytes and the prerelease/latest
-split (R9, RPS-1234); the `gemspec.rz` route (R10, RPS-1233, fixed); unknown-gem 404s and an empty repo's
+allowing a clean re-publish (R5/R16); `specs.4.8.gz`'s gzip framing (RFC 1952, `gunzipSync` succeeds
+and `inflateSync` throws) and the prerelease/latest split (R9, RPS-1234, fixed); the `gemspec.rz`
+route (R10, RPS-1233, fixed); unknown-gem 404s and an empty repo's
 listings (R11); `HEAD`-always-200 (R12, RPS-1237 observation); a platform gem's filename/info-line shape
 and yank's explicit-platform requirement (R14); that `releases`/`snapshots` are never read (R15); and
 RPS-1236's hyphen-before-digit download bug (R13).
@@ -2207,8 +2208,10 @@ adapter code was written.
   `gem`/`bundle` retries a refused request by default.
 - **H10** (`md5Hex(/info body)` matches `/versions`' own md5 after publish and after yank): confirmed
   live — `registry-rules.spec.ts`'s happy-path-shape test and the yank test both assert it.
-- **H11** (`specs.4.8.gz` is zlib not gzip; `gem fetch` fails on it): confirmed live — RPS-1234, and the
-  dedicated `gem fetch` real-client test (`test.fail()`).
+- **H11** (`specs.4.8.gz` is zlib not gzip; `gem fetch` fails on it): confirmed live, then **fixed** —
+  RPS-1234; the backend now serves real gzip (`GZIPOutputStream`), asserted directly in the
+  dedicated `gem fetch` real-client test, which now also exits 0 end to end since RPS-1233 (below)
+  removed the other bug `gem fetch` shared with `gem install`.
 - **H12** (`gem install --source` failed on the missing `gemspec.rz` route): confirmed live — RPS-1233,
   now fixed; the dedicated `gem install` real-client test asserts the fixed behavior instead of
   pinning the failure.
@@ -2244,8 +2247,9 @@ unknownPath`. Broke `gem install --source`/`gem fetch`; did NOT break `bundle in
   refutation, the headline finding of this step). Was the highest-severity candidate of this step,
   since it silently dropped an entire, otherwise-implemented feature from being reachable. Fixed by a
   concrete `RubyGemspecHandler` that registers the route: `gem install` now succeeds end-to-end
-  (`publish-consume.spec.ts`) and `registry-rules.spec.ts`'s R10 test asserts `200`. `gem fetch` still
-  fails, on the separate RPS-1234 zlib/gzip bug below.
+  (`publish-consume.spec.ts`) and `registry-rules.spec.ts`'s R10 test asserts `200`. `gem fetch`
+  shared this route dependency plus its own separate RPS-1234 zlib/gzip bug below; both are now
+  fixed and `gem fetch` succeeds end-to-end too.
 - **RB-2** (observation) — `/info/<gem>` never emits `ruby:`/`rubygems:` requirement keys
   (`CompactIndexFormatter.appendVersionLine`), even though `required_ruby_version` is correctly parsed
   by `GemspecParser` and stored on `ruby_gem_version.required_ruby_version`. This is architecturally
@@ -2253,12 +2257,21 @@ unknownPath`. Broke `gem install --source`/`gem fetch`; did NOT break `bundle in
   missing route) is only triggered by a version's `required_ruby_version` being genuinely absent from
   `/info` in a way that forces a fallback check — and it happens to just... not need one for
   resolution to succeed. Confirmed live, `registry-rules.spec.ts`'s happy-path-shape test.
-- **RPS-1234** — `specs.4.8.gz`/`latest_specs.4.8.gz`/`prerelease_specs.4.8.gz` are compressed with
-  `java.util.zip.DeflaterOutputStream` (raw zlib/RFC1950), not gzip (RFC1952) as their own `.gz`
-  filenames and a real `gem fetch`/the legacy Index fetcher both expect. Confirmed live:
-  `gunzipSync` throws, `inflateSync` succeeds and yields a valid Marshal 4.8 stream; a real `gem
-fetch` fails. `test.fail()`-pinned in both `registry-rules.spec.ts` (R9) and a dedicated
-  `publish-consume.spec.ts` real-client test.
+- **RPS-1234 — FIXED.** `specs.4.8.gz`/`latest_specs.4.8.gz`/`prerelease_specs.4.8.gz` were compressed
+  with `java.util.zip.DeflaterOutputStream` (raw zlib/RFC1950), not gzip (RFC1952) as their own `.gz`
+  filenames and a real `gem fetch`/the legacy Index fetcher both expect. Confirmed live before the
+  fix: `gunzipSync` threw, `inflateSync` succeeded and yielded a valid Marshal 4.8 stream; a real
+  `gem fetch` failed. Fixed by swapping in `java.util.zip.GZIPOutputStream`
+  (`AbstractRubySpecsIndexHandler`); `Content-Type` stays `application/octet-stream` and no
+  `Content-Encoding: gzip` header is added (the gzip framing is the file's own content, not a
+  transfer encoding — adding that header would make an HTTP client transparently decompress it and
+  hand RubyGems a bare Marshal stream to gunzip a second time). `registry-rules.spec.ts` (R9) now
+  asserts `gunzipSync` succeeds and `inflateSync` throws. The dedicated `publish-consume.spec.ts`
+  real-client `gem fetch` test asserts the same gzip framing directly and, now that `gem fetch`'s
+  other shared dependency (the `gemspec.rz` route, RPS-1233) is also fixed, asserts a real exit 0
+  end to end. Note: `AbstractRubyGemspecHandler.deflate` (the `.rz` gemspec route, RPS-1233) is a
+  different, near-identical-looking method that correctly uses raw zlib per the RubyGems spec — it
+  was deliberately left untouched.
 - **RPS-1235** — a yanked version is listed in `/info/<gem>` with a `-` prefix instead of being OMITTED
   entirely, which is what the compact-index protocol (as implemented by rubygems.org and read by a
   real Bundler client, which simply treats a `-`-prefixed line as "this version is yanked, still

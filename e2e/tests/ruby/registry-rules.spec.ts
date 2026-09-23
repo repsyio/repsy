@@ -417,8 +417,8 @@ test.describe('ruby registry rules (raw HTTP)', () => {
   );
 
   test(
-    'specs.4.8.gz is zlib-deflated, not gzip (RPS-1234); the Marshal payload starts with the 4.8 ' +
-      'header; prerelease/latest split by "contains a letter"',
+    'the Marshal payload starts with the 4.8 header; prerelease/latest split by "contains a ' +
+      'letter"',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'specsgz');
@@ -430,18 +430,20 @@ test.describe('ruby registry rules (raw HTTP)', () => {
 
       const specsRes = await rawGet(layout.repoName, admin, specsRelPath('specs'));
       expect(specsRes.status).toBe(200);
-      expect(() => zlib.gunzipSync(specsRes.body)).toThrow();
-      const inflated = zlib.inflateSync(specsRes.body);
-      expect(inflated.subarray(0, 2)).toEqual(Buffer.from([0x04, 0x08]));
+      // RPS-1234: the index files are real gzip (RFC 1952) now, not bare zlib deflate (RFC
+      // 1950) -- pin the framing itself, not just decodability of some deflate variant.
+      expect(() => zlib.inflateSync(specsRes.body)).toThrow();
+      const decoded = zlib.gunzipSync(specsRes.body);
+      expect(decoded.subarray(0, 2)).toEqual(Buffer.from([0x04, 0x08]));
 
       const latestRes = await rawGet(layout.repoName, admin, specsRelPath('latest_specs'));
-      const latestInflated = zlib.inflateSync(latestRes.body);
-      expect(latestInflated.length).toBeGreaterThan(0);
+      const latestDecoded = zlib.gunzipSync(latestRes.body);
+      expect(latestDecoded.length).toBeGreaterThan(0);
 
       const prereleaseRes = await rawGet(layout.repoName, admin, specsRelPath('prerelease_specs'));
-      const prereleaseInflated = zlib.inflateSync(prereleaseRes.body);
-      expect(prereleaseInflated.toString('latin1')).toContain('2.0.0.pre1');
-      expect(prereleaseInflated.toString('latin1')).not.toContain('1.0.0\u0000');
+      const prereleaseDecoded = zlib.gunzipSync(prereleaseRes.body);
+      expect(prereleaseDecoded.toString('latin1')).toContain('2.0.0.pre1');
+      expect(prereleaseDecoded.toString('latin1')).not.toContain('1.0.0\u0000');
     },
   );
 
