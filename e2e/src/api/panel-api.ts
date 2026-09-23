@@ -19,12 +19,9 @@
  * `pnpm gen:api` from `repsy-backend/src/main/resources/openapi/openapi-spec.yaml`). It only covers
  * what the seeder needs: users, repos, settings and deploy tokens.
  *
- * Every endpoint here that the OpenAPI spec does not list an explicit `Authorization` header
- * parameter for (every `protocol-repo-controller` and `protocol-deploy-token-controller` route) is
- * still authenticated: the backend reads the same header, just through an argument resolver the
- * spec does not document. `PanelClient`'s `TOKEN` resolver supplies it on every request; the
- * `user-controller` routes additionally require the header as an explicit parameter, so it is
- * passed there too.
+ * The OpenAPI spec lists no `Authorization` header parameter on any operation (RPS-1161): the backend
+ * reads the header through an argument resolver the spec does not document. `PanelClient`'s `TOKEN`
+ * resolver supplies it on every request, so no call here passes it explicitly.
  */
 import { ApiError, PanelClient, RepoType, UserRole } from './generated/index.js';
 import type { DeployTokenForm } from './generated/models/DeployTokenForm.js';
@@ -114,23 +111,19 @@ export class PanelApi {
 
   async createUser(form: UserCreateForm): Promise<UserResponse> {
     const res = await this.client.userController.createUser({
-      authorization: this.authorization(),
       requestBody: form,
     });
     return unwrap(res.data, 'createUser');
   }
 
   async deleteUser(userId: string): Promise<void> {
-    await this.client.userController.deleteUser({ authorization: this.authorization(), userId });
+    await this.client.userController.deleteUser({ userId });
   }
 
   async listUsers(
     params: { search?: string; page?: number; size?: number } = {},
   ): Promise<UserResponse[]> {
-    const res = await this.client.userController.listUsers({
-      authorization: this.authorization(),
-      ...params,
-    });
+    const res = await this.client.userController.listUsers(params);
     return unwrap(res.data, 'listUsers').content ?? [];
   }
 
