@@ -182,6 +182,30 @@ class PypiUploadValidationIT extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName("a 2 KB dotted archive filename is a 400 pypiArchiveFileNameTooLong, not a 500")
+  void rejectsOverLongArchiveFilename() {
+    final var repo = this.createRepo();
+    final var content = "content".getBytes(StandardCharsets.UTF_8);
+
+    final var parameters = new HashMap<String, Object>();
+    parameters.put("name", "my-package");
+    parameters.put("version", "1.0.0");
+    parameters.put("requires_python", ">=3.9");
+    parameters.put("sha256_digest", "0".repeat(64));
+
+    final var file =
+        new MockMultipartFile(
+            "content",
+            "my_package-1" + ".1".repeat(1000) + "-py3-none-any.whl",
+            MediaType.APPLICATION_OCTET_STREAM_VALUE,
+            content);
+
+    assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(context(repo), parameters, file))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("pypiArchiveFileNameTooLong");
+  }
+
+  @Test
   @DisplayName("an over-long requires_python is a 400 pypiRequiresPythonTooLong, not a 500")
   void rejectsOverLongRequiresPython() {
     final var repo = this.createRepo();

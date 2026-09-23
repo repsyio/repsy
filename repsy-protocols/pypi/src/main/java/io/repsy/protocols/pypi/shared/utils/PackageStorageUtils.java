@@ -50,6 +50,11 @@ public final class PackageStorageUtils {
   @Nullable
   public static String extractVersionFromArchiveFilename(final String filename) {
 
+    // Never run the version grammar on an over-long name: no upload can have stored one.
+    if (filename.length() > PypiPublishLimits.MAX_ARCHIVE_FILENAME_LENGTH) {
+      return null;
+    }
+
     final var matcher = ARCHIVE_FILENAME_PATTERN.matcher(filename);
 
     if (matcher.find()) {
@@ -67,6 +72,8 @@ public final class PackageStorageUtils {
     if (originalFilename == null) {
       throw new BadRequestException("archiveFileNameNull");
     }
+
+    PypiPublishLimits.checkArchiveFilename(originalFilename);
 
     if (!ARCHIVE_UPLOAD_PATTERN.matcher(originalFilename).matches()) {
       throw new BadRequestException("archiveFileNameInvalid");

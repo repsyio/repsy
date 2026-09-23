@@ -46,6 +46,10 @@ public class ReleaseVersion {
 
   public static @NonNull ReleaseVersion of(final @NonNull String releaseVersion) {
 
+    // Bound the input before either pattern runs: both nest quantifiers, so a long dotted version
+    // overflows the regex engine's stack (a 500) instead of failing as a 400.
+    PypiPublishLimits.checkVersion(releaseVersion);
+
     // version strings must be trimmed and lower-cased before processing
     final var trimmedVersion = releaseVersion.trim().toLowerCase(Locale.getDefault());
     final var normalizedVersionMatcher = NORMALIZED_VERSION_PATTERN.matcher(trimmedVersion);

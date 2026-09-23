@@ -83,6 +83,15 @@ class PackageStorageUtilsTest {
     void returnsNullWhenNoVersion() {
       assertThat(PackageStorageUtils.extractVersionFromArchiveFilename("no-version-here")).isNull();
     }
+
+    @Test
+    @DisplayName("returns null for a 2 KB dotted filename without running the version grammar")
+    void returnsNullForOverLongFilename() {
+      final var filename = "pkg-1" + ".1".repeat(1000) + ".tar.gz";
+
+      assertThat(PackageStorageUtils.extractVersionFromArchiveFilename(filename)).isNull();
+      assertThat(PackageStorageUtils.isFileBelongsRelease(filename, "1.0")).isFalse();
+    }
   }
 
   @Nested
@@ -111,6 +120,30 @@ class PackageStorageUtilsTest {
       assertThatThrownBy(() -> PackageStorageUtils.checkArchiveFilename(file))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("archiveFileNameInvalid");
+    }
+
+    @Test
+    @DisplayName("answers 400 pypiArchiveFileNameTooLong for a 2 KB dotted filename, not a 500")
+    void rejectsOverLongDottedFilename() {
+      final var filename = "pkg-1" + ".1".repeat(1000) + "-py3-none-any.whl";
+      final var file = new MockMultipartFile("content", filename, null, new byte[] {1});
+
+      assertThatThrownBy(() -> PackageStorageUtils.checkArchiveFilename(file))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("pypiArchiveFileNameTooLong");
+    }
+
+    @Test
+    @DisplayName("a filename at the limit still goes through the archive grammar without overflow")
+    void grammarHandlesTheLongestAllowedFilename() {
+      final var suffix = ".whl";
+      final var dotted = "1" + ".1".repeat((255 - "pkg-".length() - suffix.length() - 1) / 2);
+      final var filename = "pkg-" + dotted + suffix;
+      final var file = new MockMultipartFile("content", filename, null, new byte[] {1});
+
+      assertThat(filename.length()).isLessThanOrEqualTo(255);
+      assertThatCode(() -> PackageStorageUtils.checkArchiveFilename(file))
+          .doesNotThrowAnyException();
     }
 
     @Test
