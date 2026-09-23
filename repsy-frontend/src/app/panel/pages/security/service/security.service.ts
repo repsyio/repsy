@@ -15,7 +15,7 @@
 ///
 
 import { Injectable } from '@angular/core';
-import { map,Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 
 import {
   PagedModelVulnerabilityScanInfo,
@@ -28,7 +28,6 @@ import {
   VersionSecuritySummary,
   VulnerabilityScanControllerService,
 } from '../../../../../generated/api';
-import { AuthService } from '../../../../auth/pages/service/auth.service';
 
 @Injectable({
   providedIn: 'root',
@@ -37,12 +36,7 @@ export class SecurityService {
   constructor(
     private readonly securityScanControllerService: SecurityScanControllerService,
     private readonly vulnerabilityScanControllerService: VulnerabilityScanControllerService,
-    private readonly authService: AuthService,
   ) {}
-
-  private get authorizationHeader(): string {
-    return `Bearer ${this.authService.accessToken}`;
-  }
 
   public listScans(
     severity?: Severity,
@@ -52,14 +46,12 @@ export class SecurityService {
     size?: number,
   ): Observable<PagedModelVulnerabilityScanInfo> {
     return this.securityScanControllerService
-      .listSecurityScans(this.authorizationHeader, severity, repoType, repoName, page, size)
+      .listSecurityScans(severity, repoType, repoName, page, size)
       .pipe(map((r) => r.data!));
   }
 
   public getSecuritySummary(repoNames?: string[]): Observable<Record<string, RepoSecuritySummary>> {
-    return this.vulnerabilityScanControllerService
-      .getSecuritySummary(this.authorizationHeader, repoNames)
-      .pipe(map((r) => r.data ?? {}));
+    return this.vulnerabilityScanControllerService.getSecuritySummary(repoNames).pipe(map((r) => r.data ?? {}));
   }
 
   public getVersionSecuritySummary(
@@ -72,15 +64,11 @@ export class SecurityService {
   }
 
   public getArtifactSecuritySummary(repoName: string): Observable<Record<string, VersionSecuritySummary>> {
-    return this.vulnerabilityScanControllerService
-      .getArtifactSecuritySummary(repoName)
-      .pipe(map((r) => r.data ?? {}));
+    return this.vulnerabilityScanControllerService.getArtifactSecuritySummary(repoName).pipe(map((r) => r.data ?? {}));
   }
 
   public getRepoSecurityDetail(repoName: string): Observable<RepoSecurityDetail> {
-    return this.vulnerabilityScanControllerService
-      .getRepoSecurityDetail(repoName)
-      .pipe(map((r) => r.data!));
+    return this.vulnerabilityScanControllerService.getRepoSecurityDetail(repoName).pipe(map((r) => r.data!));
   }
 
   public getArtifactSecurityDetail(repoName: string, artifactName: string): Observable<RepoSecurityDetail> {
@@ -90,8 +78,6 @@ export class SecurityService {
   }
 
   public getScansSummary(repoType?: RepoType, repoName?: string): Observable<SecurityScansSummary> {
-    return this.securityScanControllerService
-      .getSecurityScansSummary(this.authorizationHeader, repoType, repoName)
-      .pipe(map((r) => r.data!));
+    return this.securityScanControllerService.getSecurityScansSummary(repoType, repoName).pipe(map((r) => r.data!));
   }
 }
