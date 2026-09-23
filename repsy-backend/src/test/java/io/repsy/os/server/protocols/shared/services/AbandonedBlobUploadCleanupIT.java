@@ -15,6 +15,9 @@
  */
 package io.repsy.os.server.protocols.shared.services;
 
+import static io.repsy.os.server.protocols.helm.HelmChartFixtures.OCI_CONFIG_TYPE;
+import static io.repsy.os.server.protocols.helm.HelmChartFixtures.OCI_LAYER_TYPE;
+import static io.repsy.os.server.protocols.helm.HelmChartFixtures.OCI_MANIFEST_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.verify;
@@ -26,6 +29,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.docker.shared.layer.entities.Layer;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
+import io.repsy.os.server.protocols.helm.HelmChartFixtures;
+import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciBlobRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -50,12 +55,14 @@ import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProc
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Abandoned Docker and Helm OCI blob uploads, through the real wire protocol (RPS-1041).
+ * Abandoned Docker and Helm OCI blob uploads, through the real wire protocol (RPS-1041), and the
+ * finalized-but-unreferenced blobs the same sweep now also collects (RPS-1112, RPS-1172).
  *
  * <p>An upload that is started and never finalized leaves its temp file on disk with its bytes
  * charged to the repo. The cleanup has to delete such a file once it has been idle longer than the
  * TTL and hand its bytes back, and it must leave finalized blobs and uploads that are still in
- * progress alone.
+ * progress alone — unless the finalized blob itself ended up referenced by nothing, in which case
+ * it is now swept too, once it is stale.
  *
  * <p>{@link UsageUpdateService} is mocked: it is {@code @Async}, so it cannot see this test's
  * uncommitted data. The mock records the disk-usage deltas the uploads and the cleanup request.
@@ -70,6 +77,7 @@ class AbandonedBlobUploadCleanupIT extends AbstractIntegrationTest {
 
   @Autowired private AbandonedBlobUploadCleanupService cleanupService;
   @Autowired private LayerRepository layerRepository;
+  @Autowired private HelmOciBlobRepository helmOciBlobRepository;
   @Autowired private ScheduledAnnotationBeanPostProcessor scheduledTasks;
 
   private static byte[] bytes(final String content) {
@@ -151,6 +159,43 @@ class AbandonedBlobUploadCleanupIT extends AbstractIntegrationTest {
     return uploadId;
   }
 
+  /**
+   * Puts a Helm OCI manifest referencing {@code layerDigest} as its single layer, under {@code
+   * name}/{@code reference}.
+   */
+  private MockHttpServletResponse putHelmManifest(
+      final Repo repo,
+      final String name,
+      final String reference,
+      final byte[] chartBytes,
+      final String layerDigest,
+      final String token)
+      throws Exception {
+    final var config = bytes("{}");
+    final var manifest =
+        ("{\"schemaVersion\":2,\"mediaType\":\"%s\",\"config\":{\"mediaType\":\"%s\","
+                + "\"digest\":\"%s\",\"size\":%d},\"layers\":[{\"mediaType\":\"%s\","
+                + "\"digest\":\"%s\",\"size\":%d}]}")
+            .formatted(
+                OCI_MANIFEST_TYPE,
+                OCI_CONFIG_TYPE,
+                sha256(config),
+                config.length,
+                OCI_LAYER_TYPE,
+                layerDigest,
+                chartBytes.length);
+
+    return this.mockMvc
+        .perform(
+            put("/v2/{repo}/{name}/manifests/{reference}", repo.getName(), name, reference)
+                .contentType(OCI_MANIFEST_TYPE)
+                .content(manifest)
+                .header(AUTHORIZATION, token)
+                .with(protocolPort()))
+        .andReturn()
+        .getResponse();
+  }
+
   /** The sum of every disk-usage delta the repo was charged or refunded. */
   private long netUsage(final Repo repo) {
     final var captor = ArgumentCaptor.forClass(UsageChangedInfo.class);
@@ -206,7 +251,7 @@ class AbandonedBlobUploadCleanupIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("Docker: a finalized layer is left alone however old it is")
+  @DisplayName("Docker: a finalized layer with its row intact is left alone however old it is")
   void dockerFinalizedLayerIsKept() throws Exception {
     final var token = this.adminProtocolBearerToken();
     final var repo = this.seedRepo(RepoType.DOCKER, uniqueRepoName("docker"));
@@ -244,6 +289,39 @@ class AbandonedBlobUploadCleanupIT extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName("Docker: a stale digest blob with no layer row is swept (RPS-1172)")
+  void dockerBlobWithNoLayerRowIsSwept() throws Exception {
+    final var repo = this.seedRepo(RepoType.DOCKER, uniqueRepoName("docker"));
+    final var content = bytes("orphaned-blob-with-no-row-".repeat(10));
+    final var digest = sha256(content);
+    final var blob = storageDirOf(repo).resolve("blobs").resolve(digest);
+    Files.createDirectories(blob.getParent());
+    Files.write(blob, content);
+    makeIdle(blob);
+    assertThat(this.layerRepository.existsByRepoIdAndDigest(repo.getId(), digest)).isFalse();
+
+    final var released = this.cleanupService.cleanupAbandonedUploads();
+
+    assertThat(released).isGreaterThanOrEqualTo(content.length);
+    assertThat(blob).doesNotExist();
+  }
+
+  @Test
+  @DisplayName("Docker: a fresh digest blob with no layer row is kept, inside the TTL")
+  void dockerFreshBlobWithNoLayerRowIsKept() throws Exception {
+    final var repo = this.seedRepo(RepoType.DOCKER, uniqueRepoName("docker"));
+    final var content = bytes("fresh-orphaned-blob-".repeat(10));
+    final var digest = sha256(content);
+    final var blob = storageDirOf(repo).resolve("blobs").resolve(digest);
+    Files.createDirectories(blob.getParent());
+    Files.write(blob, content);
+
+    this.cleanupService.cleanupAbandonedUploads();
+
+    assertThat(blob).exists();
+  }
+
+  @Test
   @DisplayName("Helm OCI: an idle unfinished upload is deleted and its bytes are released")
   void helmAbandonedUploadIsDeletedAndReleased() throws Exception {
     final var token = this.adminProtocolBearerToken();
@@ -262,22 +340,94 @@ class AbandonedBlobUploadCleanupIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("Helm OCI: in-progress uploads and finalized blobs are left alone")
-  void helmInProgressAndFinalizedBlobsAreKept() throws Exception {
+  @DisplayName("Helm OCI: an upload that is still receiving data is left alone")
+  void helmInProgressUploadIsKept() throws Exception {
     final var token = this.adminProtocolBearerToken();
     final var repo = this.seedRepo(RepoType.HELM, uniqueRepoName("helm"));
     final var chunk = bytes("in-progress-chart-".repeat(30));
-    final var inProgressId = this.abandonUpload(repo, chunk, token);
-    final var blob = bytes("finished-chart-".repeat(30));
-    final var finishedId = this.abandonUpload(repo, blob, token);
-    this.finalizeUpload(repo, finishedId, sha256(blob), token);
-    final var blobsDir = storageDirOf(repo).resolve("oci").resolve("blobs");
-    makeIdle(blobsDir.resolve(sha256(blob)));
+    final var uploadId = this.abandonUpload(repo, chunk, token);
 
     this.cleanupService.cleanupAbandonedUploads();
 
-    assertThat(blobsDir.resolve(inProgressId)).hasBinaryContent(chunk);
-    assertThat(blobsDir.resolve(sha256(blob))).hasBinaryContent(blob);
-    assertThat(this.netUsage(repo)).isEqualTo((long) chunk.length + blob.length);
+    assertThat(storageDirOf(repo).resolve("oci").resolve("blobs").resolve(uploadId))
+        .hasBinaryContent(chunk);
+    assertThat(this.netUsage(repo)).isEqualTo(chunk.length);
+  }
+
+  @Test
+  @DisplayName("Helm OCI: a finalized blob a manifest still references is kept however old it is")
+  void helmBlobReferencedByManifestIsKept() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+    final var repo = this.seedRepo(RepoType.HELM, uniqueRepoName("helm"));
+    final var chartBytes = HelmChartFixtures.chart("keepme", "1.0.0");
+    final var layerDigest = sha256(chartBytes);
+    final var uploadId = this.abandonUpload(repo, chartBytes, token);
+    this.finalizeUpload(repo, uploadId, layerDigest, token);
+
+    final var accepted =
+        this.putHelmManifest(repo, "keepme", "1.0.0", chartBytes, layerDigest, token);
+    requireStatus(accepted, 201, "OCI manifest push");
+
+    final var blob = storageDirOf(repo).resolve("oci").resolve("blobs").resolve(layerDigest);
+    makeIdle(blob);
+
+    this.cleanupService.cleanupAbandonedUploads();
+
+    assertThat(blob).exists();
+    assertThat(this.helmOciBlobRepository.findByRepoIdAndDigest(repo.getId(), layerDigest))
+        .isPresent();
+  }
+
+  @Test
+  @DisplayName(
+      "Helm OCI: a blob whose manifest push is refused for a chart-name mismatch is swept, its"
+          + " row too, and usage returns to baseline (RPS-1112)")
+  void helmRefusedManifestPushBlobIsSweptWithItsRow() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+    final var repo = this.seedRepo(RepoType.HELM, uniqueRepoName("helm"));
+    final var chartBytes = HelmChartFixtures.chart("rightname", "1.0.0");
+    final var layerDigest = sha256(chartBytes);
+    final var uploadId = this.abandonUpload(repo, chartBytes, token);
+    this.finalizeUpload(repo, uploadId, layerDigest, token);
+    assertThat(this.netUsage(repo)).isEqualTo(chartBytes.length);
+
+    // The path name ("wrongname") does not match the pushed chart's own Chart.yaml name
+    // ("rightname"): AbstractHelmOciManifestPushProtocolMethodHandler#requireMatchingChartName
+    // refuses it before any chart, chart-version or manifest row is ever created, leaving only the
+    // already-finalized layer blob and its helm_oci_blob row behind.
+    final var refused =
+        this.putHelmManifest(repo, "wrongname", "1.0.0", chartBytes, layerDigest, token);
+    requireStatus(refused, 400, "manifest push with mismatched chart name");
+
+    final var blob = storageDirOf(repo).resolve("oci").resolve("blobs").resolve(layerDigest);
+    assertThat(blob).exists();
+    assertThat(this.helmOciBlobRepository.findByRepoIdAndDigest(repo.getId(), layerDigest))
+        .isPresent();
+    makeIdle(blob);
+
+    final var released = this.cleanupService.cleanupAbandonedUploads();
+
+    assertThat(released).isGreaterThanOrEqualTo(chartBytes.length);
+    assertThat(blob).doesNotExist();
+    assertThat(this.helmOciBlobRepository.findByRepoIdAndDigest(repo.getId(), layerDigest))
+        .isEmpty();
+    assertThat(this.netUsage(repo)).isZero();
+  }
+
+  @Test
+  @DisplayName("Helm OCI: a fresh unreferenced finalized blob is kept, inside the TTL")
+  void helmFreshUnreferencedBlobIsKept() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+    final var repo = this.seedRepo(RepoType.HELM, uniqueRepoName("helm"));
+    final var chartBytes = HelmChartFixtures.chart("nomanifest", "1.0.0");
+    final var layerDigest = sha256(chartBytes);
+    final var uploadId = this.abandonUpload(repo, chartBytes, token);
+    this.finalizeUpload(repo, uploadId, layerDigest, token);
+
+    this.cleanupService.cleanupAbandonedUploads();
+
+    final var blob = storageDirOf(repo).resolve("oci").resolve("blobs").resolve(layerDigest);
+    assertThat(blob).exists();
+    assertThat(this.netUsage(repo)).isEqualTo(chartBytes.length);
   }
 }

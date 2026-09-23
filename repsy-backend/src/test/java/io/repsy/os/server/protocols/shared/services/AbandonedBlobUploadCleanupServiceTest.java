@@ -26,6 +26,10 @@ import static org.mockito.Mockito.when;
 import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
+import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChartVersion;
+import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
+import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciBlobRepository;
+import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifestRepository;
 import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
@@ -40,6 +44,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,9 +63,14 @@ class AbandonedBlobUploadCleanupServiceTest {
   private static final String UPLOAD_B = "0193c1d6-7a3e-7cc1-8f00-ba9876543210";
   private static final String DIGEST =
       "sha256:0000000000000000000000000000000000000000000000000000000000000001";
+  private static final String OTHER_DIGEST =
+      "sha256:0000000000000000000000000000000000000000000000000000000000000002";
 
   @Mock RepoRepository repoRepository;
   @Mock LayerRepository layerRepository;
+  @Mock HelmOciManifestRepository helmOciManifestRepository;
+  @Mock HelmOciBlobRepository helmOciBlobRepository;
+  @Mock HelmChartVersionRepository helmChartVersionRepository;
   @Mock DockerStorageService dockerStorageService;
   @Mock HelmStorageService helmStorageService;
   @Mock UsageUpdateService usageUpdateService;
@@ -73,6 +83,9 @@ class AbandonedBlobUploadCleanupServiceTest {
         new AbandonedBlobUploadCleanupService(
             this.repoRepository,
             this.layerRepository,
+            this.helmOciManifestRepository,
+            this.helmOciBlobRepository,
+            this.helmChartVersionRepository,
             this.dockerStorageService,
             this.helmStorageService,
             this.usageUpdateService,
@@ -87,11 +100,23 @@ class AbandonedBlobUploadCleanupServiceTest {
     return repo;
   }
 
+  private static HelmChartVersion chartVersionWithDigest(final String digest) {
+    final var chartVersion = new HelmChartVersion();
+    chartVersion.setDigest(digest);
+    return chartVersion;
+  }
+
   private void givenRepos(final Repo docker, final Repo helm) {
     when(this.repoRepository.findAllByTypeOrderByCreatedAtDescNameAsc(RepoType.DOCKER))
         .thenReturn(docker == null ? List.of() : List.of(docker));
     when(this.repoRepository.findAllByTypeOrderByCreatedAtDescNameAsc(RepoType.HELM))
         .thenReturn(helm == null ? List.of() : List.of(helm));
+  }
+
+  private void givenNoHelmReferences(final Repo helm) {
+    when(this.helmOciManifestRepository.streamContentByRepoId(helm.getId()))
+        .thenReturn(Stream.empty());
+    when(this.helmChartVersionRepository.findAllByChartRepoId(helm.getId())).thenReturn(List.of());
   }
 
   private long releasedBy(final UUID repoId) {
@@ -124,6 +149,7 @@ class AbandonedBlobUploadCleanupServiceTest {
   void deletesStaleHelmUploadAndReleasesUsage() throws IOException {
     final var helm = repo(RepoType.HELM);
     this.givenRepos(null, helm);
+    this.givenNoHelmReferences(helm);
     when(this.helmStorageService.listStaleBlobFiles(helm.getId(), THRESHOLD))
         .thenReturn(List.of(new StaleFile(UPLOAD_A, 40L), new StaleFile(UPLOAD_B, 2L)));
     when(this.helmStorageService.deleteBlobFile(helm.getId(), helm.getName(), UPLOAD_A))
@@ -136,25 +162,98 @@ class AbandonedBlobUploadCleanupServiceTest {
     assertThat(released).isEqualTo(42L);
     assertThat(this.releasedBy(helm.getId())).isEqualTo(42L);
     verifyNoInteractions(this.layerRepository);
+    verify(this.helmOciBlobRepository, never()).deleteByRepoIdAndDigest(any(), anyString());
   }
 
   @Test
-  @DisplayName("leaves a finalized blob, which is named by its digest")
-  void leavesFinalizedBlob() throws IOException {
+  @DisplayName("leaves a Docker blob still referenced by a layer row")
+  void leavesDockerBlobStillReferencedByLayerRow() throws IOException {
     final var docker = repo(RepoType.DOCKER);
-    final var helm = repo(RepoType.HELM);
-    this.givenRepos(docker, helm);
+    this.givenRepos(docker, null);
     when(this.dockerStorageService.listStaleBlobFiles(docker.getId(), THRESHOLD))
         .thenReturn(List.of(new StaleFile(DIGEST, 500L)));
-    when(this.helmStorageService.listStaleBlobFiles(helm.getId(), THRESHOLD))
-        .thenReturn(List.of(new StaleFile(DIGEST, 500L)));
+    when(this.layerRepository.existsByRepoIdAndDigest(docker.getId(), DIGEST)).thenReturn(true);
 
     final var released = this.service.cleanupAbandonedUploads(THRESHOLD);
 
     assertThat(released).isZero();
     verify(this.dockerStorageService, never()).deleteBlobFile(any(), anyString(), anyString());
-    verify(this.helmStorageService, never()).deleteBlobFile(any(), anyString(), anyString());
     verifyNoInteractions(this.usageUpdateService);
+  }
+
+  @Test
+  @DisplayName("collects a finalized Docker blob with no layer row (RPS-1172)")
+  void collectsDockerBlobWithNoLayerRow() throws IOException {
+    final var docker = repo(RepoType.DOCKER);
+    this.givenRepos(docker, null);
+    when(this.dockerStorageService.listStaleBlobFiles(docker.getId(), THRESHOLD))
+        .thenReturn(List.of(new StaleFile(DIGEST, 500L)));
+    when(this.layerRepository.existsByRepoIdAndDigest(docker.getId(), DIGEST)).thenReturn(false);
+    when(this.dockerStorageService.deleteBlobFile(docker.getId(), docker.getName(), DIGEST))
+        .thenReturn(500L);
+
+    final var released = this.service.cleanupAbandonedUploads(THRESHOLD);
+
+    assertThat(released).isEqualTo(500L);
+    assertThat(this.releasedBy(docker.getId())).isEqualTo(500L);
+  }
+
+  @Test
+  @DisplayName("leaves a Helm blob a manifest of the repo still mentions")
+  void leavesHelmBlobReferencedByManifestContent() throws IOException {
+    final var helm = repo(RepoType.HELM);
+    this.givenRepos(null, helm);
+    when(this.helmStorageService.listStaleBlobFiles(helm.getId(), THRESHOLD))
+        .thenReturn(List.of(new StaleFile(DIGEST, 500L)));
+    when(this.helmOciManifestRepository.streamContentByRepoId(helm.getId()))
+        .thenReturn(Stream.of("{\"config\":{\"digest\":\"%s\"}}".formatted(DIGEST)));
+    when(this.helmChartVersionRepository.findAllByChartRepoId(helm.getId())).thenReturn(List.of());
+
+    final var released = this.service.cleanupAbandonedUploads(THRESHOLD);
+
+    assertThat(released).isZero();
+    verify(this.helmStorageService, never()).deleteBlobFile(any(), anyString(), anyString());
+    verify(this.helmOciBlobRepository, never()).deleteByRepoIdAndDigest(any(), anyString());
+    verifyNoInteractions(this.usageUpdateService);
+  }
+
+  @Test
+  @DisplayName("leaves a Helm blob only a chart version's own digest still names")
+  void leavesHelmBlobReferencedByChartVersionDigest() throws IOException {
+    final var helm = repo(RepoType.HELM);
+    this.givenRepos(null, helm);
+    when(this.helmStorageService.listStaleBlobFiles(helm.getId(), THRESHOLD))
+        .thenReturn(List.of(new StaleFile(DIGEST, 500L)));
+    when(this.helmOciManifestRepository.streamContentByRepoId(helm.getId()))
+        .thenReturn(Stream.empty());
+    when(this.helmChartVersionRepository.findAllByChartRepoId(helm.getId()))
+        .thenReturn(List.of(chartVersionWithDigest(DIGEST)));
+
+    final var released = this.service.cleanupAbandonedUploads(THRESHOLD);
+
+    assertThat(released).isZero();
+    verify(this.helmStorageService, never()).deleteBlobFile(any(), anyString(), anyString());
+  }
+
+  @Test
+  @DisplayName("collects a finalized Helm blob no manifest or chart version references (RPS-1112)")
+  void collectsUnreferencedHelmBlobAndDeletesItsRow() throws IOException {
+    final var helm = repo(RepoType.HELM);
+    this.givenRepos(null, helm);
+    when(this.helmStorageService.listStaleBlobFiles(helm.getId(), THRESHOLD))
+        .thenReturn(List.of(new StaleFile(DIGEST, 500L)));
+    when(this.helmOciManifestRepository.streamContentByRepoId(helm.getId()))
+        .thenReturn(Stream.of("{\"config\":{\"digest\":\"%s\"}}".formatted(OTHER_DIGEST)));
+    when(this.helmChartVersionRepository.findAllByChartRepoId(helm.getId()))
+        .thenReturn(List.of(chartVersionWithDigest(OTHER_DIGEST)));
+    when(this.helmStorageService.deleteBlobFile(helm.getId(), helm.getName(), DIGEST))
+        .thenReturn(500L);
+
+    final var released = this.service.cleanupAbandonedUploads(THRESHOLD);
+
+    assertThat(released).isEqualTo(500L);
+    assertThat(this.releasedBy(helm.getId())).isEqualTo(500L);
+    verify(this.helmOciBlobRepository).deleteByRepoIdAndDigest(helm.getId(), DIGEST);
   }
 
   @Test
@@ -211,6 +310,7 @@ class AbandonedBlobUploadCleanupServiceTest {
     final var docker = repo(RepoType.DOCKER);
     final var helm = repo(RepoType.HELM);
     this.givenRepos(docker, helm);
+    this.givenNoHelmReferences(helm);
     when(this.dockerStorageService.listStaleBlobFiles(docker.getId(), THRESHOLD))
         .thenThrow(new IllegalStateException("storage unavailable"));
     when(this.helmStorageService.listStaleBlobFiles(helm.getId(), THRESHOLD))
