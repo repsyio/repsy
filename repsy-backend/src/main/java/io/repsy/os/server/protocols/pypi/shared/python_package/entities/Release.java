@@ -75,7 +75,7 @@ public class Release {
   private String requiresPython;
 
   // Unbounded (text) in both PostgreSQL and H2, so no length guard applies (RPS-1137).
-  @Column(name = "summary")
+  @Column(name = "summary", columnDefinition = "text")
   private String summary;
 
   @Column(name = "home_page", length = PypiPublishLimits.MAX_HOME_PAGE_LENGTH)
@@ -91,7 +91,7 @@ public class Release {
   private String license;
 
   // Unbounded (text) in both PostgreSQL and H2, so no length guard applies (RPS-1137).
-  @Column(name = "description")
+  @Column(name = "description", columnDefinition = "text")
   private String description;
 
   @Column(

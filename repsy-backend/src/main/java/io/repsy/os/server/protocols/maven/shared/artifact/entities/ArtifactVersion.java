@@ -63,7 +63,7 @@ public class ArtifactVersion {
   @Column(name = "name")
   private String name;
 
-  @Column(name = "description", length = 1024)
+  @Column(name = "description", columnDefinition = "text")
   private String description;
 
   @Column(name = "prefix", length = 150)

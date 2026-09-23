@@ -84,7 +84,7 @@ public class HelmOciManifest {
   private String mediaType;
 
   @Lob
-  @Column(name = "content", nullable = false)
+  @Column(name = "content", nullable = false, columnDefinition = "text")
   private String content;
 
   @Column(name = "created_at", nullable = false)

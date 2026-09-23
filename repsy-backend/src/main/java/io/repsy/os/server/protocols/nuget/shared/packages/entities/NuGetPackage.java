@@ -67,7 +67,7 @@ public class NuGetPackage {
   private Instant createdAt;
 
   @UpdateTimestamp
-  @Column(name = "updated_at", nullable = false)
+  @Column(name = "updated_at")
   private Instant updatedAt;
 
   @OneToMany(mappedBy = "nugetPackage", cascade = CascadeType.ALL, orphanRemoval = true)

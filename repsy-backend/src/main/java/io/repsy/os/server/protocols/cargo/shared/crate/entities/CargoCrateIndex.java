@@ -52,7 +52,7 @@ public class CargoCrateIndex {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private CargoCrate crate;
 
-  @Column(name = "name", nullable = false)
+  @Column(name = "name", nullable = false, columnDefinition = "text")
   private String name;
 
   @Column(name = "vers", nullable = false, length = CrateUtils.MAX_VERSION_LENGTH)
@@ -62,7 +62,7 @@ public class CargoCrateIndex {
   @Column(name = "deps", columnDefinition = "jsonb")
   private String deps;
 
-  @Column(name = "cksum", nullable = false)
+  @Column(name = "cksum", nullable = false, columnDefinition = "text")
   private String cksum;
 
   @JdbcTypeCode(SqlTypes.JSON)
@@ -77,7 +77,7 @@ public class CargoCrateIndex {
   private boolean yanked;
 
   // text in PostgreSQL, varchar(255) in H2: no length is stated, see CrateUtils.MAX_LINKS_LENGTH.
-  @Column(name = "links")
+  @Column(name = "links", columnDefinition = "text")
   private String links;
 
   @Column(name = "v", nullable = false)

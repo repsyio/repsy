@@ -45,7 +45,7 @@ public class CargoCategory {
 
   // text in PostgreSQL, varchar(255) in H2: no length is stated, see
   // CrateUtils.MAX_CATEGORY_LENGTH.
-  @Column(name = "category", nullable = false, unique = true)
+  @Column(name = "category", nullable = false, unique = true, columnDefinition = "text")
   private String category;
 
   @ManyToMany(mappedBy = "categories")

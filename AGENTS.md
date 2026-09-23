@@ -125,6 +125,18 @@ panel API. Edit that file for any API change; there is no other copy. Both sides
   scripts under `postgresql/`), named `V{version}__{description}.sql`. Add a new migration rather
   than editing an existing one.
 - Use `postgres:18` in any Dockerfile, compose file, README snippet or test you add.
+- Hibernate does not validate the entity mappings (`ddl-auto: none`), so
+  `EntitySchemaAnnotationIT` and `H2EntitySchemaAnnotationIT` compare every entity of the
+  metamodel with `information_schema` (`EntityColumnSchemaChecks`). A new entity or column is
+  checked without being listed. A `varchar` column carries exactly its `length` (in H2 at most its
+  length); a column that is `NOT NULL` says `nullable = false` (an id or a primitive needs no
+  declaration) and one that allows null never does.
+- One convention for an unbounded (`text`) `String` column: `@Column(name = "...",
+  columnDefinition = "text")`, with no `length`. Do not use `columnDefinition = "clob"` (that is
+  only what H2 makes of it) and do not add `@Lob`: it has no place in a mapping that only documents
+  the schema and it changes how Hibernate binds the value. The guard enforces this. A column that
+  is `text` in PostgreSQL but `varchar(n)` in H2 is listed in `EntityColumnSchemaChecks`
+  (`H2_BOUNDED_TEXT`), so that difference is recorded rather than discovered by an insert.
 
 ## Submodule
 
