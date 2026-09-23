@@ -23,6 +23,7 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked
@@ -31,6 +32,22 @@ public interface RubyGemProtocolService<ID> {
   List<String> getGemNames(BaseRepoInfo<ID> repoInfo);
 
   List<GemCompactEntry> getCompactEntriesByGemName(BaseRepoInfo<ID> repoInfo, String gemName);
+
+  /**
+   * Resolves a {@code .gem} filename against the stored rows, trying each of {@link
+   * io.repsy.protocols.ruby.shared.utils.GemFilenameCandidates#split candidate} readings
+   * longest-name first and returning the first that matches a real gem and version. Unlike {@link
+   * #getCompactEntriesByGemName}, this never throws for an unresolved filename.
+   */
+  Optional<GemCompactEntry> findByGemFilename(BaseRepoInfo<ID> repoInfo, String filename);
+
+  /** Cheap existence check for {@code /info/<gemName>}: whether the gem has any row at all. */
+  boolean gemNameExists(BaseRepoInfo<ID> repoInfo, String gemName);
+
+  /**
+   * Cheap existence check for a gemspec: whether the gem has a non-yanked row at {@code version}.
+   */
+  boolean hasNonYankedVersion(BaseRepoInfo<ID> repoInfo, String gemName, String version);
 
   /**
    * Records the gem version and, while that write is still open, stores its file through {@code

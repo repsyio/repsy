@@ -23,9 +23,10 @@
  * (see `ruby-raw.ts`'s file header and `README.md`'s "Ruby runner" section for the raw evidence and
  * every H/RB-number these tests reference).
  *
- * Backend bugs confirmed live while building this suite (none fixed here -- each is now its own
- * Jira story, per this repo's e2e process; RB-2/RB-7/RB-8 are source/observation notes with no
- * ticket, see README.md's "Ruby runner" section for why):
+ * Backend bugs confirmed live while building this suite (RPS-1235/RPS-1236/RPS-1237/RPS-1238 are now
+ * fixed, their tests below no longer pinned; RPS-1233/RPS-1234 are each still their own open Jira
+ * story, per this repo's e2e process; RB-2/RB-7/RB-8 are source/observation notes with no ticket,
+ * see README.md's "Ruby runner" section for why):
  *  - **RPS-1233**: `quick/Marshal.4.8/<name>-<version>.gemspec.rz` has no backend route at all (`404
  *    unknownPath`) -- breaks `gem install`/`gem fetch`, though NOT `bundle install` (H1, see
  *    `ruby-raw.ts`'s file header).
@@ -33,12 +34,15 @@
  *    even though `required_ruby_version` is parsed and stored.
  *  - **RPS-1234**: `specs.4.8.gz`/`latest_specs.4.8.gz`/`prerelease_specs.4.8.gz` are zlib-deflated
  *    (RFC1950), not gzip (RFC1952).
- *  - **RPS-1235**: a yanked version is listed in `/info/<gem>` with a `-` prefix instead of being
- *    omitted, as the compact-index spec requires.
- *  - **RPS-1236**: a gem NAME containing a hyphen immediately followed by a digit (`foo-2fa`) cannot be
- *    downloaded -- `extractGemName`'s filename-parsing cuts at that boundary.
- *  - **RPS-1237** (observation, not routed around -- nothing in the catalog loop depends on `HEAD`
- *    meaning anything): `HEAD` on any path answers `200`, existence never checked.
+ *  - **RPS-1235** (fixed): a yanked version is now omitted from `/info/<gem>`, as the compact-index
+ *    spec requires, instead of being listed with a `-` prefix.
+ *  - **RPS-1236** (fixed): a gem NAME containing a hyphen immediately followed by a digit (`foo-2fa`)
+ *    now downloads by its own filename -- the download path resolves the filename against the DB
+ *    instead of re-deriving the name from it.
+ *  - **RPS-1237** (fixed): `HEAD` now mirrors the matching `GET` route's status (`200`/`404`)
+ *    instead of always answering `200`.
+ *  - **RPS-1238** (fixed): a yanked version's `.gem` file stays downloadable by exact URL, matching
+ *    rubygems.org -- yank only unpublishes from the index.
  */
 import zlib from 'node:zlib';
 
@@ -51,6 +55,7 @@ import {
   buildRawGem,
   bundleHostKey,
   gemFilename,
+  gemRelPath,
   gemspecRzRelPath,
   infoRelPath,
   md5Hex,
@@ -367,13 +372,15 @@ test.describe('ruby registry rules (raw HTTP)', () => {
       });
       expect(unknown.status, 'yanking a version that never existed').toBe(404);
 
-      // The yanked gem's .gem file 404s (RPS-1238, observation).
+      // Yank only unpublishes from the index; the .gem file stays downloadable by exact URL,
+      // matching rubygems.org (RPS-1238).
       const dl = await rawDownload(
         layout.repoName,
         admin,
         gemFilename(layout.packageName, '1.0.0'),
       );
-      expect(dl.status, 'a yanked gem file answers 404 (RPS-1238)').toBe(404);
+      expect(dl.status, 'a yanked gem file is still downloadable (RPS-1238)').toBe(200);
+      expect(dl.body, 'the bytes are unchanged').toEqual(built.bytes);
 
       // A yanked version cannot be re-pushed even under allowOverride:true.
       await seeder.setSettings(layout.repoName, {
@@ -502,17 +509,28 @@ test.describe('ruby registry rules (raw HTTP)', () => {
     },
   );
 
-  test(
-    'HEAD on any path answers 200, whether or not it exists (RPS-1237, observation)',
-    { tag: ['@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'head');
-      const admin = adminCredential();
+  test('HEAD mirrors GET’s status (RPS-1237)', { tag: ['@negative'] }, async ({ seeder }) => {
+    const layout = await newRepo(seeder, 'head');
+    const admin = adminCredential();
+    const built = await buildGem({ name: layout.packageName, version: '1.0.0' });
+    expectMsgId(await rawPublish(layout.repoName, admin, built.bytes), 200, undefined);
 
-      const res = await rawHead(layout.repoName, admin, 'this/path/never/existed');
-      expect(res.status, 'HEAD of a path that was never published').toBe(200);
-    },
-  );
+    const unknownPath = await rawHead(layout.repoName, admin, 'this/path/never/existed');
+    expect(unknownPath.status, 'HEAD of a path that was never published').toBe(404);
+
+    const unpublishedGem = await rawHead(
+      layout.repoName,
+      admin,
+      gemRelPath(gemFilename('never-published', '9.9.9')),
+    );
+    expect(unpublishedGem.status, 'HEAD of a .gem that was never published').toBe(404);
+
+    const publishedGem = await rawHead(layout.repoName, admin, gemRelPath(built.filename));
+    expect(publishedGem.status, 'HEAD of a published .gem').toBe(200);
+
+    const versions = await rawHead(layout.repoName, admin, versionsRelPath());
+    expect(versions.status, 'HEAD of /versions').toBe(200);
+  });
 
   test(
     'a platform gem: filename/info-line shape, yank needs the explicit platform (R14)',
@@ -576,8 +594,8 @@ test.describe('ruby registry rules (raw HTTP)', () => {
   );
 
   test(
-    'a gem name containing a hyphen immediately followed by a digit publishes fine but cannot be ' +
-      'downloaded (RPS-1236)',
+    'a gem name containing a hyphen immediately followed by a digit publishes and downloads by ' +
+      'its own filename (RPS-1236)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: true });
@@ -593,12 +611,8 @@ test.describe('ruby registry rules (raw HTTP)', () => {
       );
 
       const res = await rawDownload(repo.name, admin, built.filename);
-      test.fail(
-        true,
-        'RPS-1236: extractGemName cuts the filename at the first "-<digit>" boundary, so a name ' +
-          'containing one is looked up under the wrong storage key and 404s',
-      );
       expect(res.status, 'the gem downloads by its own filename').toBe(200);
+      expect(res.body).toEqual(built.bytes);
     },
   );
 

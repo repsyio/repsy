@@ -33,7 +33,6 @@ import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
 @Slf4j
@@ -84,57 +83,44 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
     return CompactIndexFormatter.formatGemInfo(entries);
   }
 
+  /**
+   * Serves the bytes of a published gem file by its own filename, resolved against the stored rows
+   * rather than re-derived from the filename (RPS-1236). A yanked version's file is still served:
+   * yank only stops the index advertising the version, matching rubygems.org, where yank is an
+   * unpublish-from-index, not a takedown (RPS-1238).
+   */
   @Override
   public Resource downloadGem(final ProtocolContext context, final String filename) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    this.checkNotYanked(repoInfo, filename);
-    return this.storageService.getGem(repoInfo.getStorageKey(), repoInfo.getName(), filename);
+    final var entry =
+        this.gemService
+            .findByGemFilename(repoInfo, filename)
+            .orElseThrow(() -> new ItemNotFoundException("gemNotFound"));
+    return this.storageService.getGem(
+        repoInfo.getStorageKey(),
+        repoInfo.getName(),
+        entry.getGemName(),
+        entry.getVersion(),
+        entry.getPlatform());
   }
 
-  private void checkNotYanked(final BaseRepoInfo<ID> repoInfo, final String filename) {
-    final var parsed = parseGemFilename(filename);
-    if (parsed == null) {
-      return;
-    }
-    final var yanked =
-        this.gemService.getCompactEntriesByGemName(repoInfo, parsed[0]).stream()
-            .anyMatch(e -> e.isYanked() && parsed[1].equals(e.getVersion()));
-    if (yanked) {
-      throw new ItemNotFoundException("gemVersionNotFound");
-    }
+  @Override
+  public boolean gemExists(final ProtocolContext context, final String gemName) {
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    return this.gemService.gemNameExists(repoInfo, gemName);
   }
 
-  private static String @Nullable [] parseGemFilename(final String filename) {
-    if (!filename.endsWith(".gem")) {
-      return null;
-    }
-    final var base = filename.substring(0, filename.length() - ".gem".length());
-    final var boundary = findBoundary(base);
-    if (boundary < 0) {
-      return null;
-    }
-    return new String[] {base.substring(0, boundary), parseVersion(base.substring(boundary + 1))};
+  @Override
+  public boolean gemFileExists(final ProtocolContext context, final String filename) {
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    return this.gemService.findByGemFilename(repoInfo, filename).isPresent();
   }
 
-  private static int findBoundary(final String s) {
-    for (var i = 0; i < s.length() - 1; i++) {
-      if (s.charAt(i) == '-' && Character.isDigit(s.charAt(i + 1))) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
-  private static String parseVersion(final String versionAndPlatform) {
-    final var lastDash = versionAndPlatform.lastIndexOf('-');
-    if (lastDash < 0) {
-      return versionAndPlatform;
-    }
-    final var platformPart = versionAndPlatform.substring(lastDash + 1);
-    if (platformPart.isEmpty() || Character.isDigit(platformPart.charAt(0))) {
-      return versionAndPlatform;
-    }
-    return versionAndPlatform.substring(0, lastDash);
+  @Override
+  public boolean gemspecExists(
+      final ProtocolContext context, final String name, final String version) {
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    return this.gemService.hasNonYankedVersion(repoInfo, name, version);
   }
 
   @Override

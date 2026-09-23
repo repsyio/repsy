@@ -32,6 +32,18 @@ public interface RubyProtocolFacade {
 
   Resource downloadGem(ProtocolContext context, String filename);
 
+  /** Cheap existence check for {@code /info/<gemName>}, used by HEAD (RPS-1237). */
+  boolean gemExists(ProtocolContext context, String gemName);
+
+  /** Cheap existence check for {@code /gems/<filename>.gem}, used by HEAD (RPS-1237). */
+  boolean gemFileExists(ProtocolContext context, String filename);
+
+  /**
+   * Cheap existence check for {@code /quick/Marshal.4.8/<name>-<version>.gemspec.rz}, used by HEAD
+   * (RPS-1237). Mirrors {@link #getGemspec}'s own filtering: a yanked version does not count.
+   */
+  boolean gemspecExists(ProtocolContext context, String name, String version);
+
   byte[] getGemspec(ProtocolContext context, String name, String version);
 
   void publishGem(ProtocolContext context, SpooledUpload gem) throws IOException;

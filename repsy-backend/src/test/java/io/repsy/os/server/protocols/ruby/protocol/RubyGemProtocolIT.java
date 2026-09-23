@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -141,6 +142,147 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
             .getContentAsString();
 
     assertThat(body).isEqualTo("Successfully yanked gem: pushed-gem (1.2.3)");
+  }
+
+  @Test
+  @DisplayName(
+      "a gem whose name contains a hyphen immediately followed by a digit downloads by its own "
+          + "filename (RPS-1236)")
+  void downloadsGemWhoseNameContainsAHyphenDigit() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    final var gemBytes = gem("x-2fa", "1.0.0");
+    this.push(repo.getName(), gemBytes, this.adminProtocolBearerToken()).andExpect(status().isOk());
+
+    final var downloaded =
+        this.protocol(
+                get("/{repo}/gems/x-2fa-1.0.0.gem", repo.getName())
+                    .header(AUTHORIZATION, this.adminProtocolBearerToken()))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    assertThat(downloaded).isEqualTo(gemBytes);
+  }
+
+  @Test
+  @DisplayName("a platform gem downloads by its platform-suffixed filename (RPS-1236)")
+  void downloadsPlatformGem() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    final var gemBytes = gem("platform-gem", "1.0.0", "java", "fixture");
+    this.push(repo.getName(), gemBytes, this.adminProtocolBearerToken()).andExpect(status().isOk());
+
+    final var downloaded =
+        this.protocol(
+                get("/{repo}/gems/platform-gem-1.0.0-java.gem", repo.getName())
+                    .header(AUTHORIZATION, this.adminProtocolBearerToken()))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    assertThat(downloaded).isEqualTo(gemBytes);
+  }
+
+  @Test
+  @DisplayName(
+      "a yanked version is omitted from /info but still marked '-' in /versions (RPS-1235)")
+  void yankedVersionIsOmittedFromInfoButMarkedInVersions() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    final var token = this.adminProtocolBearerToken();
+    this.push(repo.getName(), gem("pushed-gem", "1.2.3"), token).andExpect(status().isOk());
+    this.push(repo.getName(), gem("pushed-gem", "2.0.0"), token).andExpect(status().isOk());
+
+    this.protocol(
+            delete("/{repo}/api/v1/gems/yank", repo.getName())
+                .header(AUTHORIZATION, token)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .param("gem_name", "pushed-gem")
+                .param("version", "1.2.3"))
+        .andExpect(status().isOk());
+
+    // saveVersionsChecksum's @Modifying bulk UPDATE does not refresh the RubyGem entity already
+    // cached in this test's one shared persistence context (each real request gets its own, so
+    // this is a test-only artifact); clear it so the /versions read below sees the fresh checksum.
+    this.entityManager.flush();
+    this.entityManager.clear();
+
+    final var info =
+        this.protocol(get("/{repo}/info/pushed-gem", repo.getName()).header(AUTHORIZATION, token))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(info).contains("2.0.0").doesNotContain("1.2.3");
+
+    final var versions =
+        this.protocol(get("/{repo}/versions", repo.getName()).header(AUTHORIZATION, token))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(versions).contains("-1.2.3");
+  }
+
+  @Test
+  @DisplayName(
+      "a yanked gem's file stays downloadable, and /info forgets the version "
+          + "(RPS-1235/RPS-1238)")
+  void yankedGemFileIsStillDownloadable() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    final var token = this.adminProtocolBearerToken();
+    final var gemBytes = gem("pushed-gem", "1.2.3");
+    this.push(repo.getName(), gemBytes, token).andExpect(status().isOk());
+
+    this.protocol(
+            delete("/{repo}/api/v1/gems/yank", repo.getName())
+                .header(AUTHORIZATION, token)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .param("gem_name", "pushed-gem")
+                .param("version", "1.2.3"))
+        .andExpect(status().isOk());
+
+    final var downloaded =
+        this.protocol(
+                get("/{repo}/gems/pushed-gem-1.2.3.gem", repo.getName())
+                    .header(AUTHORIZATION, token))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+    assertThat(downloaded).isEqualTo(gemBytes);
+
+    final var info =
+        this.protocol(get("/{repo}/info/pushed-gem", repo.getName()).header(AUTHORIZATION, token))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+    assertThat(info).doesNotContain("1.2.3");
+  }
+
+  @Test
+  @DisplayName("HEAD mirrors GET's status (RPS-1237)")
+  void headMirrorsGetStatus() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    final var token = this.adminProtocolBearerToken();
+    this.push(repo.getName(), gem("pushed-gem", "1.2.3"), token).andExpect(status().isOk());
+
+    this.protocol(
+            head("/{repo}/gems/pushed-gem-1.2.3.gem", repo.getName()).header(AUTHORIZATION, token))
+        .andExpect(status().isOk());
+
+    this.protocol(
+            head("/{repo}/gems/never-published-9.9.9.gem", repo.getName())
+                .header(AUTHORIZATION, token))
+        .andExpect(status().isNotFound());
+
+    this.protocol(head("/{repo}/versions", repo.getName()).header(AUTHORIZATION, token))
+        .andExpect(status().isOk());
+
+    this.protocol(
+            head("/{repo}/this/path/never/existed", repo.getName()).header(AUTHORIZATION, token))
+        .andExpect(status().isNotFound());
   }
 
   @Test

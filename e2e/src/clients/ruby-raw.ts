@@ -54,16 +54,17 @@
  *    `allowOverride:false` is refused with **`409 gemVersionAlreadyExists`** (`ErrorHandler` maps
  *    `ItemAlreadyExistException` to `CONFLICT`) -- confirmed live, a REAL, genuine conflict outcome
  *    (like nuget/helm/golang), not maven's 403.
- *  - `GET /<repo>/gems/<file>.gem`: `permission: READ`, `application/octet-stream`; every exception
- *    (including a yanked version, `checkNotYanked`) becomes a bodyless `404`.
+ *  - `GET /<repo>/gems/<file>.gem`: `permission: READ`, `application/octet-stream`; a gem is
+ *    resolved by filename against the DB, longest-name-first (RPS-1236, fixed), and a yanked
+ *    version's file stays servable (RPS-1238, fixed) -- any other resolution failure is a bodyless
+ *    `404`.
  *  - `GET /<repo>/versions`: `text/plain`, `created_at: <now>\n---\n<name> <v1,v2,-yankedv> <md5>\n...`
  *    (sorted by name); the `created_at` value changes on every request (never compare it across
  *    calls). The per-gem `md5` is `md5Hex` of that gem's own `/info` body (`CompactIndexFormatter`).
- *  - `GET /<repo>/info/<gem>`: `text/plain`, one line per version **including yanked ones, prefixed
- *    `-`** (RPS-1235: the compact-index spec says a yanked version should be OMITTED from `/info`
- *    entirely, only excluded there -- Repsy instead lists it with a `-` prefix, confirmed live).
- *    **No `ruby:`/`rubygems:` requirement keys are ever emitted** (RB-2, confirmed live:
- *    `CompactIndexFormatter.appendVersionLine` never writes them, even though
+ *  - `GET /<repo>/info/<gem>`: `text/plain`, one line per version, **yanked ones OMITTED entirely**
+ *    (RPS-1235, fixed: the compact-index spec requires that; the `-` prefix stays the `/versions`
+ *    convention only). **No `ruby:`/`rubygems:` requirement keys are ever emitted** (RB-2, confirmed
+ *    live: `CompactIndexFormatter.appendVersionLine` never writes them, even though
  *    `required_ruby_version` is parsed and stored) -- this is exactly why Bundler's `FetchMetadata`
  *    lazy remote-spec fetch is never triggered for a plain gem (H1's refutation). Unknown gem ->
  *    `404 gemNotFound`.
@@ -80,13 +81,13 @@
  *    default `ruby`): `MANAGE` permission (admin, or any non-read-only deploy token -- a read-only
  *    token or a `USER`-role password gets `401`, confirmed live). `200 text/plain "Successfully
  *    yanked gem: ..."`; already yanked -> `400 gemVersionAlreadyYanked`; unknown -> `404`. A yanked
- *    version's `.gem` file answers `404` on download (confirmed live) -- unlike real rubygems.org,
- *    which keeps serving a yanked file's bytes so existing lockfiles still resolve (RPS-1238, an
- *    observation, not independently forced beyond this one live check). A yanked version CANNOT be
- *    re-pushed even under `allowOverride:true` (still `409`, confirmed live); a version removed via
- *    the panel API (a real delete, not a yank) CAN be re-pushed with `200`.
- *  - `HEAD` on ANY path (an existing one included) is `200` empty, existence never checked (RPS-1237,
- *    confirmed live -- the pypi/nuget analogue).
+ *    version's `.gem` file stays downloadable (`200`, unchanged bytes), matching real rubygems.org,
+ *    where yank only unpublishes from the index so existing lockfiles still resolve (RPS-1238,
+ *    fixed). A yanked version CANNOT be re-pushed even under `allowOverride:true` (still `409`,
+ *    confirmed live); a version removed via the panel API (a real delete, not a yank) CAN be
+ *    re-pushed with `200`.
+ *  - `HEAD` mirrors the matching `GET` route's status (`200`/`404`) instead of always answering
+ *    `200` (RPS-1237, fixed).
  *  - Auth (`RubyAuthPreProcessor`, priority 100): skipped only for a public-repo READ. A
  *    missing/unparseable `Authorization` is a bodyless `401` + `WWW-Authenticate: Basic
  *    realm="Repsy Managed Repository"`. `normalizeAuthHeader` Bearer-prefixes any value that does not
@@ -133,12 +134,13 @@ function repoUrl(repoName: string): string {
 
 /**
  * `e2e_<runid>_<scenario.id with [^a-z0-9] -> _>` -- UNDERSCORES, deliberately NOT hyphens (unlike
- * every other protocol's `packageName`). Reason (RPS-1236, confirmed live): a gem name containing a
- * hyphen immediately followed by a digit (`foo-2fa`) cannot be downloaded --
- * `AbstractRubyStorageService#extractGemName`'s `VERSION_START` pattern (`-(?=\d)`) cuts the
- * filename at the first such boundary, so a name published as `foo-2fa` is looked up under storage
- * key `foo` and 404s. `REPSY_E2E_RUN_ID` can start with a digit, so a hyphenated name risks tripping
- * this exact bug by accident on every run; an underscore-only name avoids it entirely.
+ * every other protocol's `packageName`). Reason (RPS-1236, fixed): a gem name containing a hyphen
+ * immediately followed by a digit (`foo-2fa`) used to be undownloadable -- the download path
+ * re-derived the name from the filename by positional splitting instead of resolving it against the
+ * DB. That is fixed now (see `registry-rules.spec.ts`'s dedicated hyphen-digit test), but this
+ * helper stays underscore-only regardless, since `REPSY_E2E_RUN_ID` can start with a digit and a
+ * hyphenated name risks tripping this exact case by accident on every run; an underscore-only name
+ * avoids it entirely.
  */
 export function packageName(runId: string, scenario: Scenario): string {
   return `e2e_${runId}_${scenario.id.replace(/[^a-z0-9]/gi, '_').toLowerCase()}`;
@@ -416,7 +418,7 @@ export async function rawGet(
   return rawFetch(`${repoUrl(repoName)}/${relPath}`, { headers: rawAuthHeaderFor(credential) });
 }
 
-/** Raw `HEAD` of any path (RPS-1237: always `200`, existence never checked). */
+/** Raw `HEAD` of any path; mirrors the matching `GET` route's status (RPS-1237, fixed). */
 export async function rawHead(
   repoName: string,
   credential: MaterializedCredential,

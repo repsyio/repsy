@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.ruby.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
+import io.repsy.protocols.ruby.protocol.facades.contract.RubyProtocolFacade;
 import io.repsy.protocols.ruby.protocol.handlers.AbstractRubyHeadHandler;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -28,7 +29,8 @@ public class RubyHeadHandler extends AbstractRubyHeadHandler {
 
   public RubyHeadHandler(
       @Qualifier("osRubyPathParser") final PathParser basePathParser,
+      final RubyProtocolFacade facade,
       final RubyProtocolProvider provider) {
-    super(basePathParser, provider);
+    super(basePathParser, facade, provider);
   }
 }

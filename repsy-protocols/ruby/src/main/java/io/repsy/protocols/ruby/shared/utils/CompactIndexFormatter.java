@@ -88,6 +88,13 @@ public class CompactIndexFormatter {
     return buildInfoBody(entries);
   }
 
+  /**
+   * The Compact Index spec never lists a yanked version in {@code /info}: it is excluded from the
+   * file entirely, not marked. ({@code /versions} is where {@code -} marks a yanked version; see
+   * {@link #formatVersionEntry}.) {@code lastModified} is deliberately computed from the unfiltered
+   * {@code entries}, so a gem whose only version is yanked still gets a real {@code created_at}
+   * instead of the epoch.
+   */
   private static String buildInfoBody(final List<GemCompactEntry> entries) {
     final var lastModified =
         entries.stream()
@@ -96,24 +103,16 @@ public class CompactIndexFormatter {
             .orElse(Instant.EPOCH);
     final var sb = new StringBuilder();
     appendPreamble(sb, lastModified);
-    for (final var entry : entries) {
-      appendVersionLine(sb, entry);
-    }
+    entries.stream().filter(e -> !e.isYanked()).forEach(e -> appendVersionLine(sb, e));
     return sb.toString();
   }
 
   private static void appendVersionLine(final StringBuilder sb, final GemCompactEntry entry) {
-    if (entry.isYanked()) {
-      sb.append('-');
-    }
     sb.append(entry.getVersion());
     if (!DEFAULT_PLATFORM.equals(entry.getPlatform())) {
       sb.append('-').append(entry.getPlatform());
     }
-    sb.append(' ');
-    if (!entry.isYanked()) {
-      sb.append(formatDeps(entry.getRuntimeDependencies()));
-    }
+    sb.append(' ').append(formatDeps(entry.getRuntimeDependencies()));
     sb.append('|').append(CHECKSUM_PREFIX).append(entry.getChecksum()).append('\n');
   }
 

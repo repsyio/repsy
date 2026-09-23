@@ -169,8 +169,8 @@ e2e/
       publish-consume.spec.ts   # registerPublishConsumeLoop(golangAdapter) + go-get-build-run, plain-http-creds-refused, dirhash cross-check, mixed-case and wire-trace real-client tests
       registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, upload URL spellings, sha256, immutability, zip validation, @v/list/@latest, sumdb, HEAD, delete+reupload) + G1/G2/G10 candidates
     ruby/
-      publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install/gem-fetch (RPS-1233/RPS-1234, test.fail), anonymous-push, yank (RPS-1235), USER-role-push, bundle-install-e2e real-client tests
-      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow, specs.4.8.gz zlib, gemspec.rz 404, HEAD-always-200, platform gem, RPS-1236) + RPS-1233/RPS-1234/RPS-1235/RPS-1236/RPS-1237 candidates
+      publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install/gem-fetch (RPS-1233/RPS-1234, test.fail), anonymous-push, yank (RPS-1235, fixed), USER-role-push, bundle-install-e2e real-client tests
+      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow incl. RPS-1238 fixed, specs.4.8.gz zlib, gemspec.rz 404, HEAD mirrors GET incl. RPS-1237 fixed, platform gem, RPS-1236 fixed) + RPS-1233/RPS-1234 candidates
 ```
 
 ## Setup
@@ -2027,7 +2027,8 @@ end`) and a real `bundle install --verbose`, plus an auth-only raw `GET /info/<n
   `e2e-marker.txt`; `AdapterResult.contentSha256` is the sha256 of the WHOLE `.gem` file (Bundler's
   cache renames the downloaded gem into place byte-for-byte, confirmed live).
 - **`packageName(runId, scenario)` is underscore-only** (`e2e_<runid>_<scenario.id, underscored>`),
-  deliberately NOT hyphenated like every other protocol's `packageName` — see "RPS-1236" below for why.
+  deliberately NOT hyphenated like every other protocol's `packageName` — see "RPS-1236 (fixed)" below
+  for why; the helper stays underscore-only regardless of the fix.
 - **Credential mapping** (`ruby-raw.ts`'s `apiKeyFor`/`bundleCredentialsValue`, both confirmed live):
   `GEM_HOST_API_KEY` for `gem push` (the raw deploy-token secret for a `token`-kind credential,
   `Basic <base64(user:pass)>` for a `password`-kind one); `BUNDLE_<HOSTKEY>=user:secret` (Bundler's own
@@ -2085,13 +2086,14 @@ Authorization spellings (R1/R3); the happy-path shape of `/names`/`/versions`/`/
 RB-2 observation that no `ruby:`/`rubygems:` keys are ever emitted (R2/R9); the override rule's
 row-first ordering, re-verifying RPS-1060 still holds for Ruby (R4); malformed-gem 400s leaving
 nothing stored (R6); the full yank flow — success, re-yank refusal, a read-only token/USER-role
-password both refused with 401 (`MANAGE` permission), a yanked version's `.gem` file 404ing, and a
-yanked version rejecting even an `allowOverride:true` re-push (R8); a panel-API delete (not a yank)
+password both refused with 401 (`MANAGE` permission), a yanked version's `.gem` file staying
+downloadable (R8, RPS-1238, fixed), and a yanked version rejecting even an `allowOverride:true`
+re-push (R8); a panel-API delete (not a yank)
 allowing a clean re-publish (R5/R16); `specs.4.8.gz`'s zlib-not-gzip bytes and the prerelease/latest
 split (R9, RPS-1234); the missing `gemspec.rz` route (R10, RPS-1233); unknown-gem 404s and an empty repo's
-listings (R11); `HEAD`-always-200 (R12, RPS-1237 observation); a platform gem's filename/info-line shape
-and yank's explicit-platform requirement (R14); that `releases`/`snapshots` are never read (R15); and
-RPS-1236's hyphen-before-digit download bug (R13).
+listings (R11); `HEAD` mirroring GET's status (R12, RPS-1237, fixed); a platform gem's filename/info-line
+shape and yank's explicit-platform requirement (R14); that `releases`/`snapshots` are never read (R15);
+and RPS-1236's hyphen-before-digit download case (R13, fixed).
 
 ### H1-H20, RPS-1233-RPS-1238: confirmed live
 
@@ -2137,10 +2139,12 @@ adapter code was written.
   dedicated `gem fetch` real-client test (`test.fail()`).
 - **H12** (`gem install --source` fails on the missing `gemspec.rz` route): confirmed live — RPS-1233, and
   the dedicated `gem install` real-client test (`test.fail()`).
-- **H13** (a yanked version is listed in `/info` prefixed `-`, not omitted): confirmed live — RPS-1235.
+- **H13** (a yanked version is listed in `/info` prefixed `-`, not omitted): confirmed live — RPS-1235,
+  now fixed (`/info` omits it entirely; the `-` prefix stays the `/versions` convention).
 - **H14** (a gem named with a `-<digit>` segment publishes but cannot be downloaded): confirmed live —
-  RPS-1236, `registry-rules.spec.ts`'s dedicated test (`test.fail()`); this is exactly why `packageName()`
-  is underscore-only, avoiding the bug by construction rather than merely documenting it.
+  RPS-1236, now fixed (`registry-rules.spec.ts`'s dedicated test, no longer `test.fail()`-pinned);
+  `packageName()` stays underscore-only regardless, avoiding the case by construction rather than
+  relying on the fix alone.
 - **H15** (`Seeder.cleanup()` deletes a Ruby repo holding gems; a sweep afterwards lists nothing; two
   full runs without a stack reset are identical): confirmed by construction — every test in this suite
   ran under the shared `seeder` fixture and left no `e2e-*` repos behind (see "Verification" below).
@@ -2182,26 +2186,30 @@ unknownPath`. Breaks `gem install --source`/`gem fetch` (confirmed live, `test.f
   `gunzipSync` throws, `inflateSync` succeeds and yields a valid Marshal 4.8 stream; a real `gem
 fetch` fails. `test.fail()`-pinned in both `registry-rules.spec.ts` (R9) and a dedicated
   `publish-consume.spec.ts` real-client test.
-- **RPS-1235** — a yanked version is listed in `/info/<gem>` with a `-` prefix instead of being OMITTED
-  entirely, which is what the compact-index protocol (as implemented by rubygems.org and read by a
-  real Bundler client, which simply treats a `-`-prefixed line as "this version is yanked, still
-  worth knowing about") actually expects for its own internal bookkeeping — RubyGems' own compact-
-  index spec document is explicit that a yanked version's line is a real, meaningful part of the
-  format (not an error), so this is a matter of taste more than a clear-cut violation; flagged here
-  as a candidate for the coordinator to judge, not asserted as unambiguously wrong. Confirmed live:
-  `registry-rules.spec.ts`'s happy-path test, `publish-consume.spec.ts`'s dedicated yank test
-  (`test.fail()`).
-- **RPS-1236** — a gem NAME containing a hyphen immediately followed by a digit (e.g. `foo-2fa`) publishes
-  successfully (the DB row keys off the name/id, not the filename) but its `.gem` file can never be
-  downloaded: `AbstractRubyStorageService`'s `extractGemName`/`VERSION_START` pattern (`-(?=\d)`) cuts
-  the filename at the FIRST such boundary, looking the file up under storage key `foo` instead of
-  `foo-2fa`, which 404s. Confirmed live: `registry-rules.spec.ts`'s dedicated test (`test.fail()`).
-  This is why `ruby.ts`'s/`ruby-raw.ts`'s `packageName()` is underscore-only (unlike every other
-  protocol's hyphenated one): `REPSY_E2E_RUN_ID` can start with a digit, so a hyphenated scenario name
-  risked tripping this exact bug by accident on every run.
-- **RPS-1237** (observation, not routed around — nothing in the catalog loop depends on `HEAD` meaning
-  anything) — `HEAD` on ANY path answers `200` empty, existence never checked at all (the pypi/nuget
-  analogue). Confirmed live: `registry-rules.spec.ts`'s dedicated test.
+- **RPS-1235 (fixed)** — a yanked version used to be listed in `/info/<gem>` with a `-` prefix instead
+  of being OMITTED entirely, which is what the compact-index spec requires (the `-` prefix is the
+  `/versions` endpoint's own convention, not `/info`'s). Fixed by filtering yanked entries inside
+  `CompactIndexFormatter.buildInfoBody`, computed from the unfiltered list so `created_at` stays
+  correct even for an all-yanked gem. `registry-rules.spec.ts`'s happy-path test and
+  `publish-consume.spec.ts`'s dedicated yank test assert the omission directly now (no longer
+  `test.fail()`-pinned).
+- **RPS-1236 (fixed)** — a gem NAME containing a hyphen immediately followed by a digit (e.g. `foo-2fa`)
+  published successfully (the DB row keys off the name/id, not the filename) but its `.gem` file could
+  never be downloaded: `AbstractRubyStorageService`'s `extractGemName`/`VERSION_START` pattern
+  (`-(?=\d)`) cut the filename at the FIRST such boundary, looking the file up under storage key `foo`
+  instead of `foo-2fa`, which 404d. Fixed by resolving the filename against the DB instead
+  (`GemFilenameCandidates.split` tries every candidate `(name, version, platform)` reading,
+  longest-name-first, validated against real rows via the new `findByGemFilename`); `getGem` now takes
+  the resolved `(gemName, version, platform)` directly rather than parsing them from the filename.
+  `registry-rules.spec.ts`'s dedicated test asserts the download succeeds now (no longer
+  `test.fail()`-pinned). `ruby.ts`'s/`ruby-raw.ts`'s `packageName()` stays underscore-only regardless
+  (unlike every other protocol's hyphenated one), since `REPSY_E2E_RUN_ID` can start with a digit and
+  a hyphenated scenario name would otherwise risk tripping this exact case by accident on every run.
+- **RPS-1237 (fixed)** — `HEAD` on ANY path used to answer `200` empty, existence never checked at all
+  (the pypi/nuget analogue). Fixed: `AbstractRubyHeadHandler` now dispatches per path kind with
+  existence-only checks (`gemExists`/`gemFileExists`/`gemspecExists` on the facade, the `.gem` case
+  reusing RPS-1236's `findByGemFilename` resolver) and mirrors the matching `GET` route's `200`/`404`.
+  `registry-rules.spec.ts`'s dedicated test now asserts the mirrored status directly.
 - **RB-7** (observation from source, not independently forced live) — `RubyGemDownloadHandler`'s
   `downloadGem` swallows every exception (`catch (Exception)`) into a bodyless `404`, so a genuine
   server error (a storage backend outage, say) would be indistinguishable from "this gem does not
@@ -2216,12 +2224,14 @@ fetch` fails. `test.fail()`-pinned in both `registry-rules.spec.ts` (R9) and a d
   built-in "highest version wins" latest-tracking behavior either — a real `gem push` never coerces
   ordering). Not filed as a bug: this is a naming/documentation nit at most, not a functional defect,
   and no test in this harness asserts a particular `latest` value.
-- **RPS-1238** (observation) — a yanked version's `.gem` file answers `404` on download. Real
+- **RPS-1238 (fixed)** — a yanked version's `.gem` file used to answer `404` on download. Real
   rubygems.org keeps serving a yanked gem's file bytes (only the index stops advertising it), so
   existing `Gemfile.lock`s that pin a yanked version can still `bundle install` from cache/mirrors
-  elsewhere; Repsy's `checkNotYanked` refuses the file outright, which would break that same flow.
-  Confirmed live: `registry-rules.spec.ts`'s yank test. Plausible as a deliberate simplification
-  rather than an oversight (no ticket filed without the coordinator's judgment call).
+  elsewhere; Repsy's `checkNotYanked` refused the file outright, breaking that same flow. Fixed by
+  dropping the `checkNotYanked` check from `downloadGem` — yank now only unpublishes from the index,
+  matching rubygems.org; a genuine takedown still goes through panel delete, which removes the row
+  and the file. `registry-rules.spec.ts`'s yank test now asserts the download succeeds with unchanged
+  bytes.
 
 ### RB-0 — RPS-1060 re-verified, no regression
 

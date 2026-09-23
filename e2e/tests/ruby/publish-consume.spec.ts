@@ -28,8 +28,8 @@
  *  - "gem fetch fails on the specs.4.8.gz zlib/gzip mismatch" (RPS-1234 via `gem`, `test.fail()`).
  *  - "anonymous gem push exits 1 promptly, no push request ever sent" (H4): the fixture's own
  *    fingerprint proves nothing was stored.
- *  - "gem yank with a RW token succeeds, and the yanked version is listed with a '-' prefix in
- *    /info instead of being omitted" (RPS-1235, `test.fail()` on the omission expectation only).
+ *  - "gem yank with a RW token succeeds, and the yanked version is omitted from /info" (RPS-1235,
+ *    fixed -- no longer a `test.fail()` pin).
  *  - "gem push with a USER-role Basic credential" (H3, the panel's own documented convention: `bundle
  *    config <url> user:pass`/`~/.gem/credentials`'s `Basic base64(user:pass)` line).
  */
@@ -169,8 +169,7 @@ test(
 );
 
 test(
-  'ruby > gem yank with a RW token succeeds; the yanked version is listed (not omitted) with a ' +
-    "'-' prefix in /info (RPS-1235)",
+  'ruby > gem yank with a RW token succeeds; the yanked version is omitted from /info (RPS-1235)',
   { tag: ['@negative'] },
   async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: true });
@@ -201,11 +200,6 @@ test(
     const entries = parseInfo(infoRes.body);
     const entry = entries.find((e) => e.version === version);
 
-    test.fail(
-      true,
-      'RPS-1235: the compact-index spec says a yanked version should be OMITTED from /info entirely -- ' +
-        "Repsy instead keeps listing it, prefixed '-'",
-    );
     expect(entry, 'the yanked version is omitted from /info, as the spec requires').toBeUndefined();
   },
 );
