@@ -14,16 +14,16 @@
 /// limitations under the License.
 ///
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, Input } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 
+import { NuGetVersionInfo, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
-import { NugetVersionInfo } from '../../dto/nuget-version-info';
 import { NugetService } from '../../service/nuget.service';
 import { NugetPackagesVersionDetailComponent } from './nuget-packages-version-detail.component';
 
@@ -40,13 +40,14 @@ describe('NugetPackagesVersionDetailComponent README', () => {
   let nugetService: jasmine.SpyObj<NugetService>;
 
   async function render(readme: string | undefined): Promise<HTMLElement> {
-    const versionInfo = Object.assign(new NugetVersionInfo(), {
+    const versionInfo: NuGetVersionInfo = {
       packageId: 'Acme.Lib',
       version: '1.2.3',
       listed: true,
       downloadCount: 0,
+      publishedAt: '2026-01-01T00:00:00Z',
       readme,
-    });
+    };
     nugetService.fetchPackageVersion.and.resolveTo(versionInfo);
 
     const fixture: ComponentFixture<NugetPackagesVersionDetailComponent> = TestBed.createComponent(
@@ -59,9 +60,13 @@ describe('NugetPackagesVersionDetailComponent README', () => {
   }
 
   beforeEach(() => {
-    const repoChanges = new BehaviorSubject<RepoPermissionInfo>(
-      Object.assign(new RepoPermissionInfo(), { repoName: 'nuget-repo' }),
-    );
+    const repoChanges = new BehaviorSubject<RepoPermissionInfo>({
+      repoName: 'nuget-repo',
+      canRead: true,
+      canWrite: false,
+      canManage: false,
+      private: false,
+    });
     nugetService = jasmine.createSpyObj<NugetService>('NugetService', ['fetchPackageVersion'], {
       repoChanges,
     });
@@ -118,5 +123,21 @@ describe('NugetPackagesVersionDetailComponent README', () => {
     const el = await render('  \n\n ');
 
     expect(el.querySelector('[data-testid="readme"]')).toBeNull();
+  });
+
+  it('shows the server message on the page, without a second toast, when the version cannot be loaded', async () => {
+    nugetService.fetchPackageVersion.and.rejectWith(
+      new HttpErrorResponse({ status: 404, error: { text: 'Version not found' } }),
+    );
+    const fixture = TestBed.createComponent(NugetPackagesVersionDetailComponent);
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.error).toBe('Version not found');
+    expect(fixture.componentInstance.loading).toBeFalse();
+    expect(TestBed.inject(ToastService).show).not.toHaveBeenCalled();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Version not found');
   });
 });

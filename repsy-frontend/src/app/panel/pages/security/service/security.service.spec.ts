@@ -27,17 +27,10 @@ import {
   VersionSecuritySummary,
   VulnerabilityScanControllerService,
 } from '../../../../../generated/api';
-import { AuthService } from '../../../../auth/pages/service/auth.service';
-import {
-  describeAuthorizationHeader,
-  FakeAuthService,
-  fakeAuthService,
-} from '../../../shared/testing/authorization-header-spec-helpers';
+import { describeNoAuthorizationHeader } from '../../../shared/testing/authorization-header-spec-helpers';
 import { CallCase, describeCalls, restResponse } from '../../repository/testing/protocol-service-spec-helpers';
 import { SecurityService } from './security.service';
 
-const TOKEN = 'access-token';
-const BEARER = `Bearer ${TOKEN}`;
 const REPO = 'acme-repo';
 const ARTIFACT = 'acme-artifact';
 const SCANS: PagedModelVulnerabilityScanInfo = {
@@ -54,7 +47,6 @@ const SCANS_SUMMARY: SecurityScansSummary = { criticalCount: 1, highCount: 2, to
 describe('SecurityService', () => {
   let scanApi: jasmine.SpyObj<SecurityScanControllerService>;
   let vulnerabilityApi: jasmine.SpyObj<VulnerabilityScanControllerService>;
-  let authService: FakeAuthService;
   let service: SecurityService;
 
   beforeEach(() => {
@@ -69,25 +61,23 @@ describe('SecurityService', () => {
       'getRepoSecurityDetail',
       'getArtifactSecurityDetail',
     ]);
-    authService = fakeAuthService(TOKEN);
     TestBed.configureTestingModule({
       providers: [
         { provide: SecurityScanControllerService, useValue: scanApi },
         { provide: VulnerabilityScanControllerService, useValue: vulnerabilityApi },
-        { provide: AuthService, useValue: authService },
       ],
     });
     service = TestBed.inject(SecurityService);
   });
 
-  // The four calls without the header are deliberate here: the generated client has no `authorization` parameter for
-  // those operations, so the toHaveBeenCalledOnceWith arguments below double as the "no header" assertion (RPS-1161).
+  // No call passes an `authorization` argument: the generated client has no such parameter for any operation, so the
+  // toHaveBeenCalledOnceWith arguments below double as the "no header" assertion (RPS-1161).
   const cases: CallCase<SecurityService>[] = [
     {
       name: 'listScans with every filter',
       invoke: (s) => s.listScans(Severity.High, RepoType.Maven, REPO, 1, 20),
       api: () => scanApi.listSecurityScans,
-      args: [BEARER, 'HIGH', 'MAVEN', REPO, 1, 20],
+      args: ['HIGH', 'MAVEN', REPO, 1, 20],
       response: restResponse(SCANS),
       expected: SCANS,
     },
@@ -95,7 +85,7 @@ describe('SecurityService', () => {
       name: 'listScans without filters',
       invoke: (s) => s.listScans(),
       api: () => scanApi.listSecurityScans,
-      args: [BEARER, undefined, undefined, undefined, undefined, undefined],
+      args: [undefined, undefined, undefined, undefined, undefined],
       response: restResponse(SCANS),
       expected: SCANS,
     },
@@ -103,7 +93,7 @@ describe('SecurityService', () => {
       name: 'getSecuritySummary for some repositories',
       invoke: (s) => s.getSecuritySummary([REPO, 'other-repo']),
       api: () => vulnerabilityApi.getSecuritySummary,
-      args: [BEARER, [REPO, 'other-repo']],
+      args: [[REPO, 'other-repo']],
       response: restResponse(SUMMARY),
       expected: SUMMARY,
     },
@@ -111,7 +101,7 @@ describe('SecurityService', () => {
       name: 'getSecuritySummary for every repository',
       invoke: (s) => s.getSecuritySummary(),
       api: () => vulnerabilityApi.getSecuritySummary,
-      args: [BEARER, undefined],
+      args: [undefined],
       response: restResponse(SUMMARY),
       expected: SUMMARY,
     },
@@ -153,7 +143,7 @@ describe('SecurityService', () => {
       name: 'getScansSummary with a repository type and a repository',
       invoke: (s) => s.getScansSummary(RepoType.Npm, REPO),
       api: () => scanApi.getSecurityScansSummary,
-      args: [BEARER, 'NPM', REPO],
+      args: ['NPM', REPO],
       response: restResponse(SCANS_SUMMARY),
       expected: SCANS_SUMMARY,
     },
@@ -161,7 +151,7 @@ describe('SecurityService', () => {
       name: 'getScansSummary without filters',
       invoke: (s) => s.getScansSummary(),
       api: () => scanApi.getSecurityScansSummary,
-      args: [BEARER, undefined, undefined],
+      args: [undefined, undefined],
       response: restResponse(SCANS_SUMMARY),
       expected: SCANS_SUMMARY,
     },
@@ -227,8 +217,7 @@ describe('SecurityService', () => {
     }
   });
 
-  describeAuthorizationHeader({
-    authService: () => authService,
+  describeNoAuthorizationHeader({
     api: () => scanApi.listSecurityScans,
     invoke: () => service.listScans(),
   });

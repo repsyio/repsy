@@ -59,14 +59,13 @@ describe('GolangService', () => {
     service = TestBed.inject(GolangService);
   });
 
-  // GolangService has no resetActiveRepoIfChanged, so this pins the current behaviour (RPS-1159).
   describeRepoSelection({
     service: () => service,
     getPermission: () => repoApi.getPermission,
     probe: (s) => s.deleteModule(MODULE),
     probeApi: () => golangApi.deleteGolangModule,
     probeRepoArg: 1,
-    resetsOnChange: false,
+    resetsOnChange: true,
   });
 
   describe('with a selected repository', () => {

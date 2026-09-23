@@ -59,15 +59,13 @@ describe('HelmService', () => {
     service = TestBed.inject(HelmService);
   });
 
-  // HelmService has no resetActiveRepoIfChanged (unlike npm, Maven, Docker and PyPI), so this pins the current
-  // behaviour (RPS-1159): the previous repository's name is used until the new permission arrives.
   describeRepoSelection({
     service: () => service,
     getPermission: () => repoApi.getPermission,
     probe: (s) => s.getChartVersions(CHART),
     probeApi: () => helmApi.getHelmChartVersions,
     probeRepoArg: 0,
-    resetsOnChange: false,
+    resetsOnChange: true,
   });
 
   describe('with a selected repository', () => {

@@ -16,31 +16,20 @@
 import { TestBed } from '@angular/core/testing';
 
 import { TotalUsageInfo, UsageControllerService } from '../../../../../generated/api';
-import { AuthService } from '../../../../auth/pages/service/auth.service';
-import {
-  describeAuthorizationHeader,
-  FakeAuthService,
-  fakeAuthService,
-} from '../../../shared/testing/authorization-header-spec-helpers';
+import { describeNoAuthorizationHeader } from '../../../shared/testing/authorization-header-spec-helpers';
 import { CallCase, describeCalls, restResponse } from '../../repository/testing/protocol-service-spec-helpers';
 import { UsageService } from './usage.service';
 
-const TOKEN = 'access-token';
 const TOTAL_USAGE: TotalUsageInfo = { diskUsed: { value: 2048, text: '2 KB' }, reposCount: 3 };
 
 describe('UsageService', () => {
   let api: jasmine.SpyObj<UsageControllerService>;
-  let authService: FakeAuthService;
   let service: UsageService;
 
   beforeEach(() => {
     api = jasmine.createSpyObj<UsageControllerService>('UsageControllerService', ['getTotalUsage']);
-    authService = fakeAuthService(TOKEN);
     TestBed.configureTestingModule({
-      providers: [
-        { provide: UsageControllerService, useValue: api },
-        { provide: AuthService, useValue: authService },
-      ],
+      providers: [{ provide: UsageControllerService, useValue: api }],
     });
     service = TestBed.inject(UsageService);
   });
@@ -50,15 +39,14 @@ describe('UsageService', () => {
       name: 'getTotalUsage',
       invoke: (s) => s.getTotalUsage(),
       api: () => api.getTotalUsage,
-      args: [`Bearer ${TOKEN}`],
+      args: [],
       response: restResponse(TOTAL_USAGE),
       expected: TOTAL_USAGE,
     },
   ];
   describeCalls(() => service, cases);
 
-  describeAuthorizationHeader({
-    authService: () => authService,
+  describeNoAuthorizationHeader({
     api: () => api.getTotalUsage,
     invoke: () => service.getTotalUsage(),
   });

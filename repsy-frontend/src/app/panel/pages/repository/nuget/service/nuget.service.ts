@@ -14,27 +14,34 @@
 /// limitations under the License.
 ///
 
-import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, Subscriber } from 'rxjs';
+import { BehaviorSubject, firstValueFrom, Observable } from 'rxjs';
+import { map, tap } from 'rxjs/operators';
 
-import { environment } from '../../../../../../environments/environment';
-import { DeployTokenForm, RepoCreateForm, RepoDescriptionForm, RepoRenameForm } from '../../../../../../generated/api';
-import { ErrorHandlerService } from '../../../../../shared/error-handler/error-handler.service';
+import {
+  DeployTokenForm,
+  DeployTokenInfoListItem,
+  NuGetDeletedItem,
+  NugetPackageControllerService,
+  NuGetPackageInfo,
+  NuGetPackageListItem,
+  NuGetVersionInfo,
+  NuGetVersionListItem,
+  ProtocolDeployTokenControllerService,
+  ProtocolRepoControllerService,
+  RepoCreateForm,
+  RepoDescriptionForm,
+  RepoListInfo,
+  RepoPermissionInfo,
+  RepoRenameForm,
+  RepoSettingsForm,
+  RepoSettingsInfo,
+  RepoType,
+  RepoUsageInfo,
+  TokenInfo,
+} from '../../../../../../generated/api';
 import { PagedData } from '../../../../shared/dto/paged-data';
-import { RepoListItem } from '../../../../shared/dto/repo/repo-list-item';
-import { RepoPermissionInfo } from '../../../../shared/dto/repo/repo-permission-info';
-import { RepoSettingsForm } from '../../../../shared/dto/repo/repo-settings-form';
-import { RepoUsageInfo } from '../../../../shared/dto/repo-usage-info';
-import { RestResponse } from '../../../../shared/dto/rest-response';
 import { Sort } from '../../../../shared/dto/sort';
-import { DeployTokenInfo } from '../../repo-settings/deploy-token/dto/deploy-token-info';
-import { TokenCreateInfo } from '../../repo-settings/deploy-token/dto/token-create-info';
-import { NugetDeletedItem } from '../dto/nuget-deleted-item';
-import { NugetPackageInfo } from '../dto/nuget-package-info';
-import { NugetPackageListItem } from '../dto/nuget-package-list-item';
-import { NugetVersionInfo } from '../dto/nuget-version-info';
-import { NugetVersionListItem } from '../dto/nuget-version-list-item';
 
 @Injectable({
   providedIn: 'root',
@@ -42,129 +49,77 @@ import { NugetVersionListItem } from '../dto/nuget-version-list-item';
 export class NugetService {
   public readonly repoChanges: Observable<RepoPermissionInfo>;
 
-  private activeRepo: RepoPermissionInfo;
-
-  private readonly apiBaseUrl = environment.apiBaseUrl;
   private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
   constructor(
-    private readonly http: HttpClient,
-    private readonly errorHandlerService: ErrorHandlerService,
+    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly protocolDeployTokenControllerService: ProtocolDeployTokenControllerService,
+    private readonly nugetPackageControllerService: NugetPackageControllerService,
   ) {
     this.repoChanges = this.repoSubject.asObservable();
   }
 
-  public selectRepository(repoName: string): Observable<RepoPermissionInfo> {
-    const url = `${this.apiBaseUrl}/api/repos/${repoName}/permissions`;
+  private get repoName(): string {
+    return this.repoSubject.getValue()?.repoName ?? '';
+  }
 
-    return new Observable<RepoPermissionInfo>((subscriber: Subscriber<RepoPermissionInfo>) => {
-      this.http.get<RestResponse<RepoPermissionInfo>>(url).subscribe({
-        next: (res: RestResponse<RepoPermissionInfo>) => {
-          this.activeRepo = res.data;
-          this.repoSubject.next(res.data);
-          subscriber.next(res.data);
-          subscriber.complete();
-        },
-        error: (err: HttpErrorResponse) => {
-          subscriber.error(this.errorHandlerService.handle(err));
-          subscriber.complete();
-        },
-      });
-    });
+  public selectRepository(repoName: string): Observable<RepoPermissionInfo> {
+    this.resetActiveRepoIfChanged(repoName);
+
+    return this.protocolRepoControllerService.getPermission(repoName).pipe(
+      map((r) => r.data!),
+      tap((info) => this.repoSubject.next(info)),
+    );
+  }
+
+  private resetActiveRepoIfChanged(repoName: string): void {
+    if (this.repoSubject.getValue()?.repoName === repoName) {
+      return;
+    }
+
+    this.repoSubject.next(null);
   }
 
   public async createRepository(repoForm: RepoCreateForm): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/NUGET`;
-      this.http
-        .post<RestResponse<void>>(url, repoForm)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+    await firstValueFrom(this.protocolRepoControllerService.createRepo(RepoType.Nuget, repoForm));
   }
 
-  public async fetchRepositories(): Promise<RepoListItem[]> {
-    return new Promise<RepoListItem[]>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/NUGET/info`;
-      this.http
-        .get<RestResponse<RepoListItem[]>>(url)
-        .toPromise()
-        .then((res: RestResponse<RepoListItem[]>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public async fetchRepositories(): Promise<RepoListInfo[]> {
+    const response = await firstValueFrom(this.protocolRepoControllerService.getInfo(RepoType.Nuget));
+    return response.data ?? [];
   }
 
   public async fetchRepositoryUsage(): Promise<RepoUsageInfo> {
-    return new Promise<RepoUsageInfo>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/usage`;
-      this.http
-        .get<RestResponse<RepoUsageInfo>>(url)
-        .toPromise()
-        .then((res: RestResponse<RepoUsageInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+    const response = await firstValueFrom(this.protocolRepoControllerService.getUsage(this.repoName));
+    return response.data!;
   }
 
-  public async fetchRepositorySettings(): Promise<RepoSettingsForm> {
-    return new Promise<RepoSettingsForm>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/settings`;
-      this.http
-        .get<RestResponse<RepoSettingsForm>>(url)
-        .toPromise()
-        .then((res: RestResponse<RepoSettingsForm>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public async fetchRepositorySettings(): Promise<RepoSettingsInfo> {
+    const response = await firstValueFrom(this.protocolRepoControllerService.getSettings(this.repoName));
+    return response.data!;
   }
 
   public async updateRepoSettings(repoSettingsForm: RepoSettingsForm): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/settings`;
-      this.http
-        .put<RestResponse<void>>(url, repoSettingsForm)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+    await firstValueFrom(this.protocolRepoControllerService.updateSettings(this.repoName, repoSettingsForm));
   }
 
   public async updateRepositoryName(repositoryNameForm: RepoRenameForm): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/name`;
-      this.http
-        .patch<RestResponse<void>>(url, repositoryNameForm)
-        .toPromise()
-        .then(() => {
-          if (this.activeRepo) {
-            this.activeRepo.repoName = repositoryNameForm.name;
-            this.repoSubject.next(this.activeRepo);
-          }
-          resolve();
-        })
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+    await firstValueFrom(this.protocolRepoControllerService.rename(this.repoName, repositoryNameForm));
+
+    const active = this.repoSubject.getValue();
+    if (active) {
+      this.repoSubject.next({ ...active, repoName: repositoryNameForm.name });
+    }
   }
 
   public async updateRepoDescription(repositoryDescriptionForm: RepoDescriptionForm): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/description`;
-    return new Promise<void>((resolve, reject) => {
-      this.http
-        .patch<RestResponse<null>>(url, repositoryDescriptionForm)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+    await firstValueFrom(
+      this.protocolRepoControllerService.updateDescription(this.repoName, repositoryDescriptionForm),
+    );
   }
 
   public async deleteRepository(repoName: string): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/repos/${repoName}`;
-      this.http
-        .delete<RestResponse<void>>(url)
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+    await firstValueFrom(this.protocolRepoControllerService.deleteRepo(repoName));
   }
 
   public async fetchRepositoryPackages(
@@ -172,31 +127,20 @@ export class NugetService {
     sortOption: Sort,
     pageIndex: number,
     pageSize: number,
-  ): Promise<PagedData<NugetPackageListItem>> {
-    return new Promise((resolve, reject) => {
-      const params = new HttpParams()
-        .set('query', query)
-        .set('page', pageIndex.toString())
-        .set('sort', `${sortOption.column},${sortOption.type}`)
-        .set('size', pageSize.toString());
-      const url = `${this.apiBaseUrl}/api/nuget/packages/${this.activeRepo.repoName}`;
-      this.http
-        .get<RestResponse<PagedData<NugetPackageListItem>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<NugetPackageListItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  ): Promise<PagedData<NuGetPackageListItem>> {
+    const response = await firstValueFrom(
+      this.nugetPackageControllerService.searchNugetPackages(
+        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
+        this.repoName,
+        query || undefined,
+      ),
+    );
+    return this.toPagedData(response.data);
   }
 
-  public async fetchPackage(packageId: string): Promise<NugetPackageInfo> {
-    return new Promise((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/nuget/packages/${this.activeRepo.repoName}/${packageId}`;
-      this.http
-        .get<RestResponse<NugetPackageInfo>>(url)
-        .toPromise()
-        .then((res: RestResponse<NugetPackageInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public async fetchPackage(packageId: string): Promise<NuGetPackageInfo> {
+    const response = await firstValueFrom(this.nugetPackageControllerService.getNugetPackage(packageId, this.repoName));
+    return response.data!;
   }
 
   public async fetchPackageVersions(
@@ -204,96 +148,62 @@ export class NugetService {
     sortOption: Sort,
     pageIndex: number,
     pageSize: number,
-  ): Promise<PagedData<NugetVersionListItem>> {
-    return new Promise((resolve, reject) => {
-      const params = new HttpParams()
-        .set('page', pageIndex.toString())
-        .set('sort', `${sortOption.column},${sortOption.type}`)
-        .set('size', pageSize.toString());
-      const url = `${this.apiBaseUrl}/api/nuget/packages/${this.activeRepo.repoName}/${packageId}/versions`;
-      this.http
-        .get<RestResponse<PagedData<NugetVersionListItem>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<NugetVersionListItem>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  ): Promise<PagedData<NuGetVersionListItem>> {
+    const response = await firstValueFrom(
+      this.nugetPackageControllerService.listNugetVersions(
+        packageId,
+        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
+        this.repoName,
+      ),
+    );
+    return this.toPagedData(response.data);
   }
 
-  public async fetchPackageVersion(packageId: string, version: string): Promise<NugetVersionInfo> {
-    return new Promise((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/nuget/packages/${this.activeRepo.repoName}/${packageId}/${version}`;
-      this.http
-        .get<RestResponse<NugetVersionInfo>>(url)
-        .toPromise()
-        .then((res: RestResponse<NugetVersionInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public async fetchPackageVersion(packageId: string, version: string): Promise<NuGetVersionInfo> {
+    const response = await firstValueFrom(
+      this.nugetPackageControllerService.getNugetVersion(packageId, version, this.repoName),
+    );
+    return response.data!;
   }
 
-  public async deletePackage(packageId: string): Promise<NugetDeletedItem> {
-    return new Promise((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/nuget/packages/${this.activeRepo.repoName}/${packageId}`;
-      this.http
-        .delete<RestResponse<NugetDeletedItem>>(url)
-        .toPromise()
-        .then((res: RestResponse<NugetDeletedItem>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public async deletePackage(packageId: string): Promise<NuGetDeletedItem> {
+    const response = await firstValueFrom(
+      this.nugetPackageControllerService.deleteNugetPackage(packageId, this.repoName),
+    );
+    return response.data!;
   }
 
-  public async deletePackageVersion(packageId: string, version: string): Promise<NugetDeletedItem> {
-    return new Promise((resolve, reject) => {
-      const url = `${this.apiBaseUrl}/api/nuget/packages/${this.activeRepo.repoName}/${packageId}/${version}`;
-      this.http
-        .delete<RestResponse<NugetDeletedItem>>(url)
-        .toPromise()
-        .then((res: RestResponse<NugetDeletedItem>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public async deletePackageVersion(packageId: string, version: string): Promise<NuGetDeletedItem> {
+    const response = await firstValueFrom(
+      this.nugetPackageControllerService.deleteNugetVersion(packageId, version, this.repoName),
+    );
+    return response.data!;
   }
 
-  public async getDeployTokens(pageNumber: number, pageSize: number): Promise<PagedData<DeployTokenInfo>> {
-    const params = new HttpParams().set('page', pageNumber.toString()).set('size', pageSize.toString());
-    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens`;
-    return new Promise((resolve, reject) => {
-      this.http
-        .get<RestResponse<PagedData<DeployTokenInfo>>>(url, { params })
-        .toPromise()
-        .then((res: RestResponse<PagedData<DeployTokenInfo>>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public async getDeployTokens(pageNumber: number, pageSize: number): Promise<PagedData<DeployTokenInfoListItem>> {
+    const response = await firstValueFrom(
+      this.protocolDeployTokenControllerService.listDeployTokens({ page: pageNumber, size: pageSize }, this.repoName),
+    );
+    return this.toPagedData(response.data);
   }
 
   public async rotateDeployToken(tokenId: string): Promise<string> {
-    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens/${tokenId}`;
-    return new Promise((resolve, reject) => {
-      this.http
-        .put(url, {})
-        .toPromise()
-        .then((res: RestResponse<string>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+    const response = await firstValueFrom(this.protocolDeployTokenControllerService.rotate(tokenId, this.repoName));
+    return response.data!;
   }
 
-  public async createDeployToken(form: DeployTokenForm): Promise<TokenCreateInfo> {
-    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens`;
-    return new Promise((resolve, reject) => {
-      this.http
-        .post(url, form)
-        .toPromise()
-        .then((res: RestResponse<TokenCreateInfo>) => resolve(res.data))
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+  public async createDeployToken(form: DeployTokenForm): Promise<TokenInfo> {
+    const response = await firstValueFrom(
+      this.protocolDeployTokenControllerService.createDeployToken(this.repoName, form),
+    );
+    return response.data!;
   }
 
   public async revokeDeployToken(tokenId: string): Promise<void> {
-    const url = `${this.apiBaseUrl}/api/repos/${this.activeRepo.repoName}/deploy-tokens/${tokenId}`;
-    return new Promise((resolve, reject) => {
-      this.http
-        .delete(url, {})
-        .toPromise()
-        .then(() => resolve())
-        .catch((res: HttpErrorResponse) => reject(this.errorHandlerService.handle(res)));
-    });
+    await firstValueFrom(this.protocolDeployTokenControllerService.revoke(tokenId, this.repoName));
+  }
+
+  private toPagedData<T>(data: { content?: T[]; page?: unknown } | undefined): PagedData<T> {
+    return { content: data?.content ?? [], page: data?.page } as unknown as PagedData<T>;
   }
 }
