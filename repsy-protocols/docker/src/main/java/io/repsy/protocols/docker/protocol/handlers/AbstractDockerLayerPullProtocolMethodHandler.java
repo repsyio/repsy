@@ -25,6 +25,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -42,7 +43,7 @@ public abstract class AbstractDockerLayerPullProtocolMethodHandler<ID>
     implements ProtocolMethodHandler {
 
   private static final Pattern LAYER_DOWNLOAD_PATTERN =
-      Pattern.compile("^/([^/]+)/blobs/(sha256:[0-9a-fA-F]{64})/?$");
+      Pattern.compile("^/([^/]+)/blobs/(" + BlobDigests.DIGEST_REGEX + ")/?$");
 
   private final PathParser basePathParser;
   private final DockerProtocolFacade<ID> dockerFacade;

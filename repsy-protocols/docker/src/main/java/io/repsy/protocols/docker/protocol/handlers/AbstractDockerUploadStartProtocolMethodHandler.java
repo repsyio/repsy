@@ -92,6 +92,8 @@ public abstract class AbstractDockerUploadStartProtocolMethodHandler
       final HttpServletRequest request,
       final HttpServletResponse response) {
 
+    // Minted once: the Location a client PATCHes/PUTs against and the Docker-Upload-UUID it may
+    // read back must name the same session (RPS-1241), and getUuid() is a fresh id on every call.
     final var sessionId = this.getUuid();
 
     final var location =
@@ -102,7 +104,7 @@ public abstract class AbstractDockerUploadStartProtocolMethodHandler
 
     return ResponseEntity.accepted()
         .header(LOCATION, location)
-        .header(DOCKER_UPLOAD_UUID, this.getUuid().toString())
+        .header(DOCKER_UPLOAD_UUID, sessionId.toString())
         .build();
   }
 

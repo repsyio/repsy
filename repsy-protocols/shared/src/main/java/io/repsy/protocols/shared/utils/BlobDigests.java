@@ -23,6 +23,7 @@ import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
 
@@ -48,6 +49,18 @@ public class BlobDigests {
       Map.of("sha256", "SHA-256", "sha512", "SHA-512");
 
   /**
+   * A regular expression fragment (no capturing groups, no anchors) matching exactly the digests
+   * {@link #isSupported} accepts: {@code sha256:} and 64 hex characters, or {@code sha512:} and 128
+   * hex characters. Path parsers and route patterns embed this instead of a duplicated {@code
+   * sha256:} pattern, so a digest the registry accepts is also one it routes.
+   */
+  public static final String DIGEST_REGEX =
+      HEX_LENGTH_BY_ALGORITHM.entrySet().stream()
+          .sorted(Map.Entry.comparingByKey())
+          .map(entry -> entry.getKey() + ":[0-9a-fA-F]{" + entry.getValue() + "}")
+          .collect(Collectors.joining("|", "(?:", ")"));
+
+  /**
    * Tells whether {@code digest} is well formed and uses an algorithm this registry can check.
    *
    * @param digest The digest the client named
@@ -64,6 +77,47 @@ public class BlobDigests {
     final var hexLength = HEX_LENGTH_BY_ALGORITHM.get(matcher.group("algorithm"));
 
     return hexLength != null && hexLength == matcher.group("hex").length();
+  }
+
+  /**
+   * Tells whether {@code text} names a digest of a supported algorithm anywhere in it, that is,
+   * contains {@code sha256:} or {@code sha512:}. It is a cheap dispatch test for a request path: it
+   * does not validate the digest, which {@link #isSupported} or {@link #DIGEST_REGEX} do.
+   *
+   * @param text A request path or other text that may reference a digest
+   * @return True when the text contains a supported algorithm's {@code algorithm:} prefix
+   */
+  public static boolean containsDigestPrefix(final String text) {
+
+    return indexOfDigestPrefix(text) >= 0;
+  }
+
+  /**
+   * Tells whether {@code text} starts with a supported algorithm's prefix, {@code sha256:} or
+   * {@code sha512:}: a manifest reference is a digest, not a tag, exactly when it does.
+   *
+   * @param text A manifest reference or other text that may be a digest
+   * @return True when the text starts with a supported algorithm's {@code algorithm:} prefix
+   */
+  public static boolean startsWithDigestPrefix(final String text) {
+
+    return indexOfDigestPrefix(text) == 0;
+  }
+
+  /**
+   * Finds where the first digest starts in {@code text}: the earliest occurrence of {@code sha256:}
+   * or {@code sha512:}.
+   *
+   * @param text A storage path or other text that may end in a digest
+   * @return The index of the digest's algorithm prefix, or {@code -1} when the text names no digest
+   */
+  public static int indexOfDigestPrefix(final String text) {
+
+    return HEX_LENGTH_BY_ALGORITHM.keySet().stream()
+        .mapToInt(algorithm -> text.indexOf(algorithm + ":"))
+        .filter(index -> index >= 0)
+        .min()
+        .orElse(-1);
   }
 
   /**

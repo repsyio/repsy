@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.docker.shared.utils;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.server.protocols.docker.shared.constants.DockerConstants;
+import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.regex.Pattern;
 import lombok.Builder;
 import lombok.experimental.UtilityClass;
@@ -49,7 +50,9 @@ public class PathParserUtils {
                   DockerConstants.REPO_NAME_PATTERN
                       + DockerConstants.IMAGE_NAME_PATTERN
                       + "/blobs"
-                      + "/(?<sha>sha256:[0-9a-fA-F]{64})$"))
+                      + "/(?<sha>"
+                      + BlobDigests.DIGEST_REGEX
+                      + ")$"))
           .groupName("sha")
           .pathType("layer check")
           .build();
@@ -62,7 +65,9 @@ public class PathParserUtils {
                   DockerConstants.REPO_NAME_PATTERN
                       + DockerConstants.IMAGE_NAME_PATTERN
                       + "/manifests"
-                      + "/(?<sha>sha256:[0-9a-fA-F]{64})$"))
+                      + "/(?<sha>"
+                      + BlobDigests.DIGEST_REGEX
+                      + ")$"))
           .groupName("sha")
           .pathType("manifest sha")
           .build();
@@ -83,14 +88,15 @@ public class PathParserUtils {
   public static @NonNull ParsedPath parseForLayer(
       @NonNull final String requestPath, @NonNull final String fileName) {
 
-    final var config = requestPath.contains("sha256:") ? LAYER_CHECK : LAYER_UPLOAD;
-    return parsePath(requestPath, config, requestPath.contains("sha256:") ? null : fileName);
+    final var isDigest = BlobDigests.containsDigestPrefix(requestPath);
+    final var config = isDigest ? LAYER_CHECK : LAYER_UPLOAD;
+    return parsePath(requestPath, config, isDigest ? null : fileName);
   }
 
   public static @NonNull ParsedPath parseForManifest(
       @NonNull final String requestPath, @NonNull final String fileName) {
 
-    final var config = requestPath.contains("sha256:") ? MANIFEST_SHA : MANIFEST_TAG;
+    final var config = BlobDigests.containsDigestPrefix(requestPath) ? MANIFEST_SHA : MANIFEST_TAG;
     return parsePath(requestPath, config, fileName);
   }
 
