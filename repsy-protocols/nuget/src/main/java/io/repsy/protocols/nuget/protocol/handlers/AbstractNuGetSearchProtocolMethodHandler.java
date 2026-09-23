@@ -23,6 +23,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
+import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,7 +33,6 @@ import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
@@ -92,8 +92,11 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler implements Protoc
       final var takeStr = request.getParameter("take");
       final var prerelease = "true".equalsIgnoreCase(request.getParameter("prerelease"));
 
-      final var skip = parseOrDefault(skipStr, 0);
-      final var take = parseOrDefault(takeStr, 20);
+      final var skip = NuGetPackageUtils.parseNonNegativeParam(skipStr, 0, "skip");
+      final var take =
+          Math.min(
+              NuGetPackageUtils.parseNonNegativeParam(takeStr, 20, "take"),
+              NuGetPackageUtils.MAX_SEARCH_TAKE);
 
       final var repoName = ProtocolContextUtils.<Object>getRepoInfo(context).getName();
       final var baseUrl = buildBaseUrl(request, repoName);
@@ -102,14 +105,12 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler implements Protoc
           this.facade.search(context, q != null ? q : "", skip, take, prerelease, baseUrl);
 
       return ResponseEntity.ok().contentType(APPLICATION_JSON).body(results);
+    } catch (final IllegalArgumentException e) {
+      log.debug("NuGet search: invalid paging parameter: {}", e.getMessage());
+      return ResponseEntity.badRequest().build();
     } catch (final Exception e) {
       log.error("NuGet search failed", e);
       return ResponseEntity.internalServerError().build();
     }
-  }
-
-  private static int parseOrDefault(final @Nullable String value, final int defaultValue) {
-
-    return value != null ? Integer.parseInt(value) : defaultValue;
   }
 }
