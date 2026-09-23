@@ -338,6 +338,13 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
   }
 
   @Override
+  public Optional<HelmChartInfo> findChartByNameAndVersion(
+      final ProtocolContext context, final String name, final String version) {
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    return this.chartService.findOptionalByNameAndVersion(repoInfo.getId(), name, version);
+  }
+
+  @Override
   public HelmOciBlobInfo findOrCreateBlob(final HelmOciBlobForm form, final ID repoId) {
     return this.ociBlobService.findOrCreate(form, repoId);
   }

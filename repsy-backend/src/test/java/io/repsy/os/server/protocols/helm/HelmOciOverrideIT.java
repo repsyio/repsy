@@ -307,6 +307,49 @@ class HelmOciOverrideIT extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName(
+      "a real client's own two-step push (by digest, then by tag) is refused as a whole: the"
+          + " by-digest sub-request alone must not upsert the chart row (RPS-1218's own"
+          + " findChartByNameAndVersion guard)")
+  void twoStepPushIsRefusedAsAWhole() throws Exception {
+    final var repo = this.nonOverridableHelmRepo();
+    final var first = chart(CHART, "1.0.0");
+    final var second = chart(CHART, "1.0.0", "2.0", "application");
+    final var firstDigest = digest("SHA-256", first);
+    final var secondDigest = digest("SHA-256", second);
+
+    assertThat(this.pushOci(repo, CHART, "1.0.0", first).getStatus()).isEqualTo(201);
+    final var beforeRow = this.storedVersion(repo, CHART, "1.0.0");
+
+    // A real oras-go/helm OCI push does this in two separate requests: first PUT the manifest
+    // under its OWN digest as the reference, THEN PUT it again under the real tag. Simulated here
+    // with a sha256-shaped reference that has never been pushed before (the layer's own digest,
+    // not the manifest's -- the exact digest value doesn't matter for this test, only that it is a
+    // fresh reference checkManifest's by-reference lookup has never seen): never checked against
+    // that refusal, since a fresh digest never already exists as its own reference -- this is the
+    // sub-request that used to slip past the override check entirely and upsert the row via
+    // AbstractHelmProtocolTxFacade#findOrCreateChart. The tag-referenced request below is the one
+    // checkManifest's by-reference lookup DOES gate, and where the refusal is actually thrown.
+    final var byDigest = this.pushOci(repo, CHART, "sha256:" + secondDigest, second);
+    assertThat(byDigest.getStatus())
+        .as("by-digest sub-request: " + byDigest.getContentAsString())
+        .isEqualTo(409);
+
+    final var afterByDigest = this.storedVersion(repo, CHART, "1.0.0");
+    assertThat(afterByDigest)
+        .as("the by-digest sub-request alone must not have touched the row")
+        .isEqualTo(beforeRow)
+        .containsEntry("digest", firstDigest);
+
+    final var byTag = this.pushOci(repo, CHART, "1.0.0", second);
+    assertThat(byTag.getStatus()).isEqualTo(409);
+
+    final var afterByTag = this.storedVersion(repo, CHART, "1.0.0");
+    assertThat(afterByTag).isEqualTo(beforeRow).containsEntry("digest", firstDigest);
+    assertThat(this.indexYaml(repo)).contains(firstDigest).doesNotContain(secondDigest);
+  }
+
+  @Test
   @DisplayName("the classic push/override path is unchanged: it still refreshes the row and index")
   void classicOverridePathIsUnchanged() throws Exception {
     final var repo = this.overridableHelmRepo();
