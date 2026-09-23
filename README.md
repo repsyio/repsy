@@ -14,6 +14,8 @@
     - [Using Docker Compose (PostgreSQL)](#option-3-docker-compose-with-postgresql)
     - [Manual Installation](#manual-installation)
 - [Configuration](#configuration)
+- [Content Security Policy](#content-security-policy)
+- [Cross-Origin Requests (CORS)](#cross-origin-requests-cors)
 - [Usage](#usage)
 - [Reverse Proxy](#reverse-proxy)
 - [Troubleshooting](#troubleshooting)
@@ -340,12 +342,59 @@ Access at:
 | `MULTIPART_MAX_REQUEST_SIZE` | Largest total size of a multipart request, all parts included. Keep it at least as large as `MULTIPART_MAX_FILE_SIZE` | `500MB` |
 | `RUBY_MAX_GEM_SIZE` | Largest gem a `gem push` may carry (the raw request body, so the multipart limits do not apply to it). A larger gem is answered with `413`. The gem is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory. Accepts a size such as `100MB` or `1GB` | `500MB` |
 | `CARGO_MAX_CRATE_SIZE` | Largest `.crate` a `cargo publish` may carry (a length-prefixed field inside Cargo's own wire format, so neither the multipart limits nor `MULTIPART_MAX_FILE_SIZE` apply to it). A larger crate is answered with `413`. The crate is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory. crates.io itself defaults to `10MB`; raise this if you publish larger internal crates. Accepts a size such as `100MB` or `1GB` | `100MB` |
+| `APP_ALLOWED_ORIGINS` | Comma-separated list of exact origins (e.g. `https://panel.example.com,https://panel-staging.example.com`) the panel API accepts cross-origin, credentialed requests from. Unset keeps today's behaviour: any origin is allowed. Set it once the panel is reachable from a known, fixed set of origins | *(empty, any origin allowed)* |
+| `APP_CSP_ENABLED` | Send a `Content-Security-Policy` header with the panel SPA and its static assets (JSON API responses are unaffected). See [Content Security Policy](#content-security-policy) | `true` |
+| `APP_CSP_REPORT_ONLY` | Send `Content-Security-Policy-Report-Only` instead of the enforcing header: violations are reported (in a browser that supports the Reporting API and is told where to send reports), nothing is blocked. Useful while rolling out a widened or replaced policy | `false` |
+| `APP_CSP_POLICY` | Overrides the built-in Content-Security-Policy outright, so an operator can widen it (for example to allow another analytics or CDN host) without a rebuild. See [Content Security Policy](#content-security-policy) for the built-in policy | *(empty, built-in policy)* |
 
 **Important Notes:**
 
 - **Admin Username**: `admin`
 - **Admin Initial Password**: Only applied when no admin user exists in the database. After first run, change your password through the application interface.
 - **OS_APP_JWT_SECRET**: If left unset, a new random secret is generated in memory on every container start — since it isn't persisted, this means every restart or redeploy silently invalidates every issued access/refresh token, logging every user out at once. For any production or self-host deployment, set this to a fixed, securely generated value (e.g. `openssl rand -base64 32`) and keep it unchanged across restarts.
+
+### Content Security Policy
+
+Repsy sends a `Content-Security-Policy` header with the panel SPA (`GET /`, every deep SPA route)
+and its static assets (JS/CSS bundles, `index.html`). It is not sent with JSON API responses
+(`/api/**`), which have nothing to enforce a policy against. This is a second barrier against a
+sanitiser bypass in the README viewer or any future use of raw HTML injection in the panel: even if
+one slips through, the browser itself refuses to load or run content the policy does not allow.
+
+The built-in policy:
+
+```
+default-src 'self';
+script-src 'self' https://www.googletagmanager.com;
+style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;
+font-src 'self' https://cdnjs.cloudflare.com data:;
+img-src 'self' data: https://www.googletagmanager.com https://www.google-analytics.com;
+connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com <app.allowed-origins>;
+object-src 'none';
+base-uri 'self';
+frame-ancestors 'none';
+form-action 'self';
+```
+
+`connect-src` additionally allows whatever origins `APP_ALLOWED_ORIGINS` allows (see
+[Cross-Origin Requests (CORS)](#cross-origin-requests-cors)), since a browser calling the API
+cross-origin from one of those origins is exactly what CORS was configured to allow.
+
+- Set `APP_CSP_REPORT_ONLY=true` to send `Content-Security-Policy-Report-Only` instead while
+  rolling a change out: violations are reported, nothing is blocked.
+- Set `APP_CSP_POLICY` to replace the built-in policy outright, for example to allow a different
+  analytics host or CDN, without a rebuild.
+- Set `APP_CSP_ENABLED=false` to turn the header off entirely (for example if a reverse proxy in
+  front of Repsy already sends its own).
+
+### Cross-Origin Requests (CORS)
+
+The panel API allows any origin to make credentialed cross-origin requests by default, which
+matches the documented setups where the frontend and the API are served from different origins
+(UI on `:4200`, API on `:8080`; the Docker image injects `API_BASE_URL` at runtime). Set
+`APP_ALLOWED_ORIGINS` to a comma-separated list of exact origins (for example
+`https://panel.example.com`) to restrict this once the panel is reachable from a known, fixed set
+of origins. A preflight from any other origin is then rejected.
 
 ### Reverse Proxy
 
