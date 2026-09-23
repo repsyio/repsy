@@ -81,6 +81,7 @@ export class MavenBrowserComponent implements OnDestroy {
         this.repoUrl = '';
         this.baseUrl = environment.apiBaseUrl;
         this.directoryStack = [];
+        this.forwardStack = [];
 
         const rootItem = new FsItemInfo();
         rootItem.name = '/';
@@ -140,6 +141,8 @@ export class MavenBrowserComponent implements OnDestroy {
       } else if (this.directoryStack.length === 0) {
         this.directoryStack.push(new Directory('/', '/', null));
       } else {
+        // A new forward navigation invalidates whatever "next" would have gone back to.
+        this.forwardStack = [];
         const prev = this.directoryStack[this.directoryStack.length - 1];
 
         this.directoryStack.push(new Directory(requestedDirectoryName, prev.path + requestedDirectoryName, prev));
@@ -159,6 +162,7 @@ export class MavenBrowserComponent implements OnDestroy {
 
     // Reconstruct directory stack
     this.directoryStack = [];
+    this.forwardStack = [];
 
     let currentDir = dir;
 
