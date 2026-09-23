@@ -1710,10 +1710,10 @@ changes were needed in `catalog.ts` beyond the file-header/inline-comment bullet
 token still able to read (H5); a non-multipart POST answering 404 `unknownPath` and a multipart POST
 missing the `content` part answering a bodyless 400 (H11); the no-trailing-slash upload URL spelling
 being accepted (H12); invalid archive filenames refused with 400; the 307 redirect to a normalized,
-trailing-slashed project page (H14); `HEAD` answering 200 unconditionally (RPS-1226, an observation);
-a pre-release/dev/post version publishing fine under `releases:false`/`snapshots:false` (H23); and an
-unknown package/file 404ing. It also pins five backend bugs found while reading the server source and
-confirmed live (see below), each via `test.fail()`.
+trailing-slashed project page (H14); `HEAD` mirroring `GET`'s status instead of answering 200
+unconditionally (RPS-1226, fixed); a pre-release/dev/post version publishing fine under
+`releases:false`/`snapshots:false` (H23); and an unknown package/file 404ing. It also pins backend
+bugs found while reading the server source and confirmed live (see below), most via `test.fail()`.
 
 ### H1-H24, confirmed live
 
@@ -1757,8 +1757,8 @@ download` in the catalog loop succeeds against pages carrying it.
 - **H12** (`POST /<repo>` with no trailing slash accepted like `POST /<repo>/`; `POST /<repo>/simple`
   404s `unknownPath`): confirmed live — see RPS-1222 below for why this matters.
 - **H13** (the root `/simple/` index has malformed hrefs and no `text/html` content type): confirmed,
-  and with an EXTRA quirk beyond the plan's own prediction — the response's `Content-Type` is
-  `application/json`, not merely "unset"/defaulted, despite the body being HTML (RPS-1221 below).
+  and with an EXTRA quirk beyond the plan's own prediction — the response's `Content-Type` was
+  `application/json`, not merely "unset"/defaulted, despite the body being HTML (RPS-1221, fixed).
 - **H14** (a non-normalized/no-trailing-slash name 307-redirects to the normalized page): confirmed
   live, both via a raw probe and inside a real-client dedicated test (`publish-consume.spec.ts`'s
   H21 test).
@@ -1768,7 +1768,7 @@ download` in the catalog loop succeeds against pages carrying it.
   P4/RPS-1124.
 - **H17** (a missing `sha256_digest` is a 500; a wrong one is served as-is): confirmed live — see
   RPS-1224/RPS-1225.
-- **H18** (`HEAD` of a never-published path is 200): confirmed live — see RPS-1226 (observation).
+- **H18** (`HEAD` of a never-published path was 200): confirmed live, then fixed — see RPS-1226.
 - **H19** (a real `pip install --no-index --find-links ... --target ...` succeeds and the marker
   survives): confirmed live — `publish-consume.spec.ts`'s dedicated test; the RECORD/WHEEL metadata
   this harness writes is well-formed enough for pip's own installer, not merely for twine's
@@ -1793,13 +1793,17 @@ download` in the catalog loop succeeds against pages carrying it.
 
 ### Backend bug candidates found while reading and confirmed live (do not fix here)
 
-- **RPS-1221** — `packages.ftl` (the root `/simple/` index, rendered by
-  `PypiSimpleHandlerPreProcessor`) hard-codes cloud-layout hrefs, `/pypi/<repoName>/simple/<name>/`,
-  that 404 on Repsy OS's single-tenant layout (the real, working path is `/<repoName>/simple/<name>/`
-  — no `/pypi/` prefix at all here). A second, narrower quirk found only by probing live (not
-  predicted by the plan): the response's own `Content-Type` is `application/json`, not `text/html`,
-  despite the body being this same malformed HTML. Low impact — `pip install`/`download` never fetch
-  the root page, only `/simple/<project>/` — but a real PEP 503 spec violation. Confirmed live:
+- **RPS-1221 (fixed)** — `packages.ftl` (the root `/simple/` index, rendered by
+  `PypiSimpleHandlerPreProcessor`) used to hard-code cloud-layout hrefs,
+  `/pypi/<repoName>/simple/<name>/`, that 404 on Repsy OS's single-tenant layout (the real, working
+  path is `/<repoName>/simple/<name>/` — no `/pypi/` prefix at all here). A second, narrower quirk
+  found only by probing live (not predicted by the plan): the response's own `Content-Type` was
+  `application/json`, not `text/html`, despite the body being this same HTML. Low impact — `pip
+install`/`download` never fetch the root page, only `/simple/<project>/` — but a real PEP 503 spec
+  violation. Fixed: `PypiPackageServiceImpl.getPackageList` now passes a `repoUri` built the same way
+  `PypiStorageService.buildRepoUri` does (`RequestBaseUrlUtils.resolveBaseUrl()` + the repo name),
+  `packages.ftl` renders `${repoUri}/simple/${package.getNormalizedName()}/`, and
+  `PypiSimpleHandlerPreProcessor` now sets `Content-Type: text/html` explicitly. Confirmed live:
   `registry-rules.spec.ts`'s root-index test.
 - **RPS-1222** — The panel's own PyPI config screen (`pypi-config.component.ts`) tells users to
   set `.pypirc`'s `repository=${baseUrl}/${repoName}/simple`, but the upload handler only matches the
@@ -1823,9 +1827,14 @@ download` in the catalog loop succeeds against pages carrying it.
   (`uploadForm.getSha256_digest().getBytes()`). A MISSING digest crashes with an unhandled NPE
   (`500`, confirmed live — RPS-1224); a WRONG digest is silently served to every consumer as if
   correct (confirmed live — RPS-1225). Confirmed: `registry-rules.spec.ts`'s two digest tests.
-- **RPS-1226** (observation, not routed around — nothing in the catalog loop's own scenarios
-  depends on `HEAD` meaning "exists") — `HEAD` on ANY path under a pypi repo answers `200`,
-  unconditionally; existence is never checked. Confirmed live: `registry-rules.spec.ts`'s HEAD test.
+- **RPS-1226 (fixed)** — `HEAD` on ANY path under a pypi repo used to answer `200` unconditionally;
+  existence was never checked. Fixed, mirroring the Ruby analogue (RPS-1237):
+  `AbstractPypiHeadProtocolMethodHandler` now dispatches per path kind onto existence-only lookups
+  (`PypiProtocolFacade.packageExists`/`archiveFileExists`, never `getPackageList`/
+  `downloadArchiveFile`) — `/simple/` still always `200` (the path parser already guarantees the repo
+  exists), `/simple/<project>/` `200`/`404` on the package's existence (mirroring `GET`'s `307`
+  redirect first for a non-normalized name), and `/<project>/-/<file>` `200`/`404` on the archive
+  file's existence. Confirmed live: `registry-rules.spec.ts`'s HEAD test.
 - **P7** (observation, no test) — `PypiPackageServiceImpl.updateRelease` (read while investigating
   `addOrUpdateRelease`) throws a bare `IllegalStateException` in what reads as an unreachable branch;
   noted only, not independently confirmed live (no code path in this harness's own scenarios reaches

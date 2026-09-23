@@ -252,6 +252,53 @@ class AbstractPypiProtocolFacadeTest {
   // =========================================================================
 
   @Nested
+  @DisplayName("packageExists()/archiveFileExists() (RPS-1226)")
+  class ExistenceCheckTests {
+
+    @Test
+    @DisplayName("packageExists() delegates to the package service, keyed by repo id")
+    void packageExistsDelegatesToPackageService() {
+      when(packageService.packageExists(REPO_ID, "demo")).thenReturn(true);
+
+      assertThat(facade.packageExists(context(), "demo")).isTrue();
+
+      verify(packageService).packageExists(REPO_ID, "demo");
+      verifyNoInteractions(storageService);
+    }
+
+    @Test
+    @DisplayName("packageExists() reports false without throwing when the package is missing")
+    void packageExistsReportsFalseForMissingPackage() {
+      when(packageService.packageExists(REPO_ID, "missing")).thenReturn(false);
+
+      assertThat(facade.packageExists(context(), "missing")).isFalse();
+    }
+
+    @Test
+    @DisplayName("archiveFileExists() delegates to the storage service, keyed by storage key")
+    void archiveFileExistsDelegatesToStorageService() {
+      when(storageService.isPackageFileExist(REPO_ID, "demo", "demo-1.0.0.tar.gz"))
+          .thenReturn(true);
+
+      assertThat(facade.archiveFileExists(context(), "demo", "demo-1.0.0.tar.gz")).isTrue();
+
+      verify(storageService).isPackageFileExist(REPO_ID, "demo", "demo-1.0.0.tar.gz");
+      verifyNoInteractions(packageService);
+    }
+
+    @Test
+    @DisplayName("archiveFileExists() reports false without throwing when the file is missing")
+    void archiveFileExistsReportsFalseForMissingFile() {
+      when(storageService.isPackageFileExist(REPO_ID, "demo", "no-such-file.tar.gz"))
+          .thenReturn(false);
+
+      assertThat(facade.archiveFileExists(context(), "demo", "no-such-file.tar.gz")).isFalse();
+    }
+  }
+
+  // =========================================================================
+
+  @Nested
   @DisplayName("uploadPackage() success path")
   class SuccessPathTests {
 
