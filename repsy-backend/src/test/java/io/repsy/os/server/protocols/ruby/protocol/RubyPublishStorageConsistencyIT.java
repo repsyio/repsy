@@ -47,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.invocation.InvocationOnMock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -321,6 +322,123 @@ class RubyPublishStorageConsistencyIT extends AbstractIntegrationTest {
     assertThat(this.storedChecksum(repo, name, "1.0.1"))
         .as("the row describes the winner's gem, the one that is stored")
         .isEqualTo(sha256Hex(winnerGem));
+  }
+
+  @Test
+  @DisplayName(
+      "two concurrent first pushes of a new gem name with different versions both succeed"
+          + " (RPS-1125)")
+  void concurrentFirstPushesOfANewGemShareOneGemRow() throws Exception {
+    final var repo = this.rubyRepo(false);
+    final var name = uniqueGemName();
+    final var token = this.adminToken();
+
+    // Holds the first push inside the storage write, so its gem row is uncommitted when the
+    // second push reaches its own insert of that gem and has to wait for it.
+    final var firstWriting = new CountDownLatch(1);
+    final var releaseFirst = new CountDownLatch(1);
+    doAnswer(
+            invocation -> {
+              firstWriting.countDown();
+              releaseFirst.await(30, TimeUnit.SECONDS);
+              return invocation.callRealMethod();
+            })
+        .doAnswer(InvocationOnMock::callRealMethod)
+        .when(this.rubyStorageService)
+        .writeGem(any(), any(), any(), any(), any(), any());
+
+    final var executor = Executors.newFixedThreadPool(2);
+    try {
+      final var first =
+          executor.submit(() -> this.push(repo, gem(name, "1.0.0", "ruby", "a"), token));
+      assertThat(firstWriting.await(30, TimeUnit.SECONDS)).isTrue();
+
+      final var second =
+          executor.submit(() -> this.push(repo, gem(name, "2.0.0", "ruby", "b"), token));
+      TimeUnit.MILLISECONDS.sleep(500);
+      releaseFirst.countDown();
+
+      assertThat(first.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(200);
+      assertThat(second.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(200);
+    } finally {
+      releaseFirst.countDown();
+      executor.shutdownNow();
+    }
+
+    assertThat(this.storedGemCount(repo, name)).isEqualTo(1);
+    assertThat(this.storedVersionCount(repo, name)).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName(
+      "two concurrent first pushes of a new gem name with the same version: the loser answers"
+          + " 409, not 500 (RPS-1125)")
+  void concurrentFirstPushesOfANewGemWithTheSameVersionOneLoses() throws Exception {
+    final var repo = this.rubyRepo(false);
+    final var name = uniqueGemName();
+    final var token = this.adminToken();
+
+    // Holds the winner inside the storage write, so its gem and version rows are uncommitted when
+    // the loser reaches its own insert of the gem and has to wait for it.
+    final var winnerWriting = new CountDownLatch(1);
+    final var releaseWinner = new CountDownLatch(1);
+    doAnswer(
+            invocation -> {
+              winnerWriting.countDown();
+              releaseWinner.await(30, TimeUnit.SECONDS);
+              return invocation.callRealMethod();
+            })
+        .doAnswer(InvocationOnMock::callRealMethod)
+        .when(this.rubyStorageService)
+        .writeGem(any(), any(), any(), any(), any(), any());
+
+    final var executor = Executors.newFixedThreadPool(2);
+    try {
+      final var winner =
+          executor.submit(() -> this.push(repo, gem(name, "1.0.0", "ruby", "winner"), token));
+      assertThat(winnerWriting.await(30, TimeUnit.SECONDS)).isTrue();
+
+      final var loser =
+          executor.submit(() -> this.push(repo, gem(name, "1.0.0", "ruby", "loser"), token));
+      TimeUnit.MILLISECONDS.sleep(500);
+      releaseWinner.countDown();
+
+      assertThat(winner.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(200);
+      assertThat(loser.get(30, TimeUnit.SECONDS).getStatus())
+          .as("a first push of a new gem name never answers 500 on this race (RPS-1125)")
+          .isEqualTo(409);
+    } finally {
+      releaseWinner.countDown();
+      executor.shutdownNow();
+    }
+
+    assertThat(this.storedGemCount(repo, name)).isEqualTo(1);
+    assertThat(this.storedVersionCount(repo, name)).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName(
+      "a plain storage I/O failure surfaces as a server error, not invalidGemFile (RPS-1126)")
+  void storageIoFailureSurfacesAsServerErrorNotInvalidGemFile() throws Exception {
+    final var repo = this.rubyRepo(false);
+    final var name = uniqueGemName();
+    doAnswer(
+            invocation -> {
+              throw new IOException("disk full");
+            })
+        .when(this.rubyStorageService)
+        .writeGem(any(), any(), any(), any(), any(), any());
+
+    final var response = this.push(repo, gem(name, "1.0.0"), this.adminToken());
+
+    assertThat(response.getStatus())
+        .as("a storage I/O failure is a server error, not the client's bad gem file")
+        .isEqualTo(500);
+    assertThat(response.getContentAsString()).doesNotContain("invalidGemFile");
+    assertThat(this.storedVersionCount(repo, name)).isZero();
+    assertThat(this.storedGemCount(repo, name)).isZero();
+    assertThat(gemFile(repo, name, "1.0.0")).doesNotExist();
+    verifyNoInteractions(this.usageUpdateService);
   }
 
   @Test

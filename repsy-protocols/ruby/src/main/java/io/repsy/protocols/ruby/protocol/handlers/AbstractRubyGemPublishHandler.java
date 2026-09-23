@@ -91,7 +91,8 @@ public abstract class AbstractRubyGemPublishHandler implements ProtocolMethodHan
   public ResponseEntity<Object> handle(
       final ProtocolContext context,
       final HttpServletRequest request,
-      final HttpServletResponse response) {
+      final HttpServletResponse response)
+      throws IOException {
     // A client that declares an oversized body is refused before any of it is read.
     if (request.getContentLengthLong() > this.maxGemBytes) {
       throw new MaxUploadSizeExceededException(this.maxGemBytes);
@@ -109,8 +110,10 @@ public abstract class AbstractRubyGemPublishHandler implements ProtocolMethodHan
     } catch (final EntryTooLargeException e) {
       // The body was chunked or understated its length, and outgrew the limit while it was read.
       throw new MaxUploadSizeExceededException(this.maxGemBytes, e);
-    } catch (final IOException e) {
-      return ResponseEntity.badRequest().contentType(MediaType.TEXT_PLAIN).body("invalidGemFile");
     }
+    // A malformed gem is reported by GemspecParser as its own
+    // BadRequestException("invalidGemFile"),
+    // which ErrorHandler maps to 400. Any other IOException here is a storage or spool I/O failure,
+    // not something the client sent, so it is left to propagate and surface as the 500 it is.
   }
 }

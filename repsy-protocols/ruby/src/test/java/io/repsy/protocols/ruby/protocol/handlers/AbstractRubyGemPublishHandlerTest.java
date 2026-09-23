@@ -159,14 +159,15 @@ class AbstractRubyGemPublishHandlerTest {
   }
 
   @Test
-  @DisplayName("answers 400 invalidGemFile when the gem cannot be read")
-  void answersBadRequestOnIoFailure() throws Exception {
-    doThrow(new IOException("broken")).when(this.facade).publishGem(any(), any());
+  @DisplayName("lets a storage/spool IOException propagate instead of answering 400 (RPS-1126)")
+  void propagatesIoFailureInsteadOfAnsweringBadRequest() throws Exception {
+    doThrow(new IOException("disk full")).when(this.facade).publishGem(any(), any());
 
-    final var response =
-        this.handler().handle(new ProtocolContext(), push(GEM), new MockHttpServletResponse());
-
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    assertThat(response.getBody()).isEqualTo("invalidGemFile");
+    assertThatThrownBy(
+            () ->
+                this.handler()
+                    .handle(new ProtocolContext(), push(GEM), new MockHttpServletResponse()))
+        .isInstanceOf(IOException.class)
+        .hasMessage("disk full");
   }
 }

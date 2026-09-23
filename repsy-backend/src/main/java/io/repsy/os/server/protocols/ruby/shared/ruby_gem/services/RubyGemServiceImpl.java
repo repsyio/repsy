@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.ruby.shared.ruby_gem.services;
 
+import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
@@ -44,6 +45,7 @@ import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
 import io.repsy.protocols.ruby.shared.utils.GemFilenameCandidates;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -344,21 +346,32 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
   }
 
   private RubyGem upsertGem(final Repo repo, final String name, final String version) {
+    final var gem = this.findOrCreateGem(repo, name, version);
+    gem.setLatest(version);
+    return this.gemRepository.save(gem);
+  }
+
+  /**
+   * Returns the gem row, inserting it when this is the first version of a gem name.
+   *
+   * <p>The insert skips a row that already exists instead of failing on the unique index: on
+   * PostgreSQL a failed statement aborts the transaction, which now also holds the version row and
+   * the file write. When a concurrent first push has inserted the gem but not committed yet, the
+   * statement waits for it, and then finds the committed row.
+   */
+  private RubyGem findOrCreateGem(final Repo repo, final String name, final String version) {
+    final var existing = this.gemRepository.findByRepoIdAndName(repo.getId(), name);
+
+    if (existing.isPresent()) {
+      return existing.get();
+    }
+
+    this.gemRepository.insertIfAbsent(
+        UuidCreator.getTimeOrderedEpoch(), repo.getId(), name, version, Instant.now());
+
     return this.gemRepository
         .findByRepoIdAndName(repo.getId(), name)
-        .map(
-            g -> {
-              g.setLatest(version);
-              return this.gemRepository.save(g);
-            })
-        .orElseGet(
-            () -> {
-              final var gem = new RubyGem();
-              gem.setRepo(repo);
-              gem.setName(name);
-              gem.setLatest(version);
-              return this.gemRepository.save(gem);
-            });
+        .orElseThrow(() -> new ItemNotFoundException(GEM_NOT_FOUND));
   }
 
   /**
