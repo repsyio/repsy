@@ -62,21 +62,35 @@ export class GolangConfigComponent implements OnInit, OnChanges {
     this.markdown = this.getConfigMarkdown();
   }
 
+  private isPlainHttp(): boolean {
+    try {
+      return new URL(environment.repoBaseUrl).protocol !== 'https:';
+    } catch {
+      return false;
+    }
+  }
+
   private getConfigMarkdown(): string {
     const password = this.deployToken ? 'YOUR_DEPLOY_TOKEN' : 'YOUR_PASSWORD';
     const repoUrl = `${environment.repoBaseUrl}/${this.repoName}`;
+    const plainHttp = this.isPlainHttp();
     const repoUrlWithAuth = this.deployToken
       ? `${environment.repoBaseUrl.replace(/^(https?):\/\//, `$1://token:${password}@`)}/${this.repoName}`
       : `${environment.repoBaseUrl.replace(/^(https?):\/\//, `$1://${this.username}:${password}@`)}/${this.repoName}`;
+    const goproxyUrl = plainHttp ? repoUrl : repoUrlWithAuth;
 
     return `
 ### 1. Configure GOPROXY
 
 \`\`\`bash
-go env -w GOPROXY="${repoUrlWithAuth},off"
+go env -w GOPROXY="${goproxyUrl},off"
 \`\`\`
 
-> Credentials in the GOPROXY URL are only required for private registries. Omit them if your registry is public.
+${
+  plainHttp
+    ? `> **A private Go repository requires HTTPS.** The \`go\` command refuses to send credentials to an \`http://\` proxy URL (\`refusing to pass credentials to insecure URL\`) and offers no way to override this. Put a TLS-terminating reverse proxy in front of Repsy and use the \`https://\` URL, or keep this repository public.`
+    : `> Credentials in the GOPROXY URL are only required for private registries. Omit them if your registry is public.`
+}
 
 > Use \`,off\` as the fallback so Go fails loudly if a module is not in this registry instead of falling back to the internet.
 

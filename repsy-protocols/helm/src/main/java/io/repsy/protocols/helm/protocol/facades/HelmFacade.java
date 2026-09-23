@@ -82,6 +82,20 @@ public interface HelmFacade<ID> {
 
   HelmChartInfo findOrCreateChart(HelmChartForm form, ID repoId);
 
+  /**
+   * Looks up an existing chart by its actual (name, version) identity -- the pair {@link
+   * HelmChartForm}/{@code findOrCreateChart} key on -- as opposed to {@link #checkManifest}, which
+   * looks up by the OCI manifest's own reference (a tag OR a digest). A real OCI push is two
+   * separate manifest-push requests (one by digest, one by the tag reference, both routed through
+   * the same handler), and only the tag-referenced one is ever checked against {@code
+   * checkManifest}'s own by-reference lookup for an override refusal -- the digest-referenced one
+   * always looks "new" to that check (a fresh digest never already exists as its own reference), so
+   * it is never gated by it. This lookup exists so the override check can also run against the
+   * CHART's own identity, closing that gap for both push sub-requests (RPS-1218).
+   */
+  Optional<HelmChartInfo> findChartByNameAndVersion(
+      ProtocolContext context, String name, String version);
+
   HelmOciBlobInfo findOrCreateBlob(HelmOciBlobForm form, ID repoId);
 
   HelmOciManifestInfo findOrCreateManifest(HelmOciManifestForm form, ID repoId);

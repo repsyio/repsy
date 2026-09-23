@@ -273,7 +273,7 @@ details (standalone build/run instructions, its own environment variables, and A
 **Prerequisites:**
 - **Java**: JDK 25
 - **Spring Boot**: 4.0.5
-- **PostgreSQL**: 18
+- **PostgreSQL**: 18 (unless you pass `DB_URL` for the embedded H2 database, see step 3)
 - **Angular**: 21
 - **Maven**: 3.9.7 or higher
 - **Node.js** 24.x (>=24.0.0 <25.0.0)
@@ -287,7 +287,10 @@ cd repsy-frontend
 pnpm install
 cd ..
 
-# 3. Run with embedded H2 database
+# 3. Run against PostgreSQL (see prerequisites above), or set DB_URL for a zero-dependency
+#    embedded H2 database instead, e.g.:
+#    DB_URL='jdbc:h2:file:/tmp/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE' \
+#      mvn spring-boot:run
 cd repsy-backend
 mvn spring-boot:run
 ```
@@ -304,14 +307,14 @@ Access at:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ADMIN_INITIAL_PASSWORD` | Initial admin password. Only applied on first startup when no admin exists. | *(empty)* |
-| `DB_URL` | JDBC database URL. Defaults to embedded H2. | `jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE` |
+| `DB_URL` | JDBC database URL. The Docker image defaults to the embedded H2 database; running from source (`mvn spring-boot:run`) defaults to PostgreSQL on `localhost:5432` instead. | `jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE` (image only) |
 | `DB_USERNAME` | Database username | `repsy` |
 | `DB_PASSWORD` | Database password | `repsy123` |
 | `STORAGE_BASE_PATH` | Base directory for artifact file storage. Set to a path inside `/app/data` (e.g. `/app/data/storage`) to persist artifacts with a single volume mount. Deleting a repo, a package or a version moves its files into a `trash/` directory of the protocol (for example `maven/trash`) first; the trash older than `TRASH_RETENTION` is removed every day (see `TRASH_CLEANUP_ENABLED`). | `~/.repsy` |
 | `OS_APP_JWT_SECRET` | JWT signing secret. If not set, a random 256-bit secret is generated on every startup — every restart/redeploy invalidates all existing sessions, forcing every user to log in again. Set a stable, secure random value for any production/self-host deployment. | *(random, regenerated on every startup)* |
 | `SERVER_PORT` | Repository operations port | `9090` |
 | `API_PORT` | Backend API and Frontend web UI port | `8080` |
-| `H2_TCP_SERVER_ENABLED` | Enable H2 TCP server for external database access (development only) | `false` |
+| `H2_TCP_SERVER_ENABLED` | Enable the H2 TCP server. It binds loopback-only, so it is reachable only from inside the same container/host, not from an external client | `false` |
 | `H2_TCP_SERVER_PORT` | H2 TCP server port | `9092` |
 | `SECURITY_SCANNER` | Enables vulnerability scanning of pushed artifacts (`enabled`/`disabled`) | `disabled` |
 | `TRIVY_SCANNER_BASE_URL` | Base URL of the `repsy-scanner-trivy` service | `http://localhost:8090` |
@@ -643,7 +646,7 @@ Access development environment:
 - **Frontend (Web UI)**: http://localhost:4200 (with hot reload)
 - **Backend API**: http://localhost:8080
 - **Repository Operations**: http://localhost:9090
-- To inspect the H2 database directly, enable the TCP server with `H2_TCP_SERVER_ENABLED=true` and connect via `jdbc:h2:tcp://localhost:9092/~/repsy` using a tool like DBeaver or IntelliJ
+- To inspect the embedded H2 database directly, stop the app and open the database file with the H2 shell (see "Troubleshooting" below) — the TCP server (`H2_TCP_SERVER_ENABLED=true`) only binds inside the container/host loopback, so it is not reachable from an external client and is not a supported inspection path
 
 
 ### Building for Production

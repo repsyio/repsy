@@ -100,8 +100,11 @@ Push package:
 \`\`\`bash
 dotnet nuget push ./bin/Release/*.nupkg \\
   --source "${sourceUrl}" \\
-  --api-key "<YOUR_PASSWORD_OR_DEPLOY_TOKEN>"
+  --api-key "<YOUR_DEPLOY_TOKEN>"
 \`\`\`
+
+\`--api-key\` only accepts a deploy token, not your account password. To push with a password
+instead, use Option A, whose \`NuGet.Config\` credentials support both.
 
 Install package:
 

@@ -17,6 +17,7 @@ package io.repsy.protocols.docker.protocol.handlers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -33,6 +34,8 @@ import io.repsy.protocols.docker.shared.auth.services.DockerAuthService;
 import io.repsy.protocols.shared.auth.dtos.LoginResponse;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -182,5 +185,133 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
         .startsWith("Basic realm=");
     assertThat(result.getBody()).isNull();
     verify(this.authService, never()).createAnonymousUser();
+  }
+
+  // -----------------------------------------------------------------------------------------
+  // RPS-1220: an OAuth2-form-body password grant (helm registry login / oras-go) must actually
+  // validate the credentials, not fall through to the anonymous-token path.
+  // -----------------------------------------------------------------------------------------
+
+  private static final String PASSWORD_GRANT_BASIC_HEADER =
+      "Basic " + Base64.getEncoder().encodeToString("bob:secret".getBytes(StandardCharsets.UTF_8));
+
+  private MockHttpServletRequest passwordGrantRequest(
+      final String username, final String password) {
+    final var request = new MockHttpServletRequest("POST", "/v2/token");
+    request.setParameter("grant_type", "password");
+    if (username != null) {
+      request.setParameter("username", username);
+    }
+    if (password != null) {
+      request.setParameter("password", password);
+    }
+    request.setParameter("scope", PULL_SCOPE);
+    return request;
+  }
+
+  @Test
+  @DisplayName(
+      "grant_type=password with valid credentials authenticates through the Basic path and "
+          + "returns the caller's own token, not an anonymous one")
+  void passwordGrantWithValidCredentialsAuthenticates() throws Exception {
+    when(this.authService.authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER))
+        .thenReturn("user-tok-123");
+
+    final var result =
+        this.handler.handle(
+            new ProtocolContext(),
+            this.passwordGrantRequest("bob", "secret"),
+            new MockHttpServletResponse());
+
+    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("user-tok-123");
+    verify(this.authService).authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER);
+    verify(this.authService, never()).createAnonymousUser();
+  }
+
+  @Test
+  @DisplayName(
+      "grant_type=password with a wrong password answers 401 and never hands out an anonymous "
+          + "token")
+  void passwordGrantWithWrongPasswordIsRefused() throws Exception {
+    when(this.authService.authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER))
+        .thenThrow(new UnAuthorizedException("unAuthorized"));
+
+    final var result =
+        this.handler.handle(
+            new ProtocolContext(),
+            this.passwordGrantRequest("bob", "secret"),
+            new MockHttpServletResponse());
+
+    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    assertThat(result.getHeaders().getFirst(HttpHeaders.WWW_AUTHENTICATE))
+        .startsWith("Basic realm=");
+    verify(this.authService, never()).createAnonymousUser();
+  }
+
+  @Test
+  @DisplayName("grant_type=password with a blank username falls through to the anonymous path")
+  void passwordGrantWithBlankUsernameFallsThroughToAnonymous() throws Exception {
+    final var repo = repo(false);
+    doReturn(Optional.of(repo)).when(this.scopeParser).getRepoInfoByScope(PULL_SCOPE);
+    when(this.authService.createAnonymousUser()).thenReturn("anon-tok");
+
+    final var result =
+        this.handler.handle(
+            new ProtocolContext(),
+            this.passwordGrantRequest("", "secret"),
+            new MockHttpServletResponse());
+
+    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("anon-tok");
+    verify(this.authService, never()).authenticateUserDockerCli(any());
+  }
+
+  @Test
+  @DisplayName("no grant_type at all is unchanged: still the anonymous 200 for a public scope")
+  void noGrantTypeStaysAnonymous() throws Exception {
+    final var repo = repo(false);
+    doReturn(Optional.of(repo)).when(this.scopeParser).getRepoInfoByScope(PULL_SCOPE);
+    when(this.authService.createAnonymousUser()).thenReturn("anon-tok");
+
+    final var result =
+        this.handler.handle(
+            new ProtocolContext(), this.anonymousTokenRequest(), new MockHttpServletResponse());
+
+    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("anon-tok");
+  }
+
+  @Test
+  @DisplayName("an Authorization header wins over a form body present at the same time")
+  void authorizationHeaderWinsOverFormBody() throws Exception {
+    final var request = this.passwordGrantRequest("bob", "secret");
+    request.addHeader(HttpHeaders.AUTHORIZATION, AUTH_HEADER);
+    when(this.authService.authenticateUserDockerCli(AUTH_HEADER)).thenReturn("header-tok");
+
+    final var result =
+        this.handler.handle(new ProtocolContext(), request, new MockHttpServletResponse());
+
+    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("header-tok");
+    verify(this.authService).authenticateUserDockerCli(AUTH_HEADER);
+    verify(this.authService, never()).authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER);
+  }
+
+  @Test
+  @DisplayName("a password grant that is rate-limited propagates as 429, not 401")
+  void passwordGrantTooManyRequestsPropagates() {
+    when(this.authService.authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER))
+        .thenThrow(new TooManyRequestsException(7));
+
+    assertThatThrownBy(
+            () ->
+                this.handler.handle(
+                    new ProtocolContext(),
+                    this.passwordGrantRequest("bob", "secret"),
+                    new MockHttpServletResponse()))
+        .isInstanceOfSatisfying(
+            TooManyRequestsException.class,
+            ex -> assertThat(ex.getRetryAfterSeconds()).isEqualTo(7));
   }
 }

@@ -172,6 +172,12 @@ COPY --from=backend-build \
 
 COPY --chown=appuser:appgroup --from=frontend-build /app/dist/panel-frontend/browser ./static/
 
+# The image's own default database: embedded H2, so "docker run" with no other configuration works
+# with no external dependencies (see README.md's Quick Start). Running from source (mvn
+# spring-boot:run) keeps application.yml's own PostgreSQL default instead -- this ENV only affects
+# the image. Any DB_URL passed at "docker run" time overrides this. See RPS-1173.
+ENV DB_URL="jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
+
 VOLUME /app/data
 
 EXPOSE 8080 8443 9090 9443

@@ -26,13 +26,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.layer.services.LayerService;
 import io.repsy.protocols.docker.shared.storage.services.DockerStorageService;
+import io.repsy.protocols.docker.shared.tag.dtos.BaseManifestDetail;
+import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
 import io.repsy.protocols.docker.shared.utils.BaseParsedPath;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
@@ -86,7 +90,9 @@ class AbstractDockerProtocolTxFacadeTest {
 
     @Override
     public BaseParsedPath parseForManifest(final String servletPath, final String fileName) {
-      throw new UnsupportedOperationException();
+      return BaseParsedPath.builder()
+          .relativePath(new RelativePath("manifests/" + fileName))
+          .build();
     }
   }
 
@@ -188,5 +194,93 @@ class AbstractDockerProtocolTxFacadeTest {
 
     assertThat(layerInfo.getSize()).isEqualTo(512);
     verify(this.layerService).update(layerInfo, REPO_ID);
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // getManifest() -- RPS-1215: this is the single resolution path both GET and HEAD share, so its
+  // sha256 short-circuit (resolveManifestDigest) is exercised here rather than through the now
+  // -removed findTagAndManifest().
+  // ---------------------------------------------------------------------------------------------
+
+  private static final String IMAGE_NAME = "app";
+
+  private BaseImageInfo<UUID> stubImage() {
+    final var imageInfo =
+        BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name(IMAGE_NAME).build();
+    when(this.imageService.findImageInfoByRepoIdAndName(REPO_ID, IMAGE_NAME)).thenReturn(imageInfo);
+    return imageInfo;
+  }
+
+  private void stubManifestStorage(final byte[] body) {
+    when(this.dockerStorageService.getResource(
+            argThat(path -> path != null && path.getPath().contains("manifests/")), eq(REPO_NAME)))
+        .thenReturn(Optional.of(new ByteArrayResource(body)));
+  }
+
+  @Test
+  @DisplayName("getManifest() resolves a tag reference through the active-tag lookup")
+  void getManifestResolvesATagReferenceThroughTheActiveTagLookup() throws Exception {
+    final var context = newContext();
+    final var imageInfo = this.stubImage();
+    final var digest = sha256Of("manifest-body".getBytes(StandardCharsets.UTF_8));
+    when(this.manifestService.findActiveTagByNameAndRepoAndImage(REPO_ID, IMAGE_NAME, "latest"))
+        .thenReturn(Optional.of(BaseTagDetail.<UUID>builder().digest(digest).build()));
+    final var manifestDetail = new BaseManifestDetail<UUID>();
+    manifestDetail.setName("latest");
+    manifestDetail.setMediaType("application/vnd.oci.image.manifest.v1+json");
+    manifestDetail.setDigest(digest);
+    when(this.manifestService.findManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
+        .thenReturn(manifestDetail);
+    this.stubManifestStorage("manifest-body".getBytes(StandardCharsets.UTF_8));
+
+    final var result =
+        this.facade().getManifest(context, "latest", IMAGE_NAME, "/v2/images/app/manifests/latest");
+
+    assertThat(result.mediaType()).isEqualTo("application/vnd.oci.image.manifest.v1+json");
+    assertThat(result.digest()).isEqualTo(digest);
+    assertThat(result.body()).isEqualTo("manifest-body");
+    verify(this.manifestService).findActiveTagByNameAndRepoAndImage(REPO_ID, IMAGE_NAME, "latest");
+  }
+
+  @Test
+  @DisplayName(
+      "getManifest() short-circuits a sha256 reference straight to the digest, skipping "
+          + "the tag lookup entirely")
+  void getManifestShortCircuitsASha256Reference() throws Exception {
+    final var context = newContext();
+    final var imageInfo = this.stubImage();
+    final var digest = sha256Of("manifest-body".getBytes(StandardCharsets.UTF_8));
+    final var manifestDetail = new BaseManifestDetail<UUID>();
+    manifestDetail.setName(digest);
+    manifestDetail.setMediaType("application/vnd.oci.image.manifest.v1+json");
+    manifestDetail.setDigest(digest);
+    when(this.manifestService.findManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
+        .thenReturn(manifestDetail);
+    this.stubManifestStorage("manifest-body".getBytes(StandardCharsets.UTF_8));
+
+    final var result =
+        this.facade()
+            .getManifest(context, digest, IMAGE_NAME, "/v2/images/app/manifests/" + digest);
+
+    assertThat(result.digest()).isEqualTo(digest);
+    assertThat(result.body()).isEqualTo("manifest-body");
+    verify(this.manifestService, never()).findActiveTagByNameAndRepoAndImage(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("getManifest() refuses a tag reference that resolves to no active tag")
+  void getManifestRefusesAnUnknownTagReference() {
+    final var context = newContext();
+    this.stubImage();
+    when(this.manifestService.findActiveTagByNameAndRepoAndImage(REPO_ID, IMAGE_NAME, "missing"))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () ->
+                this.facade()
+                    .getManifest(
+                        context, "missing", IMAGE_NAME, "/v2/images/app/manifests/missing"))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("tagNotFound");
   }
 }

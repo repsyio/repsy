@@ -30,11 +30,15 @@ import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.ruby.shared.utils.GemspecParser;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.InflaterInputStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -122,6 +126,80 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
     assertThat(names).contains("pushed-gem");
   }
 
+  /**
+   * RPS-1234: the specs index files are served gzip-framed (RFC 1952), not bare zlib-deflated,
+   * because real RubyGems clients ({@code Gem::Util.gunzip}, a {@code Zlib::GzipReader}) require
+   * the gzip header/trailer/CRC. {@link GZIPInputStream} decoding the raw bytes pins that framing
+   * directly, not just decodability of some deflate variant.
+   */
+  private byte[] fetchSpecsIndex(final Repo repo, final String fileName) throws Exception {
+    return this.protocol(
+            get("/{repo}/" + fileName, repo.getName())
+                .header(AUTHORIZATION, this.adminProtocolBearerToken()))
+        .andExpect(status().isOk())
+        .andReturn()
+        .getResponse()
+        .getContentAsByteArray();
+  }
+
+  private byte[] assertGzipMarshalIndexContaining(final byte[] raw, final String needle)
+      throws Exception {
+    assertThat(raw[0]).as("gzip magic byte 1").isEqualTo((byte) 0x1f);
+    assertThat(raw[1]).as("gzip magic byte 2").isEqualTo((byte) 0x8b);
+
+    final byte[] decoded;
+    try (final var in = new GZIPInputStream(new ByteArrayInputStream(raw))) {
+      decoded = in.readAllBytes();
+    }
+    assertThat(decoded[0]).as("Marshal major version").isEqualTo((byte) 0x04);
+    assertThat(decoded[1]).as("Marshal minor version").isEqualTo((byte) 0x08);
+    assertThat(new String(decoded, StandardCharsets.ISO_8859_1)).contains(needle);
+    return decoded;
+  }
+
+  @Test
+  @DisplayName("GET /{repo}/specs.4.8.gz serves a gzip-framed Marshal index (RPS-1234)")
+  void servesGzippedSpecsIndex() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    this.push(repo.getName(), gem("pushed-gem", "1.2.3"), this.adminProtocolBearerToken())
+        .andExpect(status().isOk());
+
+    final var raw = this.fetchSpecsIndex(repo, "specs.4.8.gz");
+
+    this.assertGzipMarshalIndexContaining(raw, "pushed-gem");
+  }
+
+  @Test
+  @DisplayName(
+      "GET /{repo}/latest_specs.4.8.gz serves the latest non-prerelease version, gzip-framed"
+          + " (RPS-1234)")
+  void servesGzippedLatestSpecsIndex() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    this.push(repo.getName(), gem("pushed-gem", "1.2.3"), this.adminProtocolBearerToken())
+        .andExpect(status().isOk());
+
+    final var raw = this.fetchSpecsIndex(repo, "latest_specs.4.8.gz");
+
+    this.assertGzipMarshalIndexContaining(raw, "pushed-gem");
+  }
+
+  @Test
+  @DisplayName(
+      "GET /{repo}/prerelease_specs.4.8.gz serves only prerelease versions, gzip-framed"
+          + " (RPS-1234)")
+  void servesGzippedPrereleaseSpecsIndex() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    this.push(repo.getName(), gem("pushed-gem", "1.2.3"), this.adminProtocolBearerToken())
+        .andExpect(status().isOk());
+    this.push(repo.getName(), gem("pushed-gem", "2.0.0.pre1"), this.adminProtocolBearerToken())
+        .andExpect(status().isOk());
+
+    final var raw = this.fetchSpecsIndex(repo, "prerelease_specs.4.8.gz");
+    final var decoded = this.assertGzipMarshalIndexContaining(raw, "pushed-gem");
+
+    assertThat(new String(decoded, StandardCharsets.ISO_8859_1)).contains("2.0.0.pre1");
+  }
+
   @Test
   @DisplayName("DELETE /{repo}/api/v1/gems/yank yanks a pushed gem")
   void yanksPushedGem() throws Exception {
@@ -142,6 +220,50 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
             .getContentAsString();
 
     assertThat(body).isEqualTo("Successfully yanked gem: pushed-gem (1.2.3)");
+  }
+
+  /**
+   * RPS-1233: {@code quick/Marshal.4.8/*.gemspec.rz} had no registered handler ({@link
+   * io.repsy.os.server.protocols.ruby.protocol.handlers.RubyGemspecHandler} was missing), so real
+   * {@code gem install}/{@code gem fetch} clients always 404'd fetching the quick gemspec.
+   */
+  @Test
+  @DisplayName("GET /{repo}/quick/Marshal.4.8/<gem>.gemspec.rz serves the deflated Marshal gemspec")
+  void servesGemspecRz() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    this.push(repo.getName(), gem("pushed-gem", "1.2.3"), this.adminProtocolBearerToken())
+        .andExpect(status().isOk());
+
+    final var body =
+        this.protocol(
+                get("/{repo}/quick/Marshal.4.8/pushed-gem-1.2.3.gemspec.rz", repo.getName())
+                    .header(AUTHORIZATION, this.adminProtocolBearerToken()))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsByteArray();
+
+    final byte[] inflated;
+    try (var inflater = new InflaterInputStream(new ByteArrayInputStream(body))) {
+      inflated = inflater.readAllBytes();
+    }
+    assertThat(inflated[0]).isEqualTo((byte) 0x04);
+    assertThat(inflated[1]).isEqualTo((byte) 0x08);
+    final var marshal = new String(inflated, StandardCharsets.ISO_8859_1);
+    assertThat(marshal).contains("pushed-gem").contains("1.2.3");
+  }
+
+  @Test
+  @DisplayName("GET .../quick/Marshal.4.8/<gem>.gemspec.rz of an unknown version is 404")
+  void gemspecRzOfAnUnknownVersionIsNotFound() throws Exception {
+    final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    this.push(repo.getName(), gem("pushed-gem", "1.2.3"), this.adminProtocolBearerToken())
+        .andExpect(status().isOk());
+
+    this.protocol(
+            get("/{repo}/quick/Marshal.4.8/pushed-gem-9.9.9.gemspec.rz", repo.getName())
+                .header(AUTHORIZATION, this.adminProtocolBearerToken()))
+        .andExpect(status().isNotFound());
   }
 
   @Test

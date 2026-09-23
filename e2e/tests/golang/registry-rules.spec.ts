@@ -317,17 +317,7 @@ test.describe('golang registry rules (raw HTTP)', () => {
         built.bytes,
       );
 
-      test.fail(
-        true,
-        'RPS-1228: GoModFileValidator never compares the go.mod "module" directive against ' +
-          "the URL's own module path -- a zip naming a completely different module still uploads " +
-          'successfully under the URL path (a real `go get` of that path then fails validating the ' +
-          'downloaded go.mod, see publish-consume.spec.ts)',
-      );
-      expect(
-        res.status,
-        'a go.mod naming a different module than the URL path should be refused',
-      ).toBe(400);
+      expectMsgId(res, 400, 'goModModulePathMismatch');
     },
   );
 
@@ -341,13 +331,7 @@ test.describe('golang registry rules (raw HTTP)', () => {
       const built = await buildModuleZip({ modulePath: layout.modulePath, version: 'banana' });
       const res = await rawUpload(layout.repoName, admin, built);
 
-      test.fail(
-        true,
-        'RPS-1227: AbstractGoProtocolFacade.upload never validates the version string at ' +
-          'all -- "banana" is accepted (200) and listed by @v/list even though it is not a valid ' +
-          "Go semver string a real `go` command's own parser would ever produce or accept",
-      );
-      expect(res.status, 'a non-semver version string should be rejected').toBe(400);
+      expectMsgId(res, 400, 'invalidModuleVersion');
     },
   );
 

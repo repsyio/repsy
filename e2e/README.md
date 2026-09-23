@@ -169,8 +169,8 @@ e2e/
       publish-consume.spec.ts   # registerPublishConsumeLoop(golangAdapter) + go-get-build-run, plain-http-creds-refused, dirhash cross-check, mixed-case and wire-trace real-client tests
       registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, upload URL spellings, sha256, immutability, zip validation, @v/list/@latest, sumdb, HEAD, delete+reupload) + G1/G2/G10 candidates
     ruby/
-      publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install/gem-fetch (RPS-1233/RPS-1234, test.fail), anonymous-push, yank (RPS-1235, fixed), USER-role-push, bundle-install-e2e real-client tests
-      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow incl. RPS-1238 fixed, specs.4.8.gz zlib, gemspec.rz 404, HEAD mirrors GET incl. RPS-1237 fixed, platform gem, RPS-1236 fixed) + RPS-1233/RPS-1234 candidates
+      publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install (RPS-1233, fixed)/gem-fetch (RPS-1234, fixed), anonymous-push, yank (RPS-1235, fixed), USER-role-push, bundle-install-e2e real-client tests
+      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow incl. RPS-1238 fixed, specs.4.8.gz gzip framing (RPS-1234, fixed), gemspec.rz (RPS-1233, fixed), HEAD mirrors GET (RPS-1237, fixed), platform gem, RPS-1236 fixed) -- no remaining test.fail() pins
 ```
 
 ## Setup
@@ -270,7 +270,11 @@ the documentation bug already tracked by
 [RPS-1173](https://zyfera.atlassian.net/browse/RPS-1173) ("README says the embedded H2 database is
 the default, but application.yml defaults DB_URL to PostgreSQL") — re-confirmed live here with fresh
 evidence (commented on that ticket) rather than filed again. **Not fixed here**: this step touches
-only `e2e/`, never the backend or its docs.
+only `e2e/`, never the backend or its docs. **Fixed by RPS-1173 itself**: the `Dockerfile` now sets
+`ENV DB_URL=jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE`
+(the exact H2-1 (a) value this section already pinned), so the image now boots with embedded H2 when
+no `DB_URL` is passed, matching the README. This transcript is kept as the historical record of the
+bug, not rewritten.
 
 ### Scope decision: `@smoke` everywhere plus one full catalog, not ten full catalogs
 
@@ -612,49 +616,57 @@ identical, even though the exact msgId sometimes differs (see below). The overri
 `registry-rules.spec.ts` additionally pins an invalid/malformed version string at `400
 invalidPackageVersion` (`PackageUtils.extractVersionNameFromPayload`, before anything is stored).
 
-### RPS-1205, confirmed live: the exact shape
+### RPS-1205 (fixed): the exact shape the bug used to have
 
-`PackageUtils.fixTarballUrl` (`repsy-protocols/npm/.../shared/utils/PackageUtils.java`) rewrites a
-version's `dist.tarball` at publish time by splicing the repo name into the URL's path at a fixed
-offset, a transform whose own javadoc describes a cloud, multi-tenant path shape
+`PackageUtils.fixTarballUrl` (`repsy-protocols/npm/.../shared/utils/PackageUtils.java`) used to
+rewrite a version's `dist.tarball` at publish time by splicing the repo name into the URL's path at a
+fixed offset, a transform whose own javadoc described a cloud, multi-tenant path shape
 (`/npm/username/@foo/demo/-/@foo/demo-0.2.1.tgz`) Repsy OS does not have. On OS, a real npm client's
 own `dist.tarball` (computed client-side as `<registry>/<name>/-/<tarballFilename>`, i.e. already
-just `/<repoName>/<packagePath>/-/<file>`) gets a **second, wrong `/<repoName>/` segment spliced into
-the middle of the path**. Live evidence from one run (`tests/npm/registry-rules.spec.ts`):
+just `/<repoName>/<packagePath>/-/<file>`) got a **second, wrong `/<repoName>/` segment spliced into
+the middle of the path**. Live evidence from one run, before the fix (`tests/npm/registry-rules.spec.ts`):
 
 ```
 canonical path "e2e-y50b4j9002-tarball/-/e2e-y50b4j9002-tarball-0.22833922.2.tgz" -> 200
 dist.tarball   "http://localhost:9090/e2e-y50b4j9002-npm-1/e2e-y50b4j9002-tarball/e2e-y50b4j9002-npm-1/-/e2e-y50b4j9002-tarball-0.22833922.2.tgz" -> 404
 ```
 
-(`e2e-y50b4j9002-npm-1` — the repo name — appears twice: once correctly, as the request's own repo
-segment, and once spliced in mid-path by `fixTarballUrl`.) The **canonical path always serves the
+(`e2e-y50b4j9002-npm-1` — the repo name — appeared twice: once correctly, as the request's own repo
+segment, and once spliced in mid-path by `fixTarballUrl`.) The **canonical path always served the
 real, byte-correct tarball** (confirmed by content hash, not just status); **`dist.tarball` always
-answers `404`**, confirmed on unscoped and scoped packages alike (`tests/npm/publish-consume.spec.ts`'s
-scoped-package test). This is what makes RPS-1205 a URL-construction bug, not a storage one, and why
-`npmAdapter.knownConsumeFailure` routes only the final client-exit-code/content-equality consume
-assertions through `test.fail()` (`scenarios/loop.ts`) — the auth-only packument-GET outcome is
-asserted for real, same as every other scenario, and never weakened.
+answered `404`**, confirmed on unscoped and scoped packages alike (`tests/npm/publish-consume.spec.ts`'s
+scoped-package test). This is what made RPS-1205 a URL-construction bug, not a storage one.
 
-### A second, distinct backend bug found live (not RPS-1205, not fixed here)
+**Fixed**: `fixTarballUrl` now rebuilds only the filename after the last `/-/` from the version's own
+`name`/`version`, and leaves everything before it — the client-computed path — untouched. That is a
+no-op for the URL a real npm client already sends (the shape shown above as "canonical path"), so
+`dist.tarball` now matches it and is servable, on unscoped and scoped packages alike. `npmAdapter` no
+longer has a `knownConsumeFailure`, and `tests/npm/registry-rules.spec.ts`'s pin and
+`tests/npm/publish-consume.spec.ts`'s scoped round trip both assert this for real now instead of
+through `test.fail()`.
+
+### RPS-1211 (fixed): redeploying a version without `keywords`
 
 Re-publishing (redeploying, `allowOverride: true`) an **existing** npm version whose manifest has no
-`keywords` field crashes with `400 badRequest`, swallowing a `ClassCastException`:
-`PackageUtils.liftFieldsToTopLevel` defaults an absent version `keywords` onto the **top-level**
+`keywords` field used to crash with `400 badRequest`, swallowing a `ClassCastException`:
+`PackageUtils.liftFieldsToTopLevel` defaulted an absent version `keywords` onto the **top-level**
 packument as a native `new String[] {}`; `NpmPackageServiceImpl.updateVersionFromMetadata` (reached
 only on a re-publish of an _existing_ version, via `AbstractNpmProtocolFacade.publish`'s "already
-exists" branch) then calls `addKeywords`/`addMaintainers` with that **top-level** payload instead of
-the version's own sub-object, and `addKeywords` casts what it finds at `"keywords"` to
-`ArrayList<String>` — which throws, because the value is a `String[]`, not an `ArrayList`, when it
-came from that default. A first-ever publish of a package never hits this (`addPackage`'s DB path
+exists" branch) then called `addKeywords`/`addMaintainers` with that **top-level** payload instead of
+the version's own sub-object, and `addKeywords` cast what it found at `"keywords"` to
+`ArrayList<String>` — which threw, because the value was a `String[]`, not an `ArrayList`, when it
+came from that default. A first-ever publish of a package never hit this (`addPackage`'s DB path
 passes the version's own sub-object, which legitimately has no `"keywords"` key, so the read is
-`null` and skipped safely); only a **redeploy of an already-existing version** does. Confirmed live by
-adding `"keywords": []` to a version manifest, which alone made an otherwise-identical redeploy
-succeed. This is **not** the same bug as RPS-1205 (a different bug, a different code path, no
-relation to tarball URLs) — it is filed as **RPS-1211** — and **not fixed here** (out of scope, per
-the plan) — `clients/npm-raw.ts`'s `buildPublishDocument` and `src/packages/npm/package.template.json`
-both always include `"keywords": []` (a real npm client's own normalised manifest almost always does
-too), which routes around it without touching backend code.
+`null` and skipped safely); only a **redeploy of an already-existing version** did. This is **not**
+the same bug as RPS-1205 (a different bug, a different code path, no relation to tarball URLs).
+
+**Fixed**: `PackageUtils.liftFieldsToTopLevel` now defaults `keywords` to an empty `ArrayList`
+instead of a `String[]` (same `[]` on the wire), and `NpmPackageServiceImpl.addKeywords`/
+`addMaintainers` read their input through an `instanceof Collection<?>` guard instead of an unchecked
+cast, so no shape can throw there again. `clients/npm-raw.ts`'s `buildPublishDocument` and
+`src/packages/npm/package.template.json` still always include `"keywords": []` (a real npm client's
+own normalised manifest almost always does too, and removing it to add a no-`keywords` redeploy
+scenario is tracked as a small follow-up, not required for this fix to be effective).
 
 ## Cargo runner
 
@@ -673,8 +685,10 @@ work directory (`clients/exec.ts`) and runs the real `cargo` binary:
   builds the crate, which needs `rustc` and a linker — a build is the toolchain's concern, not the
   registry's, and this harness's crates are dependency-free and never need to actually compile.
   `CARGO_PUBLISH_TIMEOUT=30` bounds cargo's own post-publish index poll (default 60s) — confirmed
-  live, an underscore-named crate's poll resolves on its first attempt (well under a second), so
-  nothing here relies on the longer default (see "H2" below for the one case that does hit it).
+  live, an underscore-named crate's poll resolves on its first attempt (well under a second). A
+  hyphenated crate's poll used to burn the whole 30s window before RPS-1212 was fixed (see "H2"
+  below); now it also resolves on its first attempt, so nothing here relies on the longer default
+  any more — the lower bound is kept as a safety margin, not because anything still needs it.
 - **`resolve`**: a fresh, separate work directory (fresh `CARGO_HOME` too) with a minimal consumer
   crate (`[dependencies] <name> = { version = "=<version>", registry = "repsy" }`, an empty
   `src/lib.rs` — cargo refuses a package with no targets at all) and a plain `cargo fetch`. The
@@ -800,10 +814,18 @@ cargo fetch (dependency "e2e-<runid>-hyphen") -> exit 101, "error: no matching p
 
 This is why the catalog loop's own crate names are underscore-only (`cargoAdapter.packageName`,
 `cargo-raw.ts`'s `crateName` — never `scenarios/coordinates.ts`'s hyphenated `slugify`): a hyphenated
-name round-trips through the loop under a spelling the server itself never agrees to serve back.
-`tests/cargo/publish-consume.spec.ts`'s dedicated real-client test and
-`tests/cargo/registry-rules.spec.ts`'s raw-HTTP test both pin this directly, through `test.fail()`.
-Filed as **RPS-1212**.
+name used to round-trip through the loop under a spelling the server itself never agreed to serve
+back. Filed as **RPS-1212**.
+
+**Fixed**: `CargoCrateConverter.toCrateIndexEntry` now maps the served entry's `name` from
+`CargoCrate.originalName` (already persisted at publish time, unused by the converter until now)
+instead of the normalised lookup key. Lookup stays spelling-insensitive (both the hyphenated and the
+normalised spelling still answer `200`), but the served entry's identity is now stable and always
+names the spelling the crate was actually published under. `cargo publish` of a hyphenated crate now
+confirms on its first post-publish poll (no more ~30s stall), and `cargo fetch` resolves it instead
+of refusing with "no matching package". `tests/cargo/publish-consume.spec.ts`'s dedicated real-client
+test and `tests/cargo/registry-rules.spec.ts`'s raw-HTTP test both assert this directly now (the
+`test.fail()` pins are gone).
 
 ### Cargo protocol-specific suite (steps 5b/5c, RPS-294)
 
@@ -829,14 +851,26 @@ yank`/`cargo yank --undo` binaries — both exit `0`, the served sparse-index en
 - **Search** (`GET /<repo>/api/v1/crates?q=<query>`, `AbstractCargoSearchProtocolMethodHandler`,
   `permission: READ`): confirmed live with the real `cargo search --registry repsy` binary — exit `0`,
   stdout lists the crate, and the raw envelope (`{"crates":[...],"meta":{"total":N}}`) matches.
-- **Owners**: `GET/PUT/DELETE /<repo>/api/v1/crates/<name>/owners` (`CargoOwnersProtocolMethodHandler`
-  — defined directly in `repsy-backend`, unlike every other cargo route, which extends a shared
-  abstract class in `repsy-protocols/cargo`) answers **every** owners request, even a GET, with a
-  FIXED body (`{"ok":true,"msg":"Ownership is managed at the repository level in this registry"}`) and
-  `permission: WRITE` even for the GET. There is no `users` array at all. A real `cargo owner --list
---registry repsy <crate>` therefore fails client-side ("missing field `users`", exit `101`) even
-  though the raw HTTP GET itself succeeds (`200`) — confirmed live, filed as **RPS-1239**, pinned with
-  `test.fail()`.
+- **Owners**: `GET/PUT/DELETE /<repo>/api/v1/crates/<name>/owners` used to be one handler
+  (`CargoOwnersProtocolMethodHandler` — defined directly in `repsy-backend`, unlike every other cargo
+  route, which extends a shared abstract class in `repsy-protocols/cargo`) answering **every** owners
+  request, even a GET, with a FIXED body
+  (`{"ok":true,"msg":"Ownership is managed at the repository level in this registry"}`) and
+  `permission: WRITE` even for the GET (which also meant `getProperties()` omitted `writeOperation`,
+  so PUT/DELETE skipped authentication entirely on a public repo). There was no `users` array at all,
+  so a real `cargo owner --list --registry repsy <crate>` failed client-side ("missing field `users`",
+  exit `101`) even though the raw HTTP GET itself succeeded (`200`) — confirmed live, filed as
+  **RPS-1239**.
+
+  **Fixed**: the route is split into `CargoOwnersListProtocolMethodHandler` (GET,
+  `permission: READ`) and `CargoOwnersModifyProtocolMethodHandler` (PUT/DELETE, `permission: WRITE`,
+  `writeOperation: true`). GET now answers the crates.io `{"users": [...]}` shape with a repo-level
+  synthetic owner (`{"id":0,"login":"<repoName>","name":"Ownership is managed at the repository level
+in this registry"}"}`, since Repsy has no ownership model finer than the repository); PUT/DELETE
+  keep the original `{"ok":true,"msg":"..."}` body, but are now real write operations that
+  authenticate even on a public repo — a permission-narrowing behavior change on what was previously
+  an (unauthenticated, no-op) "working" path. A real `cargo owner --list` now succeeds.
+
 - **Index `cksum` / multi-version**: confirmed live that a crate's served sparse-index `cksum` equals
   the sha256 of the raw-downloaded `.crate` bytes (and the adapter's own publish hash), and that two
   versions of one crate coexist independently — distinct `cksum`s, distinct downloaded bytes, both
@@ -953,8 +987,8 @@ which nuget has no equivalent of — a nuget "snapshot" is stored once, like any
 (H4); a new version always accepted, an existing one replaced only when `allowOverride: true`; the
 redeploy-under-`releases:false` ordering (422 before 409); invalid/too-long/5-part version strings
 and non-package/non-multipart bodies at 400; `1.0.0.0` normalized to `1.0.0` on both the flat index
-and the download path; the service index's exact `@id`/`@type` shape including the three
-non-standard types (H6); and `X-NuGet-ApiKey`'s three cases (H7).
+and the download path; the service index's exact `@id`/`@type` shape, now the bare,
+client-recognised types RPS-1213 fixed (H6); and `X-NuGet-ApiKey`'s three cases (H7).
 
 ### H1-H13, confirmed live
 
@@ -986,14 +1020,23 @@ predicted**; none required a workaround or a routing-around hook.
   `@id` both name exactly `<repoBaseUrl>/<repoName>/v3/package[...]`, and `afterSuccessfulRoundTrip`
   (`nuget.ts`) GETs that exact URL and gets `200` with the published bytes on every successful
   scenario.
-- **H6** (`dotnet package search`/registration-based commands fail; push/restore do not): the service
-  index's exact `@type` shape was confirmed live
-  (`tests/nuget/registry-rules.spec.ts`) — `RegistrationsBaseUrl/3.0.0`, `SearchQueryService/3.0.0`,
-  `SearchAutocompleteService/3.0.0` and a non-standard `PackageDelete/2.0.0`, none of which
-  NuGet.Client's `ServiceTypes.cs` resolves, while `PackageBaseAddress/3.0.0`/`PackagePublish/2.0.0`
-  (what push/restore use) are correct. This step did not additionally run
-  `dotnet package search`/`dotnet list package` against the server to watch it fail live (the
-  service-index evidence alone is what the plan's own hypothesis was about) — filed as **RPS-1213**.
+- **H6** (`dotnet package search`/registration-based commands fail; push/restore do not): originally
+  filed as **RPS-1213** from the service index's exact `@type` shape — `RegistrationsBaseUrl/3.0.0`,
+  `SearchQueryService/3.0.0`, `SearchAutocompleteService/3.0.0` and a non-standard
+  `PackageDelete/2.0.0`, none of which NuGet.Client's `ServiceTypes.cs` recognised, while
+  `PackageBaseAddress/3.0.0`/`PackagePublish/2.0.0` (what push/restore use) were already correct.
+  **RPS-1213 is now fixed**: the service index advertises the bare `RegistrationsBaseUrl`,
+  `SearchQueryService` and `SearchAutocompleteService` (all in `ServiceTypes.cs`'s recognised set)
+  and no longer advertises `PackageDelete/2.0.0` at all (`tests/nuget/registry-rules.spec.ts`'s H6
+  test confirms the corrected shape live). Confirmed live, though: a real `dotnet package search`
+  **still** fails with the exact same "The source does not have a Search service!" message, even
+  though the same test run's own fetch of the live service index (immediately before the `dotnet`
+  invocation) shows the corrected bare `SearchQueryService` being served. So the original `@type`
+  mismatch is fixed and no longer the cause — `dotnet package search` (.NET SDK 10.0.401) has some
+  other, not-yet-understood reason it does not resolve this server's search resource. This is a new,
+  narrower open question, tracked by `tests/nuget/protocol-specific.spec.ts`'s still-pinned
+  `test.fail()` (its comment has the up-to-date evidence) — filed as
+  [RPS-1240](https://zyfera.atlassian.net/browse/RPS-1240).
 - **H7** (`X-NuGet-ApiKey: <user password>` → `401`, contradicting the panel's Option B text):
   confirmed live, exactly as predicted —
   `X-NuGet-ApiKey: <admin password>` → `401`; `X-NuGet-ApiKey: <deploy token>` → `201`;
@@ -1039,26 +1082,33 @@ credential built by hand, exactly like the Cargo protocol-specific suite above.
 - **Unlist/relist** (`DELETE`/`POST /<repo>/v3/package/<idLower>/<verLower>`,
   `AbstractNuGetUnlistProtocolMethodHandler`/`AbstractNuGetRelistProtocolMethodHandler`,
   `permission: WRITE` both ways — NuGet's own `PackagePublish/2.0.0` convention, never the
-  non-standard `PackageDelete/2.0.0` service the service index also advertises): confirmed live —
-  `DELETE` → `204`, the registration leaf's `listed` flips to `false`; `POST` → `200`, flips it back
-  to `true`. Real NuGet semantics: unlisted != deleted, so the flat `v3/package/<id>/index.json`
-  container keeps serving the version regardless of its `listed` state, and a fresh real `dotnet
-restore` of the exact unlisted version still succeeds end to end (not just a raw probe).
+  `PackageDelete/2.0.0` type the service index used to also advertise before RPS-1213 removed it):
+  confirmed live — `DELETE` → `204`, the registration leaf's `listed` flips to `false`; `POST` →
+  `200`, flips it back to `true`. Real NuGet semantics: unlisted != deleted, so the flat
+  `v3/package/<id>/index.json` container keeps serving the version regardless of its `listed` state,
+  and a fresh real `dotnet restore` of the exact unlisted version still succeeds end to end (not just
+  a raw probe).
 - **Search/autocomplete** (`GET /<repo>/v3/search`/`v3/autocomplete`, `permission: READ`): confirmed
   live over raw HTTP — search answers `{"totalHits":N,"data":[{"id","version","registration",...}]}`
   (`NuGetSearchResponse`/`NuGetSearchData`, `data[].id` the lowercased stored spelling, matched
   case-insensitively, same H8 fact as the rest of this runner's suite); autocomplete answers
   `{"totalHits":N,"data":["<idLower>",...]}` (`NuGetAutocompleteResponse`), bare id strings. Both
   routes work fine over raw HTTP — see the next point for why a real client still can't reach them.
-- **`dotnet package search` (RPS-1213 live evidence, not a new bug)**: running a real `dotnet package
-search <id> --source repsy --configfile <cfg>` against a package this suite had just published and
-  proven searchable over raw HTTP (previous point) does NOT crash and does NOT exit non-zero — exit
-  `0`, stdout reads `error: The source does not have a Search service!` and no results are returned.
-  This is one more piece of live evidence for H6/RPS-1213's already-documented root cause
-  (NuGet.Client's `ServiceTypes.cs` never resolves the bare `SearchQueryService/3.0.0` `@type` this
-  server's service index advertises, only the `-beta`/`3.4.0` spellings), now confirmed with the real
-  command's own failure shape rather than the service-index evidence alone — pinned with
-  `test.fail()` referencing RPS-1213, not a new placeholder.
+- **`dotnet package search` (RPS-1213: fixed the service index, but this command still fails, now
+  for a different, unresolved reason)**: running a real `dotnet package search <id> --source repsy
+--configfile <cfg>` against a package this suite had just published and proven searchable over raw
+  HTTP (previous point) does NOT crash and does NOT exit non-zero — exit `0`, stdout reads `error:
+The source does not have a Search service!` and no results are returned. This was originally H6/
+  RPS-1213's own live evidence for the service index advertising an unrecognised `@type`
+  (`SearchQueryService/3.0.0`, not in NuGet.Client's `ServiceTypes.cs`). RPS-1213 has since fixed
+  that — the service index now advertises the bare, recognised `SearchQueryService`, confirmed by
+  fetching the live index from inside this exact test run immediately before invoking `dotnet`, right
+  before the `dotnet` call below. Re-run after the fix, `dotnet package search` still produces the
+  identical "does not have a Search service!" failure, so the `@type` mismatch is no longer the
+  cause. The reason `dotnet package search` (.NET SDK 10.0.401) still won't resolve this server's
+  search resource is not yet understood — kept pinned with `test.fail()`, not removed, with this
+  updated evidence in its comment; filed as
+  [RPS-1240](https://zyfera.atlassian.net/browse/RPS-1240).
 - **Explicitly older version restores**: publishing version B after version A, then explicitly
   restoring A (`renderConsumerProject`/`nuget.resolve` always pin an exact bracketed
   `Version="[<version>]"`) returns exactly A's bytes, never B's — confirmed live, no "latest wins"
@@ -1163,7 +1213,7 @@ read-only token's write refusal at the OPERATION hop, reads still working (R3); 
 blob upload, a wrong digest, and dedup (R4); manifest push validation — missing blobs, a wrong
 `sha256:` reference, an unknown `Content-Type` (R5, **B4**); the override rule and an orphaned blob
 after a refusal (R6); overriding a tag breaking the OLD manifest's pull-by-digest (R7, **B2**);
-`HEAD` vs. `GET` by digest (R8, **B1**); retagging the same digest under a second tag (R9); a
+`HEAD` vs. `GET` by digest (R8, **B1, fixed by RPS-1215**); retagging the same digest under a second tag (R9); a
 config blob missing `os`/`architecture` (R12, **B5**); a multi-arch index referencing a
 digest-pushed child (R13); and that even a PUBLIC repo still needs real credentials to WRITE,
 refused at the token hop with no OCI body at all (distinct from an operation-hop 401's Bearer
@@ -1214,12 +1264,22 @@ prediction, the actual observed behaviour is what got pinned, not the guess.
 - **H9** (`override`: the new digest is served; the OLD digest's pullability, left open by the plan
   pending a live check): confirmed the new digest is served (R6); the OLD digest turned out to be
   **UNPULLABLE** — **B2 (RPS-1216)** (R7).
-- **H10** (`HEAD` vs. `GET` by digest): confirmed — `HEAD` by digest is `404` even right after a
-  `GET` by that same digest served `200` — **B1 (RPS-1215)** (R8). Notably, `crane digest <ref>@sha256:<digest>`
-  (which is a `HEAD` under the hood) does **NOT** itself fail: ggcr's own `remote.Head` falls back to
-  a `GET` when the `HEAD` fails (confirmed live, `crane`'s own stderr: `"HEAD request failed, falling
-back on GET"`), so B1 is invisible to `crane digest`'s own exit code — only a raw `HEAD` (or a
-  client without that specific fallback) observes it. The "D3" real-client test pins BOTH facts.
+- **H10** (`HEAD` vs. `GET` by digest): confirmed live at the time — `HEAD` by digest was `404` even
+  right after a `GET` by that same digest served `200` — **B1, filed as
+  [RPS-1215](https://zyfera.atlassian.net/browse/RPS-1215) and since fixed** (R8). `HEAD` now
+  resolves through the same `dockerFacade.getManifest(...)` GET uses, for both a tag and a digest
+  reference, and mirrors GET's status/headers exactly. Fixing it surfaced one more, genuinely
+  separate, previously-masked bug: `AbstractDockerProtocolTxFacade#findPlatformManifests` (building
+  a manifest-list index) resolved each child by a digest-generated storage filename directly, which
+  only ever found a child that had ALSO been independently re-pushed under its own digest as a
+  distinct reference -- exactly what a real client's `HEAD`-then-fallback-`PUT` behavior used to do
+  as a side effect of B1 itself, masking this. A second, separate ordering bug in the same area
+  (`ManifestRepository#findByRepoIdAndImageIdAndDigestList`'s `.getFirst()`, after `ORDER BY
+createdAt DESC`, could pick a DB-only "this manifest is also part of that multi-platform tag"
+  tracking row over the original storage-backed one once a digest was shared by both) was fixed
+  alongside it, in the same PR. Both are covered by `DockerManifestCheckIT`/`DockerManifestPushIT`
+  and this suite's own "HD-1"/"docker-empty-base" (`tests/docker/protocol-specific.spec.ts`) and "D3"
+  (`tests/docker/publish-consume.spec.ts`) tests, all green.
 - **H11** (timing fits the 120s test timeout): confirmed — the whole 29-test catalog completed in
   ~7-8s total wall time across 12 parallel workers, both full runs.
 - **H12** (running the whole `docker` suite twice without resetting the stack): confirmed — both
@@ -1236,13 +1296,14 @@ back on GET"`), so B1 is invisible to `crane digest`'s own exit code — only a 
 
 ### Backend bug candidates found while reading, and confirmed live (do not fix here)
 
-- **B1 (filed as [RPS-1215](https://zyfera.atlassian.net/browse/RPS-1215))** — `HEAD` a manifest by
-  digest answers `404` for a manifest a `GET` of that SAME digest serves fine (distribution spec:
-  "HEAD MUST be identical to GET without the body"). `AbstractDockerManifestCheckProtocolMethodHandler`'s
-  `findTagAndManifest` only ever resolves a TAG row, never a digest — `AbstractDockerProtocolTxFacade`'s
-  own `resolveManifestDigest` (which GET uses) does both. Confirmed live: `tests/docker/registry-rules
-.spec.ts`'s R8 (raw) and `tests/docker/publish-consume.spec.ts`'s D3 (`crane digest <ref>@sha256:<digest>`
-  — masked by ggcr's own HEAD→GET fallback, see "H10" above, so a raw `HEAD` is what actually exposes it).
+- **B1 (filed as [RPS-1215](https://zyfera.atlassian.net/browse/RPS-1215), fixed)** — `HEAD` a
+  manifest by digest used to answer `404` for a manifest a `GET` of that SAME digest served fine
+  (distribution spec: "HEAD MUST be identical to GET without the body"). Fixed by making
+  `AbstractDockerManifestCheckProtocolMethodHandler` resolve through the same
+  `dockerFacade.getManifest(...)` GET uses, instead of the old tag-only `findTagAndManifest`
+  (removed, along with its one now-unreachable caller and its dead 404 branch). See "H10" above for
+  the two further, previously-masked bugs this fix's own live verification surfaced and fixed in the
+  same PR (a manifest-list's child-by-digest resolution, and a shared-digest row-ordering bug).
 - **B2 (filed as [RPS-1216](https://zyfera.atlassian.net/browse/RPS-1216))** — Overriding a tag
   (`allowOverride: true`) makes the PREVIOUS manifest unpullable BY DIGEST, even though nothing ever
   explicitly deleted it: the tag's one `Manifest` row is reused in place (`ManifestTxService`'s
@@ -1446,10 +1507,11 @@ stack (both from the host and inside the `helm` runner container), then with raw
 were probed first, as instructed.**
 
 - **H1** (does `helm registry login` fail with a WRONG password?): **the plan's own predicted
-  answer was right, confirmed live** — it does NOT fail. `helm registry login localhost:9090
---plain-http -u <user> --password-stdin` with an intentionally wrong secret still prints "Login
-  Succeeded", exit 0, and writes the (wrong) credential into `HELM_REGISTRY_CONFIG` regardless —
-  see **B-H4** below.
+  answer was right, confirmed live at the time** — it did NOT fail. `helm registry login
+localhost:9090 --plain-http -u <user> --password-stdin` with an intentionally wrong secret used to
+  print "Login Succeeded", exit 0, and write the (wrong) credential into `HELM_REGISTRY_CONFIG`
+  regardless — see **B-H4** below, now fixed by RPS-1220. A wrong password now genuinely fails the
+  login (and the push it fronts).
 - **H3** (`--plain-http` required for `localhost:9090`): confirmed — without it, `helm registry
 login`/`push`/`pull` all fail with `http: server gave HTTP response to HTTPS client`.
 - **H4** (`helm pull oci://... --version <exact>` succeeds against Repsy): confirmed, the gating
@@ -1538,19 +1600,24 @@ search`/`install`/`pull <repo>/<chart>`, or a raw `helm pull --repo`) 404s (`cha
   whenever `--version` is empty or a semver CONSTRAINT, so a real `helm pull`/`install`/`show
 oci://.../<chart>` without an EXACT version fails outright against Repsy. Confirmed live: "HL2",
   "R8".
-- **B-H4 (filed as [RPS-1220](https://zyfera.atlassian.net/browse/RPS-1220))** — Lives in the
-  DOCKER provider's token endpoint, surfaces through Helm's shared `/v2/` ping: `helm registry
-login` succeeds with a WRONG password. Docker's `/v2/token` answers the ping's own OAuth2-form
-  POST (no `Authorization` header at all — oras-go's `ForceAttemptOAuth2` path, requesting the
-  wildcard `repository:*:pull` scope) with an ANONYMOUS token, `200`, before any credential is ever
-  checked; `helm registry login` treats that `200` as success. Confirmed live: "HL1". The push/pull
-  REQUEST itself is still credential-checked for real (a wrong-password login still fronts a
-  failing push) — this only affects the login COMMAND's own reported success, never an actual
-  write/read.
-- **B-H5** (observation) — A manifest is only addressable by the exact reference it was pushed
-  under: `GET`/`HEAD` by digest of a tag-pushed manifest both `404`. Would affect `helm pull
-oci://...@sha256:<digest>` if that were expected to work; not otherwise exercised by any real
-  client flow this step drives.
+- **B-H4 (filed as [RPS-1220](https://zyfera.atlassian.net/browse/RPS-1220), fixed)** — Lived in the
+  DOCKER provider's token endpoint, surfaced through Helm's shared `/v2/` ping: `helm registry
+login` used to succeed with a WRONG password. Docker's `/v2/token` answered the ping's own
+  OAuth2-form POST (no `Authorization` header at all — oras-go's `ForceAttemptOAuth2` path,
+  requesting the wildcard `repository:*:pull` scope) with an ANONYMOUS token, `200`, before any
+  credential was ever checked; `helm registry login` treated that `200` as success. Fixed by adding
+  a `grant_type=password` branch (gated on `authHeader == null && formCredentials != null`, so the
+  existing anonymous/Basic-header paths are untouched) that authenticates the form's
+  username/password through the same check the Basic path uses. Confirmed live: "HL1", now genuinely
+  failing a wrong-password login (and the push it fronts).
+- **B-H5** (observation, resolved as a byproduct of RPS-1215) — used to note that a manifest was
+  only addressable by the exact reference it was pushed under (`GET`/`HEAD` by digest of a
+  tag-pushed manifest both `404`, affecting any future `helm pull oci://...@sha256:<digest>`).
+  RPS-1215's fix (Docker's shared `AbstractDockerManifestCheckProtocolMethodHandler`, which Helm
+  OCI rides) makes `HEAD`/`GET` by digest work for a tag-pushed manifest too — not independently
+  re-verified with a dedicated Helm-side test here (no real client flow this step drives needs it),
+  but the underlying mechanism is the same one `tests/docker/publish-consume.spec.ts`'s "D3" now
+  confirms green.
 - **B-H6** — Not exercised: a repro needs a real `helm push` to emit a `.prov` layer BEFORE the
   chart layer in one manifest, which was not confirmed to be producible with the harness's own
   chart fixture (no `.prov` file is ever generated here) — left as an open question, not a
@@ -1980,11 +2047,15 @@ BEFORE any adapter code was written — H1-H4 and H12 gated the whole design.
   own documented `go env -w GOPROXY="<scheme>://user:pass@..."` incantation
   (`golang-config.component.ts`) cannot work AT ALL on a plain-http deployment: the `go` command
   itself refuses to send it (H3). Confirmed live: `publish-consume.spec.ts`'s dedicated test.
-- **RPS-1230** — the `410 Gone`/`GoVersionGoneException` path is DEAD: grep-confirmed nothing
-  in either Go package ever throws it (the `deleted` column `V0002__Golang_Protocol.sql` created has
-  no entity field reading it). Deleting a version through the panel API removes it OUTRIGHT (DB row
-  and all three storage files), and re-uploading the exact same version afterwards succeeds cleanly
-  with a fresh `200`, never a `410`. Confirmed live: `registry-rules.spec.ts`'s R14 test.
+- **RPS-1230** (resolved) — the `410 Gone`/`GoVersionGoneException` path was DEAD: grep-confirmed
+  nothing in either Go package ever threw it, and the `deleted` column `V0002__Golang_Protocol.sql`
+  once created was itself already dropped by `V0004__Drop_Deleted_Column.sql`, so only the Java
+  scaffolding (the exception class, its unreachable `catch`, and its unreachable
+  `@ExceptionHandler`) was left. That scaffolding has now been deleted; hard-delete stays the only
+  deletion semantics. Deleting a version through the panel API removes it OUTRIGHT (DB row and all
+  three storage files), and re-uploading the exact same version afterwards succeeds cleanly with a
+  fresh `200`, never a `410`. Confirmed live: `registry-rules.spec.ts`'s R14 test, unchanged by the
+  cleanup since the observable behavior was identical before and after.
 - **G9** (not a defect — the observed status is correct on both ports, just by two unrelated code
   paths, no ticket filed) — `sumdb/supported` 404s on BOTH the API port (`GolangModuleController
 .checkSumdbSupported`, deliberate — the doc comment says so) and the protocol port (the `go` command's
@@ -2061,10 +2132,13 @@ lazy fetch is simply never triggered. **Consequently `ruby.ts`'s `resolve()` dri
 toolchain with NO `knownConsumeFailure` hook at all** — every scenario's consume side is asserted for
 real, exactly like maven/npm/pypi, per the plan's own explicit fallback instruction for a refuted H1.
 
-RPS-1233 is real (confirmed live, `registry-rules.spec.ts`'s R10 test, `test.fail()`-pinned) and DOES
-break `gem install --source .../gem/`/`gem fetch` — both `gem` subcommands are pinned as their own
-dedicated `test.fail()`-marked real-client tests in `publish-consume.spec.ts`, never the catalog
-loop's own consumer.
+RPS-1233 was real (confirmed live, `registry-rules.spec.ts`'s R10 test) and broke `gem install
+--source .../gem/`; it is now fixed by a concrete `RubyGemspecHandler` that registers the route, and
+both `registry-rules.spec.ts`'s R10 test and `publish-consume.spec.ts`'s dedicated `gem install`
+real-client test assert the fixed behavior instead of pinning the failure. `gem fetch` shared the
+same route dependency plus its own separate bug (RPS-1234, the zlib/gzip mismatch below); both are
+now fixed and `publish-consume.spec.ts`'s dedicated `gem fetch` test asserts a real exit 0 — neither
+`gem` subcommand routes through the catalog loop's own consumer (`bundle install`, per H1 above).
 
 ### Scenario mapping onto the shared catalog
 
@@ -2088,12 +2162,12 @@ row-first ordering, re-verifying RPS-1060 still holds for Ruby (R4); malformed-g
 nothing stored (R6); the full yank flow — success, re-yank refusal, a read-only token/USER-role
 password both refused with 401 (`MANAGE` permission), a yanked version's `.gem` file staying
 downloadable (R8, RPS-1238, fixed), and a yanked version rejecting even an `allowOverride:true`
-re-push (R8); a panel-API delete (not a yank)
-allowing a clean re-publish (R5/R16); `specs.4.8.gz`'s zlib-not-gzip bytes and the prerelease/latest
-split (R9, RPS-1234); the missing `gemspec.rz` route (R10, RPS-1233); unknown-gem 404s and an empty repo's
-listings (R11); `HEAD` mirroring GET's status (R12, RPS-1237, fixed); a platform gem's filename/info-line
-shape and yank's explicit-platform requirement (R14); that `releases`/`snapshots` are never read (R15);
-and RPS-1236's hyphen-before-digit download case (R13, fixed).
+re-push (R8); a panel-API delete (not a yank) allowing a clean re-publish (R5/R16); `specs.4.8.gz`'s
+gzip framing (RFC 1952, `gunzipSync` succeeds and `inflateSync` throws) and the prerelease/latest
+split (R9, RPS-1234, fixed); the `gemspec.rz` route (R10, RPS-1233, fixed); unknown-gem 404s and an
+empty repo's listings (R11); `HEAD` mirroring GET's status (R12, RPS-1237, fixed); a platform gem's
+filename/info-line shape and yank's explicit-platform requirement (R14); that `releases`/`snapshots`
+are never read (R15); and RPS-1236's hyphen-before-digit download case (R13, fixed).
 
 ### H1-H20, RPS-1233-RPS-1238: confirmed live
 
@@ -2135,10 +2209,13 @@ adapter code was written.
   `gem`/`bundle` retries a refused request by default.
 - **H10** (`md5Hex(/info body)` matches `/versions`' own md5 after publish and after yank): confirmed
   live — `registry-rules.spec.ts`'s happy-path-shape test and the yank test both assert it.
-- **H11** (`specs.4.8.gz` is zlib not gzip; `gem fetch` fails on it): confirmed live — RPS-1234, and the
-  dedicated `gem fetch` real-client test (`test.fail()`).
-- **H12** (`gem install --source` fails on the missing `gemspec.rz` route): confirmed live — RPS-1233, and
-  the dedicated `gem install` real-client test (`test.fail()`).
+- **H11** (`specs.4.8.gz` is zlib not gzip; `gem fetch` fails on it): confirmed live, then **fixed** —
+  RPS-1234; the backend now serves real gzip (`GZIPOutputStream`), asserted directly in the
+  dedicated `gem fetch` real-client test, which now also exits 0 end to end since RPS-1233 (below)
+  removed the other bug `gem fetch` shared with `gem install`.
+- **H12** (`gem install --source` failed on the missing `gemspec.rz` route): confirmed live — RPS-1233,
+  now fixed; the dedicated `gem install` real-client test asserts the fixed behavior instead of
+  pinning the failure.
 - **H13** (a yanked version is listed in `/info` prefixed `-`, not omitted): confirmed live — RPS-1235,
   now fixed (`/info` omits it entirely; the `-` prefix stays the `/versions` convention).
 - **H14** (a gem named with a `-<digit>` segment publishes but cannot be downloaded): confirmed live —
@@ -2165,14 +2242,17 @@ adapter code was written.
 
 ### Backend bug candidates found while reading and confirmed live (do not fix here)
 
-- **RPS-1233** — `quick/Marshal.4.8/<name>-<version>.gemspec.rz` has no backend route at all: no class
-  under `repsy-backend`'s Ruby package extends `AbstractRubyGemspecHandler` (grep-confirmed), even
-  though the abstract handler, `RubyGemspecMarshalWriter` and `RubyProtocolFacade.getGemspec` all
-  exist and are implemented in `repsy-protocols/ruby`. The router's catch-all answers `404
-unknownPath`. Breaks `gem install --source`/`gem fetch` (confirmed live, `test.fail()`-pinned real-
-  client tests); does NOT break `bundle install` (H1's refutation, the headline finding of this step).
-  Highest-severity candidate of this step, since it silently drops an entire, otherwise-implemented
-  feature from being reachable.
+- **RPS-1233 (fixed)** — `quick/Marshal.4.8/<name>-<version>.gemspec.rz` had no backend route at all:
+  no class under `repsy-backend`'s Ruby package extended `AbstractRubyGemspecHandler` (grep-confirmed),
+  even though the abstract handler, `RubyGemspecMarshalWriter` and `RubyProtocolFacade.getGemspec`
+  were all already implemented in `repsy-protocols/ruby`. The router's catch-all answered `404
+unknownPath`. Broke `gem install --source`/`gem fetch`; did NOT break `bundle install` (H1's
+  refutation, the headline finding of this step). Was the highest-severity candidate of this step,
+  since it silently dropped an entire, otherwise-implemented feature from being reachable. Fixed by a
+  concrete `RubyGemspecHandler` that registers the route: `gem install` now succeeds end-to-end
+  (`publish-consume.spec.ts`) and `registry-rules.spec.ts`'s R10 test asserts `200`. `gem fetch`
+  shared this route dependency plus its own separate RPS-1234 zlib/gzip bug below; both are now
+  fixed and `gem fetch` succeeds end-to-end too.
 - **RB-2** (observation) — `/info/<gem>` never emits `ruby:`/`rubygems:` requirement keys
   (`CompactIndexFormatter.appendVersionLine`), even though `required_ruby_version` is correctly parsed
   by `GemspecParser` and stored on `ruby_gem_version.required_ruby_version`. This is architecturally
@@ -2180,12 +2260,21 @@ unknownPath`. Breaks `gem install --source`/`gem fetch` (confirmed live, `test.f
   missing route) is only triggered by a version's `required_ruby_version` being genuinely absent from
   `/info` in a way that forces a fallback check — and it happens to just... not need one for
   resolution to succeed. Confirmed live, `registry-rules.spec.ts`'s happy-path-shape test.
-- **RPS-1234** — `specs.4.8.gz`/`latest_specs.4.8.gz`/`prerelease_specs.4.8.gz` are compressed with
-  `java.util.zip.DeflaterOutputStream` (raw zlib/RFC1950), not gzip (RFC1952) as their own `.gz`
-  filenames and a real `gem fetch`/the legacy Index fetcher both expect. Confirmed live:
-  `gunzipSync` throws, `inflateSync` succeeds and yields a valid Marshal 4.8 stream; a real `gem
-fetch` fails. `test.fail()`-pinned in both `registry-rules.spec.ts` (R9) and a dedicated
-  `publish-consume.spec.ts` real-client test.
+- **RPS-1234 — FIXED.** `specs.4.8.gz`/`latest_specs.4.8.gz`/`prerelease_specs.4.8.gz` were compressed
+  with `java.util.zip.DeflaterOutputStream` (raw zlib/RFC1950), not gzip (RFC1952) as their own `.gz`
+  filenames and a real `gem fetch`/the legacy Index fetcher both expect. Confirmed live before the
+  fix: `gunzipSync` threw, `inflateSync` succeeded and yielded a valid Marshal 4.8 stream; a real
+  `gem fetch` failed. Fixed by swapping in `java.util.zip.GZIPOutputStream`
+  (`AbstractRubySpecsIndexHandler`); `Content-Type` stays `application/octet-stream` and no
+  `Content-Encoding: gzip` header is added (the gzip framing is the file's own content, not a
+  transfer encoding — adding that header would make an HTTP client transparently decompress it and
+  hand RubyGems a bare Marshal stream to gunzip a second time). `registry-rules.spec.ts` (R9) now
+  asserts `gunzipSync` succeeds and `inflateSync` throws. The dedicated `publish-consume.spec.ts`
+  real-client `gem fetch` test asserts the same gzip framing directly and, now that `gem fetch`'s
+  other shared dependency (the `gemspec.rz` route, RPS-1233) is also fixed, asserts a real exit 0
+  end to end. Note: `AbstractRubyGemspecHandler.deflate` (the `.rz` gemspec route, RPS-1233) is a
+  different, near-identical-looking method that correctly uses raw zlib per the RubyGems spec — it
+  was deliberately left untouched.
 - **RPS-1235 (fixed)** — a yanked version used to be listed in `/info/<gem>` with a `-` prefix instead
   of being OMITTED entirely, which is what the compact-index spec requires (the `-` prefix is the
   `/versions` endpoint's own convention, not `/info`'s). Fixed by filtering yanked entries inside
@@ -2400,9 +2489,10 @@ prints a `✘` for each (something inside the test body did throw, which is exac
 is watching for), but the run's own summary line and exit code both say "passed"/`0` — treat those
 two as authoritative over the per-line glyphs. Likewise for the cargo suite's `no-override`/
 `override` scenarios (`knownPublishSideEffect`, "H1" above) and its two dedicated hyphen tests ("H2"
-above), the docker suite's four `test.fail`-routed registry-rules tests (R5/B4, R7/B2, R8/B1,
-R12/B5 — "H9"/"H10"/"H13" above), the helm suite's five `test.fail`-routed tests (HL1/B-H4,
-HL2/B-H3, HL4/B-H1, HL5/B-H2, R8/B-H3 — "Helm runner" above), the pypi suite's six `test.fail`-routed
+above), the docker suite's three remaining `test.fail`-routed registry-rules tests (R5/B4, R7/B2,
+R12/B5 — "H9"/"H13" above; R8/B1 is fixed by RPS-1215 and no longer routed this way), the helm
+suite's four remaining `test.fail`-routed tests (HL2/B-H3, HL4/B-H1, HL5/B-H2, R8/B-H3 — "Helm
+runner" above; HL1/B-H4 is fixed by RPS-1220 and no longer routed this way), the pypi suite's six `test.fail`-routed
 registry-rules tests (RPS-1221/1222/1223/1224/1225, P4/RPS-1124 — "PyPI runner" above), and the golang
 suite's three `test.fail`-routed registry-rules tests (candidates G1/G2/G10 — "Go runner" above): all
 counted as "passed", not a plain pass line.

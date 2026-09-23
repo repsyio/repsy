@@ -62,7 +62,6 @@ import org.json.JSONObject;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
-import org.springframework.data.util.Pair;
 import tools.jackson.databind.ObjectMapper;
 
 @NullMarked
@@ -184,28 +183,6 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
     return this.performDatabaseLookupForManifest(
         context, manifestReference, imageName, requestPath);
-  }
-
-  @Override
-  public Pair<Optional<BaseTagDetail<ID>>, String> findTagAndManifest(
-      final ProtocolContext context,
-      final String reference,
-      final String imageName,
-      final RelativePath relativePath)
-      throws IOException {
-
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-
-    final var tagOpt =
-        this.findTagByNameAndRepoAndImageName(repoInfo, reference, imageName, relativePath);
-
-    if (tagOpt.isEmpty()) {
-      throw new ItemNotFoundException("tagNotFound");
-    }
-
-    final var manifest = this.getManifestStr(repoInfo, relativePath);
-
-    return Pair.of(tagOpt, manifest);
   }
 
   private @Nullable BaseUsages createManifest(
@@ -399,6 +376,41 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
         .orElseThrow(() -> new ItemNotFoundException("layerNotFound"));
   }
 
+  /**
+   * Resolves each platform manifest a manifest-list push declares by DIGEST. Two real push shapes
+   * reach here, and only one of them has a {@code Manifest} DB row reachable by the tag-joined
+   * query {@link #performDatabaseLookupForManifest} also uses:
+   *
+   * <ul>
+   *   <li>A child pushed under a TAG first (e.g. a real client's own per-platform {@code crane push
+   *       ... :amd64} before combining it into an index): its storage file lives under that tag's
+   *       own generated name, never a digest-generated one, so the DB row (found via {@link
+   *       ManifestService#findManifestByRepoIdAndImageNameAndDigest}, using {@code
+   *       manifest.getName()} for the filename) is the only way to resolve it correctly. Generating
+   *       the lookup filename directly from the digest (this method's ORIGINAL implementation) only
+   *       ever found this shape when a child had ALSO been separately re-pushed under its own
+   *       digest as a distinct reference -- which happened to occur as a side effect of {@code
+   *       AbstractDockerManifestCheckProtocolMethodHandler}'s old HEAD-by-digest bug (RPS-1215): a
+   *       client whose HEAD-by-digest probe wrongly 404'd would defensively re-PUT each child under
+   *       its digest before assembling the index, incidentally creating the very digest-keyed
+   *       storage entry the digest-generated filename expected. Fixing that HEAD bug means a
+   *       well-behaved client's HEAD-by-digest now correctly reports "already exists" and skips
+   *       that re-PUT, exposing this gap -- confirmed live once RPS-1215 landed (a real `crane
+   *       index append` started failing the final index PUT with 404 resourceNotFound, even though
+   *       both children's HEAD/GET succeeded).
+   *   <li>A child pushed directly BY digest reference, with no tag at all (a client that pushes
+   *       each platform manifest as a bare {@code PUT .../manifests/sha256:<digest>}, never a named
+   *       tag, then references it from an index -- {@code DockerManifestPushIT}'s own {@code
+   *       wellFormedManifestIsStored} pins exactly this). Such a manifest has no {@code
+   *       tagPlatform}/{@code tag} row at push time, so the tag-joined DB query can never find it
+   *       -- its storage file only exists under the digest-generated filename, exactly what this
+   *       method's ORIGINAL implementation looked up directly.
+   * </ul>
+   *
+   * So this tries the DB-row resolution first (fixing the first shape, matching {@link
+   * #performDatabaseLookupForManifest}), and falls back to the original digest-generated filename
+   * lookup on {@link ItemNotFoundException} (keeping the second shape working, exactly as before).
+   */
   private List<ManifestListManifestInfo> findPlatformManifests(
       final BaseRepoInfo<ID> repoInfo,
       final BaseImageInfo<ID> imageInfo,
@@ -412,10 +424,8 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
       final var digest = platformManifest.getDigest();
 
-      final var fileName = generate(repoInfo.getStorageKey(), imageInfo.getName(), digest);
-      final var parsedPath = this.parseForManifest(form.getServletPath(), fileName);
-
-      final var manifestResource = this.getResource(repoInfo, parsedPath.getRelativePath());
+      final var manifestResource =
+          this.resolvePlatformManifestResource(repoInfo, imageInfo, digest, form);
       final var manifestInfo =
           this.objectMapper.readValue(
               manifestResource.getContentAsByteArray(), ManifestListManifestInfo.class);
@@ -427,6 +437,32 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     }
 
     return manifestInfoList;
+  }
+
+  private Resource resolvePlatformManifestResource(
+      final BaseRepoInfo<ID> repoInfo,
+      final BaseImageInfo<ID> imageInfo,
+      final String digest,
+      final ManifestForm form)
+      throws IOException {
+
+    try {
+      final var manifest =
+          this.manifestService.findManifestByRepoIdAndImageNameAndDigest(
+              repoInfo.getId(), imageInfo, digest);
+
+      final var fileName =
+          generate(repoInfo.getStorageKey(), imageInfo.getName(), manifest.getName());
+      final var parsedPath = this.parseForManifest(form.getServletPath(), fileName);
+
+      return this.getResource(repoInfo, parsedPath.getRelativePath());
+    } catch (final ItemNotFoundException e) {
+
+      final var fileName = generate(repoInfo.getStorageKey(), imageInfo.getName(), digest);
+      final var parsedPath = this.parseForManifest(form.getServletPath(), fileName);
+
+      return this.getResource(repoInfo, parsedPath.getRelativePath());
+    }
   }
 
   private boolean checkLayerExistsInStorage(
@@ -523,13 +559,5 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
         idx > 0 ? relativePath.getPath().substring(0, idx) + digest : relativePath.getPath();
 
     return this.getResource(repoInfo, new RelativePath(mutatedPath));
-  }
-
-  private String getManifestStr(final BaseRepoInfo<ID> repoInfo, final RelativePath relativePath)
-      throws IOException {
-
-    final var manifestResource = this.getResource(repoInfo, relativePath);
-
-    return manifestResource.getContentAsString(StandardCharsets.UTF_8);
   }
 }

@@ -303,21 +303,12 @@ test.describe('helm registry rules (raw HTTP)', () => {
     expect(sha256Hex(getAfterRefused.body)).toBe(sha256Hex(manifest1));
   });
 
-  test(
-    'R8/B-H3: GET tags/list has no handler (candidate)',
-    { tag: ['@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'tagslist');
-      const admin = adminCredential();
-      const res = await rawGetTagsList(layout.repoName, admin, layout.chart);
-      test.fail(
-        true,
-        'RPS-1219 (B-H3): there is no GET .../tags/list handler at all -- confirmed live (404 ' +
-          'NAME_UNKNOWN), which is why a real `helm pull oci://` without an exact --version fails.',
-      );
-      expect(res.status, 'tags/list should be served').toBe(200);
-    },
-  );
+  test('R8/B-H3: GET tags/list is served', { tag: ['@negative'] }, async ({ seeder }) => {
+    const layout = await newRepo(seeder, 'tagslist');
+    const admin = adminCredential();
+    const res = await rawGetTagsList(layout.repoName, admin, layout.chart);
+    expect(res.status, 'tags/list should be served').toBe(200);
+  });
 
   test(
     'R11: classic upload rules (missing chart part, missing/invalid Chart.yaml, uppercase name, ' +

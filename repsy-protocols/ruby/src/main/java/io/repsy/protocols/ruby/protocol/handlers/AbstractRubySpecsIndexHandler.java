@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.zip.DeflaterOutputStream;
+import java.util.zip.GZIPOutputStream;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -90,7 +90,7 @@ public abstract class AbstractRubySpecsIndexHandler implements ProtocolMethodHan
       final HttpServletResponse response) {
     final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
     final var raw = this.resolveSpecs(context, relativePath);
-    return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).body(deflate(raw));
+    return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).body(gzip(raw));
   }
 
   private byte[] resolveSpecs(final ProtocolContext context, final String relativePath) {
@@ -103,11 +103,11 @@ public abstract class AbstractRubySpecsIndexHandler implements ProtocolMethodHan
     return this.facade.getSpecs(context);
   }
 
-  private static byte[] deflate(final byte[] raw) {
+  private static byte[] gzip(final byte[] raw) {
     try {
       final var out = new ByteArrayOutputStream(raw.length);
-      try (final var deflate = new DeflaterOutputStream(out)) {
-        deflate.write(raw);
+      try (final var gzip = new GZIPOutputStream(out)) {
+        gzip.write(raw);
       }
       return out.toByteArray();
     } catch (final IOException e) {
