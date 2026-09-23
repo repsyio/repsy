@@ -16,12 +16,14 @@
 package io.repsy.protocols.cargo.protocol.facades;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.cargo.protocol.facades.contract.CargoProtocolFacade;
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
+import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.SpooledUpload;
@@ -29,6 +31,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
@@ -36,6 +39,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import tools.jackson.databind.ObjectMapper;
 
+@Slf4j
 @NullMarked
 @RequiredArgsConstructor
 public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFacade {
@@ -137,15 +141,11 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
       final var indexJsonLine = CrateUtils.getIndexJsonLine(requestWithChecksum, this.objectMapper);
 
       final var usages =
-          this.cargoStorageService.writeCrateAndIndex(
-              repoInfo.getStorageKey(),
-              repoInfo.getName(),
-              crateName,
-              request.vers(),
-              spool.openStream(),
-              indexJsonLine);
-
-      this.cargoCrateService.publish(repoInfo, requestWithChecksum, inspection.edition());
+          this.cargoCrateService.publish(
+              repoInfo,
+              requestWithChecksum,
+              inspection.edition(),
+              () -> this.storeCrate(repoInfo, crateName, request.vers(), spool, indexJsonLine));
 
       context.addProperty(ARTIFACT_NAME, crateName);
       context.addProperty(ARTIFACT_VERSION, request.vers());
@@ -153,6 +153,49 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
           STORAGE_PATH,
           String.format("crates/%s/%s-%s.crate", crateName, crateName, request.vers()));
       context.addProperty(USAGES, usages);
+    }
+  }
+
+  /**
+   * Stores the crate and its index line while {@link CargoCrateService#publish} still holds the
+   * version's rows: a failure rolls the rows back, and the partly written crate file of the new
+   * version is removed so nothing is left in storage that no row describes (RPS-1124).
+   */
+  private BaseUsages storeCrate(
+      final BaseRepoInfo<ID> repoInfo,
+      final String crateName,
+      final String version,
+      final SpooledUpload spool,
+      final String indexJsonLine)
+      throws IOException {
+
+    try (final var crateStream = spool.openStream()) {
+      return this.cargoStorageService.writeCrateAndIndex(
+          repoInfo.getStorageKey(),
+          repoInfo.getName(),
+          crateName,
+          version,
+          crateStream,
+          indexJsonLine);
+    } catch (final IOException | RuntimeException e) {
+      this.discardPartialCrate(repoInfo, crateName, version, e);
+      throw e;
+    }
+  }
+
+  private void discardPartialCrate(
+      final BaseRepoInfo<ID> repoInfo,
+      final String crateName,
+      final String version,
+      final Exception cause) {
+
+    try {
+      this.cargoStorageService.deleteCrate(
+          repoInfo.getStorageKey(), repoInfo.getName(), crateName, version);
+    } catch (final IOException | RuntimeException e) {
+      // Nothing to delete when the failure came before the file was created.
+      log.debug("No partial crate removed for {} {}: {}", crateName, version, e.getMessage());
+      cause.addSuppressed(e);
     }
   }
 

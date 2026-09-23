@@ -15,12 +15,14 @@
  */
 package io.repsy.protocols.cargo.shared.crate.services;
 
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.io.IOException;
 import java.util.List;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -41,6 +43,27 @@ public interface CargoCrateService<ID> {
    */
   void publish(BaseRepoInfo<ID> repoInfo, CratePublishRequest request, @Nullable String edition);
 
+  /**
+   * Records the crate version and, while that write is still open, stores its files through {@code
+   * filesWriter} (RPS-1124).
+   *
+   * <p>The rows are written first (and flushed, so a unique-index conflict surfaces here) and the
+   * files second, inside one transaction. If the rows cannot be written, storage is never touched,
+   * so a publish that loses a race for a version cannot replace the winner's crate file or append a
+   * second index line. If the files cannot be written, the rows are rolled back.
+   *
+   * @param edition see {@link #publish(BaseRepoInfo, CratePublishRequest, String)}
+   * @return the usages reported by {@code filesWriter}
+   * @throws io.repsy.core.error_handling.exceptions.ItemAlreadyExistException when the version is
+   *     already published, including when a concurrent publish of it won the race
+   */
+  BaseUsages publish(
+      BaseRepoInfo<ID> repoInfo,
+      CratePublishRequest request,
+      @Nullable String edition,
+      CrateFilesWriter filesWriter)
+      throws IOException;
+
   void yank(BaseRepoInfo<ID> repoInfo, String name, String vers);
 
   void unyank(BaseRepoInfo<ID> repoInfo, String name, String vers);
@@ -58,4 +81,15 @@ public interface CargoCrateService<ID> {
   BaseCrateVersionInfo<ID> getCrateVersion(BaseRepoInfo<ID> repoInfo, String name, String vers);
 
   Page<CrateListItem> search(BaseRepoInfo<ID> repoInfo, String query, Pageable pageable);
+
+  /** Stores the files of a version whose rows {@link #publish} has just written. */
+  @FunctionalInterface
+  interface CrateFilesWriter {
+
+    /**
+     * Writes the crate file and its index line. The version is always new: Cargo never replaces a
+     * published version, so a writer that fails may remove whatever it has written.
+     */
+    BaseUsages write() throws IOException;
+  }
 }

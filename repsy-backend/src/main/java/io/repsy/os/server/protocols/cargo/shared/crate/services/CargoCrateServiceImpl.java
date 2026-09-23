@@ -15,8 +15,10 @@
  */
 package io.repsy.os.server.protocols.cargo.shared.crate.services;
 
+import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoAuthor;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCategory;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrate;
@@ -30,6 +32,7 @@ import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateIn
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateMetaRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoKeywordRepository;
+import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
@@ -44,6 +47,7 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
 import io.repsy.protocols.cargo.shared.crate.services.SemverComparator;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -52,6 +56,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -70,6 +75,7 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
   private static final String ERR_REPO_NOT_FOUND = "repoNotFound";
   private static final String ERR_CRATE_NOT_FOUND = "crateNotFound";
   private static final String ERR_CRATE_VERSION_NOT_FOUND = "crateVersionNotFound";
+  private static final String VERSION_UNIQUE_CONSTRAINT = "ux_cargo_crate_index__crate_id_vers";
 
   private final RepoRepository repoRepository;
   private final CargoCrateRepository crateRepository;
@@ -88,7 +94,54 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
       final CratePublishRequest request,
       final @Nullable String edition) {
 
-    final var repo = this.findRepoById(repoInfo.getId());
+    this.writeVersionRows(repoInfo, request, edition);
+  }
+
+  @Override
+  @Transactional(rollbackFor = IOException.class)
+  public BaseUsages publish(
+      final BaseRepoInfo<UUID> repoInfo,
+      final CratePublishRequest request,
+      final @Nullable String edition,
+      final CrateFilesWriter filesWriter)
+      throws IOException {
+
+    this.writeVersionRows(repoInfo, request, edition);
+
+    // The transaction, and the row lock it holds, stays open while the files are written, so a
+    // losing push waits for the winner instead of replacing its files.
+    return filesWriter.write();
+  }
+
+  private void writeVersionRows(
+      final BaseRepoInfo<UUID> repoInfo,
+      final CratePublishRequest request,
+      final @Nullable String edition) {
+
+    // Flush so a unique-index conflict (a concurrent publish of the same version) fails here,
+    // before any file is written.
+    try {
+      this.writeRows(repoInfo, request, edition);
+      this.crateIndexRepository.flush();
+    } catch (final DataIntegrityViolationException e) {
+      // Only that index means the version exists. Any other violation is not the client's
+      // conflict, so it is left to surface as the server error it is.
+      if (!ConstraintViolations.violatesConstraint(e, VERSION_UNIQUE_CONSTRAINT)) {
+        throw e;
+      }
+
+      throw new ItemAlreadyExistException(versionExistsMessage(request));
+    }
+  }
+
+  private void writeRows(
+      final BaseRepoInfo<UUID> repoInfo,
+      final CratePublishRequest request,
+      final @Nullable String edition) {
+
+    // A repo deleted since authentication is "not found" rather than a foreign-key violation.
+    this.findRepoById(repoInfo.getId());
+
     final var normalizedName = CrateUtils.normalizeCrateName(request.name());
 
     final var existingCrate =
@@ -101,7 +154,7 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
       this.checkExistsVersion(crate, request);
       crate.setLastUpdatedAt(Instant.now());
     } else {
-      crate = this.createCrate(repo, request, normalizedName);
+      crate = this.insertCrate(repoInfo.getId(), request, normalizedName);
     }
 
     crate.setHasLib(request.hasLib());
@@ -247,29 +300,50 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
             .isPresent();
 
     if (versionExists) {
-      throw new ItemAlreadyExistException(
-          "crate `%s@%s` already exists in this registry"
-              .formatted(request.name(), request.vers()));
+      throw new ItemAlreadyExistException(versionExistsMessage(request));
     }
   }
 
-  private CargoCrate createCrate(
-      final Repo repo, final CratePublishRequest request, final String normalizedName) {
+  private static String versionExistsMessage(final CratePublishRequest request) {
 
-    final var crate = new CargoCrate();
+    return "crate `%s@%s` already exists in this registry"
+        .formatted(request.name(), request.vers());
+  }
 
-    crate.setRepo(repo);
-    crate.setName(normalizedName);
-    crate.setOriginalName(request.name());
-    crate.setMaxVersion(request.vers());
-    crate.setTotalDownloads(0L);
-    crate.setDescription(request.description());
-    crate.setHomepage(request.homepage());
-    crate.setRepository(request.repository());
-    crate.setCreatedAt(Instant.now());
-    crate.setLastUpdatedAt(Instant.now());
+  /**
+   * Returns the crate row, inserting it when this is the first version of the crate.
+   *
+   * <p>The insert skips a row that already exists instead of failing on the unique index: on
+   * PostgreSQL a failed statement aborts the transaction, which now also holds the version row and
+   * the file write. When a concurrent first publish has inserted the crate but not committed yet,
+   * the statement waits for it, and the crate is then read back with its versions checked.
+   */
+  private CargoCrate insertCrate(
+      final UUID repoId, final CratePublishRequest request, final String normalizedName) {
 
-    return this.crateRepository.save(crate);
+    final var inserted =
+        this.crateRepository.insertIfAbsent(
+            UuidCreator.getTimeOrderedEpoch(),
+            repoId,
+            normalizedName,
+            request.name(),
+            request.vers(),
+            request.description(),
+            request.homepage(),
+            request.repository(),
+            request.hasLib(),
+            Instant.now());
+
+    final var crate =
+        this.crateRepository
+            .findByRepoIdAndName(repoId, normalizedName)
+            .orElseThrow(() -> new ItemNotFoundException(ERR_CRATE_NOT_FOUND));
+
+    if (inserted == 0) {
+      this.checkExistsVersion(crate, request);
+    }
+
+    return crate;
   }
 
   private void createCrateIndex(final CargoCrate crate, final CratePublishRequest request) {
