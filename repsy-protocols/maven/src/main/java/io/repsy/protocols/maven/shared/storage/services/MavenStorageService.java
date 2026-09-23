@@ -45,6 +45,19 @@ public interface MavenStorageService<ID> {
   BaseUsages writeInputStreamToPath(
       StoragePath storagePath, InputStream inputStream, String repoName);
 
+  /**
+   * Tells whether a file is stored at {@code storagePath}. A directory at that path counts as
+   * stored, so a caller that only removes what it created never removes one (RPS-1199).
+   */
+  boolean exists(StoragePath storagePath, String repoName);
+
+  /**
+   * Soft-deletes the single file at {@code storagePath} (it is moved to the trash, as every other
+   * delete is) and nothing around it: its directories are left in place. It only takes back a file
+   * the caller has just stored (RPS-1199).
+   */
+  void deleteFile(StoragePath storagePath);
+
   long deleteArtifact(UUID repoUuid, String groupId, String artifactId);
 
   long deleteArtifactVersion(UUID repoUuid, String groupId, String artifactId, String versionName);
