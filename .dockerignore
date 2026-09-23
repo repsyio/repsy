@@ -1,0 +1,51 @@
+# Copyright 2026 the original author or authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Keeps local build output, dependencies and tooling state out of the image build context. The
+# Dockerfile copies whole directories (repsy-frontend/, libs/, repsy-protocols/, core/), so without
+# this a developer's local node_modules or generated client would be copied over the freshly
+# installed/generated ones in the image build, and a local build would differ from CI.
+#
+# This is a deny-list on purpose. Do NOT exclude what the Dockerfile copies: core/ (the git
+# submodule), entrypoint.sh, every pom.xml, and
+# repsy-backend/src/main/resources/openapi/openapi-spec.yaml.
+#
+# It applies to the main build context only, not to the `openapi-jar` named context that
+# release.yml passes (a directory outside the repository, with no .dockerignore of its own).
+
+# VCS and agent tooling (.claude/worktrees holds whole other checkouts)
+.git
+.claude
+
+# Maven build output, at any depth (core/, libs/*, repsy-protocols/*, repsy-backend/)
+**/target
+
+# Frontend: installed dependencies, build output, caches and the git-ignored generated client. The
+# frontend-build stage runs pnpm install and the OpenAPI generator itself.
+repsy-frontend/node_modules
+repsy-frontend/dist
+repsy-frontend/.angular
+repsy-frontend/coverage
+repsy-frontend/src/generated
+
+# e2e harness: the Dockerfile copies nothing from it (this also covers its node_modules,
+# test-results, playwright-report and .env)
+e2e
+
+# IDE and OS files
+.idea
+.vscode
+*.iml
+.DS_Store
+**/.DS_Store

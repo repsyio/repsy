@@ -86,6 +86,15 @@ random_run_id() {
   printf '%s' "$id"
 }
 
+# Every subcommand that starts a runner container (docker compose run) must call this first. The
+# runners bind-mount ./test-results and ./playwright-report (docker-compose.runners.yml); when a
+# directory is missing Docker creates it as root, and a later runner (which runs as the host
+# uid:gid) then fails with EACCES writing its reports. Creating them here, as the invoking user,
+# makes the bind mount reuse them.
+ensure_runner_dirs() {
+  mkdir -p test-results playwright-report
+}
+
 cmd_local_up() {
   local use_h2="false"
   case "${1:-}" in
@@ -130,9 +139,7 @@ cmd_local_down() {
 
 cmd_test() {
   require_admin_password
-  # Created here, as the host user, so the bind mount in docker-compose.runners.yml reuses this
-  # directory instead of Docker auto-creating it as root on first use.
-  mkdir -p test-results playwright-report
+  ensure_runner_dirs
 
   local target="local"
   local protocols=""
@@ -221,6 +228,7 @@ cmd_test() {
 
 cmd_sweep() {
   require_admin_password
+  ensure_runner_dirs
   # Reuses the "skeleton" image: sweeping needs the harness and no protocol-specific tooling. Calls
   # tsx directly (see entrypoint.sh's comment: "pnpm exec" fails under the container's non-root,
   # host-matching uid because it re-verifies node_modules against a store built as root).

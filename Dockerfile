@@ -104,6 +104,9 @@ FROM node:24-alpine AS frontend-build
 WORKDIR /app
 ENV CI=true
 
+# Keep this pnpm version equal to the one in .github/actions/setup-frontend/action.yml (the CI
+# checks), so the release image and CI run the same pnpm. It is a literal on purpose (SonarCloud
+# githubactions:S8543 reads the pin off the line): bump both together, and never use @latest.
 RUN corepack enable && corepack prepare pnpm@12.5.1 --activate
 
 # openapi-generator-cli shells out to a JRE to run the generator jar
