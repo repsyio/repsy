@@ -18,13 +18,18 @@ package io.repsy.os.server.protocols.cargo.shared.crate.services;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.times;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoAuthor;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCategory;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrate;
@@ -43,9 +48,13 @@ import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.io.IOException;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -54,6 +63,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -126,8 +136,26 @@ class CargoCrateServiceTest {
 
       when(CargoCrateServiceTest.this.repoRepository.findById(repoId))
           .thenReturn(Optional.of(new Repo()));
+      final var insertedCrate = new CargoCrate();
+      insertedCrate.setId(UUID.randomUUID());
+      insertedCrate.setName("my_crate");
+      insertedCrate.setOriginalName("my-Crate");
+      insertedCrate.setMaxVersion("1.0.0");
+      // Absent before the insert, read back after it.
       when(CargoCrateServiceTest.this.crateRepository.findByRepoIdAndName(repoId, "my_crate"))
-          .thenReturn(Optional.empty());
+          .thenReturn(Optional.empty(), Optional.of(insertedCrate));
+      when(CargoCrateServiceTest.this.crateRepository.insertIfAbsent(
+              any(),
+              eq(repoId),
+              eq("my_crate"),
+              eq("my-Crate"),
+              eq("1.0.0"),
+              any(),
+              any(),
+              any(),
+              anyBoolean(),
+              any()))
+          .thenReturn(1);
 
       when(CargoCrateServiceTest.this.authorRepository.findByAuthor(anyString()))
           .thenReturn(Optional.empty());
@@ -150,7 +178,7 @@ class CargoCrateServiceTest {
       CargoCrateServiceTest.this.cargoCrateService.publish(repoInfo, request);
 
       final var crateCaptor = ArgumentCaptor.forClass(CargoCrate.class);
-      verify(CargoCrateServiceTest.this.crateRepository, times(2)).save(crateCaptor.capture());
+      verify(CargoCrateServiceTest.this.crateRepository).save(crateCaptor.capture());
 
       final var savedCrate = crateCaptor.getValue();
       assertThat(savedCrate.getName()).isEqualTo("my_crate");
@@ -186,6 +214,202 @@ class CargoCrateServiceTest {
       verify(CargoCrateServiceTest.this.crateRepository).save(existingCrate);
       assertThat(existingCrate.getMaxVersion()).isEqualTo("2.0.0");
       verify(CargoCrateServiceTest.this.crateIndexRepository).save(any(CargoCrateIndex.class));
+    }
+  }
+
+  @Nested
+  @DisplayName("publish() with a files writer (RPS-1124)")
+  class PublishWithFiles {
+
+    private static final String INDEX_CONSTRAINT = "ux_cargo_crate_index__crate_id_vers";
+
+    private final UUID repoId = UUID.randomUUID();
+    private final BaseUsages usages = BaseUsages.builder().diskUsage(42L).build();
+    private BaseRepoInfo<UUID> repoInfo;
+    private CargoCrate existingCrate;
+
+    @BeforeEach
+    void existingCrateOfTheRepo() {
+      this.repoInfo = CargoCrateServiceTest.this.createRepoInfo(this.repoId);
+      this.existingCrate = new CargoCrate();
+      this.existingCrate.setId(UUID.randomUUID());
+      this.existingCrate.setName("test_crate");
+      this.existingCrate.setMaxVersion("1.0.0");
+
+      lenient()
+          .when(CargoCrateServiceTest.this.repoRepository.findById(this.repoId))
+          .thenReturn(Optional.of(new Repo()));
+      lenient()
+          .when(
+              CargoCrateServiceTest.this.crateRepository.findByRepoIdAndName(
+                  this.repoId, "test_crate"))
+          .thenReturn(Optional.of(this.existingCrate));
+    }
+
+    private CratePublishRequest request() {
+      return CargoCrateServiceTest.this.createPublishRequest("test-crate", "2.0.0");
+    }
+
+    private DataIntegrityViolationException violation(final String state, final String message) {
+      return new DataIntegrityViolationException(
+          "could not execute statement", new SQLException(message, state));
+    }
+
+    @Test
+    @DisplayName("writes and flushes the version rows before it runs the files writer")
+    void writesTheRowsBeforeTheFiles() throws Exception {
+      final var order = inOrder(CargoCrateServiceTest.this.crateIndexRepository);
+      final var writerRan = new AtomicBoolean();
+
+      final var result =
+          CargoCrateServiceTest.this.cargoCrateService.publish(
+              this.repoInfo,
+              this.request(),
+              "2021",
+              () -> {
+                order.verify(CargoCrateServiceTest.this.crateIndexRepository).flush();
+                writerRan.set(true);
+                return this.usages;
+              });
+
+      assertThat(result).isSameAs(this.usages);
+      assertThat(writerRan).isTrue();
+      verify(CargoCrateServiceTest.this.crateMetaRepository).save(any(CargoCrateMeta.class));
+    }
+
+    @Test
+    @DisplayName("answers a unique violation of the version index as an existing version")
+    void mapsTheVersionIndexToAConflict() {
+      final var writerRan = new AtomicBoolean();
+      doThrow(this.violation("23505", "duplicate key value violates " + INDEX_CONSTRAINT))
+          .when(CargoCrateServiceTest.this.crateIndexRepository)
+          .flush();
+
+      assertThatThrownBy(
+              () ->
+                  CargoCrateServiceTest.this.cargoCrateService.publish(
+                      this.repoInfo,
+                      this.request(),
+                      null,
+                      () -> {
+                        writerRan.set(true);
+                        return this.usages;
+                      }))
+          .isInstanceOf(ItemAlreadyExistException.class)
+          .hasMessage("crate `test-crate@2.0.0` already exists in this registry");
+
+      assertThat(writerRan).as("the files are never written for a version that lost").isFalse();
+    }
+
+    @Test
+    @DisplayName("does not answer another violation as an existing version")
+    void leavesOtherViolationsAsServerErrors() {
+      final var writerRan = new AtomicBoolean();
+      final var other = this.violation("23514", "violates check constraint ch_other");
+      doThrow(other).when(CargoCrateServiceTest.this.crateIndexRepository).flush();
+
+      assertThatThrownBy(
+              () ->
+                  CargoCrateServiceTest.this.cargoCrateService.publish(
+                      this.repoInfo,
+                      this.request(),
+                      null,
+                      () -> {
+                        writerRan.set(true);
+                        return this.usages;
+                      }))
+          .isSameAs(other);
+
+      assertThat(writerRan).isFalse();
+    }
+
+    @Test
+    @DisplayName("does not answer a unique violation of another index as an existing version")
+    void leavesOtherUniqueIndexesAsServerErrors() {
+      final var other = this.violation("23505", "duplicate key value violates ux_cargo_author");
+      doThrow(other).when(CargoCrateServiceTest.this.crateIndexRepository).flush();
+
+      assertThatThrownBy(
+              () ->
+                  CargoCrateServiceTest.this.cargoCrateService.publish(
+                      this.repoInfo, this.request(), null, () -> this.usages))
+          .isSameAs(other);
+    }
+
+    @Test
+    @DisplayName("lets a failure of the files writer through, for the transaction to roll back")
+    void propagatesAWriterFailure() {
+      final var failure = new IOException("disk full");
+
+      assertThatThrownBy(
+              () ->
+                  CargoCrateServiceTest.this.cargoCrateService.publish(
+                      this.repoInfo,
+                      this.request(),
+                      null,
+                      () -> {
+                        throw failure;
+                      }))
+          .isSameAs(failure);
+    }
+
+    @Test
+    @DisplayName("inserts a first version of a new crate without failing when it loses the insert")
+    void aLostCrateInsertReadsTheWinnersCrateBack() throws Exception {
+      when(CargoCrateServiceTest.this.crateRepository.findByRepoIdAndName(
+              this.repoId, "test_crate"))
+          .thenReturn(Optional.empty(), Optional.of(this.existingCrate));
+      when(CargoCrateServiceTest.this.crateRepository.insertIfAbsent(
+              any(),
+              eq(this.repoId),
+              eq("test_crate"),
+              eq("test-crate"),
+              eq("2.0.0"),
+              any(),
+              any(),
+              any(),
+              anyBoolean(),
+              any()))
+          .thenReturn(0);
+      when(CargoCrateServiceTest.this.crateIndexRepository.findByCrateIdAndVers(
+              this.existingCrate.getId(), "2.0.0"))
+          .thenReturn(Optional.empty());
+
+      final var result =
+          CargoCrateServiceTest.this.cargoCrateService.publish(
+              this.repoInfo, this.request(), null, () -> this.usages);
+
+      assertThat(result).isSameAs(this.usages);
+      verify(CargoCrateServiceTest.this.crateIndexRepository).save(any(CargoCrateIndex.class));
+    }
+
+    @Test
+    @DisplayName("turns away a version the winner of a crate insert has already recorded")
+    void aLostCrateInsertStillChecksTheVersion() {
+      when(CargoCrateServiceTest.this.crateRepository.findByRepoIdAndName(
+              this.repoId, "test_crate"))
+          .thenReturn(Optional.empty(), Optional.of(this.existingCrate));
+      when(CargoCrateServiceTest.this.crateRepository.insertIfAbsent(
+              any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(), any()))
+          .thenReturn(0);
+      when(CargoCrateServiceTest.this.crateIndexRepository.findByCrateIdAndVers(
+              this.existingCrate.getId(), "2.0.0"))
+          .thenReturn(Optional.of(new CargoCrateIndex()));
+      final var writerRan = new AtomicBoolean();
+
+      assertThatThrownBy(
+              () ->
+                  CargoCrateServiceTest.this.cargoCrateService.publish(
+                      this.repoInfo,
+                      this.request(),
+                      null,
+                      () -> {
+                        writerRan.set(true);
+                        return this.usages;
+                      }))
+          .isInstanceOf(ItemAlreadyExistException.class);
+
+      assertThat(writerRan).isFalse();
     }
   }
 

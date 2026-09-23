@@ -21,11 +21,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
@@ -46,12 +49,14 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.NoSuchFileException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
@@ -204,6 +209,11 @@ class AbstractCargoProtocolFacadeTest {
       lenient()
           .when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any(), any()))
           .thenReturn(usages);
+      // Like the real service: the rows first, then the files through the writer it is handed.
+      lenient()
+          .when(crateService.publish(any(), any(), any(), any()))
+          .thenAnswer(
+              invocation -> invocation.<CargoCrateService.CrateFilesWriter>getArgument(3).write());
     }
 
     @Test
@@ -213,19 +223,22 @@ class AbstractCargoProtocolFacadeTest {
       when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
           .thenReturn(minimalRequest("my_crate", "1.0.0"));
 
+      final var stored = new AtomicReference<byte[]>();
+      when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any(), any()))
+          .thenAnswer(
+              invocation -> {
+                // The stream is closed once the write returns, so it is read while it is open.
+                stored.set(invocation.<InputStream>getArgument(4).readAllBytes());
+                return usages;
+              });
+
       facade.publish(context("/api/v1/crates/new"), stream(publishPayload("{}", crateBytes)));
 
-      verify(crateService).publish(eq(repoInfo), any(CratePublishRequest.class), any());
-      final var streamCaptor = ArgumentCaptor.forClass(InputStream.class);
+      verify(crateService).publish(eq(repoInfo), any(CratePublishRequest.class), any(), any());
       verify(storageService)
           .writeCrateAndIndex(
-              eq(REPO_ID),
-              eq(REPO_NAME),
-              eq("my_crate"),
-              eq("1.0.0"),
-              streamCaptor.capture(),
-              any());
-      assertThat(streamCaptor.getValue().readAllBytes()).isEqualTo(crateBytes);
+              eq(REPO_ID), eq(REPO_NAME), eq("my_crate"), eq("1.0.0"), any(), any());
+      assertThat(stored.get()).isEqualTo(crateBytes);
     }
 
     @Test
@@ -262,7 +275,7 @@ class AbstractCargoProtocolFacadeTest {
       facade.publish(context("/api/v1/crates/new"), stream(publishPayload("{}", crateBytes)));
 
       final var captor = ArgumentCaptor.forClass(CratePublishRequest.class);
-      verify(crateService).publish(eq(repoInfo), captor.capture(), any());
+      verify(crateService).publish(eq(repoInfo), captor.capture(), any(), any());
       assertThat(captor.getValue().cksum()).isEqualTo(expectedCksum);
     }
 
@@ -298,7 +311,7 @@ class AbstractCargoProtocolFacadeTest {
           context("/api/v1/crates/new"), stream(publishPayload("{}", minimalCrateBytes())));
 
       final var captor = ArgumentCaptor.forClass(CratePublishRequest.class);
-      verify(crateService).publish(eq(repoInfo), captor.capture(), any());
+      verify(crateService).publish(eq(repoInfo), captor.capture(), any(), any());
       assertThat(captor.getValue().homepage()).isNull();
       assertThat(captor.getValue().authors()).containsExactly("Alice");
     }
@@ -540,7 +553,7 @@ class AbstractCargoProtocolFacadeTest {
 
       facade.publish(context("/api/v1/crates/new"), stream(publishPayload("{}", crateBytes)));
 
-      verify(crateService).publish(eq(repoInfo), any(CratePublishRequest.class), eq("2021"));
+      verify(crateService).publish(eq(repoInfo), any(CratePublishRequest.class), eq("2021"), any());
     }
 
     @Test
@@ -553,7 +566,95 @@ class AbstractCargoProtocolFacadeTest {
 
       facade.publish(context("/api/v1/crates/new"), stream(publishPayload("{}", crateBytes)));
 
-      verify(crateService).publish(eq(repoInfo), any(CratePublishRequest.class), isNull());
+      verify(crateService).publish(eq(repoInfo), any(CratePublishRequest.class), isNull(), any());
+    }
+
+    @Test
+    @DisplayName("does not write anything or remove anything when the rows are rejected")
+    void writesNothingWhenTheRowsAreRejected() throws Exception {
+      when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
+          .thenReturn(minimalRequest("my_crate", "1.0.0"));
+      doThrow(new ItemAlreadyExistException("crate `my_crate@1.0.0` already exists"))
+          .when(crateService)
+          .publish(any(), any(), any(), any());
+
+      assertThatThrownBy(
+              () ->
+                  facade.publish(
+                      context("/api/v1/crates/new"),
+                      stream(publishPayload("{}", minimalCrateBytes()))))
+          .isInstanceOf(ItemAlreadyExistException.class);
+
+      verifyNoInteractions(storageService);
+    }
+
+    @Test
+    @DisplayName("removes the partly written crate and reports no usage when the write fails")
+    void removesThePartialCrateWhenTheWriteFails() throws Exception {
+      when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
+          .thenReturn(minimalRequest("my_crate", "1.0.0"));
+      when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any(), any()))
+          .thenThrow(new IOException("disk full"));
+      final var ctx = context("/api/v1/crates/new");
+      final var body = stream(publishPayload("{}", minimalCrateBytes()));
+
+      assertThatThrownBy(() -> facade.publish(ctx, body))
+          .isInstanceOf(IOException.class)
+          .hasMessage("disk full");
+
+      verify(storageService).deleteCrate(REPO_ID, REPO_NAME, "my_crate", "1.0.0");
+      assertThat(ctx.<Object>getProperty("usages")).isNull();
+    }
+
+    @Test
+    @DisplayName("removes the partly written crate when the write fails unchecked")
+    void removesThePartialCrateWhenTheWriteFailsUnchecked() throws Exception {
+      when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
+          .thenReturn(minimalRequest("my_crate", "1.0.0"));
+      when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any(), any()))
+          .thenThrow(new IllegalStateException("storage went away"));
+
+      assertThatThrownBy(
+              () ->
+                  facade.publish(
+                      context("/api/v1/crates/new"),
+                      stream(publishPayload("{}", minimalCrateBytes()))))
+          .isInstanceOf(IllegalStateException.class);
+
+      verify(storageService).deleteCrate(REPO_ID, REPO_NAME, "my_crate", "1.0.0");
+    }
+
+    @Test
+    @DisplayName("keeps the write failure as the error when there is no partial crate to remove")
+    void keepsTheWriteFailureWhenTheCleanupFails() throws Exception {
+      when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
+          .thenReturn(minimalRequest("my_crate", "1.0.0"));
+      final var writeFailure = new IOException("disk full");
+      final var cleanupFailure = new NoSuchFileException("my_crate-1.0.0.crate");
+      when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any(), any()))
+          .thenThrow(writeFailure);
+      when(storageService.deleteCrate(any(), any(), any(), any())).thenThrow(cleanupFailure);
+
+      assertThatThrownBy(
+              () ->
+                  facade.publish(
+                      context("/api/v1/crates/new"),
+                      stream(publishPayload("{}", minimalCrateBytes()))))
+          .isSameAs(writeFailure)
+          .hasSuppressedException(cleanupFailure);
+    }
+
+    @Test
+    @DisplayName("removes nothing after a successful publish")
+    void removesNothingAfterASuccessfulPublish() throws Exception {
+      when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
+          .thenReturn(minimalRequest("my_crate", "1.0.0"));
+      final var ctx = context("/api/v1/crates/new");
+
+      facade.publish(ctx, stream(publishPayload("{}", minimalCrateBytes())));
+
+      verify(storageService, never()).deleteCrate(any(), any(), any(), any());
+      assertThat(ctx.<Object>getProperty("usages")).isSameAs(usages);
     }
 
     // ── Validation ───────────────────────────────────────────────────────────
