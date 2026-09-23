@@ -372,18 +372,147 @@ class ArtifactUtilsTest {
 
   @ParameterizedTest(name = "{0} is a metadata signature: {1}")
   @CsvSource({
-    "com/acme/maven-metadata.xml.asc, true",
-    "com/acme/lib/maven-metadata.xml.asc, true",
-    "com/acme/lib/1.0-SNAPSHOT/maven-metadata.xml.asc, true",
-    "com/acme/lib/maven-metadata.xml.asc.sha1, false",
-    "com/acme/lib/maven-metadata.xml, false",
-    "com/acme/lib/1.0/lib-1.0.pom.asc, false",
-    "com/acme/lib/1.0/lib-1.0.jar.asc, false",
-    "com/acme/lib/maven-metadata.xml.ASC, false"
+    "maven-metadata.xml.asc, true",
+    "MAVEN-METADATA.XML.asc, true",
+    "maven-metadata.xml.asc.sha1, false",
+    "maven-metadata.xml, false",
+    "lib-1.0.pom.asc, false",
+    "lib-1.0.jar.asc, false",
+    "maven-metadata.xml.ASC, false",
+    "maven-metadata.xml-plugin-1.0.jar.asc, false"
   })
-  @DisplayName("tells the .asc signature of a maven-metadata.xml at any level (RPS-1185)")
-  void recognisesAMetadataSignature(final String path, final boolean expected) {
-    assertThat(ArtifactUtils.isMetadataSignature(path)).isEqualTo(expected);
+  @DisplayName(
+      "tells the .asc signature of a maven-metadata.xml by its file name alone, at any level"
+          + " (RPS-1185, RPS-1177)")
+  void recognisesAMetadataSignature(final String fileName, final boolean expected) {
+    assertThat(ArtifactUtils.isMetadataSignature(fileName)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest(name = "{0} is metadata-family: {1}")
+  @CsvSource({
+    "maven-metadata.xml, true",
+    "MAVEN-METADATA.XML, true",
+    "maven-metadata.xml.sha1, true",
+    "maven-metadata.xml.SHA1, true",
+    "maven-metadata.xml.md5, true",
+    "maven-metadata.xml.asc, true",
+    "maven-metadata.xml.asc.sha1, true",
+    "lib-1.0.jar, false",
+    "maven-metadata.xml-plugin-1.0.jar, false",
+    "maven-metadata.xml-plugin-1.0.jar.sha1, false",
+    "my-maven-metadata.xml, false"
+  })
+  @DisplayName(
+      "tells the metadata family by the file name alone, not a substring of it (RPS-1177, same"
+          + " shape of fix as RPS-1196)")
+  void recognisesTheMetadataFamilyByFileNameAlone(final String fileName, final boolean expected) {
+    assertThat(ArtifactUtils.isMetadataFamilyFile(fileName)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest(name = "{0} has GAV {1}:{2}:{3}")
+  @CsvSource(
+      nullValues = "NULL",
+      value = {
+        // Version-level metadata: only a SNAPSHOT directory is unambiguous (RPS-1195).
+        "com/acme/lib/1.0-SNAPSHOT/maven-metadata.xml, com.acme, lib, 1.0-SNAPSHOT",
+        "com/acme/lib/1.0-SNAPSHOT/maven-metadata.xml.sha1, com.acme, lib, 1.0-SNAPSHOT",
+        "com/acme/lib/1.0-SNAPSHOT/maven-metadata.xml.md5, com.acme, lib, 1.0-SNAPSHOT",
+        "com/acme/lib/1.0-SNAPSHOT/maven-metadata.xml.asc, com.acme, lib, 1.0-SNAPSHOT",
+        "com/acme/sub/lib/1.0-SNAPSHOT/maven-metadata.xml, com.acme.sub, lib, 1.0-SNAPSHOT",
+        // Artifact-level metadata has no version segment: used to be misparsed as group "com",
+        // artifact "acme", version "lib" (RPS-1177), now answers no GAV instead.
+        "com/acme/lib/maven-metadata.xml, NULL, NULL, NULL",
+        "com/acme/lib/maven-metadata.xml.sha1, NULL, NULL, NULL",
+        "com/acme/lib/maven-metadata.xml.asc, NULL, NULL, NULL",
+        // Group-level metadata (plugins).
+        "com/acme/maven-metadata.xml, NULL, NULL, NULL",
+        "com/acme/maven-metadata.xml.sha1, NULL, NULL, NULL",
+        // A hand-crafted release version-level path is indistinguishable from an artifact-level
+        // one, the documented, accepted gap (RPS-1195).
+        "com/acme/lib/1.0/maven-metadata.xml, NULL, NULL, NULL",
+        "com/acme/lib/1.0/maven-metadata.xml.sha1, NULL, NULL, NULL",
+      })
+  @DisplayName(
+      "calculates the basic GAV of a metadata-family file, without misparsing an artifact-level"
+          + " path as if it had a version (RPS-1177, RPS-1195)")
+  void calculatesTheBasicGavOfAMetadataFamilyFile(
+      final String path, final String groupId, final String artifactId, final String version) {
+    final var gav = ArtifactUtils.getGavByFile(StoragePath.of(UUID.randomUUID(), path));
+
+    if (groupId == null) {
+      assertThat(gav).isNull();
+    } else {
+      assertThat(gav).isNotNull();
+      assertThat(gav.getGroupId()).isEqualTo(groupId);
+      assertThat(gav.getArtifactId()).isEqualTo(artifactId);
+      assertThat(gav.getVersion()).isEqualTo(version);
+    }
+  }
+
+  @Test
+  @DisplayName(
+      "an artifactId that literally contains \"maven-metadata.xml\" is parsed as a real artifact,"
+          + " not routed to the metadata branch by a substring match over the whole path"
+          + " (RPS-1177)")
+  void artifactIdContainingTheMetadataFilenameSubstringIsNotMisrouted() {
+    final var path = "com/acme/maven-metadata.xml-plugin/1.0/maven-metadata.xml-plugin-1.0.jar";
+
+    final var gav = ArtifactUtils.getGavByFile(StoragePath.of(UUID.randomUUID(), path));
+
+    assertThat(gav).isNotNull();
+    assertThat(gav.getGroupId()).isEqualTo("com.acme");
+    assertThat(gav.getArtifactId()).isEqualTo("maven-metadata.xml-plugin");
+    assertThat(gav.getVersion()).isEqualTo("1.0");
+    assertThat(gav.getExtension()).isEqualTo("jar");
+  }
+
+  @ParameterizedTest(name = "{0} is a checksum file: {1}")
+  @CsvSource({
+    "lib-1.0.jar.sha1, true",
+    "lib-1.0.jar.md5, true",
+    "lib-1.0.jar.sha256, true",
+    "lib-1.0.jar.sha512, true",
+    "lib-1.0.jar.SHA1, false",
+    "lib-1.0.jar.Md5, false",
+    "lib-1.0.jar, false",
+    "maven-metadata.xml.sha1, true",
+    "maven-metadata.xml.SHA1, false"
+  })
+  @DisplayName(
+      "tells a checksum file by its suffix, case-sensitively like the M2 layout (RPS-1195)")
+  void checksumSuffixIsMatchedCaseSensitively(final String fileName, final boolean expected) {
+    assertThat(ArtifactUtils.isChecksumFile(fileName)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest(name = "{0} is {1}:{2}:{3} (classifier {4}, extension {5})")
+  @CsvSource(
+      nullValues = "NULL",
+      value = {
+        // M2GavCalculator splits the tail after "<artifactId>-<version>" at its FIRST dot, so a
+        // dotted classifier is mis-split: the real classifier "2.0" becomes "2", and the real
+        // extension "jar" becomes "0.jar" (RPS-1187, won't-fix: see AbstractMavenProtocolFacade,
+        // isScannableArtifact requires a null classifier, so the wrong-but-non-null classifier
+        // still yields the correct scanner decision by accident).
+        "com/acme/lib/1.0/lib-1.0-2.0.jar, com.acme, lib, 1.0, 2, 0.jar",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT-20260921.101010-1.jar, com.acme, lib,"
+            + " 1.0-SNAPSHOT, 20260921, 101010-1.jar",
+      })
+  @DisplayName("pins the wrong-but-harmless split of a dotted classifier (RPS-1187, won't-fix)")
+  void pinsTheDottedClassifierMisparse(
+      final String path,
+      final String groupId,
+      final String artifactId,
+      final String version,
+      final String classifier,
+      final String extension) {
+    final var gav = ArtifactUtils.getGavByFile(StoragePath.of(UUID.randomUUID(), path));
+
+    assertThat(gav).isNotNull();
+    assertThat(gav.getGroupId()).isEqualTo(groupId);
+    assertThat(gav.getArtifactId()).isEqualTo(artifactId);
+    assertThat(gav.getVersion()).isEqualTo(version);
+    assertThat(gav.getClassifier()).isEqualTo(classifier);
+    assertThat(gav.getExtension()).isEqualTo(extension);
   }
 
   @Test
