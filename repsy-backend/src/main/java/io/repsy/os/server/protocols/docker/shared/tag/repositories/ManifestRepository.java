@@ -33,6 +33,21 @@ public interface ManifestRepository extends JpaRepository<Manifest, UUID> {
 
   boolean existsByTagPlatformTagImageIdAndConfigDigest(UUID imageId, String configDigest);
 
+  /**
+   * Every caller that narrows this list to one row (via {@code getFirst()}/{@code findFirst()})
+   * wants the manifest whose {@code name} actually names a stored file -- the row from the
+   * manifest's ORIGINAL push. {@code ManifestTxService#createManifestForMultiPlatform} adds a
+   * second, DB-only tracking row for the same digest when that manifest also becomes a
+   * multi-platform tag's child (so panel listings can find it via that tag too); its {@code name}
+   * is set to the digest itself and it has no storage file of its own. That tracking row is always
+   * created strictly after the original, so ordering {@code ASC} and taking the first reliably
+   * picks the storage-backed original. Confirmed live (RPS-1215's own investigation): with the
+   * previous {@code DESC} order, `.getFirst()` picked the tracking row for any digest that had one,
+   * and a raw `getResource` lookup built from its digest-shaped {@code name} then threw
+   * `ItemNotFoundException("resourceNotFound")` -- a real, pre-existing bug, not introduced by
+   * RPS-1215, only exposed by it (its own HEAD-by-digest fix stopped a real client's incidental
+   * digest re-push from masking this by accident).
+   */
   @Query(
       """
       select m from Manifest m
@@ -43,7 +58,7 @@ public interface ManifestRepository extends JpaRepository<Manifest, UUID> {
       where m.digest = :digest
         and i.id = :imageId
         and r.id = :repoId
-        order by m.createdAt desc
+        order by m.createdAt asc
     """)
   List<Manifest> findByRepoIdAndImageIdAndDigestList(UUID repoId, UUID imageId, String digest);
 

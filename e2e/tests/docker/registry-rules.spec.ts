@@ -455,7 +455,7 @@ test.describe('docker registry rules (raw HTTP)', () => {
   );
 
   test(
-    'R8/B1: HEAD by digest is 404 even though GET by digest serves the same manifest fine',
+    'R8/B1: HEAD by digest mirrors GET by digest (RPS-1215, fixed)',
     {
       tag: ['@negative'],
     },
@@ -470,12 +470,6 @@ test.describe('docker registry rules (raw HTTP)', () => {
       expect(get.status, 'GET by digest').toBe(200);
 
       const head = await rawHeadManifest(layout.repoName, admin, layout.image, digest);
-      test.fail(
-        true,
-        'RPS-1215 (B1): HEAD by digest should mirror GET (distribution spec: "HEAD MUST ' +
-          'be identical to GET without the body"), but AbstractDockerManifestCheckProtocolMethodHandler' +
-          ' only ever resolves a TAG row (findTagAndManifest), never a digest -- confirmed live.',
-      );
       expect(head.status, 'HEAD by digest should also be 200').toBe(200);
     },
   );
