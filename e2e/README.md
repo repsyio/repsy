@@ -1980,11 +1980,15 @@ BEFORE any adapter code was written — H1-H4 and H12 gated the whole design.
   own documented `go env -w GOPROXY="<scheme>://user:pass@..."` incantation
   (`golang-config.component.ts`) cannot work AT ALL on a plain-http deployment: the `go` command
   itself refuses to send it (H3). Confirmed live: `publish-consume.spec.ts`'s dedicated test.
-- **RPS-1230** — the `410 Gone`/`GoVersionGoneException` path is DEAD: grep-confirmed nothing
-  in either Go package ever throws it (the `deleted` column `V0002__Golang_Protocol.sql` created has
-  no entity field reading it). Deleting a version through the panel API removes it OUTRIGHT (DB row
-  and all three storage files), and re-uploading the exact same version afterwards succeeds cleanly
-  with a fresh `200`, never a `410`. Confirmed live: `registry-rules.spec.ts`'s R14 test.
+- **RPS-1230** (resolved) — the `410 Gone`/`GoVersionGoneException` path was DEAD: grep-confirmed
+  nothing in either Go package ever threw it, and the `deleted` column `V0002__Golang_Protocol.sql`
+  once created was itself already dropped by `V0004__Drop_Deleted_Column.sql`, so only the Java
+  scaffolding (the exception class, its unreachable `catch`, and its unreachable
+  `@ExceptionHandler`) was left. That scaffolding has now been deleted; hard-delete stays the only
+  deletion semantics. Deleting a version through the panel API removes it OUTRIGHT (DB row and all
+  three storage files), and re-uploading the exact same version afterwards succeeds cleanly with a
+  fresh `200`, never a `410`. Confirmed live: `registry-rules.spec.ts`'s R14 test, unchanged by the
+  cleanup since the observable behavior was identical before and after.
 - **G9** (not a defect — the observed status is correct on both ports, just by two unrelated code
   paths, no ticket filed) — `sumdb/supported` 404s on BOTH the API port (`GolangModuleController
 .checkSumdbSupported`, deliberate — the doc comment says so) and the protocol port (the `go` command's

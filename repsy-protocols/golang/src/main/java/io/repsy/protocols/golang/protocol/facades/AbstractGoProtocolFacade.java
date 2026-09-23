@@ -108,14 +108,14 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
 
     final var normalizedPath = decodedPath.toLowerCase(Locale.ROOT);
 
-    rejectOverLongIdentifiers(normalizedPath, version);
+    rejectInvalidIdentifiers(normalizedPath, version);
 
     final var content = inputStream.readAllBytes();
 
     verifySha256(content, (String) context.getContextMap().get(CONTENT_SHA256_KEY));
 
     final var modContent = GoModuleZipReader.extractGoMod(content, decodedPath, version);
-    GoModFileValidator.validate(modContent);
+    GoModFileValidator.validate(modContent, decodedPath);
 
     this.goModuleService.publishModule(
         repoInfo,
@@ -148,14 +148,22 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
    * The module path and version are taken from the URL and stored in varchar columns, so a longer
    * one is refused with a 400 that names it before the upload is read (RPS-1072). Neither can be
    * cut: they are what the module is fetched by. The path is measured as it is stored, decoded and
-   * lower-cased.
+   * lower-cased. The length check runs first so an over-long version keeps answering {@code
+   * moduleVersionTooLong} rather than {@code invalidModuleVersion}: a version can be both over-long
+   * and a syntactically valid semver string (a long pre-release), and the length is the more
+   * specific fault. Only once the version is a plausible length is it checked against Go's own
+   * semver grammar (RPS-1227), so a client cannot store an arbitrary string as an immutable
+   * "version" that {@code @v/list}/{@code @latest} then have to make sense of.
    */
-  private static void rejectOverLongIdentifiers(final String normalizedPath, final String version) {
+  private static void rejectInvalidIdentifiers(final String normalizedPath, final String version) {
     if (normalizedPath.length() > GoVersionUtils.MAX_MODULE_PATH_LENGTH) {
       throw new BadRequestException("modulePathTooLong");
     }
     if (version.length() > GoVersionUtils.MAX_VERSION_LENGTH) {
       throw new BadRequestException("moduleVersionTooLong");
+    }
+    if (!GoVersionUtils.isValidSemver(version)) {
+      throw new BadRequestException("invalidModuleVersion");
     }
   }
 
