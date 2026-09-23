@@ -15,20 +15,17 @@
  */
 package io.repsy.os.server.protocols.docker.ui.utils;
 
-import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
-import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NonNull;
 
+/**
+ * Delegates to the shared {@link io.repsy.os.shared.repo.utils.RepoUtils}, kept as its own class
+ * only because {@code DockerApiFacade} already depends on this package.
+ */
 @UtilityClass
 public class RepoUtils {
 
-  private static final @NonNull Pattern REPO_NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_\\-]+$");
-
   public void validateRepoName(final @NonNull String repoName) {
-
-    if (!REPO_NAME_PATTERN.matcher(repoName).matches()) {
-      throw new AccessNotAllowedException("invalidRequest");
-    }
+    io.repsy.os.shared.repo.utils.RepoUtils.validateRepoName(repoName);
   }
 }

@@ -32,10 +32,12 @@
         <div class="text-body2 text-error min-h-7 pt-1">
           @if (renameForm.get('name').errors?.['required'] && renameForm.get('name').touched) {
             <p animate.enter="fade-in-up">• Should not be empty</p>
-          } @else if (renameForm.get('name').errors?.['pattern'] && renameForm.get('name').touched) {
-            <p animate.enter="fade-in-up">• Should be maximum 25 characters</p>
           } @else if (renameForm.get('name').errors?.['maxlength'] && renameForm.get('name').touched) {
+            <p animate.enter="fade-in-up">• Should be maximum 25 characters</p>
+          } @else if (renameForm.get('name').errors?.['pattern'] && renameForm.get('name').touched) {
             <p animate.enter="fade-in-up">• Should contain only letters, numbers, - and _, and not start with -</p>
+          } @else if (renameForm.get('name').errors?.['reservedName'] && renameForm.get('name').touched) {
+            <p animate.enter="fade-in-up">• This name is reserved for the panel. Please try another name.</p>
           }
         </div>
       </form>
