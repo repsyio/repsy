@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.shared.limits;
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
 import io.repsy.protocols.helm.shared.utils.HelmConstants;
+import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -27,11 +28,11 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * The limits the Helm, Cargo and Go publish paths hold pushed metadata to (RPS-1072), set against
- * the columns Flyway creates. A limit is only a guard if the column really is that long, so this
- * reads {@code information_schema} and reports every limit that has drifted from its column, for
- * PostgreSQL and for H2, whose scripts differ (Cargo's {@code links}, author and category are
- * {@code text} in PostgreSQL and {@code varchar(255)} in H2).
+ * The limits the Helm, Cargo, Go (RPS-1072) and npm (RPS-1136) publish paths hold pushed metadata
+ * to, set against the columns Flyway creates. A limit is only a guard if the column really is that
+ * long, so this reads {@code information_schema} and reports every limit that has drifted from its
+ * column, for PostgreSQL and for H2, whose scripts differ (Cargo's {@code links}, author and
+ * category are {@code text} in PostgreSQL and {@code varchar(255)} in H2).
  *
  * <p>It covers the limits of the constants above, not the {@code @Column} annotations of the
  * entities, which RPS-1133 compares with the schema.
@@ -254,6 +255,125 @@ final class PublishGuardLimits {
             GoVersionUtils.MAX_GO_VERSION_LENGTH,
             "go_module_version",
             "go_version"));
+
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_SCOPE_LENGTH",
+            NpmPublishLimits.MAX_SCOPE_LENGTH,
+            "npm_package",
+            "scope"));
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_NAME_LENGTH",
+            NpmPublishLimits.MAX_NAME_LENGTH,
+            "npm_package",
+            "name"));
+    // npm_package.latest and npm_package_version.version are held to the version guard (128),
+    // below the columns' actual varchar(255), so that every version accepted also fits
+    // vulnerability_scan.artifact_version (varchar(128)) without narrowing that shared column
+    // here; RPS-1140 is free to widen it independently.
+    limits.add(
+        within(
+            "NpmPublishLimits.MAX_VERSION_LENGTH",
+            NpmPublishLimits.MAX_VERSION_LENGTH,
+            "npm_package",
+            "latest"));
+    limits.add(
+        within(
+            "NpmPublishLimits.MAX_VERSION_LENGTH",
+            NpmPublishLimits.MAX_VERSION_LENGTH,
+            "npm_package_version",
+            "version"));
+    limits.add(
+        within(
+            "NpmPublishLimits.MAX_VERSION_LENGTH",
+            NpmPublishLimits.MAX_VERSION_LENGTH,
+            "vulnerability_scan",
+            "artifact_version"));
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_AUTHOR_NAME_LENGTH",
+            NpmPublishLimits.MAX_AUTHOR_NAME_LENGTH,
+            "npm_package_version",
+            "author_name"));
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_AUTHOR_EMAIL_LENGTH",
+            NpmPublishLimits.MAX_AUTHOR_EMAIL_LENGTH,
+            "npm_package_version",
+            "author_email"));
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_AUTHOR_URL_LENGTH",
+            NpmPublishLimits.MAX_AUTHOR_URL_LENGTH,
+            "npm_package_version",
+            "author_url"));
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_BUGS_URL_LENGTH",
+            NpmPublishLimits.MAX_BUGS_URL_LENGTH,
+            "npm_package_version",
+            "bugs_url"));
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_BUGS_EMAIL_LENGTH",
+            NpmPublishLimits.MAX_BUGS_EMAIL_LENGTH,
+            "npm_package_version",
+            "bugs_email"));
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_HOMEPAGE_LENGTH",
+            NpmPublishLimits.MAX_HOMEPAGE_LENGTH,
+            "npm_package_version",
+            "homepage"));
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_LICENSE_LENGTH",
+            NpmPublishLimits.MAX_LICENSE_LENGTH,
+            "npm_package_version",
+            "license"));
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_REPOSITORY_TYPE_LENGTH",
+            NpmPublishLimits.MAX_REPOSITORY_TYPE_LENGTH,
+            "npm_package_version",
+            "repository_type"));
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_REPOSITORY_URL_LENGTH",
+            NpmPublishLimits.MAX_REPOSITORY_URL_LENGTH,
+            "npm_package_version",
+            "repository_url"));
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_KEYWORD_LENGTH",
+            NpmPublishLimits.MAX_KEYWORD_LENGTH,
+            "npm_package_keyword",
+            "keyword"));
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_DIST_TAG_LENGTH",
+            NpmPublishLimits.MAX_DIST_TAG_LENGTH,
+            "npm_package_dist_tag",
+            "tag_name"));
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_MAINTAINER_NAME_LENGTH",
+            NpmPublishLimits.MAX_MAINTAINER_NAME_LENGTH,
+            "npm_package_maintainer",
+            "name"));
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_MAINTAINER_EMAIL_LENGTH",
+            NpmPublishLimits.MAX_MAINTAINER_EMAIL_LENGTH,
+            "npm_package_maintainer",
+            "email"));
+    limits.add(
+        exact(
+            "NpmPublishLimits.MAX_MAINTAINER_URL_LENGTH",
+            NpmPublishLimits.MAX_MAINTAINER_URL_LENGTH,
+            "npm_package_maintainer",
+            "url"));
 
     return limits;
   }

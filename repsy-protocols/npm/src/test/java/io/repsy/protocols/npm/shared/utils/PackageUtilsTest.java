@@ -16,7 +16,10 @@
 package io.repsy.protocols.npm.shared.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -194,6 +197,140 @@ class PackageUtilsTest {
       assertThat(payload.get("license")).isEqualTo("");
       assertThat(payload.get("readme")).isEqualTo("");
       assertThat(payload.get("readmeFilename")).isEqualTo("");
+    }
+  }
+
+  @Nested
+  @DisplayName("resolveLatestVersion (RPS-1208)")
+  class ResolveLatestVersion {
+
+    private Map<String, Object> metadataWithVersions(final String... versionNames) {
+      final Map<String, Object> versions = new HashMap<>();
+      for (final var name : versionNames) {
+        versions.put(name, Map.of());
+      }
+      return new HashMap<>(Map.of("versions", versions));
+    }
+
+    @Test
+    @DisplayName("returns an empty string when there are no versions")
+    void emptyWhenNoVersions() {
+      assertThat(PackageUtils.resolveLatestVersion(this.metadataWithVersions())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("picks the numerically greatest version, not the lexically greatest")
+    void picksNumericallyGreatest() {
+      final var metadata = this.metadataWithVersions("1.9.0", "1.10.0", "1.2.0");
+      assertThat(PackageUtils.resolveLatestVersion(metadata)).isEqualTo("1.10.0");
+    }
+
+    @Test
+    @DisplayName(
+        "resolves a version with a part above int32 max as latest among smaller versions"
+            + " (the RPS-1208 regression)")
+    void resolvesAboveInt32MaxAsLatest() {
+      final var metadata = this.metadataWithVersions("1.0.0", "2.0.0", "2147483648.0.0");
+      assertThat(PackageUtils.resolveLatestVersion(metadata)).isEqualTo("2147483648.0.0");
+    }
+
+    @Test
+    @DisplayName("does not pick a version above int32 max when a larger one exists")
+    void doesNotPickAboveInt32MaxWhenNotLatest() {
+      final var metadata = this.metadataWithVersions("2147483648.0.0", "2147483649.0.0");
+      assertThat(PackageUtils.resolveLatestVersion(metadata)).isEqualTo("2147483649.0.0");
+    }
+  }
+
+  @Nested
+  @DisplayName("buildFullName")
+  class BuildFullName {
+
+    @Test
+    @DisplayName("returns the bare name when there is no scope")
+    void noScope() {
+      assertThat(PackageUtils.buildFullName(null, "demo")).isEqualTo("demo");
+    }
+
+    @Test
+    @DisplayName("returns @scope/name when there is a scope")
+    void withScope() {
+      assertThat(PackageUtils.buildFullName("foo", "demo")).isEqualTo("@foo/demo");
+    }
+  }
+
+  @Nested
+  @DisplayName("checkPackageNameMatchesUrl (RPS-1207)")
+  class CheckPackageNameMatchesUrl {
+
+    private Map<String, Object> payload(
+        final String name, final String id, final Map<String, Object> versions) {
+      final var payload = new HashMap<String, Object>();
+      payload.put("name", name);
+      payload.put("_id", id);
+      payload.put("versions", versions);
+      return payload;
+    }
+
+    @Test
+    @DisplayName("accepts a body whose name, _id and versions[*].name all match the URL")
+    void acceptsMatchingBody() {
+      final var version = new HashMap<String, Object>(Map.of("name", "demo", "version", "1.0.0"));
+      final var payload = this.payload("demo", "demo", Map.of("1.0.0", version));
+
+      assertThatCode(() -> PackageUtils.checkPackageNameMatchesUrl(payload, null, "demo"))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("accepts a scoped body whose name matches @scope/name")
+    void acceptsMatchingScopedBody() {
+      final var version =
+          new HashMap<String, Object>(Map.of("name", "@foo/demo", "version", "1.0.0"));
+      final var payload = this.payload("@foo/demo", "@foo/demo", Map.of("1.0.0", version));
+
+      assertThatCode(() -> PackageUtils.checkPackageNameMatchesUrl(payload, "foo", "demo"))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("refuses a body whose top-level name does not match the URL")
+    void refusesMismatchedName() {
+      final var payload = this.payload("b", "a", Map.of());
+
+      assertThatThrownBy(() -> PackageUtils.checkPackageNameMatchesUrl(payload, null, "a"))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("packageNameMismatch");
+    }
+
+    @Test
+    @DisplayName("refuses a body whose _id does not match the URL")
+    void refusesMismatchedId() {
+      final var payload = this.payload("a", "b", Map.of());
+
+      assertThatThrownBy(() -> PackageUtils.checkPackageNameMatchesUrl(payload, null, "a"))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("packageNameMismatch");
+    }
+
+    @Test
+    @DisplayName("refuses a body whose versions[*].name does not match the URL")
+    void refusesMismatchedVersionName() {
+      final var version = new HashMap<String, Object>(Map.of("name", "b", "version", "1.0.0"));
+      final var payload = this.payload("a", "a", Map.of("1.0.0", version));
+
+      assertThatThrownBy(() -> PackageUtils.checkPackageNameMatchesUrl(payload, null, "a"))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("packageNameMismatch");
+    }
+
+    @Test
+    @DisplayName("does not refuse a body missing name/_id/versions entirely")
+    void ignoresAbsentFields() {
+      final var payload = new HashMap<String, Object>();
+
+      assertThatCode(() -> PackageUtils.checkPackageNameMatchesUrl(payload, null, "a"))
+          .doesNotThrowAnyException();
     }
   }
 }

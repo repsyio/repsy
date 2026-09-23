@@ -25,6 +25,7 @@ public final class NpmConstants {
 
   public static final String DIST_TAGS = "dist-tags";
   public static final String VERSIONS = "versions";
+  public static final String ID = "_id";
   public static final String BUGS = "bugs";
   public static final String MODIFIED = "modified";
   public static final String HAS_SHRINKWRAP = "_hasShrinkwrap";
