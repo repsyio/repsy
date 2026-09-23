@@ -33,6 +33,7 @@ import { SearchboxComponent } from '../../../../../shared/components/searchbox/s
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
+import { KeyboardActivateDirective } from '../../../../../shared/directives/keyboard-activate.directive';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { NpmConfigComponent } from '../../config/npm-config.component';
@@ -42,6 +43,7 @@ import { NpmService } from '../../service/npm.service';
   selector: 'app-npm-packages-scope-filter',
   standalone: true,
   imports: [
+    KeyboardActivateDirective,
     CommonModule,
     NpmConfigComponent,
     RouterLink,

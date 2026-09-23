@@ -44,9 +44,10 @@
 
       <!-- Token -->
       <div>
-        <p class="mb-1 block text-[16px] text-[#9FA0A0]">Repsy Deploy Token</p>
+        <label for="deploy-token-info-token" class="mb-1 block text-[16px] text-[#9FA0A0]">Repsy Deploy Token</label>
         <div class="flex h-[40px] items-center gap-2 rounded-lg border border-[#404141] bg-[#101112] px-4">
           <input
+            id="deploy-token-info-token"
             [type]="showToken ? 'text' : 'password'"
             [value]="tokenInfo.token"
             readonly
@@ -55,7 +56,13 @@
           />
 
           <div class="flex items-center justify-center gap-2">
-            <button type="button" class="text-neutral-400 hover:text-neutral-200" (click)="toggleShowToken()">
+            <button
+              type="button"
+              class="text-neutral-400 hover:text-neutral-200"
+              [attr.aria-label]="showToken ? 'Hide token' : 'Show token'"
+              [attr.aria-pressed]="showToken"
+              (click)="toggleShowToken()"
+            >
               <i
                 id="password-toggle-icon"
                 class="fa-solid"

@@ -55,7 +55,7 @@
         </div>
         <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
           @for (crate of crates; track crate.name; let i = $index) {
-            <div role="button" [routerLink]="'/' + activeRepo.repoName + '/' + crate.name">
+            <div role="button" appKeyboardActivate [routerLink]="'/' + activeRepo.repoName + '/' + crate.name">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === crates.length - 1 }"
@@ -104,7 +104,7 @@
                 }
                 <span class="text-[#FDFDFD]">{{ crate.downloads }}</span>
                 @if (activeRepo.canManage) {
-                  <app-dropdown (click)="$event.stopPropagation()">
+                  <app-dropdown>
                     <button
                       (click)="deleteCrate(crate)"
                       [disabled]="loading"
@@ -128,10 +128,11 @@
             <div
               class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
               role="button"
+              appKeyboardActivate
               [routerLink]="'/' + activeRepo.repoName + '/' + crate.name"
             >
               @if (activeRepo.canManage) {
-                <app-dropdown class="relative left-4 ml-auto" (click)="$event.stopPropagation()">
+                <app-dropdown class="relative left-4 ml-auto">
                   <button
                     (click)="deleteCrate(crate)"
                     [disabled]="loading"

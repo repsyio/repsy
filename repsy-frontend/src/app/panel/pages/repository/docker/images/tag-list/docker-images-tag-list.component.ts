@@ -36,6 +36,7 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
+import { KeyboardActivateDirective } from '../../../../../shared/directives/keyboard-activate.directive';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { SecurityService } from '../../../../security/service/security.service';
@@ -48,6 +49,7 @@ import { DockerService } from '../../service/docker.service';
   selector: 'app-docker-tag-list',
   standalone: true,
   imports: [
+    KeyboardActivateDirective,
     CommonModule,
     DockerConfigComponent,
     RouterLink,

@@ -77,6 +77,7 @@
           @for (mod of modules; track mod.modulePath; let i = $index) {
             <div
               role="button"
+              appKeyboardActivate
               [routerLink]="['/' + activeRepo.repoName + '/modules']"
               [queryParams]="{ modulePath: mod.modulePath }"
             >
@@ -112,7 +113,7 @@
                 />
 
                 @if (activeRepo.canManage) {
-                  <app-dropdown (click)="$event.stopPropagation()">
+                  <app-dropdown>
                     <button
                       (click)="deleteModule(mod)"
                       [disabled]="loading"
@@ -136,12 +137,13 @@
           <div animate.enter="fade-in-down" class="lg:hidden">
             <div
               role="button"
+              appKeyboardActivate
               [routerLink]="['/' + activeRepo.repoName + '/modules']"
               [queryParams]="{ modulePath: mod.modulePath }"
               class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
             >
               @if (activeRepo.canManage) {
-                <app-dropdown class="relative left-4 ml-auto" (click)="$event.stopPropagation()">
+                <app-dropdown class="relative left-4 ml-auto">
                   <button
                     (click)="deleteModule(mod)"
                     [disabled]="loading"

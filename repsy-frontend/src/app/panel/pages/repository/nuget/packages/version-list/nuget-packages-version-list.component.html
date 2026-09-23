@@ -53,6 +53,7 @@
           @for (version of versions; track version.version; let i = $index) {
             <div
               role="button"
+              appKeyboardActivate
               [routerLink]="['/' + activeRepo.repoName + '/' + packageId + '/' + version.version]"
               fragment="security"
             >
@@ -81,7 +82,7 @@
                   [always]="true"
                 />
                 @if (activeRepo.canManage) {
-                  <app-dropdown (click)="$event.stopPropagation()">
+                  <app-dropdown>
                     <button
                       (click)="deleteVersion(version)"
                       [disabled]="loading"

@@ -23,6 +23,8 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 })
 export class SearchboxComponent {
   @Input() public placeholder: string;
+  /** Accessible name of the input; falls back to the placeholder. */
+  @Input() public ariaLabel: string;
   @Output() public filter = new EventEmitter<string>();
 
   onSearch(event: Event) {

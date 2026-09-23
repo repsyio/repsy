@@ -93,7 +93,8 @@
             <!-- File Icon -->
             <div
               (click)="go(file)"
-              (keydown)="go(file)"
+              (keydown.enter)="go(file); $event.preventDefault()"
+              (keydown.space)="go(file); $event.preventDefault()"
               class="mb-4 flex items-center justify-center"
               tabindex="0"
               role="button"
@@ -112,12 +113,7 @@
             </div>
 
             <!-- File Name -->
-            <div
-              class="mb-1 text-start text-[15px] font-medium break-all text-neutral-200"
-              tabindex="0"
-              role="button"
-              [attr.aria-label]="'Open ' + file.name"
-            >
+            <div class="mb-1 text-start text-[15px] font-medium break-all text-neutral-200">
               {{ file.name }}
             </div>
 
