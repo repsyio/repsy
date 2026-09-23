@@ -57,6 +57,10 @@ import org.springframework.web.context.WebApplicationContext;
  * and must be charged for one. A layer stored before finalize renamed it can still be under its
  * layer UUID, and the manifest push drops it the same way and refunds it.
  *
+ * <p>A finalize that carries the closing chunk in its body and then fails (a digest mismatch, for
+ * example) still charges that chunk: bytes are settled centrally by the router once the handler
+ * returns or throws, not only when it returns successfully (RPS-1114).
+ *
  * <p>{@link UsageUpdateService} is mocked: it is {@code @Async}, so it cannot see this test's
  * uncommitted data. The mock records the disk-usage deltas the upload post-processor requests.
  */
@@ -443,6 +447,33 @@ class DockerLayerUploadUsageIT extends AbstractIntegrationTest {
     assertThat(storageDirOf(repo).resolve("blobs").resolve(uploadId))
         .hasBinaryContent(concat(List.of(first, second)));
     assertThat(this.netUsage(repo)).isEqualTo(first.length + second.length);
+  }
+
+  @Test
+  @DisplayName(
+      "a finalize with a closing chunk and a wrong digest still charges the whole upload"
+          + " (RPS-1114)")
+  void closingChunkWithWrongDigestIsStillCharged() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+    final var repo = this.dockerRepo();
+    final var head = layerBytes("head-".repeat(30));
+    final var tail = layerBytes("tail-".repeat(20));
+    final var layer = concat(List.of(head, tail));
+    final var claimed = sha256(layerBytes("what the client believes it sent"));
+    final var uploadId = this.startUpload(repo, token);
+    this.patchChunk(repo, uploadId, head, token);
+
+    final var response = this.tryFinalizeUpload(repo, uploadId, claimed, tail, token);
+
+    assertThat(response.getStatus()).isEqualTo(400);
+    assertThat(response.getContentAsString()).contains("DIGEST_INVALID");
+    assertThat(this.layerRepository.findByRepoIdAndDigest(repo.getId(), claimed)).isEmpty();
+    // The closing chunk carried in the failing finalize request was appended to the upload file,
+    // and the file is still what the client sent, so the request's net usage is the whole file:
+    // it must be charged even though the request itself failed, or the abandoned-upload cleanup
+    // later releases bytes that were never charged in the first place.
+    assertThat(storageDirOf(repo).resolve("blobs").resolve(uploadId)).hasBinaryContent(layer);
+    assertThat(this.netUsage(repo)).isEqualTo(layer.length);
   }
 
   @Test

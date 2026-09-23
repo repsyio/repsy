@@ -23,8 +23,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpMethod;
 
+@Slf4j
 public abstract class ProtocolProvider {
 
   private final Map<HttpMethod, List<SpecifiedProtocolMethodHandler>> methodHandlersMap =
@@ -65,6 +67,36 @@ public abstract class ProtocolProvider {
     }
 
     return ProcessorResult.next();
+  }
+
+  /**
+   * Runs the post-processors that opted in via {@link ProtocolProcessor#runsOnFailure()} after the
+   * handler threw, so whatever the failed request already did (for example, bytes already written
+   * to disk) still gets settled. The request already failed by the time this runs and the client
+   * sees that failure, so a processor's {@link ProcessorResult} is not applied here, and a
+   * processor that itself throws is logged and otherwise ignored rather than propagated: settling
+   * usage must never mask or replace the exception that caused the failure.
+   */
+  public void postProcessFailure(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final Map<String, Object> properties) {
+
+    for (final var processor : this.postProcessors) {
+      if (!processor.runsOnFailure()) {
+        continue;
+      }
+
+      try {
+        processor.process(context, request, response, properties);
+      } catch (final RuntimeException e) {
+        log.warn(
+            "Post-processor {} failed while settling a failed request",
+            processor.getClass().getSimpleName(),
+            e);
+      }
+    }
   }
 
   public void registerMethodHandler(final ProtocolMethodHandler methodHandler) {

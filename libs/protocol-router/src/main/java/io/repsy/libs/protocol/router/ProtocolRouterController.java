@@ -92,7 +92,9 @@ public class ProtocolRouterController {
         return preProcessorResult.getResult();
       }
 
-      final var result = handler.handle(context.get(), request, response);
+      final var result =
+          this.handleAndSettleOnFailure(
+              handler, provider, context.get(), request, response, properties);
 
       final var postProcessorResult =
           provider.postProcess(context.get(), request, response, properties);
@@ -105,6 +107,29 @@ public class ProtocolRouterController {
     }
 
     throw new ItemNotFoundException("unknownPath");
+  }
+
+  /**
+   * Runs the handler, settling what it already did before rethrowing an exception unchanged. The
+   * handler may have already written bytes (or otherwise changed state) before throwing, so the
+   * provider's failure hook runs first, but the exception itself reaches the caller exactly as the
+   * handler threw it: settling a failed request must never mask or replace it.
+   */
+  private ResponseEntity<Object> handleAndSettleOnFailure(
+      final ProtocolMethodHandler handler,
+      final ProtocolProvider provider,
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final Map<String, Object> properties)
+      throws Exception {
+
+    try {
+      return handler.handle(context, request, response);
+    } catch (final Exception e) {
+      provider.postProcessFailure(context, request, response, properties);
+      throw e;
+    }
   }
 
   private void registerHandlers(final ProtocolProvider provider) {

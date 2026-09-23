@@ -28,6 +28,18 @@ public abstract class ProtocolProcessor implements Comparable<ProtocolProcessor>
       HttpServletResponse response,
       Map<String, Object> properties);
 
+  /**
+   * Whether this post-processor must still run when the handler threw, so that whatever the request
+   * already did before failing (for example, bytes already written to disk) still gets settled even
+   * though the client sees the failure. Defaults to {@code false}: a post-processor whose side
+   * effect only makes sense for a request that actually succeeded (publishing an artifact-pushed
+   * event, for instance) must not run for a failed one. Only a post-processor that explicitly opts
+   * in by overriding this to {@code true} runs on failure.
+   */
+  protected boolean runsOnFailure() {
+    return false;
+  }
+
   @Override
   public int compareTo(final ProtocolProcessor processor) {
 

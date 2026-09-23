@@ -56,6 +56,16 @@ public class UsagePostProcessor extends ProtocolProcessor {
     return PRIORITY;
   }
 
+  /**
+   * Bytes a failed request already wrote to disk (for example, an OCI finalize whose closing chunk
+   * was appended before its digest check refused it) must still be charged, or the abandoned-upload
+   * cleanup later releases them without them ever having been settled (RPS-1114).
+   */
+  @Override
+  protected boolean runsOnFailure() {
+    return true;
+  }
+
   @Override
   protected @NonNull ProcessorResult process(
       final @NonNull ProtocolContext context,
