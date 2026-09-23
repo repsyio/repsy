@@ -19,8 +19,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
@@ -110,5 +113,119 @@ class AbstractDockerUploadChunkProtocolMethodHandlerTest {
   @DisplayName("answers a range that starts and ends at zero for an upload with no bytes yet")
   void answersAWellFormedRangeForAnEmptyUpload() throws Exception {
     assertThat(this.answerFor(0).getHeaders().getFirst("Range")).isEqualTo("0-0");
+  }
+
+  @Test
+  @DisplayName("echoes the session id of the URL as the Docker-Upload-UUID header")
+  void echoesTheSessionIdAsTheUploadUuidHeader() throws Exception {
+    assertThat(this.answerFor(64).getHeaders().getFirst("Docker-Upload-UUID"))
+        .isEqualTo(SESSION_ID);
+  }
+
+  @Test
+  @DisplayName("appends the chunk when Content-Range starts where the upload currently ends")
+  void appendsWhenContentRangeMatchesTheCurrentSize() throws Exception {
+    final var context = context();
+    when(this.dockerFacade.getUploadSize(
+            eq(context),
+            argThat(path -> path != null && path.getPath().equals("/blobs/" + SESSION_ID))))
+        .thenReturn(100L);
+    when(this.dockerFacade.uploadLayerChunk(
+            eq(context),
+            argThat(path -> path != null && path.getPath().equals("/blobs/" + SESSION_ID)),
+            any(),
+            eq(64L)))
+        .thenReturn(164L);
+    final var request = new MockHttpServletRequest("PATCH", UPLOAD_URI);
+    request.setContent(new byte[64]);
+    request.addHeader("Content-Range", "100-163");
+
+    final var response =
+        new TestHandler(this.basePathParser, this.dockerFacade, this.provider)
+            .handle(context, request, new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+    assertThat(response.getHeaders().getFirst("Range")).isEqualTo("0-163");
+    verify(this.dockerFacade)
+        .uploadLayerChunk(
+            eq(context),
+            argThat(path -> path != null && path.getPath().equals("/blobs/" + SESSION_ID)),
+            any(),
+            eq(64L));
+  }
+
+  @Test
+  @DisplayName("refuses a chunk whose Content-Range does not start at the current upload size")
+  void refusesAContentRangeThatDoesNotMatchTheCurrentSize() throws Exception {
+    final var context = context();
+    when(this.dockerFacade.getUploadSize(
+            eq(context),
+            argThat(path -> path != null && path.getPath().equals("/blobs/" + SESSION_ID))))
+        .thenReturn(100L);
+    final var request = new MockHttpServletRequest("PATCH", UPLOAD_URI);
+    request.setContent(new byte[64]);
+    request.addHeader("Content-Range", "0-63");
+
+    final var response =
+        new TestHandler(this.basePathParser, this.dockerFacade, this.provider)
+            .handle(context, request, new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE);
+    assertThat(response.getHeaders().getFirst("Range")).isEqualTo("0-99");
+    assertThat(response.getHeaders().getFirst("Docker-Upload-UUID")).isEqualTo(SESSION_ID);
+    assertThat(response.getHeaders().getFirst("Location")).isNotBlank();
+    verify(this.dockerFacade, never()).uploadLayerChunk(any(), any(), any(), any(Long.class));
+  }
+
+  @Test
+  @DisplayName("treats a fresh upload with no bytes yet as size zero, not a failure")
+  void treatsAMissingUploadFileAsSizeZeroForContentRangeChecks() throws Exception {
+    final var context = context();
+    when(this.dockerFacade.getUploadSize(
+            eq(context),
+            argThat(path -> path != null && path.getPath().equals("/blobs/" + SESSION_ID))))
+        .thenThrow(new ItemNotFoundException("resourceNotFound"));
+    when(this.dockerFacade.uploadLayerChunk(
+            eq(context),
+            argThat(path -> path != null && path.getPath().equals("/blobs/" + SESSION_ID)),
+            any(),
+            eq(64L)))
+        .thenReturn(64L);
+    final var request = new MockHttpServletRequest("PATCH", UPLOAD_URI);
+    request.setContent(new byte[64]);
+    request.addHeader("Content-Range", "0-63");
+
+    final var response =
+        new TestHandler(this.basePathParser, this.dockerFacade, this.provider)
+            .handle(context, request, new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+    verify(this.dockerFacade)
+        .uploadLayerChunk(
+            eq(context),
+            argThat(path -> path != null && path.getPath().equals("/blobs/" + SESSION_ID)),
+            any(),
+            eq(64L));
+  }
+
+  @Test
+  @DisplayName("keeps the old append behavior when the request carries no Content-Range")
+  void appendsWithoutCheckingWhenContentRangeIsAbsent() throws Exception {
+    final var context = context();
+    when(this.dockerFacade.uploadLayerChunk(
+            eq(context),
+            argThat(path -> path != null && path.getPath().equals("/blobs/" + SESSION_ID)),
+            any(),
+            eq(64L)))
+        .thenReturn(64L);
+    final var request = new MockHttpServletRequest("PATCH", UPLOAD_URI);
+    request.setContent(new byte[64]);
+
+    final var response =
+        new TestHandler(this.basePathParser, this.dockerFacade, this.provider)
+            .handle(context, request, new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+    verify(this.dockerFacade, never()).getUploadSize(any(), any());
   }
 }

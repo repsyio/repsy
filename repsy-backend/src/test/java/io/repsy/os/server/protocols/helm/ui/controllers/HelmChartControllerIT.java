@@ -23,6 +23,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -1750,6 +1751,128 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
         out.writeBytes(chunk);
       }
       return out.toByteArray();
+    }
+
+    /** Sends one chunk with an explicit {@code Content-Range} header. */
+    private MockHttpServletResponse patchBlobChunkWithContentRange(
+        final Repo repo,
+        final String uploadId,
+        final byte[] chunk,
+        final String range,
+        final String token)
+        throws Exception {
+      final var it = HelmChartControllerIT.this;
+      return it.protocol(
+              patch("/v2/{repo}/{name}/blobs/uploads/{id}", repo.getName(), "payments", uploadId)
+                  .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                  .header("Content-Range", range)
+                  .content(chunk)
+                  .header(AUTHORIZATION, token))
+          .andReturn()
+          .getResponse();
+    }
+
+    private MockHttpServletResponse blobUploadStatus(
+        final Repo repo, final String uploadId, final boolean head, final String token)
+        throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var builder =
+          head
+              ? head("/v2/{repo}/{name}/blobs/uploads/{id}", repo.getName(), "payments", uploadId)
+              : get("/v2/{repo}/{name}/blobs/uploads/{id}", repo.getName(), "payments", uploadId);
+      return it.protocol(builder.header(AUTHORIZATION, token)).andReturn().getResponse();
+    }
+
+    @Test
+    @DisplayName("a chunk whose Content-Range starts where the upload ends is appended as usual")
+    void contentRangeMatchingTheCurrentSizeIsAppended() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.asProtocolBearer(it.adminBearerToken());
+      final var repo = it.helmRepo();
+      final var first = "first range ".repeat(20).getBytes(StandardCharsets.UTF_8);
+      final var second = "second range ".repeat(20).getBytes(StandardCharsets.UTF_8);
+      final var blob = this.concat(first, second);
+      final var uploadId = this.startBlobUpload(repo, token);
+      requireStatus(
+          this.patchBlobChunkWithContentRange(
+              repo, uploadId, first, "0-" + (first.length - 1), token),
+          202,
+          "first ranged chunk");
+
+      final var secondResponse =
+          this.patchBlobChunkWithContentRange(
+              repo,
+              uploadId,
+              second,
+              first.length + "-" + (first.length + second.length - 1),
+              token);
+
+      requireStatus(secondResponse, 202, "second ranged chunk");
+      assertThat(secondResponse.getHeader("Range")).isEqualTo("0-" + (blob.length - 1));
+      requireStatus(
+          this.finalizeBlobUpload(repo, uploadId, sha256(blob), new byte[0], token),
+          201,
+          "OCI blob finalize");
+      assertThat(storageDirOf(repo).resolve("oci").resolve("blobs").resolve(sha256(blob)))
+          .hasBinaryContent(blob);
+    }
+
+    @Test
+    @DisplayName(
+        "a chunk whose Content-Range does not start where the upload ends is refused with 416")
+    void contentRangeMismatchIsRefusedWith416() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.asProtocolBearer(it.adminBearerToken());
+      final var repo = it.helmRepo();
+      final var first = "head range ".repeat(20).getBytes(StandardCharsets.UTF_8);
+      final var stray = "stray chunk ".repeat(20).getBytes(StandardCharsets.UTF_8);
+      final var uploadId = this.startBlobUpload(repo, token);
+      this.patchBlobChunk(repo, uploadId, first, token);
+
+      final var response =
+          this.patchBlobChunkWithContentRange(
+              repo, uploadId, stray, "0-" + (stray.length - 1), token);
+
+      assertThat(response.getStatus()).isEqualTo(416);
+      assertThat(response.getHeader("Range")).isEqualTo("0-" + (first.length - 1));
+      assertThat(response.getHeader("Docker-Upload-UUID")).isEqualTo(uploadId);
+      assertThat(response.getHeader("Location")).isNotBlank();
+      assertThat(storageDirOf(repo).resolve("oci").resolve("blobs").resolve(uploadId))
+          .hasBinaryContent(first);
+    }
+
+    @Test
+    @DisplayName("the upload-status endpoint answers 204 with the running Range, on GET and HEAD")
+    void uploadStatusAnswersTheRunningRange() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.asProtocolBearer(it.adminBearerToken());
+      final var repo = it.helmRepo();
+      final var chunk = "status range ".repeat(20).getBytes(StandardCharsets.UTF_8);
+      final var uploadId = this.startBlobUpload(repo, token);
+      this.patchBlobChunk(repo, uploadId, chunk, token);
+
+      final var getResponse = this.blobUploadStatus(repo, uploadId, false, token);
+      final var headResponse = this.blobUploadStatus(repo, uploadId, true, token);
+
+      assertThat(getResponse.getStatus()).isEqualTo(204);
+      assertThat(getResponse.getHeader("Range")).isEqualTo("0-" + (chunk.length - 1));
+      assertThat(getResponse.getHeader("Docker-Upload-UUID")).isEqualTo(uploadId);
+      assertThat(getResponse.getHeader("Location")).isNotBlank();
+      assertThat(headResponse.getStatus()).isEqualTo(204);
+      assertThat(headResponse.getHeader("Range")).isEqualTo("0-" + (chunk.length - 1));
+    }
+
+    @Test
+    @DisplayName("the upload-status endpoint answers 404 for an upload that was never started")
+    void uploadStatusAnswers404ForAnUnknownSession() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.asProtocolBearer(it.adminBearerToken());
+      final var repo = it.helmRepo();
+      final var unknownUploadId = "00000000-0000-0000-0000-000000000099";
+
+      final var response = this.blobUploadStatus(repo, unknownUploadId, false, token);
+
+      assertThat(response.getStatus()).isEqualTo(404);
     }
 
     @Test

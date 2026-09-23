@@ -158,7 +158,7 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
 
     return ResponseEntity.status(HttpStatus.CREATED)
         .header(DOCKER_CONTENT_DIGEST, digest)
-        .header(DOCKER_UPLOAD_UUID, this.getUploadUuid().toString())
+        .header(DOCKER_UPLOAD_UUID, sessionId)
         .header(LOCATION, location)
         .build();
   }
@@ -172,11 +172,6 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
         .path("/v2/{repoName}/{imageName}/blobs/{digest}")
         .buildAndExpand(urlProperties.getRepoName(), imageName, digest)
         .toUriString();
-  }
-
-  protected UUID getUploadUuid() {
-
-    return UUID.randomUUID();
   }
 
   @SneakyThrows

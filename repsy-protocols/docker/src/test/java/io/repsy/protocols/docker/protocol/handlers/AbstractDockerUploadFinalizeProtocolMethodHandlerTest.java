@@ -126,6 +126,7 @@ class AbstractDockerUploadFinalizeProtocolMethodHandlerTest {
         this.handler().handle(this.context, request(new byte[16]), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(response.getHeaders().getFirst("Docker-Upload-UUID")).isEqualTo(SESSION_ID);
     final var order = inOrder(this.dockerFacade, this.layerService);
     order
         .verify(this.dockerFacade)

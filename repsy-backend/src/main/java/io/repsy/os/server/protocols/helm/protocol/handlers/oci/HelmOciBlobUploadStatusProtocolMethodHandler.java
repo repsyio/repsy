@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.docker.protocol.handlers;
+package io.repsy.os.server.protocols.helm.protocol.handlers.oci;
 
 import io.repsy.libs.protocol.router.PathParser;
-import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
-import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
-import io.repsy.protocols.docker.protocol.handlers.AbstractDockerUploadChunkProtocolMethodHandler;
+import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
+import io.repsy.protocols.helm.protocol.facades.HelmFacade;
+import io.repsy.protocols.helm.protocol.handlers.oci.AbstractHelmOciBlobUploadStatusProtocolMethodHandler;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -26,14 +26,13 @@ import org.springframework.stereotype.Component;
 
 @Component
 @NullMarked
-public class DockerUploadChunkProtocolMethodHandler
-    extends AbstractDockerUploadChunkProtocolMethodHandler<UUID> {
+public class HelmOciBlobUploadStatusProtocolMethodHandler
+    extends AbstractHelmOciBlobUploadStatusProtocolMethodHandler<UUID> {
 
-  public DockerUploadChunkProtocolMethodHandler(
-      @Qualifier("osDockerPathParser") final PathParser basePathParser,
-      final DockerProtocolFacade<UUID> dockerFacade,
-      final DockerProtocolProvider provider) {
-
-    super(basePathParser, dockerFacade, provider);
+  public HelmOciBlobUploadStatusProtocolMethodHandler(
+      @Qualifier("osHelmOciPathParser") final PathParser basePathParser,
+      final HelmFacade<UUID> helmProtocolTxFacade,
+      final HelmProtocolProvider provider) {
+    super(basePathParser, helmProtocolTxFacade, provider);
   }
 }

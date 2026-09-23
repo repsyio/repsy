@@ -196,6 +196,31 @@ class AbstractDockerProtocolTxFacadeTest {
     verify(this.layerService).update(layerInfo, REPO_ID);
   }
 
+  @Test
+  @DisplayName("getUploadSize() reports the size of the bytes written so far")
+  void getUploadSizeReportsTheWrittenSize() throws Exception {
+    this.uploadHolds(new byte[257]);
+
+    final var size =
+        this.facade().getUploadSize(newContext(), new RelativePath("/blobs/upload-id"));
+
+    assertThat(size).isEqualTo(257);
+  }
+
+  @Test
+  @DisplayName("getUploadSize() refuses an upload session that was never written")
+  void getUploadSizeRefusesAMissingSession() {
+    when(this.dockerStorageService.getResource(
+            argThat(path -> path != null && path.getPath().equals(UPLOAD_STORAGE_PATH)),
+            eq(REPO_NAME)))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(
+            () -> this.facade().getUploadSize(newContext(), new RelativePath("/blobs/upload-id")))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("resourceNotFound");
+  }
+
   // ---------------------------------------------------------------------------------------------
   // getManifest() -- RPS-1215: this is the single resolution path both GET and HEAD share, so its
   // sha256 short-circuit (resolveManifestDigest) is exercised here rather than through the now
