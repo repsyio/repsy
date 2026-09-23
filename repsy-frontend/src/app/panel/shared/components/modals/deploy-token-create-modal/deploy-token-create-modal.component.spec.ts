@@ -226,6 +226,7 @@ describe('DeployTokenCreateModalComponent', () => {
         expect(api.createDeployToken).not.toHaveBeenCalled();
         expect(toastService.show).toHaveBeenCalledOnceWith(EXPIRATION_MESSAGE, 'error');
         expect(component.form.enabled).toBeTrue();
+        expect(component.loading).toBeFalse();
         expect(openChange).toEqual([]);
       }
 
@@ -261,6 +262,53 @@ describe('DeployTokenCreateModalComponent', () => {
 
         expect(api.createDeployToken).toHaveBeenCalledTimes(2);
         expect(toastService.show).not.toHaveBeenCalledWith(EXPIRATION_MESSAGE, 'error');
+      });
+
+      it('never leaves the modal locked: Cancel stays enabled and the user can retry after a rejection', () => {
+        fill({ expirationDate: '2027-03-11' });
+
+        component.createToken();
+        expectRejected();
+
+        // The user is not trapped: they can either close the modal...
+        component.closeModal();
+        expect(openChange).toEqual([false]);
+
+        // ...or fix the date and retry without a page reload.
+        fill({ expirationDate: TOMORROW });
+        component.createToken();
+        expect(api.createDeployToken).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('expirationDate control validator', () => {
+      it('flags a date before tomorrow as dateOutOfRange', () => {
+        fill({ expirationDate: '2026-03-10' });
+        expect(component.form.get('expirationDate').hasError('dateOutOfRange')).toBeTrue();
+        expect(component.form.invalid).toBeTrue();
+      });
+
+      it('flags a date more than one year out as dateOutOfRange', () => {
+        fill({ expirationDate: '2027-03-11' });
+        expect(component.form.get('expirationDate').hasError('dateOutOfRange')).toBeTrue();
+      });
+
+      it('flags a malformed date as dateInvalid', () => {
+        fill({ expirationDate: '2027-13-45' });
+        expect(component.form.get('expirationDate').hasError('dateInvalid')).toBeTrue();
+      });
+
+      it('accepts dates from tomorrow through one year from today', () => {
+        fill({ expirationDate: TOMORROW });
+        expect(component.form.get('expirationDate').valid).toBeTrue();
+
+        fill({ expirationDate: ONE_YEAR_LATER });
+        expect(component.form.get('expirationDate').valid).toBeTrue();
+      });
+
+      it('treats a cleared expiration date as valid, since it is optional', () => {
+        fill({ expirationDate: null });
+        expect(component.form.get('expirationDate').valid).toBeTrue();
       });
     });
   });
