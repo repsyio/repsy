@@ -55,6 +55,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -265,6 +266,15 @@ public final class NuGetPackageUtils {
     return parsed;
   }
 
+  /**
+   * Reads a tag with a regular expression, tolerant of a nuspec that is not well-formed XML. Used
+   * only where that tolerance is still wanted: the plain-text {@code <readme>} path and the
+   * plain-text fallback of {@link #extractRepositoryUrl}, for a caller other than the push path
+   * (which already rejects a nuspec that is not well-formed XML before either is reached). A
+   * regular expression does not unescape an XML entity or resolve a CDATA section, and it can match
+   * a tag inside a comment, so a {@code metadata} field is read with {@link #extractMetadataField}
+   * instead.
+   */
   public static @Nullable String extractXmlTag(final String xml, final String tagName) {
     try {
       final var patternStr = String.format("<%s>([^<]+)</%s>", tagName, tagName);
@@ -279,11 +289,54 @@ public final class NuGetPackageUtils {
   }
 
   /**
+   * Reads a {@code <metadata>} child element's text content from the nuspec with the XML parser, so
+   * an XML-escaped ampersand or angle bracket, or a CDATA section, comes back decoded instead of
+   * raw. A tag inside a comment is not an element and is never matched. Returns {@code null} when
+   * the element is absent, blank, or the nuspec cannot be parsed: {@link #readNuspecMetadata(Path)}
+   * already rejects a nuspec that is not well-formed XML before a publish reaches this, so only
+   * other callers see a parse failure here.
+   */
+  public static @Nullable String extractMetadataField(
+      final String nuspecXml, final String tagName) {
+    try {
+      return metadataChildText(parseNuspec(nuspecXml), tagName);
+    } catch (final Exception e) {
+      log.debug("Failed to extract {} from nuspec", tagName, e);
+      return null;
+    }
+  }
+
+  private static @Nullable String metadataChildText(final Document doc, final String tagName) {
+    final var metadataList = doc.getElementsByTagName("metadata");
+    if (metadataList.getLength() == 0) {
+      return null;
+    }
+
+    final var child = firstElementChild(metadataList.item(0), tagName);
+    return child == null ? null : blankToNull(child.getTextContent());
+  }
+
+  private static @Nullable Node firstElementChild(final Node parent, final String tagName) {
+    final var children = parent.getChildNodes();
+    for (int i = 0; i < children.getLength(); i++) {
+      final var node = children.item(i);
+      if (node.getNodeType() == Node.ELEMENT_NODE && tagName.equals(node.getNodeName())) {
+        return node;
+      }
+    }
+    return null;
+  }
+
+  private static @Nullable String blankToNull(final @Nullable String text) {
+    return text == null || text.isBlank() ? null : text.strip();
+  }
+
+  /**
    * Reads the title from the nuspec. A title longer than the {@code title} column is cut to fit: it
    * is only shown, and its start still names the package.
    */
   public static @Nullable String extractTitle(final String nuspecXml) {
-    return truncate(extractXmlTag(nuspecXml, "title"), MAX_TITLE_LENGTH, "title");
+    return truncate(extractMetadataField(nuspecXml, "title"), MAX_TITLE_LENGTH, "title");
   }
 
   /**
@@ -291,7 +344,7 @@ public final class NuGetPackageUtils {
    * can leave a partial last tag.
    */
   public static @Nullable String extractTags(final String nuspecXml) {
-    return truncate(extractXmlTag(nuspecXml, "tags"), MAX_TAGS_LENGTH, "tags");
+    return truncate(extractMetadataField(nuspecXml, "tags"), MAX_TAGS_LENGTH, "tags");
   }
 
   /**
@@ -300,7 +353,7 @@ public final class NuGetPackageUtils {
    * so the full value is not lost.
    */
   public static @Nullable String extractUrl(final String nuspecXml, final String tagName) {
-    return dropIfTooLong(extractXmlTag(nuspecXml, tagName), tagName);
+    return dropIfTooLong(extractMetadataField(nuspecXml, tagName), tagName);
   }
 
   /**
@@ -643,15 +696,20 @@ public final class NuGetPackageUtils {
       nuspecXml = extractNuspec(is);
     }
 
-    final var packageId = extractXmlTag(nuspecXml, "id");
-    final var version = extractXmlTag(nuspecXml, "version");
+    // Well-formedness is checked before the metadata is read: id and version now come from the XML
+    // parser (RPS-1145) rather than a regular expression, so a nuspec that is not well-formed XML
+    // must be rejected here first, with its own message, instead of surfacing as a missing id or
+    // version.
+    validateWellFormed(nuspecXml);
+
+    final var packageId = extractMetadataField(nuspecXml, "id");
+    final var version = extractMetadataField(nuspecXml, "version");
 
     if (packageId == null || packageId.isBlank() || version == null || version.isBlank()) {
       throw new IllegalArgumentException("Missing 'id' or 'version' in nuspec.");
     }
     validatePackageId(packageId);
     validatePackageVersion(version);
-    validateWellFormed(nuspecXml);
 
     final var normalizedVersion = normalizeNuGetVersion(version);
     validateVersionLength(normalizedVersion);
@@ -660,10 +718,9 @@ public final class NuGetPackageUtils {
         packageId, normalizedVersion, nuspecXml, extractReadme(tempFile, nuspecXml));
   }
 
-  // The id and version are read with a regular expression, so a nuspec that is not well-formed XML
-  // still gets past the checks above. Its dependencies (and its repository URL) are read with an
-  // XML
-  // parser, and a package published anyway would list no dependencies without any sign of why.
+  // Every metadata field, and the dependencies and repository URL, are read with the XML parser, so
+  // a nuspec that is not well-formed XML is rejected here, before any of it is read, with a message
+  // that says so instead of a missing-field or unreadable-dependencies one.
   private static void validateWellFormed(final String nuspecXml) {
     try {
       parseNuspec(nuspecXml);

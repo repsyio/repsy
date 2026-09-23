@@ -37,7 +37,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
-import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -50,7 +49,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-@Slf4j
 @Component
 @Transactional(readOnly = true)
 @NullMarked
@@ -429,8 +427,8 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     pkgVersion.setDownloadCount(0);
     pkgVersion.setCreatedAt(Instant.now());
     pkgVersion.setTitle(NuGetPackageUtils.extractTitle(nuspecXml));
-    pkgVersion.setDescription(NuGetPackageUtils.extractXmlTag(nuspecXml, "description"));
-    pkgVersion.setAuthors(NuGetPackageUtils.extractXmlTag(nuspecXml, "authors"));
+    pkgVersion.setDescription(NuGetPackageUtils.extractMetadataField(nuspecXml, "description"));
+    pkgVersion.setAuthors(NuGetPackageUtils.extractMetadataField(nuspecXml, "authors"));
     pkgVersion.setTags(NuGetPackageUtils.extractTags(nuspecXml));
     pkgVersion.setIconUrl(NuGetPackageUtils.extractUrl(nuspecXml, "iconUrl"));
     pkgVersion.setLicenseUrl(NuGetPackageUtils.extractUrl(nuspecXml, "licenseUrl"));
@@ -442,11 +440,10 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
         NuGetPackageUtils.extractDependenciesFromNuspec(
             nuspecXml, nugetPackage.getPackageId(), version);
     if (!deps.isEmpty()) {
-      try {
-        pkgVersion.setDependencies(NuGetPackageUtils.toDependenciesJson(deps));
-      } catch (final Exception e) {
-        log.warn("Failed to serialize NuGet dependencies for version {}", version, e);
-      }
+      // A failure here must fail the push (RPS-1146): the client sent these dependencies, so
+      // storing the version without them, silently, would corrupt what was published. This runs
+      // before saveAndFlush, so nothing is written when it throws.
+      pkgVersion.setDependencies(NuGetPackageUtils.toDependenciesJson(deps));
     }
 
     return pkgVersion;
