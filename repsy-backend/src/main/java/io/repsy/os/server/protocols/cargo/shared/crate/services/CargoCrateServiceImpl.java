@@ -130,7 +130,7 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
         throw e;
       }
 
-      throw new ItemAlreadyExistException(versionExistsMessage(request));
+      throw versionExists(request);
     }
   }
 
@@ -300,14 +300,19 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
             .isPresent();
 
     if (versionExists) {
-      throw new ItemAlreadyExistException(versionExistsMessage(request));
+      throw versionExists(request);
     }
   }
 
-  private static String versionExistsMessage(final CratePublishRequest request) {
+  /**
+   * The refusal of a crate version that is already published. The msgId is fixed (RPS-1127): the
+   * crate and its version are logged, not returned in the msgId.
+   */
+  private static ItemAlreadyExistException versionExists(final CratePublishRequest request) {
 
-    return "crate `%s@%s` already exists in this registry"
-        .formatted(request.name(), request.vers());
+    log.warn("crate {}@{} already exists in this registry", request.name(), request.vers());
+
+    return new ItemAlreadyExistException("crateVersionAlreadyExists");
   }
 
   /**

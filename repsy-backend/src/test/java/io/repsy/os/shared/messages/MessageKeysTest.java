@@ -55,8 +55,8 @@ import org.junit.jupiter.api.Test;
  * or of a msgId-carrying exception constructor, plus the {@code ERR_*} constant {@code
  * ErrorHandler} falls back to when an exception carries no message. Ids held in other variables are
  * not seen. A string literal that starts an exception's msgId but is free text or continued by a
- * concatenation cannot have a bundle entry, so {@link #msgIdsAreFixedIdentifiers()} fails on it
- * (RPS-992).
+ * concatenation, {@code .formatted(} or {@code String.format(} cannot have a bundle entry, so
+ * {@link #msgIdsAreFixedIdentifiers()} fails on it (RPS-992, RPS-1127).
  *
  * <p>Bundle keys that no code uses are not flagged: most of them are leftovers tracked by RPS-959.
  */
@@ -83,18 +83,23 @@ class MessageKeysTest {
   /** Exceptions {@code ErrorHandler} renders with the exception message as the msgId. */
   private static final String MSG_ID_EXCEPTION =
       "\\bnew\\s+(?:ItemNotFound|BadRequest|ItemAlreadyExist|AccessNotAllowed|UnAuthorized"
-          + "|ErrorOccurred|SignatureNotVerified|Mfa)Exception\\(\\s*";
+          + "|ErrorOccurred|SignatureNotVerified|Mfa|DataExportRequest|SubscriptionLimitReached)"
+          + "Exception\\(\\s*";
 
   private static final Pattern EXCEPTION_MSG_ID =
       Pattern.compile(MSG_ID_EXCEPTION + LITERAL_OR_CONSTANT);
 
   /**
-   * A string literal that starts an exception's msgId argument but is not a bare identifier, or is
-   * continued by a concatenation. {@code ErrorHandler} returns it as both {@code msgId} and {@code
-   * text}, because no bundle entry can exist for it (RPS-992).
+   * The first argument of an exception's msgId that cannot have a bundle entry (RPS-992, RPS-1127):
+   * a string literal that is not a bare identifier, or that is continued by a concatenation ({@code
+   * +}) or by {@code .formatted(}, or a {@code String.format(} / {@code MessageFormat.format(}
+   * call. {@code ErrorHandler} returns such a msgId as both {@code msgId} and {@code text}.
    */
   private static final Pattern NON_IDENTIFIER_MSG_ID =
-      Pattern.compile(MSG_ID_EXCEPTION + "\"(?<text>[^\"\\\\]*)\"\\s*(?<next>[,)+])");
+      Pattern.compile(
+          MSG_ID_EXCEPTION
+              + "(?:\"(?<text>(?:[^\"\\\\]|\\\\.)*)\"\\s*(?<next>[,)+]|\\.\\s*formatted\\s*\\()"
+              + "|(?<call>(?:String|MessageFormat)\\s*\\.\\s*format\\s*\\())");
 
   /**
    * The {@code ERR_*} constant an {@code ErrorHandler} handler falls back to, as in {@code
@@ -202,6 +207,90 @@ class MessageKeysTest {
   }
 
   @Test
+  @DisplayName("the msgId scan flags free text, concatenation, .formatted( and String.format(")
+  void nonIdentifierScanFlagsFreeTextMsgIds() {
+    assertThat(
+            findNonIdentifierMsgIds(
+                """
+                throw new BadRequestException("Invalid path");
+                throw new ItemNotFoundException("no key with Id %s".formatted(id));
+                throw new ItemAlreadyExistException("chartAlreadyExists: " + name);
+                throw new ItemAlreadyExistException("chartAlreadyExists"
+                    + ":" + name);
+                throw new AccessNotAllowedException("quote \\" inside", cause);
+                throw new MfaException("mfa %s" .formatted(user));
+                throw new UnAuthorizedException(
+                    "chartAlreadyExists"
+                        .formatted(name));
+                """))
+        .containsExactly(
+            "Invalid path",
+            "no key with Id %s",
+            "chartAlreadyExists: ",
+            "chartAlreadyExists",
+            "quote \\\" inside",
+            "mfa %s",
+            "chartAlreadyExists");
+  }
+
+  @Test
+  @DisplayName("the msgId scan flags a formatting call as the msgId, on one line or several")
+  void nonIdentifierScanFlagsFormattingCalls() {
+    assertThat(
+            findNonIdentifierMsgIds(
+                """
+                throw new BadRequestException(String.format("Invalid %s", type));
+                throw new BadRequestException(
+                    String.format("Invalid %s path format: %s", type, path));
+                throw new SubscriptionLimitReachedException(MessageFormat.format("x {0}", a));
+                throw new DataExportRequestException(String
+                    .format("x %s", a));
+                """))
+        .containsExactly(
+            "String.format(", "String.format(", "MessageFormat.format(", "String.format(");
+  }
+
+  @Test
+  @DisplayName("the msgId scan covers every msgId-carrying exception")
+  void nonIdentifierScanCoversEveryExceptionType() {
+    final var source =
+        Stream.of(
+                "ItemNotFound",
+                "BadRequest",
+                "ItemAlreadyExist",
+                "AccessNotAllowed",
+                "UnAuthorized",
+                "ErrorOccurred",
+                "SignatureNotVerified",
+                "Mfa",
+                "DataExportRequest",
+                "SubscriptionLimitReached")
+            .map(type -> "throw new " + type + "Exception(\"free text\");")
+            .collect(Collectors.joining("\n"));
+
+    assertThat(findNonIdentifierMsgIds(source)).hasSize(10);
+  }
+
+  @Test
+  @DisplayName("the msgId scan leaves fixed identifiers, constants and other arguments alone")
+  void nonIdentifierScanIgnoresFixedIdentifiers() {
+    assertThat(
+            findNonIdentifierMsgIds(
+                """
+                throw new BadRequestException("chartNameMissing");
+                throw new ItemNotFoundException(ERR_NOT_FOUND);
+                throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+                throw new UnAuthorizedException("unAuthorized", Map.of("k", "v"));
+                throw new ItemAlreadyExistException("crateVersionAlreadyExists");
+                throw new ErrorOccurredException(e);
+                throw new IllegalArgumentException("free text is fine here " + name);
+                log.warn("no key with Id {}".formatted(id));
+                throw new BadRequestException(errorKey);
+                """))
+        .isEmpty();
+  }
+
+  @Test
   @DisplayName("every message bundle key is used or deliberately reserved")
   void bundleKeysAreUsed() {
     final var unused = new TreeSet<>(messages.stringPropertyNames());
@@ -294,15 +383,37 @@ class MessageKeysTest {
   }
 
   private static void collectNonIdentifiers(final String source, final String file) {
+    findNonIdentifierMsgIds(source)
+        .forEach(
+            text -> nonIdentifierMsgIds.computeIfAbsent(text, key -> new TreeSet<>()).add(file));
+  }
+
+  /**
+   * The msgId arguments in {@code source} that are free text, or continued by a concatenation,
+   * {@code .formatted(} or {@code String.format(}, as the text of each (RPS-992, RPS-1127).
+   */
+  static List<String> findNonIdentifierMsgIds(final String source) {
+    final var found = new ArrayList<String>();
     final Matcher matcher = NON_IDENTIFIER_MSG_ID.matcher(source);
 
     while (matcher.find()) {
-      final var text = matcher.group("text");
+      final var call = matcher.group("call");
 
-      if ("+".equals(matcher.group("next")) || !text.matches("\\w+")) {
-        nonIdentifierMsgIds.computeIfAbsent(text, key -> new TreeSet<>()).add(file);
+      if (call != null) {
+        found.add(call.replaceAll("\\s", ""));
+        continue;
+      }
+
+      final var text = matcher.group("text");
+      final var next = matcher.group("next");
+      final var continued = !",".equals(next) && !")".equals(next);
+
+      if (continued || !text.matches("\\w+")) {
+        found.add(text);
       }
     }
+
+    return found;
   }
 
   /** {@code Matcher.group(name)} throws when the pattern has no group of that name. */

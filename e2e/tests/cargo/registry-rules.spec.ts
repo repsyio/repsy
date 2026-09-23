@@ -21,8 +21,8 @@
  * first and then confirmed against a running instance (see `README.md`'s "Scenario outcomes pinned
  * against a running instance" for the raw evidence):
  *
- *  - A duplicate-version publish is refused unconditionally (400, `{"errors":[{"detail":"crate
- *    \`<name>@<vers>\` already exists in this registry"}]}`) -- `allowOverride` is never read by the
+ *  - A duplicate-version publish is refused unconditionally (400, `{"errors":[{"detail":"this crate
+ *    version already exists in this registry"}]}`) -- `allowOverride` is never read by the
  *    protocol at all. Confirmed live (RPS-1124): the refused attempt has ALREADY
  *    overwritten the stored `.crate` bytes with its own (rejected) content before the duplicate check
  *    runs (`AbstractCargoProtocolFacade.publish` writes to storage, then `CargoCrateServiceImpl

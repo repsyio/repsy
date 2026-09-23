@@ -22,9 +22,11 @@ import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.regex.Pattern;
 import lombok.Builder;
 import lombok.experimental.UtilityClass;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+@Slf4j
 @UtilityClass
 public class PathParserUtils {
 
@@ -113,8 +115,10 @@ public class PathParserUtils {
     final var matcher = config.pattern().matcher(cleanedPath);
 
     if (!matcher.matches()) {
-      throw new BadRequestException(
-          String.format("Invalid %s path format: %s", config.pathType(), cleanedPath));
+      // The request path is for the log, the client gets a fixed msgId (RPS-1127).
+      log.debug(
+          "Invalid {} path format: {}", config.pathType(), cleanedPath.replaceAll("[\\r\\n]", "_"));
+      throw new BadRequestException("dockerPathInvalid");
     }
 
     final var parsedValue = fileName != null ? fileName : matcher.group(config.groupName());

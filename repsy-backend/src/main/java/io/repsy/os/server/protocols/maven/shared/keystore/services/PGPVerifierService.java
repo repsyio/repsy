@@ -109,10 +109,13 @@ public class PGPVerifierService {
       final var matchedKey =
           this.getPublicKey(signature.getKeyID(), sources)
               .orElseThrow(
-                  () ->
-                      new ItemNotFoundException(
-                          "no public key found with Id %s"
-                              .formatted(String.format(KEY_ID_FORMAT, signature.getKeyID()))));
+                  () -> {
+                    // The key id is for the log, the client gets a fixed msgId (RPS-1127).
+                    log.warn(
+                        "no public key found with Id {}",
+                        String.format(KEY_ID_FORMAT, signature.getKeyID()));
+                    return new ItemNotFoundException("artifactSigningKeyNotFound");
+                  });
 
       this.checkKeyValidity(matchedKey, signature.getCreationTime());
 

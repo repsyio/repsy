@@ -770,7 +770,7 @@ rolled back with it. Live evidence (`tests/cargo/registry-rules.spec.ts`):
 ```
 seed publish (bytesA)                              -> 200
 download after seed                                 -> 200, equals bytesA
-duplicate publish (bytesB, allowOverride: false)    -> 400 "crate `...` already exists in this registry"
+duplicate publish (bytesB, allowOverride: false)    -> 400 "this crate version already exists in this registry"
 served (DB-backed) sparse index after the duplicate -> unchanged (still bytesA's cksum)
 download after the duplicate                        -> 200, equals bytesB, NOT bytesA
 ```
