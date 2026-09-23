@@ -56,10 +56,11 @@
  *    on a private repo (`AbstractNuGetServiceIndexProtocolMethodHandler` L60-70). `{ resources: [ {
  *    "@id", "@type", comment } ] }` (`NuGetServiceIndexResponse`/`NuGetServiceIndexResource`).
  *    `NuGetServiceIndexResources.build` (L27-46) advertises `PackageBaseAddress/3.0.0` and
- *    `PackagePublish/2.0.0` both at `<base>/v3/package`, `RegistrationsBaseUrl/3.0.0` at
- *    `<base>/v3/registration`, `SearchQueryService/3.0.0` at `<base>/v3/search`,
- *    `SearchAutocompleteService/3.0.0` at `<base>/v3/autocomplete`, and a non-standard
- *    `PackageDelete/2.0.0` at `<base>/v3/package`. `<base>` = `NuGetUrlBuilder.buildBaseUrl` -- built
+ *    `PackagePublish/2.0.0` both at `<base>/v3/package`, `RegistrationsBaseUrl` at
+ *    `<base>/v3/registration`, `SearchQueryService` + `SearchQueryService/3.0.0-beta` at
+ *    `<base>/v3/search`, `SearchAutocompleteService` + `SearchAutocompleteService/3.0.0-beta` at
+ *    `<base>/v3/autocomplete` (RPS-1213/RPS-1240: the types NuGet.Client resolves; the pre-fix
+ *    `/3.0.0` spellings and a non-standard `PackageDelete/2.0.0` are gone). `<base>` = `NuGetUrlBuilder.buildBaseUrl` -- built
  *    from the CURRENT request's own scheme/host/port, so it always names exactly one `/<repoName>/`
  *    segment on Repsy OS's single-tenant layout.
  *  - Auth (`NuGetAuthPreProcessor`): `extractAuthHeader` reads `Authorization` when present, else

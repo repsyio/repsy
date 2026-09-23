@@ -1,6 +1,12 @@
-<label class="flex items-center gap-2" [class.cursor-pointer]="!disabled" [class.cursor-not-allowed]="disabled">
+<label
+  data-testid="toggle"
+  class="flex items-center gap-2"
+  [class.cursor-pointer]="!disabled"
+  [class.cursor-not-allowed]="disabled"
+>
   <span class="group relative inline-block h-[24px] w-[48px]">
     <input
+      data-testid="toggle-input"
       type="checkbox"
       role="switch"
       class="peer sr-only"
@@ -21,7 +27,7 @@
       [class.translate-x-5]="checked"
     ></span>
   </span>
-  <span class="font-['Comfortaa'] leading-6 text-[#9FA0A0]">
+  <span data-testid="toggle-label" class="font-['Comfortaa'] leading-6 text-[#9FA0A0]">
     {{ staticLabel ? staticLabel : checked ? checkedLabel : uncheckedLabel }}
   </span>
 </label>

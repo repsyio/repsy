@@ -1025,18 +1025,18 @@ predicted**; none required a workaround or a routing-around hook.
   `SearchQueryService/3.0.0`, `SearchAutocompleteService/3.0.0` and a non-standard
   `PackageDelete/2.0.0`, none of which NuGet.Client's `ServiceTypes.cs` recognised, while
   `PackageBaseAddress/3.0.0`/`PackagePublish/2.0.0` (what push/restore use) were already correct.
-  **RPS-1213 is now fixed**: the service index advertises the bare `RegistrationsBaseUrl`,
-  `SearchQueryService` and `SearchAutocompleteService` (all in `ServiceTypes.cs`'s recognised set)
-  and no longer advertises `PackageDelete/2.0.0` at all (`tests/nuget/registry-rules.spec.ts`'s H6
-  test confirms the corrected shape live). Confirmed live, though: a real `dotnet package search`
-  **still** fails with the exact same "The source does not have a Search service!" message, even
-  though the same test run's own fetch of the live service index (immediately before the `dotnet`
-  invocation) shows the corrected bare `SearchQueryService` being served. So the original `@type`
-  mismatch is fixed and no longer the cause — `dotnet package search` (.NET SDK 10.0.401) has some
-  other, not-yet-understood reason it does not resolve this server's search resource. This is a new,
-  narrower open question, tracked by `tests/nuget/protocol-specific.spec.ts`'s still-pinned
-  `test.fail()` (its comment has the up-to-date evidence) — filed as
-  [RPS-1240](https://zyfera.atlassian.net/browse/RPS-1240).
+  **RPS-1213 fixed the registration type and dropped `PackageDelete/2.0.0`**; its bare
+  `SearchQueryService`/`SearchAutocompleteService` replacement was not enough — **RPS-1240** found
+  (live, .NET SDK 10.0.401 / NuGet.Client 7.9.0) that NuGet.Client's `ServiceTypes.cs` has no bare
+  form for either: `SearchQueryService` is only `/Versioned`, `/3.4.0` or `/3.0.0-beta`,
+  `SearchAutocompleteService` only `/Versioned` or `/3.0.0-beta` (only `RegistrationsBaseUrl` has a
+  bare form; the service-index docs list the bare names, the client does not use them). Served by an
+  otherwise identical index, bare, `/3.5.0` and `/3.0.0-rc` reproduce "The source does not have a
+  Search service!" while `/3.0.0-beta` and `/3.4.0` make the client issue `GET
+v3/search?q=...&semVerLevel=2.0.0`. The service index now advertises the bare types plus
+  `/3.0.0-beta` for both, at the same URLs (the client queries the shared URL once), and
+  `tests/nuget/protocol-specific.spec.ts`'s `dotnet package search` test runs the real client to
+  completion (`tests/nuget/registry-rules.spec.ts`'s H6 test pins the served shape).
 - **H7** (`X-NuGet-ApiKey: <user password>` → `401`, contradicting the panel's Option B text):
   confirmed live, exactly as predicted —
   `X-NuGet-ApiKey: <admin password>` → `401`; `X-NuGet-ApiKey: <deploy token>` → `201`;
@@ -1094,21 +1094,13 @@ credential built by hand, exactly like the Cargo protocol-specific suite above.
   case-insensitively, same H8 fact as the rest of this runner's suite); autocomplete answers
   `{"totalHits":N,"data":["<idLower>",...]}` (`NuGetAutocompleteResponse`), bare id strings. Both
   routes work fine over raw HTTP — see the next point for why a real client still can't reach them.
-- **`dotnet package search` (RPS-1213: fixed the service index, but this command still fails, now
-  for a different, unresolved reason)**: running a real `dotnet package search <id> --source repsy
---configfile <cfg>` against a package this suite had just published and proven searchable over raw
-  HTTP (previous point) does NOT crash and does NOT exit non-zero — exit `0`, stdout reads `error:
-The source does not have a Search service!` and no results are returned. This was originally H6/
-  RPS-1213's own live evidence for the service index advertising an unrecognised `@type`
-  (`SearchQueryService/3.0.0`, not in NuGet.Client's `ServiceTypes.cs`). RPS-1213 has since fixed
-  that — the service index now advertises the bare, recognised `SearchQueryService`, confirmed by
-  fetching the live index from inside this exact test run immediately before invoking `dotnet`, right
-  before the `dotnet` call below. Re-run after the fix, `dotnet package search` still produces the
-  identical "does not have a Search service!" failure, so the `@type` mismatch is no longer the
-  cause. The reason `dotnet package search` (.NET SDK 10.0.401) still won't resolve this server's
-  search resource is not yet understood — kept pinned with `test.fail()`, not removed, with this
-  updated evidence in its comment; filed as
-  [RPS-1240](https://zyfera.atlassian.net/browse/RPS-1240).
+- **`dotnet package search` (RPS-1213 + RPS-1240)**: a real `dotnet package search <id> --source
+repsy --configfile <cfg>` against a package this suite had just published and proven searchable
+  over raw HTTP (previous point) lists it. Before RPS-1240 it did NOT crash and did NOT exit non-zero
+  — exit `0`, `error: The source does not have a Search service!`, no `v3/search` request — because
+  NuGet.Client has no bare-type form for search (see H6 above for the exact vocabulary). The service
+  index now advertises `SearchQueryService/3.0.0-beta` and `SearchAutocompleteService/3.0.0-beta`
+  next to the bare types.
 - **Explicitly older version restores**: publishing version B after version A, then explicitly
   restoring A (`renderConsumerProject`/`nuget.resolve` always pin an exact bracketed
   `Version="[<version>]"`) returns exactly A's bytes, never B's — confirmed live, no "latest wins"
@@ -2540,3 +2532,89 @@ The fresh-DB-per-`up` claim was confirmed directly, not just inferred: after the
 --h2` above, `GET /api/repos/MAVEN/info` returned exactly the one default `maven` repo (fresh
 `createdAt`, `diskUsage: 0`) and `GET /api/users` returned exactly the one `admin` user — no
 leftovers from the runs immediately before it.
+
+## UI test ids (data-testid conventions)
+
+The Playwright UI suite (RPS-1248) selects panel elements by `data-testid`, added to the Angular
+templates by RPS-1249. Why: before it exactly one id existed (`readme`); native ids are duplicated
+(`username` x5, `name` x3, `description` x3); every list renders a desktop grid and a mobile card
+list at once, so text and role locators match twice; and Tailwind classes change with every restyle.
+Selector priority: `getByTestId` first, then `getByRole`/`getByLabel`, never CSS classes.
+
+### Rules
+
+1. Format `<page>-<element>`, kebab-case. Static: `data-testid="x"`. Dynamic:
+   `[attr.data-testid]="'x-' + key"` (never `[data-testid]`, never `data-testid="x-{{ key }}"`; both
+   fail to compile). Never on `<ng-container>`, `<ng-template>` or control-flow blocks.
+2. Row keys are the raw identity (repo name, username, version, `@scope/name`, `group:artifact`,
+   `golang.org/x/mod`): unmodified, so they can contain `@ / : .` and upper case. `getByTestId`
+   matches the exact string.
+3. Desktop list container `<page>-table`, row `<page>-row-<key>`; mobile container `<page>-cards`,
+   card `<page>-card-<key>`. `-row-` and `-card-` differ on purpose, so `getByTestId('repo-row-x')`
+   never hits the hidden mobile duplicate. The row/card id sits on the clickable element.
+4. Elements inside a row or card use short page-independent ids (`row-name`, `row-menu`,
+   `row-delete`, ...). They repeat per row: always scope them,
+   `page.getByTestId('repo-row-x').getByTestId('row-delete')`.
+5. Shared components carry fixed internal ids (table below). To tell two instances apart, the usage
+   site puts a static `data-testid` on the component host (`<app-searchbox data-testid="repo-search">`)
+   and the page object chains `getByTestId('repo-search').getByTestId('search-input')`. Never add an
+   `@Input() testId`.
+6. Validation messages: `<form>-<field>-error-<validator>`, validator names as Angular reports them
+   (`required`, `minlength`, `maxlength`, `pattern`; `mismatch` for confirm-password checks). Key by
+   validator, never by text.
+7. Error branch: `<page>-error` on the wrapper, `<page>-error-message` on the message. Custom empty
+   state: `<page>-empty`; `<app-empty-list>` is the shared `empty-list`.
+8. `data-testid="readme"` (cargo/npm/nuget version detail) predates the scheme and Karma specs assert
+   it: it is the one id without a page prefix and must not change.
+9. An id is never reused with a different meaning on the same page, and never sits on an element that
+   exists in only one of the two list variants with another meaning in the other.
+10. Ids are inert: no class, structure or behaviour change. The only structural additions are the
+    class-less mobile wrapper `<div data-testid="<page>-cards">` around each mobile `@for` and the
+    `<span data-testid="repo-count-value-<type>">` around each dashboard repo count.
+
+### Shared component ids (fixed, scoped by the host id of rule 5)
+
+| Component | Ids |
+| --- | --- |
+| `danger-modal` | `danger-modal`, `-backdrop`, `-title`, `-close`, `-question`, `-message`, `-cancel`, `-confirm` |
+| `pagination` | `pagination`, `pagination-prev`, `pagination-next`, `pagination-page-<n>` (1-based), `pagination-ellipsis` |
+| `breadcrumb` | `breadcrumb`, `breadcrumb-item-<i>` (0-based), `breadcrumb-link`, `breadcrumb-current` |
+| `toast` | `toast-stack`, `toast` (+ `data-toast-type` = `success`/`error`), `toast-message`, `toast-close` |
+| `searchbox` | `searchbox`, `search-input` |
+| `selector` | `selector`, `selector-toggle`, `selector-menu`, `selector-option-<raw value>` |
+| `sort-selector` | `sort-selector`, `sort-selector-toggle`, `sort-selector-menu`, `sort-option-<name>` |
+| `dropdown` | `dropdown`, `dropdown-toggle`, `dropdown-menu` |
+| `toggle` | `toggle`, `toggle-input` (click it, assert `toBeChecked()`), `toggle-label` |
+| `radio-group` | `radio-group`, `radio-option-<value>` |
+| `copy-clipboard` | `copy-button` (+ `data-copied`) |
+| `tooltip` | `tooltip-text`, `tooltip-popup` |
+| others | `empty-list`, `spinner`, `splash-screen`, `markdown`, `avatar`, `avatar-image`, `avatar-fallback`, `severity-badge` (+ `data-severity`), `severity-breakdown`, `rescan-note`, `status-polling-indicator`, `security-details-link`, `security-badge` |
+| shell | `header`, `header-menu`, `sidebar`, `mobile-sidebar`, `panel-content`, `footer`, `login-page` |
+
+Modal families use one prefix each (`repo-create-*`, `user-create-*`, `user-edit-*`,
+`user-reset-password-*`, `token-create-*`, `token-info-*`, `config-modal-*`, `*-security-modal-*`),
+each with `-backdrop`, `-close` and its form fields.
+
+### Protocol pages
+
+The protocol prefix is neutral: one descriptor-driven page object serves all nine formats.
+
+| Prefix | Meaning | Where |
+| --- | --- | --- |
+| `pkg-list` | first level at `/:repo` | maven group list, npm/docker/pypi/cargo/helm/nuget/ruby/go lists |
+| `pkg-sublist` | grouping level | maven `/:repo/:group`, npm `/:repo/:scope` |
+| `pkg-versions` | versions of one item | all version lists, docker tag list |
+| `pkg-manifests` | docker only | `/:repo/:image/:tag` |
+| `pkg-detail` | one version | all version details, docker tag detail |
+
+Every list has `pkg-toolbar`, `pkg-search`, `pkg-sort`, `pkg-refresh`, `pkg-configure`,
+`pkg-settings`, `<L>-table`/`<L>-row-<key>`, `<L>-cards`/`<L>-card-<key>` and `pkg-error`. Every
+detail page has exactly ONE primary install snippet, `pkg-detail-install` (text in
+`pkg-detail-install-text`); every other code block is `pkg-detail-snippet-<slug>`.
+
+### Adding a page
+
+Pick a `<page>` prefix, tag every control, row and state (rows on the clickable element, validation
+errors per validator, error and empty branches), and update this section in the same PR. The live
+inventory is `grep -rn 'data-testid' repsy-frontend/src/app`; the per-page table is deliberately not
+duplicated here.

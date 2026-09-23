@@ -26,6 +26,7 @@ import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import io.repsy.protocols.maven.shared.utils.MavenUploadLimits;
+import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -35,6 +36,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Model;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
@@ -43,6 +45,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 
+@Slf4j
 @RequiredArgsConstructor
 @NullMarked
 public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFacade<ID> {
@@ -80,6 +83,11 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * and unverified, judged like a metadata checksum (RPS-1185). A POM, its signature and its
    * checksum are told by the file name, never by the directory (RPS-1196).
    *
+   * <p>What is left to fail after the store is the registration itself (a repo or a signed version
+   * deleted meanwhile, a database error). The usage is set on the context whether it succeeds or
+   * not, and a POM or POM signature that was new is taken back out of the repo first when it fails
+   * (RPS-1199, see {@code register}).
+   *
    * <p>A metadata-family file and a POM signature are read fully into memory, and a POM is spooled
    * to a temporary file, before anything about them is parsed or stored; each is capped by {@link
    * MavenUploadLimits} and refused with a 400 naming the limit, before anything is read, when the
@@ -115,11 +123,11 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       this.artifactService.verifySignature(repoInfo, storagePath, new ByteArrayResource(content));
     }
 
+    final var isNewRegisteredFile = this.isNewRegisteredFile(repoInfo.getName(), storagePath);
+
     final var afterUploadUsage = this.store(repoInfo.getName(), storagePath, inputStream, content);
 
-    final var resource = this.mavenStorageService.getResource(repoInfo.getName(), storagePath);
-
-    this.artifactService.createOrUpdateArtifact(repoInfo, storagePath, resource);
+    this.register(context, repoInfo, storagePath, afterUploadUsage, isNewRegisteredFile);
 
     final var gav = ArtifactUtils.getGavByFile(storagePath);
 
@@ -127,8 +135,79 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       context.addProperty(ARTIFACT_NAME, gav.getGroupId() + ":" + gav.getArtifactId());
       context.addProperty(ARTIFACT_VERSION, resolveLogicalVersion(gav));
     }
+  }
 
-    context.addProperty(USAGES, afterUploadUsage);
+  /**
+   * A POM, or the signature of one, is the only file whose registration ({@code
+   * createOrUpdateArtifact}) can still fail once it is stored, and the only one that is worth
+   * taking back: it is told here, before the store, whether the file is a new one. A file that is
+   * already there is a redeploy, and storing over it cannot be undone.
+   */
+  private boolean isNewRegisteredFile(final String repoName, final StoragePath storagePath) {
+
+    return (ArtifactUtils.isPomToParse(storagePath) || ArtifactUtils.isPomSignature(storagePath))
+        && !this.mavenStorageService.exists(storagePath, repoName);
+  }
+
+  /**
+   * Registers a stored file and reports its usage, so what the repo holds and what it is charged
+   * for cannot disagree (RPS-1199). Everything that can be told from the path, the POM and the
+   * metadata is refused before the store, so this can only fail on the request's own data source:
+   * the repo deleted meanwhile, the signed version deleted meanwhile, or a database error.
+   *
+   * <p>When it does, a file that was new is taken back out of the repo and not charged, so the
+   * client that is answered with an error has stored nothing and can send it again, even where
+   * {@code allowOverride} is off and a stored file cannot be replaced. A redeploy is left as it was
+   * written (the previous content is gone once it is overwritten) and is charged, or the counter
+   * would miss the bytes the repo holds. The usage post-processor also runs for a failed request,
+   * so what is set on the context before the exception is rethrown is still settled.
+   */
+  private void register(
+      final ProtocolContext context,
+      final BaseRepoInfo<ID> repoInfo,
+      final StoragePath storagePath,
+      final BaseUsages usage,
+      final boolean isNewRegisteredFile) {
+
+    try {
+      final var resource = this.mavenStorageService.getResource(repoInfo.getName(), storagePath);
+
+      this.artifactService.createOrUpdateArtifact(repoInfo, storagePath, resource);
+    } catch (final RuntimeException e) {
+      if (!isNewRegisteredFile || !this.takeBack(repoInfo.getName(), storagePath, e)) {
+        context.addProperty(USAGES, usage);
+      }
+
+      throw e;
+    }
+
+    context.addProperty(USAGES, usage);
+  }
+
+  /** Removes a file this request has just stored, answering whether it is gone. */
+  private boolean takeBack(
+      final String repoName, final StoragePath storagePath, final RuntimeException cause) {
+
+    try {
+      this.mavenStorageService.deleteFile(storagePath);
+
+      log.warn(
+          "Registering {} in repo {} failed, so the file it stored was taken back: {}",
+          storagePath.getRelativePath().getPath(),
+          repoName,
+          cause.toString());
+
+      return true;
+    } catch (final RuntimeException e) {
+      log.error(
+          "Registering {} in repo {} failed and the file it stored could not be taken back, it is"
+              + " charged as stored",
+          storagePath.getRelativePath().getPath(),
+          repoName,
+          e);
+
+      return false;
+    }
   }
 
   /** Stores what the client sent, from the buffer if the facade already had to read it whole. */

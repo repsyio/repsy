@@ -1,4 +1,7 @@
-<main class="grid h-full w-full grid-cols-1 gap-10 p-4 sm:p-6 md:p-8 lg:grid-cols-2 lg:gap-0 lg:p-[50px]">
+<main
+  data-testid="login-page"
+  class="grid h-full w-full grid-cols-1 gap-10 p-4 sm:p-6 md:p-8 lg:grid-cols-2 lg:gap-0 lg:p-[50px]"
+>
   <!-- Left Side -->
   <div class="flex items-center justify-center xl:me-[156px] xl:justify-end" animate.enter="fade-in-left">
     <div class="flex w-full max-w-[400px] flex-col items-center justify-center">
@@ -10,11 +13,12 @@
       <h2 class="text-h2 text-secondary-500 mt-8 mb-2">Welcome back!</h2>
       <h3 class="text-body1 text-neutral-200">Sign in to your account</h3>
       <!-- Form -->
-      <form [formGroup]="form" class="mt-[72px] w-full" (submit)="form.valid && login()">
+      <form data-testid="login-form" [formGroup]="form" class="mt-[72px] w-full" (submit)="form.valid && login()">
         <!-- Username or Email -->
         <div>
           <label class="text-body1 mb-2 inline-block text-neutral-200" for="username">Username</label>
           <input
+            data-testid="login-username"
             type="text"
             id="username"
             name="username"
@@ -25,13 +29,19 @@
 
           <div class="text-body2 text-error min-h-7 pt-1">
             @if (form.get('username').errors?.['required'] && form.get('username').touched) {
-              <p animate.enter="fade-in-up">• Should not be empty</p>
+              <p data-testid="login-username-error-required" animate.enter="fade-in-up">• Should not be empty</p>
             } @else if (form.get('username').errors?.['pattern'] && form.get('username').touched) {
-              <p animate.enter="fade-in-up">• Should not contain invalid characters</p>
+              <p data-testid="login-username-error-pattern" animate.enter="fade-in-up">
+                • Should not contain invalid characters
+              </p>
             } @else if (form.get('username').errors?.['minlength'] && form.get('username').touched) {
-              <p animate.enter="fade-in-up">• Should be minimum 3 characters</p>
+              <p data-testid="login-username-error-minlength" animate.enter="fade-in-up">
+                • Should be minimum 3 characters
+              </p>
             } @else if (form.get('username').errors?.['maxlength'] && form.get('username').touched) {
-              <p animate.enter="fade-in-up">• Should be maximum 150 characters</p>
+              <p data-testid="login-username-error-maxlength" animate.enter="fade-in-up">
+                • Should be maximum 150 characters
+              </p>
             }
           </div>
         </div>
@@ -41,6 +51,7 @@
           <label class="text-body1 mb-2 inline-block text-neutral-200" for="password">Password</label>
           <div class="relative flex items-center">
             <input
+              data-testid="login-password"
               [type]="inputType"
               id="password"
               name="password"
@@ -49,6 +60,7 @@
               class="input-text-brand w-full"
             />
             <button
+              data-testid="login-password-toggle"
               type="button"
               class="absolute right-[15px] flex items-center justify-center text-neutral-400 hover:text-neutral-200"
               (click)="toggleVisibility()"
@@ -65,19 +77,32 @@
           </div>
           <div class="text-body2 text-error min-h-7 pt-1">
             @if (form.get('password').errors?.['required'] && form.get('password').touched) {
-              <p animate.enter="fade-in-up">• Should not be empty</p>
+              <p data-testid="login-password-error-required" animate.enter="fade-in-up">• Should not be empty</p>
             } @else if (form.get('password').errors?.['pattern'] && form.get('password').touched) {
-              <p animate.enter="fade-in-up">• Should be at least 1 lowercase, uppercase letter and 1 digit</p>
+              <p data-testid="login-password-error-pattern" animate.enter="fade-in-up">
+                • Should be at least 1 lowercase, uppercase letter and 1 digit
+              </p>
             } @else if (form.get('password').errors?.['minlength'] && form.get('password').touched) {
-              <p animate.enter="fade-in-up">• Should be minimum 6 characters</p>
+              <p data-testid="login-password-error-minlength" animate.enter="fade-in-up">
+                • Should be minimum 6 characters
+              </p>
             } @else if (form.get('password').errors?.['maxlength'] && form.get('password').touched) {
-              <p animate.enter="fade-in-up">• Should be maximum 50 characters</p>
+              <p data-testid="login-password-error-maxlength" animate.enter="fade-in-up">
+                • Should be maximum 50 characters
+              </p>
             }
           </div>
         </div>
 
         <!-- Sign In Button -->
-        <button type="submit" [disabled]="form.invalid || loading" class="repsy-btn-base mb-4 w-full">Sign In</button>
+        <button
+          data-testid="login-submit"
+          type="submit"
+          [disabled]="form.invalid || loading"
+          class="repsy-btn-base mb-4 w-full"
+        >
+          Sign In
+        </button>
       </form>
     </div>
   </div>

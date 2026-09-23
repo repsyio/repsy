@@ -28,6 +28,7 @@ import freemarker.template.Configuration;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
+import io.repsy.libs.storage.core.exceptions.IsADirectoryException;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.List;
@@ -152,5 +153,33 @@ class AbstractMavenStorageServiceTest {
     verify(this.storageStrategy).delete(argThat(pathEndingWith(METADATA_FILENAME + ".asc.sha1")));
     verify(this.storageStrategy, never())
         .delete(argThat(pathEndingWith(METADATA_FILENAME + ".asc.md5")));
+  }
+
+  @Test
+  @DisplayName("exists tells a stored file, a missing one and a directory (RPS-1199)")
+  void existsTellsStoredMissingAndDirectory() {
+    final var pom = StoragePath.of(REPO_ID, "com/example/demo/1.0/demo-1.0.pom");
+    final var missing = StoragePath.of(REPO_ID, "com/example/demo/2.0/demo-2.0.pom");
+    final var directory = StoragePath.of(REPO_ID, "com/example/demo/3.0/demo-3.0.pom");
+    when(this.storageStrategy.get(pom, REPO_NAME))
+        .thenReturn(Optional.of(new ByteArrayResource("<project/>".getBytes(UTF_8))));
+    when(this.storageStrategy.get(missing, REPO_NAME)).thenReturn(Optional.empty());
+    when(this.storageStrategy.get(directory, REPO_NAME)).thenThrow(new IsADirectoryException());
+
+    assertThat(this.storageService.exists(pom, REPO_NAME)).isTrue();
+    assertThat(this.storageService.exists(missing, REPO_NAME)).isFalse();
+    assertThat(this.storageService.exists(directory, REPO_NAME)).isTrue();
+  }
+
+  @Test
+  @DisplayName("deleteFile soft-deletes only the one file (RPS-1199)")
+  void deleteFileSoftDeletesOnlyTheFile() {
+    final var pom = StoragePath.of(REPO_ID, "com/example/demo/1.0/demo-1.0.pom");
+
+    this.storageService.deleteFile(pom);
+
+    verify(this.storageStrategy).delete(pom);
+    verify(this.storageStrategy, never()).calculatePathUsage(any());
+    verify(this.storageStrategy, never()).listDirectoryContents(any());
   }
 }

@@ -1,5 +1,5 @@
 @if (visible && (isSupported$ | async)) {
-  <button type="button" (click)="openModal($event)" class="cursor-pointer">
+  <button data-testid="security-badge" type="button" (click)="openModal($event)" class="cursor-pointer">
     <app-severity-badge
       [severity]="severity"
       [scanned]="scanned"

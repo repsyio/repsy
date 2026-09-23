@@ -1,5 +1,6 @@
-<div class="relative flex">
+<div data-testid="dropdown" class="relative flex">
   <button
+    data-testid="dropdown-toggle"
     type="button"
     class="px-[20px] text-[#9FA0A0] hover:text-[#FDFDFD]"
     aria-haspopup="menu"
@@ -28,6 +29,7 @@
 
   @if (isOpen) {
     <div
+      data-testid="dropdown-menu"
       animate.enter="fade-in-down"
       role="menu"
       tabindex="-1"

@@ -171,6 +171,22 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
   }
 
   @Override
+  public boolean exists(final StoragePath storagePath, final String repoName) {
+
+    try {
+      return this.storageStrategy.get(storagePath, repoName).isPresent();
+    } catch (final IsADirectoryException _) {
+      return true;
+    }
+  }
+
+  @Override
+  public void deleteFile(final StoragePath storagePath) {
+
+    this.storageStrategy.delete(storagePath);
+  }
+
+  @Override
   public long deleteArtifact(final UUID repoUuid, final String groupId, final String artifactId) {
 
     final var artifactPath = this.getPath(groupId, artifactId);

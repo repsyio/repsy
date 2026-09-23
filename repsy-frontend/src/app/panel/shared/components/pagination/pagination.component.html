@@ -1,5 +1,6 @@
-<div class="flex items-center justify-end gap-1 py-2" [ngClass]="{ hidden: totalPages <= 1 }">
+<div data-testid="pagination" class="flex items-center justify-end gap-1 py-2" [ngClass]="{ hidden: totalPages <= 1 }">
   <button
+    data-testid="pagination-prev"
     (click)="previousPage()"
     class="text-secondary-500 flex h-8 w-7 items-center justify-center rounded-[8px] bg-neutral-400 p-[6px] text-sm font-medium hover:bg-neutral-300 disabled:opacity-50"
     [disabled]="pageNum === 0"
@@ -10,6 +11,7 @@
     @for (page of pages; track page) {
       @if (isNumber(page)) {
         <button
+          [attr.data-testid]="'pagination-page-' + (page + 1)"
           (click)="goToPage(page)"
           [disabled]="page === pageNum"
           [ngClass]="{
@@ -21,6 +23,7 @@
         </button>
       } @else {
         <span
+          data-testid="pagination-ellipsis"
           class="text-secondary-500 flex h-8 min-w-8 items-center justify-center rounded-[8px] bg-neutral-400 p-[6px] text-sm font-medium select-none"
         >
           …
@@ -29,6 +32,7 @@
     }
   </div>
   <button
+    data-testid="pagination-next"
     (click)="nextPage()"
     class="text-secondary-500 flex h-8 w-7 items-center justify-center rounded-[8px] bg-neutral-400 p-[6px] text-sm font-medium hover:bg-neutral-300 disabled:opacity-50"
     [disabled]="pageNum + 1 >= totalPages"

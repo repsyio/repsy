@@ -1,6 +1,7 @@
 <!-- Modal Backdrop -->
 @if (open) {
   <button
+    data-testid="version-security-modal-backdrop"
     animate.enter="fade-in-up"
     class="bg-opacity-50 fixed inset-0 z-3 backdrop-blur-sm"
     (click)="$event.stopPropagation(); closeModal()"
@@ -10,6 +11,7 @@
 
   <!-- Modal Content -->
   <div
+    data-testid="version-security-modal"
     class="fixed top-1/2 left-1/2 z-4 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-[#404141] bg-[#101112] p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px]"
   >
     <div class="flex flex-col flex-col-reverse items-center justify-between sm:flex-row">
@@ -17,7 +19,12 @@
         {{ artifactName }}<span class="text-neutral-400">&#64;</span>{{ artifactVersion }}
         <span class="text-[#9C9C9D]">— Security</span>
       </h1>
-      <button type="button" (click)="closeModal()" class="hover:text-secondary-500 text-neutral-200">
+      <button
+        data-testid="version-security-modal-close"
+        type="button"
+        (click)="closeModal()"
+        class="hover:text-secondary-500 text-neutral-200"
+      >
         <svg
           width="15"
           height="15"
@@ -48,6 +55,7 @@
 
       @if (isDetailClickable) {
         <button
+          data-testid="version-security-modal-view-details"
           type="button"
           (click)="openDetail($event)"
           class="text-brand-500 text-[13px] font-medium hover:underline"

@@ -1,5 +1,6 @@
-<div class="relative">
+<div data-testid="selector" class="relative">
   <button
+    data-testid="selector-toggle"
     (click)="toggleDropdown($event)"
     type="button"
     [ngClass]="size === 'small' ? 'h-[40px]' : 'h-[50px]'"
@@ -26,6 +27,7 @@
   </button>
   @if (isOpen) {
     <div
+      data-testid="selector-menu"
       [appOutSideClick]="isOpen"
       (outSideClick)="isOpen = false"
       [ngClass]="size === 'small' ? 'top-[44px]' : 'top-[54px]'"
@@ -34,6 +36,7 @@
     >
       @for (option of options; track option; let i = $index) {
         <button
+          [attr.data-testid]="'selector-option-' + option"
           type="button"
           [ngClass]="{ 'rounded-t-lg': i === 0, 'rounded-b-lg': i === options.length - 1 }"
           class="flex w-full items-center rounded-t-lg px-4 py-2 text-[14px] text-white hover:bg-[#2D2C2C]"
