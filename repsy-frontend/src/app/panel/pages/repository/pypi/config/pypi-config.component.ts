@@ -64,7 +64,7 @@ Add repository configuration;
 index-servers = repsy-default
 
 [repsy-default]
-repository=${this.baseUrl}/${this.repoName}/simple
+repository=${this.baseUrl}/${this.repoName}
 username=${this.username}
 \`\`\`
 

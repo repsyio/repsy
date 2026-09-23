@@ -67,6 +67,17 @@
         </a>
       </div>
 
+      @if (versionInfo.description?.trim()) {
+        <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Description</h2>
+        <div class="mb-8 overflow-x-auto rounded-lg border border-[#2A2A2A] bg-[#0C0C0C] p-4" data-testid="readme">
+          @if (versionInfo.descriptionContentType === 'text/markdown') {
+            <app-markdown [markdown]="versionInfo.description" />
+          } @else {
+            <pre class="text-[13px] whitespace-pre-wrap text-[#9C9C9D]">{{ versionInfo.description }}</pre>
+          }
+        </div>
+      }
+
       @if (versionInfo.classifiers.length !== 0) {
         <div class="mb-2 flex flex-col gap-2">
           <h2 class="mb-2 text-[16px] text-[#9FA0A0]">Classifiers</h2>
