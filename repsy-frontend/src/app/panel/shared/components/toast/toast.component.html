@@ -1,6 +1,8 @@
-<div class="z-200 container w-full max-w-[500px] px-4 sm:px-0">
+<div data-testid="toast-stack" class="z-200 container w-full max-w-[500px] px-4 sm:px-0">
   @for (toast of toastService.toasts; track toast.id) {
     <div
+      data-testid="toast"
+      [attr.data-toast-type]="toast.type"
       animate.enter="toast-in"
       class="custom-toast flex w-full items-start justify-between gap-2 rounded-lg border"
       [class.success]="toast.type === 'success'"
@@ -22,9 +24,13 @@
         }
       </div>
 
-      <span class="break-all">{{ toast.message }}</span>
+      <span data-testid="toast-message" class="break-all">{{ toast.message }}</span>
 
-      <button (click)="removeToast(toast.id)" class="group ml-auto flex h-[24px] w-[24px] items-center">
+      <button
+        data-testid="toast-close"
+        (click)="removeToast(toast.id)"
+        class="group ml-auto flex h-[24px] w-[24px] items-center"
+      >
         <svg
           width="15"
           height="15"

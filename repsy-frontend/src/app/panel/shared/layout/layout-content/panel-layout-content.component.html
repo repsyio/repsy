@@ -5,7 +5,7 @@
 >
   <app-sidebar [isMobileMenuOpen]="isMobileMenuOpen" (closeModal)="closeMobileMenu()" />
 
-  <div class="mx-auto h-full min-h-[775px] w-full max-w-[1025px] overflow-hidden">
+  <div data-testid="panel-content" class="mx-auto h-full min-h-[775px] w-full max-w-[1025px] overflow-hidden">
     <ng-content></ng-content>
   </div>
 </main>

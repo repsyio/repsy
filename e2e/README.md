@@ -2540,3 +2540,89 @@ The fresh-DB-per-`up` claim was confirmed directly, not just inferred: after the
 --h2` above, `GET /api/repos/MAVEN/info` returned exactly the one default `maven` repo (fresh
 `createdAt`, `diskUsage: 0`) and `GET /api/users` returned exactly the one `admin` user — no
 leftovers from the runs immediately before it.
+
+## UI test ids (data-testid conventions)
+
+The Playwright UI suite (RPS-1248) selects panel elements by `data-testid`, added to the Angular
+templates by RPS-1249. Why: before it exactly one id existed (`readme`); native ids are duplicated
+(`username` x5, `name` x3, `description` x3); every list renders a desktop grid and a mobile card
+list at once, so text and role locators match twice; and Tailwind classes change with every restyle.
+Selector priority: `getByTestId` first, then `getByRole`/`getByLabel`, never CSS classes.
+
+### Rules
+
+1. Format `<page>-<element>`, kebab-case. Static: `data-testid="x"`. Dynamic:
+   `[attr.data-testid]="'x-' + key"` (never `[data-testid]`, never `data-testid="x-{{ key }}"`; both
+   fail to compile). Never on `<ng-container>`, `<ng-template>` or control-flow blocks.
+2. Row keys are the raw identity (repo name, username, version, `@scope/name`, `group:artifact`,
+   `golang.org/x/mod`): unmodified, so they can contain `@ / : .` and upper case. `getByTestId`
+   matches the exact string.
+3. Desktop list container `<page>-table`, row `<page>-row-<key>`; mobile container `<page>-cards`,
+   card `<page>-card-<key>`. `-row-` and `-card-` differ on purpose, so `getByTestId('repo-row-x')`
+   never hits the hidden mobile duplicate. The row/card id sits on the clickable element.
+4. Elements inside a row or card use short page-independent ids (`row-name`, `row-menu`,
+   `row-delete`, ...). They repeat per row: always scope them,
+   `page.getByTestId('repo-row-x').getByTestId('row-delete')`.
+5. Shared components carry fixed internal ids (table below). To tell two instances apart, the usage
+   site puts a static `data-testid` on the component host (`<app-searchbox data-testid="repo-search">`)
+   and the page object chains `getByTestId('repo-search').getByTestId('search-input')`. Never add an
+   `@Input() testId`.
+6. Validation messages: `<form>-<field>-error-<validator>`, validator names as Angular reports them
+   (`required`, `minlength`, `maxlength`, `pattern`; `mismatch` for confirm-password checks). Key by
+   validator, never by text.
+7. Error branch: `<page>-error` on the wrapper, `<page>-error-message` on the message. Custom empty
+   state: `<page>-empty`; `<app-empty-list>` is the shared `empty-list`.
+8. `data-testid="readme"` (cargo/npm/nuget version detail) predates the scheme and Karma specs assert
+   it: it is the one id without a page prefix and must not change.
+9. An id is never reused with a different meaning on the same page, and never sits on an element that
+   exists in only one of the two list variants with another meaning in the other.
+10. Ids are inert: no class, structure or behaviour change. The only structural additions are the
+    class-less mobile wrapper `<div data-testid="<page>-cards">` around each mobile `@for` and the
+    `<span data-testid="repo-count-value-<type>">` around each dashboard repo count.
+
+### Shared component ids (fixed, scoped by the host id of rule 5)
+
+| Component | Ids |
+| --- | --- |
+| `danger-modal` | `danger-modal`, `-backdrop`, `-title`, `-close`, `-question`, `-message`, `-cancel`, `-confirm` |
+| `pagination` | `pagination`, `pagination-prev`, `pagination-next`, `pagination-page-<n>` (1-based), `pagination-ellipsis` |
+| `breadcrumb` | `breadcrumb`, `breadcrumb-item-<i>` (0-based), `breadcrumb-link`, `breadcrumb-current` |
+| `toast` | `toast-stack`, `toast` (+ `data-toast-type` = `success`/`error`), `toast-message`, `toast-close` |
+| `searchbox` | `searchbox`, `search-input` |
+| `selector` | `selector`, `selector-toggle`, `selector-menu`, `selector-option-<raw value>` |
+| `sort-selector` | `sort-selector`, `sort-selector-toggle`, `sort-selector-menu`, `sort-option-<name>` |
+| `dropdown` | `dropdown`, `dropdown-toggle`, `dropdown-menu` |
+| `toggle` | `toggle`, `toggle-input` (click it, assert `toBeChecked()`), `toggle-label` |
+| `radio-group` | `radio-group`, `radio-option-<value>` |
+| `copy-clipboard` | `copy-button` (+ `data-copied`) |
+| `tooltip` | `tooltip-text`, `tooltip-popup` |
+| others | `empty-list`, `spinner`, `splash-screen`, `markdown`, `avatar`, `avatar-image`, `avatar-fallback`, `severity-badge` (+ `data-severity`), `severity-breakdown`, `rescan-note`, `status-polling-indicator`, `security-details-link`, `security-badge` |
+| shell | `header`, `header-menu`, `sidebar`, `mobile-sidebar`, `panel-content`, `footer`, `login-page` |
+
+Modal families use one prefix each (`repo-create-*`, `user-create-*`, `user-edit-*`,
+`user-reset-password-*`, `token-create-*`, `token-info-*`, `config-modal-*`, `*-security-modal-*`),
+each with `-backdrop`, `-close` and its form fields.
+
+### Protocol pages
+
+The protocol prefix is neutral: one descriptor-driven page object serves all nine formats.
+
+| Prefix | Meaning | Where |
+| --- | --- | --- |
+| `pkg-list` | first level at `/:repo` | maven group list, npm/docker/pypi/cargo/helm/nuget/ruby/go lists |
+| `pkg-sublist` | grouping level | maven `/:repo/:group`, npm `/:repo/:scope` |
+| `pkg-versions` | versions of one item | all version lists, docker tag list |
+| `pkg-manifests` | docker only | `/:repo/:image/:tag` |
+| `pkg-detail` | one version | all version details, docker tag detail |
+
+Every list has `pkg-toolbar`, `pkg-search`, `pkg-sort`, `pkg-refresh`, `pkg-configure`,
+`pkg-settings`, `<L>-table`/`<L>-row-<key>`, `<L>-cards`/`<L>-card-<key>` and `pkg-error`. Every
+detail page has exactly ONE primary install snippet, `pkg-detail-install` (text in
+`pkg-detail-install-text`); every other code block is `pkg-detail-snippet-<slug>`.
+
+### Adding a page
+
+Pick a `<page>` prefix, tag every control, row and state (rows on the clickable element, validation
+errors per validator, error and empty branches), and update this section in the same PR. The live
+inventory is `grep -rn 'data-testid' repsy-frontend/src/app`; the per-page table is deliberately not
+duplicated here.

@@ -1,7 +1,8 @@
 <div class="relative">
-  <span>{{ text }}</span>
+  <span data-testid="tooltip-text">{{ text }}</span>
   @if (isVisible && (always || text.length > maxLength)) {
     <button
+      data-testid="tooltip-popup"
       (click)="$event.stopPropagation()"
       animate.enter="fade-in-down"
       class="absolute top-6 -left-1 z-1 w-max max-w-[150px] transform rounded-md bg-[#101112] px-2 py-1 text-sm break-all text-white shadow-md"

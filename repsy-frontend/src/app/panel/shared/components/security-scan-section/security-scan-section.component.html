@@ -1,10 +1,12 @@
 @if (isSupported$ | async) {
 <section
+  data-testid="scan-section"
   id="security"
   class="mb-8 overflow-x-auto rounded-lg bg-[#101112] p-[22px]"
   animate.enter="fade-in-up"
 >
   <button
+    data-testid="scan-section-toggle"
     type="button"
     (click)="toggleExpanded()"
     class="flex w-full items-center justify-between gap-4 text-left"
@@ -14,14 +16,14 @@
 
       @if (!loading) {
         @if (neverScanned) {
-          <span class="text-[13px] text-[#9C9C9D]">Not scanned yet</span>
+          <span data-testid="scan-section-never-scanned" class="text-[13px] text-[#9C9C9D]">Not scanned yet</span>
         } @else if (worstSeverity) {
           <app-severity-badge [severity]="worstSeverity" [compact]="true" />
-          <span class="text-[13px] text-[#9C9C9D]">
+          <span data-testid="scan-section-findings-count" class="text-[13px] text-[#9C9C9D]">
             {{ overview?.totalCount ?? 0 }} finding{{ (overview?.totalCount ?? 0) === 1 ? '' : 's' }}
           </span>
         } @else if (overview?.lastCompletedAt) {
-          <span class="text-[13px] text-success-400">Clean</span>
+          <span data-testid="scan-section-clean" class="text-[13px] text-success-400">Clean</span>
         }
         <app-rescan-note [status]="overview?.status" [hasCompletedScan]="!!overview?.lastCompletedAt" />
       }
@@ -44,7 +46,12 @@
     <div class="mt-4">
       @if (canTriggerScan && !loading && !neverScanned) {
         <div class="mb-4 flex justify-end">
-          <button (click)="triggerScan()" [disabled]="!canTrigger" class="repsy-btn-secondary shrink-0">
+          <button
+            data-testid="scan-section-rescan"
+            (click)="triggerScan()"
+            [disabled]="!canTrigger"
+            class="repsy-btn-secondary shrink-0"
+          >
             {{ triggering ? 'Triggering...' : 'Re-scan' }}
           </button>
         </div>
@@ -52,7 +59,12 @@
 
       @if (canTriggerScan && !loading && neverScanned) {
         <div class="mb-4 flex justify-end">
-          <button (click)="triggerScan()" [disabled]="triggering" class="repsy-btn-confirm shrink-0">
+          <button
+            data-testid="scan-section-scan-now"
+            (click)="triggerScan()"
+            [disabled]="triggering"
+            class="repsy-btn-confirm shrink-0"
+          >
             {{ triggering ? 'Triggering...' : 'Scan Now' }}
           </button>
         </div>
@@ -61,12 +73,13 @@
       @if (loading) {
         <app-spinner />
       } @else if (neverScanned) {
-        <p class="text-[13px] text-[#9C9C9D]">No vulnerability scans yet for this version.</p>
+        <p data-testid="scan-section-empty" class="text-[13px] text-[#9C9C9D]">No vulnerability scans yet for this version.</p>
       } @else {
         <div class="mb-4 flex flex-wrap items-center gap-3">
       <span class="text-[13px] text-[#9C9C9D]">
         Status:
         <span
+          data-testid="scan-section-status"
           [class.text-success-400]="selectedScan?.status === ScanStatus.Completed"
           [class.text-info-400]="selectedScan?.status === ScanStatus.Running"
           [class.text-warning-400]="selectedScan?.status === ScanStatus.Queued"
@@ -118,6 +131,7 @@
         >
           <div>CVE ID</div>
           <div
+            data-testid="scan-findings-sort-severity"
             role="button"
             tabindex="0"
             class="flex w-fit cursor-pointer items-center gap-1"
@@ -144,9 +158,10 @@
         </div>
 
         <!-- Findings Table (Desktop) -->
-        <div class="hidden rounded-b-[12px] border border-neutral-400 lg:block">
+        <div data-testid="scan-findings-table" class="hidden rounded-b-[12px] border border-neutral-400 lg:block">
           @for (finding of findings; track finding.id; let i = $index) {
             <div
+              [attr.data-testid]="'scan-finding-row-' + finding.id"
               class="grid grid-cols-[110px_140px_1.5fr_120px_140px_130px] items-center gap-4 p-[10px]"
               [ngClass]="{ 'rounded-b-[12px]': i === findings.length - 1 }"
             >
@@ -202,8 +217,12 @@
         </div>
 
         <!-- Findings List (Mobile) -->
+        <div data-testid="scan-findings-cards">
         @for (finding of findings; track finding.id; let i = $index) {
-          <div class="rounded-lg border border-neutral-400 p-[14px] lg:hidden">
+          <div
+            [attr.data-testid]="'scan-finding-card-' + finding.id"
+            class="rounded-lg border border-neutral-400 p-[14px] lg:hidden"
+          >
             <div class="mb-2 flex flex-wrap items-center gap-2">
               @if (finding.referenceUrl) {
                 <a
@@ -247,9 +266,11 @@
             </div>
           }
         }
+        </div>
 
         @if (findingsTotalPages > 1) {
           <app-pagination
+            data-testid="scan-findings-pagination"
             [pageNum]="findingsPageNum"
             [totalPages]="findingsTotalPages"
             (pageNumChange)="loadFindingsPage($event)"
@@ -260,13 +281,19 @@
 
     @if (scans.length > 0) {
       <h4 class="mb-2 text-[13px] text-white">Scan History</h4>
-      <div class="flex flex-col gap-1">
+      <div data-testid="scan-history" class="flex flex-col gap-1">
         @for (scan of scans; track scan.id) {
           <div
+            [attr.data-testid]="'scan-history-item-' + scan.id"
             class="flex items-center justify-between gap-2 rounded-lg border border-transparent p-[10px] text-[13px] hover:border-neutral-400"
             [class.border-neutral-400]="scan.id === selectedScan?.id"
           >
-            <button (click)="selectScan(scan.id!)" type="button" class="flex-1 text-left text-[#9C9C9D]">
+            <button
+              data-testid="row-select"
+              (click)="selectScan(scan.id!)"
+              type="button"
+              class="flex-1 text-left text-[#9C9C9D]"
+            >
               {{ scan.createdAt | date: 'medium' }}
             </button>
             <span class="flex items-center gap-2">
@@ -284,7 +311,12 @@
       </div>
 
       @if (totalPages > 1) {
-        <app-pagination [pageNum]="pageNum" [totalPages]="totalPages" (pageNumChange)="loadPage($event)" />
+        <app-pagination
+          data-testid="scan-history-pagination"
+          [pageNum]="pageNum"
+          [totalPages]="totalPages"
+          (pageNumChange)="loadPage($event)"
+        />
       }
     }
       }
