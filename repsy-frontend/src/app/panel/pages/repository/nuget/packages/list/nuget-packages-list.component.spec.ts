@@ -14,42 +14,45 @@
 /// limitations under the License.
 ///
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { fakeAsync, flushMicrotasks } from '@angular/core/testing';
 import moment from 'moment';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import { environment } from '../../../../../../../environments/environment';
-import { VersionSecuritySummary } from '../../../../../../../generated/api';
+import { NuGetPackageListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { RepoPermissionInfo } from '../../../../../shared/dto/repo/repo-permission-info';
 import { Sort } from '../../../../../shared/dto/sort';
 import { SecurityService } from '../../../../security/service/security.service';
-import { NugetPackageListItem } from '../../dto/nuget-package-list-item';
 import { NugetService } from '../../service/nuget.service';
 import { NugetPackagesListComponent } from './nuget-packages-list.component';
 
 const REPO = 'nuget-repo';
+
+function httpError(text: string, status = 400): HttpErrorResponse {
+  return new HttpErrorResponse({ status, error: { text } });
+}
 const DEFAULT_SORT: Sort = { name: 'Name (A-Z)', column: 'packageId', type: 'ASC' };
 const SECURITY_SUMMARY: Record<string, VersionSecuritySummary> = {
   'Acme.Lib': { scanned: true, findingCount: 1 } as VersionSecuritySummary,
 };
 
-function item(packageId: string): NugetPackageListItem {
-  return Object.assign(new NugetPackageListItem(), { packageId, latestVersion: '1.0.0', totalDownloads: 0 });
+function item(packageId: string): NuGetPackageListItem {
+  return { packageId, latestVersion: '1.0.0', totalDownloads: 0 };
 }
 
-function pageOf(content: NugetPackageListItem[], totalPages: number): PagedData<NugetPackageListItem> {
-  const paged = new PagedData<NugetPackageListItem>();
+function pageOf(content: NuGetPackageListItem[], totalPages: number): PagedData<NuGetPackageListItem> {
+  const paged = new PagedData<NuGetPackageListItem>();
   paged.content = content;
   paged.page = { number: 0, size: 10, totalElements: content.length, totalPages };
   return paged;
 }
 
 function repo(canManage: boolean): RepoPermissionInfo {
-  return Object.assign(new RepoPermissionInfo(), { repoName: REPO, canRead: true, canWrite: canManage, canManage });
+  return { repoName: REPO, canRead: true, canWrite: canManage, canManage, private: false };
 }
 
 describe('NugetPackagesListComponent', () => {
@@ -148,18 +151,18 @@ describe('NugetPackagesListComponent', () => {
     }));
 
     it('shows the failure and keeps the listing empty when the fetch fails', fakeAsync(() => {
-      nugetService.fetchRepositoryPackages.and.rejectWith('Repository not found');
+      nugetService.fetchRepositoryPackages.and.rejectWith(httpError('Repository not found', 404));
 
       selectRepo();
 
       expect(component.error).toBe('Repository not found');
-      expect(toastService.show).toHaveBeenCalledOnceWith('Repository not found', 'error');
+      expect(toastService.show).not.toHaveBeenCalled();
       expect(component.loading).toBeFalse();
       expect(component.packages).toEqual([]);
     }));
 
     it('clears an earlier error after a successful fetch', fakeAsync(() => {
-      nugetService.fetchRepositoryPackages.and.rejectWith('boom');
+      nugetService.fetchRepositoryPackages.and.rejectWith(httpError('boom', 500));
       selectRepo();
       nugetService.fetchRepositoryPackages.and.resolveTo(pageOf([item('Acme.Lib')], 1));
 
@@ -277,14 +280,14 @@ describe('NugetPackagesListComponent', () => {
       expect(component.loading).toBeFalse();
     }));
 
-    it('shows the failure and does not refresh when deleting fails', fakeAsync(() => {
-      nugetService.deletePackage.and.rejectWith('Package is in use');
+    it('does not refresh, toast a second time or leave the page loading when deleting fails', fakeAsync(() => {
+      nugetService.deletePackage.and.rejectWith(httpError('Package is in use', 409));
       component.deletePackage(pkg);
 
       dangerModalService.call();
       flushMicrotasks();
 
-      expect(toastService.show).toHaveBeenCalledOnceWith('Package is in use', 'error');
+      expect(toastService.show).not.toHaveBeenCalled();
       expect(nugetService.fetchRepositoryPackages).not.toHaveBeenCalled();
       expect(component.loading).toBeFalse();
     }));

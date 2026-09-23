@@ -1435,20 +1435,11 @@ paths:
           schema:
             type: string
             default: ''
-        - name: page
+        - name: pageable
           in: query
-          required: false
+          required: true
           schema:
-            type: integer
-            format: int32
-            default: 0
-        - name: size
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 10
+            "$ref": "#/components/schemas/Pageable"
       responses:
         '200':
           description: OK
@@ -1519,20 +1510,11 @@ paths:
           required: true
           schema:
             type: string
-        - name: page
+        - name: pageable
           in: query
-          required: false
+          required: true
           schema:
-            type: integer
-            format: int32
-            default: 0
-        - name: size
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 10
+            "$ref": "#/components/schemas/Pageable"
       responses:
         '200':
           description: OK

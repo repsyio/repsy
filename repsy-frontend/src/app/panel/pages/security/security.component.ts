@@ -122,7 +122,6 @@ export class SecurityComponent implements OnInit, OnDestroy {
     this.fetchScans();
   }
 
-
   public refreshPage(): void {
     this.pageNum = 0;
     this.repoNameSearch = '';
@@ -150,15 +149,12 @@ export class SecurityComponent implements OnInit, OnDestroy {
 
   private fetchSupportedRepoTypes(): void {
     this.securityScanSupportService.getSupportedRepoTypes().subscribe((supported) => {
-      this.repoTypeOptions = [ALL_OPTION, ...Array.from(supported).sort()];
+      this.repoTypeOptions = [ALL_OPTION, ...Array.from(supported).sort((a, b) => a.localeCompare(b))];
     });
   }
 
   private fetchScansSummary(): void {
     this.loadingSummary = true;
-
-
-
 
     this.securityService
       .getScansSummary()
@@ -227,10 +223,6 @@ export class SecurityComponent implements OnInit, OnDestroy {
           this.pagedData = pagedModel;
           this.scans = pagedModel.content ?? [];
         },
-
-
-
-
 
         error: (err: HttpErrorResponse) => {
           if (err.status === 403) {
