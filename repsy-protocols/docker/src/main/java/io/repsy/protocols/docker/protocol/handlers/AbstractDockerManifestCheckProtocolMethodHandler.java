@@ -25,8 +25,6 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
-import io.repsy.protocols.docker.protocol.parser.DockerPathParserManifest;
-import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,7 +40,7 @@ import org.springframework.http.ResponseEntity;
 
 @NullMarked
 public abstract class AbstractDockerManifestCheckProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler, DockerPathParserManifest {
+    implements ProtocolMethodHandler {
 
   private static final Pattern MANIFEST_CHECK_PATTERN =
       Pattern.compile("^/([^/]+)/manifests/(.+)$");
@@ -102,7 +100,6 @@ public abstract class AbstractDockerManifestCheckProtocolMethodHandler<ID>
       final HttpServletResponse response)
       throws Exception {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
 
     final var matcher = MANIFEST_CHECK_PATTERN.matcher(relativePath);
@@ -114,25 +111,13 @@ public abstract class AbstractDockerManifestCheckProtocolMethodHandler<ID>
     final var imageName = matcher.group(1);
     final var reference = matcher.group(2);
 
-    final var fileName =
-        ManifestNameGenerator.generate(repoInfo.getStorageKey(), imageName, reference);
-    final var parsedManifestPath = this.parseForManifest(request.getServletPath(), fileName);
-
-    final var tagManifestPair =
-        this.dockerFacade.findTagAndManifest(
-            context, reference, imageName, parsedManifestPath.getRelativePath());
-
-    if (tagManifestPair.getFirst().isEmpty()) {
-      return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-    }
-
-    final var tagDetail = tagManifestPair.getFirst().get();
-    final var manifestContent = tagManifestPair.getSecond();
+    final var manifest =
+        this.dockerFacade.getManifest(context, reference, imageName, request.getServletPath());
 
     return ResponseEntity.ok()
-        .header(CONTENT_TYPE, tagDetail.getMediaType())
-        .header(CONTENT_LENGTH, String.valueOf(manifestContent.getBytes(UTF_8).length))
-        .header(DOCKER_CONTENT_DIGEST, tagDetail.getDigest())
+        .header(CONTENT_TYPE, manifest.mediaType())
+        .header(CONTENT_LENGTH, String.valueOf(manifest.body().getBytes(UTF_8).length))
+        .header(DOCKER_CONTENT_DIGEST, manifest.digest())
         .build();
   }
 }

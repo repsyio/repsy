@@ -27,9 +27,9 @@
  * there is no `world` fixture call; `cargo.publish(world)` is invoked directly. A raw-HTTP
  * verification probe uses `adminCredential()` instead, the same split every other protocol's
  * dedicated tests use for read-side checks. Every crate name is underscore-only
- * (`cargoAdapter.packageName`'s own convention), routing around RPS-1212 (the served sparse index
- * normalises `-` -> `_`, so a hyphenated name here would just re-trip that already-pinned bug instead
- * of exercising yank/search/owners/checksum/multi-version).
+ * (`cargoAdapter.packageName`'s own convention) -- originally to route around RPS-1212, now fixed
+ * (`publish-consume.spec.ts` and `registry-rules.spec.ts` cover the hyphenated-name path); kept
+ * underscore-only here since renaming every crate in this suite is not otherwise motivated.
  *
  * HC-1/HC-2/HC-6 were probed live against a running local stack BEFORE this file was written (see
  * this PR's own report for the exact commands/output):
@@ -37,13 +37,15 @@
  *  - HC-1: real `cargo yank`/`cargo yank --undo`/`cargo search --registry repsy`/`cargo owner --list
  *    --registry repsy` all reach the server and get a real response. Yank/unyank/search work exactly
  *    as a real crates.io-shaped client expects (exit 0, the sparse index's `yanked` field flips, the
- *    search envelope is found). `cargo owner --list`, however, does NOT: Repsy OS's own
+ *    search envelope is found). `cargo owner --list` originally did NOT: Repsy OS's own
  *    `CargoOwnersProtocolMethodHandler` (defined directly in `repsy-backend`, not the shared
- *    `repsy-protocols/cargo` abstract-class family every other cargo route extends) answers every
+ *    `repsy-protocols/cargo` abstract-class family every other cargo route extends) answered every
  *    owners request -- even a GET -- with a FIXED `{"ok":true,"msg":"..."}` body and no `users` array
- *    at all, so a real `cargo owner --list` fails client-side ("missing field `users`", exit 101)
- *    even though the raw HTTP GET itself succeeds (200). This is now filed as RPS-1239 (distinct from
- *    RPS-1124/RPS-1212), pinned below with `test.fail()`, never fixed here.
+ *    at all, so a real `cargo owner --list` failed client-side ("missing field `users`", exit 101)
+ *    even though the raw HTTP GET itself succeeded (200). Filed as RPS-1239 (distinct from
+ *    RPS-1124/RPS-1212) and now fixed: the route is split into a dedicated READ handler for GET
+ *    (crates.io's `{"users": [...]}` shape, a repo-level synthetic owner) and a WRITE handler for
+ *    PUT/DELETE (unchanged `{"ok":true,"msg":"..."}` body).
  *  - HC-2: a yanked crate's `.crate` bytes are STILL downloadable afterwards (confirmed live, 200) --
  *    `AbstractCargoDownloadProtocolMethodHandler` has no yanked check at all. This matches real
  *    Cargo semantics: yank only affects fresh dependency RESOLUTION, never a download of an
@@ -289,54 +291,47 @@ test('cargo > search finds a published crate', { tag: ['@smoke'] }, async ({ see
   expect(parsed.meta.total, 'at least one crate matches the query').toBeGreaterThanOrEqual(1);
 });
 
-test(
-  'cargo > owners lists the publisher (RPS-1239: no "users" array)',
-  { tag: ['@smoke'] },
-  async ({ seeder }) => {
-    const layout = await newRepoWithToken(seeder, 'owners');
-    const version = cargoAdapter.version('release');
-    const target: Coordinates = { packageName: layout.packageName, version };
-    const world = buildWorld(layout, target, 'owners');
+test('cargo > owners lists the publisher', { tag: ['@smoke'] }, async ({ seeder }) => {
+  const layout = await newRepoWithToken(seeder, 'owners');
+  const version = cargoAdapter.version('release');
+  const target: Coordinates = { packageName: layout.packageName, version };
+  const world = buildWorld(layout, target, 'owners');
 
-    const published = await cargo.publish(world);
-    expect(published.outcome, `publish: expected "ok" (${published.command})`).toBe('ok');
-    expect(published.clientExitCode, `cargo publish: ${published.command}`).toBe(0);
+  const published = await cargo.publish(world);
+  expect(published.outcome, `publish: expected "ok" (${published.command})`).toBe('ok');
+  expect(published.clientExitCode, `cargo publish: ${published.command}`).toBe(0);
 
-    const { home, work } = await isolatedWorkDir(`cargo-owners-${seeder.runId}`);
-    await renderCargoConfig(work, layout.repoName);
+  const { home, work } = await isolatedWorkDir(`cargo-owners-${seeder.runId}`);
+  await renderCargoConfig(work, layout.repoName);
 
-    const ownerResult = await run(
-      'cargo',
-      ['owner', '--list', '--registry', 'repsy', layout.packageName],
-      {
-        cwd: work,
-        env: cargoEnv(home, layout.credential),
-        timeoutMs: 60_000,
-        redact: [layout.credential.password ?? ''],
-        label: 'cargo-owner-list',
-      },
-    );
+  const ownerResult = await run(
+    'cargo',
+    ['owner', '--list', '--registry', 'repsy', layout.packageName],
+    {
+      cwd: work,
+      env: cargoEnv(home, layout.credential),
+      timeoutMs: 60_000,
+      redact: [layout.credential.password ?? ''],
+      label: 'cargo-owner-list',
+    },
+  );
 
-    const admin = adminCredential();
-    const rawRes = await rawOwners(layout.repoName, admin, layout.packageName);
-    expect(rawRes.status, 'the raw owners GET succeeds').toBe(200);
+  const admin = adminCredential();
+  const rawRes = await rawOwners(layout.repoName, admin, layout.packageName);
+  expect(rawRes.status, 'the raw owners GET succeeds').toBe(200);
 
-    // Confirmed live: RPS-1239: CargoOwnersProtocolMethodHandler answers every owners
-    // request -- even a GET -- with a fixed {"ok":true,"msg":"..."} body and no "users" array at
-    // all, so a real `cargo owner --list` fails client-side ("missing field `users`") even though
-    // the raw GET above succeeds. Never fixed here -- pinned so a future fix flips this test to an
-    // unexpected pass instead of silently starting to fail elsewhere.
-    test.fail(
-      true,
-      'RPS-1239: cargo owner --list fails client-side ("missing field `users`") because ' +
-        'CargoOwnersProtocolMethodHandler answers every owners request with a fixed ' +
-        '{"ok":true,"msg":"..."} body and no "users" array at all',
-    );
-    expect(ownerResult.exitCode, `cargo owner --list: ${ownerResult.command}`).toBe(0);
-    const body = JSON.parse(rawRes.body.toString('utf8')) as { users?: unknown[] };
-    expect(Array.isArray(body.users), 'the owners response carries a "users" array').toBe(true);
-  },
-);
+  // RPS-1239 (fixed): the owners GET is now a dedicated READ handler that answers the
+  // crates.io {"users": [...]} shape (a repo-level synthetic owner, since Repsy has no
+  // ownership model finer than the repository), so a real `cargo owner --list` succeeds
+  // instead of failing client-side with "missing field `users`".
+  expect(ownerResult.exitCode, `cargo owner --list: ${ownerResult.command}`).toBe(0);
+  const body = JSON.parse(rawRes.body.toString('utf8')) as { users?: unknown[] };
+  expect(Array.isArray(body.users), 'the owners response carries a "users" array').toBe(true);
+  expect(
+    ownerResult.stdout,
+    'cargo owner --list should print the repo-level synthetic owner',
+  ).toContain(layout.repoName);
+});
 
 test(
   'cargo > index cksum equals the served .crate bytes',

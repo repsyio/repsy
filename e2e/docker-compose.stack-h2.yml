@@ -17,7 +17,11 @@
 # root README's own documented `DB_URL` for embedded H2
 # (`jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE`) is the
 # one pinned here; a `DATABASE_TO_LOWER=TRUE` variant was probed too and also works, but is not
-# needed. Same project name and ports as docker-compose.stack.yml, so the two profiles are mutually
+# needed. RPS-1173 later made this the image's own ENV default too, so this explicit DB_URL is no
+# longer strictly load-bearing for booting -- kept anyway, on purpose: an e2e profile should pin its
+# own database explicitly rather than lean on an image default that could change, so this file stays
+# correct either way that default goes. Same project name and ports as docker-compose.stack.yml, so
+# the two profiles are mutually
 # exclusive by construction and `run.sh local down [--h2]` tears down whichever is up. Started and
 # stopped by `./run.sh local up|down --h2`; REPSY_ADMIN_PASSWORD must be set (e2e/.env, copied from
 # .env.example).

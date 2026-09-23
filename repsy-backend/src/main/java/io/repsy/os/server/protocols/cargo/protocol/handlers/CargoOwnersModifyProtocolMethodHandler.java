@@ -13,26 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.docker.protocol.handlers;
+package io.repsy.os.server.protocols.cargo.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
-import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
-import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
-import io.repsy.protocols.docker.protocol.handlers.AbstractDockerManifestCheckProtocolMethodHandler;
-import java.util.UUID;
+import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
+import io.repsy.protocols.cargo.protocol.handlers.AbstractCargoOwnersModifyProtocolMethodHandler;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
 @NullMarked
-public class DockerManifestCheckProtocolMethodHandler
-    extends AbstractDockerManifestCheckProtocolMethodHandler<UUID> {
+public class CargoOwnersModifyProtocolMethodHandler
+    extends AbstractCargoOwnersModifyProtocolMethodHandler {
 
-  public DockerManifestCheckProtocolMethodHandler(
-      @Qualifier("osDockerPathParser") final PathParser basePathParser,
-      final DockerProtocolFacade<UUID> dockerFacade,
-      final DockerProtocolProvider provider) {
-    super(basePathParser, dockerFacade, provider);
+  public CargoOwnersModifyProtocolMethodHandler(
+      @Qualifier("osCargoPathParser") final PathParser basePathParser,
+      final CargoProtocolProvider provider) {
+
+    super(basePathParser, provider);
   }
 }

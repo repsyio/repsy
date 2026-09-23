@@ -31,10 +31,12 @@ import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
+import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -113,6 +115,12 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
       final var authHeader = request.getHeader(AUTHORIZATION);
       final var scope = request.getParameter("scope");
 
+      final var formCredentials = readPasswordGrantCredentials(request);
+      if (authHeader == null && formCredentials != null) {
+        final var sessionToken = this.authService.authenticateUserDockerCli(formCredentials);
+        return ResponseEntity.ok(this.createLoginResponse(sessionToken));
+      }
+
       if (authHeader == null) {
         return this.handleUnauthenticatedRequest(scope);
       }
@@ -127,6 +135,27 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
     } catch (final Exception _) {
       return this.buildUnauthorizedResponse();
     }
+  }
+
+  /**
+   * Synthesises a Basic {@code Authorization} header from an OAuth2 password-grant form body, so an
+   * {@code oras-go}/Helm-style {@code grant_type=password} login is authenticated through the same
+   * credential check the Basic header path uses (RPS-1220).
+   *
+   * @return The synthesised header, or {@code null} when the request is not a credentialed
+   *     password-grant attempt, in which case it falls through to the existing anonymous handling
+   */
+  private static @Nullable String readPasswordGrantCredentials(final HttpServletRequest request) {
+    if (!"password".equals(request.getParameter("grant_type"))) {
+      return null;
+    }
+    final var username = request.getParameter("username");
+    final var password = request.getParameter("password");
+    if (username == null || username.isBlank() || password == null || password.isEmpty()) {
+      return null;
+    }
+    final var raw = username + ":" + password;
+    return "Basic " + Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
   }
 
   private ResponseEntity<Object> handleUnauthenticatedRequest(final @Nullable String scope) {

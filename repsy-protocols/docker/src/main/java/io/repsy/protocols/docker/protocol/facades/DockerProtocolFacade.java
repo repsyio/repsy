@@ -19,16 +19,13 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
-import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestDetails;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
-import org.springframework.data.util.Pair;
 
 @NullMarked
 public interface DockerProtocolFacade<ID> {
@@ -64,9 +61,5 @@ public interface DockerProtocolFacade<ID> {
 
   ManifestDetails getManifest(
       ProtocolContext context, String manifestReference, String imageName, String requestPath)
-      throws IOException;
-
-  Pair<Optional<BaseTagDetail<ID>>, String> findTagAndManifest(
-      ProtocolContext context, String reference, String imageName, RelativePath relativePath)
       throws IOException;
 }

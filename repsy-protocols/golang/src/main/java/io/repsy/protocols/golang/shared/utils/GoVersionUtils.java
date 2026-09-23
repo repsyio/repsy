@@ -63,6 +63,28 @@ public class GoVersionUtils {
   private static final int SEMVER_PATCH_GROUP = 3;
   private static final int SEMVER_PRE_RELEASE_GROUP = 4;
 
+  // Strict Go semver gate (RPS-1227): vMAJOR.MINOR.PATCH[-prerelease][+build], no leading zeros in
+  // numeric identifiers. Deliberately separate from SEMVER_PATTERN above, which is intentionally
+  // loose so COMPARATOR can still order a pre-existing non-standard version instead of throwing.
+  private static final String NUM = "(0|[1-9]\\d*)";
+  private static final String PRE_ID = "(?:0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*)";
+  private static final String BUILD_ID = "[0-9A-Za-z-]+";
+  private static final Pattern STRICT_SEMVER =
+      Pattern.compile(
+          "v" + NUM + "\\." + NUM + "\\." + NUM + "(?:-" + PRE_ID + "(?:\\." + PRE_ID + ")*)?"
+              + "(?:\\+" + BUILD_ID + "(?:\\." + BUILD_ID + ")*)?");
+
+  /**
+   * Whether {@code version} is a syntactically valid Go semver string: {@code vMAJOR.MINOR.PATCH}
+   * with an optional pre-release and/or build-metadata suffix, no leading zeros in a numeric
+   * identifier. Accepts build metadata (e.g. {@code +incompatible}) and pseudo-versions (e.g.
+   * {@code v1.0.0-20240101120000-0123456789ab}), both of which are real, valid Go module versions
+   * (RPS-1227).
+   */
+  public static boolean isValidSemver(final String version) {
+    return STRICT_SEMVER.matcher(version).matches();
+  }
+
   /**
    * Comparator for Go semver strings (e.g. "v1.2.3"). Follows SemVer precedence: pre-release
    * versions (e.g. "v1.0.0-beta") sort <em>before</em> the corresponding release for the same
@@ -79,7 +101,7 @@ public class GoVersionUtils {
         }
 
         for (int i = SEMVER_MAJOR_GROUP; i <= SEMVER_PATCH_GROUP; i++) {
-          final int diff = Long.compare(Long.parseLong(m1.group(i)), Long.parseLong(m2.group(i)));
+          final int diff = compareNumeric(m1.group(i), m2.group(i));
           if (diff != 0) {
             return diff;
           }
@@ -90,6 +112,32 @@ public class GoVersionUtils {
       };
 
   private static final Set<String> VERSIONED_EXTENSIONS = Set.of(".zip", ".mod", ".info");
+
+  /**
+   * Compares two non-negative decimal integers given as digit strings, without parsing them to a
+   * numeric type. {@code SEMVER_PATTERN}'s numeric groups are unbounded ({@code \d+}), so a
+   * long-but-valid field (for example a 25-digit major version) overflowed {@code Long.parseLong}
+   * and turned an ordinary {@code @v/list}/{@code @latest} read into a 500. Longer digit strings
+   * are always the larger number once leading zeros are stripped, so length first, then
+   * lexicographic, is exact and needs no numeric parsing at all.
+   */
+  private static int compareNumeric(final String a, final String b) {
+    final var sa = stripLeadingZeros(a);
+    final var sb = stripLeadingZeros(b);
+
+    if (sa.length() != sb.length()) {
+      return Integer.compare(sa.length(), sb.length());
+    }
+    return sa.compareTo(sb);
+  }
+
+  private static String stripLeadingZeros(final String digits) {
+    var start = 0;
+    while (start < digits.length() - 1 && digits.charAt(start) == '0') {
+      start++;
+    }
+    return digits.substring(start);
+  }
 
   /**
    * Extracts the version string from the last path segment, stripping any known extension (.zip,

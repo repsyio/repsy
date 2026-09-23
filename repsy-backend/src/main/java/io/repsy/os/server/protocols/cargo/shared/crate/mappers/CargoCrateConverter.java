@@ -59,7 +59,7 @@ public interface CargoCrateConverter {
       CargoCrate crate, CargoCrateMeta meta, CargoCrateIndex index);
 
   @Mappings({
-    @Mapping(target = "name", source = "name"),
+    @Mapping(target = "name", source = "crate.originalName"),
     @Mapping(target = "vers", source = "vers"),
     @Mapping(target = "deps", source = "deps", qualifiedByName = "jsonToDeps"),
     @Mapping(target = "cksum", source = "cksum"),

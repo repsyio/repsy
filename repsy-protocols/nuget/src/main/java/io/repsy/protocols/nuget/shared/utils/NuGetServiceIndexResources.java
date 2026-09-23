@@ -32,16 +32,12 @@ public final class NuGetServiceIndexResources {
         new NuGetServiceIndexResource(
             baseUrl + "/v3/package", "PackagePublish/2.0.0", "Package publish endpoint"),
         new NuGetServiceIndexResource(
-            baseUrl + "/v3/registration",
-            "RegistrationsBaseUrl/3.0.0",
-            "Package registration base URL"),
+            baseUrl + "/v3/registration", "RegistrationsBaseUrl", "Package registration base URL"),
         new NuGetServiceIndexResource(
-            baseUrl + "/v3/search", "SearchQueryService/3.0.0", "Package search service"),
+            baseUrl + "/v3/search", "SearchQueryService", "Package search service"),
         new NuGetServiceIndexResource(
             baseUrl + "/v3/autocomplete",
-            "SearchAutocompleteService/3.0.0",
-            "Package autocomplete service"),
-        new NuGetServiceIndexResource(
-            baseUrl + "/v3/package", "PackageDelete/2.0.0", "Package delete/unlist endpoint"));
+            "SearchAutocompleteService",
+            "Package autocomplete service"));
   }
 }

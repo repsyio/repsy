@@ -17,10 +17,9 @@
 /**
  * The scenario-driven npm suite (step 3a, RPS-294): `registerPublishConsumeLoop(npmAdapter)` wires
  * the whole shared catalog into npm, exactly like `tests/maven/publish-consume.spec.ts` does for
- * maven. Every scenario whose `consume` expectation is `'ok'` currently surfaces RPS-1205 (`npm
- * install` cannot fetch the tarball on Repsy OS) via `npmAdapter.knownConsumeFailure`, so those
- * scenarios report as an *expected* failure, not a plain pass or a plain fail -- see `scenarios/
- * loop.ts`'s file header. The auth/override/version-kind outcome itself is still asserted for real.
+ * maven. RPS-1205 (`npm install` could not fetch the tarball on Repsy OS) is fixed, so npm has no
+ * `knownConsumeFailure` any more and every scenario's consume side is asserted for real, same as
+ * maven -- see `scenarios/loop.ts`'s file header.
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import * as npm from '../../src/clients/npm.js';
@@ -36,17 +35,16 @@ registerPublishConsumeLoop(npmAdapter);
 /**
  * A real `npm publish`/`npm install` round trip of a SCOPED package (`@e2e-<runid>/scoped`), the npm
  * analogue of maven's RPS-1196 hand-built-`World` test: scope handling is exactly where a
- * path-construction bug like RPS-1205 tends to also bite (the scope is a real path segment in the
+ * path-construction bug like RPS-1205 used to also bite (the scope is a real path segment in the
  * canonical tarball URL, but is dropped from the tarball's own file name -- see `npm-raw.ts`'s file
  * header), so this is worth its own direct check beyond the catalog loop's unscoped packages.
  *
- * The publish half is expected to succeed outright. The consume half is expected to fail exactly the
- * way RPS-1205 fails every other package on this instance (`test.fail`, not a plain assertion): the
- * real `npm install` cannot fetch the tarball, even though the auth-only packument GET succeeds and
- * the tarball is genuinely sitting in storage at its canonical path, which this test proves directly.
+ * Both halves are now expected to succeed outright: the real `npm install` fetches the tarball, the
+ * auth-only packument GET succeeds, and the tarball is genuinely sitting in storage at its canonical
+ * path, which this test proves directly.
  */
 test(
-  'npm > scoped package real client round trip (RPS-1205)',
+  'npm > scoped package real client round trip (RPS-1205, fixed)',
   { tag: ['@smoke'] },
   async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
@@ -92,11 +90,6 @@ test(
       `resolve: the auth-only packument GET should still succeed (http ${resolved.httpStatus})`,
     ).toBe('ok');
 
-    test.fail(
-      true,
-      'RPS-1205: npm install cannot fetch the tarball (fixTarballUrl misrewrites the path for the ' +
-        'OS single-tenant layout), scoped packages included',
-    );
     expect(resolved.clientExitCode, `npm install: ${resolved.command}`).toBe(0);
     expect(
       resolved.contentSha256,

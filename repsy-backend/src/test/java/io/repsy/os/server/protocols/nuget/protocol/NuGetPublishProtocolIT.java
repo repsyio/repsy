@@ -36,8 +36,13 @@ import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPack
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
 import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.server.protocols.nuget.ui.facades.NuGetApiFacade;
+import io.repsy.os.server.shared.token.entities.RepoDeployToken;
+import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
+import io.repsy.os.server.shared.token.utils.DeployTokenHash;
+import io.repsy.os.server.shared.token.utils.TokenUsernameGenerator;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.os.shared.token.utils.TokenFactory;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -50,6 +55,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
@@ -114,6 +121,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
   @Autowired private NuGetApiFacade nugetApiFacade;
   @Autowired private RepoTxService repoTxService;
   @Autowired private PlatformTransactionManager transactionManager;
+  @Autowired private RepoDeployTokenRepository deployTokenRepository;
 
   /**
    * A package to build: {@code id}/{@code version} go into the nuspec verbatim, and {@code
@@ -367,6 +375,26 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
     return "Basic "
         + Base64.getEncoder()
             .encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
+  }
+
+  /**
+   * Inserts a deploy token for {@code repo} in the current test transaction, returns its secret.
+   */
+  private String seedDeployToken(final Repo repo, final boolean readOnly) {
+    final var secret = TokenFactory.deployToken();
+    final var entity = new RepoDeployToken();
+
+    entity.setRepo(this.repoRepository.getReferenceById(repo.getId()));
+    entity.setName("token-" + secret.substring(0, 6));
+    entity.setUsername(TokenUsernameGenerator.deployTokenUsername());
+    entity.setToken(DeployTokenHash.hash(secret));
+    entity.setReadOnly(readOnly);
+    entity.setExpirationDate(Instant.now().plus(30, ChronoUnit.DAYS));
+    entity.setTokenDurationDay(30);
+    this.deployTokenRepository.save(entity);
+    this.entityManager.flush();
+
+    return secret;
   }
 
   private static AbstractMockHttpServletRequestBuilder<?> push(
@@ -1652,6 +1680,113 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
                   multipart(HttpMethod.PUT, PUSH_PATH, repo.getName())
                       .part(new MockPart(PACKAGE_PART, "package.nupkg", pkg.nupkg()))
                       .header(API_KEY_HEADER, token))
+              .andReturn()
+              .getResponse();
+
+      assertStatus(response, 201);
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, pkg.id())).hasSize(1);
+    }
+
+    /**
+     * RPS-1214: pins the panel's "Option B" contract at the protocol level. {@code X-NuGet-ApiKey}
+     * is fed through {@code NuGetAuthPreProcessor}'s Bearer path, and a deploy token secret is a
+     * valid bearer credential there -- this is the case the panel's {@code --api-key
+     * "<YOUR_DEPLOY_TOKEN>"} documents.
+     */
+    @Test
+    @DisplayName("accepts a deploy token secret in the X-NuGet-ApiKey header (RPS-1214)")
+    void apiKeyHeaderWithDeployTokenSecret() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var pkg = new Pkg(uniquePackageId(), "1.0.0");
+      final var secret = NuGetPublishProtocolIT.this.seedDeployToken(repo, false);
+
+      final var response =
+          NuGetPublishProtocolIT.this
+              .protocol(
+                  multipart(HttpMethod.PUT, PUSH_PATH, repo.getName())
+                      .part(new MockPart(PACKAGE_PART, "package.nupkg", pkg.nupkg()))
+                      .header(API_KEY_HEADER, secret))
+              .andReturn()
+              .getResponse();
+
+      assertStatus(response, 201);
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, pkg.id())).hasSize(1);
+    }
+
+    /**
+     * RPS-1214: the flip side of the contract above. A user/admin password is not a valid bearer
+     * credential (it is not a deploy token, a protocol JWT, nor "Basic "-prefixed), so it is
+     * refused with the same 401/Basic-challenge shape as every other bad credential here -- this is
+     * why the panel's old "Option B" copy, which told users to pass their password as {@code
+     * --api-key}, was wrong and has been corrected to the deploy token only.
+     */
+    @Test
+    @DisplayName(
+        "rejects a user password sent in the X-NuGet-ApiKey header, with a Basic "
+            + "challenge (RPS-1214)")
+    void apiKeyHeaderRejectsUserPassword() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.privateNugetRepo();
+      NuGetPublishProtocolIT.this.createUser(uniqueUsername("nuget"), UserRole.USER);
+      final var pkg = new Pkg(uniquePackageId(), "1.0.0");
+
+      final var response =
+          NuGetPublishProtocolIT.this
+              .protocol(
+                  multipart(HttpMethod.PUT, PUSH_PATH, repo.getName())
+                      .part(new MockPart(PACKAGE_PART, "package.nupkg", pkg.nupkg()))
+                      .header(API_KEY_HEADER, VALID_PASSWORD))
+              .andReturn()
+              .getResponse();
+
+      assertStatus(response, 401);
+      assertThat(response.getHeader("WWW-Authenticate")).isEqualTo(BASIC_CHALLENGE);
+      NuGetPublishProtocolIT.this.assertNothingStored(repo, pkg.id());
+    }
+
+    /**
+     * RPS-1214: {@code normalizeAuthHeader} leaves a value that already starts with {@code "Basic
+     * "} untouched, so it dispatches to {@code handleBasicAuth} instead of the Bearer path -- the
+     * documented escape hatch for a password credential in Option B.
+     */
+    @Test
+    @DisplayName("accepts a Basic-prefixed value in the X-NuGet-ApiKey header (RPS-1214)")
+    void apiKeyHeaderAcceptsBasicPrefixedValue() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.privateNugetRepo();
+      final var user =
+          NuGetPublishProtocolIT.this.createUser(uniqueUsername("nuget"), UserRole.USER);
+      final var pkg = new Pkg(uniquePackageId(), "1.0.0");
+
+      final var response =
+          NuGetPublishProtocolIT.this
+              .protocol(
+                  multipart(HttpMethod.PUT, PUSH_PATH, repo.getName())
+                      .part(new MockPart(PACKAGE_PART, "package.nupkg", pkg.nupkg()))
+                      .header(API_KEY_HEADER, basic(user.getUsername(), VALID_PASSWORD)))
+              .andReturn()
+              .getResponse();
+
+      assertStatus(response, 201);
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, pkg.id())).hasSize(1);
+    }
+
+    /**
+     * RPS-1214: pins {@code extractAuthHeader}'s precedence, which was untested before. A garbage
+     * {@code X-NuGet-ApiKey} value must not interfere when a valid {@code Authorization} header is
+     * also present.
+     */
+    @Test
+    @DisplayName("prefers Authorization over X-NuGet-ApiKey when both are present (RPS-1214)")
+    void authorizationHeaderTakesPrecedenceOverApiKey() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var pkg = new Pkg(uniquePackageId(), "1.0.0");
+
+      final var response =
+          NuGetPublishProtocolIT.this
+              .protocol(
+                  multipart(HttpMethod.PUT, PUSH_PATH, repo.getName())
+                      .part(new MockPart(PACKAGE_PART, "package.nupkg", pkg.nupkg()))
+                      .header(AUTHORIZATION, NuGetPublishProtocolIT.this.adminProtocolBearerToken())
+                      .header(API_KEY_HEADER, "not-a-real-token"))
               .andReturn()
               .getResponse();
 
