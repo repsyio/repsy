@@ -19,8 +19,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ticker;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.net.InetAddresses;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
+import java.net.Inet6Address;
+import java.net.InetAddress;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -41,7 +46,10 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  *   <li>The client is the remote address of the request. Behind a reverse proxy that is the address
  *       Tomcat's {@code RemoteIpValve} took from {@code X-Forwarded-For}, and only when the direct
  *       peer is a trusted proxy ({@code server.forward-headers-strategy: native}), so a client
- *       cannot pick its own key by sending the header. The whole IPv6 address is the key.
+ *       cannot pick its own key by sending the header. For IPv4 the whole address is the key; for
+ *       IPv6 the key is the address's {@code /64} network, since a single subscriber or site
+ *       normally holds a whole {@code /64} and could otherwise get a fresh count for every address
+ *       it uses (RPS-1164).
  *   <li>The key is the client and never the username. An unknown username, a wrong password and a
  *       known user all count the same and are refused the same way, so the throttle reveals nothing
  *       about which usernames exist (RPS-906).
@@ -129,7 +137,8 @@ public class AuthFailureThrottle {
   /** Counts one failed BCrypt check for the client of the current request. */
   public void recordFailure() {
 
-    final var client = currentClient();
+    final var remoteAddr = currentRemoteAddr();
+    final var client = remoteAddr == null ? null : throttleKey(remoteAddr);
 
     if (this.windows == null || client == null) {
       return;
@@ -140,10 +149,12 @@ public class AuthFailureThrottle {
         this.windows.asMap().compute(client, (key, current) -> this.next(current, now));
 
     if (window.failures() == this.maxFailures) {
-      // Once per window, because the count only grows. The address is the only thing logged.
+      // Once per window, because the count only grows. The address is logged individually, even
+      // though IPv6 clients are throttled per network, so an operator can still see it.
       log.warn(
-          "Client {} made {} failed password checks, refusing its password checks until its"
-              + " window ends",
+          "Client {} (network {}) made {} failed password checks, refusing its password checks"
+              + " until its window ends",
+          remoteAddr,
           client,
           this.maxFailures);
     }
@@ -222,10 +233,44 @@ public class AuthFailureThrottle {
 
   private static @Nullable String currentClient() {
 
+    final var remoteAddr = currentRemoteAddr();
+
+    return remoteAddr == null ? null : throttleKey(remoteAddr);
+  }
+
+  private static @Nullable String currentRemoteAddr() {
+
     return RequestContextHolder.getRequestAttributes()
             instanceof final ServletRequestAttributes attributes
         ? attributes.getRequest().getRemoteAddr()
         : null;
+  }
+
+  /**
+   * The throttle key for one remote address: the address itself for IPv4, or its {@code /64}
+   * network for IPv6, so an attacker (or a legitimate NAT'd network) cannot evade the throttle by
+   * cycling through the addresses of one network (RPS-1164). Parsing is strict (a literal address,
+   * no DNS lookup); an address {@link InetAddresses#forString} cannot parse is throttled under its
+   * own literal text, which only happens for a remote address Tomcat did not hand us as a literal
+   * IP in the first place.
+   */
+  private static @NonNull String throttleKey(final @NonNull String remoteAddr) {
+
+    final InetAddress address;
+
+    try {
+      address = InetAddresses.forString(remoteAddr);
+    } catch (final IllegalArgumentException notALiteralAddress) {
+      return remoteAddr;
+    }
+
+    if (address instanceof final Inet6Address inet6) {
+      final var network = Arrays.copyOf(inet6.getAddress(), 8);
+
+      return HexFormat.of().formatHex(network);
+    }
+
+    return remoteAddr;
   }
 
   /** The failures of one client since {@code startNanos}. */

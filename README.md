@@ -544,9 +544,8 @@ limit off.
   asks for credentials again in a loop. Maven and npm retry with a backoff; pip, twine, cargo, go,
   NuGet, gem and bundler show the HTTP error; Docker and Helm print `toomanyrequests`. Fix the
   credentials in the job and wait for the `Retry-After` time.
-- **IPv6:** the whole address is one client. A client that controls a whole IPv6 network can use
-  many addresses, so a rate limit in your reverse proxy that groups IPv6 clients by network (for
-  example per `/64`) is a good addition.
+- **IPv6:** the client is the address's `/64` network, not the full address, since a single
+  subscriber or site normally holds a whole `/64`. Two addresses of the same `/64` share one count.
 
 A rate limit in your reverse proxy can be used in addition: it can also cap the request rate as a
 whole, which this limit does not do.
