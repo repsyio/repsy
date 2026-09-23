@@ -39,6 +39,7 @@ import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactDeployType;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
+import io.repsy.protocols.maven.shared.utils.MavenUploadLimits;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.ByteArrayInputStream;
@@ -74,6 +75,10 @@ import org.springframework.core.io.Resource;
  *
  * <p>RPS-1185: the {@code .asc} signature of a metadata file is handled like a metadata checksum,
  * classified by its path and never parsed, and it is not a POM signature, so it is never verified.
+ *
+ * <p>RPS-1121: a metadata-family file, a POM signature and a POM are each capped ({@link
+ * MavenUploadLimits}) before they are read whole or spooled, so an oversized one is refused with a
+ * 400 and stores nothing.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractMavenProtocolFacade upload")
@@ -578,5 +583,126 @@ class AbstractMavenProtocolFacadeTest {
         .isInstanceOf(IOException.class);
 
     verify(this.storageService, never()).writeInputStreamToPath(any(), any(), anyString());
+  }
+
+  private static String filler(final long bytes) {
+    return "a".repeat(Math.toIntExact(bytes));
+  }
+
+  /** A valid POM padded with a comment so its total size can be pinned exactly (RPS-1121). */
+  private static String pomOfSize(final long totalBytes) {
+    final var prefix =
+        "<project>\n"
+            + "  <modelVersion>4.0.0</modelVersion>\n"
+            + "  <groupId>com.example</groupId>\n"
+            + "  <artifactId>lib</artifactId>\n"
+            + "  <version>1.0</version>\n"
+            + "  <!-- ";
+    final var suffix = " -->\n</project>\n";
+    final var padding = totalBytes - prefix.getBytes(UTF_8).length - suffix.getBytes(UTF_8).length;
+
+    return prefix + filler(padding) + suffix;
+  }
+
+  @Test
+  @DisplayName("stores a maven-metadata.xml exactly at the size limit (RPS-1121)")
+  void storesMetadataAtTheSizeLimit() throws Exception {
+    final var path = "com/example/lib/maven-metadata.xml";
+    final var body = filler(MavenUploadLimits.MAX_METADATA_BYTES);
+    requestFor(path);
+    when(this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
+            any(), any(byte[].class), any(StoragePath.class)))
+        .thenReturn(new MutablePair<>(ArtifactDeployType.NEW, ArtifactVersionType.RELEASE));
+    storageReportsUsage(body.length());
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(body.getBytes(UTF_8)));
+
+    upload(body);
+
+    assertThat(this.stored).singleElement().isEqualTo(body.getBytes(UTF_8));
+  }
+
+  @Test
+  @DisplayName(
+      "refuses a maven-metadata.xml one byte over the size limit, storing nothing (RPS-1121)")
+  void rejectsMetadataOverTheSizeLimit() throws Exception {
+    final var path = "com/example/lib/maven-metadata.xml";
+    final var body = filler(MavenUploadLimits.MAX_METADATA_BYTES + 1);
+    requestFor(path);
+
+    assertThatThrownBy(() -> upload(body))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("mavenMetadataTooLarge");
+
+    verifyNoInteractions(this.storageService);
+    verify(this.artifactService, never())
+        .getDeployAndVersionTypesByMetadataTypeFiles(any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+  }
+
+  @Test
+  @DisplayName("verifies and stores a POM signature exactly at the size limit (RPS-1121)")
+  void verifiesAndStoresAPomSignatureAtTheSizeLimit() throws Exception {
+    final var signature = filler(MavenUploadLimits.MAX_POM_SIGNATURE_BYTES);
+    requestFor(POM_PATH + ".asc");
+    deployIsAllowed();
+    storageReportsUsage(signature.length());
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(signature.getBytes(UTF_8)));
+
+    upload(signature);
+
+    assertThat(this.stored).singleElement().isEqualTo(signature.getBytes(UTF_8));
+    verify(this.artifactService)
+        .verifySignature(any(), any(StoragePath.class), any(Resource.class));
+  }
+
+  @Test
+  @DisplayName(
+      "refuses a POM signature one byte over the size limit before verifying or storing it"
+          + " (RPS-1121)")
+  void rejectsAPomSignatureOverTheSizeLimit() {
+    final var signature = filler(MavenUploadLimits.MAX_POM_SIGNATURE_BYTES + 1);
+    requestFor(POM_PATH + ".asc");
+    deployIsAllowed();
+
+    assertThatThrownBy(() -> upload(signature))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("mavenSignatureTooLarge");
+
+    verifyNoInteractions(this.storageService);
+    verify(this.artifactService, never()).verifySignature(any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
+  }
+
+  @Test
+  @DisplayName("stores a POM exactly at the size limit (RPS-1121)")
+  void storesAPomAtTheSizeLimit() throws Exception {
+    final var pom = pomOfSize(MavenUploadLimits.MAX_POM_BYTES);
+    requestFor(POM_PATH);
+    deployIsAllowed();
+    storageReportsUsage(pom.length());
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(new ByteArrayResource(pom.getBytes(UTF_8)));
+
+    upload(pom);
+
+    assertThat(this.stored).singleElement().isEqualTo(pom.getBytes(UTF_8));
+  }
+
+  @Test
+  @DisplayName("refuses a POM one byte over the size limit before parsing or storing it (RPS-1121)")
+  void rejectsAPomOverTheSizeLimit() {
+    final var pom = pomOfSize(MavenUploadLimits.MAX_POM_BYTES + 1);
+    requestFor(POM_PATH);
+    deployIsAllowed();
+
+    assertThatThrownBy(() -> upload(pom))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("pomFileTooLarge");
+
+    verify(this.storageService, never()).writeInputStreamToPath(any(), any(), anyString());
+    verify(this.artifactService, never()).createOrUpdateArtifact(any(), any(), any());
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
   }
 }

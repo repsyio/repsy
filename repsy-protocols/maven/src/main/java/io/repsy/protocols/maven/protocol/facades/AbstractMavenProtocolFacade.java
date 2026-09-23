@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.maven.protocol.facades;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -24,6 +25,9 @@ import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenUploadLimits;
+import io.repsy.protocols.shared.utils.BoundedEntryReader;
+import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.ByteArrayInputStream;
@@ -76,6 +80,11 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * that file would be (RPS-1183). A metadata signature ({@code maven-metadata.xml.asc}) is stored
    * unparsed and unverified, judged like a metadata checksum (RPS-1185). A POM, its signature and
    * its checksum are told by the file name, never by the directory (RPS-1196).
+   *
+   * <p>A metadata-family file and a POM signature are read fully into memory, and a POM is spooled
+   * to a temporary file, before anything about them is parsed or stored; each is capped by {@link
+   * MavenUploadLimits} and refused with a 400 naming the limit, before anything is read, when the
+   * client declares a larger body, and while it is read otherwise (RPS-1121).
    */
   @Override
   public void upload(
@@ -94,7 +103,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     if (ArtifactUtils.isFileSuitableForGavExtraction(fileName)) {
       artifactPair = this.artifactService.getDeployAndVersionType(repoInfo, storagePath);
     } else {
-      content = inputStream.readAllBytes();
+      content = readBoundedMetadata(inputStream, contentLength);
       artifactPair =
           this.artifactService.getDeployAndVersionTypesByMetadataTypeFiles(
               repoInfo, content, storagePath);
@@ -104,7 +113,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
     if (content == null && ArtifactUtils.isPomSignature(storagePath)) {
       // A signature is well below 1 KB, and it is read once here to be verified and then stored.
-      content = inputStream.readAllBytes();
+      content = readBoundedPomSignature(inputStream, contentLength);
       this.artifactService.verifySignature(repoInfo, storagePath, new ByteArrayResource(content));
     }
 
@@ -147,8 +156,9 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
   /**
    * Parses the POM before anything is stored. {@code createOrUpdateArtifact} reads it back from
    * storage, so a malformed POM used to be written first and stay in the repo (and off the usage
-   * counter) when the parse then failed. A POM is spooled to a temporary file, parsed, and only
-   * then copied to storage, so a rejected one never reaches it.
+   * counter) when the parse then failed. A POM is spooled to a temporary file, capped at {@link
+   * MavenUploadLimits#MAX_POM_BYTES}, parsed, and only then copied to storage, so a rejected one
+   * never reaches it and an oversized one is refused instead of filling the disk (RPS-1121).
    *
    * <p>The same holds for a POM whose declared groupId (its own, else its parent's) is not the
    * group of its path: it would be stored and served but never registered, so it is refused with
@@ -158,7 +168,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       final String repoName, final StoragePath storagePath, final InputStream inputStream)
       throws IOException {
 
-    try (final var pom = SpooledUpload.spool(inputStream)) {
+    try (final var pom = SpooledUpload.spool(inputStream, MavenUploadLimits.MAX_POM_BYTES)) {
       final @Nullable Model model;
 
       try (final var pomStream = pom.openStream()) {
@@ -170,6 +180,40 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       try (final var pomStream = pom.openStream()) {
         return this.mavenStorageService.writeInputStreamToPath(storagePath, pomStream, repoName);
       }
+    } catch (final EntryTooLargeException e) {
+      throw new BadRequestException("pomFileTooLarge");
+    }
+  }
+
+  /**
+   * Reads a metadata-family file ({@code maven-metadata.xml}, one of its checksums or its {@code
+   * .asc}) whole, refusing one larger than {@link MavenUploadLimits#MAX_METADATA_BYTES} with a 400
+   * before anything is stored (RPS-1121).
+   */
+  private static byte[] readBoundedMetadata(final InputStream inputStream, final long contentLength)
+      throws IOException {
+
+    try {
+      return BoundedEntryReader.readAllBytes(
+          inputStream, contentLength, MavenUploadLimits.MAX_METADATA_BYTES);
+    } catch (final EntryTooLargeException e) {
+      throw new BadRequestException("mavenMetadataTooLarge");
+    }
+  }
+
+  /**
+   * Reads a POM signature ({@code .pom.asc}) whole, refusing one larger than {@link
+   * MavenUploadLimits#MAX_POM_SIGNATURE_BYTES} with a 400 before it is verified or stored
+   * (RPS-1121).
+   */
+  private static byte[] readBoundedPomSignature(
+      final InputStream inputStream, final long contentLength) throws IOException {
+
+    try {
+      return BoundedEntryReader.readAllBytes(
+          inputStream, contentLength, MavenUploadLimits.MAX_POM_SIGNATURE_BYTES);
+    } catch (final EntryTooLargeException e) {
+      throw new BadRequestException("mavenSignatureTooLarge");
     }
   }
 
