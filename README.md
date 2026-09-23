@@ -13,6 +13,7 @@
     - [Using Docker (PostgreSQL)](#option-2-docker-with-postgresql)
     - [Using Docker Compose (PostgreSQL)](#option-3-docker-compose-with-postgresql)
     - [Manual Installation](#manual-installation)
+- [Upgrading](#upgrading)
 - [Configuration](#configuration)
 - [Content Security Policy](#content-security-policy)
 - [Cross-Origin Requests (CORS)](#cross-origin-requests-cors)
@@ -301,6 +302,36 @@ Access at:
 - **Frontend (Web UI)**: http://localhost:4200
 - **Backend API**: http://localhost:8080
 - **Repository Operations**: http://localhost:9090
+
+## Upgrading
+
+### Password reset when upgrading past the BCrypt migration (RPS-961 / RPS-1033)
+
+The first release that contains both RPS-961 (hashing passwords with BCrypt) and RPS-1033
+(retiring the legacy salted SHA-256 verification path) resets the password of every account that
+has not logged in since RPS-961 shipped. The latest release, `v26.08.4`, contains neither change,
+so this applies starting with the next release.
+
+**What happens:** a SHA-256 hash cannot be converted to BCrypt without the plain-text password,
+so migration `V0017__Drop_User_Salt.sql` sets the empty-hash password-reset marker on every
+account whose hash is not already BCrypt, revokes that account's refresh tokens, and drops the
+now-unused `users.salt` column. An account that has already logged in since RPS-961 shipped
+already has a BCrypt hash and is unaffected. This is a one-time migration: it does not run again
+on later upgrades.
+
+**What you'll see:** on startup, `AdminUserInitializer` generates a new password for every admin
+account left with the reset marker and logs it at `WARN`:
+
+```
+Admin password has been reset for user <username>. New password: <password>
+```
+
+Copy that password from the log right after the upgrade; it is not stored anywhere and is not
+logged again.
+
+**Resetting other users:** a non-admin account left with the reset marker cannot log in until an
+admin resets its password, either from the users page in the web UI or directly with
+`POST /api/users/{userId}/actions/reset-password`.
 
 ## Configuration
 

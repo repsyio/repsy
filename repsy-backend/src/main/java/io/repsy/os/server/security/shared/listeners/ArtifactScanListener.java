@@ -50,6 +50,7 @@ public class ArtifactScanListener {
 
   private static final String DOCKER_REPO_TYPE = "DOCKER";
   private static final String NO_SCANNER_NAME = "none";
+  private static final String SCAN_NOT_FOUND_MSG_ID = "vulnerabilityScanNotFound";
 
   private final @NonNull VulnerabilityScannerRegistry scannerRegistry;
   private final @NonNull VulnerabilityScanTxService scanTxService;
@@ -154,14 +155,49 @@ public class ArtifactScanListener {
               scanInputs.artifactContent(),
               scanInputs.dockerRegistryReference(),
               scanInputs.registryAuthToken()));
+    } catch (final ItemNotFoundException exception) {
+      this.handleScanRowGone(event, scanId, exception);
     } catch (final Exception exception) {
-      log.error(
-          "Vulnerability scan failed for {}@{}",
-          event.artifactName(),
-          event.artifactVersion(),
-          exception);
-      this.scanTxService.recordScanFailure(scanId, resolveFailureMessage(exception));
+      this.handleScanFailure(event, scanId, exception);
     }
+  }
+
+  /**
+   * The scan row is gone when the repo it belonged to was deleted after the scan was queued (the
+   * foreign key is {@code on delete cascade}); the no-op scanner then fails to record its outcome
+   * with {@link ItemNotFoundException}("{@value #SCAN_NOT_FOUND_MSG_ID}"). That is a benign race,
+   * not a real scan failure, so it is logged at INFO and does not record a failed scan for a row
+   * that no longer exists. Any other {@link ItemNotFoundException} is treated as a genuine failure.
+   */
+  private void handleScanRowGone(
+      final @NonNull ArtifactPushedEvent event,
+      final @NonNull UUID scanId,
+      final @NonNull ItemNotFoundException exception) {
+
+    if (!SCAN_NOT_FOUND_MSG_ID.equals(exception.getMessage())) {
+      this.handleScanFailure(event, scanId, exception);
+      return;
+    }
+
+    log.info(
+        "Skipping vulnerability scan outcome for {}@{} (repo={}): the scan row no longer exists,"
+            + " most likely because the repo was deleted while the scan was in flight",
+        event.artifactName(),
+        event.artifactVersion(),
+        event.repoName());
+  }
+
+  private void handleScanFailure(
+      final @NonNull ArtifactPushedEvent event,
+      final @NonNull UUID scanId,
+      final @NonNull Exception exception) {
+
+    log.error(
+        "Vulnerability scan failed for {}@{}",
+        event.artifactName(),
+        event.artifactVersion(),
+        exception);
+    this.scanTxService.recordScanFailure(scanId, resolveFailureMessage(exception));
   }
 
   private @Nullable ScanInputs resolveScanInputs(
