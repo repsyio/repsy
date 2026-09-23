@@ -15,15 +15,18 @@
  */
 package io.repsy.os.server.protocols.helm.shared.chart.services;
 
+import com.github.f4b6a3.uuid.UuidCreator;
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChart;
 import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChartVersion;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepository;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
-import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +35,7 @@ import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -42,6 +46,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @NullMarked
 public class HelmChartService implements ChartService<UUID> {
+
+  private static final String VERSION_UNIQUE_CONSTRAINT = "ux_helm_chart_version__chart_id_version";
 
   private final HelmChartRepository helmChartRepository;
   private final HelmChartVersionRepository helmChartVersionRepository;
@@ -75,6 +81,48 @@ public class HelmChartService implements ChartService<UUID> {
     version.setDigest(form.getDigest());
     version.setSize(form.getSize());
     return this.toDetail(this.helmChartVersionRepository.save(version));
+  }
+
+  @Override
+  @Transactional(rollbackFor = IOException.class)
+  public HelmChartInfo publish(
+      final UUID repoId,
+      final HelmChartForm form,
+      final boolean allowOverride,
+      final ChartFileWriter fileWriter)
+      throws IOException {
+    final HelmChartInfo replaced;
+    final HelmChartInfo published;
+
+    try {
+      final var chart = this.findOrCreateChart(repoId, form.getName());
+      final var existing =
+          this.helmChartVersionRepository.findByChartAndVersion(chart, form.getVersion());
+
+      if (existing.isPresent() && !allowOverride) {
+        throw new ItemAlreadyExistException("chartAlreadyExists");
+      }
+
+      replaced = existing.map(this::toDetail).orElse(null);
+      final var saved = this.findOrCreateVersion(chart, form);
+      // Flush so a unique-index conflict (a concurrent upload of the same version) fails here,
+      // before the file is written. The transaction, and the row lock it holds, stays open while
+      // the file is written, so a losing upload waits for the winner instead of replacing its file.
+      this.helmChartVersionRepository.flush();
+      published = this.toDetail(saved);
+    } catch (final DataIntegrityViolationException e) {
+      // Only that index means the version exists. Any other violation is not the client's
+      // conflict, so it is left to surface as the server error it is.
+      if (!ConstraintViolations.violatesConstraint(e, VERSION_UNIQUE_CONSTRAINT)) {
+        throw e;
+      }
+
+      throw new ItemAlreadyExistException("chartAlreadyExists");
+    }
+
+    fileWriter.write(replaced);
+
+    return published;
   }
 
   @Override
@@ -155,18 +203,27 @@ public class HelmChartService implements ChartService<UUID> {
     return this.helmChartVersionRepository.existsByChartRepoIdAndDigest(repoId, digest);
   }
 
+  /**
+   * Returns the chart row, inserting it when this is the first version of a chart name.
+   *
+   * <p>The insert skips a row that already exists instead of failing on the unique index: on
+   * PostgreSQL a failed statement aborts the transaction, which also holds the version row and the
+   * file write. When a concurrent first upload has inserted the chart but not committed yet, the
+   * statement waits for it, and then finds the committed row.
+   */
   private HelmChart findOrCreateChart(final UUID repoId, final String name) {
+    final var existing = this.helmChartRepository.findByRepoIdAndName(repoId, name);
+
+    if (existing.isPresent()) {
+      return existing.get();
+    }
+
+    this.helmChartRepository.insertIfAbsent(
+        UuidCreator.getTimeOrderedEpoch(), repoId, name, Instant.now());
+
     return this.helmChartRepository
         .findByRepoIdAndName(repoId, name)
-        .orElseGet(
-            () -> {
-              final var repo = new Repo();
-              repo.setId(repoId);
-              final var chart = new HelmChart();
-              chart.setRepo(repo);
-              chart.setName(name);
-              return this.helmChartRepository.save(chart);
-            });
+        .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
   }
 
   private HelmChartVersion findOrCreateVersion(final HelmChart chart, final HelmChartForm form) {
