@@ -33,6 +33,7 @@ import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -132,10 +133,13 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
 
+    // The flat-container version list is documented in ascending version order; the repository
+    // keeps returning rows newest-published-first, so the ordering is fixed up here (RPS-1130).
     return this.packageVersionRepository
         .findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(pkg.getId())
         .stream()
         .map(v -> v.getVersion().toLowerCase(Locale.ROOT))
+        .sorted(NuGetPackageUtils.VERSION_COMPARATOR)
         .toList();
   }
 
@@ -158,10 +162,15 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
 
+    // The registration leaves are documented in ascending version order and paged as a
+    // contiguous range; the repository keeps returning rows newest-published-first, so the
+    // ordering is fixed up here (RPS-1130).
     return this.packageVersionRepository
         .findByNugetPackageIdOrderByPublishedAtDesc(pkg.getId())
         .stream()
         .map(v -> this.converter.toVersionInfo(v, packageId))
+        .sorted(
+            Comparator.comparing(NuGetVersionInfo::version, NuGetPackageUtils.VERSION_COMPARATOR))
         .toList();
   }
 
