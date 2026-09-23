@@ -389,11 +389,13 @@ test.describe('nuget registry rules (raw HTTP)', () => {
       // RPS-1214: NuGetAuthPreProcessor.extractAuthHeader feeds
       // X-NuGet-ApiKey through the SAME Bearer path a raw deploy token uses
       // (normalizeAuthHeader prefixes "Bearer " unless the value already starts with "Basic "/
-      // "Bearer "), and a user/admin PASSWORD is never a valid bearer credential -- yet the panel's
-      // "Option B" text (nuget-config.component.ts) tells users to pass
-      // "<YOUR_PASSWORD_OR_DEPLOY_TOKEN>" as --api-key. Confirmed live: a real password there is
-      // refused with 401, contradicting that text. Not fixed here (frontend docs vs. a server-side
-      // fallback is a coordinator decision).
+      // "Bearer "), and a user/admin PASSWORD is never a valid bearer credential. This is the
+      // intended, documented contract, not an open bug: the panel's "Option B" text
+      // (nuget-config.component.ts) used to tell users to pass their password as --api-key, but
+      // has been corrected to the deploy token only (a password is unattributable in a
+      // single-string header with no username, so honouring it would require testing it against
+      // every user -- a credential oracle). This 401 pins that the server keeps refusing a
+      // password there.
       const admin = adminCredential();
       const v2 = nugetAdapter.version('release');
       const form2 = new FormData();
@@ -409,8 +411,8 @@ test.describe('nuget registry rules (raw HTTP)', () => {
       });
       expect(
         passwordPublish.status,
-        'RPS-1214: X-NuGet-ApiKey never authenticates a user ' +
-          'password (it is fed through the Bearer path), contradicting the panel’s Option B text',
+        'RPS-1214: X-NuGet-ApiKey never authenticates a user password (it is fed through the ' +
+          'Bearer path); the panel’s Option B text now documents the deploy token only',
       ).toBe(401);
 
       // A "Basic <base64>" value in X-NuGet-ApiKey is dispatched unchanged to the Basic path
