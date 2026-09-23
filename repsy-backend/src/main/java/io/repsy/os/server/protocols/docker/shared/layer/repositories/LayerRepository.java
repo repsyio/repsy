@@ -45,6 +45,8 @@ public interface LayerRepository extends JpaRepository<Layer, UUID> {
 
   boolean existsByIdAndRepoId(UUID id, UUID repoId);
 
+  boolean existsByRepoIdAndDigest(UUID repoId, String digest);
+
   long countByRepoIdAndDigestIn(UUID repoId, List<String> digests);
 
   @Query(
