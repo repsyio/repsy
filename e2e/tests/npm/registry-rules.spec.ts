@@ -28,10 +28,11 @@
  *  - A malformed/invalid semver version string is refused with 400 `invalidPackageVersion`
  *    (`PackageUtils.extractVersionNameFromPayload`, before anything is read from the payload beyond
  *    the version name) and stores nothing.
- *  - RPS-1205: a packument's own `dist.tarball` (rewritten by `PackageUtils.fixTarballUrl` at
- *    publish time) and the tarball's real, canonical stored path
- *    (`<packagePath>/-/<tarballFilename>`) are fetched and compared directly, live, to characterise
- *    the bug's exact shape.
+ *  - RPS-1205 (fixed): a packument's own `dist.tarball` (rewritten by `PackageUtils.fixTarballUrl`
+ *    at publish time) and the tarball's real, canonical stored path
+ *    (`<packagePath>/-/<tarballFilename>`) are fetched and compared directly, live -- both now serve
+ *    the same, real bytes; `fixTarballUrl` used to splice the repo name into the path at an offset
+ *    that assumed a cloud, multi-tenant URL shape Repsy OS does not have.
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import {
@@ -194,7 +195,7 @@ test.describe('npm registry rules (raw HTTP)', () => {
   );
 
   test(
-    'RPS-1205: the packument dist.tarball URL vs. the canonical stored path',
+    'RPS-1205 (fixed): the packument dist.tarball URL matches the canonical stored path',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'tarball');
@@ -232,20 +233,19 @@ test.describe('npm registry rules (raw HTTP)', () => {
         'the canonical path serves exactly what was published',
       ).toBe(sha256Hex(bytes));
 
-      // Live evidence (probed against a running instance, see the e2e run report): the packument's
-      // own dist.tarball -- rewritten by PackageUtils.fixTarballUrl, which splices the repo name
-      // into the path at an offset that assumes a cloud, multi-tenant URL shape Repsy OS does not
-      // have -- always answers 404 `itemNotFound` here, never the real bytes. This is the exact
-      // reason a real `npm install` cannot fetch the tarball (`npmAdapter.knownConsumeFailure`,
-      // `clients/npm.ts`), and it is what makes RPS-1205 a URL-construction bug, not a storage one:
-      // the canonical path above always has the real bytes.
-      test.fail(
-        true,
-        `RPS-1205: the packument's dist.tarball ("${distTarballUrl}") answers 404, not the real ` +
-          'tarball -- this is what makes a real npm install fail to fetch it.',
-      );
+      // RPS-1205 (fixed): the packument's own dist.tarball used to be corrupted by
+      // PackageUtils.fixTarballUrl, which spliced the repo name into the path at an offset that
+      // assumed a cloud, multi-tenant URL shape Repsy OS does not have, so it always answered 404
+      // `itemNotFound` here instead of the real bytes -- even though the canonical path above always
+      // had them (a URL-construction bug, not a storage one). fixTarballUrl now rebuilds only the
+      // filename after the last `/-/` from the version's own name/version, which is a no-op for the
+      // URL a real npm client already computes, so dist.tarball is servable too.
       const viaDistTarball = await rawGetTarballByUrl(distTarballUrl as string, admin);
-      expect(viaDistTarball.status).toBe(200);
+      expect(viaDistTarball.status, `dist.tarball ("${distTarballUrl}") is now servable`).toBe(200);
+      expect(
+        sha256Hex(viaDistTarball.body),
+        'dist.tarball serves exactly what was published, same as the canonical path',
+      ).toBe(sha256Hex(bytes));
     },
   );
 });

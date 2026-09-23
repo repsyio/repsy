@@ -616,49 +616,57 @@ identical, even though the exact msgId sometimes differs (see below). The overri
 `registry-rules.spec.ts` additionally pins an invalid/malformed version string at `400
 invalidPackageVersion` (`PackageUtils.extractVersionNameFromPayload`, before anything is stored).
 
-### RPS-1205, confirmed live: the exact shape
+### RPS-1205 (fixed): the exact shape the bug used to have
 
-`PackageUtils.fixTarballUrl` (`repsy-protocols/npm/.../shared/utils/PackageUtils.java`) rewrites a
-version's `dist.tarball` at publish time by splicing the repo name into the URL's path at a fixed
-offset, a transform whose own javadoc describes a cloud, multi-tenant path shape
+`PackageUtils.fixTarballUrl` (`repsy-protocols/npm/.../shared/utils/PackageUtils.java`) used to
+rewrite a version's `dist.tarball` at publish time by splicing the repo name into the URL's path at a
+fixed offset, a transform whose own javadoc described a cloud, multi-tenant path shape
 (`/npm/username/@foo/demo/-/@foo/demo-0.2.1.tgz`) Repsy OS does not have. On OS, a real npm client's
 own `dist.tarball` (computed client-side as `<registry>/<name>/-/<tarballFilename>`, i.e. already
-just `/<repoName>/<packagePath>/-/<file>`) gets a **second, wrong `/<repoName>/` segment spliced into
-the middle of the path**. Live evidence from one run (`tests/npm/registry-rules.spec.ts`):
+just `/<repoName>/<packagePath>/-/<file>`) got a **second, wrong `/<repoName>/` segment spliced into
+the middle of the path**. Live evidence from one run, before the fix (`tests/npm/registry-rules.spec.ts`):
 
 ```
 canonical path "e2e-y50b4j9002-tarball/-/e2e-y50b4j9002-tarball-0.22833922.2.tgz" -> 200
 dist.tarball   "http://localhost:9090/e2e-y50b4j9002-npm-1/e2e-y50b4j9002-tarball/e2e-y50b4j9002-npm-1/-/e2e-y50b4j9002-tarball-0.22833922.2.tgz" -> 404
 ```
 
-(`e2e-y50b4j9002-npm-1` — the repo name — appears twice: once correctly, as the request's own repo
-segment, and once spliced in mid-path by `fixTarballUrl`.) The **canonical path always serves the
+(`e2e-y50b4j9002-npm-1` — the repo name — appeared twice: once correctly, as the request's own repo
+segment, and once spliced in mid-path by `fixTarballUrl`.) The **canonical path always served the
 real, byte-correct tarball** (confirmed by content hash, not just status); **`dist.tarball` always
-answers `404`**, confirmed on unscoped and scoped packages alike (`tests/npm/publish-consume.spec.ts`'s
-scoped-package test). This is what makes RPS-1205 a URL-construction bug, not a storage one, and why
-`npmAdapter.knownConsumeFailure` routes only the final client-exit-code/content-equality consume
-assertions through `test.fail()` (`scenarios/loop.ts`) — the auth-only packument-GET outcome is
-asserted for real, same as every other scenario, and never weakened.
+answered `404`**, confirmed on unscoped and scoped packages alike (`tests/npm/publish-consume.spec.ts`'s
+scoped-package test). This is what made RPS-1205 a URL-construction bug, not a storage one.
 
-### A second, distinct backend bug found live (not RPS-1205, not fixed here)
+**Fixed**: `fixTarballUrl` now rebuilds only the filename after the last `/-/` from the version's own
+`name`/`version`, and leaves everything before it — the client-computed path — untouched. That is a
+no-op for the URL a real npm client already sends (the shape shown above as "canonical path"), so
+`dist.tarball` now matches it and is servable, on unscoped and scoped packages alike. `npmAdapter` no
+longer has a `knownConsumeFailure`, and `tests/npm/registry-rules.spec.ts`'s pin and
+`tests/npm/publish-consume.spec.ts`'s scoped round trip both assert this for real now instead of
+through `test.fail()`.
+
+### RPS-1211 (fixed): redeploying a version without `keywords`
 
 Re-publishing (redeploying, `allowOverride: true`) an **existing** npm version whose manifest has no
-`keywords` field crashes with `400 badRequest`, swallowing a `ClassCastException`:
-`PackageUtils.liftFieldsToTopLevel` defaults an absent version `keywords` onto the **top-level**
+`keywords` field used to crash with `400 badRequest`, swallowing a `ClassCastException`:
+`PackageUtils.liftFieldsToTopLevel` defaulted an absent version `keywords` onto the **top-level**
 packument as a native `new String[] {}`; `NpmPackageServiceImpl.updateVersionFromMetadata` (reached
 only on a re-publish of an _existing_ version, via `AbstractNpmProtocolFacade.publish`'s "already
-exists" branch) then calls `addKeywords`/`addMaintainers` with that **top-level** payload instead of
-the version's own sub-object, and `addKeywords` casts what it finds at `"keywords"` to
-`ArrayList<String>` — which throws, because the value is a `String[]`, not an `ArrayList`, when it
-came from that default. A first-ever publish of a package never hits this (`addPackage`'s DB path
+exists" branch) then called `addKeywords`/`addMaintainers` with that **top-level** payload instead of
+the version's own sub-object, and `addKeywords` cast what it found at `"keywords"` to
+`ArrayList<String>` — which threw, because the value was a `String[]`, not an `ArrayList`, when it
+came from that default. A first-ever publish of a package never hit this (`addPackage`'s DB path
 passes the version's own sub-object, which legitimately has no `"keywords"` key, so the read is
-`null` and skipped safely); only a **redeploy of an already-existing version** does. Confirmed live by
-adding `"keywords": []` to a version manifest, which alone made an otherwise-identical redeploy
-succeed. This is **not** the same bug as RPS-1205 (a different bug, a different code path, no
-relation to tarball URLs) — it is filed as **RPS-1211** — and **not fixed here** (out of scope, per
-the plan) — `clients/npm-raw.ts`'s `buildPublishDocument` and `src/packages/npm/package.template.json`
-both always include `"keywords": []` (a real npm client's own normalised manifest almost always does
-too), which routes around it without touching backend code.
+`null` and skipped safely); only a **redeploy of an already-existing version** did. This is **not**
+the same bug as RPS-1205 (a different bug, a different code path, no relation to tarball URLs).
+
+**Fixed**: `PackageUtils.liftFieldsToTopLevel` now defaults `keywords` to an empty `ArrayList`
+instead of a `String[]` (same `[]` on the wire), and `NpmPackageServiceImpl.addKeywords`/
+`addMaintainers` read their input through an `instanceof Collection<?>` guard instead of an unchecked
+cast, so no shape can throw there again. `clients/npm-raw.ts`'s `buildPublishDocument` and
+`src/packages/npm/package.template.json` still always include `"keywords": []` (a real npm client's
+own normalised manifest almost always does too, and removing it to add a no-`keywords` redeploy
+scenario is tracked as a small follow-up, not required for this fix to be effective).
 
 ## Cargo runner
 
