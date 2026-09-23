@@ -47,7 +47,7 @@ describe('HelmService', () => {
       'getHelmChartVersions',
       'getHelmChartDetail',
       'deleteAllHelmChartVersions',
-      'deleteHelmChart',
+      'deleteHelmChartVersion',
       'getHelmChartOciTags',
     ]);
     TestBed.configureTestingModule({
@@ -119,12 +119,12 @@ describe('HelmService', () => {
         args: [REPO, CHART],
         response: restResponse('ignored'),
         expected: undefined,
-        notCalled: () => [helmApi.deleteHelmChart],
+        notCalled: () => [helmApi.deleteHelmChartVersion],
       },
       {
         name: 'deleteChart (one version)',
         invoke: (s) => s.deleteChart(CHART, VERSION),
-        api: () => helmApi.deleteHelmChart,
+        api: () => helmApi.deleteHelmChartVersion,
         args: [REPO, CHART, VERSION],
         response: restResponse('ignored'),
         expected: undefined,

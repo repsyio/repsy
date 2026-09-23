@@ -79,8 +79,8 @@ public interface NpmStorageService {
 
   Path getPackageBasePath(@Nullable String scopeName, String packageName);
 
-  String getReadmeContent(UUID repoId, String repoName, Path packageBasePath, String versionName)
-      throws IOException;
+  @Nullable String getReadmeContent(
+      UUID repoId, String repoName, Path packageBasePath, String versionName) throws IOException;
 
   Resource getTarball(
       UUID repoId,

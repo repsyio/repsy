@@ -449,22 +449,39 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
   }
 
   @Override
-  public String getReadmeContent(
+  public @Nullable String getReadmeContent(
       final UUID repoId,
       final String repoName,
       final Path packageBasePath,
       final String versionName)
       throws IOException {
 
+    // A missing metadata.json is left to throw ItemNotFoundException out of getMetadata() below:
+    // it means storage itself is broken for this package, which is a real error the version
+    // detail page should surface, unlike the three cases handled here (RPS-1143). Those instead
+    // mean this one version's entry is incomplete -- for example after a partial publish or a
+    // manual storage edit -- while every other field on the page still comes from the database,
+    // so the page renders without a README rather than 500ing.
     final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
     final var storagePath = StoragePath.of(repoId, metadataPath.toString());
 
     final var metadata = this.getMetadata(storagePath, repoName);
 
     final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
+
+    if (versions == null) {
+      return null;
+    }
+
     final var version = (Map<String, Object>) versions.get(versionName);
 
-    return (String) version.get("readme");
+    if (version == null) {
+      return null;
+    }
+
+    final var readme = version.get("readme");
+
+    return readme instanceof String readmeContent ? readmeContent : null;
   }
 
   @Override
