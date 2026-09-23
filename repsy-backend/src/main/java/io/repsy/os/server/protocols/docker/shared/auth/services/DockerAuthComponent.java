@@ -107,15 +107,6 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
     }
   }
 
-  private @Nullable AuthenticationType extractAuthenticationTypeSafely(final String authHeader) {
-
-    try {
-      return this.jwtUtils.extractAuthenticationType(authHeader, TokenRealm.PROTOCOL);
-    } catch (final IllegalArgumentException _) {
-      return null;
-    }
-  }
-
   private Credentials getBasicAuthCredentials(final String basicToken) {
 
     final var credentials = extractCredentialsFromBasicToken(basicToken);
@@ -162,42 +153,22 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
     return Optional.of(token);
   }
 
+  /**
+   * Docker clients exchange Basic credentials for a JWT at {@code /v2/token} first, so a raw
+   * deploy-token secret handed to {@code /v2} directly as a Bearer value must be refused, not
+   * accepted the way every other protocol accepts it (RPS-1171).
+   */
   @Override
-  public void handleBearerAuth(
-      final String authHeader, final UUID repoId, final Permission permission) {
-
-    final var authType = this.extractAuthenticationTypeSafely(authHeader);
-
-    if (authType == AuthenticationType.DEPLOY_TOKEN) {
-      this.authorizeTokenRequestTokenId(
-          repoId, this.jwtUtils.extractUserId(authHeader, TokenRealm.PROTOCOL), permission);
-      return;
-    }
-
-    if (authType == AuthenticationType.DOCKER_SCAN) {
-      this.authorizeScannerToken(authHeader, repoId, permission);
-      return;
-    }
-
-    // Public reads never reach this method, they skip authentication. Anything that does (a write
-    // or a private repo) needs a real credential, which an anonymous token is not.
-    if (authType == AuthenticationType.ANONYMOUS) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    final var username = this.jwtUtils.verifyAndExtractUsername(authHeader, TokenRealm.PROTOCOL);
-    final var userInfo = this.userTxService.getUserByUsernameOptional(username).orElse(null);
-
-    // A valid token of a user who no longer exists is an authentication failure, never a downgrade
-    // to an anonymous caller (RPS-962, RPS-1027).
-    if (userInfo == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
-
-    this.authorizeUser(userInfo, permission);
+  protected boolean acceptsRawDeployTokenBearer() {
+    return false;
   }
 
-  private void authorizeScannerToken(
+  /**
+   * A scanner token is repo-scoped and carries no user; only Docker issues it, for its
+   * vulnerability scanner to re-pull the image it just scanned.
+   */
+  @Override
+  protected void authorizeScannerBearer(
       final String authHeader, final UUID repoId, final Permission permission) {
 
     if (permission != Permission.READ) {

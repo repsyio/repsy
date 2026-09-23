@@ -119,6 +119,25 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
         .startsWith("Basic realm=");
   }
 
+  /**
+   * RPS-1165: only a credential failure is answered as 401. Anything else (a database outage, a
+   * bug) must reach {@code ErrorHandler} so it is logged and answered 500, instead of looking like
+   * a wrong credential to the client.
+   */
+  @Test
+  @DisplayName("lets a non-authentication exception propagate instead of answering 401")
+  void nonAuthenticationExceptionPropagates() {
+    when(this.authService.authenticateUserDockerCli(AUTH_HEADER))
+        .thenThrow(new IllegalStateException("database is down"));
+
+    assertThatThrownBy(
+            () ->
+                this.handler.handle(
+                    new ProtocolContext(), this.tokenRequest(), new MockHttpServletResponse()))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("database is down");
+  }
+
   @Test
   @DisplayName("lets a client over the failed-login limit through as an exception, not 401")
   void tooManyRequests() {

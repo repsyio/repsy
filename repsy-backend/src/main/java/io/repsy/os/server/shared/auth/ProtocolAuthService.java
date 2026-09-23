@@ -22,6 +22,7 @@ import static io.repsy.os.shared.auth.utils.AuthUtils.isBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBearerToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.removeBasicPrefix;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.generated.model.RepoPermissionInfo;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
@@ -83,12 +84,12 @@ public class ProtocolAuthService {
 
     final var bearerToken = authHeader.substring(AUTH_BEARER.length());
 
-    if (this.tryAuthorizeWithDeployToken(repoId, bearerToken, permission)) {
+    if (this.acceptsRawDeployTokenBearer()
+        && this.tryAuthorizeWithDeployToken(repoId, bearerToken, permission)) {
       return;
     }
 
-    final var authenticationType =
-        this.jwtUtils.extractAuthenticationType(authHeader, TokenRealm.PROTOCOL);
+    final var authenticationType = this.extractAuthenticationTypeChecked(authHeader);
 
     if (authenticationType == AuthenticationType.DEPLOY_TOKEN) {
       this.authorizeTokenRequestTokenId(
@@ -96,14 +97,57 @@ public class ProtocolAuthService {
       return;
     }
 
-    // A scanner token is repo-scoped and has no user; only Docker knows how to authorize it. An
-    // anonymous token has no user either, so its username claim must not be looked up (RPS-986).
-    if (authenticationType == AuthenticationType.DOCKER_SCAN
-        || authenticationType == AuthenticationType.ANONYMOUS) {
+    // A scanner token is repo-scoped and has no user; only Docker knows how to authorize one, so
+    // every other protocol keeps refusing it through the hook's default.
+    if (authenticationType == AuthenticationType.DOCKER_SCAN) {
+      this.authorizeScannerBearer(authHeader, repoId, permission);
+      return;
+    }
+
+    // An anonymous token has no user either, so its username claim must not be looked up
+    // (RPS-986).
+    if (authenticationType == AuthenticationType.ANONYMOUS) {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
     this.authorizeJWTRequest(authHeader, permission);
+  }
+
+  /**
+   * Whether a raw deploy-token secret may be presented as the Bearer value itself, as {@link
+   * #tryAuthorizeWithDeployToken} checks. True for every protocol except Docker, whose clients
+   * exchange Basic credentials for a JWT at {@code /v2/token} first: a raw deploy-token secret
+   * handed to {@code /v2} as a Bearer value must be refused, not silently accepted.
+   */
+  protected boolean acceptsRawDeployTokenBearer() {
+    return true;
+  }
+
+  /**
+   * Authorizes a {@link AuthenticationType#DOCKER_SCAN} bearer token. Only Docker issues this type
+   * (a repo-scoped, user-less token minted for its vulnerability scanner), so every other protocol
+   * keeps this default of refusing it.
+   */
+  protected void authorizeScannerBearer(
+      final @NonNull String authHeader,
+      final @NonNull UUID repoId,
+      final @NonNull Permission permission) {
+    throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+  }
+
+  /**
+   * {@link JwtUtils#extractAuthenticationType} rejects a claim it does not recognize with {@link
+   * BadRequestException}. That is right for a request body the client controls, but an unrecognized
+   * {@code authentication_type} claim in a bearer token is a credential problem, not a bad request,
+   * so every protocol answers it the same way an invalid signature would: 401.
+   */
+  private @NonNull AuthenticationType extractAuthenticationTypeChecked(
+      final @NonNull String authHeader) {
+    try {
+      return this.jwtUtils.extractAuthenticationType(authHeader, TokenRealm.PROTOCOL);
+    } catch (final BadRequestException _) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
   }
 
   /**

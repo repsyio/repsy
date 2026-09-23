@@ -30,6 +30,7 @@ import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.server.shared.auth.AuthThrottleProperties;
 import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
 import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
+import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -237,14 +238,13 @@ class DockerAuthComponentTest {
     @Test
     @DisplayName("handleBearerAuth still lets the token of an existing user through")
     void existingUserStillAuthorized() {
-      when(DockerAuthComponentTest.this.userTxService.getUserByUsernameOptional("ghost"))
+      when(DockerAuthComponentTest.this.userTxService.getAuthenticatedUserByUsername("ghost"))
           .thenReturn(
-              Optional.of(
-                  UserInfo.builder()
-                      .id(UUID.randomUUID())
-                      .username("ghost")
-                      .role(UserRole.USER)
-                      .build()));
+              UserInfo.builder()
+                  .id(UUID.randomUUID())
+                  .username("ghost")
+                  .role(UserRole.USER)
+                  .build());
 
       assertThatCode(
               () -> this.component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ))
@@ -319,6 +319,101 @@ class DockerAuthComponentTest {
           () -> this.component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.WRITE));
       verify(DockerAuthComponentTest.this.userTxService, never())
           .getUserByUsernameOptional(anyString());
+    }
+  }
+
+  /**
+   * RPS-1171: Docker's clients exchange Basic credentials for a JWT at {@code /v2/token} first, so
+   * {@code /v2} must never accept a raw deploy-token secret directly as the Bearer value the way
+   * every other protocol accepts it (pinned end-to-end by {@code QueryTokenRefusedIT}).
+   */
+  @Nested
+  @DisplayName("a raw deploy-token secret is never accepted as the bearer value")
+  class RawDeployTokenBearer {
+
+    private static final String BEARER = "Bearer signed.jwt.token";
+
+    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+    private final DeployTokenService deployTokenService = Mockito.mock(DeployTokenService.class);
+
+    private final DockerAuthComponent component =
+        new DockerAuthComponent(
+            DockerAuthComponentTest.this.userTxService,
+            this.jwtUtils,
+            this.deployTokenService,
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+
+    @Test
+    @DisplayName("handleBearerAuth never looks the value up as a deploy token")
+    void neverTriesTheRawSecretAsADeployToken() {
+      final var repoId = UUID.randomUUID();
+      final var info = new DeployTokenInfo();
+      info.setId(UUID.randomUUID());
+      // Stubbed to succeed if it were ever tried, so this pins that the lookup is skipped
+      // entirely, not merely that a not-found lookup happens to end in a refusal.
+      when(this.deployTokenService.findByRepoIdAndToken(repoId, "signed.jwt.token"))
+          .thenReturn(Optional.of(info));
+      when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenThrow(new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED));
+
+      assertThatThrownBy(() -> this.component.handleBearerAuth(BEARER, repoId, Permission.READ))
+          .isInstanceOf(UnAuthorizedException.class);
+      verify(this.deployTokenService, never()).findByRepoIdAndToken(any(), anyString());
+    }
+  }
+
+  /**
+   * RPS-1171: {@code DOCKER_SCAN} is the one bearer type the shared base class refuses by default,
+   * because only Docker's vulnerability scanner is issued it.
+   */
+  @Nested
+  @DisplayName("a scanner token authorizes a read of its own repo only")
+  class ScannerToken {
+
+    private static final String BEARER = "Bearer signed.jwt.token";
+
+    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+
+    private final DockerAuthComponent component =
+        new DockerAuthComponent(
+            DockerAuthComponentTest.this.userTxService,
+            this.jwtUtils,
+            Mockito.mock(DeployTokenService.class),
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+
+    ScannerToken() {
+      when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenReturn(AuthenticationType.DOCKER_SCAN);
+    }
+
+    @Test
+    @DisplayName("authorizes a read of the repo it is scoped to")
+    void authorizesReadOfItsOwnRepo() {
+      final var repoId = UUID.randomUUID();
+      when(this.jwtUtils.extractUserId(BEARER, TokenRealm.PROTOCOL)).thenReturn(repoId);
+
+      assertThatCode(() -> this.component.handleBearerAuth(BEARER, repoId, Permission.READ))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("refuses a write")
+    void refusesWrite() {
+      final var repoId = UUID.randomUUID();
+      when(this.jwtUtils.extractUserId(BEARER, TokenRealm.PROTOCOL)).thenReturn(repoId);
+
+      assertUnauthorized(() -> this.component.handleBearerAuth(BEARER, repoId, Permission.WRITE));
+    }
+
+    @Test
+    @DisplayName("refuses a read of a different repo")
+    void refusesAnotherRepo() {
+      when(this.jwtUtils.extractUserId(BEARER, TokenRealm.PROTOCOL)).thenReturn(UUID.randomUUID());
+
+      assertUnauthorized(
+          () -> this.component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
     }
   }
 }
