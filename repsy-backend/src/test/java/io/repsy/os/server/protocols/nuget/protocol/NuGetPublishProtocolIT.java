@@ -20,6 +20,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
@@ -70,6 +71,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -605,6 +607,49 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
       assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, id))
           .singleElement()
           .satisfies(v -> assertThat(v.getReadme()).isNull());
+    }
+
+    @Test
+    @DisplayName("decodes XML-escaped nuspec metadata instead of storing it raw (RPS-1145)")
+    void storesXmlEscapedMetadataDecoded() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var id = uniquePackageId();
+      final var nuspec =
+          """
+          <?xml version="1.0" encoding="utf-8"?>
+          <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+            <metadata>
+              <id>%1$s</id>
+              <version>1.0.0</version>
+              <title>%1$s &amp; Co</title>
+              <authors>A &amp; B</authors>
+              <description>Uses &lt;script&gt; safely &amp; correctly</description>
+              <tags>a&amp;b c&amp;d</tags>
+            </metadata>
+          </package>
+          """
+              .formatted(id);
+      final var nupkg =
+          zip(
+              entry("[Content_Types].xml", "<Types/>"),
+              entry("_rels/.rels", "<Relationships/>"),
+              entry(id + ".nuspec", nuspec),
+              entry("lib/net8.0/" + id + ".dll", "MZ fixture assembly for " + id));
+
+      assertStatus(
+          NuGetPublishProtocolIT.this.pushAs(
+              repo, nupkg, NuGetPublishProtocolIT.this.adminProtocolBearerToken()),
+          201);
+
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, id))
+          .singleElement()
+          .satisfies(
+              v -> {
+                assertThat(v.getTitle()).isEqualTo(id + " & Co");
+                assertThat(v.getAuthors()).isEqualTo("A & B");
+                assertThat(v.getDescription()).isEqualTo("Uses <script> safely & correctly");
+                assertThat(v.getTags()).isEqualTo("a&b c&d");
+              });
     }
 
     /**
@@ -1569,6 +1614,38 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
           .contains("NuGet publish failed")
           .contains("java.lang.IllegalStateException: storage backend down");
       verifyNoInteractions(NuGetPublishProtocolIT.this.usageUpdateService);
+    }
+  }
+
+  /**
+   * RPS-1146: {@code createNuGetPackageVersion} used to catch a dependency-JSON serialization
+   * failure, warn, and store the version with a {@code null} dependencies column anyway. It now
+   * lets the failure propagate, so the push fails instead of silently losing the dependencies the
+   * client sent.
+   */
+  @Nested
+  @DisplayName("dependency serialization failure (RPS-1146)")
+  class DependencySerializationFailure {
+
+    @Test
+    @DisplayName("fails the push instead of storing null dependencies, and stores nothing")
+    void failsInsteadOfStoringNullDependencies() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.nugetRepo();
+      final var pkg = new Pkg(uniquePackageId(), "1.0.0", true);
+
+      try (var utils = mockStatic(NuGetPackageUtils.class, Mockito.CALLS_REAL_METHODS)) {
+        utils
+            .when(() -> NuGetPackageUtils.toDependenciesJson(any()))
+            .thenThrow(new IllegalStateException("mapper misconfigured"));
+
+        NuGetPublishProtocolIT.this
+            .protocol(
+                push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.errors[0].message").value("Publish failed"));
+      }
+
+      NuGetPublishProtocolIT.this.assertNothingStored(repo, pkg.id());
     }
   }
 

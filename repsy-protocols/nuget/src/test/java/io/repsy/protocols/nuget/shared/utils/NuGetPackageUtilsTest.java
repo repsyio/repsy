@@ -318,6 +318,97 @@ class NuGetPackageUtilsTest {
     }
   }
 
+  @Nested
+  @DisplayName("XML-escaped and CDATA nuspec metadata, read with the XML parser (RPS-1145)")
+  class DecodedMetadata {
+
+    private static String nuspec(final String metadataXml) {
+      return "<package><metadata><id>Some.Package</id><version>1.0.0</version>%s</metadata></package>"
+          .formatted(metadataXml);
+    }
+
+    @Test
+    @DisplayName("decodes an XML-escaped ampersand in the title instead of storing it raw")
+    void decodesAmpersandInTitle() {
+      final var xml = nuspec("<title>A &amp; B</title>");
+
+      assertThat(NuGetPackageUtils.extractTitle(xml)).isEqualTo("A & B");
+    }
+
+    @Test
+    @DisplayName("decodes an escaped angle bracket in the description")
+    void decodesAngleBracketInDescription() {
+      final var xml = nuspec("<description>Uses &lt;script&gt; safely</description>");
+
+      assertThat(NuGetPackageUtils.extractMetadataField(xml, "description"))
+          .isEqualTo("Uses <script> safely");
+    }
+
+    @Test
+    @DisplayName("decodes an escaped ampersand in the authors")
+    void decodesAmpersandInAuthors() {
+      final var xml = nuspec("<authors>A &amp; B</authors>");
+
+      assertThat(NuGetPackageUtils.extractMetadataField(xml, "authors")).isEqualTo("A & B");
+    }
+
+    @Test
+    @DisplayName("decodes an escaped ampersand in the tags")
+    void decodesAmpersandInTags() {
+      final var xml = nuspec("<tags>a&amp;b c&amp;d</tags>");
+
+      assertThat(NuGetPackageUtils.extractTags(xml)).isEqualTo("a&b c&d");
+    }
+
+    @Test
+    @DisplayName("decodes an escaped ampersand in a URL element")
+    void decodesAmpersandInUrl() {
+      final var xml = nuspec("<projectUrl>https://example.test/x?a=1&amp;b=2</projectUrl>");
+
+      assertThat(NuGetPackageUtils.extractUrl(xml, "projectUrl"))
+          .isEqualTo("https://example.test/x?a=1&b=2");
+    }
+
+    @Test
+    @DisplayName("reads a CDATA section decoded")
+    void readsCdataSection() {
+      final var xml = nuspec("<description><![CDATA[A & B <fine>]]></description>");
+
+      assertThat(NuGetPackageUtils.extractMetadataField(xml, "description"))
+          .isEqualTo("A & B <fine>");
+    }
+
+    @Test
+    @DisplayName("does not read a tag inside a comment")
+    void ignoresTagInsideComment() {
+      final var xml = nuspec("<!-- <title>Commented</title> --><title>Real</title>");
+
+      assertThat(NuGetPackageUtils.extractTitle(xml)).isEqualTo("Real");
+    }
+
+    @Test
+    @DisplayName("is null, not the commented value, when only a commented tag is present")
+    void commentedOnlyTagIsAbsent() {
+      final var xml = nuspec("<!-- <title>Commented</title> -->");
+
+      assertThat(NuGetPackageUtils.extractTitle(xml)).isNull();
+    }
+
+    @Test
+    @DisplayName("is null for a metadata field the nuspec does not declare")
+    void missingFieldIsNull() {
+      assertThat(NuGetPackageUtils.extractMetadataField(nuspec(""), "description")).isNull();
+    }
+
+    @Test
+    @DisplayName("is null, like the regular-expression reader, when the nuspec is not well-formed")
+    void malformedNuspecIsNull() {
+      final var xml = "<package><metadata><title>A &amp; B</title>";
+
+      assertThat(NuGetPackageUtils.extractMetadataField(xml, "title")).isNull();
+    }
+  }
+
   @ParameterizedTest
   @CsvSource({
     "/v3/package/Some.Package/1.0.0, Some.Package, 1.0.0",
