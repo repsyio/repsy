@@ -135,7 +135,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
     final var versionPair = PackageUtils.extractVersionFromPayload(payload);
 
-    PackageUtils.fixTarballUrl(versionPair.getSecond(), repoName);
+    this.fixTarballUrl(versionPair.getSecond(), repoName);
 
     final var distributionTags = (Map<String, String>) payload.get(NpmConstants.DIST_TAGS);
 
@@ -215,7 +215,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
     timeField.put(versionPair.getFirst(), PackageUtils.getFormattedCurrentTime());
     timeField.put(NpmConstants.MODIFIED, PackageUtils.getFormattedCurrentTime());
 
-    PackageUtils.fixTarballUrl(versionPair.getSecond(), repoName);
+    this.fixTarballUrl(versionPair.getSecond(), repoName);
 
     if (distTag.getKey().equals(NpmConstants.LATEST)) { // npm publish
 
@@ -326,6 +326,23 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
             repoName, metadata, StoragePath.of(repoId, metadataPath.toString()));
 
     return Pair.of(latestVersion, total - metadataUsage.getDiskUsage());
+  }
+
+  /**
+   * Rewrites the freshly published version's {@code dist.tarball}, once the repo name is known.
+   *
+   * <p>Delegates to {@link PackageUtils#fixTarballUrl(Map)}, which normalizes only the filename
+   * after {@code /-/} and otherwise leaves the client-computed URL untouched. {@code repoName} is
+   * unused on Repsy OS: the URL npm computes there already carries the correct (and only) repo
+   * segment. The parameter, and this seam, exist so a subclass that serves a URL layout where the
+   * repo name is not already part of the client's path (for example a multi-tenant registry) can
+   * override just this method instead of reintroducing a positional splice into the shared {@link
+   * PackageUtils}.
+   */
+  protected void fixTarballUrl(final Map<String, Object> version, final String repoName)
+      throws URISyntaxException {
+
+    PackageUtils.fixTarballUrl(version);
   }
 
   private Resource getResource(final StoragePath storagePath, final String repoName) {
