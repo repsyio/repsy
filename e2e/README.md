@@ -169,8 +169,8 @@ e2e/
       publish-consume.spec.ts   # registerPublishConsumeLoop(golangAdapter) + go-get-build-run, plain-http-creds-refused, dirhash cross-check, mixed-case and wire-trace real-client tests
       registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, upload URL spellings, sha256, immutability, zip validation, @v/list/@latest, sumdb, HEAD, delete+reupload) + G1/G2/G10 candidates
     ruby/
-      publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install/gem-fetch (RPS-1233/RPS-1234, test.fail), anonymous-push, yank (RPS-1235), USER-role-push, bundle-install-e2e real-client tests
-      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow, specs.4.8.gz zlib, gemspec.rz 404, HEAD-always-200, platform gem, RPS-1236) + RPS-1233/RPS-1234/RPS-1235/RPS-1236/RPS-1237 candidates
+      publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install (RPS-1233, fixed)/gem-fetch (RPS-1234, test.fail), anonymous-push, yank (RPS-1235), USER-role-push, bundle-install-e2e real-client tests
+      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow, specs.4.8.gz zlib, gemspec.rz (RPS-1233, fixed), HEAD-always-200, platform gem, RPS-1236) + RPS-1234/RPS-1235/RPS-1236/RPS-1237 candidates
 ```
 
 ## Setup
@@ -2131,10 +2131,13 @@ lazy fetch is simply never triggered. **Consequently `ruby.ts`'s `resolve()` dri
 toolchain with NO `knownConsumeFailure` hook at all** — every scenario's consume side is asserted for
 real, exactly like maven/npm/pypi, per the plan's own explicit fallback instruction for a refuted H1.
 
-RPS-1233 is real (confirmed live, `registry-rules.spec.ts`'s R10 test, `test.fail()`-pinned) and DOES
-break `gem install --source .../gem/`/`gem fetch` — both `gem` subcommands are pinned as their own
-dedicated `test.fail()`-marked real-client tests in `publish-consume.spec.ts`, never the catalog
-loop's own consumer.
+RPS-1233 was real (confirmed live, `registry-rules.spec.ts`'s R10 test) and broke `gem install
+--source .../gem/`; it is now fixed by a concrete `RubyGemspecHandler` that registers the route, and
+both `registry-rules.spec.ts`'s R10 test and `publish-consume.spec.ts`'s dedicated `gem install`
+real-client test assert the fixed behavior instead of pinning the failure. `gem fetch` still fails on
+a separate bug (RPS-1234, the zlib/gzip mismatch below) and stays pinned with `test.fail()` in
+`publish-consume.spec.ts` — neither `gem` subcommand routes through the catalog loop's own consumer
+(`bundle install`, per H1 above).
 
 ### Scenario mapping onto the shared catalog
 
@@ -2159,7 +2162,7 @@ nothing stored (R6); the full yank flow — success, re-yank refusal, a read-onl
 password both refused with 401 (`MANAGE` permission), a yanked version's `.gem` file 404ing, and a
 yanked version rejecting even an `allowOverride:true` re-push (R8); a panel-API delete (not a yank)
 allowing a clean re-publish (R5/R16); `specs.4.8.gz`'s zlib-not-gzip bytes and the prerelease/latest
-split (R9, RPS-1234); the missing `gemspec.rz` route (R10, RPS-1233); unknown-gem 404s and an empty repo's
+split (R9, RPS-1234); the `gemspec.rz` route (R10, RPS-1233, fixed); unknown-gem 404s and an empty repo's
 listings (R11); `HEAD`-always-200 (R12, RPS-1237 observation); a platform gem's filename/info-line shape
 and yank's explicit-platform requirement (R14); that `releases`/`snapshots` are never read (R15); and
 RPS-1236's hyphen-before-digit download bug (R13).
@@ -2206,8 +2209,9 @@ adapter code was written.
   live — `registry-rules.spec.ts`'s happy-path-shape test and the yank test both assert it.
 - **H11** (`specs.4.8.gz` is zlib not gzip; `gem fetch` fails on it): confirmed live — RPS-1234, and the
   dedicated `gem fetch` real-client test (`test.fail()`).
-- **H12** (`gem install --source` fails on the missing `gemspec.rz` route): confirmed live — RPS-1233, and
-  the dedicated `gem install` real-client test (`test.fail()`).
+- **H12** (`gem install --source` failed on the missing `gemspec.rz` route): confirmed live — RPS-1233,
+  now fixed; the dedicated `gem install` real-client test asserts the fixed behavior instead of
+  pinning the failure.
 - **H13** (a yanked version is listed in `/info` prefixed `-`, not omitted): confirmed live — RPS-1235.
 - **H14** (a gem named with a `-<digit>` segment publishes but cannot be downloaded): confirmed live —
   RPS-1236, `registry-rules.spec.ts`'s dedicated test (`test.fail()`); this is exactly why `packageName()`
@@ -2232,14 +2236,16 @@ adapter code was written.
 
 ### Backend bug candidates found while reading and confirmed live (do not fix here)
 
-- **RPS-1233** — `quick/Marshal.4.8/<name>-<version>.gemspec.rz` has no backend route at all: no class
-  under `repsy-backend`'s Ruby package extends `AbstractRubyGemspecHandler` (grep-confirmed), even
-  though the abstract handler, `RubyGemspecMarshalWriter` and `RubyProtocolFacade.getGemspec` all
-  exist and are implemented in `repsy-protocols/ruby`. The router's catch-all answers `404
-unknownPath`. Breaks `gem install --source`/`gem fetch` (confirmed live, `test.fail()`-pinned real-
-  client tests); does NOT break `bundle install` (H1's refutation, the headline finding of this step).
-  Highest-severity candidate of this step, since it silently drops an entire, otherwise-implemented
-  feature from being reachable.
+- **RPS-1233 (fixed)** — `quick/Marshal.4.8/<name>-<version>.gemspec.rz` had no backend route at all:
+  no class under `repsy-backend`'s Ruby package extended `AbstractRubyGemspecHandler` (grep-confirmed),
+  even though the abstract handler, `RubyGemspecMarshalWriter` and `RubyProtocolFacade.getGemspec`
+  were all already implemented in `repsy-protocols/ruby`. The router's catch-all answered `404
+unknownPath`. Broke `gem install --source`/`gem fetch`; did NOT break `bundle install` (H1's
+  refutation, the headline finding of this step). Was the highest-severity candidate of this step,
+  since it silently dropped an entire, otherwise-implemented feature from being reachable. Fixed by a
+  concrete `RubyGemspecHandler` that registers the route: `gem install` now succeeds end-to-end
+  (`publish-consume.spec.ts`) and `registry-rules.spec.ts`'s R10 test asserts `200`. `gem fetch` still
+  fails, on the separate RPS-1234 zlib/gzip bug below.
 - **RB-2** (observation) — `/info/<gem>` never emits `ruby:`/`rubygems:` requirement keys
   (`CompactIndexFormatter.appendVersionLine`), even though `required_ruby_version` is correctly parsed
   by `GemspecParser` and stored on `ruby_gem_version.required_ruby_version`. This is architecturally
