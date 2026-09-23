@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.ruby.protocol;
 
 import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.PUBLISH_PATH;
 import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.gem;
+import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.gemWithDependency;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -633,6 +634,110 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
       assertThat(this.storedGemFiles(repo)).containsExactly(GEM + "-1.0.0.gem");
       assertThat(storageDirOf(repo).resolve("gems").resolve(GEM).resolve(GEM + "-1.0.0.gem"))
           .hasBinaryContent(original);
+    }
+  }
+
+  /**
+   * RPS-1135: a dependency's name or formatted requirement list longer than its {@code
+   * ruby_gem_dependency} column used to fail the row insert the same way the {@code
+   * ruby_gem_version} columns did before RPS-1071. Both are now rejected with a 400 that names the
+   * field, before any row or file is written, and a value exactly at the limit is stored.
+   */
+  @Nested
+  @DisplayName("over-long dependency metadata (RPS-1135)")
+  class OverLongDependencies {
+
+    private static final String GEM = "long-dependency";
+
+    private Repo newRepo() {
+      return RubyGemProtocolIT.this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
+    }
+
+    private ResultActions push(final Repo repo, final byte[] gem) throws Exception {
+      return RubyGemProtocolIT.this.push(
+          repo.getName(), gem, RubyGemProtocolIT.this.adminProtocolBearerToken());
+    }
+
+    private int rowCount(final Repo repo) {
+      final var count =
+          RubyGemProtocolIT.this.jdbcTemplate.queryForObject(
+              """
+              select (select count(*) from ruby_gem where repo_id = ?)
+                   + (select count(*) from ruby_gem_version v join ruby_gem g on g.id = v.gem_id
+                       where g.repo_id = ?)
+                   + (select count(*) from ruby_gem_dependency d
+                       join ruby_gem_version v on v.id = d.gem_version_id
+                       join ruby_gem g on g.id = v.gem_id
+                       where g.repo_id = ?)
+              """,
+              Integer.class,
+              repo.getId(),
+              repo.getId(),
+              repo.getId());
+
+      return count == null ? 0 : count;
+    }
+
+    private List<String> storedGemFiles(final Repo repo) throws IOException {
+      final var dir = storageDirOf(repo);
+      if (!Files.exists(dir)) {
+        return List.of();
+      }
+      try (final var files = Files.walk(dir)) {
+        return files
+            .filter(Files::isRegularFile)
+            .map(file -> file.getFileName().toString())
+            .filter(name -> name.endsWith(".gem"))
+            .toList();
+      }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({"name,gemDependencyNameTooLong", "requirements,gemDependencyRequirementsTooLong"})
+    @DisplayName(
+        "rejects an over-long dependency field with a 400 that names it and stores nothing")
+    void rejectsOverLongDependencyField(final String field, final String msgId) throws Exception {
+      final var repo = this.newRepo();
+      final var depName =
+          "name".equals(field) ? "d".repeat(GemspecParser.MAX_DEPENDENCY_NAME_LENGTH + 1) : "dep";
+      final var depVersion =
+          "requirements".equals(field)
+              ? "1".repeat(GemspecParser.MAX_DEPENDENCY_REQUIREMENTS_LENGTH - 2)
+              : "1.0";
+
+      this.push(repo, gemWithDependency(GEM, "1.0.0", depName, depVersion))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.msgId").value(msgId));
+
+      assertThat(this.rowCount(repo)).as("no gem, version or dependency row").isZero();
+      assertThat(this.storedGemFiles(repo)).as("no .gem file").isEmpty();
+    }
+
+    @Test
+    @DisplayName("stores a dependency name and requirements exactly at the column limit")
+    void storesDependencyFieldsAtTheLimit() throws Exception {
+      final var repo = this.newRepo();
+      final var depName = "d".repeat(GemspecParser.MAX_DEPENDENCY_NAME_LENGTH);
+      final var depVersion = "1".repeat(GemspecParser.MAX_DEPENDENCY_REQUIREMENTS_LENGTH - 3);
+
+      this.push(repo, gemWithDependency(GEM, "1.0.0", depName, depVersion))
+          .andExpect(status().isOk());
+
+      final var stored =
+          RubyGemProtocolIT.this.jdbcTemplate.queryForMap(
+              """
+              select d.name, d.requirements
+                from ruby_gem_dependency d
+                join ruby_gem_version v on v.id = d.gem_version_id
+                join ruby_gem g on g.id = v.gem_id
+               where g.repo_id = ? and g.name = ?
+              """,
+              repo.getId(),
+              GEM);
+
+      assertThat(stored)
+          .containsEntry("name", depName)
+          .containsEntry("requirements", ">= " + depVersion);
     }
   }
 }

@@ -452,4 +452,82 @@ class GemspecParserTest {
       return java.util.stream.IntStream.range(0, count).mapToObj(i -> "a".repeat(length)).toList();
     }
   }
+
+  /**
+   * RPS-1135: a dependency's name and its formatted requirement list, stored in {@code
+   * ruby_gem_dependency}, used to fail the row insert the same way the {@code ruby_gem_version}
+   * columns did before RPS-1071. Both are now rejected with a 400 that names the field, before
+   * anything is written.
+   */
+  @Nested
+  @DisplayName("over-long dependency metadata (RPS-1135)")
+  class OverLongDependencies {
+
+    /** A gemspec whose one dependency has the given name and {@code >= <version>} requirement. */
+    private static byte[] gemWithDependency(final String name, final String version)
+        throws IOException {
+      final var yaml =
+          HEADER
+              + """
+              dependencies:
+              - !ruby/object:Gem::Dependency
+                name: "%s"
+                requirement: !ruby/object:Gem::Requirement
+                  requirements:
+                  - - ">="
+                    - !ruby/object:Gem::Version
+                      version: "%s"
+                type: :runtime
+              """
+                  .formatted(name, version);
+
+      return gem(yaml);
+    }
+
+    @Test
+    @DisplayName("parse() rejects a dependency name one over the column limit and names the field")
+    void rejectsOverLongDependencyName() throws IOException {
+      final var name = "d".repeat(GemspecParser.MAX_DEPENDENCY_NAME_LENGTH + 1);
+
+      assertThatThrownBy(() -> parse(gemWithDependency(name, "1.0")))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessageContaining("gemDependencyNameTooLong");
+    }
+
+    @Test
+    @DisplayName("parse() keeps a dependency name that fills the column exactly")
+    void keepsDependencyNameAtTheLimit() throws IOException {
+      final var name = "d".repeat(GemspecParser.MAX_DEPENDENCY_NAME_LENGTH);
+
+      final var metadata = parse(gemWithDependency(name, "1.0"));
+
+      assertThat(metadata.getRuntimeDependencies())
+          .containsExactly(dependency(name, ">= 1.0", "runtime"));
+    }
+
+    @Test
+    @DisplayName(
+        "parse() rejects a dependency requirement one over the column limit and names the field")
+    void rejectsOverLongDependencyRequirements() throws IOException {
+      // Stored as ">= <version>", so 3 characters longer than the version alone.
+      final var version = "1".repeat(GemspecParser.MAX_DEPENDENCY_REQUIREMENTS_LENGTH - 2);
+
+      assertThatThrownBy(() -> parse(gemWithDependency("demo-dep", version)))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessageContaining("gemDependencyRequirementsTooLong");
+    }
+
+    @Test
+    @DisplayName("parse() keeps a dependency requirement that fills the column exactly")
+    void keepsDependencyRequirementsAtTheLimit() throws IOException {
+      final var version = "1".repeat(GemspecParser.MAX_DEPENDENCY_REQUIREMENTS_LENGTH - 3);
+
+      final var metadata = parse(gemWithDependency("demo-dep", version));
+
+      assertThat(metadata.getRuntimeDependencies())
+          .containsExactly(dependency("demo-dep", ">= " + version, "runtime"));
+      assertThat(metadata.getRuntimeDependencies().get(0).getRequirements())
+          .hasSize(GemspecParser.MAX_DEPENDENCY_REQUIREMENTS_LENGTH);
+    }
+  }
 }

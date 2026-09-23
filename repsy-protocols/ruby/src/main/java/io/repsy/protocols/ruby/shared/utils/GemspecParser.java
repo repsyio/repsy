@@ -89,6 +89,15 @@ public class GemspecParser {
   /** {@code ruby_gem_version.required_ruby_version}. */
   public static final int MAX_REQUIRED_RUBY_VERSION_LENGTH = 64;
 
+  // The limits of the ruby_gem_dependency columns a dependency's name and formatted requirement
+  // list are stored in (RPS-1135), counted the same way as above.
+
+  /** {@code ruby_gem_dependency.name}. */
+  public static final int MAX_DEPENDENCY_NAME_LENGTH = 255;
+
+  /** {@code ruby_gem_dependency.requirements}. */
+  public static final int MAX_DEPENDENCY_REQUIREMENTS_LENGTH = 255;
+
   private static final String AUTHOR_SEPARATOR = ", ";
   private static final String RUNTIME_DEP = "runtime";
   private static final String DEFAULT_PLATFORM = "ruby";
@@ -136,6 +145,9 @@ public class GemspecParser {
    *   <li>the authors are cut to the last whole author that fits, so the stored list stays valid;
    *       they are only shown, and the full gemspec is stored with the gem
    *   <li>a homepage is dropped, because a cut URL links somewhere else
+   *   <li>a dependency's name and its formatted requirement list are rejected with a 400 that names
+   *       the field (RPS-1135): the name is an identifier the resolver matches other gems against,
+   *       and cutting or dropping a requirement would change what the gem resolves against
    * </ul>
    */
   private static GemMetadata parseMetadataGz(final byte[] gzBytes) {
@@ -314,10 +326,25 @@ public class GemspecParser {
 
       final var typeStr = depType instanceof final String s ? normalizeType(s) : RUNTIME_DEP;
       final var reqStr = formatDepRequirement(depReqs);
+      rejectOverLongDependency(name, reqStr);
 
       result.add(GemDependency.builder().name(name).requirements(reqStr).type(typeStr).build());
     }
     return List.copyOf(result);
+  }
+
+  /**
+   * Rejects a dependency's name or formatted requirement list that is over its {@code
+   * ruby_gem_dependency} column (RPS-1135), the same way {@link #rejectOverLongIdentifiers} does
+   * for the {@code ruby_gem_version} columns.
+   */
+  private static void rejectOverLongDependency(final String name, final String requirements) {
+    if (isTooLong(name, MAX_DEPENDENCY_NAME_LENGTH)) {
+      throw new BadRequestException("gemDependencyNameTooLong");
+    }
+    if (isTooLong(requirements, MAX_DEPENDENCY_REQUIREMENTS_LENGTH)) {
+      throw new BadRequestException("gemDependencyRequirementsTooLong");
+    }
   }
 
   private static String normalizeType(final String type) {

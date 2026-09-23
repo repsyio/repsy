@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.protocols.ruby.shared.utils.GemspecParser;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -49,10 +50,13 @@ public class RubyGemDependency {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private RubyGemVersion gemVersion;
 
-  @Column(name = "name", nullable = false, length = 255)
+  @Column(name = "name", nullable = false, length = GemspecParser.MAX_DEPENDENCY_NAME_LENGTH)
   private String name;
 
-  @Column(name = "requirements", nullable = false, length = 255)
+  @Column(
+      name = "requirements",
+      nullable = false,
+      length = GemspecParser.MAX_DEPENDENCY_REQUIREMENTS_LENGTH)
   private String requirements;
 
   @Column(name = "type", nullable = false, length = 16)
