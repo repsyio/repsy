@@ -167,6 +167,24 @@ storage-gateway:
 admin:
   initial-password: ${ADMIN_INITIAL_PASSWORD:}
 
+app:
+  # Origins the panel API accepts cross-origin, credentialed requests from. Empty (the default)
+  # keeps today's behaviour: any origin is allowed. Comma-separated, exact origins only (e.g.
+  # https://panel.example.com), once set. See CorsGlobalConfiguration.
+  allowed-origins: ${APP_ALLOWED_ORIGINS:}
+
+  csp:
+    # Sends a Content-Security-Policy header (SecurityHeadersFilter) with the panel SPA and its
+    # static assets, so a sanitiser bypass or a future [innerHTML] use has a second barrier.
+    enabled: ${APP_CSP_ENABLED:true}
+    # Send Content-Security-Policy-Report-Only instead of the enforcing header: violations are
+    # reported, nothing is blocked. Useful while rolling a widened/custom policy out.
+    report-only: ${APP_CSP_REPORT_ONLY:false}
+    # Overrides the built-in policy outright. Unset keeps the built-in policy (see
+    # SecurityHeadersFilter), which already allows what index.html loads (Google Tag Manager,
+    # cdnjs.cloudflare.com) plus whatever app.allowed-origins allows for connect-src.
+    policy: ${APP_CSP_POLICY:}
+
 h2:
   tcp-server:
     enabled: ${H2_TCP_SERVER_ENABLED:false}

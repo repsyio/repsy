@@ -21,16 +21,33 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+/**
+ * Allows the panel API to be called cross-origin. See {@link AppCorsProperties} for how {@code
+ * app.allowed-origins} (env {@code APP_ALLOWED_ORIGINS}) restricts this; unset, it keeps today's
+ * behaviour of accepting any origin.
+ */
 @Configuration
 @RequiredArgsConstructor
 public class CorsGlobalConfiguration implements WebMvcConfigurer {
+
+  private final @NonNull AppCorsProperties appCorsProperties;
+
   @Override
   public void addCorsMappings(final @NonNull CorsRegistry registry) {
-    registry
-        .addMapping("/**")
-        .allowedOriginPatterns("*")
-        .allowedMethods("*")
-        .allowedHeaders("*")
-        .allowCredentials(true);
+
+    final var mapping =
+        registry.addMapping("/**").allowedMethods("*").allowedHeaders("*").allowCredentials(true);
+
+    final var allowedOrigins = this.appCorsProperties.allowedOriginList();
+
+    if (allowedOrigins.isEmpty()) {
+      // No app.allowed-origins configured: keep today's behaviour. allowedOriginPatterns("*")
+      // (unlike allowedOrigins("*")) is allowed together with allowCredentials(true), since Spring
+      // reflects the request's actual Origin back instead of a literal "*".
+      mapping.allowedOriginPatterns("*");
+    } else {
+      // allowCredentials(true) requires exact origins, not patterns, once the list is configured.
+      mapping.allowedOrigins(allowedOrigins.toArray(new String[0]));
+    }
   }
 }

@@ -31,6 +31,8 @@ import io.repsy.os.server.security.scanner.trivy.DockerRegistryProperties;
 import io.repsy.os.server.security.scanner.trivy.TrivyScannerProperties;
 import io.repsy.os.server.shared.auth.AuthThrottleProperties;
 import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
+import io.repsy.os.shared.configs.AppCorsProperties;
+import io.repsy.os.shared.configs.ContentSecurityPolicyProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
@@ -56,6 +58,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
   DockerRegistryProperties.class,
   BasicAuthCacheProperties.class,
   AuthThrottleProperties.class,
+  AppCorsProperties.class,
+  ContentSecurityPolicyProperties.class,
 })
 @EnableAsync
 @EnableScheduling
