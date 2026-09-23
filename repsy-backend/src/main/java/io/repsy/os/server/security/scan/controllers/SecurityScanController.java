@@ -27,6 +27,7 @@ import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
 import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.os.shared.utils.PagingOffsetValidator;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -67,6 +68,7 @@ final class SecurityScanController {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
+    PagingOffsetValidator.requireNoOffsetOverflow(page, size);
     final var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
     final var scans = this.scanTxService.listAllScans(severity, repoType, repoName, pageable);
 

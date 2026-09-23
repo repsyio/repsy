@@ -20,6 +20,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.method.HandlerMethod;
@@ -35,6 +36,12 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * here gives every {@code Pageable} endpoint the same answer without rewriting each of them.
  *
  * <p>An absent or blank value is left alone, so the resolver still applies the endpoint's default.
+ *
+ * <p>Once {@code page} and {@code size} are each individually valid, their product is also checked:
+ * Spring Data computes the query offset as {@code page * size} and, further down the JPA/Hibernate
+ * stack, narrows it to an {@code int}, so a combination that overflows {@link Integer#MAX_VALUE}
+ * reaches the database layer as an unhandled exception instead of a validation error. Rejecting it
+ * here keeps that failure a 400, like every other invalid paging value.
  */
 public final class PagingParameterInterceptor implements HandlerInterceptor {
 
@@ -53,21 +60,36 @@ public final class PagingParameterInterceptor implements HandlerInterceptor {
       return true;
     }
 
-    final var invalid = new ArrayList<String>(2);
-
-    if (!isWithin(request.getParameter(PAGE_PARAMETER), 0, Integer.MAX_VALUE)) {
-      invalid.add(PAGE_PARAMETER);
-    }
-
-    if (!isWithin(request.getParameter(SIZE_PARAMETER), 1, MAX_PAGE_SIZE)) {
-      invalid.add(SIZE_PARAMETER);
-    }
-
+    final var invalid = invalidParameters(request);
     if (!invalid.isEmpty()) {
       throw new InvalidPagingParameterException(String.join(",", invalid));
     }
 
     return true;
+  }
+
+  private static @NonNull List<String> invalidParameters(
+      final @NonNull HttpServletRequest request) {
+
+    final var invalid = new ArrayList<String>(2);
+    final var rawPage = request.getParameter(PAGE_PARAMETER);
+    final var rawSize = request.getParameter(SIZE_PARAMETER);
+
+    final var pageValid = isWithin(rawPage, 0, Integer.MAX_VALUE);
+    if (!pageValid) {
+      invalid.add(PAGE_PARAMETER);
+    }
+
+    final var sizeValid = isWithin(rawSize, 1, MAX_PAGE_SIZE);
+    if (!sizeValid) {
+      invalid.add(SIZE_PARAMETER);
+    }
+
+    if (pageValid && sizeValid && overflowsOffset(rawPage, rawSize)) {
+      invalid.add(PAGE_PARAMETER);
+    }
+
+    return invalid;
   }
 
   private static boolean takesPageable(final @NonNull HandlerMethod handlerMethod) {
@@ -89,5 +111,20 @@ public final class PagingParameterInterceptor implements HandlerInterceptor {
     } catch (final NumberFormatException e) {
       return false;
     }
+  }
+
+  /**
+   * Whether {@code page * size} exceeds {@link Integer#MAX_VALUE}, widened to {@code long} so the
+   * multiplication itself cannot overflow. Only called once both raw values already parsed as
+   * individually valid ints, so {@link Integer#parseInt(String)} cannot throw here. A blank value
+   * (page or size absent) is left to the resolver's default, as elsewhere in this class, so it
+   * never reaches this check.
+   */
+  private static boolean overflowsOffset(final String rawPage, final String rawSize) {
+    if (rawPage == null || rawPage.isBlank() || rawSize == null || rawSize.isBlank()) {
+      return false;
+    }
+
+    return (long) Integer.parseInt(rawPage) * Integer.parseInt(rawSize) > Integer.MAX_VALUE;
   }
 }
