@@ -53,8 +53,12 @@
         </div>
         <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
           @for (version of versions; track version.version; let i = $index) {
-            <div role="button" [routerLink]="['/' + activeRepo.repoName + '/' + gemName + '/' + version.version]"
-              fragment="security">
+            <div
+              role="button"
+              appKeyboardActivate
+              [routerLink]="['/' + activeRepo.repoName + '/' + gemName + '/' + version.version]"
+              fragment="security"
+            >
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === versions.length - 1 }"
@@ -84,7 +88,7 @@
                   [always]="true"
                 />
                 @if (activeRepo.canManage) {
-                  <app-dropdown (click)="$event.stopPropagation()">
+                  <app-dropdown>
                     <button
                       (click)="deleteVersion(version)"
                       [disabled]="loading"
@@ -107,12 +111,13 @@
           <div animate.enter="fade-in-down" class="lg:hidden">
             <div
               role="button"
+              appKeyboardActivate
               [routerLink]="['/' + activeRepo.repoName + '/' + gemName + '/' + version.version]"
               fragment="security"
               class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
             >
               @if (activeRepo.canManage) {
-                <app-dropdown class="relative left-4 ml-auto" (click)="$event.stopPropagation()">
+                <app-dropdown class="relative left-4 ml-auto">
                   <button
                     (click)="deleteVersion(version)"
                     [disabled]="loading"

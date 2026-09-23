@@ -34,6 +34,7 @@ import { SearchboxComponent } from '../../../../../shared/components/searchbox/s
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
+import { KeyboardActivateDirective } from '../../../../../shared/directives/keyboard-activate.directive';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { MavenConfigComponent } from '../../config/maven-config.component';
@@ -43,6 +44,7 @@ import { MavenService } from '../../service/maven.service';
   selector: 'app-maven-group-list',
   standalone: true,
   imports: [
+    KeyboardActivateDirective,
     CommonModule,
     EmptyListComponent,
     SearchboxComponent,

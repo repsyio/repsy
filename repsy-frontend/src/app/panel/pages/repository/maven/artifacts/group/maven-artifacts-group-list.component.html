@@ -86,6 +86,7 @@
           @for (artifact of artifacts; track artifact.artifactName; let i = $index) {
             <div
               role="button"
+              appKeyboardActivate
               [routerLink]="
                 '/' +
                 activeRepo.repoName +
@@ -195,7 +196,7 @@
                 />
 
                 @if (activeRepo.canManage) {
-                  <app-dropdown (click)="$event.stopPropagation()">
+                  <app-dropdown>
                     <button
                       (click)="deleteGroup(artifact)"
                       [disabled]="loading"
@@ -220,6 +221,7 @@
             <div
               class="hover:border-secondary-500 relative flex flex-col gap-2 rounded-[12px] border border-neutral-400 bg-neutral-500 p-4 hover:bg-[#1D1C1C]"
               role="button"
+              appKeyboardActivate
               [routerLink]="
                 '/' +
                 activeRepo.repoName +
@@ -232,7 +234,7 @@
               "
             >
               @if (activeRepo.canManage) {
-                <app-dropdown class="relative left-4 ml-auto" (click)="$event.stopPropagation()">
+                <app-dropdown class="relative left-4 ml-auto">
                   <button
                     (click)="deleteGroup(artifact)"
                     [disabled]="loading"

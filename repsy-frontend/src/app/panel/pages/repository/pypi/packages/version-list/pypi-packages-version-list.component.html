@@ -67,7 +67,11 @@
         <!-- Version Table (Desktop) -->
         <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
           @for (version of versions; track version.version; let i = $index) {
-            <div role="button" [routerLink]="'/' + activeRepo.repoName + '/' + packageName + '/' + version.version">
+            <div
+              role="button"
+              appKeyboardActivate
+              [routerLink]="'/' + activeRepo.repoName + '/' + packageName + '/' + version.version"
+            >
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === versions.length - 1 }"
@@ -100,7 +104,7 @@
                 />
 
                 @if (activeRepo.canManage) {
-                  <app-dropdown (click)="$event.stopPropagation()">
+                  <app-dropdown>
                     <button
                       (click)="deleteVersion(version)"
                       [disabled]="loading"
@@ -125,10 +129,11 @@
             <div
               class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
               role="button"
+              appKeyboardActivate
               [routerLink]="'/' + activeRepo.repoName + '/' + packageName + '/' + version.version"
             >
               @if (activeRepo.canWrite) {
-                <app-dropdown class="relative left-4 ml-auto" (click)="$event.stopPropagation()">
+                <app-dropdown class="relative left-4 ml-auto">
                   <button
                     (click)="deleteVersion(version)"
                     [disabled]="loading"

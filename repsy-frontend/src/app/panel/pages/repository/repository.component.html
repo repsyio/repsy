@@ -74,7 +74,7 @@
         <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
           <!-- Repo Items -->
           @for (repo of paginatedRepos; track repo.name; let i = $index) {
-            <div role="button" [routerLink]="'/' + repo.name">
+            <div role="button" appKeyboardActivate [routerLink]="'/' + repo.name">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === paginatedRepos.length - 1 }"
@@ -286,7 +286,7 @@
                 />
 
                 @if (isAdmin) {
-                  <app-dropdown (click)="$event.stopPropagation()">
+                  <app-dropdown>
                     <button
                       [routerLink]="'/' + repo.name + '/settings'"
                       class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FDFDFD] hover:bg-[#2D2C2C]"
@@ -345,11 +345,12 @@
             <div
               class="group relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
               role="button"
+              appKeyboardActivate
               tabindex="0"
               [routerLink]="'/' + repo.name"
             >
               @if (isAdmin) {
-                <app-dropdown class="relative left-4 ml-auto" (click)="$event.stopPropagation()">
+                <app-dropdown class="relative left-4 ml-auto">
                   <button
                     [routerLink]="'/' + repo.name + '/settings'"
                     class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FDFDFD] hover:bg-[#2D2C2C]"
@@ -554,7 +555,7 @@
                     <img
                       ngSrc="/assets/icons/ruby/ruby.svg"
                       alt="Ruby"
-                      class="group-hover:opacity-90 h-[20px] w-[20px] shrink-0"
+                      class="h-[20px] w-[20px] shrink-0 group-hover:opacity-90"
                       width="20"
                       height="20"
                     />
@@ -562,15 +563,15 @@
                 }
                 <span class="break-all text-[#FDFDFD]">{{ repo.name }}</span>
                 <app-repo-security-badge
-                    [repoName]="repo.name"
-                    [repoType]="repo.repoType"
-                    [severity]="securitySummary[repo.name]?.severity ?? null"
-                    [scanned]="securitySummary[repo.name]?.scanned ?? false"
-                    [rescanInProgressCount]="securitySummary[repo.name]?.rescanInProgressCount ?? 0"
-                    [rescanFailedCount]="securitySummary[repo.name]?.rescanFailedCount ?? 0"
-                    [unscannedInProgressCount]="securitySummary[repo.name]?.unscannedInProgressCount ?? 0"
-                    [unscannedFailedCount]="securitySummary[repo.name]?.unscannedFailedCount ?? 0"
-                  />
+                  [repoName]="repo.name"
+                  [repoType]="repo.repoType"
+                  [severity]="securitySummary[repo.name]?.severity ?? null"
+                  [scanned]="securitySummary[repo.name]?.scanned ?? false"
+                  [rescanInProgressCount]="securitySummary[repo.name]?.rescanInProgressCount ?? 0"
+                  [rescanFailedCount]="securitySummary[repo.name]?.rescanFailedCount ?? 0"
+                  [unscannedInProgressCount]="securitySummary[repo.name]?.unscannedInProgressCount ?? 0"
+                  [unscannedFailedCount]="securitySummary[repo.name]?.unscannedFailedCount ?? 0"
+                />
               </div>
 
               <div class="space-y-2">
