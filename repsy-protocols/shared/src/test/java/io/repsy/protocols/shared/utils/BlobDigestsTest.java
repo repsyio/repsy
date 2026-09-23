@@ -135,4 +135,45 @@ class BlobDigestsTest {
         .isInstanceOf(IOException.class)
         .hasMessage("disk gone");
   }
+
+  @Test
+  @DisplayName("DIGEST_REGEX matches exactly the digests isSupported() accepts")
+  void digestRegexAgreesWithIsSupported() {
+    final var pattern = java.util.regex.Pattern.compile("^" + BlobDigests.DIGEST_REGEX + "$");
+
+    for (final var digest :
+        java.util.List.of(
+            SHA256,
+            SHA512,
+            "sha512:" + "a".repeat(64),
+            "sha256:" + "a".repeat(128),
+            "sha384:" + "a".repeat(96),
+            "sha256:",
+            "sha256:" + "z".repeat(64),
+            "latest",
+            "")) {
+      assertThat(pattern.matcher(digest).matches())
+          .as(digest)
+          .isEqualTo(BlobDigests.isSupported(digest));
+    }
+  }
+
+  @Test
+  @DisplayName("digest prefix helpers find a sha256: or sha512: prefix and nothing else")
+  void digestPrefixHelpers() {
+    assertThat(BlobDigests.containsDigestPrefix("a/manifests/" + SHA256)).isTrue();
+    assertThat(BlobDigests.containsDigestPrefix("a/manifests/" + SHA512)).isTrue();
+    assertThat(BlobDigests.containsDigestPrefix("a/manifests/latest")).isFalse();
+    assertThat(BlobDigests.containsDigestPrefix("a/manifests/sha384:abc")).isFalse();
+
+    assertThat(BlobDigests.indexOfDigestPrefix("blobs/" + SHA512)).isEqualTo(6);
+    assertThat(BlobDigests.indexOfDigestPrefix("blobs/sha512:x/sha256:y")).isEqualTo(6);
+    assertThat(BlobDigests.indexOfDigestPrefix("blobs/sha256:x/sha512:y")).isEqualTo(6);
+    assertThat(BlobDigests.indexOfDigestPrefix("blobs/uuid")).isEqualTo(-1);
+
+    assertThat(BlobDigests.startsWithDigestPrefix(SHA256)).isTrue();
+    assertThat(BlobDigests.startsWithDigestPrefix(SHA512)).isTrue();
+    assertThat(BlobDigests.startsWithDigestPrefix("latest")).isFalse();
+    assertThat(BlobDigests.startsWithDigestPrefix("tag-sha256:abc")).isFalse();
+  }
 }

@@ -321,11 +321,12 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
   }
 
   private void checkDeploymentRules(
-      final BaseRepoInfo<ID> repoInfo, final ManifestInfo manifestInfo, final ManifestForm form) {
+      final BaseRepoInfo<ID> repoInfo, final ManifestInfo manifestInfo, final ManifestForm form)
+      throws IOException {
 
     this.verifyLayers(repoInfo.getId(), manifestInfo);
 
-    this.verifyTag(form.getTagName(), form.getDigest());
+    this.verifyTag(form);
   }
 
   private BaseUsages writeManifest(final BaseRepoInfo<ID> repoInfo, final ManifestForm form)
@@ -346,11 +347,25 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     this.layerService.isAllExistsByRepoIdAndDigests(repoId, digests);
   }
 
-  private void verifyTag(final String tagName, final String digest) {
+  /**
+   * Refuses a manifest pushed by a digest reference that is not the manifest's own digest. A sha256
+   * reference must equal the digest this registry calculates; a reference of another supported
+   * algorithm (sha512, RPS-1242) is checked by hashing the pushed bytes with that algorithm.
+   */
+  private void verifyTag(final ManifestForm form) throws IOException {
 
-    if (tagName.startsWith(DockerConstants.SHA256_PREFIX) && !tagName.equals(digest)) {
-      throw new BadRequestException("digestMismatch");
+    final var tagName = form.getTagName();
+
+    if (!BlobDigests.startsWithDigestPrefix(tagName) || tagName.equals(form.getDigest())) {
+      return;
     }
+
+    if (!tagName.startsWith(DockerConstants.SHA256_PREFIX)
+        && BlobDigests.matches(tagName, new ByteArrayInputStream(form.getManifestBytes()))) {
+      return;
+    }
+
+    throw new BadRequestException("digestMismatch");
   }
 
   /**
@@ -541,7 +556,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
   private boolean checkLayerExistsInStorage(
       final BaseRepoInfo<ID> repoInfo, final RelativePath relativePath, final LayerInfo layerInfo) {
 
-    final var idx = relativePath.getPath().indexOf(DockerConstants.SHA256_PREFIX);
+    final var idx = BlobDigests.indexOfDigestPrefix(relativePath.getPath());
 
     if (this.checkLayerForSha(idx, repoInfo, relativePath, layerInfo)) {
       return true;
@@ -626,7 +641,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
   private Resource getLayerResource(
       final String digest, final BaseRepoInfo<ID> repoInfo, final RelativePath relativePath) {
 
-    final var idx = relativePath.getPath().indexOf(DockerConstants.SHA256_PREFIX);
+    final var idx = BlobDigests.indexOfDigestPrefix(relativePath.getPath());
 
     final var mutatedPath =
         idx > 0 ? relativePath.getPath().substring(0, idx) + digest : relativePath.getPath();
