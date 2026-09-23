@@ -7,7 +7,7 @@
 
   <body>
     <#list packages as package>
-      <a href="/pypi/${repoName}/simple/${package.getNormalizedName()}/">${package.getName()}</a><br/>
+      <a href="${repoUri}/simple/${package.getNormalizedName()}/">${package.getName()}</a><br/>
     </#list>
   </body>
 </html>

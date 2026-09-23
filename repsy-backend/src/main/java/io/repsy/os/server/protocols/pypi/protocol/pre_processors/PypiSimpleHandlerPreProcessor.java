@@ -37,6 +37,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
@@ -96,7 +97,8 @@ public class PypiSimpleHandlerPreProcessor extends ProtocolProcessor {
     final var packageListResourceOpt = this.getPackageListResourceOpt(packageName, repoInfo);
 
     if (packageListResourceOpt.isPresent()) {
-      return ProcessorResult.of(ResponseEntity.ok(packageListResourceOpt.get()));
+      return ProcessorResult.of(
+          ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(packageListResourceOpt.get()));
     }
 
     return ProcessorResult.next();

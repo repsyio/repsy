@@ -36,6 +36,8 @@ public interface PypiPackageRepository extends JpaRepository<PypiPackage, UUID> 
 
   Optional<PypiPackage> findByRepoIdAndNormalizedName(UUID repoId, String normalizedName);
 
+  boolean existsByRepoIdAndNormalizedName(UUID repoId, String normalizedName);
+
   @Query(
       """
           select p from PypiPackage p

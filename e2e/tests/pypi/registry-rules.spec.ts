@@ -24,13 +24,11 @@
  * tests reference).
  *
  * Six backend bug candidates were found and confirmed live while building this suite, each filed as
- * its own Jira story per this repo's e2e process. RPS-1223/RPS-1224/RPS-1225 are now FIXED (see
- * `AbstractPypiProtocolFacade.uploadPackage`/`AbstractPypiStorageService`) and their tests below pin
- * the corrected behaviour; the rest are still open:
- *  - **RPS-1221**: the root `/simple/` index (`packages.ftl`) hard-codes cloud-layout
- *    `/pypi/<repo>/simple/<name>/` hrefs that 404 on Repsy OS's single-tenant layout; the response's
- *    own `Content-Type` is `application/json` despite an HTML body. Harmless to a real `pip` loop
- *    (`pip install`/`download` never fetch this page), but a real spec violation.
+ * its own Jira story per this repo's e2e process. RPS-1221/RPS-1223/RPS-1224/RPS-1225/RPS-1226 are
+ * now FIXED (see `AbstractPypiProtocolFacade.uploadPackage`/`AbstractPypiStorageService`,
+ * `PypiPackageServiceImpl.getPackageList`/`packages.ftl`/`PypiSimpleHandlerPreProcessor`,
+ * `AbstractPypiHeadProtocolMethodHandler`) and their tests below pin the corrected behaviour; the
+ * rest are still open:
  *  - **RPS-1222**: the panel's own PyPI config screen tells users
  *    `repository=${baseUrl}/${repoName}/simple` for `.pypirc`, but the upload handler only matches
  *    the repo ROOT -- `twine upload -r <that source>` 404s (`unknownPath`).
@@ -47,9 +45,9 @@
  *    rejects a missing digest with `400 sha256DigestMissing`, computes the SHA-256 of the actual
  *    uploaded bytes, rejects a mismatch with `400 sha256DigestMismatch` (case-insensitively), and
  *    stores/serves only the server-computed, lowercased value -- all before any storage write.
- *  - **RPS-1226** (observation, not routed around -- nothing in the catalog loop depends on
- *    `HEAD` meaning anything): `HEAD` on any path under a pypi repo answers `200`, existence never
- *    checked.
+ *  - **RPS-1226** (fixed): `HEAD` on any path under a pypi repo used to answer `200` unconditionally,
+ *    existence never checked. `AbstractPypiHeadProtocolMethodHandler` now mirrors `GET`'s status via
+ *    existence-only facade lookups (a non-normalized project name mirrors `GET`'s `307` redirect too).
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import { pypiAdapter } from '../../src/clients/pypi.js';
@@ -70,6 +68,8 @@ import {
   rawHead,
   rawUpload,
   sha256Hex,
+  simplePagePath,
+  simpleRootPath,
   uploadUrl,
   wheelFilename,
   type RawResponse,
@@ -412,9 +412,8 @@ test.describe('pypi registry rules (raw HTTP)', () => {
   );
 
   test(
-    'the root /simple/ index hard-codes a cloud-layout /pypi/ prefix that does not exist on ' +
-      'Repsy OS (RPS-1221)',
-    { tag: ['@negative'] },
+    'the root /simple/ index links to the real, working project page, off the repo’s own ' +
+      'URI (RPS-1221, fixed)',
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'rootindex');
       const admin = adminCredential();
@@ -430,14 +429,17 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       const link = links.find((l) => l.text === layout.packageName);
       expect(link, `a root-index entry for "${layout.packageName}"`).toBeDefined();
 
-      test.fail(
-        true,
-        'RPS-1221: packages.ftl hard-codes a cloud-layout "/pypi/<repo>/simple/<name>/" href ' +
-          "that 404s on Repsy OS's single-tenant layout -- the real project-page path is " +
-          '"/<repo>/simple/<name>/"',
-      );
+      // RPS-1221 (fixed): the href no longer hard-codes a dead cloud-layout "/pypi/" prefix -- it
+      // is now the request's own absolute repo URI plus one repo segment, matching the real
+      // project page (and the per-project page's own href shape, H8).
       expect(link?.href, 'the root index links to the real, working project page').toBe(
-        `/${layout.repoName}/simple/${layout.packageName}/`,
+        `${env.repoBaseUrl}/${layout.repoName}/simple/${layout.packageName}/`,
+      );
+
+      // The link must itself resolve, not just look plausible.
+      const followed = await rawGetSimplePage(layout.repoName, admin, layout.packageName);
+      expect(followed.status, 'following the rendered href resolves the real project page').toBe(
+        200,
       );
     },
   );
@@ -466,17 +468,46 @@ test.describe('pypi registry rules (raw HTTP)', () => {
   );
 
   test(
-    'HEAD on any path under a pypi repo answers 200, whether or not it exists (RPS-1226, ' +
-      'observation)',
+    'HEAD mirrors GET’s status: 404 for a path that was never published, 200 once it is ' +
+      '(RPS-1226, fixed)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'head');
       const admin = adminCredential();
+      const version = pypiAdapter.version('release');
+      const built = buildWheel({ name: layout.packageName, version });
 
-      // This is genuinely how the server behaves today -- an observation this suite documents, not
-      // a bug routed around: nothing in the catalog loop relies on HEAD meaning "exists".
-      const res = await rawHead(layout.repoName, admin, 'no/such/-/file.whl');
-      expect(res.status, 'HEAD of a path that was never published').toBe(200);
+      // RPS-1226 (fixed): HEAD used to answer 200 unconditionally, existence never checked.
+      const missingProject = await rawHead(layout.repoName, admin, simplePagePath('no-such-pkg'));
+      expect(missingProject.status, 'HEAD of a project page that was never published').toBe(404);
+
+      const missingFile = await rawHead(
+        layout.repoName,
+        admin,
+        downloadPath(layout.packageName, wheelFilename(layout.packageName, version)),
+      );
+      expect(missingFile.status, 'HEAD of an archive file that was never published').toBe(404);
+
+      expectMsgId(await rawUpload(layout.repoName, admin, built), 200, undefined);
+
+      const existingProject = await rawHead(
+        layout.repoName,
+        admin,
+        simplePagePath(layout.packageName),
+      );
+      expect(existingProject.status, 'HEAD of the now-published project page').toBe(200);
+
+      const existingFile = await rawHead(
+        layout.repoName,
+        admin,
+        downloadPath(layout.packageName, built.filename),
+      );
+      expect(existingFile.status, 'HEAD of the now-published archive file').toBe(200);
+
+      const rootIndex = await rawHead(layout.repoName, admin, simpleRootPath());
+      expect(rootIndex.status, 'HEAD of the root /simple/ index (the repo already resolved)').toBe(
+        200,
+      );
     },
   );
 

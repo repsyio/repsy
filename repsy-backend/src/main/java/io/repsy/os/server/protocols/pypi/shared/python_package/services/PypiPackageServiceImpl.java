@@ -31,6 +31,7 @@ import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.Pypi
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseClassifierRepository;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseProjectURLRepository;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseRepository;
+import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
 import io.repsy.protocols.pypi.shared.python_package.dtos.ReleaseVersionRequiresPython;
@@ -55,6 +56,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
 @Transactional(readOnly = true)
@@ -121,6 +123,13 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
 
     pythonPypiPackage.setLatestVersion(releaseVersion.getVersion());
     this.pypiPackageRepository.save(pythonPypiPackage);
+  }
+
+  @Override
+  public boolean packageExists(final UUID repoId, final String packageNormalizedName) {
+
+    return this.pypiPackageRepository.existsByRepoIdAndNormalizedName(
+        repoId, packageNormalizedName);
   }
 
   @Override
@@ -235,9 +244,15 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
 
     final var template = this.freeMarkerConfiguration.getTemplate("packages.ftl");
 
+    final var repoUri =
+        UriComponentsBuilder.fromUriString(RequestBaseUrlUtils.resolveBaseUrl())
+            .pathSegment(repoName)
+            .build()
+            .toUriString();
+
     return new ByteArrayResource(
         FreeMarkerTemplateUtils.processTemplateIntoString(
-                template, Map.of("packages", packages, "repoName", repoName))
+                template, Map.of("packages", packages, "repoName", repoName, "repoUri", repoUri))
             .getBytes(UTF_8));
   }
 

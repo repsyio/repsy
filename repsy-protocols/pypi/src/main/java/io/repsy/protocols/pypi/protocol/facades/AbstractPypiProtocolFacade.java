@@ -125,6 +125,24 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
         repoInfo, packageNormalizedName, requiresPythonMap);
   }
 
+  @Override
+  public boolean packageExists(final ProtocolContext context, final String packageNormalizedName) {
+
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+
+    return this.pypiPackageService.packageExists(repoInfo.getId(), packageNormalizedName);
+  }
+
+  @Override
+  public boolean archiveFileExists(
+      final ProtocolContext context, final String packageName, final String fileName) {
+
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+
+    return this.pypiStorageService.isPackageFileExist(
+        repoInfo.getStorageKey(), packageName, fileName);
+  }
+
   private void checkOverridePermission(
       final BaseRepoInfo<ID> repoInfo,
       final PackageUploadForm uploadForm,

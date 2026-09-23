@@ -16,20 +16,36 @@
 package io.repsy.os.server.protocols.pypi.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
+import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacadeImpl;
+import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
 import io.repsy.protocols.pypi.protocol.handlers.AbstractPypiHeadProtocolMethodHandler;
+import io.repsy.protocols.pypi.shared.utils.UriUtils;
+import jakarta.servlet.http.HttpServletRequest;
+import java.net.URI;
+import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
 @NullMarked
-public class PypiHeadProtocolMethodHandler extends AbstractPypiHeadProtocolMethodHandler {
+public class PypiHeadProtocolMethodHandler extends AbstractPypiHeadProtocolMethodHandler<UUID> {
 
   public PypiHeadProtocolMethodHandler(
       @Qualifier("osPypiPathParser") final PathParser pathParser,
+      final PypiProtocolFacadeImpl pypiProtocolFacade,
       final PypiProtocolProvider provider) {
 
-    super(pathParser, provider);
+    super(pathParser, pypiProtocolFacade, provider);
+  }
+
+  @Override
+  protected @Nullable URI getNormalizedUri(
+      final HttpServletRequest request, @Nullable final String packageName) {
+
+    return UriUtils.normalizedUri(
+        request, packageName, RequestBaseUrlUtils.resolveBaseUrl(request));
   }
 }

@@ -29,5 +29,8 @@ public interface PypiPackageService<ID> {
 
   BasePackageInfo<ID> getPackage(ID repoId, String packageNormalizedName);
 
+  /** Existence-only check, never {@link #getPackage}: used to answer {@code HEAD}. */
+  boolean packageExists(ID repoId, String packageNormalizedName);
+
   List<ReleaseVersionRequiresPython> getReleaseIndexListItemInfos(ID packageId);
 }
