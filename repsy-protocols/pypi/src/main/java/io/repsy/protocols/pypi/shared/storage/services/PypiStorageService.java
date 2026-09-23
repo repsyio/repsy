@@ -47,7 +47,7 @@ public interface PypiStorageService<ID> {
 
   void clearTrash();
 
-  boolean isPackageFileExist(UUID repoId, String normalizedName, String version, String filename);
+  boolean isPackageFileExist(UUID repoId, String normalizedName, String filename);
 
   BaseUsages writePackageArchive(
       UUID repoId, String repoName, PackageUploadForm uploadForm, MultipartFile file)

@@ -36,6 +36,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -239,11 +240,7 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
 
   @Override
   public boolean isPackageFileExist(
-      final UUID repoId, final String normalizedName, final String version, final String filename) {
-
-    if (!PackageStorageUtils.isFileBelongsRelease(filename, version)) {
-      return false;
-    }
+      final UUID repoId, final String normalizedName, final String filename) {
 
     final var path = StoragePath.of(repoId, Paths.get(normalizedName, filename).toString());
 
@@ -276,7 +273,8 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
 
     final var digestStoragePath = StoragePath.of(repoId, digestPath);
 
-    final var uploadFormSha256DigestBytes = uploadForm.getSha256_digest().getBytes(UTF_8);
+    final var uploadFormSha256DigestBytes =
+        Objects.requireNonNull(uploadForm.getSha256_digest(), "sha256_digest").getBytes(UTF_8);
 
     try (final var bais = new ByteArrayInputStream(uploadFormSha256DigestBytes)) {
       final var metadataUsage = this.storageStrategy.write(repoName, digestStoragePath, bais);

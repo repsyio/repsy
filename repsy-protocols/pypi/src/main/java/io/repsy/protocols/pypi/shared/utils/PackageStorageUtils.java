@@ -16,16 +16,24 @@
 package io.repsy.protocols.pypi.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
+import java.io.IOException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 @UtilityClass
 @NullMarked
 public final class PackageStorageUtils {
   public static final String HASH_ALGORITHM = "sha256";
+
+  private static final int DIGEST_BUFFER_SIZE = 8192;
 
   private static final String NAME_PART = "(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9])";
   private static final String VERSION_PART =
@@ -73,5 +81,34 @@ public final class PackageStorageUtils {
     }
 
     return ReleaseVersion.of(extractedVersion).getVersion().equals(version);
+  }
+
+  /** Rejects an upload whose {@code sha256_digest} form field is missing or blank. */
+  public static void checkSha256Digest(final PackageUploadForm uploadForm) {
+
+    if (!StringUtils.hasText(uploadForm.getSha256_digest())) {
+      throw new BadRequestException("sha256DigestMissing");
+    }
+  }
+
+  /**
+   * Computes the SHA-256 of the uploaded file's actual bytes, streaming so a large archive is never
+   * fully buffered in memory.
+   */
+  public static String computeSha256(final MultipartFile file) throws IOException {
+
+    try (var in = file.getInputStream()) {
+      final var digest = MessageDigest.getInstance("SHA-256");
+      final var buf = new byte[DIGEST_BUFFER_SIZE];
+      int read;
+
+      while ((read = in.read(buf)) != -1) {
+        digest.update(buf, 0, read);
+      }
+
+      return HexFormat.of().formatHex(digest.digest());
+    } catch (final NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 algorithm not available", e);
+    }
   }
 }
