@@ -30,6 +30,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.function.Function;
 import org.bouncycastle.bcpg.ArmoredOutputStream;
@@ -59,7 +60,11 @@ import reactor.core.publisher.Mono;
  * fixed {@code artifactSignatureNotVerified} id, not the BouncyCastle text. RPS-1191: so does a
  * body that is not an OpenPGP signature at all (invalid armor, a bad CRC, binary garbage), which
  * BouncyCastle reports as an {@code IOException} and which used to answer 500. RPS-1189: a repo's
- * registered public keys (see {@link PublicKeySources}) are tried before any key server.
+ * registered public keys (see {@link PublicKeySources}) are tried before any key server. RPS-1194:
+ * a key server answering a corrupt key block is skipped the same way, trying the next one instead
+ * of failing the whole lookup. RPS-1202: a key that is revoked, or that was expired at the
+ * signature's creation time, is refused the same way a bad signature is, whether the key came from
+ * a registered key or a key server.
  */
 @DisplayName("PGPVerifierService")
 class PGPVerifierServiceTest {
@@ -366,6 +371,60 @@ class PGPVerifierServiceTest {
         .isInstanceOf(ItemNotFoundException.class);
   }
 
+  /** A key block armor whose header matches but whose data is truncated (RPS-1194). */
+  private static String corruptedArmoredPublicKey() {
+    final var lines = armorLines(keys.armoredPublicKey());
+    final var crc = crcLineIndex(lines);
+    lines.subList(crc - 3, crc).clear();
+    return String.join("\n", lines) + "\n";
+  }
+
+  private static ClientResponse keyBlockResponse(final String armoredKeyBlock) {
+    return ClientResponse.create(HttpStatus.OK)
+        .header(HttpHeaders.CONTENT_TYPE, "text/plain")
+        .body(armoredKeyBlock)
+        .build();
+  }
+
+  @Test
+  @DisplayName(
+      "a key server answering a corrupt key block is skipped, the next server's key still"
+          + " verifies (RPS-1194)")
+  void aCorruptKeyBlockFromOneServerIsSkippedForTheNext() {
+    final var signature = resource(keys.detachedSignature(POM));
+    final var corrupt = corruptedArmoredPublicKey();
+
+    final var service =
+        this.serviceAnswering(
+            uri ->
+                uri.getHost().equals("keyserver.ubuntu.com")
+                    ? keyBlockResponse(corrupt)
+                    : keyResponse());
+
+    assertThatCode(() -> service.verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
+        .doesNotThrowAnyException();
+
+    // Both key servers are asked: the first one's corrupt answer does not abort the lookup.
+    assertThat(this.asked).hasSize(2);
+  }
+
+  @Test
+  @DisplayName(
+      "answers itemNotFound, not a 500 or 422, when every key server answers a corrupt key block"
+          + " (RPS-1194)")
+  void answersItemNotFoundWhenEveryServerAnswersACorruptKeyBlock() {
+    final var signature = resource(keys.detachedSignature(POM));
+    final var corrupt = corruptedArmoredPublicKey();
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> keyBlockResponse(corrupt))
+                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
+        .isInstanceOf(ItemNotFoundException.class);
+
+    assertThat(this.asked).hasSize(2);
+  }
+
   @Test
   @DisplayName("a registered key verifies a real signature and asks no key server (RPS-1189)")
   void aRegisteredKeyVerifiesWithoutAskingAKeyServer() {
@@ -461,6 +520,106 @@ class PGPVerifierServiceTest {
         .doesNotThrowAnyException();
 
     assertThat(this.asked).isEmpty();
+  }
+
+  @Test
+  @DisplayName("refuses a signature made after its (registered) key's validity period (RPS-1202)")
+  void refusesASignatureAfterTheRegisteredKeysExpiry() {
+    final var expiring = PgpTestKeys.generate().withKeyExpirySeconds(1);
+    final var afterExpiry = new Date(System.currentTimeMillis() + 60_000);
+    final var signature = resource(expiring.detachedSignature(POM, afterExpiry));
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(expiring.armoredPublicKey())))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
+  }
+
+  @Test
+  @DisplayName("accepts a signature made within the (registered) key's validity period (RPS-1202)")
+  void acceptsASignatureWithinTheRegisteredKeysExpiry() {
+    final var expiring = PgpTestKeys.generate().withKeyExpirySeconds(3_600);
+    final var signature = resource(expiring.detachedSignature(POM, new Date()));
+
+    assertThatCode(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(expiring.armoredPublicKey())))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName(
+      "refuses a signature verified by a key-server key expired at signing time (RPS-1202)")
+  void refusesASignatureAfterAKeyServerKeysExpiry() {
+    final var expiring = PgpTestKeys.generate().withKeyExpirySeconds(1);
+    final var afterExpiry = new Date(System.currentTimeMillis() + 60_000);
+    final var signature = resource(expiring.detachedSignature(POM, afterExpiry));
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> keyBlockResponse(expiring.armoredPublicKey()))
+                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
+  }
+
+  @Test
+  @DisplayName("refuses a signature made with a revoked (registered) key (RPS-1202)")
+  void refusesASignatureMadeWithARevokedRegisteredKey() {
+    final var revoked = PgpTestKeys.generate().withRevocation();
+    final var signature = resource(revoked.detachedSignature(POM));
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(revoked.armoredPublicKey())))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
+  }
+
+  @Test
+  @DisplayName("refuses a signature verified by a revoked key-server key (RPS-1202)")
+  void refusesASignatureMadeWithARevokedKeyServerKey() {
+    final var revoked = PgpTestKeys.generate().withRevocation();
+    final var signature = resource(revoked.detachedSignature(POM));
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> keyBlockResponse(revoked.armoredPublicKey()))
+                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
+  }
+
+  @Test
+  @DisplayName(
+      "refuses a signature made with a revoked subkey, even though the primary key is fine"
+          + " (RPS-1202)")
+  void refusesASignatureMadeWithARevokedSubkey() {
+    final var revokedSubkey = PgpTestKeys.generate().withRevokedSubkey();
+    final var signature = resource(revokedSubkey.detachedSignature(POM));
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(revokedSubkey.armoredPublicKey())))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
   }
 
   @Test
