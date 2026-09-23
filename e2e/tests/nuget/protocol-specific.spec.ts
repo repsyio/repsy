@@ -35,37 +35,38 @@
  *    `AbstractNuGetRelistProtocolMethodHandler`, whose `UNLIST_PATTERN`/`RELIST_PATTERN` match
  *    exactly two path segments under `v3/package/`) was read FIRST, confirming unlist is a raw `DELETE
  *    /v3/package/<idLower>/<verLower>` and relist a raw `POST` of that exact same URL --
- *    `PackagePublish/2.0.0`'s own routes, never the non-standard `PackageDelete/2.0.0` service the
- *    index also advertises. Confirmed live with raw `curl`: `DELETE` -> `204`, the registration
- *    leaf's top-level `listed` flips to `false`, the flat `v3/package/<id>/index.json` container
- *    keeps the version regardless; `POST` -> `200`, `listed` flips back to `true`. A real `dotnet
- *    restore`/`dotnet add package --version <exact>` of the exact unlisted version still succeeds
- *    (this suite's own "unlist"/"relist" tests are that live evidence, end to end with the real
- *    client, not just curl).
+ *    `PackagePublish/2.0.0`'s own routes, never the `PackageDelete/2.0.0` type the service index used
+ *    to also advertise (removed by RPS-1213). Confirmed live with raw `curl`: `DELETE` -> `204`, the
+ *    registration leaf's top-level `listed` flips to `false`, the flat `v3/package/<id>/index.json`
+ *    container keeps the version regardless; `POST` -> `200`, `listed` flips back to `true`. A real
+ *    `dotnet restore`/`dotnet add package --version <exact>` of the exact unlisted version still
+ *    succeeds (this suite's own "unlist"/"relist" tests are that live evidence, end to end with the
+ *    real client, not just curl).
  *  - HN-2: `GET /v3/search?q=<id>&prerelease=true` and `GET /v3/autocomplete?q=<prefix>` were
  *    confirmed live: search answers `{"totalHits":1,"data":[{"id":"<idLower>","version":"...",
  *    "registration":"<url>",...}]}` (`NuGetSearchResponse`/`NuGetSearchData` -- `data[].id` is the
  *    stored, LOWERCASED spelling, matched case-insensitively here, same as every other nuget H8
  *    lowercase fact); autocomplete answers `{"totalHits":1,"data":["<idLower>"]}`
  *    (`NuGetAutocompleteResponse`).
- *  - HN-3: a real `dotnet package search <id> --source repsy --configfile <cfg>` was run live
- *    inside the nuget runner container. It does NOT crash and does NOT exit non-zero -- exit `0`,
- *    stdout instead reads `error: The source does not have a Search service!` and the command
- *    returns no results at all. This is the exact root cause README.md's H6/RPS-1213 already
- *    documents (confirmed there from the service-index's own `@type` shape alone, never previously
- *    run live against a real `dotnet package search` invocation): NuGet.Client's `ServiceTypes.cs`
- *    only resolves `SearchQueryService(/3.0.0-beta|/3.4.0)`, not the bare `/3.0.0` spelling this
- *    server advertises, so the client concludes the source has no search service at all and never
- *    even issues the `v3/search` request this suite's own "search and autocomplete" test (above)
- *    just proved works fine over raw HTTP. Below is pinned with `test.fail()` referencing the
- *    ALREADY-FILED RPS-1213 (not a new candidate) -- this is one more piece of live evidence for
- *    that same root cause, matching the pattern `tests/cargo/protocol-specific.spec.ts` used for
- *    RPS-1239. The assertion pinned below (`stdout` contains the package id) is what a real,
- *    working `SearchQueryService` client would produce; it fails today for exactly this reason.
+ *  - HN-3 (RPS-1213 fixed, but this stayed red for a DIFFERENT reason -- see the test below): a real
+ *    `dotnet package search <id> --source repsy --configfile <cfg>` was run live inside the nuget
+ *    runner container, both before and after RPS-1213's service-index fix. Before the fix, this was
+ *    live evidence for README.md's H6/RPS-1213 (the service index advertised
+ *    `SearchQueryService/3.0.0`, a spelling NuGet.Client's `ServiceTypes.cs` does not recognise, so
+ *    the client silently treated the source as having no search service at all -- never even issuing
+ *    the `v3/search` request this suite's own "search and autocomplete" test just proved works fine
+ *    over raw HTTP). RPS-1213 fixed that: the service index now advertises the bare, recognised
+ *    `SearchQueryService` -- confirmed by fetching the live index from inside this exact test run,
+ *    immediately before the `dotnet` invocation below. Re-run after the fix, `dotnet package search`
+ *    still exits `0` with the identical `error: The source does not have a Search service!` and no
+ *    results. So the original `@type` mismatch is no longer the cause; why `dotnet package search`
+ *    (.NET SDK 10.0.401) still won't resolve this server's search resource is not yet understood.
+ *    Still pinned with `test.fail()` below, now with this updated evidence -- not RPS-1213's bug
+ *    anymore -- filed as RPS-1240 for this narrower follow-up.
  *
- * No NEW backend bug was found while building this suite; every hypothesis matched the plan (HN-3's
- * exact FAILURE SHAPE -- a clean exit 0 with a "no Search service" message, not a crash or a
- * non-zero exit -- was the one detail confirmed live rather than assumed, see above).
+ * RPS-1213 (the service-index `@type` fix) is DONE; the one open item this suite still flags is the
+ * HN-3 follow-up above -- `dotnet package search` failing for a reason still unidentified, not the
+ * `@type` mismatch RPS-1213 fixed.
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import * as nuget from '../../src/clients/nuget.js';
@@ -76,9 +77,11 @@ import {
   parseAutocompleteResponse,
   parseRegistrationIndex,
   parseSearchResponse,
+  parseServiceIndex,
   parseVersions,
   rawAutocomplete,
   rawGetRegistrationIndex,
+  rawGetServiceIndex,
   rawGetVersions,
   rawRelist,
   rawSearch,
@@ -301,7 +304,7 @@ test(
 );
 
 test(
-  'nuget > dotnet package search cannot use those routes (RPS-1213 live evidence)',
+  'nuget > dotnet package search still cannot use those routes after RPS-1213 (reason unresolved)',
   { tag: ['@smoke'] },
   async ({ seeder }) => {
     const layout = await newRepoWithToken(seeder, 'pkgsearch');
@@ -312,6 +315,23 @@ test(
     const published = await nuget.publish(world);
     expect(published.outcome, `publish: expected "ok" (${published.command})`).toBe('ok');
     expect(published.clientExitCode, `dotnet nuget push: ${published.command}`).toBe(0);
+
+    // Pins the fix side of RPS-1213 inline, right before the dotnet invocation below: if this ever
+    // regresses (the @type mismatch comes back), THIS assertion fails first and points straight at
+    // the service index, instead of the generic "does not have a Search service!" the dotnet
+    // assertions below would otherwise produce for either cause.
+    const serviceIndexRes = await rawGetServiceIndex(layout.repoName);
+    expect(serviceIndexRes.status, 'raw service index GET').toBe(200);
+    expect(
+      parseServiceIndex(serviceIndexRes.body).map((r) => r.type),
+      'the service index advertises the bare, NuGet.Client-recognised search/registration types',
+    ).toEqual(
+      expect.arrayContaining([
+        'RegistrationsBaseUrl',
+        'SearchQueryService',
+        'SearchAutocompleteService',
+      ]),
+    );
 
     const { home, work } = await isolatedWorkDir(`nuget-pkgsearch-${seeder.runId}`);
     const cfgPath = await renderNugetConfig(home, layout.repoName, layout.credential);
@@ -328,18 +348,24 @@ test(
       },
     );
 
-    // Confirmed live (HN-3, this file's own header): the real client does NOT crash and does NOT
-    // exit non-zero here -- it exits 0 and prints "error: The source does not have a Search
-    // service!" instead of ever reaching the v3/search route the "search and autocomplete" test
-    // above just proved works fine over raw HTTP. This is RPS-1213's own root cause (the
-    // service-index's non-standard SearchQueryService/3.0.0 @type spelling, README.md's H6), not a
-    // new bug -- never fixed here, just pinned with one more piece of live evidence.
+    // Confirmed live (HN-3, this file's own header): RPS-1213 fixed the service index's @type
+    // strings (bare "SearchQueryService", recognised by NuGet.Client's ServiceTypes.cs, replacing
+    // the unrecognised "SearchQueryService/3.0.0"). Fetching the live service index from inside this
+    // exact test run, immediately before the "dotnet" invocation below, confirms the corrected type
+    // is what's actually served. Yet the real client does NOT crash and does NOT exit non-zero here
+    // -- it still exits 0 and still prints "error: The source does not have a Search service!"
+    // instead of ever reaching the v3/search route the "search and autocomplete" test above just
+    // proved works fine over raw HTTP. So this is no longer RPS-1213's @type-mismatch root cause --
+    // something else about how "dotnet package search" (.NET SDK 10.0.401) resolves (or fails to
+    // resolve) this server's search resource is still unexplained. Kept pinned with test.fail(),
+    // not removed; filed as RPS-1240 for this narrower follow-up.
     test.fail(
       true,
-      'RPS-1213: dotnet package search never reaches the v3/search route -- NuGet.Client does ' +
-        'not resolve the bare "SearchQueryService/3.0.0" @type this server advertises, so the ' +
-        'client concludes the source has no search service (exit 0, "The source does not have a ' +
-        'Search service!"), even though the route itself works over raw HTTP',
+      'dotnet package search still reports "The source does not have a Search service!" (exit 0) ' +
+        'after RPS-1213 corrected the service index to advertise the bare, NuGet.Client-recognised ' +
+        '"SearchQueryService" type (confirmed live from this same test run) -- the original @type ' +
+        'mismatch is fixed, but this command still will not resolve the search resource for a ' +
+        'reason not yet identified, even though the v3/search route itself works fine over raw HTTP',
     );
     expect(searchResult.exitCode, `dotnet package search: ${searchResult.command}`).toBe(0);
     expect(

@@ -957,8 +957,8 @@ which nuget has no equivalent of — a nuget "snapshot" is stored once, like any
 (H4); a new version always accepted, an existing one replaced only when `allowOverride: true`; the
 redeploy-under-`releases:false` ordering (422 before 409); invalid/too-long/5-part version strings
 and non-package/non-multipart bodies at 400; `1.0.0.0` normalized to `1.0.0` on both the flat index
-and the download path; the service index's exact `@id`/`@type` shape including the three
-non-standard types (H6); and `X-NuGet-ApiKey`'s three cases (H7).
+and the download path; the service index's exact `@id`/`@type` shape, now the bare,
+client-recognised types RPS-1213 fixed (H6); and `X-NuGet-ApiKey`'s three cases (H7).
 
 ### H1-H13, confirmed live
 
@@ -990,14 +990,23 @@ predicted**; none required a workaround or a routing-around hook.
   `@id` both name exactly `<repoBaseUrl>/<repoName>/v3/package[...]`, and `afterSuccessfulRoundTrip`
   (`nuget.ts`) GETs that exact URL and gets `200` with the published bytes on every successful
   scenario.
-- **H6** (`dotnet package search`/registration-based commands fail; push/restore do not): the service
-  index's exact `@type` shape was confirmed live
-  (`tests/nuget/registry-rules.spec.ts`) — `RegistrationsBaseUrl/3.0.0`, `SearchQueryService/3.0.0`,
-  `SearchAutocompleteService/3.0.0` and a non-standard `PackageDelete/2.0.0`, none of which
-  NuGet.Client's `ServiceTypes.cs` resolves, while `PackageBaseAddress/3.0.0`/`PackagePublish/2.0.0`
-  (what push/restore use) are correct. This step did not additionally run
-  `dotnet package search`/`dotnet list package` against the server to watch it fail live (the
-  service-index evidence alone is what the plan's own hypothesis was about) — filed as **RPS-1213**.
+- **H6** (`dotnet package search`/registration-based commands fail; push/restore do not): originally
+  filed as **RPS-1213** from the service index's exact `@type` shape — `RegistrationsBaseUrl/3.0.0`,
+  `SearchQueryService/3.0.0`, `SearchAutocompleteService/3.0.0` and a non-standard
+  `PackageDelete/2.0.0`, none of which NuGet.Client's `ServiceTypes.cs` recognised, while
+  `PackageBaseAddress/3.0.0`/`PackagePublish/2.0.0` (what push/restore use) were already correct.
+  **RPS-1213 is now fixed**: the service index advertises the bare `RegistrationsBaseUrl`,
+  `SearchQueryService` and `SearchAutocompleteService` (all in `ServiceTypes.cs`'s recognised set)
+  and no longer advertises `PackageDelete/2.0.0` at all (`tests/nuget/registry-rules.spec.ts`'s H6
+  test confirms the corrected shape live). Confirmed live, though: a real `dotnet package search`
+  **still** fails with the exact same "The source does not have a Search service!" message, even
+  though the same test run's own fetch of the live service index (immediately before the `dotnet`
+  invocation) shows the corrected bare `SearchQueryService` being served. So the original `@type`
+  mismatch is fixed and no longer the cause — `dotnet package search` (.NET SDK 10.0.401) has some
+  other, not-yet-understood reason it does not resolve this server's search resource. This is a new,
+  narrower open question, tracked by `tests/nuget/protocol-specific.spec.ts`'s still-pinned
+  `test.fail()` (its comment has the up-to-date evidence) — filed as
+  [RPS-1240](https://zyfera.atlassian.net/browse/RPS-1240).
 - **H7** (`X-NuGet-ApiKey: <user password>` → `401`, contradicting the panel's Option B text):
   confirmed live, exactly as predicted —
   `X-NuGet-ApiKey: <admin password>` → `401`; `X-NuGet-ApiKey: <deploy token>` → `201`;
@@ -1043,26 +1052,33 @@ credential built by hand, exactly like the Cargo protocol-specific suite above.
 - **Unlist/relist** (`DELETE`/`POST /<repo>/v3/package/<idLower>/<verLower>`,
   `AbstractNuGetUnlistProtocolMethodHandler`/`AbstractNuGetRelistProtocolMethodHandler`,
   `permission: WRITE` both ways — NuGet's own `PackagePublish/2.0.0` convention, never the
-  non-standard `PackageDelete/2.0.0` service the service index also advertises): confirmed live —
-  `DELETE` → `204`, the registration leaf's `listed` flips to `false`; `POST` → `200`, flips it back
-  to `true`. Real NuGet semantics: unlisted != deleted, so the flat `v3/package/<id>/index.json`
-  container keeps serving the version regardless of its `listed` state, and a fresh real `dotnet
-restore` of the exact unlisted version still succeeds end to end (not just a raw probe).
+  `PackageDelete/2.0.0` type the service index used to also advertise before RPS-1213 removed it):
+  confirmed live — `DELETE` → `204`, the registration leaf's `listed` flips to `false`; `POST` →
+  `200`, flips it back to `true`. Real NuGet semantics: unlisted != deleted, so the flat
+  `v3/package/<id>/index.json` container keeps serving the version regardless of its `listed` state,
+  and a fresh real `dotnet restore` of the exact unlisted version still succeeds end to end (not just
+  a raw probe).
 - **Search/autocomplete** (`GET /<repo>/v3/search`/`v3/autocomplete`, `permission: READ`): confirmed
   live over raw HTTP — search answers `{"totalHits":N,"data":[{"id","version","registration",...}]}`
   (`NuGetSearchResponse`/`NuGetSearchData`, `data[].id` the lowercased stored spelling, matched
   case-insensitively, same H8 fact as the rest of this runner's suite); autocomplete answers
   `{"totalHits":N,"data":["<idLower>",...]}` (`NuGetAutocompleteResponse`), bare id strings. Both
   routes work fine over raw HTTP — see the next point for why a real client still can't reach them.
-- **`dotnet package search` (RPS-1213 live evidence, not a new bug)**: running a real `dotnet package
-search <id> --source repsy --configfile <cfg>` against a package this suite had just published and
-  proven searchable over raw HTTP (previous point) does NOT crash and does NOT exit non-zero — exit
-  `0`, stdout reads `error: The source does not have a Search service!` and no results are returned.
-  This is one more piece of live evidence for H6/RPS-1213's already-documented root cause
-  (NuGet.Client's `ServiceTypes.cs` never resolves the bare `SearchQueryService/3.0.0` `@type` this
-  server's service index advertises, only the `-beta`/`3.4.0` spellings), now confirmed with the real
-  command's own failure shape rather than the service-index evidence alone — pinned with
-  `test.fail()` referencing RPS-1213, not a new placeholder.
+- **`dotnet package search` (RPS-1213: fixed the service index, but this command still fails, now
+  for a different, unresolved reason)**: running a real `dotnet package search <id> --source repsy
+--configfile <cfg>` against a package this suite had just published and proven searchable over raw
+  HTTP (previous point) does NOT crash and does NOT exit non-zero — exit `0`, stdout reads `error:
+The source does not have a Search service!` and no results are returned. This was originally H6/
+  RPS-1213's own live evidence for the service index advertising an unrecognised `@type`
+  (`SearchQueryService/3.0.0`, not in NuGet.Client's `ServiceTypes.cs`). RPS-1213 has since fixed
+  that — the service index now advertises the bare, recognised `SearchQueryService`, confirmed by
+  fetching the live index from inside this exact test run immediately before invoking `dotnet`, right
+  before the `dotnet` call below. Re-run after the fix, `dotnet package search` still produces the
+  identical "does not have a Search service!" failure, so the `@type` mismatch is no longer the
+  cause. The reason `dotnet package search` (.NET SDK 10.0.401) still won't resolve this server's
+  search resource is not yet understood — kept pinned with `test.fail()`, not removed, with this
+  updated evidence in its comment; filed as
+  [RPS-1240](https://zyfera.atlassian.net/browse/RPS-1240).
 - **Explicitly older version restores**: publishing version B after version A, then explicitly
   restoring A (`renderConsumerProject`/`nuget.resolve` always pin an exact bracketed
   `Version="[<version>]"`) returns exactly A's bytes, never B's — confirmed live, no "latest wins"
