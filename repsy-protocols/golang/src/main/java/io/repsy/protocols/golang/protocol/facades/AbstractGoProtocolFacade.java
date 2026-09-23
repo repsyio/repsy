@@ -85,8 +85,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
       return this.handleLatestVersion(repoInfo, path);
     }
 
-    final var storagePath = StoragePath.of(repoInfo.getStorageKey(), path);
-    return this.goStorageService.getResource(repoInfo.getName(), storagePath);
+    return this.getResourceWithLegacyFallback(repoInfo, path);
   }
 
   @Override
@@ -106,9 +105,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
 
     final var decodedPath = GoVersionUtils.decodeModulePath(modulePath);
 
-    final var normalizedPath = decodedPath.toLowerCase(Locale.ROOT);
-
-    rejectInvalidIdentifiers(normalizedPath, version);
+    rejectInvalidIdentifiers(decodedPath, version);
 
     final var content = inputStream.readAllBytes();
 
@@ -119,27 +116,31 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
 
     this.goModuleService.publishModule(
         repoInfo,
-        normalizedPath,
+        decodedPath,
         version,
         GoVersionUtils.extractGoVersionFromMod(modContent),
         GoModuleHashCalculator.hashMod(modContent),
         GoModuleHashCalculator.hashZip(content));
 
-    final var modUsages = this.writeModFile(repoInfo, normalizedPath, version, modContent);
+    // The DB key is the case-preserved decoded path; the on-disk storage key is its !-escaped,
+    // all-lower-case form (RPS-1232), so storage never has to rely on a case-sensitive filesystem.
+    final var escapedPath = GoVersionUtils.escapeModulePath(decodedPath);
+
+    final var modUsages = this.writeModFile(repoInfo, escapedPath, version, modContent);
 
     final var zipStoragePath =
         StoragePath.of(
             repoInfo.getStorageKey(),
-            this.goStorageService.getModuleZipRelativePath(normalizedPath, version));
+            this.goStorageService.getModuleZipRelativePath(escapedPath, version));
     final var zipUsages =
         this.goStorageService.writeInputStreamToPath(
             zipStoragePath, new ByteArrayInputStream(content), repoInfo.getName());
 
-    final var infoUsages = this.writeInfoFile(repoInfo, normalizedPath, version);
+    final var infoUsages = this.writeInfoFile(repoInfo, escapedPath, version);
 
     final var totalDiskUsage =
         modUsages.getDiskUsage() + zipUsages.getDiskUsage() + infoUsages.getDiskUsage();
-    context.addProperty(ARTIFACT_NAME, normalizedPath);
+    context.addProperty(ARTIFACT_NAME, decodedPath);
     context.addProperty(ARTIFACT_VERSION, version);
     context.addProperty(USAGES, BaseUsages.ofDisk(totalDiskUsage));
   }
@@ -147,16 +148,16 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
   /**
    * The module path and version are taken from the URL and stored in varchar columns, so a longer
    * one is refused with a 400 that names it before the upload is read (RPS-1072). Neither can be
-   * cut: they are what the module is fetched by. The path is measured as it is stored, decoded and
-   * lower-cased. The length check runs first so an over-long version keeps answering {@code
-   * moduleVersionTooLong} rather than {@code invalidModuleVersion}: a version can be both over-long
-   * and a syntactically valid semver string (a long pre-release), and the length is the more
-   * specific fault. Only once the version is a plausible length is it checked against Go's own
+   * cut: they are what the module is fetched by. The path is measured as it is stored: decoded and
+   * case-preserved (RPS-1232). The length check runs first so an over-long version keeps answering
+   * {@code moduleVersionTooLong} rather than {@code invalidModuleVersion}: a version can be both
+   * over-long and a syntactically valid semver string (a long pre-release), and the length is the
+   * more specific fault. Only once the version is a plausible length is it checked against Go's own
    * semver grammar (RPS-1227), so a client cannot store an arbitrary string as an immutable
    * "version" that {@code @v/list}/{@code @latest} then have to make sense of.
    */
-  private static void rejectInvalidIdentifiers(final String normalizedPath, final String version) {
-    if (normalizedPath.length() > GoVersionUtils.MAX_MODULE_PATH_LENGTH) {
+  private static void rejectInvalidIdentifiers(final String decodedPath, final String version) {
+    if (decodedPath.length() > GoVersionUtils.MAX_MODULE_PATH_LENGTH) {
       throw new BadRequestException("modulePathTooLong");
     }
     if (version.length() > GoVersionUtils.MAX_VERSION_LENGTH) {
@@ -168,31 +169,78 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
   }
 
   private Resource handleVersionList(final BaseRepoInfo<I> repoInfo, final String path) {
+    final var versions = this.listVersions(repoInfo, path);
+    if (!versions.isEmpty()) {
+      return new ByteArrayResource(versions.getBytes(StandardCharsets.UTF_8));
+    }
+
+    // See getResourceWithLegacyFallback: a legacy module is only stored under its lower-case
+    // spelling, so an empty listing under the real (mixed) case is retried once against it.
+    final var lowerPath = lowerCaseModuleSegment(path);
+    final var fallbackVersions =
+        lowerPath.equals(path) ? versions : this.listVersions(repoInfo, lowerPath);
+    return new ByteArrayResource(fallbackVersions.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private String listVersions(final BaseRepoInfo<I> repoInfo, final String path) {
     final var atVPath = path.substring(0, path.length() - "list".length());
     final var atVStoragePath = StoragePath.of(repoInfo.getStorageKey(), atVPath);
 
-    final var versions =
-        this.goStorageService.listDirectory(atVStoragePath).stream()
-            .filter(item -> !item.isDirectory() && item.getName().endsWith(INFO_EXTENSION))
-            .map(
-                item ->
-                    item.getName().substring(0, item.getName().length() - INFO_EXTENSION.length()))
-            .sorted(GoVersionUtils.COMPARATOR)
-            .collect(Collectors.joining("\n"));
-
-    return new ByteArrayResource(versions.getBytes(StandardCharsets.UTF_8));
+    return this.goStorageService.listDirectory(atVStoragePath).stream()
+        .filter(item -> !item.isDirectory() && item.getName().endsWith(INFO_EXTENSION))
+        .map(item -> item.getName().substring(0, item.getName().length() - INFO_EXTENSION.length()))
+        .sorted(GoVersionUtils.COMPARATOR)
+        .collect(Collectors.joining("\n"));
   }
 
   private Resource handleLatestVersion(final BaseRepoInfo<I> repoInfo, final String path) {
-    final var modulePath = path.substring(1, path.length() - LATEST_SUFFIX.length());
+    // path was canonicalized by decodePath(): the module segment is the !-escaped storage form.
+    final var escapedModulePath = path.substring(1, path.length() - LATEST_SUFFIX.length());
+    final var decodedModulePath = GoVersionUtils.decodeModulePath(escapedModulePath);
     final var latestVersion =
         this.goModuleService
-            .findLatestPublishedVersion(repoInfo, modulePath)
+            .findLatestPublishedVersion(repoInfo, decodedModulePath)
             .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
 
-    final var infoPath = PATH_SEPARATOR + modulePath + "/@v/" + latestVersion + INFO_EXTENSION;
-    return this.goStorageService.getResource(
-        repoInfo.getName(), StoragePath.of(repoInfo.getStorageKey(), infoPath));
+    final var infoPath =
+        PATH_SEPARATOR + escapedModulePath + "/@v/" + latestVersion + INFO_EXTENSION;
+    return this.getResourceWithLegacyFallback(repoInfo, infoPath);
+  }
+
+  /**
+   * Reads a storage resource whose path starts with a module segment, falling back to the module
+   * segment's all-lower-case spelling when the primary path is not found (RPS-1232). Before this
+   * ticket, every module path was lower-cased before it reached storage, so a module that was
+   * published under a mixed-case URL is, on disk, only reachable under its lower-cased spelling.
+   * Rather than moving those already-stored objects, a request for the real (mixed) case that finds
+   * nothing at its own escaped path is retried once against the lower-cased one, so a legacy module
+   * keeps resolving for a client that has always used its real case. A module path that is already
+   * all-lower-case is unaffected: the fallback path equals the primary one and is skipped.
+   */
+  private Resource getResourceWithLegacyFallback(
+      final BaseRepoInfo<I> repoInfo, final String path) {
+    try {
+      return this.goStorageService.getResource(
+          repoInfo.getName(), StoragePath.of(repoInfo.getStorageKey(), path));
+    } catch (final ItemNotFoundException e) {
+      final var lowerPath = lowerCaseModuleSegment(path);
+      if (lowerPath.equals(path)) {
+        throw e;
+      }
+      return this.goStorageService.getResource(
+          repoInfo.getName(), StoragePath.of(repoInfo.getStorageKey(), lowerPath));
+    }
+  }
+
+  /** Lower-cases only the module-path segment of {@code path} (before "/@v/"), if any. */
+  private static String lowerCaseModuleSegment(final String path) {
+    final var atVIndex = path.indexOf("/@v/");
+    if (atVIndex < 0) {
+      return path;
+    }
+    final var escapedModulePath = path.substring(1, atVIndex);
+    final var lowered = GoVersionUtils.decodeModulePath(escapedModulePath).toLowerCase(Locale.ROOT);
+    return PATH_SEPARATOR + lowered + path.substring(atVIndex);
   }
 
   private BaseUsages writeModFile(
@@ -223,21 +271,28 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     }
   }
 
+  /**
+   * Canonicalizes the module-path segment of a request path to its !-escaped storage form
+   * (RPS-1232): decodes it (resolving any !-escape and passing raw characters through unchanged)
+   * and then re-escapes it. For a well-formed request, whose module segment already came in
+   * escaped, this is a no-op; it also normalizes a client that sent raw upper-case characters
+   * instead of escaping them. The suffix ("/@v/...", "/@latest") is left untouched.
+   */
   private static String decodePath(final String path) {
     if (path.endsWith(LATEST_SUFFIX)) {
       final var encoded = path.substring(1, path.length() - LATEST_SUFFIX.length());
-      return "/"
-          + GoVersionUtils.decodeModulePath(encoded).toLowerCase(Locale.ROOT)
-          + LATEST_SUFFIX;
+      return "/" + canonicalizeModulePath(encoded) + LATEST_SUFFIX;
     }
     final var atVIndex = path.indexOf("/@v/");
     if (atVIndex < 0) {
       return path;
     }
     final var encoded = path.substring(1, atVIndex);
-    return "/"
-        + GoVersionUtils.decodeModulePath(encoded).toLowerCase(Locale.ROOT)
-        + path.substring(atVIndex);
+    return "/" + canonicalizeModulePath(encoded) + path.substring(atVIndex);
+  }
+
+  private static String canonicalizeModulePath(final String encoded) {
+    return GoVersionUtils.escapeModulePath(GoVersionUtils.decodeModulePath(encoded));
   }
 
   @SneakyThrows

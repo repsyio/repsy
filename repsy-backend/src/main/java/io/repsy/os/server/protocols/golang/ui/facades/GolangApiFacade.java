@@ -27,6 +27,7 @@ import io.repsy.os.server.protocols.golang.shared.go_module.services.GoModuleSer
 import io.repsy.os.server.protocols.golang.shared.storage.services.GolangStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -90,7 +91,10 @@ public class GolangApiFacade implements ProtocolApiFacade {
             .findByRepoIdAndModulePath(repoInfo.getStorageKey(), modulePath)
             .orElseThrow(() -> new ItemNotFoundException("moduleNotFound"));
 
-    final var storagePath = StoragePath.of(repoInfo.getStorageKey(), "/" + modulePath);
+    // modulePath is the DB's case-preserved path; storage keys the module by its !-escaped form
+    // (RPS-1232), which is identical for an all-lower-case path, so this is a no-op there.
+    final var storagePath =
+        StoragePath.of(repoInfo.getStorageKey(), "/" + GoVersionUtils.escapeModulePath(modulePath));
     this.golangStorageService.deleteDirectory(storagePath);
 
     this.goModuleRepository.delete(goModule);
@@ -113,7 +117,9 @@ public class GolangApiFacade implements ProtocolApiFacade {
             .orElseThrow(() -> new ItemNotFoundException("versionNotFound"));
 
     final var versionStoragePath =
-        StoragePath.of(repoInfo.getStorageKey(), "/" + modulePath + "/@v/" + version);
+        StoragePath.of(
+            repoInfo.getStorageKey(),
+            "/" + GoVersionUtils.escapeModulePath(modulePath) + "/@v/" + version);
     this.golangStorageService.deleteVersionFiles(versionStoragePath, repoInfo.getName());
 
     this.goModuleVersionRepository.delete(moduleVersion);

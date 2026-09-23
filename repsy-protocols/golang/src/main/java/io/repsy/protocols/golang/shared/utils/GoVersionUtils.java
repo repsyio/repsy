@@ -39,9 +39,9 @@ public class GoVersionUtils {
    * varchar(1024)}, but a push to a repo with security scanning on, which is the default, also
    * records a {@code vulnerability_scan} row whose {@code artifact_name} is the module path in a
    * {@code varchar(512)}. A longer path failed that insert and with it the whole upload, so 512 is
-   * what a registry could always store. The path stored is the decoded, lower-cased one, so that is
-   * the one to measure. The {@code GoModule} entity states the column's own length, 1024, and does
-   * not take it from here.
+   * what a registry could always store. The path stored is the decoded, case-preserved one
+   * (RPS-1232), so that is the one to measure. The {@code GoModule} entity states the column's own
+   * length, 1024, and does not take it from here.
    */
   public static final int MAX_MODULE_PATH_LENGTH = 512;
 
@@ -207,6 +207,34 @@ public class GoVersionUtils {
         escape = false;
       } else if (c == '!') {
         escape = true;
+      } else {
+        sb.append(c);
+      }
+    }
+
+    return sb.toString();
+  }
+
+  /**
+   * Encodes a decoded, case-preserved module path into Go's own proxy-protocol escape form (the
+   * exact inverse of {@link #decodeModulePath}, matching {@code
+   * golang.org/x/mod/module.EscapePath}): every ASCII upper-case letter becomes {@code !} followed
+   * by its lower-case form. E.g. "github.com/BurntSushi/toml" → "github.com/!burnt!sushi/toml".
+   *
+   * <p>The result never contains an upper-case letter, so it is safe to use as an on-disk storage
+   * path even on a case-insensitive filesystem (RPS-1232): two module paths that differ only by
+   * case always escape to two different strings (the case moves into a {@code !} marker instead of
+   * being folded away), while a module path that is already all lower-case escapes to itself
+   * unchanged, so every module stored before this encoding was introduced keeps working with no
+   * data migration.
+   */
+  public static String escapeModulePath(final String decoded) {
+    final var sb = new StringBuilder(decoded.length());
+
+    for (int i = 0; i < decoded.length(); i++) {
+      final char c = decoded.charAt(i);
+      if (c >= 'A' && c <= 'Z') {
+        sb.append('!').append(Character.toLowerCase(c));
       } else {
         sb.append(c);
       }

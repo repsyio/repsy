@@ -23,15 +23,18 @@
  * (see `golang-raw.ts`'s file header and `README.md`'s "Go runner" section for the raw evidence and
  * every H/G number these tests reference).
  *
- * Three backend bugs were found and confirmed live while building this suite (none fixed here --
- * each is now its own Jira story, per this repo's e2e process):
+ * Two backend bugs were found and confirmed live while building this suite (not fixed here -- each
+ * is now its own Jira story, per this repo's e2e process):
  *  - **RPS-1227**: no version-string validation of any kind -- `banana`/`v1`/`1.0.0` are all
  *    accepted, stored immutably, and listed by `@v/list`.
  *  - **RPS-1228**: the go.mod `module` directive is never compared against the URL's own module
  *    path -- a zip whose go.mod names a completely different module still uploads successfully (a
  *    real `go get` of the URL's own path then fails, `publish-consume.spec.ts`'s own test).
- *  - **RPS-1232**: module paths are lower-cased for storage/lookup, so `GoProbe` and `goprobe`
- *    collide as the SAME module even though Go itself treats module paths as case-sensitive.
+ *
+ * A third, **RPS-1232** (module paths were lower-cased for storage/lookup, so `GoProbe` and
+ * `goprobe` collided as the SAME module even though Go itself treats module paths as
+ * case-sensitive), has since been fixed. The test below now pins the corrected, case-sensitive
+ * behaviour instead of `test.fail()`-ing the collision.
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import { golangAdapter } from '../../src/clients/golang.js';
@@ -382,8 +385,8 @@ test.describe('golang registry rules (raw HTTP)', () => {
   );
 
   test(
-    'module paths are lower-cased for storage/lookup: a mixed-case upload collides with the ' +
-      'lower-case module, and the lower-case URL always reaches it (RPS-1232)',
+    'module paths are case-sensitive for storage/lookup: a mixed-case upload does not collide ' +
+      "with its lower-case spelling -- each is Go's own, distinct module (RPS-1232, fixed)",
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'mixedcase');
@@ -396,16 +399,16 @@ test.describe('golang registry rules (raw HTTP)', () => {
       const mixed = await buildModuleZip({ modulePath: mixedCasePath, version: 'v0.0.2' });
       expectMsgId(await rawUpload(layout.repoName, admin, mixed), 200, undefined);
 
-      test.fail(
-        true,
-        'RPS-1232: module paths are lower-cased for storage/lookup, so a mixed-case upload ' +
-          'is stored under the SAME module as its lower-case spelling -- the two do not collide as ' +
-          "distinct modules the way real Go's own case-sensitive module identity would treat them",
-      );
       const listRes = await rawGet(layout.repoName, admin, listRelPath(layout.modulePath));
       expect(parseVersionList(listRes.body), 'the mixed-case upload is a DISTINCT module').toEqual([
         'v0.0.1',
       ]);
+
+      const mixedListRes = await rawGet(layout.repoName, admin, listRelPath(mixedCasePath));
+      expect(
+        parseVersionList(mixedListRes.body),
+        'the mixed-case module keeps its own, separate version history',
+      ).toEqual(['v0.0.2']);
     },
   );
 

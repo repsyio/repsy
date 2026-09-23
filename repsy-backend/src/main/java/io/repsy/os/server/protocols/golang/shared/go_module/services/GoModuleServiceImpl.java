@@ -29,6 +29,7 @@ import io.repsy.protocols.golang.shared.module.services.GoModuleService;
 import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -98,12 +99,33 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
   public Optional<String> findLatestPublishedVersion(
       final BaseRepoInfo<UUID> repoInfo, final String modulePath) {
 
-    return this.goModuleRepository
-        .findByRepoIdAndModulePath(repoInfo.getStorageKey(), modulePath)
+    return this.findModule(repoInfo.getStorageKey(), modulePath)
         .flatMap(
             module ->
                 this.computeLatestVersion(
                     this.goModuleVersionRepository.findAllByModuleId(module.getId())));
+  }
+
+  /**
+   * Looks a module up by its exact, case-preserved path, falling back to the path's all-lower-case
+   * spelling only when no row with the exact case exists (RPS-1232). Before this ticket, every
+   * module path was lower-cased before being stored, so a module published under a mixed-case URL
+   * has, in the database, only ever existed under its lower-cased spelling. Rather than migrating
+   * those rows, a lookup for the real (mixed) case that finds nothing falls back once to the
+   * lower-cased row, so it keeps resolving for a client that has always used the module's real
+   * case. A path that is already all-lower-case is unaffected: the fallback path equals the
+   * requested one.
+   */
+  private Optional<GoModule> findModule(final UUID repoId, final String modulePath) {
+    final var exact = this.goModuleRepository.findByRepoIdAndModulePath(repoId, modulePath);
+    if (exact.isPresent()) {
+      return exact;
+    }
+    final var lowerCasePath = modulePath.toLowerCase(Locale.ROOT);
+    if (lowerCasePath.equals(modulePath)) {
+      return Optional.empty();
+    }
+    return this.goModuleRepository.findByRepoIdAndModulePath(repoId, lowerCasePath);
   }
 
   public Page<io.repsy.os.generated.model.GoModuleListItem> getModules(
