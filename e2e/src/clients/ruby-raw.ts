@@ -69,9 +69,11 @@
  *    `404 gemNotFound`.
  *  - `GET /<repo>/names`: preamble + one name per line.
  *  - `GET /<repo>/specs.4.8.gz` / `latest_specs.4.8.gz` / `prerelease_specs.4.8.gz`: a Marshal 4.8
- *    array of `[name, Gem::Version, platform]`, compressed with `java.util.zip.DeflaterOutputStream`
- *    -- **raw zlib/RFC1950, NOT gzip** (RPS-1234, confirmed live: `gunzipSync` throws, `inflateSync`
- *    succeeds and yields the Marshal `\x04\x08` header). Prerelease = "version contains a letter".
+ *    array of `[name, Gem::Version, platform]`, compressed with `java.util.zip.GZIPOutputStream` --
+ *    **real gzip/RFC1952** (RPS-1234, fixed: previously `DeflaterOutputStream` produced raw
+ *    zlib/RFC1950 despite the `.gz` filename, so `gunzipSync` threw and only `inflateSync` could
+ *    decode it; confirmed live post-fix: `gunzipSync` now succeeds and yields the Marshal `\x04\x08`
+ *    header). Prerelease = "version contains a letter".
  *  - `GET /<repo>/quick/Marshal.4.8/<name>-<ver>[-<platform>].gemspec.rz`: **`404 unknownPath`** (RPS-1233,
  *    grep- and live-confirmed: no backend class extends `AbstractRubyGemspecHandler`, even though the
  *    abstract handler/writer exist in `repsy-protocols/ruby`). Breaks `gem install`/`gem fetch`

@@ -25,7 +25,10 @@
  *  - "gem install fails on the missing gemspec.rz route" (RPS-1233 via `gem`, `test.fail()`): unlike the
  *    catalog loop's own consumer (real `bundle install`, which never needs this route -- H1's
  *    refutation, `ruby-raw.ts`'s file header), a real `gem install` DOES need it and fails.
- *  - "gem fetch fails on the specs.4.8.gz zlib/gzip mismatch" (RPS-1234 via `gem`, `test.fail()`).
+ *  - "gem fetch still fails" (RPS-1234 via `gem`, `test.fail()`): the specs.4.8.gz zlib/gzip
+ *    mismatch itself is fixed (asserted directly in the test, not just via the exit code) -- but
+ *    `gem fetch` needs the SAME missing gemspec.rz route as `gem install` above (RPS-1233, still
+ *    open), so the command still does not exit 0; only the failure reason changed.
  *  - "anonymous gem push exits 1 promptly, no push request ever sent" (H4): the fixture's own
  *    fingerprint proves nothing was stored.
  *  - "gem yank with a RW token succeeds, and the yanked version is listed with a '-' prefix in
@@ -36,6 +39,7 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
 import mustache from 'mustache';
 
@@ -99,7 +103,8 @@ test(
 );
 
 test(
-  'ruby > gem fetch fails on the specs.4.8.gz zlib/gzip mismatch (RPS-1234)',
+  'ruby > gem fetch: specs.4.8.gz is real gzip now (RPS-1234, fixed), but the command still ' +
+    'fails on the missing gemspec.rz route (RPS-1233)',
   { tag: ['@negative'] },
   async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: false });
@@ -111,10 +116,14 @@ test(
     const publishRes = await rawPublish(repo.name, admin, built.bytes);
     expect(publishRes.status, 'seed publish').toBe(200);
 
-    // Sanity check first: the server really does answer zlib, not gzip (this is what makes gem
-    // fetch's own failure below a real client-observed consequence, not a coincidence).
+    // RPS-1234 is fixed: confirmed directly here (not just via `gem fetch`'s overall exit code,
+    // which depends on the separate, still-open bug below) -- the server now answers real gzip
+    // (RFC 1952): gunzipSync succeeds, inflateSync throws.
     const specsRes = await rawGet(repo.name, admin, specsRelPath());
     expect(specsRes.status, 'specs.4.8.gz is served').toBe(200);
+    expect(() => zlib.inflateSync(specsRes.body)).toThrow();
+    const decoded = zlib.gunzipSync(specsRes.body);
+    expect(decoded.subarray(0, 2)).toEqual(Buffer.from([0x04, 0x08]));
 
     const { home, work } = await isolatedWorkDir(`ruby-gemfetch-${seeder.runId}`);
     const result = await run(
@@ -125,9 +134,10 @@ test(
 
     test.fail(
       true,
-      'RPS-1234: specs.4.8.gz/latest_specs.4.8.gz/prerelease_specs.4.8.gz are zlib-deflated ' +
-        '(RFC1950), not gzip (RFC1952) -- a real `gem fetch` (the legacy Index fetcher) cannot ' +
-        'decompress them and fails',
+      'RPS-1233: `gem fetch` (like `gem install`, the test above) also needs ' +
+        'quick/Marshal.4.8/*.gemspec.rz, which still has no backend route (404 unknownPath) -- ' +
+        'confirmed live post-RPS-1234-fix: the failure moved from a gzip decompression error on ' +
+        'specs.4.8.gz to a 404 on gemspec.rz, so the command still does not exit 0',
     );
     expect(result.exitCode, `gem fetch: ${result.command}`).toBe(0);
   },

@@ -169,8 +169,8 @@ e2e/
       publish-consume.spec.ts   # registerPublishConsumeLoop(golangAdapter) + go-get-build-run, plain-http-creds-refused, dirhash cross-check, mixed-case and wire-trace real-client tests
       registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, upload URL spellings, sha256, immutability, zip validation, @v/list/@latest, sumdb, HEAD, delete+reupload) + G1/G2/G10 candidates
     ruby/
-      publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install/gem-fetch (RPS-1233/RPS-1234, test.fail), anonymous-push, yank (RPS-1235), USER-role-push, bundle-install-e2e real-client tests
-      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow, specs.4.8.gz zlib, gemspec.rz 404, HEAD-always-200, platform gem, RPS-1236) + RPS-1233/RPS-1234/RPS-1235/RPS-1236/RPS-1237 candidates
+      publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install/gem-fetch (RPS-1233, test.fail; gem-fetch's specs.4.8.gz zlib/gzip mismatch is separately RPS-1234, fixed -- gem-fetch itself still test.fail()s on RPS-1233's shared gemspec.rz 404), anonymous-push, yank (RPS-1235), USER-role-push, bundle-install-e2e real-client tests
+      registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, override row-first, malformed gem, full yank flow, specs.4.8.gz gzip framing, gemspec.rz 404, HEAD-always-200, platform gem, RPS-1236) + RPS-1233/RPS-1235/RPS-1236/RPS-1237 candidates (RPS-1234 fixed)
 ```
 
 ## Setup
@@ -2087,8 +2087,9 @@ row-first ordering, re-verifying RPS-1060 still holds for Ruby (R4); malformed-g
 nothing stored (R6); the full yank flow — success, re-yank refusal, a read-only token/USER-role
 password both refused with 401 (`MANAGE` permission), a yanked version's `.gem` file 404ing, and a
 yanked version rejecting even an `allowOverride:true` re-push (R8); a panel-API delete (not a yank)
-allowing a clean re-publish (R5/R16); `specs.4.8.gz`'s zlib-not-gzip bytes and the prerelease/latest
-split (R9, RPS-1234); the missing `gemspec.rz` route (R10, RPS-1233); unknown-gem 404s and an empty repo's
+allowing a clean re-publish (R5/R16); `specs.4.8.gz`'s gzip framing (RFC 1952, `gunzipSync` succeeds
+and `inflateSync` throws) and the prerelease/latest split (R9, RPS-1234, fixed); the missing
+`gemspec.rz` route (R10, RPS-1233); unknown-gem 404s and an empty repo's
 listings (R11); `HEAD`-always-200 (R12, RPS-1237 observation); a platform gem's filename/info-line shape
 and yank's explicit-platform requirement (R14); that `releases`/`snapshots` are never read (R15); and
 RPS-1236's hyphen-before-digit download bug (R13).
@@ -2133,8 +2134,12 @@ adapter code was written.
   `gem`/`bundle` retries a refused request by default.
 - **H10** (`md5Hex(/info body)` matches `/versions`' own md5 after publish and after yank): confirmed
   live — `registry-rules.spec.ts`'s happy-path-shape test and the yank test both assert it.
-- **H11** (`specs.4.8.gz` is zlib not gzip; `gem fetch` fails on it): confirmed live — RPS-1234, and the
-  dedicated `gem fetch` real-client test (`test.fail()`).
+- **H11** (`specs.4.8.gz` is zlib not gzip; `gem fetch` fails on it): confirmed live, then **fixed** —
+  RPS-1234; the backend now serves real gzip (`GZIPOutputStream`), asserted directly in the
+  dedicated `gem fetch` real-client test. That command still does not exit 0, though: `gem fetch`
+  also needs the same missing `gemspec.rz` route as `gem install` (RPS-1233, still open, confirmed
+  live post-fix — the failure moved from a gzip decompression error to a 404 on `gemspec.rz`), so
+  the test remains `test.fail()`, now for that reason.
 - **H12** (`gem install --source` fails on the missing `gemspec.rz` route): confirmed live — RPS-1233, and
   the dedicated `gem install` real-client test (`test.fail()`).
 - **H13** (a yanked version is listed in `/info` prefixed `-`, not omitted): confirmed live — RPS-1235.
@@ -2176,12 +2181,23 @@ unknownPath`. Breaks `gem install --source`/`gem fetch` (confirmed live, `test.f
   missing route) is only triggered by a version's `required_ruby_version` being genuinely absent from
   `/info` in a way that forces a fallback check — and it happens to just... not need one for
   resolution to succeed. Confirmed live, `registry-rules.spec.ts`'s happy-path-shape test.
-- **RPS-1234** — `specs.4.8.gz`/`latest_specs.4.8.gz`/`prerelease_specs.4.8.gz` are compressed with
-  `java.util.zip.DeflaterOutputStream` (raw zlib/RFC1950), not gzip (RFC1952) as their own `.gz`
-  filenames and a real `gem fetch`/the legacy Index fetcher both expect. Confirmed live:
-  `gunzipSync` throws, `inflateSync` succeeds and yields a valid Marshal 4.8 stream; a real `gem
-fetch` fails. `test.fail()`-pinned in both `registry-rules.spec.ts` (R9) and a dedicated
-  `publish-consume.spec.ts` real-client test.
+- **RPS-1234 — FIXED.** `specs.4.8.gz`/`latest_specs.4.8.gz`/`prerelease_specs.4.8.gz` were compressed
+  with `java.util.zip.DeflaterOutputStream` (raw zlib/RFC1950), not gzip (RFC1952) as their own `.gz`
+  filenames and a real `gem fetch`/the legacy Index fetcher both expect. Confirmed live before the
+  fix: `gunzipSync` threw, `inflateSync` succeeded and yielded a valid Marshal 4.8 stream; a real
+  `gem fetch` failed. Fixed by swapping in `java.util.zip.GZIPOutputStream`
+  (`AbstractRubySpecsIndexHandler`); `Content-Type` stays `application/octet-stream` and no
+  `Content-Encoding: gzip` header is added (the gzip framing is the file's own content, not a
+  transfer encoding — adding that header would make an HTTP client transparently decompress it and
+  hand RubyGems a bare Marshal stream to gunzip a second time). `registry-rules.spec.ts` (R9) now
+  asserts `gunzipSync` succeeds and `inflateSync` throws. The dedicated `publish-consume.spec.ts`
+  real-client `gem fetch` test asserts the same gzip framing directly, but stays `test.fail()`:
+  `gem fetch` shares `gem install`'s dependency on the still-missing `gemspec.rz` route (RPS-1233,
+  confirmed live post-fix — the failure moved from a gzip decompression error on `specs.4.8.gz` to
+  a 404 on `gemspec.rz`), so the command itself does not exit 0 until RPS-1233 also lands. Note:
+  `AbstractRubyGemspecHandler.deflate` (the `.rz` gemspec route, RPS-1233) is a different,
+  near-identical-looking method that correctly uses raw zlib per the RubyGems spec — it was
+  deliberately left untouched.
 - **RPS-1235** — a yanked version is listed in `/info/<gem>` with a `-` prefix instead of being OMITTED
   entirely, which is what the compact-index protocol (as implemented by rubygems.org and read by a
   real Bundler client, which simply treats a `-`-prefixed line as "this version is yanked, still
