@@ -13,38 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.docker.shared.image.entities;
+package io.repsy.os.server.protocols.maven.shared.artifact.entities;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.repsy.os.shared.entities.AbstractEntityIdentityTest;
-import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class ImageTest extends AbstractEntityIdentityTest<Image> {
+class VersionLicenseTest extends AbstractEntityIdentityTest<VersionLicense> {
 
   @Override
-  protected Image newEntity(final UUID id) {
-    final var image = new Image();
-    image.setId(id);
-    image.setName("library/alpine");
-    image.setDigest("sha256:aaaa");
-    return image;
+  protected VersionLicense newEntity(final UUID id) {
+    final var versionLicense = new VersionLicense();
+    versionLicense.setId(id);
+    versionLicense.setName("Apache-2.0");
+    return versionLicense;
   }
 
   @Override
-  protected void changeState(final Image image) {
-    image.setName("library/busybox");
-    image.setSize(42);
-    image.setDigest("sha256:bbbb");
-    image.setLastUpdatedAt(Instant.now());
+  protected void changeState(final VersionLicense versionLicense) {
+    versionLicense.setName("MIT");
+    versionLicense.setUrl("https://example.org/license");
   }
 
   @Override
-  protected Image newProxy(final UUID id) {
-    return new Image() {
+  protected VersionLicense newProxy(final UUID id) {
+    return new VersionLicense() {
       @Override
       public UUID getId() {
         return id;
@@ -53,17 +49,16 @@ class ImageTest extends AbstractEntityIdentityTest<Image> {
   }
 
   @Override
-  protected void assignId(final Image image, final UUID id) {
-    image.setId(id);
+  protected void assignId(final VersionLicense versionLicense, final UUID id) {
+    versionLicense.setId(id);
   }
 
   @Test
-  @DisplayName("Hashing and printing an image never touch its tags or repo")
+  @DisplayName("Hashing and printing a version license never touch its lazy associations")
   void hashCodeAndToStringSkipAssociations() {
-    final var image = this.newEntity(UUID.randomUUID());
-    image.setTags(new UntouchableSet<>());
+    final var versionLicense = this.newEntity(UUID.randomUUID());
 
-    assertThat(image.hashCode()).isEqualTo(Image.class.hashCode());
-    assertThat(image.toString()).doesNotContain("tags=", "repo=");
+    assertThat(versionLicense.hashCode()).isEqualTo(VersionLicense.class.hashCode());
+    assertThat(versionLicense.toString()).doesNotContain("artifactVersion=");
   }
 }

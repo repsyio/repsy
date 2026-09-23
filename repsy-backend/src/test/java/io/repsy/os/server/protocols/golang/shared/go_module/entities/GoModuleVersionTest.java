@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.docker.shared.image.entities;
+package io.repsy.os.server.protocols.golang.shared.go_module.entities;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,28 +23,25 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class ImageTest extends AbstractEntityIdentityTest<Image> {
+class GoModuleVersionTest extends AbstractEntityIdentityTest<GoModuleVersion> {
 
   @Override
-  protected Image newEntity(final UUID id) {
-    final var image = new Image();
-    image.setId(id);
-    image.setName("library/alpine");
-    image.setDigest("sha256:aaaa");
-    return image;
+  protected GoModuleVersion newEntity(final UUID id) {
+    final var goModuleVersion = new GoModuleVersion();
+    goModuleVersion.setId(id);
+    goModuleVersion.setVersion("v1.0.0");
+    return goModuleVersion;
   }
 
   @Override
-  protected void changeState(final Image image) {
-    image.setName("library/busybox");
-    image.setSize(42);
-    image.setDigest("sha256:bbbb");
-    image.setLastUpdatedAt(Instant.now());
+  protected void changeState(final GoModuleVersion goModuleVersion) {
+    goModuleVersion.setVersion("v2.0.0");
+    goModuleVersion.setCreatedAt(Instant.now());
   }
 
   @Override
-  protected Image newProxy(final UUID id) {
-    return new Image() {
+  protected GoModuleVersion newProxy(final UUID id) {
+    return new GoModuleVersion() {
       @Override
       public UUID getId() {
         return id;
@@ -53,17 +50,16 @@ class ImageTest extends AbstractEntityIdentityTest<Image> {
   }
 
   @Override
-  protected void assignId(final Image image, final UUID id) {
-    image.setId(id);
+  protected void assignId(final GoModuleVersion goModuleVersion, final UUID id) {
+    goModuleVersion.setId(id);
   }
 
   @Test
-  @DisplayName("Hashing and printing an image never touch its tags or repo")
+  @DisplayName("Hashing and printing a go module version never touch its lazy associations")
   void hashCodeAndToStringSkipAssociations() {
-    final var image = this.newEntity(UUID.randomUUID());
-    image.setTags(new UntouchableSet<>());
+    final var goModuleVersion = this.newEntity(UUID.randomUUID());
 
-    assertThat(image.hashCode()).isEqualTo(Image.class.hashCode());
-    assertThat(image.toString()).doesNotContain("tags=", "repo=");
+    assertThat(goModuleVersion.hashCode()).isEqualTo(GoModuleVersion.class.hashCode());
+    assertThat(goModuleVersion.toString()).doesNotContain("goModule=");
   }
 }

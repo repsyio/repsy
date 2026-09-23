@@ -28,10 +28,10 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
@@ -44,8 +44,6 @@ import org.jspecify.annotations.NonNull;
 @Table(name = "npm_package_version")
 @NoArgsConstructor
 @ToString(exclude = {"npmPackage", "packageKeywords", "packageDistTags", "packageMaintainers"})
-@EqualsAndHashCode(
-    exclude = {"npmPackage", "packageKeywords", "packageDistTags", "packageMaintainers"})
 public class PackageVersion {
   @Id
   @UuidV7
@@ -110,4 +108,32 @@ public class PackageVersion {
 
   @OneToMany(mappedBy = "packageVersion", cascade = CascadeType.ALL, orphanRemoval = true)
   private @NonNull Set<PackageMaintainer> packageMaintainers = new HashSet<>();
+
+  /**
+   * Identifier-based equality: two package versions are equal when they are the same instance or
+   * carry the same non-null id. One that has not been persisted yet has no id and equals only
+   * itself. {@code getId()} is used on both sides so a Hibernate proxy is compared by its real id.
+   */
+  @Override
+  public boolean equals(final Object o) {
+    if (this == o) {
+      return true;
+    }
+
+    if (!(o instanceof final PackageVersion other)) {
+      return false;
+    }
+
+    return this.getId() != null && Objects.equals(this.getId(), other.getId());
+  }
+
+  /**
+   * Constant on purpose: the id is assigned on persist and the other columns can change on flush,
+   * so a hash derived from them would move a package version held in a {@code HashSet} into the
+   * wrong bucket. It also keeps the lazy associations out of the hash.
+   */
+  @Override
+  public int hashCode() {
+    return PackageVersion.class.hashCode();
+  }
 }

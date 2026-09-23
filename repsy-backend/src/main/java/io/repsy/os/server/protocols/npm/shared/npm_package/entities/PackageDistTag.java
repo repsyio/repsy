@@ -25,9 +25,9 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
@@ -39,7 +39,6 @@ import org.hibernate.annotations.OnDeleteAction;
 @Table(name = "npm_package_dist_tag")
 @NoArgsConstructor
 @ToString(exclude = {"packageVersion"})
-@EqualsAndHashCode(exclude = {"packageVersion"})
 public class PackageDistTag {
   @Id
   @UuidV7
@@ -57,4 +56,32 @@ public class PackageDistTag {
   @CreationTimestamp
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
+
+  /**
+   * Identifier-based equality: two package dist tags are equal when they are the same instance or
+   * carry the same non-null id. One that has not been persisted yet has no id and equals only
+   * itself. {@code getId()} is used on both sides so a Hibernate proxy is compared by its real id.
+   */
+  @Override
+  public boolean equals(final Object o) {
+    if (this == o) {
+      return true;
+    }
+
+    if (!(o instanceof final PackageDistTag other)) {
+      return false;
+    }
+
+    return this.getId() != null && Objects.equals(this.getId(), other.getId());
+  }
+
+  /**
+   * Constant on purpose: the id is assigned on persist and the other columns can change on flush,
+   * so a hash derived from them would move a package dist tag held in a {@code HashSet} into the
+   * wrong bucket. It also keeps the lazy associations out of the hash.
+   */
+  @Override
+  public int hashCode() {
+    return PackageDistTag.class.hashCode();
+  }
 }

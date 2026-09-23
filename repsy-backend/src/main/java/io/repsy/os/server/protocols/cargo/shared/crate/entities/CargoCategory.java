@@ -22,10 +22,10 @@ import jakarta.persistence.Id;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.jspecify.annotations.NonNull;
@@ -35,7 +35,6 @@ import org.jspecify.annotations.NonNull;
 @Table(name = "cargo_category")
 @NoArgsConstructor
 @ToString(exclude = "crates")
-@EqualsAndHashCode(exclude = "crates")
 public class CargoCategory {
 
   @Id
@@ -50,4 +49,32 @@ public class CargoCategory {
 
   @ManyToMany(mappedBy = "categories")
   private @NonNull Set<CargoCrate> crates = new HashSet<>();
+
+  /**
+   * Identifier-based equality: two cargo categorys are equal when they are the same instance or
+   * carry the same non-null id. One that has not been persisted yet has no id and equals only
+   * itself. {@code getId()} is used on both sides so a Hibernate proxy is compared by its real id.
+   */
+  @Override
+  public boolean equals(final Object o) {
+    if (this == o) {
+      return true;
+    }
+
+    if (!(o instanceof final CargoCategory other)) {
+      return false;
+    }
+
+    return this.getId() != null && Objects.equals(this.getId(), other.getId());
+  }
+
+  /**
+   * Constant on purpose: the id is assigned on persist and the other columns can change on flush,
+   * so a hash derived from them would move a cargo category held in a {@code HashSet} into the
+   * wrong bucket. It also keeps the lazy associations out of the hash.
+   */
+  @Override
+  public int hashCode() {
+    return CargoCategory.class.hashCode();
+  }
 }

@@ -30,10 +30,12 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.jspecify.annotations.NonNull;
@@ -42,6 +44,7 @@ import org.jspecify.annotations.NonNull;
 @Entity
 @Table(name = "maven_artifact_version")
 @NoArgsConstructor
+@ToString(exclude = {"artifact", "versionLicenses", "versionDevelopers"})
 public class ArtifactVersion {
   @Id
   @UuidV7
@@ -113,4 +116,32 @@ public class ArtifactVersion {
 
   @OneToMany(mappedBy = "artifactVersion", cascade = CascadeType.ALL, orphanRemoval = true)
   private @NonNull Set<VersionDeveloper> versionDevelopers = new HashSet<>();
+
+  /**
+   * Identifier-based equality: two artifact versions are equal when they are the same instance or
+   * carry the same non-null id. One that has not been persisted yet has no id and equals only
+   * itself. {@code getId()} is used on both sides so a Hibernate proxy is compared by its real id.
+   */
+  @Override
+  public boolean equals(final Object o) {
+    if (this == o) {
+      return true;
+    }
+
+    if (!(o instanceof final ArtifactVersion other)) {
+      return false;
+    }
+
+    return this.getId() != null && Objects.equals(this.getId(), other.getId());
+  }
+
+  /**
+   * Constant on purpose: the id is assigned on persist and the other columns can change on flush,
+   * so a hash derived from them would move a artifact version held in a {@code HashSet} into the
+   * wrong bucket. It also keeps the lazy associations out of the hash.
+   */
+  @Override
+  public int hashCode() {
+    return ArtifactVersion.class.hashCode();
+  }
 }

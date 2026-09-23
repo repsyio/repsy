@@ -13,38 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.docker.shared.image.entities;
+package io.repsy.os.server.protocols.cargo.shared.crate.entities;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.repsy.os.shared.entities.AbstractEntityIdentityTest;
-import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class ImageTest extends AbstractEntityIdentityTest<Image> {
+class CargoCrateMetaTest extends AbstractEntityIdentityTest<CargoCrateMeta> {
 
   @Override
-  protected Image newEntity(final UUID id) {
-    final var image = new Image();
-    image.setId(id);
-    image.setName("library/alpine");
-    image.setDigest("sha256:aaaa");
-    return image;
+  protected CargoCrateMeta newEntity(final UUID id) {
+    final var cargoCrateMeta = new CargoCrateMeta();
+    cargoCrateMeta.setId(id);
+    cargoCrateMeta.setVersion("1.0.0");
+    return cargoCrateMeta;
   }
 
   @Override
-  protected void changeState(final Image image) {
-    image.setName("library/busybox");
-    image.setSize(42);
-    image.setDigest("sha256:bbbb");
-    image.setLastUpdatedAt(Instant.now());
+  protected void changeState(final CargoCrateMeta cargoCrateMeta) {
+    cargoCrateMeta.setVersion("2.0.0");
+    cargoCrateMeta.setDownloads(42L);
   }
 
   @Override
-  protected Image newProxy(final UUID id) {
-    return new Image() {
+  protected CargoCrateMeta newProxy(final UUID id) {
+    return new CargoCrateMeta() {
       @Override
       public UUID getId() {
         return id;
@@ -53,17 +49,16 @@ class ImageTest extends AbstractEntityIdentityTest<Image> {
   }
 
   @Override
-  protected void assignId(final Image image, final UUID id) {
-    image.setId(id);
+  protected void assignId(final CargoCrateMeta cargoCrateMeta, final UUID id) {
+    cargoCrateMeta.setId(id);
   }
 
   @Test
-  @DisplayName("Hashing and printing an image never touch its tags or repo")
+  @DisplayName("Hashing and printing a cargo crate meta never touch its lazy associations")
   void hashCodeAndToStringSkipAssociations() {
-    final var image = this.newEntity(UUID.randomUUID());
-    image.setTags(new UntouchableSet<>());
+    final var cargoCrateMeta = this.newEntity(UUID.randomUUID());
 
-    assertThat(image.hashCode()).isEqualTo(Image.class.hashCode());
-    assertThat(image.toString()).doesNotContain("tags=", "repo=");
+    assertThat(cargoCrateMeta.hashCode()).isEqualTo(CargoCrateMeta.class.hashCode());
+    assertThat(cargoCrateMeta.toString()).doesNotContain("crate=");
   }
 }
