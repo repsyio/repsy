@@ -31,6 +31,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.repo.dtos.RepoScope;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Set;
@@ -78,7 +79,7 @@ public class KeyStoreController {
   }
 
   @PostMapping("/{repoName}")
-  @RepoOperation(permission = Permission.WRITE)
+  @RepoOperation(scope = RepoScope.MAVEN, permission = Permission.MANAGE)
   public RestResponse<KeyStoreItem> create(
       final RepoInfo repoInfo, @RequestBody final KeyStoreForm form) {
 
@@ -88,7 +89,7 @@ public class KeyStoreController {
   }
 
   @DeleteMapping("/{repoName}/{keyStoreId}")
-  @RepoOperation(permission = Permission.MANAGE)
+  @RepoOperation(scope = RepoScope.MAVEN, permission = Permission.MANAGE)
   public RestResponse<KeyStoreItem> delete(
       final RepoInfo repoInfo, @PathVariable final UUID keyStoreId) {
 
@@ -98,7 +99,7 @@ public class KeyStoreController {
   }
 
   @GetMapping("/{repoName}")
-  @RepoOperation(permission = Permission.MANAGE)
+  @RepoOperation(scope = RepoScope.MAVEN, permission = Permission.MANAGE)
   public RestResponse<PagedModel<KeyStoreItem>> list(
       final RepoInfo repoInfo,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
@@ -111,7 +112,7 @@ public class KeyStoreController {
   }
 
   @GetMapping("/{repoName}/public-keys")
-  @RepoOperation(permission = Permission.MANAGE)
+  @RepoOperation(scope = RepoScope.MAVEN, permission = Permission.MANAGE)
   public RestResponse<PagedModel<PgpPublicKeyItem>> listPublicKeys(
       final RepoInfo repoInfo,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
@@ -124,7 +125,7 @@ public class KeyStoreController {
   }
 
   @PostMapping("/{repoName}/public-keys")
-  @RepoOperation(permission = Permission.MANAGE)
+  @RepoOperation(scope = RepoScope.MAVEN, permission = Permission.MANAGE)
   public RestResponse<PgpPublicKeyItem> createPublicKey(
       final RepoInfo repoInfo, @RequestBody @Valid final PgpPublicKeyForm form) {
 
@@ -134,7 +135,7 @@ public class KeyStoreController {
   }
 
   @DeleteMapping("/{repoName}/public-keys/{publicKeyId}")
-  @RepoOperation(permission = Permission.MANAGE)
+  @RepoOperation(scope = RepoScope.MAVEN, permission = Permission.MANAGE)
   public RestResponse<Void> deletePublicKey(
       final RepoInfo repoInfo, @PathVariable final UUID publicKeyId) {
 

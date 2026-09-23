@@ -366,14 +366,11 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
                       .with(apiPort())
                       .header(AUTHORIZATION, adminToken))
               .andReturn();
-      // KeyStoreController currently does not declare a Maven repo scope; the generic resolver
-      // therefore accepts a non-Maven repo and returns its empty key-store page.
-      assertThat(wrongType.getResponse().getStatus()).isEqualTo(200);
-      assertSuccess(wrongType.getResponse().getContentAsString(), "keyStoresFetched");
-      assertThat(
-              (List<Map<String, Object>>)
-                  JsonPath.read(wrongType.getResponse().getContentAsString(), "$.data.content"))
-          .isEmpty();
+      // RPS-1203: KeyStoreController now declares a Maven repo scope, so a non-Maven repo is
+      // rejected before the key-store page is ever reached.
+      assertThat(wrongType.getResponse().getStatus()).isEqualTo(400);
+      assertError(wrongType.getResponse().getContentAsString(), "repoScopeNotMatched");
+
       final var missingRepo =
           KeyStoreControllerIT.this
               .mockMvc
@@ -385,9 +382,17 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
       assertThat(missingRepo.getResponse().getStatus()).isEqualTo(404);
       assertError(missingRepo.getResponse().getContentAsString(), "repoNotFound");
 
-      final var created =
+      // RPS-1201: create now needs MANAGE, so a WRITE-only (USER-role) caller is refused, same as
+      // list and delete already were.
+      final var createByWriteOnlyUser =
           KeyStoreControllerIT.this.performCreate(
               maven, userToken, KeyStoreControllerIT.this.body(server.getId()));
+      assertError(createByWriteOnlyUser, "unAuthorized");
+      assertThat(KeyStoreControllerIT.this.keyStoreRepository.findAll()).isEmpty();
+
+      final var created =
+          KeyStoreControllerIT.this.performCreate(
+              maven, adminToken, KeyStoreControllerIT.this.body(server.getId()));
       assertSuccess(created, "keyStoreCreated");
       final var row =
           KeyStoreControllerIT.this.keyStoreRepository.findAll().stream().findFirst().orElseThrow();
@@ -401,6 +406,49 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
               .andReturn();
       assertThat(delete.getResponse().getStatus()).isEqualTo(401);
       assertError(delete.getResponse().getContentAsString(), "unAuthorized");
+    }
+
+    @Test
+    @DisplayName(
+        "a WRITE-only (USER-role) caller is refused to create a key store, like it is for MANAGE-only verbs")
+    void aWriteOnlyUserIsRefusedToCreateAKeyStore() throws Exception {
+      final var repo = KeyStoreControllerIT.this.createRepo(RepoType.MAVEN);
+      final var user = KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.USER);
+      final var userToken = KeyStoreControllerIT.this.bearerTokenFor(user);
+      final var server = KeyStoreControllerIT.this.keyserver("keyserver.pgp.com");
+
+      final var response =
+          KeyStoreControllerIT.this
+              .mockMvc
+              .perform(
+                  post("/api/mvn/key-stores/" + repo.getName())
+                      .with(apiPort())
+                      .header(AUTHORIZATION, userToken)
+                      .contentType(MediaType.APPLICATION_JSON)
+                      .content(KeyStoreControllerIT.this.body(server.getId())))
+              .andReturn();
+
+      assertThat(response.getResponse().getStatus()).isEqualTo(401);
+      assertError(response.getResponse().getContentAsString(), "unAuthorized");
+      assertThat(KeyStoreControllerIT.this.keyStoreRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    @DisplayName(
+        "a non-Maven repo is rejected with repoScopeNotMatched before creating a key store")
+    void rejectsANonMavenRepoOnCreate() throws Exception {
+      final var npm = KeyStoreControllerIT.this.createRepo(RepoType.NPM);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
+      final var adminToken = KeyStoreControllerIT.this.bearerTokenFor(admin);
+      final var server = KeyStoreControllerIT.this.keyserver("keyserver.pgp.com");
+
+      final var created =
+          KeyStoreControllerIT.this.performCreate(
+              npm, adminToken, KeyStoreControllerIT.this.body(server.getId()));
+
+      assertError(created, "repoScopeNotMatched");
+      assertThat(KeyStoreControllerIT.this.keyStoreRepository.findAll()).isEmpty();
     }
 
     @Test
@@ -611,6 +659,20 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
           this.deletePublicKey(repo, userToken, UUID.fromString(id)).andReturn();
       assertThat(deleteAttempt.getResponse().getStatus()).isEqualTo(401);
       assertError(deleteAttempt.getResponse().getContentAsString(), "unAuthorized");
+    }
+
+    @Test
+    @DisplayName("a non-Maven repo is rejected with repoScopeNotMatched before listing public keys")
+    void rejectsANonMavenRepoOnListPublicKeys() throws Exception {
+      final var npm = KeyStoreControllerIT.this.createRepo(RepoType.NPM);
+      final var admin =
+          KeyStoreControllerIT.this.createUser(uniqueUsername("user"), UserRole.ADMIN);
+      final var token = KeyStoreControllerIT.this.bearerTokenFor(admin);
+
+      final var result = this.listPublicKeys(npm, token).andReturn();
+
+      assertThat(result.getResponse().getStatus()).isEqualTo(400);
+      assertError(result.getResponse().getContentAsString(), "repoScopeNotMatched");
     }
 
     @Test
