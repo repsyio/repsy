@@ -30,33 +30,25 @@ export class ProfileService {
     private readonly authService: AuthService,
   ) {}
 
-  private get authorizationHeader(): string {
-    return `Bearer ${this.authService.accessToken}`;
-  }
-
   public get(): Observable<ProfileInfo> {
-    return this.profileControllerService.getProfile(this.authorizationHeader).pipe(map((r) => r.data!));
+    return this.profileControllerService.getProfile().pipe(map((r) => r.data!));
   }
 
   public updatePassword(password: string): Observable<LoginInfo> {
-    return this.profileControllerService
-      .updatePassword(this.authorizationHeader, { password })
-      .pipe(
-        map((r) => {
-          const loginInfo = r.data!;
-          this.authService.updateLoginInfo(loginInfo);
-          return loginInfo;
-        }),
-      );
+    return this.profileControllerService.updatePassword({ password }).pipe(
+      map((r) => {
+        const loginInfo = r.data!;
+        this.authService.updateLoginInfo(loginInfo);
+        return loginInfo;
+      }),
+    );
   }
 
   public updateUsername(username: string): Observable<LoginInfo> {
-    return this.profileControllerService
-      .updateUsername(this.authorizationHeader, { username })
-      .pipe(map((r) => r.data!));
+    return this.profileControllerService.updateUsername({ username }).pipe(map((r) => r.data!));
   }
 
   public deleteAccount(): Observable<void> {
-    return this.profileControllerService.deleteProfile(this.authorizationHeader).pipe(map(() => undefined));
+    return this.profileControllerService.deleteProfile().pipe(map(() => undefined));
   }
 }

@@ -10,11 +10,6 @@ paths:
         - user-controller
       operationId: updateUser
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          schema:
-            type: string
         - name: userId
           in: path
           required: true
@@ -44,11 +39,6 @@ paths:
         - user-controller
       operationId: deleteUser
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          schema:
-            type: string
         - name: userId
           in: path
           required: true
@@ -157,12 +147,6 @@ paths:
       tags:
         - profile-controller
       operationId: updateUsername
-      parameters:
-        - name: Authorization
-          in: header
-          required: true
-          schema:
-            type: string
       requestBody:
         content:
           application/json:
@@ -182,12 +166,6 @@ paths:
       tags:
         - profile-controller
       operationId: updatePassword
-      parameters:
-        - name: Authorization
-          in: header
-          required: true
-          schema:
-            type: string
       requestBody:
         content:
           application/json:
@@ -208,11 +186,6 @@ paths:
         - user-controller
       operationId: listUsers
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          schema:
-            type: string
         - name: search
           in: query
           required: false
@@ -254,12 +227,6 @@ paths:
       tags:
         - user-controller
       operationId: createUser
-      parameters:
-        - name: Authorization
-          in: header
-          required: true
-          schema:
-            type: string
       requestBody:
         content:
           application/json:
@@ -284,11 +251,6 @@ paths:
         - user-controller
       operationId: resetPassword
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          schema:
-            type: string
         - name: userId
           in: path
           required: true
@@ -380,12 +342,6 @@ paths:
       tags:
         - key-store-controller
       operationId: listAllowedKeyServers
-      parameters:
-        - name: Authorization
-          in: header
-          required: true
-          schema:
-            type: string
       responses:
         '200':
           description: OK
@@ -621,12 +577,6 @@ paths:
       tags:
         - usage-controller
       operationId: getTotalUsage
-      parameters:
-        - name: Authorization
-          in: header
-          required: true
-          schema:
-            type: string
       responses:
         '200':
           description: OK
@@ -950,12 +900,6 @@ paths:
       tags:
         - profile-controller
       operationId: getProfile
-      parameters:
-        - name: Authorization
-          in: header
-          required: true
-          schema:
-            type: string
       responses:
         '200':
           description: OK
@@ -968,12 +912,6 @@ paths:
       tags:
         - profile-controller
       operationId: deleteProfile
-      parameters:
-        - name: Authorization
-          in: header
-          required: true
-          schema:
-            type: string
       responses:
         '200':
           description: OK
@@ -3037,11 +2975,6 @@ paths:
         - vulnerability-scan-controller
       operationId: getSecuritySummary
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          schema:
-            type: string
         - name: repoNames
           in: query
           required: false
@@ -3065,11 +2998,6 @@ paths:
         - security-scan-controller
       operationId: listSecurityScans
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          schema:
-            type: string
         - name: severity
           in: query
           required: false
@@ -3122,11 +3050,6 @@ paths:
         - security-scan-controller
       operationId: getSecurityScansSummary
       parameters:
-        - name: Authorization
-          in: header
-          required: true
-          schema:
-            type: string
         - name: repoType
           in: query
           required: false

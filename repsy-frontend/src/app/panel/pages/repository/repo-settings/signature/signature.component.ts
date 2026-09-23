@@ -27,7 +27,6 @@ import {
   KeyStoreItem,
   RepoPermissionInfo,
 } from '../../../../../../generated/api';
-import { AuthService } from '../../../../../auth/pages/service/auth.service';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SelectorComponent } from '../../../../shared/components/selector/selector.component';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
@@ -60,7 +59,6 @@ export class SignatureComponent implements OnInit {
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly keyStoreControllerService: KeyStoreControllerService,
-    private readonly authService: AuthService,
   ) {
     this.docsBaseUrl = environment.docsBase;
   }
@@ -70,12 +68,8 @@ export class SignatureComponent implements OnInit {
     this.fetchAllowedKeyservers();
   }
 
-  private get authorizationHeader(): string {
-    return `Bearer ${this.authService.accessToken}`;
-  }
-
   private fetchAllowedKeyservers(): void {
-    this.keyStoreControllerService.listAllowedKeyServers(this.authorizationHeader).subscribe({
+    this.keyStoreControllerService.listAllowedKeyServers().subscribe({
       next: (r) => {
         this.allowedKeyservers = r.data ?? [];
         this.serverLabels = this.allowedKeyservers.map((s) => `${s.displayName} (${s.host})`);

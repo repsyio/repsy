@@ -19,22 +19,14 @@ import { map, Observable } from 'rxjs';
 
 import { TotalUsageInfo } from '../../../../../generated/api';
 import { UsageControllerService } from '../../../../../generated/api';
-import { AuthService } from '../../../../auth/pages/service/auth.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class UsageService {
-  constructor(
-    private readonly usageControllerService: UsageControllerService,
-    private readonly authService: AuthService,
-  ) {}
-
-  private get authorizationHeader(): string {
-    return `Bearer ${this.authService.accessToken}`;
-  }
+  constructor(private readonly usageControllerService: UsageControllerService) {}
 
   public getTotalUsage(): Observable<TotalUsageInfo> {
-    return this.usageControllerService.getTotalUsage(this.authorizationHeader).pipe(map((r) => r.data!));
+    return this.usageControllerService.getTotalUsage().pipe(map((r) => r.data!));
   }
 }
