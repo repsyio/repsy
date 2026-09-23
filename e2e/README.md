@@ -1025,18 +1025,18 @@ predicted**; none required a workaround or a routing-around hook.
   `SearchQueryService/3.0.0`, `SearchAutocompleteService/3.0.0` and a non-standard
   `PackageDelete/2.0.0`, none of which NuGet.Client's `ServiceTypes.cs` recognised, while
   `PackageBaseAddress/3.0.0`/`PackagePublish/2.0.0` (what push/restore use) were already correct.
-  **RPS-1213 is now fixed**: the service index advertises the bare `RegistrationsBaseUrl`,
-  `SearchQueryService` and `SearchAutocompleteService` (all in `ServiceTypes.cs`'s recognised set)
-  and no longer advertises `PackageDelete/2.0.0` at all (`tests/nuget/registry-rules.spec.ts`'s H6
-  test confirms the corrected shape live). Confirmed live, though: a real `dotnet package search`
-  **still** fails with the exact same "The source does not have a Search service!" message, even
-  though the same test run's own fetch of the live service index (immediately before the `dotnet`
-  invocation) shows the corrected bare `SearchQueryService` being served. So the original `@type`
-  mismatch is fixed and no longer the cause — `dotnet package search` (.NET SDK 10.0.401) has some
-  other, not-yet-understood reason it does not resolve this server's search resource. This is a new,
-  narrower open question, tracked by `tests/nuget/protocol-specific.spec.ts`'s still-pinned
-  `test.fail()` (its comment has the up-to-date evidence) — filed as
-  [RPS-1240](https://zyfera.atlassian.net/browse/RPS-1240).
+  **RPS-1213 fixed the registration type and dropped `PackageDelete/2.0.0`**; its bare
+  `SearchQueryService`/`SearchAutocompleteService` replacement was not enough — **RPS-1240** found
+  (live, .NET SDK 10.0.401 / NuGet.Client 7.9.0) that NuGet.Client's `ServiceTypes.cs` has no bare
+  form for either: `SearchQueryService` is only `/Versioned`, `/3.4.0` or `/3.0.0-beta`,
+  `SearchAutocompleteService` only `/Versioned` or `/3.0.0-beta` (only `RegistrationsBaseUrl` has a
+  bare form; the service-index docs list the bare names, the client does not use them). Served by an
+  otherwise identical index, bare, `/3.5.0` and `/3.0.0-rc` reproduce "The source does not have a
+  Search service!" while `/3.0.0-beta` and `/3.4.0` make the client issue `GET
+v3/search?q=...&semVerLevel=2.0.0`. The service index now advertises the bare types plus
+  `/3.0.0-beta` for both, at the same URLs (the client queries the shared URL once), and
+  `tests/nuget/protocol-specific.spec.ts`'s `dotnet package search` test runs the real client to
+  completion (`tests/nuget/registry-rules.spec.ts`'s H6 test pins the served shape).
 - **H7** (`X-NuGet-ApiKey: <user password>` → `401`, contradicting the panel's Option B text):
   confirmed live, exactly as predicted —
   `X-NuGet-ApiKey: <admin password>` → `401`; `X-NuGet-ApiKey: <deploy token>` → `201`;
@@ -1094,21 +1094,13 @@ credential built by hand, exactly like the Cargo protocol-specific suite above.
   case-insensitively, same H8 fact as the rest of this runner's suite); autocomplete answers
   `{"totalHits":N,"data":["<idLower>",...]}` (`NuGetAutocompleteResponse`), bare id strings. Both
   routes work fine over raw HTTP — see the next point for why a real client still can't reach them.
-- **`dotnet package search` (RPS-1213: fixed the service index, but this command still fails, now
-  for a different, unresolved reason)**: running a real `dotnet package search <id> --source repsy
---configfile <cfg>` against a package this suite had just published and proven searchable over raw
-  HTTP (previous point) does NOT crash and does NOT exit non-zero — exit `0`, stdout reads `error:
-The source does not have a Search service!` and no results are returned. This was originally H6/
-  RPS-1213's own live evidence for the service index advertising an unrecognised `@type`
-  (`SearchQueryService/3.0.0`, not in NuGet.Client's `ServiceTypes.cs`). RPS-1213 has since fixed
-  that — the service index now advertises the bare, recognised `SearchQueryService`, confirmed by
-  fetching the live index from inside this exact test run immediately before invoking `dotnet`, right
-  before the `dotnet` call below. Re-run after the fix, `dotnet package search` still produces the
-  identical "does not have a Search service!" failure, so the `@type` mismatch is no longer the
-  cause. The reason `dotnet package search` (.NET SDK 10.0.401) still won't resolve this server's
-  search resource is not yet understood — kept pinned with `test.fail()`, not removed, with this
-  updated evidence in its comment; filed as
-  [RPS-1240](https://zyfera.atlassian.net/browse/RPS-1240).
+- **`dotnet package search` (RPS-1213 + RPS-1240)**: a real `dotnet package search <id> --source
+repsy --configfile <cfg>` against a package this suite had just published and proven searchable
+  over raw HTTP (previous point) lists it. Before RPS-1240 it did NOT crash and did NOT exit non-zero
+  — exit `0`, `error: The source does not have a Search service!`, no `v3/search` request — because
+  NuGet.Client has no bare-type form for search (see H6 above for the exact vocabulary). The service
+  index now advertises `SearchQueryService/3.0.0-beta` and `SearchAutocompleteService/3.0.0-beta`
+  next to the bare types.
 - **Explicitly older version restores**: publishing version B after version A, then explicitly
   restoring A (`renderConsumerProject`/`nuget.resolve` always pin an exact bracketed
   `Version="[<version>]"`) returns exactly A's bytes, never B's — confirmed live, no "latest wins"

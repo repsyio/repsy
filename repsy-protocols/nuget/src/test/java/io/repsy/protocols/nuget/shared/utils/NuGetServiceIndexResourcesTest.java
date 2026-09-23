@@ -24,42 +24,46 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * RPS-1213: {@code NuGetServiceIndexResources.build} used to advertise {@code @type} strings (e.g.
- * {@code RegistrationsBaseUrl/3.0.0}, {@code SearchQueryService/3.0.0}) that NuGet.Client does not
- * recognise, plus an invented {@code PackageDelete/2.0.0} type. The client matches {@code @type} by
- * exact string against a fixed vocabulary, so an unrecognised type is silently treated as "resource
- * absent" -- which made {@code dotnet package search} and friends fail with "The source does not
- * have a Search service!" even though the underlying routes worked.
+ * RPS-1213 / RPS-1240: {@code NuGetServiceIndexResources.build} used to advertise {@code @type}
+ * strings NuGet.Client does not recognise. The client matches {@code @type} by exact string against
+ * a fixed vocabulary, so an unrecognised type is silently treated as "resource absent" -- which
+ * made {@code dotnet package search} fail with "The source does not have a Search service!" even
+ * though the underlying routes worked. RPS-1213 switched to the bare spellings the service-index
+ * docs list, which fixed only {@code RegistrationsBaseUrl}: RPS-1240 found (live, .NET SDK
+ * 10.0.401) that NuGet.Client's {@code SearchQueryService} and {@code SearchAutocompleteService}
+ * vocabularies contain no bare form, only the versioned ones.
  */
 class NuGetServiceIndexResourcesTest {
 
   /**
-   * NuGet.Client's recognised {@code @type} vocabulary for these three resource kinds, per
-   * NuGet.Client's {@code ServiceTypes.cs}
-   * (https://github.com/NuGet/NuGet.Client/blob/dev/src/NuGet.Core/NuGet.Protocol/Resources/ServiceTypes.cs)
-   * and the official service-index docs
-   * (https://learn.microsoft.com/en-us/nuget/api/service-index#resources). A type not in this set
-   * is invisible to the client, even though the docs describe it as free-form-looking versioned
-   * strings.
+   * NuGet.Client's recognised {@code @type} vocabulary for these three resource kinds, copied from
+   * {@code ServiceTypes.cs}
+   * (https://github.com/NuGet/NuGet.Client/blob/dev/src/NuGet.Core/NuGet.Protocol/ServiceTypes.cs).
+   * A type not in these sets is invisible to the client, even though the docs describe the bare
+   * search spellings.
    */
   private static final Set<String> KNOWN_REGISTRATIONS_BASE_URL_TYPES =
       Set.of(
           "RegistrationsBaseUrl",
+          "RegistrationsBaseUrl/Versioned",
           "RegistrationsBaseUrl/3.0.0-beta",
           "RegistrationsBaseUrl/3.0.0-rc",
           "RegistrationsBaseUrl/3.4.0",
           "RegistrationsBaseUrl/3.6.0");
 
   private static final Set<String> KNOWN_SEARCH_QUERY_SERVICE_TYPES =
-      Set.of("SearchQueryService", "SearchQueryService/3.0.0-beta", "SearchQueryService/3.4.0");
+      Set.of(
+          "SearchQueryService/Versioned",
+          "SearchQueryService/3.4.0",
+          "SearchQueryService/3.0.0-beta");
 
   private static final Set<String> KNOWN_SEARCH_AUTOCOMPLETE_SERVICE_TYPES =
-      Set.of("SearchAutocompleteService", "SearchAutocompleteService/3.0.0-beta");
+      Set.of("SearchAutocompleteService/Versioned", "SearchAutocompleteService/3.0.0-beta");
 
   private static final String BASE_URL = "https://repsy.example/some-repo";
 
   @Test
-  @DisplayName("serves exactly the six-resource shape, dropping the invented PackageDelete type")
+  @DisplayName("serves exactly the expected resources, dropping the invented PackageDelete type")
   void servesExactlyTheExpectedResources() {
     final var resources = NuGetServiceIndexResources.build(BASE_URL);
 
@@ -76,8 +80,14 @@ class NuGetServiceIndexResourcesTest {
             new NuGetServiceIndexResource(
                 BASE_URL + "/v3/search", "SearchQueryService", "Package search service"),
             new NuGetServiceIndexResource(
+                BASE_URL + "/v3/search", "SearchQueryService/3.0.0-beta", "Package search service"),
+            new NuGetServiceIndexResource(
                 BASE_URL + "/v3/autocomplete",
                 "SearchAutocompleteService",
+                "Package autocomplete service"),
+            new NuGetServiceIndexResource(
+                BASE_URL + "/v3/autocomplete",
+                "SearchAutocompleteService/3.0.0-beta",
                 "Package autocomplete service"));
   }
 
@@ -93,33 +103,38 @@ class NuGetServiceIndexResourcesTest {
   }
 
   @Test
-  @DisplayName(
-      "registration, search and autocomplete each advertise a type NuGet.Client recognises")
-  void advertisesOnlyRecognisedTypes() {
+  @DisplayName("registration, search and autocomplete each advertise a type NuGet.Client resolves")
+  void advertisesATypeTheClientResolves() {
     final var resources = NuGetServiceIndexResources.build(BASE_URL);
 
-    assertThat(KNOWN_REGISTRATIONS_BASE_URL_TYPES)
+    assertThat(typesOf(resources, BASE_URL + "/v3/registration"))
         .as("RegistrationsBaseUrl @type must be one NuGet.Client's ServiceTypes.cs recognises")
-        .contains(typeOf(resources, BASE_URL + "/v3/registration"));
-    assertThat(KNOWN_SEARCH_QUERY_SERVICE_TYPES)
+        .containsAnyElementsOf(KNOWN_REGISTRATIONS_BASE_URL_TYPES);
+    assertThat(typesOf(resources, BASE_URL + "/v3/search"))
         .as("SearchQueryService @type must be one NuGet.Client's ServiceTypes.cs recognises")
-        .contains(typeOf(resources, BASE_URL + "/v3/search"));
-    assertThat(KNOWN_SEARCH_AUTOCOMPLETE_SERVICE_TYPES)
+        .containsAnyElementsOf(KNOWN_SEARCH_QUERY_SERVICE_TYPES);
+    assertThat(typesOf(resources, BASE_URL + "/v3/autocomplete"))
         .as("SearchAutocompleteService @type must be one NuGet.Client's ServiceTypes.cs recognises")
-        .contains(typeOf(resources, BASE_URL + "/v3/autocomplete"));
+        .containsAnyElementsOf(KNOWN_SEARCH_AUTOCOMPLETE_SERVICE_TYPES);
   }
 
-  /**
-   * Looks up the {@code @type} of the one resource served under {@code id}. Only safe for the
-   * registration/search/autocomplete ids, which are each served once; {@code /v3/package} is served
-   * twice (base address and publish) and is never looked up here.
-   */
-  private static String typeOf(final List<NuGetServiceIndexResource> resources, final String id) {
+  @Test
+  @DisplayName("keeps the bare search types for clients that follow the service-index docs")
+  void keepsTheBareSearchTypes() {
+    final var resources = NuGetServiceIndexResources.build(BASE_URL);
+
+    assertThat(typesOf(resources, BASE_URL + "/v3/search")).contains("SearchQueryService");
+    assertThat(typesOf(resources, BASE_URL + "/v3/autocomplete"))
+        .contains("SearchAutocompleteService");
+  }
+
+  /** Every {@code @type} served under {@code id}. */
+  private static List<String> typesOf(
+      final List<NuGetServiceIndexResource> resources, final String id) {
     return resources.stream()
         .filter(resource -> resource.id().equals(id))
-        .findFirst()
-        .orElseThrow()
-        .type();
+        .map(NuGetServiceIndexResource::type)
+        .toList();
   }
 
   @Test
@@ -146,6 +161,8 @@ class NuGetServiceIndexResourcesTest {
             BASE_URL + "/v3/package",
             BASE_URL + "/v3/registration",
             BASE_URL + "/v3/search",
+            BASE_URL + "/v3/search",
+            BASE_URL + "/v3/autocomplete",
             BASE_URL + "/v3/autocomplete");
   }
 }

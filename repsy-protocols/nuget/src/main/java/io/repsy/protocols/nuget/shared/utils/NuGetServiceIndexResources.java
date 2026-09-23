@@ -24,7 +24,21 @@ import org.jspecify.annotations.NullMarked;
 @UtilityClass
 public final class NuGetServiceIndexResources {
 
+  /**
+   * RPS-1240: NuGet.Client's {@code ServiceTypes.SearchQueryService} is {@code {"/Versioned",
+   * "/3.4.0", "/3.0.0-beta"}} and {@code SearchAutocompleteService} is {@code {"/Versioned",
+   * "/3.0.0-beta"}}: the bare, unversioned spellings the service-index docs also list are NOT in
+   * the client's vocabulary (only {@code RegistrationsBaseUrl} has a bare form there), so a client
+   * that only saw the bare type reported "The source does not have a Search service!". The bare
+   * type stays advertised too (for clients that follow the docs to the letter), next to the
+   * versioned type the NuGet client resolves; both point to the same URL, which the client queries
+   * once. {@code /3.0.0-beta} rather than {@code /3.4.0} because this server does not honour {@code
+   * semVerLevel}.
+   */
   public static List<NuGetServiceIndexResource> build(final String baseUrl) {
+
+    final var searchUrl = baseUrl + "/v3/search";
+    final var autocompleteUrl = baseUrl + "/v3/autocomplete";
 
     return List.of(
         new NuGetServiceIndexResource(
@@ -33,11 +47,14 @@ public final class NuGetServiceIndexResources {
             baseUrl + "/v3/package", "PackagePublish/2.0.0", "Package publish endpoint"),
         new NuGetServiceIndexResource(
             baseUrl + "/v3/registration", "RegistrationsBaseUrl", "Package registration base URL"),
+        new NuGetServiceIndexResource(searchUrl, "SearchQueryService", "Package search service"),
         new NuGetServiceIndexResource(
-            baseUrl + "/v3/search", "SearchQueryService", "Package search service"),
+            searchUrl, "SearchQueryService/3.0.0-beta", "Package search service"),
         new NuGetServiceIndexResource(
-            baseUrl + "/v3/autocomplete",
-            "SearchAutocompleteService",
+            autocompleteUrl, "SearchAutocompleteService", "Package autocomplete service"),
+        new NuGetServiceIndexResource(
+            autocompleteUrl,
+            "SearchAutocompleteService/3.0.0-beta",
             "Package autocomplete service"));
   }
 }
