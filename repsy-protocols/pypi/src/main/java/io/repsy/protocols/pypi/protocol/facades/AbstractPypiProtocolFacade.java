@@ -37,11 +37,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 
+@Slf4j
 @NullMarked
 @RequiredArgsConstructor
 public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFacade<ID> {
@@ -49,6 +51,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
   private static final String STORAGE_PATH = "storagePath";
+  private static final String FILE_ALREADY_EXISTS = "fileAlreadyExists";
 
   private final PypiStorageService<ID> pypiStorageService;
   private final PypiPackageService<ID> pypiPackageService;
@@ -160,27 +163,77 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
       return;
     }
 
-    final var fileExists =
-        this.pypiStorageService.isPackageFileExist(
-            repoInfo.getStorageKey(),
-            uploadForm.getNormalizedName(),
-            Objects.requireNonNull(file.getOriginalFilename()));
-
-    if (fileExists) {
-      throw new AccessNotAllowedException("fileAlreadyExists");
+    if (this.archiveExists(repoInfo, uploadForm, file)) {
+      throw new AccessNotAllowedException(FILE_ALREADY_EXISTS);
     }
+  }
+
+  private boolean archiveExists(
+      final BaseRepoInfo<ID> repoInfo,
+      final PackageUploadForm uploadForm,
+      final MultipartFile file) {
+
+    return this.pypiStorageService.isPackageFileExist(
+        repoInfo.getStorageKey(),
+        uploadForm.getNormalizedName(),
+        Objects.requireNonNull(file.getOriginalFilename()));
   }
 
   private BaseUsages savePackage(
       final BaseRepoInfo<ID> repoInfo, final PackageUploadForm uploadForm, final MultipartFile file)
       throws IOException {
 
-    final var usages =
-        this.pypiStorageService.writePackageArchive(
-            repoInfo.getStorageKey(), repoInfo.getName(), uploadForm, file);
+    return this.pypiPackageService.publishRelease(
+        repoInfo, uploadForm, () -> this.storeArchive(repoInfo, uploadForm, file));
+  }
 
-    this.pypiPackageService.addOrUpdateRelease(repoInfo, uploadForm);
+  /**
+   * Stores the archive while {@link PypiPackageService#publishRelease} still holds the package's
+   * row lock. A failure rolls the rows back, and for a file that was not there before the partly
+   * written files are removed. A file being replaced keeps its row and is left alone.
+   */
+  private BaseUsages storeArchive(
+      final BaseRepoInfo<ID> repoInfo, final PackageUploadForm uploadForm, final MultipartFile file)
+      throws IOException {
 
-    return usages;
+    // The check before the transaction cannot see a concurrent upload of the same file. Every
+    // upload of the package waits for the one before it, so this one can.
+    final var replacesExisting = this.archiveExists(repoInfo, uploadForm, file);
+
+    if (replacesExisting && !repoInfo.isAllowOverride()) {
+      throw new AccessNotAllowedException(FILE_ALREADY_EXISTS);
+    }
+
+    try {
+      return this.pypiStorageService.writePackageArchive(
+          repoInfo.getStorageKey(), repoInfo.getName(), uploadForm, file);
+    } catch (final IOException | RuntimeException e) {
+      if (!replacesExisting) {
+        this.discardPartialArchive(repoInfo, uploadForm, file, e);
+      }
+      throw e;
+    }
+  }
+
+  private void discardPartialArchive(
+      final BaseRepoInfo<ID> repoInfo,
+      final PackageUploadForm uploadForm,
+      final MultipartFile file,
+      final Exception cause) {
+
+    try {
+      this.pypiStorageService.discardArchive(
+          repoInfo.getStorageKey(),
+          repoInfo.getName(),
+          uploadForm.getNormalizedName(),
+          Objects.requireNonNull(file.getOriginalFilename()));
+    } catch (final RuntimeException e) {
+      log.warn(
+          "Could not remove the partly written archive {} of package {}: {}",
+          file.getOriginalFilename(),
+          uploadForm.getNormalizedName(),
+          e.getMessage());
+      cause.addSuppressed(e);
+    }
   }
 }

@@ -247,6 +247,22 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
     return this.storageStrategy.get(path, normalizedName).isPresent();
   }
 
+  @Override
+  public void discardArchive(
+      final UUID repoId,
+      final String repoName,
+      final String normalizedName,
+      final String filename) {
+
+    for (final var name : List.of(filename, filename + "." + HASH_ALGORITHM)) {
+      final var path = StoragePath.of(repoId, Paths.get(normalizedName, name).toString());
+
+      if (this.storageStrategy.get(path, repoName).isPresent()) {
+        this.storageStrategy.delete(path);
+      }
+    }
+  }
+
   /** Write archive file to fs, if it does not exists already */
   @Override
   public BaseUsages writePackageArchive(

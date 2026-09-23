@@ -35,6 +35,7 @@ import io.repsy.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
+import java.io.IOException;
 import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.HexFormat;
@@ -98,6 +99,13 @@ class AbstractPypiProtocolFacadeTest {
     return ctx;
   }
 
+  /** Makes the mocked service run the file writer like the real one does after the rows. */
+  private void publishRunsFileWriter() throws Exception {
+    when(packageService.publishRelease(any(), any(), any()))
+        .thenAnswer(
+            invocation -> invocation.<PypiPackageService.ReleaseFileWriter>getArgument(2).write());
+  }
+
   private static String sha256Hex(final byte[] bytes) throws Exception {
     return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
   }
@@ -159,6 +167,7 @@ class AbstractPypiProtocolFacadeTest {
       final var upperCaseDigest = sha256Hex(bytes).toUpperCase(java.util.Locale.ROOT);
       final var params = form("pkg", "1.0.0", upperCaseDigest);
 
+      publishRunsFileWriter();
       when(storageService.writePackageArchive(any(), any(), any(), any())).thenReturn(usages);
 
       facade.uploadPackage(context(), params, file);
@@ -178,6 +187,7 @@ class AbstractPypiProtocolFacadeTest {
       final var digest = sha256Hex(bytes);
       final var params = form("pkg", "1.0.0", digest);
 
+      publishRunsFileWriter();
       when(storageService.writePackageArchive(any(), any(), any(), any())).thenReturn(usages);
 
       facade.uploadPackage(context(), params, file);
@@ -225,6 +235,7 @@ class AbstractPypiProtocolFacadeTest {
       final var params = form("pkg", "1.0.0", digest);
 
       when(storageService.isPackageFileExist(any(), any(), any())).thenReturn(false);
+      publishRunsFileWriter();
       when(storageService.writePackageArchive(any(), any(), any(), any())).thenReturn(usages);
 
       facade.uploadPackage(context(), params, file);
@@ -233,19 +244,44 @@ class AbstractPypiProtocolFacadeTest {
     }
 
     @Test
-    @DisplayName("skips the existence check entirely when the repo allows override")
-    void skipsCheckWhenOverrideAllowed() throws Exception {
+    @DisplayName("lets an existing file be replaced when the repo allows override")
+    void replacesAnExistingFileWhenOverrideAllowed() throws Exception {
       repoInfo.setAllowOverride(true);
       final var bytes = "content".getBytes();
       final var digest = sha256Hex(bytes);
       final var file = file("pkg-1.0.0.tar.gz", bytes);
       final var params = form("pkg", "1.0.0", digest);
 
+      publishRunsFileWriter();
+      when(storageService.isPackageFileExist(REPO_ID, "pkg", "pkg-1.0.0.tar.gz")).thenReturn(true);
       when(storageService.writePackageArchive(any(), any(), any(), any())).thenReturn(usages);
 
       facade.uploadPackage(context(), params, file);
 
-      verify(storageService, never()).isPackageFileExist(any(), any(), any());
+      verify(storageService).writePackageArchive(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName(
+        "refuses a file that appeared after the first check, once the package row is locked, and"
+            + " does not delete the file it did not write")
+    void refusesAFileThatAppearedBeforeTheLock() throws Exception {
+      repoInfo.setAllowOverride(false);
+      final var bytes = "content".getBytes();
+      final var file = file("pkg-1.0.0.tar.gz", bytes);
+      final var params = form("pkg", "1.0.0", sha256Hex(bytes));
+
+      publishRunsFileWriter();
+      // Free for the check before the transaction, taken by the time the lock is held.
+      when(storageService.isPackageFileExist(REPO_ID, "pkg", "pkg-1.0.0.tar.gz"))
+          .thenReturn(false, true);
+
+      assertThatThrownBy(() -> facade.uploadPackage(context(), params, file))
+          .isInstanceOf(AccessNotAllowedException.class)
+          .hasMessage("fileAlreadyExists");
+
+      verify(storageService, never()).writePackageArchive(any(), any(), any(), any());
+      verify(storageService, never()).discardArchive(any(), any(), any(), any());
     }
   }
 
@@ -310,15 +346,90 @@ class AbstractPypiProtocolFacadeTest {
       final var file = file("my_package-1.0.0-py3-none-any.whl", bytes);
       final var params = form("My.Package", "1.0.0", digest);
 
+      publishRunsFileWriter();
       when(storageService.writePackageArchive(any(), any(), any(), any())).thenReturn(usages);
 
       final var ctx = context();
       facade.uploadPackage(ctx, params, file);
 
-      verify(packageService).addOrUpdateRelease(eq(repoInfo), any(PackageUploadForm.class));
+      verify(packageService).publishRelease(eq(repoInfo), any(PackageUploadForm.class), any());
       assertThat(ctx.<String>getProperty("artifactName")).isEqualTo("my-package");
       assertThat(ctx.<String>getProperty("artifactVersion")).isEqualTo("1.0.0");
       assertThat(ctx.<BaseUsages>getProperty("usages")).isSameAs(usages);
+    }
+  }
+
+  // =========================================================================
+
+  @Nested
+  @DisplayName("uploadPackage() storage failure (RPS-1124)")
+  class StorageFailureTests {
+
+    private MockMultipartFile upload() {
+      return file("pkg-1.0.0.tar.gz", "content".getBytes());
+    }
+
+    private Map<String, Object> params() throws Exception {
+      return form("pkg", "1.0.0", sha256Hex("content".getBytes()));
+    }
+
+    @Test
+    @DisplayName("writes nothing and reports nothing when the rows are rejected")
+    void writesNothingWhenTheRowsAreRejected() throws Exception {
+      final var rejected = new IllegalStateException("database said no");
+      when(packageService.publishRelease(any(), any(), any())).thenThrow(rejected);
+
+      final var ctx = context();
+      assertThatThrownBy(() -> facade.uploadPackage(ctx, params(), upload())).isSameAs(rejected);
+
+      verify(storageService, never()).writePackageArchive(any(), any(), any(), any());
+      verify(storageService, never()).discardArchive(any(), any(), any(), any());
+      assertThat(ctx.<BaseUsages>getProperty("usages")).isNull();
+      assertThat(ctx.<String>getProperty("artifactName")).isNull();
+    }
+
+    @Test
+    @DisplayName("removes the partly written files of a new file when the write fails")
+    void removesThePartialFilesOfANewFile() throws Exception {
+      publishRunsFileWriter();
+      final var failure = new IOException("disk full");
+      when(storageService.writePackageArchive(any(), any(), any(), any())).thenThrow(failure);
+
+      final var ctx = context();
+      assertThatThrownBy(() -> facade.uploadPackage(ctx, params(), upload())).isSameAs(failure);
+
+      verify(storageService).discardArchive(REPO_ID, REPO_NAME, "pkg", "pkg-1.0.0.tar.gz");
+      assertThat(ctx.<BaseUsages>getProperty("usages")).isNull();
+    }
+
+    @Test
+    @DisplayName("keeps the file being replaced when the write fails")
+    void keepsTheFileBeingReplaced() throws Exception {
+      publishRunsFileWriter();
+      when(storageService.isPackageFileExist(REPO_ID, "pkg", "pkg-1.0.0.tar.gz")).thenReturn(true);
+      final var failure = new IllegalStateException("disk full");
+      when(storageService.writePackageArchive(any(), any(), any(), any())).thenThrow(failure);
+
+      assertThatThrownBy(() -> facade.uploadPackage(context(), params(), upload()))
+          .isSameAs(failure);
+
+      verify(storageService, never()).discardArchive(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("reports the write failure, with the cleanup failure attached, not the other way")
+    void keepsTheWriteFailureWhenTheCleanupFails() throws Exception {
+      publishRunsFileWriter();
+      final var failure = new IllegalStateException("disk full");
+      final var cleanupFailure = new IllegalStateException("cannot delete");
+      when(storageService.writePackageArchive(any(), any(), any(), any())).thenThrow(failure);
+      org.mockito.Mockito.doThrow(cleanupFailure)
+          .when(storageService)
+          .discardArchive(any(), any(), any(), any());
+
+      assertThatThrownBy(() -> facade.uploadPackage(context(), params(), upload()))
+          .isSameAs(failure)
+          .hasSuppressedException(cleanupFailure);
     }
   }
 }
