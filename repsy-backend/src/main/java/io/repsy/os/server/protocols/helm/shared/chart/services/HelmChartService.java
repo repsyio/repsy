@@ -170,20 +170,34 @@ public class HelmChartService implements ChartService<UUID> {
   }
 
   private HelmChartVersion findOrCreateVersion(final HelmChart chart, final HelmChartForm form) {
-    return this.helmChartVersionRepository
-        .findByChartAndVersion(chart, form.getVersion())
-        .orElseGet(
-            () -> {
-              final var version = new HelmChartVersion();
-              version.setChart(chart);
-              version.setVersion(form.getVersion());
-              version.setDescription(form.getDescription());
-              version.setAppVersion(form.getAppVersion());
-              version.setType(form.getType());
-              version.setDigest(form.getDigest());
-              version.setSize(form.getSize());
-              return this.helmChartVersionRepository.save(version);
-            });
+    final var existing =
+        this.helmChartVersionRepository.findByChartAndVersion(chart, form.getVersion());
+    if (existing.isPresent()) {
+      // Genuinely upserts (RPS-1218): the OCI push path
+      // (AbstractHelmOciManifestPushProtocolMethodHandler) reaches this method for both a first
+      // push and an override of the same (name, version), so a found row must be refreshed the
+      // same way ChartService.update() refreshes the classic override path -- otherwise an
+      // accepted OCI override with different bytes leaves the row pointing at superseded content.
+      // The classic route never reaches this branch: pushChart() pre-checks and calls update()
+      // itself before ever calling findOrCreate().
+      final var version = existing.get();
+      version.setDescription(form.getDescription());
+      version.setAppVersion(form.getAppVersion());
+      version.setType(form.getType());
+      version.setDigest(form.getDigest());
+      version.setSize(form.getSize());
+      return this.helmChartVersionRepository.save(version);
+    }
+
+    final var version = new HelmChartVersion();
+    version.setChart(chart);
+    version.setVersion(form.getVersion());
+    version.setDescription(form.getDescription());
+    version.setAppVersion(form.getAppVersion());
+    version.setType(form.getType());
+    version.setDigest(form.getDigest());
+    version.setSize(form.getSize());
+    return this.helmChartVersionRepository.save(version);
   }
 
   private ChartDetail toDetail(final HelmChartVersion version) {
