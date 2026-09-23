@@ -17,7 +17,9 @@
 export class RepoSettingsForm {
   public privateRepo: boolean;
   public allowOverride: boolean;
-  public releases = false;
-  public snapshots = false;
+  // Maven and NuGet only: the backend refuses them for any other repo type (RPS-1210), so they must
+  // be left undefined (and so not serialized) unless the caller sets them.
+  public releases?: boolean;
+  public snapshots?: boolean;
   public securityScanEnabled = true;
 }

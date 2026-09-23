@@ -15,7 +15,7 @@
 ///
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { Severity } from '../../../../../generated/api';
+import { ScanStatus, Severity } from '../../../../../generated/api';
 import { SeverityBadgeComponent } from './severity-badge.component';
 
 describe('SeverityBadgeComponent', () => {
@@ -108,6 +108,23 @@ describe('SeverityBadgeComponent', () => {
       expect(badge().getAttribute('title')).toBe(
         '1 version being scanned for the first time and the first scan of 3 versions failed.',
       );
+    });
+
+    it('names the state of a single version through its scan status, without a rescan icon', () => {
+      render({ scanned: false, scanStatus: ScanStatus.Running, unscannedInProgressCount: 1 });
+
+      expect(text()).toBe('Scanning...');
+      expect(badge().getAttribute('title')).toBe('The first scan is in progress.');
+      expect(component.rescanTitle).toBe('');
+      expect(fixture.nativeElement.querySelector('[role="img"]')).toBeNull();
+    });
+
+    it('names a failed first scan of a single version', () => {
+      render({ scanned: false, scanStatus: ScanStatus.Failed, unscannedFailedCount: 1 });
+
+      expect(text()).toBe('Scan failed');
+      expect(badge().getAttribute('title')).toBe('The first scan failed.');
+      expect(fixture.nativeElement.querySelector('[role="img"]')).toBeNull();
     });
 
     it('is not a first-scan state without unscanned versions', () => {

@@ -83,6 +83,7 @@ export class HelmChartsListComponent implements OnDestroy {
   public readonly username: string;
 
   private readonly repositoryChanges$: Subscription;
+  private securitySummarySubscription?: Subscription;
 
   constructor(
     private readonly authService: AuthService,
@@ -104,6 +105,7 @@ export class HelmChartsListComponent implements OnDestroy {
 
   public ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
+    this.securitySummarySubscription?.unsubscribe();
   }
 
   public loadPage(pageNum: number): void {
@@ -135,7 +137,11 @@ export class HelmChartsListComponent implements OnDestroy {
       this.loading = true;
       this.helmService
         .deleteAllVersions(chart.name)
-        .pipe(finalize(() => { this.loading = false; }))
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
         .subscribe({
           next: () => {
             this.refreshPage();
@@ -158,7 +164,11 @@ export class HelmChartsListComponent implements OnDestroy {
     this.loading = true;
     this.helmService
       .searchCharts(this.searchText, this.sortOption, this.pageNum, this.pageSize)
-      .pipe(finalize(() => { this.loading = false; }))
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
       .subscribe({
         next: (pagedData: PagedData<HelmChartListItem>) => {
           this.pagedData.page = pagedData.page;
@@ -177,11 +187,14 @@ export class HelmChartsListComponent implements OnDestroy {
   }
 
   private fetchSecuritySummary(): void {
-    this.securityService.getArtifactSecuritySummary(this.activeRepo.repoName).subscribe({
-      next: (summary) => {
-        this.securitySummary = summary;
-      },
-      error: () => {},
-    });
+    this.securitySummarySubscription?.unsubscribe();
+    this.securitySummarySubscription = this.securityService
+      .watchArtifactSecuritySummary(this.activeRepo.repoName)
+      .subscribe({
+        next: (summary) => {
+          this.securitySummary = summary;
+        },
+        error: () => {},
+      });
   }
 }

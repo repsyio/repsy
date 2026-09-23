@@ -139,8 +139,6 @@ test(
     await seeder.setSettings(repo.name, {
       privateRepo: true,
       allowOverride: false,
-      releases: true,
-      snapshots: true,
     });
     const credential = adminCredential();
     const chart = `e2e-${seeder.runId}-c2`;

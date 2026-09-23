@@ -20,6 +20,7 @@ import { Observable } from 'rxjs';
 
 import { ScanStatus, Severity } from '../../../../../generated/api';
 import { SecurityScanSupportService } from '../../service/security-scan-support.service';
+import { hasRescanFailed, isRescanInProgress } from '../../util/rescan-status.util';
 import { SeverityBadgeComponent } from '../severity-badge/severity-badge.component';
 import { VersionSecurityModalComponent } from '../version-security-modal/version-security-modal.component';
 
@@ -45,6 +46,21 @@ export class VersionSecurityBadgeComponent implements OnInit {
 
   public ngOnInit(): void {
     this.isSupported$ = this.securityScanSupportService.isSupported(this.repoType);
+  }
+
+  /** The version has no completed scan yet and its first scan is pending, queued or running. */
+  public get firstScanInProgress(): boolean {
+    return !this.scanned && isRescanInProgress(this.scanStatus);
+  }
+
+  /** The version has no completed scan and its scan failed. */
+  public get firstScanFailed(): boolean {
+    return !this.scanned && hasRescanFailed(this.scanStatus);
+  }
+
+  /** A completed scan, or a first scan that is unfinished or failed, is worth a badge. */
+  public get visible(): boolean {
+    return this.scanned || this.firstScanInProgress || this.firstScanFailed;
   }
 
   public openModal(event: Event): void {

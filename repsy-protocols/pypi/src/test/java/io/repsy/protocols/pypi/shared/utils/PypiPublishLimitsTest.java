@@ -62,6 +62,20 @@ class PypiPublishLimitsTest {
     }
 
     @Test
+    @DisplayName("accepts an archive file name at the 255 character limit")
+    void acceptsArchiveFilenameWithinLimit() {
+      PypiPublishLimits.checkArchiveFilename(repeat('a', 255));
+    }
+
+    @Test
+    @DisplayName("refuses an archive file name longer than 255 characters (RPS-1155)")
+    void refusesOverLongArchiveFilename() {
+      assertThatThrownBy(() -> PypiPublishLimits.checkArchiveFilename(repeat('a', 256)))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("pypiArchiveFileNameTooLong");
+    }
+
+    @Test
     @DisplayName("refuses a requires_python longer than 255 characters")
     void refusesOverLongRequiresPython() {
       assertThatThrownBy(() -> PypiPublishLimits.checkRequiresPython(repeat('p', 256)))

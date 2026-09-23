@@ -56,8 +56,6 @@ describe('VisibilityComponent', () => {
     expect(lastSentForm(repoApi.updateSettings, 1)).toEqual({
       privateRepo: true,
       allowOverride: false,
-      releases: false,
-      snapshots: false,
       securityScanEnabled: false,
     });
     expect(toastService.show).toHaveBeenCalledOnceWith('Repository visibility has changed as private', 'success');

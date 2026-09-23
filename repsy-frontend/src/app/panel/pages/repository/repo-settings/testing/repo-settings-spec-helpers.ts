@@ -55,9 +55,11 @@ export function releaseAwareParentForm(values: Partial<ParentFormValues> = {}): 
 }
 
 /**
- * The form a spy was last called with, as a plain object: the components build their payloads from DTO classes
- * (`RepoSettingsForm`, `MavenRepoSettingsForm`), which `toEqual` would otherwise tell apart from an object literal.
+ * The form a spy was last called with, as the plain object that goes over the wire: the components build their
+ * payloads from DTO classes (`RepoSettingsForm`, `MavenRepoSettingsForm`), which `toEqual` would otherwise tell apart
+ * from an object literal, and JSON drops an unset optional field such as `releases` on a non-Maven/NuGet repository
+ * (the backend refuses it there, RPS-1210).
  */
 export function lastSentForm(spy: jasmine.Spy, argIndex: number): Record<string, unknown> {
-  return { ...(spy.calls.mostRecent().args[argIndex] as object) } as Record<string, unknown>;
+  return JSON.parse(JSON.stringify(spy.calls.mostRecent().args[argIndex])) as Record<string, unknown>;
 }

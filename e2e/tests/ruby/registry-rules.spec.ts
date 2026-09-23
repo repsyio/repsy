@@ -255,8 +255,6 @@ test.describe('ruby registry rules (raw HTTP)', () => {
       await seeder.setSettings(layout.repoName, {
         privateRepo: true,
         allowOverride: false,
-        releases: true,
-        snapshots: true,
       });
 
       const filename = gemFilename(layout.packageName, '1.0.0');
@@ -280,8 +278,6 @@ test.describe('ruby registry rules (raw HTTP)', () => {
       await seeder.setSettings(layout.repoName, {
         privateRepo: true,
         allowOverride: true,
-        releases: true,
-        snapshots: true,
       });
       expectMsgId(await rawPublish(layout.repoName, admin, builtB.bytes), 200, undefined);
       const dlReplaced = await rawDownload(layout.repoName, admin, filename);
@@ -385,8 +381,6 @@ test.describe('ruby registry rules (raw HTTP)', () => {
       await seeder.setSettings(layout.repoName, {
         privateRepo: true,
         allowOverride: true,
-        releases: true,
-        snapshots: true,
       });
       const rebuilt = await buildGem({
         name: layout.packageName,
@@ -563,16 +557,14 @@ test.describe('ruby registry rules (raw HTTP)', () => {
   );
 
   test(
-    'releases/snapshots repo settings are never read: any version string publishes and is ' +
-      'servable regardless (R15)',
+    'releases/snapshots are not ruby repo settings (the settings PUT refuses them, RPS-1210): ' +
+      'any version string publishes and is servable (R15)',
     { tag: ['@settings'] },
     async ({ seeder }) => {
       const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: true });
       await seeder.setSettings(repo.name, {
         privateRepo: true,
         allowOverride: true,
-        releases: false,
-        snapshots: false,
       });
       const admin = adminCredential();
       const name = `e2e_${seeder.runId}_norulesetting`;

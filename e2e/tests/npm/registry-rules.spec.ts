@@ -106,8 +106,6 @@ test.describe('npm registry rules (raw HTTP)', () => {
       await seeder.setSettings(layout.repoName, {
         privateRepo: true,
         allowOverride: false,
-        releases: true,
-        snapshots: true,
       });
 
       const packumentBefore = await rawGetPackument(layout.repoName, admin, layout.packageName);
