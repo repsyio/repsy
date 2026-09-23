@@ -45,6 +45,9 @@ public abstract class AbstractCargoPublishProtocolMethodHandler implements Proto
   private static final String PUBLISH_SUCCESS =
       "{\"warnings\":{\"invalid_categories\":[],\"invalid_badges\":[],\"other\":[]}}";
 
+  private static final String VERSION_EXISTS_DETAIL =
+      "this crate version already exists in this registry";
+
   private final PathParser basePathParser;
   private final CargoProtocolFacade facade;
 
@@ -111,8 +114,11 @@ public abstract class AbstractCargoPublishProtocolMethodHandler implements Proto
       return ResponseEntity.ok()
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
           .body(PUBLISH_SUCCESS);
-    } catch (final IllegalArgumentException | ItemAlreadyExistException e) {
+    } catch (final IllegalArgumentException e) {
       return cargoError(HttpStatus.BAD_REQUEST, e.getMessage());
+    } catch (final ItemAlreadyExistException _) {
+      // The exception carries a fixed msgId (RPS-1127), which is not a sentence for cargo to show.
+      return cargoError(HttpStatus.BAD_REQUEST, VERSION_EXISTS_DETAIL);
     } catch (final MaxUploadSizeExceededException e) {
       return cargoError(HttpStatus.PAYLOAD_TOO_LARGE, "the crate exceeds the maximum upload size");
     }

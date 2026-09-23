@@ -124,7 +124,7 @@ class CargoCrateServiceTest {
       assertThatThrownBy(
               () -> CargoCrateServiceTest.this.cargoCrateService.publish(repoInfo, request))
           .isInstanceOf(ItemAlreadyExistException.class)
-          .hasMessage("crate `test-crate@1.0.0` already exists in this registry");
+          .hasMessage("crateVersionAlreadyExists");
     }
 
     @Test
@@ -296,7 +296,7 @@ class CargoCrateServiceTest {
                         return this.usages;
                       }))
           .isInstanceOf(ItemAlreadyExistException.class)
-          .hasMessage("crate `test-crate@2.0.0` already exists in this registry");
+          .hasMessage("crateVersionAlreadyExists");
 
       assertThat(writerRan).as("the files are never written for a version that lost").isFalse();
     }

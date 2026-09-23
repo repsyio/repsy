@@ -17,6 +17,8 @@ package io.repsy.os.shared.error_handling.services;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -29,7 +31,9 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.MfaException;
 import io.repsy.core.error_handling.exceptions.RedirectToPathException;
 import io.repsy.core.error_handling.exceptions.RetryableException;
@@ -45,6 +49,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.support.ResourceBundleMessageSource;
@@ -304,6 +309,25 @@ class ErrorHandlerTest {
         .perform(get("/db/duplicate-key"))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.msgId").value("itemAlreadyExists"));
+  }
+
+  @ParameterizedTest(name = "{0} answers {1} with a bundle sentence for {2}")
+  @CsvSource({
+    "/msgid/crate-version-exists, 409, crateVersionAlreadyExists",
+    "/msgid/docker-path, 400, dockerPathInvalid",
+    "/msgid/signing-key, 404, artifactSigningKeyNotFound"
+  })
+  @DisplayName(
+      "a fixed msgId that replaced free text is answered with its messages.properties text")
+  void fixedMsgIdsResolveToBundleText(final String path, final int status, final String msgId)
+      throws Exception {
+    // RPS-1127: these ids used to be free text with the crate, request path or key id in them.
+    this.mockMvc
+        .perform(get(path))
+        .andExpect(status().is(status))
+        .andExpect(jsonPath("$.msgId").value(msgId))
+        .andExpect(jsonPath("$.text").value(not(msgId)))
+        .andExpect(jsonPath("$.text").value(containsString(" ")));
   }
 
   @ParameterizedTest(name = "SQL state {0}")
@@ -649,6 +673,21 @@ class ErrorHandlerTest {
     String constraintViolation(@PathVariable("sqlState") final String sqlState) {
       throw new DataIntegrityViolationException(
           "could not execute statement", new SQLException("violation", sqlState));
+    }
+
+    @GetMapping("/msgid/crate-version-exists")
+    String crateVersionExists() {
+      throw new ItemAlreadyExistException("crateVersionAlreadyExists");
+    }
+
+    @GetMapping("/msgid/docker-path")
+    String dockerPath() {
+      throw new BadRequestException("dockerPathInvalid");
+    }
+
+    @GetMapping("/msgid/signing-key")
+    String signingKey() {
+      throw new ItemNotFoundException("artifactSigningKeyNotFound");
     }
 
     @GetMapping("/moved")

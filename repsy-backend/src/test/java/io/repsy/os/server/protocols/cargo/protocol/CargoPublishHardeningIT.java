@@ -162,7 +162,7 @@ class CargoPublishHardeningIT extends AbstractIntegrationTest {
         .andExpect(status().isBadRequest())
         .andExpect(
             jsonPath("$.errors[0].detail")
-                .value("crate `dup-crate@1.0.0` already exists in this registry"));
+                .value("this crate version already exists in this registry"));
   }
 
   @Test

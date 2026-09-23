@@ -166,7 +166,7 @@ class AbstractCargoPublishProtocolMethodHandlerTest {
     @DisplayName("returns 400 with a cargo error body when the crate/version already exists")
     void returnsBadRequestOnAlreadyExists() throws IOException {
       final var ctx = context(PUBLISH_PATH);
-      doThrow(new ItemAlreadyExistException("crate `demo@1.0.0` already exists in this registry"))
+      doThrow(new ItemAlreadyExistException("crateVersionAlreadyExists"))
           .when(facade)
           .publish(eq(ctx), any(InputStream.class));
 
@@ -176,7 +176,7 @@ class AbstractCargoPublishProtocolMethodHandlerTest {
 
       assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
       assertThat(errorDetail(result))
-          .isEqualTo("crate `demo@1.0.0` already exists in this registry");
+          .isEqualTo("this crate version already exists in this registry");
     }
 
     @Test

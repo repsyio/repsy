@@ -306,7 +306,7 @@ class PGPVerifierServiceTest {
                 this.serviceAnswering(uri -> notFound())
                     .verify(new ByteArrayResource(POM), signature, hosts("keys.acme.com")))
         .isInstanceOf(ItemNotFoundException.class)
-        .hasMessage("no public key found with Id %016X".formatted(keys.keyId()));
+        .hasMessage("artifactSigningKeyNotFound");
 
     // The repo's own server, then both public ones.
     assertThat(this.asked).hasSize(3);

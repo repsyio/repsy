@@ -574,7 +574,7 @@ class AbstractCargoProtocolFacadeTest {
     void writesNothingWhenTheRowsAreRejected() throws Exception {
       when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
           .thenReturn(minimalRequest("my_crate", "1.0.0"));
-      doThrow(new ItemAlreadyExistException("crate `my_crate@1.0.0` already exists"))
+      doThrow(new ItemAlreadyExistException("crateVersionAlreadyExists"))
           .when(crateService)
           .publish(any(), any(), any(), any());
 

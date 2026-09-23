@@ -105,11 +105,11 @@ class PathParserUtilsTest {
     assertThatThrownBy(
             () -> PathParserUtils.parseForManifest("/v2/repo/image/manifests/" + digest, FILE_NAME))
         .isInstanceOf(BadRequestException.class)
-        .hasMessageContaining("manifest sha");
+        .hasMessage("dockerPathInvalid");
     assertThatThrownBy(
             () -> PathParserUtils.parseForLayer("/v2/repo/image/blobs/" + digest, FILE_NAME))
         .isInstanceOf(BadRequestException.class)
-        .hasMessageContaining("layer check");
+        .hasMessage("dockerPathInvalid");
   }
 
   @Test
@@ -120,6 +120,6 @@ class PathParserUtilsTest {
                 PathParserUtils.parseForManifest(
                     "/v2/repo/image/manifests/sha384:" + "ab".repeat(48), FILE_NAME))
         .isInstanceOf(BadRequestException.class)
-        .hasMessageContaining("manifest tag");
+        .hasMessage("dockerPathInvalid");
   }
 }
