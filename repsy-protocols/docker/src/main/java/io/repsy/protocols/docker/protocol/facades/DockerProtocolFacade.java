@@ -24,7 +24,6 @@ import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import java.io.IOException;
 import java.io.InputStream;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
 @NullMarked
@@ -54,8 +53,8 @@ public interface DockerProtocolFacade<ID> {
   void finalizeLayerUpload(ProtocolContext context, RelativePath relativePath, LayerInfo layerInfo)
       throws IOException;
 
-  @Nullable String saveManifest(
-      ProtocolContext context, BaseImageInfo<ID> imageInfo, ManifestForm form) throws IOException;
+  String saveManifest(ProtocolContext context, BaseImageInfo<ID> imageInfo, ManifestForm form)
+      throws IOException;
 
   Resource getLayer(ProtocolContext context, String digest, String servletPath) throws IOException;
 

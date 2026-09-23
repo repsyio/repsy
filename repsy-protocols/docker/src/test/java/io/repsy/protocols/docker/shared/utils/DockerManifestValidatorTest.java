@@ -33,6 +33,8 @@ class DockerManifestValidatorTest {
   private static final String OCI_MANIFEST = "application/vnd.oci.image.manifest.v1+json";
   private static final String DOCKER_MANIFEST =
       "application/vnd.docker.distribution.manifest.v2+json";
+  private static final String DOCKER_MANIFEST_SCHEMA1 =
+      "application/vnd.docker.distribution.manifest.v1+json";
   private static final String OCI_INDEX = "application/vnd.oci.image.index.v1+json";
   private static final String DOCKER_LIST =
       "application/vnd.docker.distribution.manifest.list.v2+json";
@@ -123,6 +125,65 @@ class DockerManifestValidatorTest {
   }
 
   @ParameterizedTest(name = "{0}")
+  @MethodSource("imageManifestTypes")
+  @DisplayName("refuses schemaVersion 1 for a media type that requires 2 (RPS-1151)")
+  void refusesSchemaVersion1ForSchema2MediaType(final String type) {
+    assertThatThrownBy(
+            () ->
+                DockerManifestValidator.validate(
+                    type, "{\"schemaVersion\":1,\"config\":" + CONFIG + ",\"layers\":[]}"))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("manifestSchemaVersionInvalid");
+  }
+
+  @Test
+  @DisplayName("accepts schemaVersion 1 for the legacy Docker schema1 media type")
+  void acceptsSchemaVersion1ForSchema1MediaType() {
+    assertThatCode(
+            () ->
+                DockerManifestValidator.validate(
+                    DOCKER_MANIFEST_SCHEMA1,
+                    "{\"schemaVersion\":1,\"config\":" + CONFIG + ",\"layers\":[]}"))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("refuses schemaVersion 2 for the legacy Docker schema1 media type")
+  void refusesSchemaVersion2ForSchema1MediaType() {
+    assertThatThrownBy(
+            () ->
+                DockerManifestValidator.validate(
+                    DOCKER_MANIFEST_SCHEMA1,
+                    "{\"schemaVersion\":2,\"config\":" + CONFIG + ",\"layers\":[]}"))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("manifestSchemaVersionInvalid");
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("imageManifestTypes")
+  @DisplayName("refuses a schemaVersion too large to fit an int, instead of truncating it")
+  void refusesOutOfRangeSchemaVersion(final String type) {
+    assertThatThrownBy(
+            () ->
+                DockerManifestValidator.validate(
+                    type, "{\"schemaVersion\":4294967298,\"config\":" + CONFIG + ",\"layers\":[]}"))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("manifestSchemaVersionInvalid");
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("imageManifestTypes")
+  @DisplayName("refuses a negative schemaVersion")
+  void refusesNegativeSchemaVersion(final String type) {
+    assertThatThrownBy(
+            () ->
+                DockerManifestValidator.validate(
+                    type, "{\"schemaVersion\":-1,\"config\":" + CONFIG + ",\"layers\":[]}"))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("manifestSchemaVersionInvalid");
+  }
+
+  @ParameterizedTest(name = "{0}")
   @MethodSource("indexCases")
   @DisplayName("refuses an index without what the push reads")
   void refusesIncompleteIndex(final String body, final String msgId) {
@@ -144,8 +205,6 @@ class DockerManifestValidatorTest {
         Arguments.of(
             index("[{\"digest\":\" \",\"size\":9,\"platform\":" + PLATFORM + "}]"),
             "manifestListManifestsInvalid"),
-        Arguments.of(
-            index("[{\"digest\":\"sha256:m\",\"size\":9}]"), "manifestListManifestsInvalid"),
         Arguments.of(index("[" + ENTRY + ",null]"), "manifestListManifestsInvalid"),
         Arguments.of(
             index("[{\"digest\":\"sha256:m\",\"platform\":" + PLATFORM + "}]"), "manifestInvalid"),
@@ -206,6 +265,29 @@ class DockerManifestValidatorTest {
         .doesNotThrowAnyException();
   }
 
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("indexTypes")
+  @DisplayName(
+      "accepts an index entry without a platform (RPS-1117): grouping an artifact and its"
+          + " referrers, not per-platform images, is legitimate")
+  void acceptsIndexEntryWithoutPlatform(final String type) {
+    assertThatCode(
+            () ->
+                DockerManifestValidator.validate(
+                    type, index("[{\"digest\":\"sha256:m\",\"size\":9}]")))
+        .doesNotThrowAnyException();
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("indexTypes")
+  @DisplayName("refuses an index schemaVersion other than 2 (RPS-1151)")
+  void refusesWrongSchemaVersionForIndex(final String type) {
+    assertThatThrownBy(
+            () -> DockerManifestValidator.validate(type, "{\"schemaVersion\":1,\"manifests\":[]}"))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("manifestSchemaVersionInvalid");
+  }
+
   @ParameterizedTest
   @ValueSource(
       strings = {
@@ -213,9 +295,10 @@ class DockerManifestValidatorTest {
         "application/json",
         "text/plain"
       })
-  @DisplayName("leaves a media type the registry does not store to the push, whatever the body")
-  void ignoresUnknownMediaType(final String type) {
-    assertThatCode(() -> DockerManifestValidator.validate(type, "not json"))
-        .doesNotThrowAnyException();
+  @DisplayName("refuses a manifest media type the registry does not store (RPS-1110)")
+  void refusesUnknownMediaType(final String type) {
+    assertThatThrownBy(() -> DockerManifestValidator.validate(type, "not json"))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("manifestMediaTypeUnsupported");
   }
 }

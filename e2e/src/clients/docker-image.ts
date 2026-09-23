@@ -25,11 +25,12 @@
  * same bytes a real `crane push` sent.
  *
  * Layer/config/manifest facts this builder relies on (see `docker-raw.ts`'s header for the wire-level
- * facts, and `AbstractDockerProtocolTxFacade.extractPlatform`, confirmed live -- README.md's "R12/B5"):
- *  - The config JSON MUST carry `architecture`/`os` (`org.json`'s `getString` throws -- a bare
- *    `JSONException` bubbles up to a flat 500, `unsupportedMediaType`'s sibling bug, see README.md's
- *    "R12/B5") and `rootfs.diff_ids` (the OCI image-spec's own `config.md` requirement) -- the sha256
- *    of the UNCOMPRESSED tar, not the gzip.
+ * facts, and `AbstractDockerProtocolTxFacade.extractPlatform` -- README.md's "R12/B5", fixed by
+ * RPS-1116):
+ *  - For an image-config media type, the config JSON MUST carry `architecture`/`os` (a config
+ *    without them now answers a 400 `manifestConfigInvalid`, not a flat 500 -- `unsupportedMediaType`'s
+ *    former sibling bug, see README.md's "R12/B5") and `rootfs.diff_ids` (the OCI image-spec's own
+ *    `config.md` requirement) -- the sha256 of the UNCOMPRESSED tar, not the gzip.
  *  - Docker's classic media types (`schemaVersion: 2`,
  *    `application/vnd.docker.distribution.manifest.v2+json`) are the default family; OCI media types
  *    (`application/vnd.oci.image.manifest.v1+json`) are opt-in via `family: 'oci'` -- exercised by the

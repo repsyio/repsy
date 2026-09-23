@@ -21,6 +21,7 @@ import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_IMAGE_INDEX;
 import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 import static org.springframework.http.HttpHeaders.LOCATION;
 
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
@@ -121,7 +122,7 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
     final var contentType = request.getHeader(CONTENT_TYPE);
 
     if (contentType == null) {
-      return ResponseEntity.badRequest().build();
+      throw new BadRequestException("manifestContentTypeMissing");
     }
 
     final var manifestJson = this.getManifestJsonStr(context, request);
@@ -150,10 +151,6 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
             .build();
 
     final var manifestDigest = this.dockerFacade.saveManifest(context, imageInfo, form);
-
-    if (manifestDigest == null) {
-      return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body("invalidManifest");
-    }
 
     if (!contentType.equals(OCI_IMAGE_INDEX) && !contentType.equals(DOCKER_MANIFEST_LIST)) {
       final var storagePathMap = this.layerRenamer.findLayersToRename(repoInfo, manifestJson);

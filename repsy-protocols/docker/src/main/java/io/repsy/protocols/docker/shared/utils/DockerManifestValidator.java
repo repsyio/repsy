@@ -22,11 +22,15 @@ import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_IMAGE_INDEX;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_MANIFEST_SCHEMA1;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.protocols.docker.shared.tag.dtos.Config;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestInfo;
+import io.repsy.protocols.docker.shared.tag.dtos.ManifestLayer;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestList;
+import java.util.List;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
@@ -49,39 +53,54 @@ public final class DockerManifestValidator {
   private static final ObjectMapper OBJECT_MAPPER =
       JsonMapper.builder().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
 
+  /** The only {@code schemaVersion} the legacy Docker schema1 manifest media type allows. */
+  private static final int SCHEMA_VERSION_1 = 1;
+
+  /** The {@code schemaVersion} every other manifest, and every index, media type requires. */
+  private static final int SCHEMA_VERSION_2 = 2;
+
   /**
-   * Refuses a manifest the registry cannot store. A media type the registry does not know is not
-   * judged here: the push refuses it on its own.
+   * Refuses a manifest the registry cannot store.
    *
    * @param contentType The {@code Content-Type} the manifest was pushed with
    * @param manifestJson The pushed body
    * @throws BadRequestException When the body is not a JSON object, has a field of the wrong type,
-   *     or lacks what its media type requires
+   *     lacks what its media type requires, or the {@code Content-Type} is not one the registry
+   *     stores
    */
   public static void validate(final String contentType, final String manifestJson) {
 
     switch (contentType) {
       case OCI_MANIFEST_SCHEMA1, DOCKER_MANIFEST_SCHEMA1, DOCKER_MANIFEST_SCHEMA2 ->
-          validateImageManifest(manifestJson);
+          validateImageManifest(contentType, manifestJson);
 
       case OCI_IMAGE_INDEX, DOCKER_MANIFEST_LIST -> validateIndex(manifestJson);
 
-      default -> {
-        // Not a manifest type the registry stores; the push answers it separately.
-      }
+      default -> throw new BadRequestException("manifestMediaTypeUnsupported");
     }
   }
 
-  private static void validateImageManifest(final String manifestJson) {
+  private static void validateImageManifest(final String contentType, final String manifestJson) {
 
     final var manifest = bind(manifestJson, ManifestInfo.class);
 
-    final var config = manifest.getConfig();
+    validateConfig(manifest.getConfig());
+    validateLayers(manifest.getLayers());
+
+    final var expectedSchemaVersion =
+        DOCKER_MANIFEST_SCHEMA1.equals(contentType) ? SCHEMA_VERSION_1 : SCHEMA_VERSION_2;
+    validateSchemaVersion(manifest.getSchemaVersion(), expectedSchemaVersion);
+  }
+
+  private static void validateConfig(final @Nullable Config config) {
+
     if (config == null || StringUtils.isBlank(config.getDigest())) {
       throw new BadRequestException("manifestConfigMissing");
     }
+  }
 
-    final var layers = manifest.getLayers();
+  private static void validateLayers(final @Nullable List<ManifestLayer> layers) {
+
     if (layers == null
         || layers.stream()
             .anyMatch(layer -> layer == null || StringUtils.isBlank(layer.getDigest()))) {
@@ -96,12 +115,22 @@ public final class DockerManifestValidator {
     final var manifests = index.getManifests();
     if (manifests == null
         || manifests.stream()
-            .anyMatch(
-                entry ->
-                    entry == null
-                        || StringUtils.isBlank(entry.getDigest())
-                        || entry.getPlatform() == null)) {
+            .anyMatch(entry -> entry == null || StringUtils.isBlank(entry.getDigest()))) {
       throw new BadRequestException("manifestListManifestsInvalid");
+    }
+
+    validateSchemaVersion(index.getSchemaVersion(), SCHEMA_VERSION_2);
+  }
+
+  /**
+   * A {@code schemaVersion} outside what the media type allows is either truncated silently (a
+   * {@code long} narrowed to the database's {@code int} column, RPS-1151) or plainly wrong, so it
+   * is refused up front instead of ever reaching the cast.
+   */
+  private static void validateSchemaVersion(final long actual, final int expected) {
+
+    if (actual != expected) {
+      throw new BadRequestException("manifestSchemaVersionInvalid");
     }
   }
 

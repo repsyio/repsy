@@ -16,9 +16,11 @@
 package io.repsy.protocols.docker.protocol.facades;
 
 import static io.repsy.protocols.docker.shared.utils.ManifestNameGenerator.generate;
+import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_CONFIG_JSON;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_LIST;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_SCHEMA1;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_SCHEMA2;
+import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_CONFIG_JSON;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_EMPTY;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_IMAGE_INDEX;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_MANIFEST_SCHEMA1;
@@ -38,6 +40,7 @@ import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.layer.services.LayerService;
 import io.repsy.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
+import io.repsy.protocols.docker.shared.tag.dtos.Config;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestDetails;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestInfo;
@@ -58,6 +61,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -126,7 +131,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
   }
 
   @Override
-  public @Nullable String saveManifest(
+  public String saveManifest(
       final ProtocolContext context, final BaseImageInfo<ID> imageInfo, final ManifestForm form)
       throws IOException {
 
@@ -134,6 +139,8 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
     this.checkRepoAllowOverride(repoInfo, form.getTagName(), imageInfo, form.getRelativePath());
 
+    // DockerManifestValidator.validate already refused a Content-Type the registry does not
+    // store, before anything for this push was looked up or written.
     final var usage =
         switch (form.getContentType()) {
           case OCI_MANIFEST_SCHEMA1, DOCKER_MANIFEST_SCHEMA1, DOCKER_MANIFEST_SCHEMA2 ->
@@ -142,7 +149,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
           case OCI_IMAGE_INDEX, DOCKER_MANIFEST_LIST ->
               this.createManifestList(repoInfo, imageInfo, form);
 
-          default -> throw new IllegalArgumentException("unsupportedMediaType");
+          default -> throw new BadRequestException("manifestMediaTypeUnsupported");
         };
 
     if (usage != null) {
@@ -198,13 +205,16 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
     this.checkDeploymentRules(repoInfo, manifestInfo, form);
 
-    final var usages = this.writeManifest(repoInfo, form);
-
     if (this.isAttestationManifest(manifestInfo)) {
-      return usages;
+      return this.writeManifest(repoInfo, form);
     }
 
-    final var platform = this.extractPlatform(repoInfo, manifestInfo.getConfig().getDigest());
+    // Extracted BEFORE the manifest is written: a config blob RPS-1116 refuses must leave nothing
+    // on disk, so a rejected push cannot be found again by a later GET even though it was refused.
+    final var platform = this.extractPlatform(repoInfo, manifestInfo.getConfig());
+
+    final var usages = this.writeManifest(repoInfo, form);
+
     final var tagForm = TagForm.of(form, imageInfo.getName(), platform, manifestInfo);
 
     if (tagForm.isSinglePlatformByTagName()) {
@@ -333,16 +343,56 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     }
   }
 
-  private String extractPlatform(final BaseRepoInfo<ID> repoInfo, final String configDigest)
+  /**
+   * Resolves the platform a manifest is stored under. Only an <em>image config</em> media type
+   * ({@code DOCKER_CONFIG_JSON}/{@code OCI_CONFIG_JSON}) is required to carry {@code os}/{@code
+   * architecture}: any other config media type is an OCI artifact, legitimately without either, and
+   * is stored under {@link DockerConstants#UNKNOWN_PLATFORM} (RPS-1116).
+   */
+  private String extractPlatform(final BaseRepoInfo<ID> repoInfo, final Config config)
       throws IOException {
 
-    final var layer = this.findLayerInfoByRepoIdAndDigest(repoInfo.getId(), configDigest);
+    if (!isImageConfigMediaType(config.getMediaType())) {
+      return DockerConstants.UNKNOWN_PLATFORM;
+    }
 
-    final var config = this.getConfig(repoInfo, layer);
-    final var os = new JSONObject(config).getString("os");
-    final var platform = new JSONObject(config).getString("architecture");
+    final var layer = this.findLayerInfoByRepoIdAndDigest(repoInfo.getId(), config.getDigest());
+    final var configJson = this.getConfig(repoInfo, layer);
 
-    return os + "/" + platform;
+    return parsePlatform(configJson);
+  }
+
+  private static boolean isImageConfigMediaType(final @Nullable String mediaType) {
+
+    return DOCKER_CONFIG_JSON.equals(mediaType) || OCI_CONFIG_JSON.equals(mediaType);
+  }
+
+  /**
+   * A config blob that is not JSON, or a JSON object without {@code os} or {@code architecture}, is
+   * the client's mistake, not a server failure (RPS-1116): {@code org.json} throws a bare {@code
+   * JSONException} for both, which is turned into a 400 that names the problem.
+   */
+  private static String parsePlatform(final String config) {
+
+    final JSONObject json;
+    try {
+      json = new JSONObject(config);
+    } catch (final JSONException _) {
+      throw new BadRequestException("manifestConfigInvalid");
+    }
+
+    try {
+      final var os = json.getString("os");
+      final var architecture = json.getString("architecture");
+
+      if (StringUtils.isBlank(os) || StringUtils.isBlank(architecture)) {
+        throw new BadRequestException("manifestConfigInvalid");
+      }
+
+      return os + "/" + architecture;
+    } catch (final JSONException _) {
+      throw new BadRequestException("manifestConfigInvalid");
+    }
   }
 
   private String getConfig(final BaseRepoInfo<ID> repoInfo, final LayerInfo layerInfo)
@@ -430,8 +480,14 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
           this.objectMapper.readValue(
               manifestResource.getContentAsByteArray(), ManifestListManifestInfo.class);
 
+      final var platform = platformManifest.getPlatform();
+
       manifestInfo.setDigest(digest);
-      manifestInfo.setPlatform(platformManifest.getPlatform().toString());
+      // An index entry without a platform is legitimate (RPS-1117: an index grouping an artifact
+      // and its referrers, not per-platform images), and shares one tag_platform row with every
+      // other platform-less entry of the same push.
+      manifestInfo.setPlatform(
+          platform != null ? platform.toString() : DockerConstants.UNKNOWN_PLATFORM);
 
       manifestInfoList.add(manifestInfo);
     }

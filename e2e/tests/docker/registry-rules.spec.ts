@@ -356,7 +356,8 @@ test.describe('docker registry rules (raw HTTP)', () => {
       );
       expectOci(wrongRef, 400, 'DIGEST_INVALID');
 
-      // An unknown Content-Type: candidate B4, confirmed live -- a flat 500, not a 400.
+      // An unknown Content-Type: candidate B4 (RPS-1110, fixed) -- refused up front by
+      // DockerManifestValidator.validate's default branch, before the image row is even looked up.
       const unknownType = await rawPutManifest(
         layout.repoName,
         admin,
@@ -365,14 +366,7 @@ test.describe('docker registry rules (raw HTTP)', () => {
         built.manifestBytes,
         'text/plain',
       );
-      test.fail(
-        true,
-        'RPS-1110 (B4): an unknown manifest Content-Type answers a flat 500 UNKNOWN ' +
-          '(IllegalArgumentException("unsupportedMediaType") has no ErrorHandler mapping), not a ' +
-          "4xx -- confirmed live. The repo's Image row for this image name is also already created " +
-          'by this point (findOrCreateImage runs before the Content-Type switch).',
-      );
-      expectOci(unknownType, 400, 'UNSUPPORTED');
+      expectOci(unknownType, 400, 'MANIFEST_INVALID');
     },
   );
 
@@ -572,12 +566,9 @@ test.describe('docker registry rules (raw HTTP)', () => {
         manifestBytes,
         built.manifestMediaType,
       );
-      test.fail(
-        true,
-        'RPS-1116 (B5): a config blob missing os/architecture crashes the manifest push ' +
-          "with a flat 500 (org.json's getString() throws inside extractPlatform, no ErrorHandler " +
-          'mapping) -- confirmed live, the sibling of B4.',
-      );
+      // RPS-1116, fixed: extractPlatform now runs before the manifest is written, and a config
+      // blob missing os/architecture (an image-config media type) is refused with a 4xx that names
+      // the problem, not a flat 500.
       expectOci(res, 400, 'MANIFEST_INVALID');
     },
   );

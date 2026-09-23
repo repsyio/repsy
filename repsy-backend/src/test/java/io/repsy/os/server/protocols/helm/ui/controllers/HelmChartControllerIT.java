@@ -2514,6 +2514,73 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   }
 
   // ---------------------------------------------------------------------------------------------
+  // OCI endpoints: a required header/parameter that is missing answers the OCI errors[] body
+  // instead of a bare status (RPS-1110)
+  // ---------------------------------------------------------------------------------------------
+
+  @Nested
+  @DisplayName("OCI missing required headers")
+  class OciMissingRequiredHeaders {
+
+    @Test
+    @DisplayName(
+        "a manifest push with NO Content-Type header at all is refused with an OCI errors[] body,"
+            + " not a bodyless 400")
+    void manifestPushWithoutContentTypeIsRejected() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var repo = it.helmRepo();
+
+      final var push =
+          it.protocol(
+                  put("/v2/{repo}/{name}/manifests/{tag}", repo.getName(), "payments", "1.0.0")
+                      .content("{}".getBytes(StandardCharsets.UTF_8))
+                      .header(AUTHORIZATION, it.adminProtocolBearerToken()))
+              .andReturn()
+              .getResponse();
+
+      requireStatus(push, 400, "manifest push with no Content-Type");
+      expectOciError(
+          push,
+          "MANIFEST_INVALID",
+          "The manifest push needs a Content-Type header.",
+          "manifestContentTypeMissing");
+    }
+
+    @Test
+    @DisplayName(
+        "a blob upload finalize with no digest query parameter is refused with an OCI errors[]"
+            + " body, not a bodyless 400")
+    void blobFinalizeWithoutDigestIsRejected() throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var repo = it.helmRepo();
+      final var token = it.adminProtocolBearerToken();
+
+      final var start =
+          it.protocol(
+                  post("/v2/{repo}/{name}/blobs/uploads/", repo.getName(), "payments")
+                      .header(AUTHORIZATION, token))
+              .andReturn()
+              .getResponse();
+      requireStatus(start, 202, "OCI blob upload start");
+      final var location = start.getHeader("Location");
+      final var uploadId = location.substring(location.lastIndexOf('/') + 1);
+
+      final var finalize =
+          it.protocol(
+                  put("/v2/{repo}/{name}/blobs/uploads/{id}", repo.getName(), "payments", uploadId)
+                      .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                      .content("abc".getBytes(StandardCharsets.UTF_8))
+                      .header(AUTHORIZATION, token))
+              .andReturn()
+              .getResponse();
+
+      requireStatus(finalize, 400, "blob finalize with no digest");
+      expectOciError(
+          finalize, "UNSUPPORTED", "The upload needs a digest query parameter.", "digestMissing");
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------
   // OCI manifest push: malformed manifest (RPS-987)
   // ---------------------------------------------------------------------------------------------
 

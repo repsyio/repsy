@@ -393,7 +393,7 @@ public class ManifestTxService implements ManifestService<UUID> {
     manifest.setMediaType(newManifest.getMediaType());
     manifest.setConfigMediaType(newManifest.getConfig().getMediaType());
     manifest.setConfigDigest(newManifest.getConfigDigest());
-    manifest.setSchemaVersion((int) newManifest.getSchemaVersion());
+    manifest.setSchemaVersion(Math.toIntExact(newManifest.getSchemaVersion()));
     manifest.setLayers(layers);
     manifest.setPlatform(newManifest.getPlatform());
     manifest.setConfigSize(configLayer.getSize());
@@ -586,7 +586,7 @@ public class ManifestTxService implements ManifestService<UUID> {
     manifest.setMediaType(manifestInfo.getMediaType());
     manifest.setConfigMediaType(manifestInfo.getConfig().getMediaType());
     manifest.setConfigDigest(manifestInfo.getConfig().getDigest());
-    manifest.setSchemaVersion((int) manifestInfo.getSchemaVersion());
+    manifest.setSchemaVersion(Math.toIntExact(manifestInfo.getSchemaVersion()));
     manifest.setLayers(new HashSet<>());
     manifest.setPlatform(form.getPlatform());
 

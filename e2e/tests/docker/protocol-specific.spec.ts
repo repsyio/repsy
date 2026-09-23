@@ -36,9 +36,9 @@
  *    daemon-free and needs nothing beyond the plain manifest-PUT wire calls this server already
  *    supports. Read FIRST from `AbstractDockerProtocolTxFacade.saveManifest`'s own `switch`
  *    (`repsy-protocols/docker`): `OCI_IMAGE_INDEX`/`DOCKER_MANIFEST_LIST` route to
- *    `createManifestList`, a genuinely distinct, purpose-built code path -- NOT the flat-500
- *    `default -> throw new IllegalArgumentException("unsupportedMediaType")` branch B4/RPS-1110
- *    already pins for a truly unknown `Content-Type`. `createManifestList`'s own
+ *    `createManifestList`, a genuinely distinct, purpose-built code path -- NOT the `default ->
+ *    throw new BadRequestException("manifestMediaTypeUnsupported")` branch B4/RPS-1110 (fixed;
+ *    was a flat 500) pins for a truly unknown `Content-Type`. `createManifestList`'s own
  *    `findPlatformManifests` (same file, directly below) is what makes "push every child by digest
  *    FIRST" a hard SERVER rule, not just client politeness: it `getResource()`s each
  *    `platformManifest.getDigest()` by file name and throws `ItemNotFoundException
