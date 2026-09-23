@@ -19,9 +19,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import java.nio.file.Path;
@@ -166,6 +170,93 @@ class AbstractNpmStorageServiceTest {
       assertThatThrownBy(
               () -> service.getReadmeContent(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, VERSION_NAME))
           .isInstanceOf(ItemNotFoundException.class);
+    }
+  }
+
+  @Nested
+  @DisplayName("RPS-1124: undoing a publish that failed part-way")
+  class DiscardPublishedVersion {
+
+    private static final String TARBALL = "my-package/my-package-1.0.0.tgz";
+    private static final String METADATA = "my-package/package.json";
+
+    private StoragePath pathEnding(final String path) {
+      return org.mockito.ArgumentMatchers.argThat(
+          (StoragePath p) -> p != null && p.getPath().endsWith(path));
+    }
+
+    private void stubPresent(final String path, final boolean present) {
+      when(storageStrategy.get(
+              org.mockito.ArgumentMatchers.argThat(
+                  (StoragePath p) -> p != null && p.getPath().endsWith(path)),
+              anyString()))
+          .thenReturn(present ? Optional.of(new ByteArrayResource(new byte[0])) : Optional.empty());
+    }
+
+    @Test
+    @DisplayName("reads the stored metadata as it is")
+    void readsTheMetadataBytes() throws Exception {
+      stubMetadata("{\"name\":\"my-package\"}");
+
+      assertThat(service.readMetadataBytes(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH))
+          .isEqualTo("{\"name\":\"my-package\"}".getBytes());
+    }
+
+    @Test
+    @DisplayName("a package without metadata cannot be read")
+    void missingMetadataCannotBeRead() {
+      when(storageStrategy.get(any(StoragePath.class), anyString())).thenReturn(Optional.empty());
+
+      assertThatThrownBy(() -> service.readMetadataBytes(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH))
+          .isInstanceOf(ItemNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("removes the tarball and the metadata of a package the publish was creating")
+    void removesTheFilesOfANewPackage() throws Exception {
+      stubPresent(TARBALL, true);
+      stubPresent(METADATA, true);
+
+      service.discardPublishedVersion(
+          REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, "my-package", VERSION_NAME, null);
+
+      verify(storageStrategy).delete(pathEnding(TARBALL));
+      verify(storageStrategy).delete(pathEnding(METADATA));
+      verify(storageStrategy, never()).write(anyString(), any(StoragePath.class), any());
+    }
+
+    @Test
+    @DisplayName("skips the files the publish never got to write")
+    void skipsFilesThatWereNeverWritten() throws Exception {
+      stubPresent(TARBALL, false);
+      stubPresent(METADATA, false);
+
+      service.discardPublishedVersion(
+          REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, "my-package", VERSION_NAME, null);
+
+      verify(storageStrategy, never()).delete(any(StoragePath.class));
+    }
+
+    @Test
+    @DisplayName("removes the tarball of a new version and puts the previous metadata back")
+    void restoresThePreviousMetadata() throws Exception {
+      final var previous = "{\"name\":\"my-package\"}".getBytes();
+      final var written = new java.util.concurrent.atomic.AtomicReference<byte[]>();
+      stubPresent(TARBALL, true);
+      when(storageStrategy.write(anyString(), any(StoragePath.class), any()))
+          .thenAnswer(
+              invocation -> {
+                written.set(invocation.<java.io.InputStream>getArgument(2).readAllBytes());
+                return BaseUsages.ofDisk(previous.length);
+              });
+
+      service.discardPublishedVersion(
+          REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, "my-package", VERSION_NAME, previous);
+
+      verify(storageStrategy).delete(pathEnding(TARBALL));
+      verify(storageStrategy, never()).delete(pathEnding(METADATA));
+      verify(storageStrategy).write(eq(REPO_NAME), pathEnding(METADATA), any());
+      assertThat(written.get()).isEqualTo(previous);
     }
   }
 }
