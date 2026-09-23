@@ -178,7 +178,7 @@ class AbstractNuGetStorageServiceTest {
         .isEqualTo(7L);
 
     final var deleted = ArgumentCaptor.forClass(StoragePath.class);
-    verify(this.storageStrategy).deleteDirectory(deleted.capture());
+    verify(this.storageStrategy).delete(deleted.capture());
     assertThat(relativePath(deleted.getValue())).isEqualTo("packages/some.package/1.0.0+build");
   }
 
@@ -190,7 +190,7 @@ class AbstractNuGetStorageServiceTest {
     this.service.deletePackageVersion(REPO_ID, "Some.Package", "1.0");
 
     final var deleted = ArgumentCaptor.forClass(StoragePath.class);
-    verify(this.storageStrategy).deleteDirectory(deleted.capture());
+    verify(this.storageStrategy).delete(deleted.capture());
     assertThat(relativePath(deleted.getValue())).isEqualTo("packages/some.package/1.0.0");
   }
 
@@ -217,7 +217,7 @@ class AbstractNuGetStorageServiceTest {
     assertThat(written.getAllValues())
         .extracting(AbstractNuGetStorageServiceTest::relativePath)
         .containsExactly(CANONICAL_NUPKG, CANONICAL_NUSPEC);
-    verify(this.storageStrategy, never()).deleteDirectory(any(StoragePath.class));
+    verify(this.storageStrategy, never()).delete(any(StoragePath.class));
   }
 
   @Test
@@ -263,7 +263,7 @@ class AbstractNuGetStorageServiceTest {
     this.service.deleteRepo(REPO_ID);
 
     final var deleted = ArgumentCaptor.forClass(StoragePath.class);
-    verify(this.storageStrategy, times(2)).deleteDirectory(deleted.capture());
+    verify(this.storageStrategy, times(2)).delete(deleted.capture());
     assertThat(deleted.getAllValues())
         .extracting(StoragePath::getPath)
         .containsExactly(REPO_ID + "/packages/some.package", REPO_ID.toString());

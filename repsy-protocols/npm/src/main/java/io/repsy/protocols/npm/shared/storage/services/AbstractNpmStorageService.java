@@ -52,7 +52,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
   @Override
   public void deleteRepo(final UUID repoId) {
     final var storagePath = StoragePath.of(repoId);
-    this.storageStrategy.deleteDirectory(storagePath);
+    this.storageStrategy.delete(storagePath);
   }
 
   @Override
@@ -264,7 +264,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
     final var usage = this.storageStrategy.calculatePathUsage(storagePath);
 
-    this.storageStrategy.deleteDirectory(storagePath);
+    this.storageStrategy.delete(storagePath);
 
     return usage;
   }
@@ -519,6 +519,6 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
   public void clearTrash() {
 
-    this.storageStrategy.clearTrash();
+    final var unused = this.storageStrategy.clearTrash();
   }
 }

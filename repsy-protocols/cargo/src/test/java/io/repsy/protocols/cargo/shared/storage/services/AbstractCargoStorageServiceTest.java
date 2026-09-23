@@ -189,7 +189,7 @@ class AbstractCargoStorageServiceTest {
       when(storageStrategy.getFileUsage(path(INDEX_PATH), eq(REPO_NAME))).thenReturn(40L);
 
       assertThat(service.deletePackage(REPO_ID, REPO_NAME, "serde")).isEqualTo(340L);
-      verify(storageStrategy).deleteDirectory(path(crateDir));
+      verify(storageStrategy).delete(path(crateDir));
       verify(storageStrategy).delete(path(INDEX_PATH));
     }
 
@@ -203,7 +203,7 @@ class AbstractCargoStorageServiceTest {
           .isInstanceOf(ErrorOccurredException.class)
           .hasMessage("errorOccurred")
           .hasCauseInstanceOf(IOException.class);
-      verify(storageStrategy, never()).deleteDirectory(any());
+      verify(storageStrategy, never()).delete(any());
     }
   }
 
@@ -253,7 +253,7 @@ class AbstractCargoStorageServiceTest {
   void deleteRepo() {
     service.deleteRepo(REPO_ID);
 
-    verify(storageStrategy).deleteDirectory(path(REPO_ID.toString()));
+    verify(storageStrategy).delete(path(REPO_ID.toString()));
     verify(storageStrategy, never()).calculatePathUsage(any());
   }
 

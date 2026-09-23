@@ -21,18 +21,43 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import io.repsy.libs.storage.core.dtos.TrashCleanupResult;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 
 @DisplayName("StorageTrashCleanupTask")
 class StorageTrashCleanupTaskTest {
+
+  private final ListAppender<ILoggingEvent> logAppender = new ListAppender<>();
+  private Logger taskLogger;
+
+  @BeforeEach
+  void attachLogAppender() {
+    this.taskLogger = (Logger) LoggerFactory.getLogger(StorageTrashCleanupTask.class);
+    this.logAppender.start();
+    this.taskLogger.addAppender(this.logAppender);
+  }
+
+  @AfterEach
+  void detachLogAppender() {
+    this.taskLogger.detachAppender(this.logAppender);
+  }
 
   private static Map<String, StorageStrategy> strategies(final StorageStrategy... strategies) {
     final var byType = new LinkedHashMap<String, StorageStrategy>();
@@ -42,12 +67,19 @@ class StorageTrashCleanupTaskTest {
     return byType;
   }
 
+  private static void stubResult(final StorageStrategy strategy, final TrashCleanupResult result) {
+    when(strategy.clearTrash()).thenReturn(CompletableFuture.completedFuture(result));
+  }
+
   @Test
   @DisplayName("cleanup() empties the trash of every storage strategy exactly once")
   void clearsTheTrashOfEveryStrategyOnce() {
     final var first = mock(StorageStrategy.class);
     final var second = mock(StorageStrategy.class);
     final var third = mock(StorageStrategy.class);
+    stubResult(first, TrashCleanupResult.EMPTY);
+    stubResult(second, TrashCleanupResult.EMPTY);
+    stubResult(third, TrashCleanupResult.EMPTY);
 
     new StorageTrashCleanupTask(strategies(first, second, third)).cleanup();
 
@@ -58,12 +90,31 @@ class StorageTrashCleanupTaskTest {
   }
 
   @Test
-  @DisplayName("a strategy that fails does not stop the others and does not propagate")
-  void aFailingStrategyDoesNotStopTheOthers() {
+  @DisplayName("logs one info line per strategy summarizing what the pass removed")
+  void logsAnInfoLinePerStrategyResult() {
+    final var strategy = mock(StorageStrategy.class);
+    stubResult(strategy, new TrashCleanupResult(2, 5, 1234L));
+
+    new StorageTrashCleanupTask(strategies(strategy)).cleanup();
+
+    assertThat(this.logAppender.list)
+        .filteredOn(event -> event.getLevel() == Level.INFO)
+        .anySatisfy(
+            event -> {
+              final var message = event.getFormattedMessage();
+              assertThat(message).contains("TYPE0").contains("2").contains("5").contains("1234");
+            });
+  }
+
+  @Test
+  @DisplayName("a strategy whose submission fails synchronously does not stop the others")
+  void aStrategyThatFailsToSubmitDoesNotStopTheOthers() {
     final var before = mock(StorageStrategy.class);
     final var failing = mock(StorageStrategy.class);
     final var after = mock(StorageStrategy.class);
-    doThrow(new IllegalStateException("trash is unreadable")).when(failing).clearTrash();
+    stubResult(before, TrashCleanupResult.EMPTY);
+    stubResult(after, TrashCleanupResult.EMPTY);
+    doThrow(new IllegalStateException("executor rejected the task")).when(failing).clearTrash();
 
     assertThatCode(() -> new StorageTrashCleanupTask(strategies(before, failing, after)).cleanup())
         .doesNotThrowAnyException();
@@ -71,6 +122,30 @@ class StorageTrashCleanupTaskTest {
     verify(before).clearTrash();
     verify(failing).clearTrash();
     verify(after).clearTrash();
+  }
+
+  @Test
+  @DisplayName(
+      "a strategy whose pass fails asynchronously logs a warning and does not stop the others")
+  void aStrategyThatFailsAsynchronouslyDoesNotStopTheOthers() {
+    final var before = mock(StorageStrategy.class);
+    final var failing = mock(StorageStrategy.class);
+    final var after = mock(StorageStrategy.class);
+    stubResult(before, TrashCleanupResult.EMPTY);
+    stubResult(after, TrashCleanupResult.EMPTY);
+    when(failing.clearTrash())
+        .thenReturn(
+            CompletableFuture.failedFuture(new IllegalStateException("trash is unreadable")));
+
+    assertThatCode(() -> new StorageTrashCleanupTask(strategies(before, failing, after)).cleanup())
+        .doesNotThrowAnyException();
+
+    verify(before).clearTrash();
+    verify(failing).clearTrash();
+    verify(after).clearTrash();
+    assertThat(this.logAppender.list)
+        .filteredOn(event -> event.getLevel() == Level.WARN)
+        .anySatisfy(event -> assertThat(event.getFormattedMessage()).contains("TYPE1"));
   }
 
   @Test

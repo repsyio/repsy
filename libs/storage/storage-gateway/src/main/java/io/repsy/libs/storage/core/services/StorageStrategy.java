@@ -19,12 +19,14 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
+import io.repsy.libs.storage.core.dtos.TrashCleanupResult;
 import io.repsy.libs.storage.core.exceptions.IsADirectoryException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import org.jspecify.annotations.NonNull;
 import org.springframework.core.io.Resource;
 
@@ -32,11 +34,23 @@ public interface StorageStrategy {
 
   void createDirectory(@NonNull String name) throws IsADirectoryException;
 
-  void deleteDirectory(@NonNull StoragePath storagePath);
-
+  /**
+   * Soft-deletes the file or directory at {@code storagePath}: it is moved out of the way, not
+   * erased, so it is recoverable until {@link #clearTrash()} permanently removes it after the
+   * configured retention period elapses. There is no separate hard-delete operation; a caller that
+   * needs the space back immediately still has to wait out the retention period.
+   */
   void delete(@NonNull StoragePath storagePath);
 
-  void clearTrash();
+  /**
+   * Permanently removes the trashed files and directories whose retention period has elapsed. Does
+   * not touch anything moved into the trash more recently than that. Idempotent: an item already
+   * removed by an earlier or concurrent pass is simply not counted again.
+   *
+   * @return a future that completes with what the pass actually removed, or completes exceptionally
+   *     if the pass failed partway through
+   */
+  @NonNull CompletableFuture<TrashCleanupResult> clearTrash();
 
   long calculatePathUsage(@NonNull StoragePath paths);
 

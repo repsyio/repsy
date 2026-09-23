@@ -49,7 +49,7 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   @Override
   public void deleteRepo(final UUID repoUuid) {
     final var storagePath = StoragePath.of(repoUuid);
-    this.storageStrategy.deleteDirectory(storagePath);
+    this.storageStrategy.delete(storagePath);
   }
 
   @Override
@@ -107,7 +107,7 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
 
   @Override
   public void clearTrash() {
-    this.storageStrategy.clearTrash();
+    final var unused = this.storageStrategy.clearTrash();
   }
 
   @Override

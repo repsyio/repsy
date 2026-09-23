@@ -23,6 +23,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
+import io.repsy.libs.storage.core.dtos.TrashCleanupResult;
 import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import io.repsy.libs.storage.core.exceptions.IsADirectoryException;
 import io.repsy.libs.storage.core.services.StorageStrategy;
@@ -32,8 +33,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.FileChannel;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
@@ -47,13 +50,15 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 import lombok.SneakyThrows;
 import org.jspecify.annotations.NonNull;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.scheduling.annotation.Async;
-import org.springframework.util.FileSystemUtils;
 
 public class FileSystemStorageStrategy implements StorageStrategy {
 
@@ -322,9 +327,15 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     return this.calculatePathUsage(paths, 0L);
   }
 
+  /**
+   * Soft-deletes the file or directory at {@code storagePath}: it is moved into {@code
+   * <trashPath>/<today>/<timestamp>/<path>}, so it stays recoverable until {@link #clearTrash()}
+   * removes it for good after the retention period elapses. {@code Files.move} does not distinguish
+   * a file from a directory, so a single object and a whole tree are soft-deleted the same way.
+   */
   @SneakyThrows
   @Override
-  public void deleteDirectory(final @NonNull StoragePath storagePath) {
+  public void delete(final @NonNull StoragePath storagePath) {
     final Path basePathObj = this.toPhysicalPath(storagePath);
     final String relativePath =
         String.join(
@@ -338,34 +349,32 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     Files.move(basePathObj, trashPathObj);
   }
 
-  @Override
-  public void delete(final @NonNull StoragePath storagePath) {
-    this.deleteDirectory(storagePath);
-  }
-
   /**
    * Deletes the date directories of the trash that are older than the retention period, for good.
    *
-   * <p>{@link #deleteDirectory} files a deleted item under the directory named after today's date
-   * in the system time zone, and this method reads that name back in the same zone, so a directory
-   * counts as old once its whole day lies before {@code now - retention}. A retention of at least
-   * one day therefore never touches the directory a concurrent delete is moving into. A {@link
+   * <p>{@link #delete} files a deleted item under the directory named after today's date in the
+   * system time zone, and this method reads that name back in the same zone, so a directory counts
+   * as old once its whole day lies before {@code now - retention}. A retention of at least one day
+   * therefore never touches the directory a concurrent delete is moving into. A {@link
    * Duration#ZERO} retention does, and is only meant for tests. A directory whose name is not a
    * date is not ours and is left alone.
    *
    * <p>Runs on the application's {@code maintenanceTaskExecutor}: walking and deleting the trash
    * can take minutes and must not hold up the default {@code @Async} pool. An application that
-   * enables {@code @Async} has to define a bean of that name.
+   * enables {@code @Async} has to define a bean of that name. Spring executes this method on that
+   * pool and reports an exception it throws through the returned future instead of throwing it
+   * synchronously, because the return type is a future.
    */
   @SneakyThrows
   @Async("maintenanceTaskExecutor")
   @Override
-  public void clearTrash() {
+  public @NonNull CompletableFuture<TrashCleanupResult> clearTrash() {
     if (!Files.exists(this.trashPath) || !Files.isDirectory(this.trashPath)) {
-      return;
+      return CompletableFuture.completedFuture(TrashCleanupResult.EMPTY);
     }
 
     final Instant threshold = Instant.now().minus(this.trashRetentionPeriod);
+    TrashCleanupResult result = TrashCleanupResult.EMPTY;
 
     try (final Stream<Path> trashItems = Files.list(this.trashPath)) {
       final List<Path> dateDirs = trashItems.filter(Files::isDirectory).toList();
@@ -374,10 +383,50 @@ public class FileSystemStorageStrategy implements StorageStrategy {
         final Optional<Instant> dirInstant = toDayStart(dateDir);
 
         if (dirInstant.isPresent() && dirInstant.get().isBefore(threshold)) {
-          FileSystemUtils.deleteRecursively(dateDir);
+          result = result.plus(deleteRecursivelyWithStats(dateDir));
         }
       }
     }
+
+    return CompletableFuture.completedFuture(result);
+  }
+
+  /**
+   * Deletes {@code directory} and everything under it, for good, tallying what it removed along the
+   * way. The stats are gathered while walking rather than beforehand, so they reflect exactly what
+   * this call actually deleted.
+   */
+  @SneakyThrows
+  private static @NonNull TrashCleanupResult deleteRecursivelyWithStats(final Path directory) {
+    final AtomicInteger directoriesDeleted = new AtomicInteger();
+    final AtomicInteger filesDeleted = new AtomicInteger();
+    final AtomicLong bytesFreed = new AtomicLong();
+
+    Files.walkFileTree(
+        directory,
+        new SimpleFileVisitor<>() {
+          @Override
+          public @NonNull FileVisitResult visitFile(
+              final Path file, final @NonNull BasicFileAttributes attrs) throws IOException {
+            bytesFreed.addAndGet(attrs.size());
+            filesDeleted.incrementAndGet();
+            Files.delete(file);
+            return FileVisitResult.CONTINUE;
+          }
+
+          @Override
+          public @NonNull FileVisitResult postVisitDirectory(final Path dir, final IOException exc)
+              throws IOException {
+            if (exc != null) {
+              throw exc;
+            }
+            Files.delete(dir);
+            directoriesDeleted.incrementAndGet();
+            return FileVisitResult.CONTINUE;
+          }
+        });
+
+    return new TrashCleanupResult(directoriesDeleted.get(), filesDeleted.get(), bytesFreed.get());
   }
 
   private static Optional<Instant> toDayStart(final Path dateDir) {

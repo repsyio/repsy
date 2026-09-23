@@ -165,7 +165,7 @@ class MaintenanceTaskExecutorIT extends AbstractIntegrationTest {
     final var completedBefore =
         this.maintenanceTaskExecutor.getThreadPoolExecutor().getCompletedTaskCount();
 
-    strategy.clearTrash();
+    final var unused = strategy.clearTrash();
 
     final var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS);
     while (Files.exists(expiredDir) && System.nanoTime() < deadline) {

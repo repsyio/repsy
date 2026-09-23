@@ -148,7 +148,7 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
     final var versionStoragePath = StoragePath.of(repoId, versionPath);
 
     final var usage = this.storageStrategy.calculatePathUsage(versionStoragePath);
-    this.storageStrategy.deleteDirectory(versionStoragePath);
+    this.storageStrategy.delete(versionStoragePath);
 
     return usage;
   }
@@ -161,7 +161,7 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
     final var packageStoragePath = StoragePath.of(repoId, packagePath);
 
     final var usage = this.storageStrategy.calculatePathUsage(packageStoragePath);
-    this.storageStrategy.deleteDirectory(packageStoragePath);
+    this.storageStrategy.delete(packageStoragePath);
 
     return usage;
   }
@@ -169,7 +169,7 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
   @Override
   public void deleteRepo(final UUID repoId) {
     final var storagePath = StoragePath.of(repoId);
-    this.storageStrategy.deleteDirectory(storagePath);
+    this.storageStrategy.delete(storagePath);
   }
 
   /**
