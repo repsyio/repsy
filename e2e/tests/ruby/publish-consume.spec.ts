@@ -22,9 +22,10 @@
  * exercise (every H/RB-number below was confirmed live before this file was written -- see
  * `README.md`'s "Ruby runner" section for the raw evidence):
  *
- *  - "gem install fails on the missing gemspec.rz route" (RPS-1233 via `gem`, `test.fail()`): unlike the
- *    catalog loop's own consumer (real `bundle install`, which never needs this route -- H1's
- *    refutation, `ruby-raw.ts`'s file header), a real `gem install` DOES need it and fails.
+ *  - "gem install succeeds using the quick/Marshal.4.8/*.gemspec.rz route" (RPS-1233, fixed, via
+ *    `gem`): unlike the catalog loop's own consumer (real `bundle install`, which never needs this
+ *    route -- H1's refutation, `ruby-raw.ts`'s file header), a real `gem install` DOES need it, and
+ *    a concrete `RubyGemspecHandler` now registers it.
  *  - "gem fetch fails on the specs.4.8.gz zlib/gzip mismatch" (RPS-1234 via `gem`, `test.fail()`).
  *  - "anonymous gem push exits 1 promptly, no push request ever sent" (H4): the fixture's own
  *    fingerprint proves nothing was stored.
@@ -61,42 +62,42 @@ import { registerPublishConsumeLoop } from '../../src/scenarios/loop.js';
 
 registerPublishConsumeLoop(rubyAdapter);
 
-test(
-  'ruby > gem install fails on the missing quick/Marshal.4.8/*.gemspec.rz route (RPS-1233)',
-  { tag: ['@negative'] },
-  async ({ seeder }) => {
-    const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: false });
-    const admin = adminCredential();
-    const name = `e2e_${seeder.runId}_geminstall`;
-    const version = rubyAdapter.version('release');
+test('ruby > gem install succeeds using the quick/Marshal.4.8/*.gemspec.rz route (RPS-1233)', async ({
+  seeder,
+}) => {
+  const repo = await seeder.createRepo(RepoType.RUBY, { privateRepo: false });
+  const admin = adminCredential();
+  const name = `e2e_${seeder.runId}_geminstall`;
+  const version = rubyAdapter.version('release');
 
-    const built = await buildGem({ name, version });
-    const publishRes = await rawPublish(repo.name, admin, built.bytes);
-    expect(publishRes.status, 'seed publish').toBe(200);
+  const built = await buildGem({ name, version });
+  const publishRes = await rawPublish(repo.name, admin, built.bytes);
+  expect(publishRes.status, 'seed publish').toBe(200);
 
-    const { home, work } = await isolatedWorkDir(`ruby-geminstall-${seeder.runId}`);
-    const result = await run(
-      'gem',
-      [
-        'install',
-        '--source',
-        `${env.repoBaseUrl}/${repo.name}`,
-        name,
-        '-v',
-        version,
-        '--no-document',
-      ],
-      { cwd: work, env: gemEnv(home, {}), timeoutMs: 60_000, label: 'ruby-geminstall' },
-    );
+  const { home, work } = await isolatedWorkDir(`ruby-geminstall-${seeder.runId}`);
+  const result = await run(
+    'gem',
+    [
+      'install',
+      '--source',
+      `${env.repoBaseUrl}/${repo.name}`,
+      name,
+      '-v',
+      version,
+      '--no-document',
+    ],
+    { cwd: work, env: gemEnv(home, {}), timeoutMs: 60_000, label: 'ruby-geminstall' },
+  );
 
-    test.fail(
-      true,
-      'RPS-1233: quick/Marshal.4.8/*.gemspec.rz has no backend route at all (404 unknownPath) -- a ' +
-        'real `gem install` (unlike bundle install, H1) needs it and fails',
-    );
-    expect(result.exitCode, `gem install: ${result.command}`).toBe(0);
-  },
-);
+  expect(result.exitCode, `gem install: ${result.command}`).toBe(0);
+
+  // A real gem install resolves the version via quick/Marshal.4.8/*.gemspec.rz, then writes the
+  // resolved spec under GEM_HOME/specifications -- confirms the route was actually exercised, not
+  // just that the process happened to exit 0.
+  const installedGemspec = path.join(home, 'gems', 'specifications', `${name}-${version}.gemspec`);
+  const stat = await fs.stat(installedGemspec);
+  expect(stat.isFile(), `installed gemspec at ${installedGemspec}`).toBe(true);
+});
 
 test(
   'ruby > gem fetch fails on the specs.4.8.gz zlib/gzip mismatch (RPS-1234)',
