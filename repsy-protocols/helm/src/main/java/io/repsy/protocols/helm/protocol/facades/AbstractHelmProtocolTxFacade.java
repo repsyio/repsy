@@ -16,7 +16,6 @@
 package io.repsy.protocols.helm.protocol.facades;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
-import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
@@ -174,31 +173,52 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID>
         StoragePath.of(
             repoInfo.getStorageKey(), this.helmStorageService.getChartRelativePath(name, version));
 
-    final var existingOpt =
-        this.chartService.findOptionalByNameAndVersion(repoInfo.getId(), name, version);
+    return this.chartService.publish(
+        repoInfo.getId(),
+        form,
+        repoInfo.isAllowOverride(),
+        replaced -> this.storeChart(context, repoInfo, storagePath, chartStream, form, replaced));
+  }
 
-    if (existingOpt.isPresent()) {
-      if (!repoInfo.isAllowOverride()) {
-        log.info("Chart {}:{} already exists in repo {}", name, version, repoInfo.getName());
-        throw new ItemAlreadyExistException("chartAlreadyExists");
-      }
-      final var oldSize = existingOpt.get().size();
-      final var chartInfo = this.chartService.update(repoInfo.getId(), form);
+  /**
+   * Stores the chart file while {@link ChartService#publish} still holds the version's row: a
+   * failure rolls the row back, and for a new version the partly written file is removed. A version
+   * being replaced keeps its row, so its file is left alone.
+   */
+  private void storeChart(
+      final ProtocolContext context,
+      final BaseRepoInfo<ID> repoInfo,
+      final StoragePath storagePath,
+      final InputStream chartStream,
+      final HelmChartForm form,
+      final @Nullable HelmChartInfo replaced) {
+
+    try {
       this.helmStorageService.saveChart(repoInfo.getName(), storagePath, chartStream);
-      context.addProperty(ARTIFACT_NAME, name);
-      context.addProperty(ARTIFACT_VERSION, version);
-      context.addProperty(STORAGE_PATH, storagePath.getRelativePath().getPath());
-      context.addProperty("usages", BaseUsages.ofDisk(size - oldSize));
-      return chartInfo;
+    } catch (final RuntimeException e) {
+      if (replaced == null) {
+        this.discardPartialChart(repoInfo, storagePath, e);
+      }
+      throw e;
     }
 
-    final var chartInfo = this.chartService.findOrCreate(form, repoInfo.getId());
-    this.helmStorageService.saveChart(repoInfo.getName(), storagePath, chartStream);
-    context.addProperty(ARTIFACT_NAME, name);
-    context.addProperty(ARTIFACT_VERSION, version);
+    context.addProperty(ARTIFACT_NAME, form.getName());
+    context.addProperty(ARTIFACT_VERSION, form.getVersion());
     context.addProperty(STORAGE_PATH, storagePath.getRelativePath().getPath());
-    context.addProperty("usages", BaseUsages.ofDisk(size));
-    return chartInfo;
+    context.addProperty(
+        "usages", BaseUsages.ofDisk(form.getSize() - (replaced == null ? 0 : replaced.size())));
+  }
+
+  private void discardPartialChart(
+      final BaseRepoInfo<ID> repoInfo, final StoragePath storagePath, final Exception cause) {
+
+    try {
+      this.helmStorageService.deleteChart(storagePath, repoInfo.getName());
+    } catch (final IOException | RuntimeException e) {
+      // Nothing to delete when the failure came before the file was created.
+      log.debug("No partial chart removed at {}: {}", storagePath, e.getMessage());
+      cause.addSuppressed(e);
+    }
   }
 
   @Override

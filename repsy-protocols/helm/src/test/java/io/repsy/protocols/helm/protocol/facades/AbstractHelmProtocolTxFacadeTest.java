@@ -18,7 +18,9 @@ package io.repsy.protocols.helm.protocol.facades;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -31,6 +33,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService;
 import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService.DeletedChart;
@@ -42,7 +45,9 @@ import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
+import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -344,33 +349,148 @@ class AbstractHelmProtocolTxFacadeTest {
   @DisplayName("pushChart()")
   class PushChart {
 
-    @Test
-    @DisplayName("rejects an existing version with a fixed msgId that carries no name or version")
-    void rejectsExistingVersionWithFixedMsgId() {
+    private static final String CHART_PATH = "charts/payments-1.0.0.tgz";
+
+    private BaseRepoInfo<UUID> repo() {
+      return ProtocolContextUtils.<UUID>getRepoInfo(AbstractHelmProtocolTxFacadeTest.this.context);
+    }
+
+    /** Runs the file writer the facade hands to {@code publish}, as the service would. */
+    private void publishRunsTheWriterWith(final HelmChartInfo replaced) throws Exception {
       when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.getChartRelativePath(
               "payments", "1.0.0"))
-          .thenReturn("charts/payments-1.0.0.tgz");
-      when(AbstractHelmProtocolTxFacadeTest.this.chartService.findOptionalByNameAndVersion(
-              REPO_ID, "payments", "1.0.0"))
-          .thenReturn(Optional.of(AbstractHelmProtocolTxFacadeTest.this.chartInfo));
+          .thenReturn(CHART_PATH);
+      when(AbstractHelmProtocolTxFacadeTest.this.chartService.publish(
+              eq(REPO_ID), any(HelmChartForm.class), anyBoolean(), any()))
+          .thenAnswer(
+              invocation -> {
+                invocation.<ChartService.ChartFileWriter>getArgument(3).write(replaced);
+                return AbstractHelmProtocolTxFacadeTest.this.chartInfo;
+              });
+    }
 
-      assertThatThrownBy(
-              () ->
-                  AbstractHelmProtocolTxFacadeTest.this.facade.pushChart(
-                      AbstractHelmProtocolTxFacadeTest.this.context,
-                      "payments",
-                      "1.0.0",
-                      "",
-                      "",
-                      null,
-                      DIGEST,
-                      body(),
-                      BLOB_SIZE))
+    private HelmChartInfo push() throws Exception {
+      return AbstractHelmProtocolTxFacadeTest.this.facade.pushChart(
+          AbstractHelmProtocolTxFacadeTest.this.context,
+          "payments",
+          "1.0.0",
+          "",
+          "",
+          null,
+          DIGEST,
+          body(),
+          BLOB_SIZE);
+    }
+
+    @Test
+    @DisplayName("hands the row to the chart service before any file is written")
+    void writesTheFileOnlyThroughThePublishCallback() throws Exception {
+      when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.getChartRelativePath(
+              "payments", "1.0.0"))
+          .thenReturn(CHART_PATH);
+      when(AbstractHelmProtocolTxFacadeTest.this.chartService.publish(
+              eq(REPO_ID), any(HelmChartForm.class), eq(true), any()))
+          .thenReturn(AbstractHelmProtocolTxFacadeTest.this.chartInfo);
+      this.repo().setAllowOverride(true);
+
+      final var info = this.push();
+
+      assertThat(info).isSameAs(AbstractHelmProtocolTxFacadeTest.this.chartInfo);
+      verify(AbstractHelmProtocolTxFacadeTest.this.helmStorageService, never())
+          .saveChart(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("propagates the conflict of the chart service and writes nothing")
+    void propagatesTheConflict() throws Exception {
+      when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.getChartRelativePath(
+              "payments", "1.0.0"))
+          .thenReturn(CHART_PATH);
+      when(AbstractHelmProtocolTxFacadeTest.this.chartService.publish(
+              eq(REPO_ID), any(HelmChartForm.class), eq(false), any()))
+          .thenThrow(new ItemAlreadyExistException("chartAlreadyExists"));
+
+      assertThatThrownBy(this::push)
           .isInstanceOf(ItemAlreadyExistException.class)
           .hasMessage("chartAlreadyExists");
 
       verify(AbstractHelmProtocolTxFacadeTest.this.helmStorageService, never())
           .saveChart(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("stores a new version and charges its whole size")
+    void chargesTheWholeSizeOfANewVersion() throws Exception {
+      this.publishRunsTheWriterWith(null);
+
+      this.push();
+
+      verify(AbstractHelmProtocolTxFacadeTest.this.helmStorageService)
+          .saveChart(eq(REPO_NAME), any(), any());
+      assertThat(AbstractHelmProtocolTxFacadeTest.this.reportedUsage()).isEqualTo(BLOB_SIZE);
+      assertThat(AbstractHelmProtocolTxFacadeTest.this.context.<String>getProperty("storagePath"))
+          .isEqualTo(CHART_PATH);
+      assertThat(AbstractHelmProtocolTxFacadeTest.this.context.<String>getProperty("artifactName"))
+          .isEqualTo("payments");
+    }
+
+    @Test
+    @DisplayName("charges only the difference when a version is replaced")
+    void chargesTheDifferenceOfAReplacedVersion() throws Exception {
+      when(AbstractHelmProtocolTxFacadeTest.this.chartInfo.size()).thenReturn(100L);
+      this.publishRunsTheWriterWith(AbstractHelmProtocolTxFacadeTest.this.chartInfo);
+
+      this.push();
+
+      assertThat(AbstractHelmProtocolTxFacadeTest.this.reportedUsage()).isEqualTo(BLOB_SIZE - 100L);
+    }
+
+    @Test
+    @DisplayName("removes the partly written file of a new version when the write fails")
+    void removesThePartialFileOfANewVersion() throws Exception {
+      this.publishRunsTheWriterWith(null);
+      final var failure = new IllegalStateException("disk full");
+      doThrow(failure)
+          .when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService)
+          .saveChart(any(), any(), any());
+
+      assertThatThrownBy(this::push).isSameAs(failure);
+
+      verify(AbstractHelmProtocolTxFacadeTest.this.helmStorageService)
+          .deleteChart(any(), eq(REPO_NAME));
+      assertThat(AbstractHelmProtocolTxFacadeTest.this.context.<Object>getProperty("usages"))
+          .isNull();
+    }
+
+    @Test
+    @DisplayName("keeps the file of a replaced version when the write fails")
+    void keepsTheFileOfAReplacedVersion() throws Exception {
+      this.publishRunsTheWriterWith(AbstractHelmProtocolTxFacadeTest.this.chartInfo);
+      doThrow(new IllegalStateException("disk full"))
+          .when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService)
+          .saveChart(any(), any(), any());
+
+      assertThatThrownBy(this::push).isInstanceOf(IllegalStateException.class);
+
+      verify(AbstractHelmProtocolTxFacadeTest.this.helmStorageService, never())
+          .deleteChart(any(), any());
+    }
+
+    @Test
+    @DisplayName("still reports the write failure when the partial file cannot be removed")
+    void reportsTheWriteFailureWhenCleanupFails() throws Exception {
+      this.publishRunsTheWriterWith(null);
+      final var failure = new IllegalStateException("disk full");
+      doThrow(failure)
+          .when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService)
+          .saveChart(any(), any(), any());
+      when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.deleteChart(
+              any(), eq(REPO_NAME)))
+          .thenThrow(new IOException("no such file"));
+
+      assertThatThrownBy(this::push)
+          .isSameAs(failure)
+          .satisfies(e -> assertThat(e.getSuppressed()).hasSize(1));
     }
   }
 

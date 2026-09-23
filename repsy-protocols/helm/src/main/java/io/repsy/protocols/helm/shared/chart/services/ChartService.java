@@ -17,9 +17,11 @@ package io.repsy.protocols.helm.shared.chart.services;
 
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 @NullMarked
 public interface ChartService<ID> {
@@ -30,6 +32,23 @@ public interface ChartService<ID> {
 
   HelmChartInfo update(ID repoId, HelmChartForm form);
 
+  /**
+   * Records the chart version of a classic upload and, while that write is still open, stores its
+   * file through {@code fileWriter}.
+   *
+   * <p>The row is written first (and flushed, so a unique-index conflict surfaces here) and the
+   * file second, inside one transaction. If the row cannot be written, the file is never touched,
+   * so an upload that loses a race for a version cannot replace the winner's file. If the file
+   * cannot be written, the row is rolled back.
+   *
+   * @param allowOverride whether an existing version of the chart may be replaced
+   * @throws io.repsy.core.error_handling.exceptions.ItemAlreadyExistException When the version
+   *     exists and may not be replaced, or a concurrent upload of it won the race
+   */
+  HelmChartInfo publish(
+      ID repoId, HelmChartForm form, boolean allowOverride, ChartFileWriter fileWriter)
+      throws IOException;
+
   HelmChartInfo findByRepoIdAndNameAndVersion(ID repoId, String name, String version);
 
   List<HelmChartInfo> findAllByRepoId(ID repoId);
@@ -37,4 +56,17 @@ public interface ChartService<ID> {
   void delete(ID repoId, String name, String version);
 
   boolean existsByRepoIdAndDigest(ID repoId, String digest);
+
+  /** Stores the file of a version whose row {@link #publish} has just written. */
+  @FunctionalInterface
+  interface ChartFileWriter {
+
+    /**
+     * Writes the file of the version.
+     *
+     * @param replaced the version being replaced as it was before, or {@code null} for a new
+     *     version
+     */
+    void write(@Nullable HelmChartInfo replaced) throws IOException;
+  }
 }
