@@ -73,7 +73,7 @@ test.describe('Repository list', () => {
     test.fail(
       true,
       'The search box keeps its text after refresh (and after a type change) while the list is ' +
-        'unfiltered again: NOT YET FILED, see the PR description',
+        'unfiltered again: RPS-1283',
     );
     const repos = new RepositoriesPage(adminPage);
     await seeder.createRepo(RepoType.MAVEN);
@@ -136,7 +136,7 @@ test.describe('Repository list', () => {
     test.fail(
       true,
       'The list keeps the old page index when the search changes, so after narrowing and widening ' +
-        'the search it shows page 1 with page 2 marked as current: NOT YET FILED, see the PR description',
+        'the search it shows page 1 with page 2 marked as current: RPS-1283',
     );
     const repos = new RepositoriesPage(adminPage);
     for (let count = 0; count < REPO_PAGE_SIZE + 1; count++) {

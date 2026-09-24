@@ -2593,10 +2593,10 @@ Things a test here relies on, which a change to the page can break:
 - **The visibility toggle** is toggled by clicking its label text: the `toggle-input` checkbox is `sr-only`
   under a covering span, so Playwright refuses to click it (read `isChecked()` from it, though).
 - **Known defects, pinned as `test.fail`** (a `✘` line in the list reporter with a passing summary is the
-  expectation): the description textarea's `maxlength="500"` hides the ">500" error (RPS-1265), a USER's
-  Recent Activity is empty because `/api/repos/{name}/usage` refuses a USER and one failing call drops a
-  whole type (RPS-1276), the search box keeps its text and the page index stays stale after a refresh or a
-  new search. Drop the `test.fail` when the fix lands.
+  expectation): the description textarea's `maxlength="500"` hides the ">500" error (RPS-1265), and the
+  search box keeps its text and the page index stays stale after a refresh or a new search (RPS-1283).
+  Drop the `test.fail` when the fix lands. (A USER's Recent Activity was pinned to RPS-1276 until that
+  fix; the row now shows, so DASH-04 asserts it plainly.)
 
 ### Users and profile (RPS-1253)
 

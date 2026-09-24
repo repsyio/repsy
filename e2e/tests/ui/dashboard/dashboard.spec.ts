@@ -192,11 +192,6 @@ test.describe('Dashboard', () => {
     userPage,
     seeder,
   }) => {
-    test.fail(
-      true,
-      'RPS-1276: the dashboard asks GET /api/repos/{name}/usage for every repository and a USER ' +
-        'is refused (401 unAuthorized), which drops every repository of that type from the list',
-    );
     const dashboard = new DashboardPage(userPage);
     const repo = await seeder.createRepo(RepoType.MAVEN);
 
