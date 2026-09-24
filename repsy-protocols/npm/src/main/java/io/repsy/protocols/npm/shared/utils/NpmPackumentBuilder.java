@@ -31,8 +31,9 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Rebuilds a package's metadata (its packument, the {@code package.json} of the storage layout)
- * from what the database holds, for a package whose file is gone from storage. The database is the
- * source of truth, so the rebuilt metadata lists exactly the versions and dist-tags of its rows.
+ * from what the database holds, for a package whose file is gone from storage or corrupt. The
+ * database is the source of truth, so the rebuilt metadata lists exactly the versions and dist-tags
+ * of its rows.
  *
  * <p>Per version, the metadata is the manifest from the version's tarball where there is one (the
  * only place the dependencies, scripts and the like survive), completed by the columns of the row

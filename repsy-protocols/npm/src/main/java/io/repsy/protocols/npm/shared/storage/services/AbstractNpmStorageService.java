@@ -42,18 +42,23 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Base64;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.data.util.Pair;
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
+@Slf4j
 @RequiredArgsConstructor
 @SuppressWarnings("unchecked")
 @NullMarked
 public abstract class AbstractNpmStorageService implements NpmStorageService {
+
+  private static final ObjectMapper METADATA_MAPPER = new ObjectMapper();
 
   private final StorageStrategy storageStrategy;
 
@@ -202,14 +207,15 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final Map<String, Object> payload,
       final Path packageBasePath,
       final UUID repoId,
-      final String repoName)
+      final String repoName,
+      final Supplier<NpmPackageSnapshot> snapshot)
       throws IOException, URISyntaxException {
 
-    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
-    final var metadataStoragePath = StoragePath.of(repoId, metadataPath.toString());
-
-    final var resource = this.getResource(metadataStoragePath, repoName);
-    final var fullMetadata = PackageUtils.readMetadataFromResource(resource);
+    // A file that is gone or corrupt is rebuilt from the rows (RPS-1310), which the publish has
+    // already written: the version being added is in them, without a tarball yet, and is replaced
+    // by the payload's own entry below.
+    final var fullMetadata =
+        this.readMetadataOrRebuild(repoId, repoName, packageBasePath, snapshot);
 
     final var currentMetadataLength = PackageUtils.getMetadataLength(fullMetadata);
 
@@ -266,16 +272,10 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
   }
 
   @Override
-  public byte[] readMetadataBytes(
+  public byte @Nullable [] readMetadataBytes(
       final UUID repoId, final String repoName, final Path packageBasePath) throws IOException {
 
-    final var metadata = this.readMetadataBytesIfPresent(repoId, repoName, packageBasePath);
-
-    if (metadata == null) {
-      throw new ItemNotFoundException("itemNotFound");
-    }
-
-    return metadata;
+    return this.readMetadataBytesIfPresent(repoId, repoName, packageBasePath);
   }
 
   /** The stored package metadata as it is, or {@code null} when the file is gone. */
@@ -327,7 +327,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
     final var previousMetadata = this.readMetadataBytesIfPresent(repoId, repoName, packageBasePath);
     final var rebuiltSize =
-        previousMetadata == null
+        this.usableMetadata(previousMetadata, repoName, packageBasePath) == null
             ? this.writeRebuiltMetadata(repoId, repoName, packageBasePath, snapshot.get())
             : 0L;
 
@@ -363,13 +363,92 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final Supplier<NpmPackageSnapshot> snapshot)
       throws IOException {
 
-    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
+    final var stored =
+        this.usableMetadata(
+            this.readMetadataBytesIfPresent(repoId, repoName, packageBasePath),
+            repoName,
+            packageBasePath);
+
+    return stored != null ? stored : this.rebuildMetadata(repoId, repoName, snapshot.get());
+  }
+
+  /**
+   * The metadata as stored, or {@code null} when there is none to use: the file is gone ({@code
+   * bytes} is {@code null}) or it is corrupt. A corrupt file is worth a warning, unlike a missing
+   * one: nothing removes it but a fault, and the rows that stand in for it cannot bring back what
+   * only the file held (see {@link NpmPackumentBuilder}).
+   */
+  private @Nullable Map<String, Object> usableMetadata(
+      final byte @Nullable [] bytes, final String repoName, final Path packageBasePath) {
+
+    if (bytes == null) {
+      return null;
+    }
+
+    final var metadata = this.parseMetadata(bytes, repoName, packageBasePath);
+
+    if (metadata == null) {
+      return null;
+    }
+
+    if (!hasPackumentShape(metadata)) {
+      log.warn(
+          "The {} of npm package {} in repo {} has no versions, dist-tags and time: its rows are"
+              + " used instead",
+          NpmConstants.METADATA_FILENAME,
+          packageBasePath,
+          repoName);
+      return null;
+    }
+
+    return metadata;
+  }
+
+  private @Nullable Map<String, Object> parseStoredMetadata(
+      final byte @Nullable [] bytes, final String repoName, final Path packageBasePath) {
+
+    return bytes == null ? null : this.parseMetadata(bytes, repoName, packageBasePath);
+  }
+
+  /**
+   * The metadata as a map, or {@code null} (with a warning) when the bytes are not a JSON object.
+   */
+  private @Nullable Map<String, Object> parseMetadata(
+      final byte[] bytes, final String repoName, final Path packageBasePath) {
 
     try {
-      return this.getMetadata(StoragePath.of(repoId, metadataPath.toString()), repoName);
-    } catch (final ItemNotFoundException _) {
-      return this.rebuildMetadata(repoId, repoName, snapshot.get());
+      final var metadata =
+          METADATA_MAPPER.readValue(bytes, new TypeReference<Map<String, Object>>() {});
+
+      if (metadata != null) {
+        return metadata;
+      }
+    } catch (final JacksonException e) {
+      log.warn(
+          "The {} of npm package {} in repo {} is corrupt ({}): its rows are used instead",
+          NpmConstants.METADATA_FILENAME,
+          packageBasePath,
+          repoName,
+          e.getOriginalMessage());
+      return null;
     }
+
+    log.warn(
+        "The {} of npm package {} in repo {} is corrupt (it holds no object): its rows are used"
+            + " instead",
+        NpmConstants.METADATA_FILENAME,
+        packageBasePath,
+        repoName);
+
+    return null;
+  }
+
+  /** What every change of the metadata relies on being there. */
+  private static boolean hasPackumentShape(final Map<String, Object> metadata) {
+
+    return metadata.get(NpmConstants.VERSIONS) instanceof Map
+        && metadata.get(NpmConstants.DIST_TAGS) instanceof Map
+        && metadata.get("time") instanceof Map;
   }
 
   /**
@@ -704,13 +783,19 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final Supplier<NpmPackageSnapshot> snapshot)
       throws IOException {
 
-    try {
-      return this.getMetadata(repoId, repoName, scopeName, packageName, isAbbreviated);
-    } catch (final ItemNotFoundException missing) {
-      final var rebuilt = this.rebuildIfPackageExists(repoId, repoName, snapshot, missing);
+    final var packageBasePath = this.getPackageBasePath(scopeName, packageName);
+    final var stored =
+        this.usableMetadata(
+            this.readMetadataBytesIfPresent(repoId, repoName, packageBasePath),
+            repoName,
+            packageBasePath);
+    final var metadata =
+        stored != null
+            ? stored
+            : this.rebuildIfPackageExists(
+                repoId, repoName, snapshot, new ItemNotFoundException("itemNotFound"));
 
-      return isAbbreviated ? this.createAbbreviatedMetadata(rebuilt) : rebuilt;
-    }
+    return isAbbreviated ? this.createAbbreviatedMetadata(metadata) : metadata;
   }
 
   /** Rebuilds the metadata of a package the rows know, and otherwise fails as the read did. */
@@ -809,16 +894,22 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final String versionName)
       throws IOException {
 
-    // A missing metadata.json is left to throw ItemNotFoundException out of getMetadata() below:
-    // it means storage itself is broken for this package, which is a real error the version
-    // detail page should surface, unlike the three cases handled here (RPS-1143). Those instead
-    // mean this one version's entry is incomplete -- for example after a partial publish or a
-    // manual storage edit -- while every other field on the page still comes from the database,
-    // so the page renders without a README rather than 500ing.
-    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
-    final var storagePath = StoragePath.of(repoId, metadataPath.toString());
+    // A metadata.json that is gone or corrupt has no readme to give, and the rows cannot bring one
+    // back: a readme is not among them, so a rebuild (RPS-1300) would leave it out too, at the cost
+    // of reading every tarball to build a page that shows one version. The page renders without a
+    // README, like for the three cases below (RPS-1143), where one version's entry is incomplete
+    // for example after a partial publish or a manual storage edit. The caller has found the
+    // version in the database, so a file missing for it is what RPS-1300 handles everywhere else,
+    // and no longer a broken storage worth an error (RPS-1310).
+    final var metadata =
+        this.parseStoredMetadata(
+            this.readMetadataBytesIfPresent(repoId, repoName, packageBasePath),
+            repoName,
+            packageBasePath);
 
-    final var metadata = this.getMetadata(storagePath, repoName);
+    if (metadata == null) {
+      return null;
+    }
 
     final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
 
