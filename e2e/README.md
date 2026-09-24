@@ -2708,7 +2708,7 @@ How the tests are written, and what they had to work around:
 Known product bugs are pinned with `test.fail('... RPS-nnnn')`, so the test turns red the day the
 bug is fixed and the marker has to go: the Visibility and Package Override help texts describe the
 opposite of the toggle (RPS-1261, two tests), and `#name`/`#description` are duplicated between the
-rename form and the create-token modal (RPS-1266). A third pin has no ticket yet: revoking the only token on page 2
+rename form and the create-token modal (RPS-1266). A third pin is RPS-1285: revoking the only token on page 2
 fires two list requests and the empty page-2 answer can land last, leaving "Your list is empty" over three tokens (the test
 slows that answer to make the order certain). Not covered here: the Vulnerability Scanning toggle
 (hidden without a scanner, RPS-1259), the per-protocol "configure" modal behind a token row, the

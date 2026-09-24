@@ -69,7 +69,7 @@ test.describe('Mobile viewport', () => {
       true,
       'The burger never opens the sidebar: PanelLayoutComponent renders <app-panel-header /> without ' +
         'a (mobileMenuToggle) handler, so its isMobileMenuOpen stays false and there is no navigation ' +
-        'at phone width. Not tracked in Jira yet (reported in the RPS-1258 PR). The steps after the ' +
+        'at phone width (RPS-1291). The steps after the ' +
         'burger are written from the templates and could not be run until it is fixed.',
     );
     const page = await openUiPage({ session: adminSession, viewport: PHONE });
@@ -116,10 +116,7 @@ test.describe('Mobile viewport', () => {
     openUiPage,
     seededUser,
   }) => {
-    test.fail(
-      true,
-      'The burger never opens the sidebar (see the previous test). Not tracked in Jira yet.',
-    );
+    test.fail(true, 'The burger never opens the sidebar (RPS-1291, see the previous test).');
     const session = await loginSession(seededUser.username, seededUser.password);
     const page = await openUiPage({ session, viewport: PHONE });
     const shell = new Shell(page);

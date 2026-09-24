@@ -104,8 +104,7 @@ test.describe('Error handling', () => {
     test.fail(
       true,
       'RepositoryComponent declares `error` but never sets it, so the `repo-error` block can never ' +
-        'render: a failed list shows the empty state instead. Not tracked in Jira yet (reported in ' +
-        'the RPS-1258 PR).',
+        'render: a failed list shows the empty state instead (RPS-1292).',
     );
     const repos = new RepositoriesPage(adminPage);
     await withRoute(adminPage, INFO_URL, respondWith(500), async () => {
