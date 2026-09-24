@@ -146,9 +146,9 @@ test.describe('UI harness fixtures', () => {
     await expect(new LoginPage(page).form).toBeVisible();
     expect(served.some((path) => /\/main-[^/]+\.js$/.test(path))).toBe(true);
     expect(served.some((path) => path.endsWith('.css'))).toBe(true);
-    const status = await page.evaluate(async () => (await fetch('/api/repos/NPM/info')).status);
+    const status = await page.evaluate(async () => (await fetch('/api/repos/counts')).status);
     expect([200, 401]).toContain(status);
-    expect(served).toContain('/api/repos/NPM/info');
+    expect(served).toContain('/api/repos/counts');
     // A write is not among them.
     const write = await page.evaluate(
       async () => (await fetch('/api/nothing', { method: 'POST' })).status,

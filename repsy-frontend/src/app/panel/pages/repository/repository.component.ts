@@ -18,10 +18,16 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
-import { Subscription } from 'rxjs';
-import { finalize, map } from 'rxjs/operators';
+import { of, Subject, Subscription, timer } from 'rxjs';
+import { catchError, filter, finalize, map, switchMap, tap } from 'rxjs/operators';
 
-import { ProtocolRepoControllerService, RepoSecuritySummary, RepoType as ApiRepoType } from '../../../../generated/api';
+import {
+  PagedModelRepoListInfo,
+  ProtocolRepoControllerService,
+  RepoCollectionControllerService,
+  RepoListInfo,
+  RepoSecuritySummary,
+} from '../../../../generated/api';
 import { SpinnerComponent } from '../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../shared/components/ellipsis/ellipsis.pipe';
@@ -37,8 +43,23 @@ import { TooltipComponent } from '../../shared/components/tooltip/tooltip.compon
 import { RepoListItem } from '../../shared/dto/repo/repo-list-item';
 import { RepoType } from '../../shared/dto/repo/repo-type';
 import { ByteFormatter } from '../../shared/util/byte-formatter';
+import { toApiRepoType } from '../../shared/util/repo-api-type';
 import { ProfileService } from '../profile/service/profile.service';
 import { SecurityService } from '../security/service/security.service';
+
+/** The list is sorted like the server sorts by default: the newest repository first. */
+export const REPO_LIST_SORT = 'createdAt,desc';
+/** How long the search box must be idle before the typed text is sent to the server. */
+export const SEARCH_DEBOUNCE_MS = 250;
+
+/** One request of the list: what the server is asked for, and whether the page shows its spinner meanwhile. */
+interface ListRequest {
+  option: string;
+  q: string;
+  page: number;
+  /** True for a load that starts from nothing (first load, type change, refresh); a page or search change keeps the rows until the answer arrives. */
+  spinner: boolean;
+}
 
 @Component({
   selector: 'app-repository',
@@ -63,9 +84,10 @@ import { SecurityService } from '../security/service/security.service';
 export class RepositoryComponent implements OnDestroy {
   public pageNum = 0;
   public pageSize = 10;
-  public repositories: RepoListItem[] = [];
-  public filteredRepos: RepoListItem[] = [];
+  /** The rows of the page the server answered with. */
   public paginatedRepos: RepoListItem[] = [];
+  /** The total number of pages of the current type and search, from the server's page metadata. */
+  public totalPages = 0;
   public createRepoModal: boolean;
   public repoOption = RepoType.ALL;
   public repoOptions = [
@@ -83,28 +105,22 @@ export class RepositoryComponent implements OnDestroy {
   public loading = true;
   public operationLock = false;
   public username: string;
-  /** Set when every requested type failed to load: the page shows its error state instead of a list. */
+  /** Set when the list could not be loaded: the page shows its error state instead of a list. */
   public error = '';
-  /** Set when only some of the requested types failed: the loaded ones are listed, and this says which are missing. */
-  public warning = '';
   public isAdmin = false;
   /** The text of the search box: it is emptied whenever the list is loaded again, so box and list agree. */
   public searchQuery = '';
   public securitySummary: Record<string, RepoSecuritySummary> = {};
 
-  private pendingRepoFetches = 0;
-  private requestedRepoFetches = 0;
-  private failedRepoTypes: RepoType[] = [];
+  /** The search the list currently shows; `searchQuery` runs ahead of it while the typing is debounced. */
+  private appliedQuery = '';
   private securitySummarySubscription?: Subscription;
-  /**
-   * Identifies the current load. A load supersedes the previous one: its requests are cancelled and,
-   * because an unsubscribe still runs `finalize`, every callback also checks that its own load is
-   * still the current one before it touches the list or the counters.
-   */
-  private loadGeneration = 0;
-  private loadSubscription?: Subscription;
+  private readonly requests = new Subject<ListRequest>();
+  private readonly typedSearches = new Subject<string>();
+  private readonly subscriptions = new Subscription();
 
   constructor(
+    private readonly repoCollectionControllerService: RepoCollectionControllerService,
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
     private readonly securityService: SecurityService,
     private readonly profileFacadeService: ProfileService,
@@ -113,43 +129,62 @@ export class RepositoryComponent implements OnDestroy {
   ) {
     const state = window.history.state;
 
-    if (state && state.repoType) {
+    if (state && this.repoOptions.includes(state.repoType)) {
       this.repoOption = state.repoType as RepoType;
     }
+
+    // A request supersedes the one before it: switchMap unsubscribes from it, which cancels it on the wire.
+    this.subscriptions.add(
+      this.requests
+        .pipe(
+          tap((request) => this.startLoading(request)),
+          switchMap((request) =>
+            this.repoCollectionControllerService
+              .listRepos(toApiRepoType(request.option), request.q || undefined, request.page, this.pageSize, [
+                REPO_LIST_SORT,
+              ])
+              .pipe(
+                map((response) => ({ request, page: response.data })),
+                // The HTTP error interceptor already shows the toast; the failure is kept for the page.
+                catchError(() => of({ request, page: null })),
+              ),
+          ),
+        )
+        .subscribe(({ request, page }) => this.showResult(request, page)),
+    );
+
+    // The typed text is sent once the box has been idle; a reload that emptied the box meanwhile drops it.
+    this.subscriptions.add(
+      this.typedSearches
+        .pipe(
+          switchMap((text) => timer(SEARCH_DEBOUNCE_MS).pipe(map(() => text))),
+          filter((text) => text === this.searchQuery),
+        )
+        .subscribe((text) => this.applySearch(text)),
+    );
 
     this.loadUserRole();
     this.filterRepos(this.repoOption);
   }
 
   public ngOnDestroy(): void {
-    this.loadGeneration++;
-    this.loadSubscription?.unsubscribe();
+    this.subscriptions.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
   public loadPage(pageNum: number): void {
-    const startIndex = pageNum * this.pageSize;
-    const endIndex = startIndex + this.pageSize;
-
-    this.paginatedRepos = this.filteredRepos
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(startIndex, endIndex);
+    this.pageNum = pageNum;
+    this.requests.next({ option: this.repoOption, q: this.appliedQuery, page: pageNum, spinner: false });
   }
 
+  /** Called on every keystroke; the request goes out when the typing pauses, and it starts from the first page. */
   public search(repoName: string) {
     this.searchQuery = repoName;
-    this.filteredRepos = this.repositories.filter((repo) => repo.name.toLowerCase().includes(repoName.toLowerCase()));
-
-    this.pageNum = 0;
-    this.loadPage(0);
+    this.typedSearches.next(repoName);
   }
 
   public refreshPage(): void {
     this.filterRepos(this.repoOption);
-  }
-
-  public getTotalPages(): number {
-    return Math.ceil(this.filteredRepos.length / this.pageSize);
   }
 
   public formatBytes(bytes: number, decimals = 2): string {
@@ -158,24 +193,11 @@ export class RepositoryComponent implements OnDestroy {
 
   public filterRepos(option: string) {
     // The list is unfiltered again and starts on its first page: the search box and the page index follow.
+    this.repoOption = option as RepoType;
     this.searchQuery = '';
+    this.appliedQuery = '';
     this.pageNum = 0;
-    this.loading = true;
-    this.error = '';
-    this.warning = '';
-    this.failedRepoTypes = [];
-    this.repositories = [];
-    this.filteredRepos = [];
-    this.paginatedRepos = [];
-    this.securitySummary = {};
-    this.securitySummarySubscription?.unsubscribe();
-    // The generation moves first: unsubscribing runs the old requests' `finalize`, which must see that
-    // its load is no longer the current one.
-    this.loadGeneration++;
-    this.loadSubscription?.unsubscribe();
-    this.loadSubscription = new Subscription();
-
-    this.loadAllRepos(option);
+    this.requests.next({ option, q: '', page: 0, spinner: true });
   }
 
   public deleteRepository(repo: RepoListItem) {
@@ -213,91 +235,67 @@ export class RepositoryComponent implements OnDestroy {
     return moment(date).fromNow();
   }
 
-  private fetchAllRepositories(): void {
-    this.fetchRepositoryTypes([
-      RepoType.MAVEN,
-      RepoType.NPM,
-      RepoType.PYPI,
-      RepoType.DOCKER,
-      RepoType.CARGO,
-      RepoType.GOLANG,
-      RepoType.HELM,
-      RepoType.NUGET,
-      RepoType.RUBY,
-    ]);
+  private applySearch(text: string): void {
+    this.appliedQuery = text;
+    this.pageNum = 0;
+    this.requests.next({ option: this.repoOption, q: text, page: 0, spinner: false });
   }
 
-  // The number of requests is fixed before the first one is sent, so the outcome (all failed, some
-  // failed, none failed) is decided only once every one of them has answered.
-  private fetchRepositoryTypes(repoTypes: RepoType[]): void {
-    this.requestedRepoFetches = repoTypes.length;
-    this.pendingRepoFetches = repoTypes.length;
-    const generation = this.loadGeneration;
-    repoTypes.forEach((repoType) => this.fetchRepositories(repoType, generation));
+  private startLoading(request: ListRequest): void {
+    this.error = '';
+    // The badges of the rows that are about to be replaced are not polled any longer.
+    this.securitySummarySubscription?.unsubscribe();
+
+    if (request.spinner) {
+      this.loading = true;
+      this.paginatedRepos = [];
+      this.totalPages = 0;
+      this.securitySummary = {};
+    }
   }
 
-  private fetchRepositories(repoType: RepoType, generation: number): void {
-    const subscription = this.protocolRepoControllerService
-      .getInfo(repoType.toUpperCase() as ApiRepoType)
-      .pipe(
-        finalize(() => {
-          if (generation !== this.loadGeneration) {
-            return;
-          }
-          this.pendingRepoFetches--;
-          if (this.pendingRepoFetches === 0) {
-            this.loading = false;
-            this.reportFailedFetches();
-            this.fetchSecuritySummary();
-          } else if (this.repositories.length > 0) {
-            // Rows show as soon as one type has some; while nothing has arrived the spinner stays,
-            // so a load that is going to fail never flashes the empty state first.
-            this.loading = false;
-          }
-        }),
-        map((r) => r.data as unknown as RepoListItem[]),
-      )
-      .subscribe({
-        next: (repos: RepoListItem[]) => {
-          if (generation !== this.loadGeneration) {
-            return;
-          }
-          const temp = (repos ?? []).map((repo: RepoListItem) => {
-            repo.repoType = repoType;
-            return repo;
-          });
+  private showResult(request: ListRequest, page: PagedModelRepoListInfo | null | undefined): void {
+    this.loading = false;
 
-          this.repositories.push(...temp);
-          this.filteredRepos.push(...temp);
-          this.loadPage(0);
-        },
-        // The HTTP error interceptor already shows the toast; the failure is kept for the page.
-        error: () => {
-          if (generation !== this.loadGeneration) {
-            return;
-          }
-          this.failedRepoTypes.push(repoType);
-        },
-      });
-    this.loadSubscription?.add(subscription);
-  }
-
-  private reportFailedFetches(): void {
-    if (this.failedRepoTypes.length === 0) {
+    if (page === null) {
+      this.error = 'The repositories could not be loaded. Use the refresh button to try again.';
+      this.paginatedRepos = [];
+      this.totalPages = 0;
+      this.securitySummary = {};
       return;
     }
 
-    if (this.failedRepoTypes.length === this.requestedRepoFetches) {
-      this.error = 'The repositories could not be loaded. Use the refresh button to try again.';
-    } else {
-      this.warning = `Some repositories could not be loaded (${this.failedRepoTypes.join(', ')}), so the list is incomplete. Use the refresh button to try again.`;
+    const content = page?.content ?? [];
+    const totalPages = page?.page?.totalPages ?? 0;
+
+    if (content.length === 0 && request.page > 0) {
+      // The page is gone (repositories were deleted meanwhile): show the last one that is left.
+      this.pageNum = Math.max(0, totalPages - 1);
+      this.requests.next({ ...request, page: this.pageNum, spinner: false });
+      return;
     }
+
+    this.totalPages = totalPages;
+    this.paginatedRepos = content.map((repo) => this.toListItem(repo));
+    this.securitySummary = {};
+    this.fetchSecuritySummary();
   }
 
+  private toListItem(repo: RepoListInfo): RepoListItem {
+    return {
+      name: repo.name,
+      privateRepo: repo.privateRepo ?? false,
+      repoType: (repo.type ?? '').toLowerCase(),
+      createdAt: repo.createdAt,
+      diskUsage: repo.diskUsage ?? 0,
+    };
+  }
+
+  /** Only the repositories of the page on screen are asked about; the summary is polled while a scan is unfinished. */
   private fetchSecuritySummary(): void {
     this.securitySummarySubscription?.unsubscribe();
 
-    const repoNames = this.repositories.map((repo) => repo.name);
+    const repoNames = this.paginatedRepos.map((repo) => repo.name);
     if (repoNames.length === 0) {
       return;
     }
@@ -310,17 +308,6 @@ export class RepositoryComponent implements OnDestroy {
       // without their security badges.
       error: () => {},
     });
-  }
-
-  private loadAllRepos(option: string) {
-    switch (option) {
-      case RepoType.ALL:
-        this.fetchAllRepositories();
-        break;
-      default:
-        this.fetchRepositoryTypes([option as RepoType]);
-        break;
-    }
   }
 
   private loadUserRole(): void {

@@ -66,15 +66,6 @@
   <app-spinner />
 } @else {
   @if (!this.error) {
-    @if (warning) {
-      <div
-        data-testid="repo-warning"
-        role="status"
-        class="border-warning-500 text-warning-500 mb-4 rounded border px-4 py-3 text-[14px]"
-      >
-        <span data-testid="repo-warning-message">{{ warning }}</span>
-      </div>
-    }
     @if (paginatedRepos?.length > 0) {
       <div class="text-body1">
         <!-- Table Headers (Desktop)-->
@@ -637,7 +628,7 @@
         </div>
 
         <!-- Pagination -->
-        <app-pagination (pageNumChange)="loadPage($event)" [(pageNum)]="pageNum" [totalPages]="getTotalPages()" />
+        <app-pagination (pageNumChange)="loadPage($event)" [(pageNum)]="pageNum" [totalPages]="totalPages" />
       </div>
     } @else {
       <app-empty-list />

@@ -16,10 +16,10 @@
 import { ChangeDetectorRef } from '@angular/core';
 import { of, Subject, throwError } from 'rxjs';
 
-import { ProfileInfo, ProtocolRepoControllerService, RepoListInfo, RepoType } from '../../../../../generated/api';
+import { ProfileInfo, RepoCollectionControllerService, RepoListInfo, RepoType } from '../../../../../generated/api';
 import { ProfileService } from '../../profile/service/profile.service';
 import { UsageService } from '../service/usage.service';
-import { DashboardContentComponent } from './dashboard-content.component';
+import { DashboardContentComponent, RECENT_REPOSITORY_COUNT } from './dashboard-content.component';
 
 const ALL_TYPES = [
   RepoType.Maven,
@@ -33,8 +33,20 @@ const ALL_TYPES = [
   RepoType.Ruby,
 ];
 
-function repo(name: string, createdAt: string): RepoListInfo {
-  return { name, createdAt } as RepoListInfo;
+const COUNTS: Record<string, number> = {
+  MAVEN: 1,
+  NPM: 2,
+  PYPI: 3,
+  DOCKER: 4,
+  CARGO: 5,
+  GOLANG: 6,
+  HELM: 7,
+  NUGET: 8,
+  RUBY: 9,
+};
+
+function repo(name: string, type: RepoType, diskUsage = 0): RepoListInfo {
+  return { name, type, diskUsage, createdAt: '2026-01-01T00:00:00Z' } as RepoListInfo;
 }
 
 // RxJS reports an unhandled subscriber error asynchronously, on window, and Jasmine fails the spec on it.
@@ -56,25 +68,22 @@ async function collectUnhandledErrors(body: () => void): Promise<unknown[]> {
 }
 
 describe('DashboardContentComponent', () => {
-  let repoService: jasmine.SpyObj<ProtocolRepoControllerService>;
+  let repoService: jasmine.SpyObj<RepoCollectionControllerService>;
   let usageService: jasmine.SpyObj<UsageService>;
   let profileService: jasmine.SpyObj<ProfileService>;
   let cdRef: jasmine.SpyObj<ChangeDetectorRef>;
-  let counts: Partial<Record<string, number | undefined>>;
-  let infos: Partial<Record<string, RepoListInfo[]>>;
+  let counts: Record<string, number> | undefined;
+  let recent: RepoListInfo[];
 
   beforeEach(() => {
-    counts = {};
-    infos = {};
-    repoService = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getCount',
-      'getInfo',
-      'getUsage',
+    counts = { ...COUNTS };
+    recent = [];
+    repoService = jasmine.createSpyObj<RepoCollectionControllerService>('RepoCollectionControllerService', [
+      'getRepoCounts',
+      'listRepos',
     ]);
-    repoService.getCount.and.callFake(((type: RepoType) => of({ data: counts[type] })) as never);
-    repoService.getInfo.and.callFake(((type: RepoType) => of({ data: infos[type] })) as never);
-    repoService.getUsage.and.callFake(((name: string) =>
-      of({ data: { diskUsed: { value: name.length * 100 } } })) as never);
+    repoService.getRepoCounts.and.callFake((() => of({ data: counts })) as never);
+    repoService.listRepos.and.callFake((() => of({ data: { content: recent, page: {} } })) as never);
     usageService = jasmine.createSpyObj<UsageService>('UsageService', ['getTotalUsage']);
     usageService.getTotalUsage.and.returnValue(of({ reposCount: 3 }) as never);
     profileService = jasmine.createSpyObj<ProfileService>('ProfileService', ['get']);
@@ -86,49 +95,85 @@ describe('DashboardContentComponent', () => {
     return new DashboardContentComponent(repoService, usageService, profileService, cdRef);
   }
 
+  function shownCounts(component: DashboardContentComponent): Record<string, number> {
+    return {
+      MAVEN: component.mavenRepoCount,
+      NPM: component.npmRegistryCount,
+      PYPI: component.pypiRepoCount,
+      DOCKER: component.dockerRepoCount,
+      CARGO: component.cargoRepoCount,
+      GOLANG: component.golangRepoCount,
+      HELM: component.helmRepoCount,
+      NUGET: component.nugetRepoCount,
+      RUBY: component.rubyRepoCount,
+    };
+  }
+
   it('shows the total usage', () => {
     const component = create();
 
     expect(component.usage as unknown).toEqual({ reposCount: 3 });
   });
 
-  describe('the role of the user', () => {
-    it('lets an admin see the repository counts of every type and create repositories', () => {
-      counts = { MAVEN: 1, NPM: 2, PYPI: 3, DOCKER: 4, CARGO: 5, GOLANG: 6, HELM: 7, NUGET: 8, RUBY: 9 };
-
+  describe('the repository counts', () => {
+    it('come from ONE request for every type', () => {
       const component = create();
 
-      expect(component.isAdmin).toBeTrue();
-      expect(repoService.getCount.calls.allArgs().map((args) => args[0])).toEqual(
-        jasmine.arrayWithExactContents(ALL_TYPES),
-      );
-      expect(component.mavenRepoCount).toBe(1);
-      expect(component.npmRegistryCount).toBe(2);
-      expect(component.pypiRepoCount).toBe(3);
-      expect(component.dockerRepoCount).toBe(4);
-      expect(component.cargoRepoCount).toBe(5);
-      expect(component.golangRepoCount).toBe(6);
-      expect(component.helmRepoCount).toBe(7);
-      expect(component.nugetRepoCount).toBe(8);
-      expect(component.rubyRepoCount).toBe(9);
+      expect(repoService.getRepoCounts).toHaveBeenCalledTimes(1);
+      expect(shownCounts(component)).toEqual(COUNTS);
     });
 
-    it('counts a type the response has no number for as zero', () => {
-      counts = { MAVEN: undefined };
-
-      const component = create();
-
-      expect(component.mavenRepoCount).toBe(0);
-    });
-
-    it('does not fetch any count for a user who is not an admin', () => {
+    it('are shown to a user who is not an admin, the same as to an admin', () => {
       profileService.get.and.returnValue(of({ role: 'USER' } as ProfileInfo));
 
       const component = create();
 
       expect(component.isAdmin).toBeFalse();
-      expect(repoService.getCount).not.toHaveBeenCalled();
-      expect(component.mavenRepoCount).toBe(0);
+      expect(repoService.getRepoCounts).toHaveBeenCalledTimes(1);
+      expect(shownCounts(component)).toEqual(COUNTS);
+    });
+
+    it('are requested even before the profile has arrived, and when it fails', () => {
+      profileService.get.and.returnValue(new Subject<ProfileInfo>());
+
+      const component = create();
+
+      expect(repoService.getRepoCounts).toHaveBeenCalledTimes(1);
+      expect(shownCounts(component)).toEqual(COUNTS);
+    });
+
+    it('count a type the response has no number for as zero', () => {
+      counts = { MAVEN: 4 };
+
+      const component = create();
+
+      expect(shownCounts(component)).toEqual({
+        MAVEN: 4,
+        NPM: 0,
+        PYPI: 0,
+        DOCKER: 0,
+        CARGO: 0,
+        GOLANG: 0,
+        HELM: 0,
+        NUGET: 0,
+        RUBY: 0,
+      });
+    });
+
+    it('stay zero when the response has no data', () => {
+      counts = undefined;
+
+      const component = create();
+
+      expect(Object.values(shownCounts(component))).toEqual(new Array(9).fill(0));
+    });
+  });
+
+  describe('the role of the user', () => {
+    it('lets an admin create repositories', () => {
+      const component = create();
+
+      expect(component.isAdmin).toBeTrue();
     });
 
     it('opens the create-repository modal only for an admin', () => {
@@ -154,99 +199,58 @@ describe('DashboardContentComponent', () => {
   });
 
   describe('the recent repositories', () => {
-    it('asks for the repositories of every type, whatever the role', () => {
+    it('come from ONE request, with the positional arguments in the generated order, whatever the role', () => {
       profileService.get.and.returnValue(of({ role: 'USER' } as ProfileInfo));
 
       create();
 
-      expect(repoService.getInfo.calls.allArgs().map((args) => args[0])).toEqual(ALL_TYPES);
-    });
-
-    it('lists them with their type and disk usage, newest first', () => {
-      infos = {
-        MAVEN: [repo('old-maven', '2026-01-01T00:00:00Z')],
-        NPM: [repo('new-npm', '2026-03-01T00:00:00Z'), repo('mid-npm', '2026-02-01T00:00:00Z')],
-      };
-
-      const component = create();
-
-      expect(component.repoListInfos.map((r) => r.name)).toEqual(['new-npm', 'mid-npm', 'old-maven']);
-      expect(component.repoListInfos.map((r) => r.type)).toEqual([RepoType.Npm, RepoType.Npm, RepoType.Maven]);
-      expect(component.repoListInfos.map((r) => r.diskUsage)).toEqual([700, 700, 900]);
-      expect(repoService.getUsage).toHaveBeenCalledWith('new-npm');
-    });
-
-    it('keeps only the six newest of all types together', () => {
-      ALL_TYPES.forEach((type, index) => {
-        infos[type] = [repo(`repo-${index}`, `2026-01-0${index + 1}T00:00:00Z`)];
-      });
-
-      const component = create();
-
-      expect(component.repoListInfos.map((r) => r.name)).toEqual([
-        'repo-8',
-        'repo-7',
-        'repo-6',
-        'repo-5',
-        'repo-4',
-        'repo-3',
+      // listRepos(type, q, page, size, sort): q and sort are strings, so a swapped order would still compile.
+      expect(repoService.listRepos).toHaveBeenCalledOnceWith(undefined, undefined, 0, RECENT_REPOSITORY_COUNT, [
+        'createdAt,desc',
       ]);
+      expect(RECENT_REPOSITORY_COUNT).toBe(6);
     });
 
-    it('handles a type that cannot be listed: no unhandled error, the other types still show', async () => {
-      infos = { NPM: [repo('an-npm', '2026-02-01T00:00:00Z')] };
-      repoService.getInfo.and.callFake(((type: RepoType) =>
-        type === RepoType.Maven ? throwError(() => new Error('boom')) : of({ data: infos[type] })) as never);
-      let component!: DashboardContentComponent;
-
-      const unhandled = await collectUnhandledErrors(() => (component = create()));
-
-      expect(unhandled).toEqual([]);
-      expect(component.repoListInfos.map((r) => r.name)).toEqual(['an-npm']);
-    });
-
-    it('keeps a repository whose usage cannot be fetched, with an unknown disk usage', async () => {
-      infos = {
-        MAVEN: [repo('bad-usage', '2026-03-01T00:00:00Z'), repo('good-maven', '2026-01-01T00:00:00Z')],
-        NPM: [repo('an-npm', '2026-02-01T00:00:00Z')],
-      };
-      repoService.getUsage.and.callFake(((name: string) =>
-        name === 'bad-usage'
-          ? throwError(() => new Error('boom'))
-          : of({ data: { diskUsed: { value: name.length * 100 } } })) as never);
-      let component!: DashboardContentComponent;
-
-      const unhandled = await collectUnhandledErrors(() => (component = create()));
-
-      expect(unhandled).toEqual([]);
-      expect(component.repoListInfos.map((r) => r.name)).toEqual(['bad-usage', 'an-npm', 'good-maven']);
-      expect(component.repoListInfos.map((r) => r.type)).toEqual([RepoType.Maven, RepoType.Npm, RepoType.Maven]);
-      expect(component.repoListInfos.map((r) => r.diskUsage)).toEqual([undefined, 600, 1000]);
-    });
-
-    it('keeps a repository whose usage response has no disk usage', () => {
-      infos = { MAVEN: [repo('no-usage', '2026-03-01T00:00:00Z')] };
-      repoService.getUsage.and.returnValue(of({ data: {} }) as never);
+    it('are listed as the server answers them, with their type and disk usage', () => {
+      recent = [repo('new-npm', RepoType.Npm, 700), repo('old-maven', RepoType.Maven, 900)];
 
       const component = create();
 
-      expect(component.repoListInfos.map((r) => r.name)).toEqual(['no-usage']);
-      expect(component.repoListInfos[0].diskUsage).toBeUndefined();
+      expect(component.repoListInfos.map((r) => r.name)).toEqual(['new-npm', 'old-maven']);
+      expect(component.repoListInfos.map((r) => r.type)).toEqual([RepoType.Npm, RepoType.Maven]);
+      expect(component.repoListInfos.map((r) => r.diskUsage)).toEqual([700, 900]);
     });
 
-    it('is empty when there are no repositories at all', () => {
+    it('are empty when there are no repositories at all', () => {
       const component = create();
 
       expect(component.repoListInfos).toEqual([]);
-      expect(repoService.getUsage).not.toHaveBeenCalled();
+    });
+
+    it('are empty when the response has no data', () => {
+      repoService.listRepos.and.returnValue(of({}) as never);
+
+      const component = create();
+
+      expect(component.repoListInfos).toEqual([]);
+    });
+
+    it('handle a failing list: no unhandled error, the rest of the dashboard still shows', async () => {
+      repoService.listRepos.and.returnValue(throwError(() => new Error('boom')));
+      let component!: DashboardContentComponent;
+
+      const unhandled = await collectUnhandledErrors(() => (component = create()));
+
+      expect(unhandled).toEqual([]);
+      expect(component.repoListInfos).toEqual([]);
+      expect(shownCounts(component)).toEqual(COUNTS);
     });
   });
 
   describe('a failing source leaves the rest of the dashboard working, with no unhandled error', () => {
     it('total usage', async () => {
       usageService.getTotalUsage.and.returnValue(throwError(() => new Error('boom')));
-      counts = { MAVEN: 4 };
-      infos = { NPM: [repo('an-npm', '2026-02-01T00:00:00Z')] };
+      recent = [repo('an-npm', RepoType.Npm)];
       let component!: DashboardContentComponent;
 
       const unhandled = await collectUnhandledErrors(() => (component = create()));
@@ -254,47 +258,34 @@ describe('DashboardContentComponent', () => {
       expect(unhandled).toEqual([]);
       expect(component.usage as unknown).toEqual({});
       expect(component.isAdmin).toBeTrue();
-      expect(component.mavenRepoCount).toBe(4);
+      expect(component.mavenRepoCount).toBe(1);
       expect(component.repoListInfos.map((r) => r.name)).toEqual(['an-npm']);
     });
 
-    it('the profile: the user is not an admin, no count is fetched, the rest still shows', async () => {
+    it('the profile: the user is not an admin, the counts and the list still show', async () => {
       profileService.get.and.returnValue(throwError(() => new Error('boom')));
-      infos = { NPM: [repo('an-npm', '2026-02-01T00:00:00Z')] };
+      recent = [repo('an-npm', RepoType.Npm)];
       let component!: DashboardContentComponent;
 
       const unhandled = await collectUnhandledErrors(() => (component = create()));
 
       expect(unhandled).toEqual([]);
       expect(component.isAdmin).toBeFalse();
-      expect(repoService.getCount).not.toHaveBeenCalled();
+      expect(shownCounts(component)).toEqual(COUNTS);
       expect(component.usage as unknown).toEqual({ reposCount: 3 });
       expect(component.repoListInfos.map((r) => r.name)).toEqual(['an-npm']);
     });
 
-    ALL_TYPES.forEach((failing) => {
-      it(`the ${failing} repository count: it stays zero and the other counts are still shown`, async () => {
-        counts = { MAVEN: 1, NPM: 2, PYPI: 3, DOCKER: 4, CARGO: 5, GOLANG: 6, HELM: 7, NUGET: 8, RUBY: 9 };
-        repoService.getCount.and.callFake(((type: RepoType) =>
-          type === failing ? throwError(() => new Error('boom')) : of({ data: counts[type] })) as never);
-        let component!: DashboardContentComponent;
+    it('the counts: they stay zero, the list still shows', async () => {
+      repoService.getRepoCounts.and.returnValue(throwError(() => new Error('boom')));
+      recent = [repo('an-npm', RepoType.Npm)];
+      let component!: DashboardContentComponent;
 
-        const unhandled = await collectUnhandledErrors(() => (component = create()));
+      const unhandled = await collectUnhandledErrors(() => (component = create()));
 
-        const shown: Record<RepoType, number> = {
-          MAVEN: component.mavenRepoCount,
-          NPM: component.npmRegistryCount,
-          PYPI: component.pypiRepoCount,
-          DOCKER: component.dockerRepoCount,
-          CARGO: component.cargoRepoCount,
-          GOLANG: component.golangRepoCount,
-          HELM: component.helmRepoCount,
-          NUGET: component.nugetRepoCount,
-          RUBY: component.rubyRepoCount,
-        };
-        expect(unhandled).toEqual([]);
-        ALL_TYPES.forEach((type) => expect(shown[type]).toBe(type === failing ? 0 : counts[type]!));
-      });
+      expect(unhandled).toEqual([]);
+      expect(Object.values(shownCounts(component))).toEqual(new Array(ALL_TYPES.length).fill(0));
+      expect(component.repoListInfos.map((r) => r.name)).toEqual(['an-npm']);
     });
   });
 
@@ -302,5 +293,42 @@ describe('DashboardContentComponent', () => {
     create();
 
     expect(cdRef.markForCheck).toHaveBeenCalled();
+  });
+
+  // The dashboard lives inside an OnPush component: whichever answer arrives LAST must mark the view, or the
+  // page keeps showing the state before it.
+  describe('marks the view for a check after each answer, whichever arrives last', () => {
+    let usage: Subject<unknown>;
+    let counted: Subject<unknown>;
+    let listed: Subject<unknown>;
+
+    beforeEach(() => {
+      usage = new Subject();
+      counted = new Subject();
+      listed = new Subject();
+      usageService.getTotalUsage.and.returnValue(usage as never);
+      repoService.getRepoCounts.and.returnValue(counted as never);
+      repoService.listRepos.and.returnValue(listed as never);
+      create();
+      cdRef.markForCheck.calls.reset();
+    });
+
+    it('the total usage', () => {
+      usage.next({ reposCount: 3 });
+
+      expect(cdRef.markForCheck).toHaveBeenCalledTimes(1);
+    });
+
+    it('the counts', () => {
+      counted.next({ data: COUNTS });
+
+      expect(cdRef.markForCheck).toHaveBeenCalledTimes(1);
+    });
+
+    it('the recent repositories', () => {
+      listed.next({ data: { content: [] } });
+
+      expect(cdRef.markForCheck).toHaveBeenCalledTimes(1);
+    });
   });
 });

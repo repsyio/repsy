@@ -249,7 +249,8 @@ postgres container reachable):
   `DB_URL=jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE` —
   **boots cleanly.** Flyway ran all 19 H2 migrations with no error, the app logged
   `repsy started successfully!`, the SPA answered `200` on `/`, `POST /api/auth/login` with the
-  configured `ADMIN_INITIAL_PASSWORD` returned a token, and `GET /api/repos/{TYPE}/info` for all 9
+  configured `ADMIN_INITIAL_PASSWORD` returned a token, and the per-type repository list (then
+  `GET /api/repos/{TYPE}/info`, now `GET /api/repos?type={TYPE}`, RPS-1268) for all 9
   `RepoType`s (`MAVEN`, `NPM`, `PYPI`, `DOCKER`, `CARGO`, `GOLANG`, `HELM`, `NUGET`, `RUBY`) each
   returned exactly the one expected default repo.
 - **(b)** the same value with `;DATABASE_TO_LOWER=TRUE` appended (matching
@@ -2598,16 +2599,23 @@ npm and docker, REPO-06, REPO-10) are also `@smoke`.
 
 Things a test here relies on, which a change to the page can break:
 
-- **The list loads nine `getInfo` calls, not one.** It shows the spinner until an answer has rows (or the last one is in) and renders
-  rows as the others arrive; search, type filter and pagination run client-side over what has arrived. So
-  `RepositoriesPage.afterInfoResponses()` (used by `goto`, `selectType`, `refresh`, `confirmDelete`) waits
-  for every answer of the reload, then `settle()`s (two animation frames, so a negative assertion does not
-  run on the view before the last answer). Type into the search box only after that.
+- **The list is ONE server-side request (RPS-1268).** `GET /api/repos?type=&q=&page=&size=10&sort=createdAt,desc`
+  answers with the page of rows and its page count; type filter, search and pagination all go to the server
+  (the SPA used to fire nine `getInfo` calls and filter client-side). The spinner shows for a first load, a
+  type change and a refresh; a search or a page change keeps the rows until the answer is in. Typing waits
+  for a 250 ms pause before the request goes out, and a newer request cancels the running one (`switchMap`).
+  So `RepositoriesPage.afterListResponse(action, {type?, q?, page?})` (used by `goto`, `search`,
+  `selectType`, `refresh`, `goToPage`, `confirmDelete`) waits for the ONE list answer that matches the query
+  its action must send (a `search` only resolves for a request asking for `page=0`), then `settle()`s (two
+  animation frames, so a negative assertion does not run on the view before the answer). After the rows are in
+  the page calls `GET /api/repos/security-summary?repoNames=` once, with the names of the page only.
+  The dashboard makes one `GET /api/repos/counts` and one `GET /api/repos?size=6` for every role, and no
+  per-repository usage call (`DashboardPage.trackRepoRequests()` records them).
 - **Other tests' repositories are in the same list.** The list holds the nine defaults and everything the
   parallel workers created, ten per page, newest first. A test narrows the list with a string only its own
   repositories contain (`e2e-<runid>-`, `seeder.runId`) before it looks at rows, and asserts an unfiltered
-  list by size only. Dashboard counts are compared with `panelApi.listRepos()` reads taken before AND after
-  the page loaded, retried until nothing moved; Recent Activity (the six newest repositories) is reloaded
+  list by size only. Dashboard counts are compared with `panelApi.repoCounts()` reads taken before AND after
+  the page loaded, retried until nothing moved (for an admin and, since RPS-1284, for a USER too); Recent Activity (the six newest repositories) is reloaded
   until the seeded repository is in it.
 - **UI-created repositories** are named with `seeder.reserveRepoName(type)` and adopted with
   `seeder.adoptRepo(name)` BEFORE the submit, so a failure half way still deletes them.
@@ -2616,9 +2624,12 @@ Things a test here relies on, which a change to the page can break:
 - **The description textarea has a counter and no `maxlength` attribute** (RPS-1265): text past 500
   characters is kept, the "n/500" counter and the maxlength message show, and Create is disabled. Type it
   with `pressSequentially` to prove a real keyboard is not cut. (The search box and page index after a refresh or a new search were
-  pinned to RPS-1283 and are fixed; a refresh during a load, RPS-1293, is covered by a route that holds
-  the first maven answer. A USER's Recent Activity was pinned to RPS-1276 until that
-  fix; the row now shows, so DASH-04 asserts it plainly.)
+  pinned to RPS-1283 and are fixed; a superseded load, RPS-1293, is now a newer search cancelling a held
+  one (`switchMap`), covered by a route that holds the first search's answer. A USER's Recent Activity was
+  pinned to RPS-1276 until that fix; the row now shows, so DASH-04 asserts it plainly. A USER used to see a
+  card of nine zeros, because the counts were an admin-only call (RPS-1284): `GET /api/repos/counts` is
+  open to every role, and DASH-04 asserts the USER sees the API's real counts and that no per-repository
+  usage call is made.)
 
 ### Users and profile (RPS-1253)
 
@@ -2913,17 +2924,17 @@ helper) and `tests/ui/nav/breadcrumb.ts` (the breadcrumb page object). Run them 
 this story added (`package.json`, `pnpm-lock.yaml`), so the `ui` runner image must be rebuilt once
 (`./run.sh test --protocol ui -b`).
 
-| Spec               | Scenarios   | What is pinned                                                                                                                                                                                                                                                                                                                                                         |
-| ------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `errors/errors`    | ERR-01      | all nine `.../{TYPE}/info` calls answered 500: exactly `Server error` (never the body's text), no rows, page alive; ONE type (NPM) failing: the toast plus the `repo-warning`, others still list; all types failing: `repo-error`, not `empty-list`, and the refresh button retries; a failing NuGet package list: `pkg-error` with `Error Occurred` next to the toast |
-| `errors/errors`    | ERR-02      | an aborted request (status 0): `Connection error`, on the repository list and on the users page                                                                                                                                                                                                                                                                        |
-| `errors/errors`    | ERR-03      | 403 on `GET /api/users`: `Access denied` (no body) or the server's own `text`; 403 on `/security`: `Access denied` plus `You do not have permission to view this page`, and the redirect to the dashboard                                                                                                                                                              |
-| `nav/breadcrumbs`  | NAV-01      | Maven: version -> artifact -> group -> repository -> Repositories, URL, remaining crumbs and the rendered page after each click; npm scoped package: the `@scope` crumb over a URL without `@`                                                                                                                                                                         |
-| `nav/mobile`       | NAV-02      | 390x844: desktop sidebar hidden and burger present (and the reverse at 1440); the burger opens the mobile sidebar, its links, the X, the backdrop and Escape close it (admin, and a USER without Users/Security); repository, users, Maven list/group/versions show `<page>-cards` and hide `<page>-table`                                                             |
-| `nav/mobile`       | NAV-03      | the mobile menu closes when the viewport widens past `md` and stays closed when it narrows again; `document.body.style.overflow` is `hidden` (and the wheel does not scroll the page) while it is open, `''` after every way of closing it                                                                                                                             |
-| `errors/not-found` | ERR-04      | `/not-found` in the panel layout: an anonymous visitor (phone and desktop, and on a deep unknown path `/a/b/c`) gets no sidebar, no burger, no avatar menu, a `header-login` link and no `/api/profile` request; an admin and a USER at phone width open the mobile sidebar from it; at desktop the sidebar shows and the burger does not                              |
-| `a11y/a11y`        | A11Y-01     | axe on login, dashboard, repository list, repository settings, users (admin), the open modals and, for every protocol, its list, sublist, versions, manifests and detail pages (40 scans); enforced: a serious/critical violation fails the test                                                                                                                       |
-| `a11y/rows`        | A11Y-08..10 | list rows are links (RPS-1266 part 4): one stretched `a.row-link` per row, named after the row, nothing interactive inside another, Tab + Enter, a modified click left to the browser, the row menu on top of the next row; the dashboard count rows and the Maven browser use real buttons, no `javascript:` anchors                                                  |
+| Spec               | Scenarios   | What is pinned                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `errors/errors`    | ERR-01      | the list request (`GET /api/repos`) answered 500: exactly `Server error` (never the body's text), ONE request, no rows, page alive; `repo-error`, not `empty-list`, and the refresh button retries; a failing search shows `repo-error` too and refresh brings the list back; a failing NuGet package list: `pkg-error` with `Error Occurred` next to the toast |
+| `errors/errors`    | ERR-02      | an aborted request (status 0): `Connection error`, on the repository list and on the users page                                                                                                                                                                                                                                                                 |
+| `errors/errors`    | ERR-03      | 403 on `GET /api/users`: `Access denied` (no body) or the server's own `text`; 403 on `/security`: `Access denied` plus `You do not have permission to view this page`, and the redirect to the dashboard                                                                                                                                                       |
+| `nav/breadcrumbs`  | NAV-01      | Maven: version -> artifact -> group -> repository -> Repositories, URL, remaining crumbs and the rendered page after each click; npm scoped package: the `@scope` crumb over a URL without `@`                                                                                                                                                                  |
+| `nav/mobile`       | NAV-02      | 390x844: desktop sidebar hidden and burger present (and the reverse at 1440); the burger opens the mobile sidebar, its links, the X, the backdrop and Escape close it (admin, and a USER without Users/Security); repository, users, Maven list/group/versions show `<page>-cards` and hide `<page>-table`                                                      |
+| `nav/mobile`       | NAV-03      | the mobile menu closes when the viewport widens past `md` and stays closed when it narrows again; `document.body.style.overflow` is `hidden` (and the wheel does not scroll the page) while it is open, `''` after every way of closing it                                                                                                                      |
+| `errors/not-found` | ERR-04      | `/not-found` in the panel layout: an anonymous visitor (phone and desktop, and on a deep unknown path `/a/b/c`) gets no sidebar, no burger, no avatar menu, a `header-login` link and no `/api/profile` request; an admin and a USER at phone width open the mobile sidebar from it; at desktop the sidebar shows and the burger does not                       |
+| `a11y/a11y`        | A11Y-01     | axe on login, dashboard, repository list, repository settings, users (admin), the open modals and, for every protocol, its list, sublist, versions, manifests and detail pages (40 scans); enforced: a serious/critical violation fails the test                                                                                                                |
+| `a11y/rows`        | A11Y-08..10 | list rows are links (RPS-1266 part 4): one stretched `a.row-link` per row, named after the row, nothing interactive inside another, Tab + Enter, a modified click left to the browser, the row menu on top of the next row; the dashboard count rows and the Maven browser use real buttons, no `javascript:` anchors                                           |
 
 Things a later author must know:
 
@@ -2931,9 +2942,9 @@ Things a later author must know:
   again in a `finally` (`withRoute`), and start asserting the toast BEFORE the navigation that raises it
   (`expectToastLater`): a toast is short-lived (3 s success, 7 s error). The interceptor's mapping is status 0 -> `Connection error`,
   403 -> the server's `text` or `Access denied`, >= 500 -> `Server error`, other 4xx -> the server's `text`.
-- **The repository list renders whatever arrives** of its nine parallel `info` calls, so one failing type
-  loses only its own rows and the page shows `repo-warning`; only when EVERY request failed does it show
-  `repo-error` (never the empty state), and the refresh button retries.
+- **The repository list is one request**, so it has no partial state (RPS-1268 removed the per-type
+  `repo-warning`): a failing request shows `repo-error` (never the empty state), and the refresh button
+  retries.
 - **One layout owns the mobile menu.** `PanelLayoutComponent` (routed pages and, through content projection,
   the dashboard) keeps `isMobileMenuOpen`; the header burger only asks for a state and exists only when the
   layout has a sidebar, i.e. with a session. The sidebar closes it (X, backdrop, Escape, a link, any
@@ -3122,8 +3133,10 @@ host-matching uid even though the packages themselves only need to be read.
   `protocol-deploy-token-controller` routes need it too, just via an argument resolver the spec
   does not document.
 - `POST /api/users`, `DELETE /api/users/{userId}`, `GET /api/users` (ADMIN only).
-- `POST /api/repos/{repoType}` (`RepoType` is upper-case: `MAVEN`, `NPM`, ...), `DELETE
-/api/repos/{repoName}`, `GET /api/repos/{repoType}/info` (list), `GET`/`PUT
+- `POST /api/repos` (the body carries `name`, `type` (upper-case `RepoType`: `MAVEN`, `NPM`, ...),
+  `privateRepo`, `description`; the answer is the created repository), `DELETE /api/repos/{repoName}`,
+  `GET /api/repos` (`type`, `q`, `page`, `size` 1-100, `sort`: the paged list; `PanelApi.listRepos` reads a
+  page, `listAllRepos` all pages), `GET /api/repos/counts` (`PanelApi.repoCounts`), `GET`/`PUT
 /api/repos/{repoName}/settings`.
 - `POST /api/repos/{repoName}/deploy-tokens` (`name`, `read_only`, `expiration_date`, `username`),
   `DELETE .../deploy-tokens/{tokenId}`, `PUT .../deploy-tokens/{tokenId}` (rotate), `GET
@@ -3175,8 +3188,7 @@ pnpm exec prettier --check .
 ./run.sh local down
 ```
 
-After a run, confirm no `e2e-*` repos or users remain: `GET /api/repos/{repoType}/info` for every
-`RepoType` and `GET /api/users` should list none (`./run.sh sweep --all --dry-run` does this for
+After a run, confirm no `e2e-*` repos or users remain: `GET /api/repos?q=e2e-` and `GET /api/users` should list none (`./run.sh sweep --all --dry-run` does this for
 you). A meaningfulness check for the maven catalog: temporarily flip one scenario's expectation in
 `catalog.ts` (e.g. `token-expired`'s publish to `'ok'`, or `redeploy-snapshots-off`'s), confirm
 `./run.sh test --protocol maven --grep <id>` fails, then restore it (this was also re-run once for
@@ -3223,7 +3235,7 @@ hyphenated-crate-name test, helm's HL1/HL2) documented above for the postgres pr
 confirmed between the two database profiles for every runner, not just maven.
 
 The fresh-DB-per-`up` claim was confirmed directly, not just inferred: after the second `local up
---h2` above, `GET /api/repos/MAVEN/info` returned exactly the one default `maven` repo (fresh
+--h2` above, `GET /api/repos?type=MAVEN` (then `/api/repos/MAVEN/info`) returned exactly the one default `maven` repo (fresh
 `createdAt`, `diskUsage: 0`) and `GET /api/users` returned exactly the one `admin` user — no
 leftovers from the runs immediately before it.
 

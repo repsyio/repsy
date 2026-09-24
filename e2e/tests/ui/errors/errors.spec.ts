@@ -24,8 +24,8 @@
  *
  * Two facts the tests are built around. A toast is short-lived (an error toast 7 s, a success toast
  * 3 s), so it is asserted right after the request that raises it (the assertion is started BEFORE the navigation that triggers it, then awaited).
- * And the repository list fires nine parallel `GET /api/repos/<TYPE>/info` calls, one per type, and
- * renders whatever arrives: stubbing all nine and stubbing only one are different scenarios.
+ * And the repository list is ONE `GET /api/repos` call (RPS-1268): it either answers or the page is in
+ * its error state, with no partial list in between.
  */
 import type { Page, Route } from '@playwright/test';
 
@@ -37,7 +37,7 @@ import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { Toasts } from '../../../src/ui/pages/components.js';
 import { UsersPage } from '../../../src/ui/pages/users.js';
 
-const INFO_URL = /\/api\/repos\/[A-Z]+\/info(\?|$)/;
+const LIST_URL = /\/api\/repos(\?|$)/;
 const USERS_URL = /\/api\/users(\?|$)/;
 const NUGET_LIST_URL = /\/api\/nuget\/packages\/[^/?]+(\?|$)/;
 const SCANS_URL = /\/api\/security\/scans(\?|$)/;
@@ -74,13 +74,19 @@ function expectToastLater(toasts: Toasts, text: string): Promise<void> {
 }
 
 test.describe('Error handling', () => {
-  test('ERR-01: a 500 on every repository type shows a "Server error" toast and no rows', async ({
+  test('ERR-01: a 500 on the repository list shows a "Server error" toast and no rows', async ({
     adminPage,
   }) => {
     const repos = new RepositoriesPage(adminPage);
+    const requests: string[] = [];
+    adminPage.on('request', (request) => {
+      if (request.method() === 'GET' && LIST_URL.test(request.url())) {
+        requests.push(request.url());
+      }
+    });
     await withRoute(
       adminPage,
-      INFO_URL,
+      LIST_URL,
       respondWith(500, { text: 'internal detail that must not reach the user' }),
       async () => {
         const raised = expectToastLater(repos.toasts, 'Server error');
@@ -96,15 +102,18 @@ test.describe('Error handling', () => {
         await expect(repos.title).toBeVisible();
         await expect(repos.spinner.root).toBeHidden();
         await expect(repos.rows()).toHaveCount(0);
+        // One request, one failure, one toast: not nine requests with nine outcomes.
+        expect(requests).toHaveLength(1);
+        await expect(repos.toasts.error()).toHaveCount(1);
       },
     );
   });
 
-  test('ERR-01: the list shows its error state, not the empty state, when every type fails', async ({
+  test('ERR-01: the list shows its error state, not the empty state, when the request fails', async ({
     adminPage,
   }) => {
     const repos = new RepositoriesPage(adminPage);
-    await withRoute(adminPage, INFO_URL, respondWith(500), async () => {
+    await withRoute(adminPage, LIST_URL, respondWith(500), async () => {
       const raised = expectToastLater(repos.toasts, 'Server error');
       await adminPage.goto('/repositories');
       await raised;
@@ -123,7 +132,7 @@ test.describe('Error handling', () => {
     adminPage,
   }) => {
     const repos = new RepositoriesPage(adminPage);
-    await withRoute(adminPage, INFO_URL, respondWith(500), async () => {
+    await withRoute(adminPage, LIST_URL, respondWith(500), async () => {
       await adminPage.goto('/repositories');
       await expect(repos.error).toBeVisible();
     });
@@ -154,41 +163,41 @@ test.describe('Error handling', () => {
     });
   });
 
-  test('ERR-01: one failing type raises the toast and a warning while the other types still list', async ({
+  test('ERR-01: a search that fails shows the error state, and refresh brings the list back', async ({
     adminPage,
     seeder,
   }) => {
     const repos = new RepositoriesPage(adminPage);
     const maven = await seeder.createRepo(RepoType.MAVEN);
-    const npm = await seeder.createRepo(RepoType.NPM);
+    await repos.goto();
 
     await withRoute(
       adminPage,
-      INFO_URL,
+      LIST_URL,
       (route) =>
-        route.request().url().includes('/NPM/info') ? respondWith(500)(route) : route.fallback(),
+        route.request().url().includes('q=') ? respondWith(500)(route) : route.fallback(),
       async () => {
         const raised = expectToastLater(repos.toasts, 'Server error');
-        await repos.goto();
+        await repos.search(maven.name);
         await raised;
 
-        // Only this test's own repositories, found by its run id: the maven one is listed, the npm
-        // one (the failed type) is not, and the failure did not take the other eight types with it.
-        await repos.search(`e2e-${seeder.runId}-`);
-        await expect(repos.row(maven.name)).toBeVisible();
-        await expect(repos.row(npm.name)).toHaveCount(0);
-
-        // The list is not the error state: a warning names the type that is missing.
-        await expect(repos.error).toHaveCount(0);
-        await expect(adminPage.getByTestId('repo-warning')).toBeVisible();
-        await expect(adminPage.getByTestId('repo-warning-message')).toContainText('npm');
+        // No partial state: not the rows of the old list, not a warning, the whole error state.
+        await expect(repos.error).toBeVisible();
+        await expect(repos.rows()).toHaveCount(0);
+        await expect(adminPage.getByTestId('repo-warning')).toHaveCount(0);
       },
     );
+
+    // The stub is gone: refresh is the Retry, and it also empties the search box.
+    await repos.refresh();
+    await expect(repos.error).toHaveCount(0);
+    await expect(repos.searchInput).toHaveValue('');
+    await expect(repos.rows().first()).toBeVisible();
   });
 
   test('ERR-02: an aborted request shows a "Connection error" toast', async ({ adminPage }) => {
     const repos = new RepositoriesPage(adminPage);
-    await withRoute(adminPage, INFO_URL, abort, async () => {
+    await withRoute(adminPage, LIST_URL, abort, async () => {
       const raised = expectToastLater(repos.toasts, 'Connection error');
       await adminPage.goto('/repositories');
       await raised;

@@ -16,10 +16,8 @@
 
 import { ChangeDetectorRef, Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
-import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
 
-import { RepoListInfo, RepoType, TotalUsageInfo } from '../../../../../generated/api';
-import { ProtocolRepoControllerService } from '../../../../../generated/api';
+import { RepoCollectionControllerService, RepoListInfo, RepoType, TotalUsageInfo } from '../../../../../generated/api';
 import { RepositoryCreateModalComponent } from '../../../shared/components/modals/repository-create-modal/repository-create-modal.component';
 import { ProfileService } from '../../profile/service/profile.service';
 import { RecentActivityComponent } from '../recent-activity/recent-activity.component';
@@ -29,10 +27,8 @@ import { UsageService } from '../service/usage.service';
 import { TotalDiskComponent } from '../total-disk/total-disk.component';
 import { WelcomeCardComponent } from '../welcome-card/welcome-card.component';
 
-interface Repository {
-  type: RepoType;
-  usageCount: number;
-}
+/** How many repositories the recent activity card lists. */
+export const RECENT_REPOSITORY_COUNT = 6;
 
 @Component({
   selector: 'app-dashboard-content',
@@ -59,13 +55,12 @@ export class DashboardContentComponent {
   public helmRepoCount = 0;
   public nugetRepoCount = 0;
   public rubyRepoCount = 0;
-  public repositories: Repository[] = [];
   public repoListInfos: RepoListInfo[] = [];
   public createRepoModal: boolean;
   public isAdmin = false;
 
   constructor(
-    private readonly protocolRepoControllerService: ProtocolRepoControllerService,
+    private readonly repoCollectionControllerService: RepoCollectionControllerService,
     private readonly usageService: UsageService,
     private readonly profileService: ProfileService,
     private readonly cdRef: ChangeDetectorRef,
@@ -76,6 +71,7 @@ export class DashboardContentComponent {
     this.usageService.getTotalUsage().subscribe({
       next: (usage) => {
         Object.assign(this.usage, usage);
+        this.cdRef.markForCheck();
       },
       error: () => {},
     });
@@ -83,14 +79,15 @@ export class DashboardContentComponent {
     this.profileService.get().subscribe({
       next: (profile) => {
         this.isAdmin = profile.role === 'ADMIN';
-        if (this.isAdmin) {
-          this.fetchRepoCounts();
-        }
         this.cdRef.markForCheck();
       },
       error: () => {},
     });
-    this.fetchRepoInfos();
+
+    // The counts and the recent repositories are open to every role: a USER sees the same numbers as
+    // an ADMIN, not a card of zeros.
+    this.fetchRepoCounts();
+    this.fetchRecentRepos();
   }
 
   public openCreateRepo(): void {
@@ -99,81 +96,40 @@ export class DashboardContentComponent {
     }
   }
 
+  /** One request for all nine types. A count that cannot be fetched stays at zero. */
   private fetchRepoCounts(): void {
-    this.fetchRepoCount(RepoType.Npm, (c) => (this.npmRegistryCount = c));
-    this.fetchRepoCount(RepoType.Pypi, (c) => (this.pypiRepoCount = c));
-    this.fetchRepoCount(RepoType.Maven, (c) => (this.mavenRepoCount = c));
-    this.fetchRepoCount(RepoType.Docker, (c) => (this.dockerRepoCount = c));
-    this.fetchRepoCount(RepoType.Cargo, (c) => (this.cargoRepoCount = c));
-    this.fetchRepoCount(RepoType.Golang, (c) => (this.golangRepoCount = c));
-    this.fetchRepoCount(RepoType.Helm, (c) => (this.helmRepoCount = c));
-    this.fetchRepoCount(RepoType.Nuget, (c) => (this.nugetRepoCount = c));
-    this.fetchRepoCount(RepoType.Ruby, (c) => (this.rubyRepoCount = c));
+    this.repoCollectionControllerService.getRepoCounts().subscribe({
+      next: (response) => {
+        const counts = response.data ?? {};
+        this.npmRegistryCount = counts[RepoType.Npm] ?? 0;
+        this.pypiRepoCount = counts[RepoType.Pypi] ?? 0;
+        this.mavenRepoCount = counts[RepoType.Maven] ?? 0;
+        this.dockerRepoCount = counts[RepoType.Docker] ?? 0;
+        this.cargoRepoCount = counts[RepoType.Cargo] ?? 0;
+        this.golangRepoCount = counts[RepoType.Golang] ?? 0;
+        this.helmRepoCount = counts[RepoType.Helm] ?? 0;
+        this.nugetRepoCount = counts[RepoType.Nuget] ?? 0;
+        this.rubyRepoCount = counts[RepoType.Ruby] ?? 0;
+        this.cdRef.markForCheck();
+      },
+      error: () => {},
+    });
   }
 
-  private fetchRepoCount(repoType: RepoType, assign: (count: number) => void): void {
-    this.protocolRepoControllerService
-      .getCount(repoType)
-      .pipe(map((r) => r.data ?? 0))
+  /**
+   * The newest repositories of every type, in one request. Each item already carries its disk usage,
+   * so no per-repository usage call is made (that call needs the MANAGE permission a USER lacks).
+   */
+  private fetchRecentRepos(): void {
+    this.repoCollectionControllerService
+      .listRepos(undefined, undefined, 0, RECENT_REPOSITORY_COUNT, ['createdAt,desc'])
       .subscribe({
-        next: (count) => {
-          assign(count);
+        next: (response) => {
+          this.repoListInfos = response.data?.content ?? [];
           this.cdRef.markForCheck();
         },
-        // A count that cannot be fetched stays at zero.
+        // The HTTP error interceptor already shows the failure; the card stays empty.
         error: () => {},
       });
-  }
-
-  private fetchRepoInfo(repoType: RepoType): void {
-    this.protocolRepoControllerService
-      .getInfo(repoType)
-      .pipe(
-        map((r) => r.data ?? []),
-        switchMap((repos) => {
-          if (repos.length === 0) {
-            return of([]);
-          }
-          return forkJoin(
-            repos.map((repo) =>
-              this.protocolRepoControllerService.getUsage(repo.name).pipe(
-                // A repository whose usage cannot be fetched still shows, with an unknown disk usage,
-                // instead of failing the forkJoin and dropping every repository of its type.
-                map((r) => r.data?.diskUsed?.value),
-                catchError(() => of(undefined)),
-                map((diskUsage) => {
-                  repo.diskUsage = diskUsage;
-                  repo.type = repoType;
-                  return repo;
-                }),
-              ),
-            ),
-          );
-        }),
-      )
-      .subscribe({
-        next: (updatedRepos) => {
-          this.repoListInfos = this.repoListInfos
-            .concat(updatedRepos)
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-            .slice(0, 6);
-          this.cdRef.markForCheck();
-        },
-        // The HTTP error interceptor already shows the failure; a type that cannot be listed just
-        // contributes no recent repositories, and must not become an unhandled RxJS error.
-        error: () => {},
-      });
-  }
-
-  private fetchRepoInfos(): void {
-    this.fetchRepoInfo(RepoType.Maven);
-    this.fetchRepoInfo(RepoType.Npm);
-    this.fetchRepoInfo(RepoType.Pypi);
-    this.fetchRepoInfo(RepoType.Docker);
-    this.fetchRepoInfo(RepoType.Cargo);
-    this.fetchRepoInfo(RepoType.Golang);
-    this.fetchRepoInfo(RepoType.Helm);
-    this.fetchRepoInfo(RepoType.Nuget);
-    this.fetchRepoInfo(RepoType.Ruby);
   }
 }

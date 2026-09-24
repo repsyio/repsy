@@ -44,7 +44,7 @@ async function expectNoAxeViolations(page: Page, selector: string): Promise<void
   ).toEqual([]);
 }
 
-const NPM_INFO_URL = /\/api\/repos\/NPM\/info(\?|$)/;
+const REPO_LIST_URL = /\/api\/repos(\?|$)/;
 
 test.describe('Shared components: ARIA contract', { tag: '@a11y' }, () => {
   test('A11Y-02: the row menu is a labelled menu button with menu items', async ({
@@ -131,10 +131,10 @@ test.describe('Shared components: ARIA contract', { tag: '@a11y' }, () => {
   });
 
   test.describe('toasts', () => {
-    /** Loads the repository list with the NPM `info` call failing, which raises ONE error toast. */
+    /** Loads the repository list with the list call failing, which raises ONE error toast. */
     async function raiseErrorToast(page: Page) {
       await page.clock.install();
-      await page.route(NPM_INFO_URL, (route) =>
+      await page.route(REPO_LIST_URL, (route) =>
         route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }),
       );
       const repos = new RepositoriesPage(page);
@@ -224,7 +224,10 @@ test.describe('Shared components: ARIA contract', { tag: '@a11y' }, () => {
     await expect(repos.pagination.prev.locator('img')).toHaveAttribute('alt', '');
     await expect(repos.pagination.next.locator('img')).toHaveAttribute('alt', '');
 
-    await nav.getByRole('button', { name: 'Next page' }).click();
+    // Server-side paging: the click asks the server for page 2 (`page=1`).
+    await repos.afterListResponse(() => nav.getByRole('button', { name: 'Next page' }).click(), {
+      page: 1,
+    });
 
     await expect(repos.rows()).toHaveCount(1);
     await expect(repos.pagination.page(2)).toHaveAttribute('aria-current', 'page');

@@ -29,14 +29,11 @@ import {
   NuGetVersionListItem,
   ProtocolDeployTokenControllerService,
   ProtocolRepoControllerService,
-  RepoCreateForm,
   RepoDescriptionForm,
-  RepoListInfo,
   RepoPermissionInfo,
   RepoRenameForm,
   RepoSettingsForm,
   RepoSettingsInfo,
-  RepoType,
   RepoUsageInfo,
   TokenInfo,
 } from '../../../../../../generated/api';
@@ -78,15 +75,6 @@ export class NugetService {
     }
 
     this.repoSubject.next(null);
-  }
-
-  public async createRepository(repoForm: RepoCreateForm): Promise<void> {
-    await firstValueFrom(this.protocolRepoControllerService.createRepo(RepoType.Nuget, repoForm));
-  }
-
-  public async fetchRepositories(): Promise<RepoListInfo[]> {
-    const response = await firstValueFrom(this.protocolRepoControllerService.getInfo(RepoType.Nuget));
-    return response.data ?? [];
   }
 
   public async fetchRepositoryUsage(): Promise<RepoUsageInfo> {

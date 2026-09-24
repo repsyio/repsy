@@ -27,16 +27,18 @@ import { RepoCreateModal } from './repo-create-modal.js';
 
 const USAGES_URL = /\/api\/usages(\?|$)/;
 const PROFILE_URL = /\/api\/profile(\?|$)/;
-const COUNT_URL = /\/api\/repos\/[A-Z]+\/count(\?|$)/;
-const INFO_URL = /\/api\/repos\/[A-Z]+\/info(\?|$)/;
+const COUNTS_URL = /\/api\/repos\/counts(\?|$)/;
+const LIST_URL = /\/api\/repos(\?|$)/;
+/** The per-repository usage call the dashboard used to make for every recent repository (gone since RPS-1268). */
+const REPO_USAGE_URL = /\/api\/repos\/[^/?]+\/usage(\?|$)/;
 
-/** How many rows Recent Activity keeps (`DashboardContentComponent`: `.slice(0, 6)`). */
+/** How many rows Recent Activity keeps (`DashboardContentComponent`: `RECENT_REPOSITORY_COUNT`, the list's `size`). */
 export const RECENT_ACTIVITY_SIZE = 6;
 
 /**
  * The dashboard (`/`). Cards: welcome, Total Disk Usage, Security Overview, the nine per-type
- * repository counts (admin only: the counts are not even requested for a USER) and Recent Activity
- * (the six newest repositories, each row a link to the repository).
+ * repository counts (one `GET /api/repos/counts` for every role) and Recent Activity (the six
+ * newest repositories from one `GET /api/repos?size=6`, each row a link to the repository).
  */
 export class DashboardPage extends UiPage {
   readonly welcomeCard: Locator;
@@ -82,23 +84,17 @@ export class DashboardPage extends UiPage {
 
   /**
    * Opens `/` and resolves once the answers that drive the cards are in: the profile (admin or
-   * not), the usage, and (admin) the nine counts. Recent Activity's rows arrive later still (one
-   * `info` per type, then one usage per repo), so its assertions retry on their own.
+   * not), the usage, the repository counts and the recent-repositories list (both for every role
+   * since RPS-1268).
    */
-  async open(options: { admin: boolean }): Promise<void> {
+  async open(): Promise<void> {
     const answers = [
       this.page.waitForResponse((response) => PROFILE_URL.test(response.url())),
       this.page.waitForResponse((response) => USAGES_URL.test(response.url())),
-      ...UI_REPO_TYPES.map(({ type }) =>
-        this.page.waitForResponse((response) => response.url().includes(`/api/repos/${type}/info`)),
+      this.page.waitForResponse((response) => COUNTS_URL.test(response.url())),
+      this.page.waitForResponse(
+        (response) => response.request().method() === 'GET' && LIST_URL.test(response.url()),
       ),
-      ...(options.admin
-        ? UI_REPO_TYPES.map(({ type }) =>
-            this.page.waitForResponse((response) =>
-              response.url().includes(`/api/repos/${type}/count`),
-            ),
-          )
-        : []),
     ];
     const all = Promise.all(answers);
     all.catch(() => undefined);
@@ -155,20 +151,24 @@ export class DashboardPage extends UiPage {
   }
 
   /**
-   * Starts recording every `GET /api/repos/<TYPE>/count` and `.../info` request of this page, from
-   * now on; call before `open()`. `count` is how a test proves a USER never asks for the counts.
+   * Starts recording the repository requests of this page from now on (call before `open()`):
+   * `counts` are `GET /api/repos/counts`, `lists` are `GET /api/repos?...`, `usages` are the
+   * per-repository `GET /api/repos/<name>/usage` calls the dashboard no longer makes.
    */
-  trackRepoRequests(): { counts: () => string[]; infos: () => string[] } {
+  trackRepoRequests(): { counts: () => string[]; lists: () => string[]; usages: () => string[] } {
     const counts: string[] = [];
-    const infos: string[] = [];
+    const lists: string[] = [];
+    const usages: string[] = [];
     const record = (request: Request): void => {
-      if (COUNT_URL.test(request.url())) {
+      if (COUNTS_URL.test(request.url())) {
         counts.push(request.url());
-      } else if (INFO_URL.test(request.url())) {
-        infos.push(request.url());
+      } else if (LIST_URL.test(request.url()) && request.method() === 'GET') {
+        lists.push(request.url());
+      } else if (REPO_USAGE_URL.test(request.url())) {
+        usages.push(request.url());
       }
     };
     this.page.on('request', record);
-    return { counts: () => [...counts], infos: () => [...infos] };
+    return { counts: () => [...counts], lists: () => [...lists], usages: () => [...usages] };
   }
 }
