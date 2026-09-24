@@ -4292,7 +4292,9 @@ components:
     Conflict:
       description: >-
         The request collides with something that exists (`itemAlreadyExists`, `repoExists`,
-        `keyStoreAlreadyExists`, `pgpPublicKeyAlreadyExists`, `scanAlreadyRunning`).
+        `keyStoreAlreadyExists`, `pgpPublicKeyAlreadyExists`, `scanAlreadyRunning`), or with another
+        request that changed the same item at the same moment (`concurrentModification`): read the
+        item again and repeat the request.
       content:
         application/json:
           schema:

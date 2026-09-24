@@ -56,10 +56,12 @@ import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.core.MethodParameter;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.BeanPropertyBindingResult;
@@ -397,6 +399,66 @@ class ErrorHandlerTest {
   }
 
   @Test
+  @DisplayName("answers 409 concurrentModification for a lost optimistic-lock race (RPS-1325)")
+  void optimisticLockFailure() throws Exception {
+    this.mockMvc
+        .perform(get("/optimistic-lock"))
+        .andExpect(status().isConflict())
+        .andExpect(header().doesNotExist(HttpHeaders.RETRY_AFTER))
+        .andExpect(jsonPath("$.msgId").value("concurrentModification"))
+        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(
+            jsonPath("$.text")
+                .value(
+                    "The item was changed by another request at the same time. Please try again."))
+        .andExpect(jsonPath("$.data").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("answers 409 for the plain OptimisticLockingFailureException as well")
+  void plainOptimisticLockFailure() throws Exception {
+    this.mockMvc
+        .perform(get("/optimistic-lock/plain"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.msgId").value("concurrentModification"));
+  }
+
+  @Test
+  @DisplayName("answers 503 with Retry-After on the OCI endpoints, where clients retry a 5xx")
+  void optimisticLockFailureOnOciEndpoint() throws Exception {
+    final var path = "/v2/repo/app/manifests/latest";
+
+    this.mockMvc
+        .perform(get(path).servletPath(path))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(header().string(HttpHeaders.RETRY_AFTER, "1"))
+        .andExpect(jsonPath("$.msgId").value("concurrentModification"));
+  }
+
+  @Test
+  @DisplayName("logs a lost optimistic-lock race as a warning, not as an error")
+  void optimisticLockFailureIsLoggedAsWarning() throws Exception {
+    this.mockMvc.perform(get("/optimistic-lock")).andExpect(status().isConflict());
+
+    assertThat(this.logEvents.list)
+        .filteredOn(event -> event.getLevel().isGreaterOrEqual(Level.WARN))
+        .extracting(ILoggingEvent::getLevel)
+        .containsExactly(Level.WARN);
+  }
+
+  @Test
+  @DisplayName("does not render an optimistic-lock failure when no servlet response is available")
+  void optimisticLockFailureWithoutResponse() {
+    final var handler =
+        new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+
+    assertThat(
+            handler.handleException(
+                new OptimisticLockingFailureException("stale"), new MockHttpServletRequest(), null))
+        .isNull();
+  }
+
+  @Test
   @DisplayName("answers 503 scanExecutorSaturated for a retryable scan failure")
   void retryableScanFailure() throws Exception {
     this.mockMvc
@@ -657,6 +719,21 @@ class ErrorHandlerTest {
     @GetMapping("/mfa/no-message")
     String mfaWithoutMessage() {
       throw new MfaException(null);
+    }
+
+    @GetMapping("/optimistic-lock")
+    String optimisticLock() {
+      throw new ObjectOptimisticLockingFailureException(Object.class, "id");
+    }
+
+    @GetMapping("/optimistic-lock/plain")
+    String plainOptimisticLock() {
+      throw new OptimisticLockingFailureException("stale");
+    }
+
+    @GetMapping("/v2/repo/app/manifests/latest")
+    String ociOptimisticLock() {
+      throw new ObjectOptimisticLockingFailureException(Object.class, "id");
     }
 
     @GetMapping("/db/duplicate-key")
