@@ -285,6 +285,10 @@ services:
       REPSY_UI_NO_SANDBOX: ${REPSY_UI_NO_SANDBOX:-}
       # Comma list of opt-in suites (e.g. "throttle,scanner"), read by optedIn() in src/ui/session.ts.
       REPSY_UI_OPT_IN: ${REPSY_UI_OPT_IN:-}
+      # Where the @scanner specs reach the stub scanner's /control API (docker-compose.stack-scanner.yml
+      # publishes it on loopback; this service has the host network) and the key both sides share.
+      REPSY_SCANNER_STUB_URL: ${REPSY_SCANNER_STUB_URL:-http://localhost:${REPSY_E2E_SCANNER_PORT:-8090}}
+      REPSY_SCANNER_API_KEY: ${REPSY_SCANNER_API_KEY:-e2e-scanner-key}
       # Forwarded to this service only: playwright.config.ts's isCI (retries, forbidOnly, trace mode)
       # keys off it, and forwarding it to the protocol runners would change their behaviour.
       CI: ${CI:-}
