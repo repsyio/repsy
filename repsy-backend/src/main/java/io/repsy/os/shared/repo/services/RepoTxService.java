@@ -27,9 +27,12 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.mappers.RepoConverter;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.repo.utils.RepoUtils;
+import io.repsy.os.shared.utils.LikePatterns;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -40,6 +43,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -208,6 +213,45 @@ public class RepoTxService {
     return this.repoRepository.findAllByTypeOrderByCreatedAtDescNameAsc(repoType).stream()
         .map(this::mapToRepoListInfo)
         .toList();
+  }
+
+  /**
+   * One page of the repos of every type, or of one type, whose name contains {@code query}.
+   *
+   * @param type only repos of this type, all types when null
+   * @param query text the name contains, case-insensitive with its {@code %}, {@code _} and {@code
+   *     \} taken literally; every repo matches when null or blank
+   * @param pageable the page, sorted by properties of {@link Repo}
+   */
+  public @NonNull Page<RepoListInfo> listRepos(
+      final @Nullable RepoType type,
+      final @Nullable String query,
+      final @NonNull Pageable pageable) {
+
+    final var pattern = LikePatterns.of("%", query == null ? "" : query.strip(), "%");
+
+    return this.repoRepository.search(type, pattern, pageable).map(this::mapToRepoListInfo);
+  }
+
+  /** The number of repos of every type, {@code 0} for a type that has none. */
+  public @NonNull Map<RepoType, Long> getRepoCounts() {
+    final var counts = new EnumMap<RepoType, Long>(RepoType.class);
+
+    for (final var type : RepoType.values()) {
+      counts.put(type, 0L);
+    }
+
+    for (final var row : this.repoRepository.countGroupedByType()) {
+      if (row[0] instanceof final RepoType type) {
+        counts.put(type, (Long) row[1]);
+      }
+    }
+
+    return counts;
+  }
+
+  public @NonNull RepoListInfo getRepoListInfo(final @NonNull UUID repoId) {
+    return this.mapToRepoListInfo(this.findRepoById(repoId));
   }
 
   public long getRepoCount(final @NonNull RepoType repoType) {

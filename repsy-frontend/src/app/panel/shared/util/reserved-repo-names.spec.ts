@@ -20,7 +20,7 @@ import { isReservedRepoName, RESERVED_REPO_NAMES, reservedRepoNameValidator } fr
 
 describe('reserved-repo-names', () => {
   describe('RESERVED_REPO_NAMES', () => {
-    it('covers every fixed top-level route plus the API-port paths', () => {
+    it('covers every fixed top-level route plus the API-port and /api/repos paths', () => {
       expect([...RESERVED_REPO_NAMES]).toEqual(
         jasmine.arrayWithExactContents([
           'login',
@@ -32,6 +32,8 @@ describe('reserved-repo-names', () => {
           'api',
           'assets',
           'favicon.ico',
+          'counts',
+          'security-summary',
         ]),
       );
     });
