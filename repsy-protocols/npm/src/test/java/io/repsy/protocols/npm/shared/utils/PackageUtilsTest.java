@@ -28,6 +28,7 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.util.Pair;
 
 @DisplayName("PackageUtils")
 class PackageUtilsTest {
@@ -331,6 +332,46 @@ class PackageUtilsTest {
 
       assertThatCode(() -> PackageUtils.checkPackageNameMatchesUrl(payload, null, "a"))
           .doesNotThrowAnyException();
+    }
+  }
+
+  @Nested
+  @DisplayName("resolveLatestVersion and findDeprecatedVersions (RPS-1280)")
+  class RemovalHelpers {
+
+    @Test
+    @DisplayName("resolves the highest version by semver, not by name")
+    void highestBySemver() {
+      assertThat(PackageUtils.resolveLatestVersion(List.of("1.9.0", "1.10.0", "1.2.0")))
+          .isEqualTo("1.10.0");
+    }
+
+    @Test
+    @DisplayName("an empty list has no latest version")
+    void noVersionsNoLatest() {
+      assertThat(PackageUtils.resolveLatestVersion(List.<String>of())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a version the payload lacks is not reported as deprecated")
+    void aVersionPublishedAfterTheClientReadIsSkipped() {
+      final var stored =
+          metadataOf(
+              Map.of(
+                  "1.0.0", new HashMap<String, Object>(), "1.1.0", new HashMap<String, Object>()));
+      final var deprecatedOne = new HashMap<String, Object>();
+      deprecatedOne.put("deprecated", "use 1.1");
+      final var sent = metadataOf(Map.of("1.0.0", deprecatedOne));
+
+      assertThat(PackageUtils.findDeprecatedVersions(stored, sent))
+          .containsExactly(Pair.of("1.0.0", "use 1.1"));
+    }
+
+    private Map<String, Object> metadataOf(final Map<String, Object> versions) {
+      final var metadata = new HashMap<String, Object>();
+      metadata.put("versions", new HashMap<>(versions));
+
+      return metadata;
     }
   }
 }

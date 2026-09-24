@@ -24,6 +24,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
@@ -79,7 +80,9 @@ public final class PackageUtils {
     for (final var entry : oldVersions.entrySet()) {
       final var newVersion = (Map<String, Object>) newVersions.get(entry.getKey());
 
-      if (newVersion.containsKey(NpmConstants.DEPRECATED)) {
+      // A version the payload lacks was published after the client read the metadata: it is not
+      // something the client deprecated.
+      if (newVersion != null && newVersion.containsKey(NpmConstants.DEPRECATED)) {
         final var entryVersion = (Map<String, Object>) entry.getValue();
         final var entryDeprecated = (String) entryVersion.getOrDefault(NpmConstants.DEPRECATED, "");
         final var newDeprecated = (String) newVersion.getOrDefault(NpmConstants.DEPRECATED, "");
@@ -373,14 +376,20 @@ public final class PackageUtils {
 
     final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
 
-    if (versions.isEmpty()) {
+    return resolveLatestVersion(versions.keySet());
+  }
+
+  /** The highest of the version names by semver, or an empty string when there are none. */
+  public static String resolveLatestVersion(final Collection<String> versionNames) {
+
+    if (versionNames.isEmpty()) {
       return "";
     }
 
     String latestVersion = null;
     NpmSemver latestSemver = null;
 
-    for (final var key : versions.keySet()) {
+    for (final var key : versionNames) {
       final var semver = NpmSemver.parse(key);
 
       if (latestSemver == null || semver.compareTo(latestSemver) > 0) {

@@ -246,16 +246,29 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
     return this.npmPackageConverter.toPackageInfo(npmPackage, npmPackage.getRepo());
   }
 
-  @Transactional
+  // The storage strategy throws the IOException of a failed removal unchecked (sneaky), which only
+  // rolls the rows back when the rule names it.
+  @Transactional(rollbackFor = IOException.class)
   @Override
-  public void deletePackage(final UUID packageId) {
+  public PackageDeletion deletePackage(
+      final BaseRepoInfo<UUID> repoInfo,
+      final @Nullable String scopeName,
+      final String packageName,
+      final PackageRemover remover) {
 
-    final var npmPackage =
-        this.npmPackageRepository
-            .findById(packageId)
-            .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.PACKAGE_NOT_FOUND));
+    final var npmPackage = this.lockPackage(repoInfo, scopeName, packageName);
+
+    return this.removePackage(npmPackage, this.getVersionNames(npmPackage.getId()), remover);
+  }
+
+  private PackageDeletion removePackage(
+      final NpmPackage npmPackage, final List<String> versions, final PackageRemover remover) {
 
     this.npmPackageRepository.delete(npmPackage);
+    // Flush so a rejection by the database fails here, before any file is removed.
+    this.npmPackageRepository.flush();
+
+    return new PackageDeletion(versions, remover.removePackage());
   }
 
   public List<String> getVersionNames(final UUID packageId) {
@@ -265,73 +278,99 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
         .toList();
   }
 
-  @Transactional
+  @Transactional(rollbackFor = IOException.class)
   @Override
-  public void handleDeprecations(
-      final UUID repoId,
+  public BaseUsages handleDeprecations(
+      final BaseRepoInfo<UUID> repoInfo,
       final @Nullable String scopeName,
       final String packageName,
-      final List<Pair<String, String>> deprecatedVersions) {
+      final List<Pair<String, String>> deprecations,
+      final MetadataWriter writer)
+      throws IOException {
 
-    final var npmPackage = this.findPackageByRepoIdAndScopeAndName(repoId, scopeName, packageName);
+    final var npmPackage = this.lockPackage(repoInfo, scopeName, packageName);
 
-    for (final var pair : deprecatedVersions) {
+    for (final var pair : deprecations) {
       if (pair.getSecond().isEmpty()) {
         this.unDeprecatePackage(npmPackage.getId(), pair.getFirst()); // un-deprecate
       } else {
         this.deprecatePackage(npmPackage.getId(), pair.getFirst(), pair.getSecond()); // deprecate
       }
     }
+
+    // Flush so a database failure surfaces here, before the metadata file is touched.
+    this.packageVersionRepository.flush();
+
+    return writer.write();
   }
 
+  @Transactional(rollbackFor = IOException.class)
   @Override
-  public boolean isLastVersion(
-      final UUID repoId, final @Nullable String scope, final String packageName) {
-
-    final var versionCount =
-        this.packageVersionRepository.countByNpmPackageRepoIdAndNpmPackageScopeAndNpmPackageName(
-            repoId, scope, packageName);
-
-    return versionCount == 1;
-  }
-
-  @Transactional
-  @Override
-  public void deletePackageVersion(
+  public PackageDeletion deletePackageVersion(
       final BaseRepoInfo<UUID> repoInfo,
       final @Nullable String scopeName,
       final String packageName,
       final String versionName,
-      final String nextLatestVersion) {
+      final VersionRemover versionRemover,
+      final PackageRemover packageRemover)
+      throws IOException {
 
-    final var npmPackage =
-        this.npmPackageRepository
-            .findByRepoIdAndScopeAndName(repoInfo.getId(), scopeName, packageName)
-            .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.PACKAGE_NOT_FOUND));
+    final var npmPackage = this.lockPackage(repoInfo, scopeName, packageName);
 
-    final var packageVersion =
-        this.packageVersionRepository
-            .findByNpmPackageIdAndVersion(npmPackage.getId(), versionName)
+    // Counted under the lock, so a publish that finished first is part of what is left.
+    final var versions = this.packageVersionRepository.findByNpmPackageId(npmPackage.getId());
+
+    final var removed =
+        versions.stream()
+            .filter(version -> version.getVersion().equals(versionName))
+            .findFirst()
             .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.PACKAGE_VERSION_NOT_FOUND));
 
-    if (npmPackage.getLatest().equals(versionName)) {
-      final var latestPackageVersion =
-          this.packageVersionRepository
-              .findByNpmPackageIdAndVersion(npmPackage.getId(), nextLatestVersion)
-              .orElseThrow(
-                  () -> new ItemNotFoundException(ErrorConstants.PACKAGE_VERSION_NOT_FOUND));
-
-      final var distTag = new PackageDistTag();
-      distTag.setPackageVersion(latestPackageVersion);
-      distTag.setTagName(NpmConstants.LATEST);
-      distTag.setPackageVersion(latestPackageVersion);
-      this.packageDistTagRepository.save(distTag);
-
-      npmPackage.setLatest(latestPackageVersion.getVersion());
-      this.npmPackageRepository.save(npmPackage);
+    if (versions.size() == 1) {
+      return this.removePackage(npmPackage, List.of(versionName), packageRemover);
     }
 
-    this.packageVersionRepository.delete(packageVersion);
+    final var newLatest = this.nextLatestAfterRemoving(npmPackage, removed, versions);
+
+    // The version goes first: deleting it takes the tags that point at it along, the latest tag
+    // among them, which is then made anew on the version that takes over.
+    this.packageVersionRepository.delete(removed);
+    this.packageVersionRepository.flush();
+
+    if (newLatest != null) {
+      this.pointTagAt(npmPackage, newLatest, NpmConstants.LATEST);
+
+      npmPackage.setLatest(newLatest.getVersion());
+      this.npmPackageRepository.save(npmPackage);
+      // Flush so a rejection by the database fails here, before any file is touched.
+      this.npmPackageRepository.flush();
+    }
+
+    return new PackageDeletion(
+        List.of(versionName),
+        versionRemover.removeVersion(newLatest == null ? null : newLatest.getVersion()));
+  }
+
+  /**
+   * The highest remaining version when the version that is being removed is the package's latest,
+   * otherwise {@code null}.
+   */
+  private @Nullable PackageVersion nextLatestAfterRemoving(
+      final NpmPackage npmPackage, final PackageVersion removed, final List<PackageVersion> all) {
+
+    if (!npmPackage.getLatest().equals(removed.getVersion())) {
+      return null;
+    }
+
+    final var remaining = all.stream().filter(version -> !version.equals(removed)).toList();
+    final var latestName =
+        PackageUtils.resolveLatestVersion(
+            remaining.stream().map(PackageVersion::getVersion).toList());
+
+    return remaining.stream()
+        .filter(version -> version.getVersion().equals(latestName))
+        .findFirst()
+        .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.PACKAGE_VERSION_NOT_FOUND));
   }
 
   public List<PackageDistributionTagMapListItem> getDistributionTags(
