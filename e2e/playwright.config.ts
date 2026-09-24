@@ -20,8 +20,18 @@ import { defineConfig } from '@playwright/test';
 
 const isCI = Boolean(process.env.CI);
 
+// Read from process.env on purpose, NOT via src/env.ts: env.ts throws at import time without
+// REPSY_ADMIN_PASSWORD, which would break `playwright test --list` (and every other project) on a host
+// without a .env. Only the ui runner sets REPSY_UI_WORKERS (docker-compose.runners.yml), so the
+// protocol runners keep Playwright's default worker count; `workers` is config-wide, not per project.
+const uiWorkers = process.env.REPSY_UI_WORKERS ? Number(process.env.REPSY_UI_WORKERS) : undefined;
+// The SPA is served on the API port (8080), not the protocol port (9090).
+const uiBaseUrl =
+  process.env.REPSY_UI_BASE_URL || process.env.REPSY_API_BASE_URL || 'http://localhost:8080';
+
 // One project per protocol is added from step 2 onward; `skeleton` proves the harness itself
-// (seeding, cleanup, the raw-HTTP auth probe) and needs no protocol client or browser.
+// (seeding, cleanup, the raw-HTTP auth probe) and needs no protocol client or browser. `ui` is the
+// odd one out: it drives the panel in a browser rather than a package client.
 export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
@@ -37,6 +47,7 @@ export default defineConfig({
   // tight for it.
   timeout: 120_000,
   expect: { timeout: 10_000 },
+  workers: uiWorkers,
   projects: [
     {
       name: 'skeleton',
@@ -81,6 +92,36 @@ export default defineConfig({
     {
       name: 'ruby',
       testMatch: 'ruby/**/*.spec.ts',
+    },
+    {
+      // The panel UI, driven in headless Chromium (README.md "UI suite"). Runs in the "ui" runner,
+      // which is the only one with a browser installed; specs live under tests/ui/.
+      name: 'ui',
+      testMatch: 'ui/**/*.spec.ts',
+      // A UI test waits on renders and network round trips, but never on a real package client.
+      timeout: 60_000,
+      use: {
+        browserName: 'chromium',
+        headless: true,
+        baseURL: uiBaseUrl,
+        viewport: { width: 1440, height: 900 },
+        testIdAttribute: 'data-testid',
+        actionTimeout: 10_000,
+        navigationTimeout: 20_000,
+        // `on-first-retry` never fires outside CI (retries is 0 there), so a local failure would leave
+        // no trace behind; keep one on failure instead.
+        trace: isCI ? 'on-first-retry' : 'retain-on-failure',
+        screenshot: 'only-on-failure',
+        video: 'retain-on-failure',
+        // The app itself ignores prefers-reduced-motion; src/ui/defaults.ts injects the CSS that does
+        // the work. This only makes the media query true for anything that does honour it.
+        contextOptions: { reducedMotion: 'reduce' },
+        launchOptions: {
+          // Playwright's own default is chromiumSandbox:false; this suite wants the sandbox ON unless
+          // opted out (kernels without unprivileged user namespaces). Never a bare --no-sandbox arg.
+          chromiumSandbox: process.env.REPSY_UI_NO_SANDBOX !== '1',
+        },
+      },
     },
   ],
 });

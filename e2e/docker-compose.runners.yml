@@ -235,6 +235,42 @@ services:
       - ./test-results:/app/test-results
       - ./playwright-report:/app/playwright-report
 
+  ui:
+    <<: *runner-common
+    build:
+      context: .
+      dockerfile: runners/ui.Dockerfile
+    # Chromium's renderer keeps its shared memory in /dev/shm; Docker's 64 MB default makes tabs crash
+    # under parallel workers. Sharing the host's IPC namespace (its /dev/shm) sidesteps that limit.
+    ipc: host
+    # Chromium's sandbox needs user namespaces, which Docker's default seccomp profile blocks for a
+    # non-root uid (probed: "Chromium sandboxing failed!"). Playwright's own profile is the default
+    # one plus exactly those syscalls. The relative path resolves against this file's directory.
+    # REPSY_UI_NO_SANDBOX=1 (below) is the escape hatch for a kernel without unprivileged user
+    # namespaces at all; see README.md "UI suite".
+    security_opt:
+      - seccomp=./runners/ui-seccomp.json
+    environment:
+      <<: *runner-environment
+      # The SPA is served on the API port, so the UI base URL defaults to REPSY_API_BASE_URL.
+      REPSY_UI_BASE_URL: ${REPSY_UI_BASE_URL:-${REPSY_API_BASE_URL:-http://localhost:8080}}
+      # Read by playwright.config.ts; only this service sets it, so the protocol runners keep
+      # Playwright's default worker count.
+      REPSY_UI_WORKERS: ${REPSY_UI_WORKERS:-4}
+      REPSY_UI_NO_SANDBOX: ${REPSY_UI_NO_SANDBOX:-}
+      # Comma list of opt-in suites (e.g. "throttle,scanner"), read by optedIn() in src/ui/session.ts.
+      REPSY_UI_OPT_IN: ${REPSY_UI_OPT_IN:-}
+      # Forwarded to this service only: playwright.config.ts's isCI (retries, forbidOnly, trace mode)
+      # keys off it, and forwarding it to the protocol runners would change their behaviour.
+      CI: ${CI:-}
+    volumes:
+      # No shared/named cache volume: the browser is baked into the image (/ms-playwright).
+      - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
+      - ./src:/app/src
+      - ./tests:/app/tests:ro
+      - ./test-results:/app/test-results
+      - ./playwright-report:/app/playwright-report
+
 volumes:
   # Named (not bind-mounted): holds only downloaded third-party Maven plugins/dependencies, so it
   # persists across `run.sh test` invocations without leaving anything in the working tree.
