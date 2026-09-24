@@ -95,6 +95,15 @@ repsy:
     # Repsy is self-hosted, so an operator publishing larger internal crates (vendored native
     # libraries, generated bindings) can raise this without a rebuild (RPS-1119).
     max-crate-size: ${CARGO_MAX_CRATE_SIZE:100MB}
+  maven:
+    # A Maven repo that verifies every signature accepts a signature before the file it signs (Maven
+    # uploads in parallel) and holds it, unverified and not served, until that file arrives. What is
+    # older than `ttl` is deleted every `purge-interval`. Durations are ISO-8601 (PT24H = 24 hours).
+    pending-signature:
+      enabled: ${PENDING_SIGNATURE_PURGE_ENABLED:true}
+      ttl: ${PENDING_SIGNATURE_TTL:PT24H}
+      purge-interval: ${PENDING_SIGNATURE_PURGE_INTERVAL:PT15M}
+
   ssl:
     api:
       enabled: ${API_SSL_ENABLED:false}

@@ -30,7 +30,7 @@ import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.server.security.scanner.dtos.ScanRequest;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
-import io.repsy.protocols.docker.shared.utils.DockerConstants;
+import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -324,7 +324,7 @@ public class ArtifactScanListener {
       final @NonNull ArtifactPushedEvent event) {
 
     final var version = event.artifactVersion();
-    final var separator = version.startsWith(DockerConstants.SHA256_PREFIX) ? "@" : ":";
+    final var separator = BlobDigests.startsWithDigestPrefix(version) ? "@" : ":";
 
     return event.repoName() + "/" + event.artifactName() + separator + version;
   }

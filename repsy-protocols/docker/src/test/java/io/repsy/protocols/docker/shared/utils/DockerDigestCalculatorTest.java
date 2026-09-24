@@ -56,4 +56,25 @@ class DockerDigestCalculatorTest {
     assertThat(DockerDigestCalculator.isSha512("sha512:" + "a".repeat(128))).isTrue();
     assertThat(DockerDigestCalculator.isSha512("sha256:" + "a".repeat(64))).isFalse();
   }
+
+  @Test
+  @DisplayName("reports a digest reference as sent, hex lower-cased, in its own algorithm")
+  void reportsTheReferenceForADigestReference() {
+    final var sha256 = "sha256:" + "a".repeat(64);
+    final var sha512 = "sha512:" + "b".repeat(128);
+
+    assertThat(DockerDigestCalculator.reportedDigest(sha512, sha256)).isEqualTo(sha512);
+    assertThat(DockerDigestCalculator.reportedDigest(sha256, sha256)).isEqualTo(sha256);
+    assertThat(DockerDigestCalculator.reportedDigest("sha512:" + "B".repeat(128), sha256))
+        .isEqualTo(sha512);
+  }
+
+  @Test
+  @DisplayName("reports the canonical sha256 digest for a tag")
+  void reportsTheCanonicalDigestForATag() {
+    final var sha256 = "sha256:" + "a".repeat(64);
+
+    assertThat(DockerDigestCalculator.reportedDigest("latest", sha256)).isEqualTo(sha256);
+    assertThat(DockerDigestCalculator.reportedDigest("v1-sha512", sha256)).isEqualTo(sha256);
+  }
 }

@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.maven.shared.artifact.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -93,8 +93,12 @@ class VersionSignatureServiceTest {
 
     this.service.refreshSigned(this.storageKey, this.version, VERSION_PATH);
 
-    assertThat(this.version.isSigned()).isTrue();
-    verify(this.artifactVersionRepository).save(this.version);
+    final var order = inOrder(this.artifactVersionRepository, this.versionSignatureRepository);
+    order.verify(this.artifactVersionRepository).lockForSignedUpdate(this.version.getId());
+    order
+        .verify(this.versionSignatureRepository)
+        .findFileNamesByArtifactVersionId(this.version.getId());
+    order.verify(this.artifactVersionRepository).updateSigned(this.version.getId(), true);
   }
 
   @Test
@@ -106,8 +110,7 @@ class VersionSignatureServiceTest {
 
     this.service.refreshSigned(this.storageKey, this.version, VERSION_PATH);
 
-    assertThat(this.version.isSigned()).isFalse();
-    verify(this.artifactVersionRepository).save(this.version);
+    verify(this.artifactVersionRepository).updateSigned(this.version.getId(), false);
   }
 
   @Test
@@ -118,20 +121,18 @@ class VersionSignatureServiceTest {
 
     this.service.refreshSigned(this.storageKey, this.version, VERSION_PATH);
 
-    assertThat(this.version.isSigned()).isFalse();
-    verify(this.artifactVersionRepository, never()).save(any());
+    verify(this.artifactVersionRepository).updateSigned(this.version.getId(), false);
   }
 
   @Test
-  @DisplayName("ignores a signature row of a file that is gone, and saves nothing when unchanged")
-  void aStaleRowDoesNotSignAndAnUnchangedValueIsNotSaved() {
+  @DisplayName("ignores a signature row of a file that is gone")
+  void aStaleRowDoesNotSign() {
     this.directoryHolds("lib-1.0.pom", "lib-1.0.jar");
     this.verifiedFiles("lib-1.0.pom", "lib-1.0-gone.jar");
 
     this.service.refreshSigned(this.storageKey, this.version, VERSION_PATH);
 
-    assertThat(this.version.isSigned()).isFalse();
-    verify(this.artifactVersionRepository, never()).save(any());
+    verify(this.artifactVersionRepository).updateSigned(this.version.getId(), false);
   }
 
   @Test
@@ -156,7 +157,7 @@ class VersionSignatureServiceTest {
 
     this.service.refreshSigned(this.storageKey, this.version, snapshotPath);
 
-    assertThat(this.version.isSigned()).isTrue();
+    verify(this.artifactVersionRepository).updateSigned(this.version.getId(), true);
   }
 
   @Test

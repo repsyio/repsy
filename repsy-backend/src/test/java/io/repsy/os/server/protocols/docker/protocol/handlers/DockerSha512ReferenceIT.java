@@ -22,13 +22,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
+import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
+import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
+import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.Locale;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -44,6 +51,12 @@ import org.springframework.web.context.WebApplicationContext;
  * sha256:} one. {@code BlobDigests.isSupported} (and so the push guards and the blob finalize)
  * accept both algorithms, but the path dispatch only recognized {@code sha256:}, so a sha512
  * reference was parsed as a tag and rejected.
+ *
+ * <p>RPS-1244: a manifest is first-class in both algorithms. It is stored with its {@code sha256}
+ * and its {@code sha512} digest, so it is addressable by either, and the response reports the
+ * algorithm the client used ({@code Docker-Content-Digest} and {@code Location}): a reference by
+ * {@code sha512} gets the {@code sha512} digest back, a tag or a {@code sha256} reference keeps the
+ * {@code sha256} one. A {@code sha512:} reference never becomes a tag row.
  */
 @DisplayName("Docker sha512 digest references")
 class DockerSha512ReferenceIT extends AbstractIntegrationTest {
@@ -54,6 +67,31 @@ class DockerSha512ReferenceIT extends AbstractIntegrationTest {
   private static final String OCI_LAYER = "application/vnd.oci.image.layer.v1.tar+gzip";
 
   @Autowired private WebApplicationContext webApplicationContext;
+  @Autowired private ImageRepository imageRepository;
+  @Autowired private ManifestRepository manifestRepository;
+  @Autowired private TagRepository tagRepository;
+
+  private DockerWire wire;
+
+  @BeforeEach
+  void setUpWire() {
+    this.wire =
+        new DockerWire(
+            this.mockMvc,
+            this.webApplicationContext,
+            protocolPort(),
+            this.adminProtocolBearerToken());
+  }
+
+  /** Pushes an image manifest by tag, and answers its bytes as the registry stored them. */
+  private String pushByTag(final Repo repo, final String tag, final String layer) throws Exception {
+    this.wire.pushBlobsOf(repo, IMAGE, layer);
+    final var manifest = DockerWire.imageManifest(layer);
+    final var push = this.wire.putImage(repo, IMAGE, tag, manifest);
+    assertThat(push.getStatus()).as(push.getContentAsString()).isEqualTo(201);
+
+    return manifest;
+  }
 
   private static String digest(final String algorithm, final String jcaName, final byte[] bytes) {
     try {
@@ -217,6 +255,8 @@ class DockerSha512ReferenceIT extends AbstractIntegrationTest {
 
     final var push = this.putManifest(repo, reference, manifest, token);
     assertThat(push.getStatus()).as(push.getContentAsString()).isEqualTo(201);
+    assertThat(push.getHeader("Docker-Content-Digest")).isEqualTo(reference);
+    assertThat(push.getHeader("Location")).endsWith("/manifests/" + reference);
 
     final var head = this.manifestRequest(true, repo, reference, token);
     final var get = this.manifestRequest(false, repo, reference, token);
@@ -225,6 +265,162 @@ class DockerSha512ReferenceIT extends AbstractIntegrationTest {
     assertThat(get.getStatus()).as(get.getContentAsString()).isEqualTo(200);
     assertThat(get.getContentAsString()).isEqualTo(manifest);
     assertThat(get.getContentType()).isEqualTo(OCI_MANIFEST);
+    assertThat(head.getHeader("Docker-Content-Digest")).isEqualTo(reference);
+    assertThat(get.getHeader("Docker-Content-Digest")).isEqualTo(reference);
+  }
+
+  @Test
+  @DisplayName(
+      "a push by sha512 stores no tag: no tag row is named after the digest, and the panel lists none")
+  void aShaFiveTwelvePushCreatesNoTag() throws Exception {
+    final var repo = this.dockerRepo();
+    final var manifest = this.pushByTag(repo, "latest", "layer-tag");
+    final var byDigest = DockerWire.imageManifest("layer-digest");
+    this.wire.pushBlobsOf(repo, IMAGE, "layer-digest");
+    final var reference = sha512(DockerWire.bytes(byDigest));
+
+    final var push = this.wire.putImage(repo, IMAGE, reference, byDigest);
+
+    assertThat(push.getStatus()).as(push.getContentAsString()).isEqualTo(201);
+    final var image = this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE).orElseThrow();
+    assertThat(this.tagRepository.findAllByImageRepoIdAndImageId(repo.getId(), image.getId()))
+        .extracting(tag -> tag.getName())
+        .containsExactly("latest");
+    final var tags =
+        this.expectSuccess(
+            this.perform(
+                get("/api/docker/images/%s/%s/tags".formatted(repo.getName(), IMAGE))
+                    .header(AUTHORIZATION, this.adminBearerToken())),
+            "imageTagsFetched",
+            "Image tags fetched.");
+    assertThat(JsonPath.<List<String>>read(tags, "$.data.content[*].name"))
+        .containsExactly("latest");
+    assertThat(this.manifestRepository.findAllByImageId(image.getId())).hasSize(2);
+    assertThat(manifest).isNotEqualTo(byDigest);
+  }
+
+  @Test
+  @DisplayName("a manifest pushed by tag is stored with both digests and served by either")
+  void aManifestIsAddressableByBothDigests() throws Exception {
+    final var repo = this.dockerRepo();
+    final var manifest = this.pushByTag(repo, "latest", "layer-both");
+    final var sha256 = sha256(DockerWire.bytes(manifest));
+    final var sha512 = sha512(DockerWire.bytes(manifest));
+    final var image = this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE).orElseThrow();
+
+    final var row = this.manifestRepository.findByImageIdAndAnyDigest(image.getId(), sha512);
+    assertThat(row).isPresent();
+    assertThat(row.get().getDigest()).isEqualTo(sha256);
+    assertThat(row.get().getDigestSha512()).isEqualTo(sha512);
+
+    final var token = this.adminProtocolBearerToken();
+
+    for (final var headOnly : List.of(false, true)) {
+      final var bySha256 = this.manifestRequest(headOnly, repo, sha256, token);
+      final var bySha512 = this.manifestRequest(headOnly, repo, sha512, token);
+      final var byTag = this.manifestRequest(headOnly, repo, "latest", token);
+
+      assertThat(bySha256.getStatus()).isEqualTo(200);
+      assertThat(bySha512.getStatus()).isEqualTo(200);
+      assertThat(byTag.getStatus()).isEqualTo(200);
+      assertThat(bySha256.getHeader("Docker-Content-Digest")).isEqualTo(sha256);
+      assertThat(bySha512.getHeader("Docker-Content-Digest")).isEqualTo(sha512);
+      assertThat(byTag.getHeader("Docker-Content-Digest")).isEqualTo(sha256);
+      assertThat(bySha512.getHeader("Content-Length"))
+          .isEqualTo(bySha256.getHeader("Content-Length"));
+    }
+    assertThat(this.wire.getManifest(repo, IMAGE, sha512).getContentAsString()).isEqualTo(manifest);
+  }
+
+  @Test
+  @DisplayName("the push by tag answers with the sha256 digest, and a sha256 push with that digest")
+  void aTagOrShaTwoFiftySixPushKeepsTheShaTwoFiftySixDigest() throws Exception {
+    final var repo = this.dockerRepo();
+    this.wire.pushBlobsOf(repo, IMAGE, "layer-sha256");
+    final var manifest = DockerWire.imageManifest("layer-sha256");
+    final var sha256 = sha256(DockerWire.bytes(manifest));
+
+    final var byTag = this.wire.putImage(repo, IMAGE, "latest", manifest);
+    final var bySha256 = this.wire.putImage(repo, IMAGE, sha256, manifest);
+
+    assertThat(byTag.getHeader("Docker-Content-Digest")).isEqualTo(sha256);
+    assertThat(byTag.getHeader("Location")).endsWith("/manifests/" + sha256);
+    assertThat(bySha256.getStatus()).isEqualTo(201);
+    assertThat(bySha256.getHeader("Docker-Content-Digest")).isEqualTo(sha256);
+    assertThat(bySha256.getHeader("Location")).endsWith("/manifests/" + sha256);
+  }
+
+  @Test
+  @DisplayName("hex digits of a sha512 reference are case-insensitive and echoed lower-cased")
+  void upperCaseShaFiveTwelveReferenceIsEchoedLowerCased() throws Exception {
+    final var repo = this.dockerRepo();
+    final var manifest = this.pushByTag(repo, "latest", "layer-case");
+    final var sha512 = sha512(DockerWire.bytes(manifest));
+    final var upper = "sha512:" + sha512.substring("sha512:".length()).toUpperCase(Locale.ROOT);
+
+    final var get = this.wire.getManifest(repo, IMAGE, upper);
+
+    assertThat(get.getStatus()).isEqualTo(200);
+    assertThat(get.getHeader("Docker-Content-Digest")).isEqualTo(sha512);
+    assertThat(this.wire.putImage(repo, IMAGE, upper, manifest).getHeader("Docker-Content-Digest"))
+        .isEqualTo(sha512);
+  }
+
+  @Test
+  @DisplayName("a well-formed sha512 that names no manifest of the image is 404, not a mismatch")
+  void anUnknownShaFiveTwelveIs404() throws Exception {
+    final var repo = this.dockerRepo();
+    this.pushByTag(repo, "latest", "layer-known");
+
+    final var get = this.wire.getManifest(repo, IMAGE, "sha512:" + "0".repeat(128));
+    final var head = this.wire.headManifest(repo, IMAGE, "sha512:" + "0".repeat(128));
+
+    assertThat(get.getStatus()).isEqualTo(404);
+    assertThat(head.getStatus()).isEqualTo(404);
+  }
+
+  @Test
+  @DisplayName(
+      "an index may list its manifests by sha512 and is itself pushed and served by sha512")
+  void anIndexOfShaFiveTwelveChildren() throws Exception {
+    final var repo = this.dockerRepo();
+    final var child = this.pushByTag(repo, "child", "layer-child");
+    final var childSha512 = sha512(DockerWire.bytes(child));
+    final var index =
+        "{\"schemaVersion\":2,\"mediaType\":\"%s\",\"manifests\":[{\"mediaType\":\"%s\",\"digest\":\"%s\",\"size\":%d,\"platform\":{\"architecture\":\"amd64\",\"os\":\"linux\"}}]}"
+            .formatted(
+                DockerWire.OCI_INDEX, OCI_MANIFEST, childSha512, DockerWire.bytes(child).length);
+    final var indexSha512 = sha512(DockerWire.bytes(index));
+
+    final var push = this.wire.putManifest(repo, IMAGE, indexSha512, DockerWire.OCI_INDEX, index);
+
+    assertThat(push.getStatus()).as(push.getContentAsString()).isEqualTo(201);
+    assertThat(push.getHeader("Docker-Content-Digest")).isEqualTo(indexSha512);
+    final var get = this.wire.getManifest(repo, IMAGE, indexSha512);
+    assertThat(get.getStatus()).isEqualTo(200);
+    assertThat(get.getContentAsString()).isEqualTo(index);
+    assertThat(get.getHeader("Docker-Content-Digest")).isEqualTo(indexSha512);
+    assertThat(this.wire.getManifest(repo, IMAGE, childSha512).getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  @DisplayName(
+      "an identical push fills a missing sha512 digest, so an old row becomes addressable by it")
+  void anIdenticalPushFillsAMissingShaFiveTwelve() throws Exception {
+    final var repo = this.dockerRepo();
+    final var manifest = this.pushByTag(repo, "latest", "layer-legacy");
+    final var sha512 = sha512(DockerWire.bytes(manifest));
+    final var image = this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE).orElseThrow();
+    final var row =
+        this.manifestRepository.findByImageIdAndAnyDigest(image.getId(), sha512).orElseThrow();
+    row.setDigestSha512(null);
+    this.manifestRepository.saveAndFlush(row);
+    assertThat(this.wire.getManifest(repo, IMAGE, sha512).getStatus()).isEqualTo(404);
+
+    final var again = this.wire.putImage(repo, IMAGE, "latest", manifest);
+
+    assertThat(again.getStatus()).isEqualTo(201);
+    assertThat(this.wire.getManifest(repo, IMAGE, sha512).getStatus()).isEqualTo(200);
   }
 
   @ParameterizedTest(name = "{0}")

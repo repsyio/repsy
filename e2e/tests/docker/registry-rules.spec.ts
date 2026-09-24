@@ -20,8 +20,10 @@
  * read from `AbstractDockerProtocolTxFacade`/`DockerAuthComponent`/`DockerHeaderPreProcessor` first
  * and then confirmed against a running instance (see `docker-raw.ts`'s file header and README.md's
  * "Docker runner" section for the raw evidence and the full H1-H14 write-up). Sections R1-R13 mirror
- * the implementation plan's own hypothesis numbering 1:1.
+ * the implementation plan's own hypothesis numbering 1:1; R14 (RPS-1244) pins the sha512 manifest
+ * digests.
  */
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 
 import { RepoType } from '../../src/api/panel-api.js';
@@ -51,6 +53,12 @@ import type { Seeder } from '../../src/seed/seeder.js';
 interface Layout {
   repoName: string;
   image: string;
+}
+
+/** `sha512:<hex>` of the bytes: a manifest's second digest, the one a client that hashes with
+ *  sha512 names it by (RPS-1244). */
+function sha512Digest(bytes: Buffer): string {
+  return `sha512:${createHash('sha512').update(bytes).digest('hex')}`;
 }
 
 async function newRepo(
@@ -626,6 +634,103 @@ test.describe('docker registry rules (raw HTTP)', () => {
       const getIndex = await rawGetManifest(layout.repoName, admin, layout.image, 'multiarch');
       expect(getIndex.status).toBe(200);
       expect(getIndex.contentType?.split(';')[0]).toBe(indexObj.mediaType);
+    },
+  );
+
+  test(
+    'R14: a manifest is addressable by sha256 AND sha512, and every response reports the ' +
+      'algorithm the client used (RPS-1244)',
+    { tag: ['@settings'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'sha512');
+      const admin = adminCredential();
+      const { built, manifestRes } = await rawPushImage(layout, admin, 'latest', 'r14');
+      const sha512 = sha512Digest(built.manifestBytes);
+
+      // By tag: the canonical sha256, in the header and in the Location.
+      expect(manifestRes.status).toBe(201);
+      expect(manifestRes.digestHeader, 'a push by tag reports the sha256').toBe(
+        built.manifestDigest,
+      );
+      expect(manifestRes.location, 'and locates the manifest by its sha256').toMatch(
+        new RegExp(`/manifests/${built.manifestDigest}$`),
+      );
+
+      // By sha512 (GET and HEAD): the same bytes, the sha512 digest reported back.
+      const getBySha512 = await rawGetManifest(layout.repoName, admin, layout.image, sha512);
+      expect(getBySha512.status, 'GET by the sha512 of a tag-pushed manifest').toBe(200);
+      expect(getBySha512.body.equals(built.manifestBytes)).toBe(true);
+      expect(getBySha512.digestHeader, 'GET by sha512 reports the sha512').toBe(sha512);
+      const headBySha512 = await rawHeadManifest(layout.repoName, admin, layout.image, sha512);
+      expect(headBySha512.status).toBe(200);
+      expect(headBySha512.digestHeader, 'HEAD by sha512 reports the sha512').toBe(sha512);
+
+      // By sha256 and by tag: still the sha256.
+      const getBySha256 = await rawGetManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        built.manifestDigest,
+      );
+      expect(getBySha256.digestHeader).toBe(built.manifestDigest);
+      const getByTag = await rawGetManifest(layout.repoName, admin, layout.image, 'latest');
+      expect(getByTag.digestHeader).toBe(built.manifestDigest);
+
+      // Pushing the same bytes by their sha512 is accepted (no new tag) and answered in sha512.
+      const putBySha512 = await rawPutManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        sha512,
+        built.manifestBytes,
+        built.manifestMediaType,
+      );
+      expect(putBySha512.status).toBe(201);
+      expect(putBySha512.digestHeader, 'a push by sha512 reports the sha512').toBe(sha512);
+      expect(putBySha512.location).toMatch(new RegExp(`/manifests/${sha512}$`));
+
+      // A different manifest pushed ONLY by its sha512 is pullable by both digests, never a tag.
+      const other = await freshImage('docker-r14-other', 'r14-other');
+      await uploadBlobs(layout, admin, other);
+      const otherSha512 = sha512Digest(other.manifestBytes);
+      const otherPut = await rawPutManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        otherSha512,
+        other.manifestBytes,
+        other.manifestMediaType,
+      );
+      expect(otherPut.status, 'a bare sha512 push').toBe(201);
+      const otherBySha256 = await rawGetManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        other.manifestDigest,
+      );
+      expect(otherBySha256.status, 'pullable by its sha256').toBe(200);
+      expect(otherBySha256.digestHeader).toBe(other.manifestDigest);
+      const otherBySha512 = await rawGetManifest(layout.repoName, admin, layout.image, otherSha512);
+      expect(otherBySha512.status, 'pullable by its sha512').toBe(200);
+      expect(otherBySha512.digestHeader).toBe(otherSha512);
+
+      // A wrong sha512 reference stays a digest mismatch (RPS-1242); an unknown one is a 404.
+      const wrong = await rawPutManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        `sha512:${'0'.repeat(128)}`,
+        other.manifestBytes,
+        other.manifestMediaType,
+      );
+      expectOci(wrong, 400, 'DIGEST_INVALID');
+      const unknown = await rawGetManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        `sha512:${'0'.repeat(128)}`,
+      );
+      expect(unknown.status).toBe(404);
     },
   );
 

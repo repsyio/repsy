@@ -23,7 +23,9 @@ import io.repsy.os.generated.model.ImageListItem;
 import io.repsy.os.generated.model.ImageTagListItem;
 import io.repsy.os.generated.model.ManifestListItem;
 import io.repsy.os.generated.model.TagDetail;
+import io.repsy.os.generated.model.UntaggedManifestCleanupResult;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
+import io.repsy.os.server.protocols.docker.shared.layer.dtos.OrphanLayerInfo;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
 import io.repsy.os.server.protocols.docker.shared.tag.services.TagDeletionComponent;
 import io.repsy.os.server.protocols.docker.ui.facades.DockerApiFacade;
@@ -111,6 +113,34 @@ public class DockerImageController {
     this.dockerApiFacade.deleteOrphanLayers(repoInfo);
 
     return this.restResponseFactory.success("orphanLayersDeleted");
+  }
+
+  /**
+   * Deletes the manifests no tag points to, then the layers only they used. The manifest files are
+   * gone, and their bytes refunded, before the response; the layer blobs are deleted in the
+   * background and refund themselves. The literal {@code manifests} segment comes first so the
+   * route is not read as {@code /{repoName}/{imageName}}.
+   */
+  @DeleteMapping("/manifests/{repoName}/untagged")
+  @RepoOperation(permission = Permission.MANAGE)
+  public RestResponse<UntaggedManifestCleanupResult> deleteUntaggedManifests(
+      final RepoInfo repoInfo, @RequestParam(required = false) final String image) {
+
+    final var manifests = this.dockerApiFacade.deleteUntaggedManifests(repoInfo, image);
+
+    this.updateUsage(
+        repoInfo, BaseUsages.builder().diskUsage(-1L * manifests.freedBytes()).build());
+
+    final var orphans = this.dockerApiFacade.deleteOrphanLayers(repoInfo);
+
+    final var result =
+        new UntaggedManifestCleanupResult()
+            .deletedManifests(manifests.deletedManifests())
+            .freedManifestBytes(manifests.freedBytes())
+            .orphanLayersScheduled(orphans.size())
+            .orphanLayerBytes(orphans.stream().mapToLong(OrphanLayerInfo::size).sum());
+
+    return this.restResponseFactory.success("untaggedManifestsDeleted", result);
   }
 
   @DeleteMapping("/{repoName}/{imageName}")

@@ -29,6 +29,7 @@ import { MavenRepoSettingsForm } from '../maven/dto/maven-repo-settings-form';
 import { RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { DeleteOrphanLayersComponent } from './delete-orphan-layers/delete-orphan-layers.component';
 import { DeleteRepoComponent } from './delete-repo/delete-repo.component';
+import { DeleteUntaggedManifestsComponent } from './delete-untagged-manifests/delete-untagged-manifests.component';
 import { DeployTokenComponent } from './deploy-token/deploy-token.component';
 import { VersionAllowanceComponent } from './maven-version-allowence/maven-version-allowence.component';
 import { PackageOverrideComponent } from './package-override/package-override.component';
@@ -50,6 +51,7 @@ import { VulnerabilityScanningComponent } from './vulnerability-scanning/vulnera
     RepoInfoComponent,
     NgOptimizedImage,
     DeleteRepoComponent,
+    DeleteUntaggedManifestsComponent,
     DeleteOrphanLayersComponent,
     VersionAllowanceComponent,
     RepoStorageComponent,
