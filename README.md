@@ -531,8 +531,10 @@ limit off.
 
 - **What counts:** a failed password verification (a wrong password, or a username that does not
   exist) and a credential sent as a `Bearer` value that Repsy does not recognise: a deploy token
-  that was revoked, rotated or belongs to another repository, an expired or forged token (npm's
-  `_authToken`, a NuGet API key, a Cargo or Ruby token, a `docker` client replaying an old token).
+  that was revoked, rotated or belongs to another repository, or a forged token (npm's
+  `_authToken`, a NuGet API key, a Cargo or Ruby token). A validly signed token that has merely
+  expired is recognised and does not count (it is answered `sessionExpired`), so a long `docker
+  push` whose token runs out does not spend the budget of everyone behind the same address.
   All of them count the same and are refused the same way (`401 unAuthorized`), so the limit never
   reveals which usernames exist, and it is keyed on the client, never on the username. A request
   that succeeds, a valid deploy token, a valid bearer token, a recognised token that is refused

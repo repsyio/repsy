@@ -567,16 +567,19 @@ class ProtocolAuthServiceTest {
     }
 
     @Test
-    @DisplayName("an expired protocol JWT answers unAuthorized, not sessionExpired, and is counted")
-    void expiredJwtIsCounted() {
-      this.rejectBearerAs("sessionExpired");
+    @DisplayName("an expired but validly signed JWT keeps sessionExpired and is not counted")
+    void expiredJwtIsNotCounted() {
+      this.rejectBearerAs(ErrorConstants.SESSION_EXPIRED);
 
-      for (var i = 0; i < LIMIT; i++) {
-        assertUnauthorized(() -> this.bearer(Permission.READ));
+      for (var i = 0; i < LIMIT * 3; i++) {
+        assertThatThrownBy(() -> this.bearer(Permission.READ))
+            .isExactlyInstanceOf(UnAuthorizedException.class)
+            .hasMessage(ErrorConstants.SESSION_EXPIRED);
       }
 
-      assertThatThrownBy(() -> this.bearer(Permission.READ))
-          .isInstanceOf(TooManyRequestsException.class);
+      // Still under the limit: the next wrong bearer is the first one on the count, not a 429.
+      this.rejectBearerAs(ErrorConstants.ACCESS_NOT_ALLOWED);
+      assertUnauthorized(() -> this.bearer(Permission.READ));
     }
 
     @Test

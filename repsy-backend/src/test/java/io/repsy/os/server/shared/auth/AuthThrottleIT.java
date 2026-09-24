@@ -575,4 +575,28 @@ class AuthThrottleIT extends AbstractIntegrationTest {
       assertThat(JsonPath.<String>read(body(response), "$.msgId")).isEqualTo("unAuthorized");
     }
   }
+
+  @Test
+  @DisplayName(
+      "does not count an expired but validly signed protocol JWT, which keeps sessionExpired")
+  void expiredProtocolJwtIsNotCounted() throws Exception {
+    final var repo = this.seedNpmRepo();
+    final var user = this.createUser(uniqueUsername("expired"), UserRole.USER);
+    final var expired =
+        AuthUtils.AUTH_BEARER
+            + this.jwtUtils.createProtocolToken(
+                user.getId(), user.getUsername(), Duration.ofSeconds(-60));
+
+    for (var i = 0; i < MAX_FAILURES * 2; i++) {
+      final var response = this.npmBearer(repo, expired);
+
+      assertThat(response.getStatus()).as(body(response)).isEqualTo(401);
+      assertThat(JsonPath.<String>read(body(response), "$.msgId")).isEqualTo("sessionExpired");
+    }
+
+    // The count is untouched: the first wrong credential is a 401, not a 429.
+    final var wrong = this.npmBearer(repo, "Bearer not.a.token");
+    assertThat(wrong.getStatus()).isEqualTo(401);
+    assertThat(JsonPath.<String>read(body(wrong), "$.msgId")).isEqualTo("unAuthorized");
+  }
 }

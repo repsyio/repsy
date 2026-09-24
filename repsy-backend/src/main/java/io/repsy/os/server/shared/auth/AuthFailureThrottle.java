@@ -54,9 +54,10 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  *       known user all count the same and are refused the same way, so the throttle reveals nothing
  *       about which usernames exist (RPS-906).
  *   <li>Only failed credential checks count: a failed BCrypt check, and a Bearer value that is
- *       neither a live deploy token nor a verifiable protocol JWT (RPS-1209). A success never
- *       resets the count, so a client cannot clear it by logging in with an account of its own;
- *       only the end of the window does.
+ *       neither a live deploy token nor a verifiable protocol JWT (RPS-1209); an expired but
+ *       validly signed JWT is recognized and does not count. A success never resets the count, so a
+ *       client cannot clear it by logging in with an account of its own; only the end of the window
+ *       does.
  *   <li>A fixed window per client: after {@code maxFailures} failures the next password check is
  *       refused until the window ends. A refused attempt costs no BCrypt, but it is counted too, so
  *       a client that keeps sending guesses reaches {@link #isSaturated() saturation} after {@value

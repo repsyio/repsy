@@ -79,7 +79,8 @@ public class ProtocolAuthService {
    *
    * <p>A Bearer value that is neither a live deploy token nor a verifiable protocol JWT answers
    * {@code unAuthorized} and counts against {@link AuthFailureThrottle}, like a wrong Basic
-   * password (RPS-1209).
+   * password (RPS-1209). An expired protocol JWT is answered {@code sessionExpired} and not
+   * counted.
    */
   public void handleBearerAuth(
       final @NonNull String authHeader,
@@ -142,8 +143,13 @@ public class ProtocolAuthService {
   /**
    * Verifies the bearer JWT and returns its authentication type. A Bearer value that is no live
    * deploy token and no protocol JWT is a wrong credential: it answers {@code unAuthorized} like a
-   * wrong password and counts as one failure against the client (RPS-1209), whatever the reason the
-   * JWT was refused (bad signature, expired, wrong realm).
+   * wrong password and counts as one failure against the client (RPS-1209), whether the JWT has a
+   * bad signature, the wrong realm or is no JWT at all.
+   *
+   * <p>A validly signed JWT that has merely expired is a credential Repsy recognizes, not a guess:
+   * Docker and Helm clients hold short-lived tokens, and a long push over a shared address, with
+   * its parallel layer uploads, would otherwise spend the budget of every client behind it. It is
+   * answered {@code sessionExpired} as before and is not counted.
    *
    * <p>{@link JwtUtils#extractAuthenticationType} rejects a claim it does not recognize with {@link
    * BadRequestException}. That is right for a request body the client controls, but an unrecognized
@@ -152,16 +158,26 @@ public class ProtocolAuthService {
    *
    * <p>The check comes after the verification, so a verified token is never refused for the count,
    * like a remembered password (RPS-1092). What Repsy recognized but refuses (a revoked or
-   * read-only deploy token, no ADMIN for MANAGE) is decided later and does not count.
+   * read-only deploy token, no ADMIN for MANAGE) is decided later and does not count either.
    */
   private @NonNull AuthenticationType verifiedAuthenticationType(final @NonNull String authHeader) {
     try {
       return this.jwtUtils.extractAuthenticationType(authHeader, TokenRealm.PROTOCOL);
-    } catch (final BadRequestException | UnAuthorizedException _) {
-      this.authFailureThrottle.checkAllowed();
-      this.authFailureThrottle.recordFailure();
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    } catch (final UnAuthorizedException ex) {
+      if (ErrorConstants.SESSION_EXPIRED.equals(ex.getMessage())) {
+        throw ex;
+      }
+      throw this.countedUnAuthorized();
+    } catch (final BadRequestException _) {
+      throw this.countedUnAuthorized();
     }
+  }
+
+  /** Counts one failed credential against the client and returns the answer to give for it. */
+  private @NonNull UnAuthorizedException countedUnAuthorized() {
+    this.authFailureThrottle.checkAllowed();
+    this.authFailureThrottle.recordFailure();
+    return new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
   }
 
   /**
