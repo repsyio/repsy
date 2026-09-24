@@ -71,7 +71,7 @@ e2e/
   docker-compose.stack-h2.yml  # H2 profile: Repsy alone (embedded H2, no postgres service), `run.sh local up|down --h2`
   docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
-  runners/maven.Dockerfile     # + pinned Temurin/Maven; see "Adding a protocol adapter" below
+  runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle and gpg; see "Adding a protocol adapter" below
   runners/npm.Dockerfile       # + nothing else: npm ships with the node:24 base already
   runners/cargo.Dockerfile     # + a pinned Rust toolchain, copied in from the official rust image
   runners/nuget.Dockerfile     # + a pinned .NET SDK, copied in from the official Ubuntu-noble SDK image
@@ -115,6 +115,8 @@ e2e/
       npm-raw.ts                  # npm-specific raw PUT/GET (packument/tarball), publish-document builder
       npm.ts                      # the npm client + npmAdapter: publish()/resolve()/seedPublish(), npm pack/publish/install
       pgp.ts                     # real OpenPGP.js key generation and detached signing, no gpg/network
+      gpg.ts                     # a real `gpg` key in its own GNUPGHOME (RPS-1316): generate, export the public key, dispose
+      maven-signing.ts           # a real `mvn deploy` with maven-gpg-plugin and a Gradle maven-publish + signing publish (RPS-1316)
       cargo-raw.ts                 # cargo-specific raw PUT/GET (publish/config.json/sparse-index/download), body builder
       cargo.ts                     # the cargo client + cargoAdapter: publish()/resolve()/seedPublish(), cargo package/publish/fetch
       nuget-raw.ts                  # nuget-specific raw PUT/GET (publish/versions/download/registration/service-index), buildNupkg (fflate)
@@ -147,11 +149,13 @@ e2e/
     ui/                         # the panel UI suite (Playwright + headless Chromium): smoke.spec.ts (@smoke) and harness.spec.ts, one folder per area from here on -- see "UI suite"
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe; both tests tagged @smoke
     skeleton/repo-settings.spec.ts  # RPS-1200 settings-PUT field-by-field matrix across RepoTypes; untagged (not smoke-sized)
+    skeleton/repo-type-casing.spec.ts  # RPS-1269 repo type: /format answers upper case; type accepted in any case (query and body)
     maven/
       publish-consume.spec.ts   # registerPublishConsumeLoop(mavenAdapter) + the RPS-1196 real-client test
       upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules
       pgp-signature.spec.ts     # registered PGP public keys (RPS-1189): verify, reject, isolate, delete; every-signature verification (RPS-1188); key-server lookup off (RPS-1204)
       parallel-signed-deploy.spec.ts  # a REAL parallel `mvn deploy:deploy-file` of a signed release to a verify-all repo (RPS-1188), plus the one-thread control
+      gpg-signed-deploy.spec.ts  # RPS-1316, tag @gpg: maven-gpg-plugin and Gradle `signing` deploys with a real gpg key to a verify-all repo (signed / unsigned / unregistered key)
       remote-throttle.spec.ts   # sanity check of RemoteAuthBudget/withBackoff429, no server needed
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
@@ -445,7 +449,9 @@ What the server does, per rule (all pinned above or in `tests/maven/upload-rules
   `parallel-signed-deploy.spec.ts`. The pin sends an `.asc`
   with no signature packet, which is refused before any key server is asked, so no network and no
   `gpg` are needed; a signature that verifies (or fails against a real key) is covered by
-  `MavenPomSignatureIT` on the backend side.
+  `MavenPomSignatureIT` on the backend side, and end to end, with a real `gpg` key and the real
+  clients (`maven-gpg-plugin`, Gradle's `signing`), by `gpg-signed-deploy.spec.ts` (RPS-1316,
+  tag `@gpg`: `./run.sh test --protocol maven --grep @gpg`).
   An `.asc` that is not a signature at all (the two armor lines only, a bad CRC, binary garbage)
   answers the same `422 artifactSignatureNotVerified` and stores nothing, where it used to be a
   `500 errorOccurred` (RPS-1191). A `.pom.asc` of a POM that is stored but has no registered version
@@ -531,7 +537,9 @@ five worked examples.
 ## Maven runner
 
 `runners/maven.Dockerfile` adds a pinned Eclipse Temurin JDK and Apache Maven (build args
-`TEMURIN_VERSION`, `MAVEN_VERSION`) to the harness image. `clients/maven.ts` renders
+`TEMURIN_VERSION`, `MAVEN_VERSION`), a pinned Gradle (`GRADLE_VERSION`, with its published
+`GRADLE_SHA256`, checked at build time) and `gpg` (Debian's GnuPG 2.2, no key server tooling) to
+the harness image; the last two are only for `gpg-signed-deploy.spec.ts` (below). `clients/maven.ts` renders
 `src/packages/maven/{pom,settings}.template.xml` into a per-invocation isolated work directory
 (`clients/exec.ts`) and runs the real `mvn` binary:
 
@@ -553,6 +561,22 @@ test or per worker — with a throwaway `mvn package` (compiler/jar/install/depl
 throwaway `dependency:get` (the dependency plugin itself). This harness's own test artifacts never
 end up in that shared cache: they always live under the unique `io.repsy.e2e.<runid>` groupId, which
 a tail lookup can never already hold.
+
+**Signed deploys with a real `gpg` (`gpg-signed-deploy.spec.ts`, RPS-1316).** `clients/gpg.ts`
+generates a passphrase-protected key with `gpg --batch --gen-key` in its own, short `GNUPGHOME` per
+test (stopped and deleted afterwards), and the spec registers its exported public key on a repo with
+`pgpVerifyAllSignaturesEnabled` (and the key server lookup off) through the panel API.
+`clients/maven-signing.ts` then deploys a tiny project with `maven-gpg-plugin` bound to `verify` (six
+files, three `.asc`) and, separately, publishes one with Gradle's `maven-publish` + `signing`
+(`useGpgCmd()`; the jar, sources, POM and Gradle module metadata, each with an `.asc`). Parallel
+workers share nothing but the read-only Maven cache tail: each has its own `GNUPGHOME`, Maven local
+repository, and Gradle user home (`--no-daemon`, no daemon outlives a test). Gradle's `maven-publish`,
+`signing` and `java-library` plugins ship with the distribution, so a Gradle run needs no network
+beyond the Repsy stack. Pinned outcomes, per client: a deploy signed with the registered key ends
+`signed`; an unsigned deploy is accepted (every file stored, no `.asc`, not `signed`); a deploy signed
+with a key that is not registered fails with a 404 (see `pgp-signature.spec.ts`; on an `.asc`, or on the
+file a parked `.asc` belongs to, whichever the client sent second), stores no
+signature and leaves the version not `signed` (the files sent before the failure stay).
 
 Because `mvn` hides the HTTP status behind its own exit code, `clients/maven.ts` also does a raw
 HTTP PUT (publish) or GET (consume, of the repo root — see that file's comment on why the repo root

@@ -5,7 +5,7 @@
     @if (chart) {
       <div data-testid="pkg-detail" animate.enter="fade-in-up">
         <app-security-scan-section
-          [repoType]="'HELM'"
+          [repoType]="securityRepoType"
           [repoName]="activeRepo.repoName"
           [artifactName]="chartName"
           [artifactVersion]="versionName"

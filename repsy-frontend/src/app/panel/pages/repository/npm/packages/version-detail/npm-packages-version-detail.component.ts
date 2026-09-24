@@ -20,7 +20,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
-import { PackageVersionDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { PackageVersionDetail, RepoPermissionInfo, RepoType } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { MarkdownComponent } from '../../../../../shared/components/markdown/markdown.component';
@@ -45,6 +45,7 @@ import { NpmService } from '../../service/npm.service';
   templateUrl: './npm-packages-version-detail.component.html',
 })
 export class NpmPackagesVersionDetailComponent implements OnDestroy {
+  public readonly securityRepoType = RepoType.Npm;
   public loading = true;
   public scopeName: string;
   public packageName: string;
@@ -72,7 +73,7 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
         this.loadVersion();
       }
     });
-    this.breadcrumbSecurityLinkService.show('NPM');
+    this.breadcrumbSecurityLinkService.show(RepoType.Npm);
   }
 
   public ngOnDestroy(): void {

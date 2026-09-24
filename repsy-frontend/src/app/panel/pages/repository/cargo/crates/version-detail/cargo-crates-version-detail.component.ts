@@ -21,7 +21,7 @@ import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
 import { Subscription } from 'rxjs';
 import { finalize, switchMap } from 'rxjs/operators';
 
-import { RepoPermissionInfo } from '../../../../../../../generated/api';
+import { RepoPermissionInfo, RepoType } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { MarkdownComponent } from '../../../../../shared/components/markdown/markdown.component';
@@ -48,6 +48,7 @@ import { CargoService } from '../../service/cargo.service';
   templateUrl: './cargo-crates-version-detail.component.html',
 })
 export class CargoCratesVersionDetailComponent implements OnDestroy {
+  public readonly securityRepoType = RepoType.Cargo;
   public loading = true;
   public error: string;
   public packageName: string;

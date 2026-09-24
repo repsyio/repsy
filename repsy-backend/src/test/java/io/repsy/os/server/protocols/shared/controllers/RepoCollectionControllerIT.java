@@ -622,6 +622,42 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
       verifyNoInteractions(RepoCollectionControllerIT.this.usageUpdateService);
     }
 
+    @ParameterizedTest(name = "type={0}")
+    @ValueSource(strings = {"maven", "Maven", "mAvEn", "MAVEN", " maven "})
+    @DisplayName("accepts the type in the body in any case and answers with the upper-case type")
+    void typeInTheBodyIsCaseInsensitive(final String type) throws Exception {
+      final var name = uniqueRepoName("case");
+
+      final var body =
+          expectSuccess(
+              RepoCollectionControllerIT.this.create(
+                  RepoCollectionControllerIT.this.adminBearerToken(), createBody(name, type)),
+              "repoCreated",
+              "Repo created.");
+
+      assertThat(JsonPath.<String>read(body, "$.data.type")).isEqualTo("MAVEN");
+      assertThat(RepoCollectionControllerIT.this.reloadRepo(name).getType())
+          .isEqualTo(RepoType.MAVEN);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @EnumSource(RepoType.class)
+    @DisplayName("accepts the lower-case slug of every type in the body")
+    void lowerCaseBodyForEveryType(final RepoType type) throws Exception {
+      final var name = uniqueRepoName("lower");
+
+      final var body =
+          expectSuccess(
+              RepoCollectionControllerIT.this.create(
+                  RepoCollectionControllerIT.this.adminBearerToken(),
+                  createBody(name, type.name().toLowerCase(Locale.ROOT))),
+              "repoCreated",
+              "Repo created.");
+
+      assertThat(JsonPath.<String>read(body, "$.data.type")).isEqualTo(type.name());
+      assertThat(RepoCollectionControllerIT.this.reloadRepo(name).getType()).isEqualTo(type);
+    }
+
     @Test
     @DisplayName("creates a public repo without a description when only name and type are sent")
     void defaults() throws Exception {
@@ -867,6 +903,8 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
           Arguments.of("missing type", "{\"name\":\"%s\"}".formatted(name)),
           Arguments.of("null type", createBody(name, null)),
           Arguments.of("unknown type", createBody(name, "FOO")),
+          Arguments.of("unknown lower-case type", createBody(name, "mvn")),
+          Arguments.of("blank type", createBody(name, " ")),
           Arguments.of("type of the wrong kind", "{\"name\":\"%s\",\"type\":7}".formatted(name)),
           Arguments.of("missing name", "{\"type\":\"MAVEN\"}"),
           Arguments.of("empty object", "{}"),

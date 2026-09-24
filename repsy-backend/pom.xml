@@ -390,6 +390,11 @@
                             <importMappings>
                                 <importMapping>Instant=java.time.Instant</importMapping>
                             </importMappings>
+                            <!-- One RepoType for the wire and the panel API: the hand-written enum reads
+                                 JSON without regard to case (RPS-1269), so no other enum is affected. -->
+                            <schemaMappings>
+                                <schemaMapping>RepoType=io.repsy.protocols.shared.repo.dtos.RepoType</schemaMapping>
+                            </schemaMappings>
                             <configOptions>
                                 <useSpringBoot3>true</useSpringBoot3>
                                 <openApiNullable>false</openApiNullable>

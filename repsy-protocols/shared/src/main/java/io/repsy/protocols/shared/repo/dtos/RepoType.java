@@ -15,7 +15,9 @@
  */
 package io.repsy.protocols.shared.repo.dtos;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Optional;
 import org.jspecify.annotations.NonNull;
 
@@ -44,7 +46,29 @@ public enum RepoType {
     return this.prefix + repoName;
   }
 
+  /**
+   * Finds the type named by {@code value}, without regard to case ({@code maven} is {@code MAVEN})
+   * and ignoring surrounding whitespace. The canonical spelling everywhere is the upper-case {@link
+   * #name()}; this is the one place that accepts the lower-case slug too.
+   */
   public static Optional<RepoType> fromString(final String value) {
-    return Arrays.stream(values()).filter(t -> t.name().equals(value)).findFirst();
+    if (value == null) {
+      return Optional.empty();
+    }
+
+    final var normalized = value.strip().toUpperCase(Locale.ROOT);
+
+    return Arrays.stream(values()).filter(t -> t.name().equals(normalized)).findFirst();
+  }
+
+  /**
+   * The JSON reader of this enum, case-insensitive. It exists so the panel API accepts {@code
+   * "maven"} as well as {@code "MAVEN"} in a request body; it is scoped to this enum only, other
+   * enums (severity, role...) keep Jackson's exact-name matching.
+   */
+  @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
+  public static RepoType fromJson(final String value) {
+    return fromString(value)
+        .orElseThrow(() -> new IllegalArgumentException("Unknown repo type: " + value));
   }
 }

@@ -43,7 +43,7 @@ import { TooltipComponent } from '../../shared/components/tooltip/tooltip.compon
 import { RepoListItem } from '../../shared/dto/repo/repo-list-item';
 import { RepoType } from '../../shared/dto/repo/repo-type';
 import { ByteFormatter } from '../../shared/util/byte-formatter';
-import { toApiRepoType } from '../../shared/util/repo-api-type';
+import { toApiRepoType, toRouteSlug } from '../../shared/util/repo-api-type';
 import { ProfileService } from '../profile/service/profile.service';
 import { SecurityService } from '../security/service/security.service';
 
@@ -285,7 +285,7 @@ export class RepositoryComponent implements OnDestroy {
     return {
       name: repo.name,
       privateRepo: repo.privateRepo ?? false,
-      repoType: (repo.type ?? '').toLowerCase(),
+      repoType: toRouteSlug(repo.type) ?? '',
       createdAt: repo.createdAt,
       diskUsage: repo.diskUsage ?? 0,
     };

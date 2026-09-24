@@ -83,7 +83,8 @@ const PUBLISH_TIMEOUT_MS = 120_000;
 const CONSUME_TIMEOUT_MS = 120_000;
 const WARM_TIMEOUT_MS = 180_000;
 
-const SHARED_M2_DIR =
+/** Maven's shared, third-party-only local-repository tail (see the file comment). */
+export const SHARED_M2_DIR =
   process.env.MAVEN_SHARED_REPO_DIR ?? path.join(os.tmpdir(), 'repsy-e2e-maven-m2');
 const WARM_MARKER = path.join(SHARED_M2_DIR, '.e2e-warm');
 
