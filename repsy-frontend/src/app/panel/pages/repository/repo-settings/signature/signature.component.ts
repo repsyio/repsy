@@ -108,7 +108,7 @@ export class SignatureComponent implements OnInit {
     message: string,
     revert: () => void,
   ): void {
-    this.protocolRepoControllerService.updateSettings(this.activeRepository.repoName, form).subscribe({
+    this.protocolRepoControllerService.updateRepoSettings(this.activeRepository.repoName, form).subscribe({
       next: () => {
         this.parentForm?.get(controlName)?.setValue(form[controlName]);
         this.toastService.show(message, 'success');

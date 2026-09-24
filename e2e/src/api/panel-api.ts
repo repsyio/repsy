@@ -176,7 +176,7 @@ export class PanelApi {
 
   /** `GET /api/repos/{repoName}/format`: the repository's type, in the API's canonical upper case. */
   async getRepoFormat(repoName: string): Promise<RepoType> {
-    const res = await this.client.protocolRepoController.getRepoType({ repoName });
+    const res = await this.client.protocolRepoController.getRepoFormat({ repoName });
     return unwrap(res.data, 'getRepoFormat');
   }
 
@@ -241,12 +241,12 @@ export class PanelApi {
   }
 
   async getSettings(repoName: string): Promise<RepoSettingsInfo> {
-    const res = await this.client.protocolRepoController.getSettings({ repoName });
-    return unwrap(res.data, 'getSettings');
+    const res = await this.client.protocolRepoController.getRepoSettings({ repoName });
+    return unwrap(res.data, 'getRepoSettings');
   }
 
   async updateSettings(repoName: string, form: RepoSettingsForm): Promise<void> {
-    await this.client.protocolRepoController.updateSettings({ repoName, requestBody: form });
+    await this.client.protocolRepoController.updateRepoSettings({ repoName, requestBody: form });
   }
 
   async createDeployToken(repoName: string, form: DeployTokenForm): Promise<TokenInfo> {
@@ -258,12 +258,15 @@ export class PanelApi {
   }
 
   async revokeDeployToken(repoName: string, tokenId: string): Promise<void> {
-    await this.client.protocolDeployTokenController.revoke({ repoName, tokenId });
+    await this.client.protocolDeployTokenController.revokeDeployToken({ repoName, tokenId });
   }
 
   /** Returns the new token value; the old one stops working immediately. */
   async rotateDeployToken(repoName: string, tokenId: string): Promise<string> {
-    const res = await this.client.protocolDeployTokenController.rotate({ repoName, tokenId });
+    const res = await this.client.protocolDeployTokenController.rotateDeployToken({
+      repoName,
+      tokenId,
+    });
     return unwrap(res.data, 'rotateDeployToken');
   }
 
@@ -378,7 +381,7 @@ export class PanelApi {
       repoName,
       groupName,
       artifactName,
-      versionName,
+      version: versionName,
     });
     return unwrap(res.data, 'getMavenArtifactVersion');
   }
@@ -424,7 +427,7 @@ export class PanelApi {
 
   /**
    * Deletes one Ruby gem version (`DELETE /api/ruby/gems/{repoName}/{gemName}/versions/
-   * {versionName}?platform=`, step 4e/RPS-294 R5/R16) -- a real panel-API delete, distinct from a
+   * {version}?platform=`, step 4e/RPS-294 R5/R16) -- a real panel-API delete, distinct from a
    * protocol-level `gem yank`. Called directly with `fetch`, like {@link
    * deleteGolangModuleVersion}: the generated client is not worth wiring in for a single endpoint no
    * other part of this harness needs.

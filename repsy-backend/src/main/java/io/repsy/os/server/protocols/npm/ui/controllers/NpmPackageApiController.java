@@ -97,19 +97,18 @@ public class NpmPackageApiController {
   }
 
   @DeleteMapping({
-    "/{repoName}/{packageName}/versions/{versionName}",
-    "/{repoName}/{scope}/{packageName}/versions/{versionName}",
+    "/{repoName}/{packageName}/versions/{version}",
+    "/{repoName}/{scope}/{packageName}/versions/{version}",
   })
   @RepoOperation(permission = Permission.MANAGE)
   public RestResponse<Void> deleteVersion(
       final RepoInfo repoInfo,
       @PathVariable(required = false) final @Nullable String scope,
       @PathVariable final String packageName,
-      @PathVariable final String versionName)
+      @PathVariable final String version)
       throws IOException {
 
-    final var usages =
-        this.npmFacade.deletePackageVersion(repoInfo, scope, packageName, versionName);
+    final var usages = this.npmFacade.deletePackageVersion(repoInfo, scope, packageName, version);
 
     this.updateUsage(repoInfo, usages);
 
@@ -135,20 +134,20 @@ public class NpmPackageApiController {
   @GetMapping({
     "/{repoName}/{packageName}",
     "/{repoName}/{scope}/{packageName}",
-    "/{repoName}/{packageName}/versions/{versionName}",
-    "/{repoName}/{scope}/{packageName}/versions/{versionName}",
+    "/{repoName}/{packageName}/versions/{version}",
+    "/{repoName}/{scope}/{packageName}/versions/{version}",
   })
   @RepoOperation
   public RestResponse<PackageVersionDetail> getVersion(
       final RepoInfo repoInfo,
       @PathVariable(required = false) final @Nullable String scope,
       @PathVariable final String packageName,
-      @PathVariable final @Nullable String versionName)
+      @PathVariable final @Nullable String version)
       throws IOException {
 
-    final var version = this.npmFacade.getVersion(repoInfo, scope, packageName, versionName);
+    final var packageVersion = this.npmFacade.getVersion(repoInfo, scope, packageName, version);
 
-    return this.restResponseFactory.success("packageVersionFetched", version);
+    return this.restResponseFactory.success("packageVersionFetched", packageVersion);
   }
 
   @GetMapping({

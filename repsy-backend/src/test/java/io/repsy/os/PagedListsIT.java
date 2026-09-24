@@ -202,7 +202,7 @@ class PagedListsIT extends AbstractIntegrationTest {
               "version",
               "publishedAt"),
           list(
-              "listContainsGroupName",
+              "listMavenGroups",
               RepoType.MAVEN,
               "/api/mvn/artifacts/{repo}",
               true,
@@ -211,7 +211,7 @@ class PagedListsIT extends AbstractIntegrationTest {
               "artifactName",
               "lastUpdatedAt"),
           list(
-              "listContainsArtifactName",
+              "listMavenArtifacts",
               RepoType.MAVEN,
               "/api/mvn/artifacts/{repo}/com.example",
               true,

@@ -56,8 +56,10 @@ describe('SignatureComponent', () => {
     keyStoreService.listMavenKeyStores.and.returnValue(of({ data: { content: [keyStore('k1')] } }) as never);
     keyStoreService.createMavenKeyStore.and.returnValue(of({}) as never);
     keyStoreService.deleteMavenKeyStore.and.returnValue(of({}) as never);
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['updateSettings']);
-    repoApi.updateSettings.and.returnValue(of({}) as never);
+    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'updateRepoSettings',
+    ]);
+    repoApi.updateRepoSettings.and.returnValue(of({}) as never);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModalService = new DangerModalService();
     component = new SignatureComponent(toastService, dangerModalService, keyStoreService, repoApi);
@@ -99,7 +101,7 @@ describe('SignatureComponent', () => {
 
       component.changeVerifyAllSignatures();
 
-      expect(repoApi.updateSettings).toHaveBeenCalledOnceWith(REPO, { pgpVerifyAllSignaturesEnabled: true });
+      expect(repoApi.updateRepoSettings).toHaveBeenCalledOnceWith(REPO, { pgpVerifyAllSignaturesEnabled: true });
       expect(component.parentForm.get('pgpVerifyAllSignaturesEnabled').value).toBeTrue();
       expect(toastService.show).toHaveBeenCalledOnceWith('Every signature is now verified', 'success');
       expect(reloaded).toHaveBeenCalledTimes(1);
@@ -113,7 +115,7 @@ describe('SignatureComponent', () => {
 
       component.changeKeyServerLookup();
 
-      expect(repoApi.updateSettings).toHaveBeenCalledOnceWith(REPO, { pgpKeyServerLookupEnabled: false });
+      expect(repoApi.updateRepoSettings).toHaveBeenCalledOnceWith(REPO, { pgpKeyServerLookupEnabled: false });
       expect(component.parentForm.get('pgpKeyServerLookupEnabled').value).toBeFalse();
       expect(toastService.show).toHaveBeenCalledOnceWith('Key server lookup is now disabled', 'success');
       expect(reloaded).toHaveBeenCalledTimes(1);
@@ -122,7 +124,7 @@ describe('SignatureComponent', () => {
     it('puts a toggle back, and neither toasts nor reloads, when the update fails', () => {
       const reloaded = jasmine.createSpy('reloaded');
       component.fetch.subscribe(reloaded);
-      repoApi.updateSettings.and.returnValue(throwError(() => new Error('boom')));
+      repoApi.updateRepoSettings.and.returnValue(throwError(() => new Error('boom')));
       component.ngOnInit();
       component.verifyAllSignaturesEnabled = true;
       component.keyServerLookupEnabled = false;

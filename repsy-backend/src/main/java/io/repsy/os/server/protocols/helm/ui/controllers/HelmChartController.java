@@ -86,57 +86,59 @@ public class HelmChartController {
     return this.restResponseFactory.success("chartsFetched", new PagedModel<>(charts));
   }
 
-  @GetMapping("/{repoName}/{name}")
+  @GetMapping("/{repoName}/{chartName}")
   @RepoOperation
   public RestResponse<List<HelmChartVersionItem>> getHelmChartVersions(
-      final RepoInfo repoInfo, @PathVariable final String name) {
+      final RepoInfo repoInfo, @PathVariable final String chartName) {
 
-    final var versions = this.helmApiFacade.getVersions(repoInfo, name);
+    final var versions = this.helmApiFacade.getVersions(repoInfo, chartName);
 
     return this.restResponseFactory.success("chartVersionsFetched", versions);
   }
 
-  @GetMapping("/{repoName}/{name}/{version}")
+  @GetMapping("/{repoName}/{chartName}/{version}")
   @RepoOperation
   public RestResponse<HelmChartDetail> getHelmChartDetail(
       final RepoInfo repoInfo,
-      @PathVariable final String name,
+      @PathVariable final String chartName,
       @PathVariable final String version) {
 
-    final var detail = this.helmApiFacade.getDetail(repoInfo, name, version);
+    final var detail = this.helmApiFacade.getDetail(repoInfo, chartName, version);
 
     return this.restResponseFactory.success("chartDetailFetched", detail);
   }
 
-  @DeleteMapping("/{repoName}/{name}")
+  @DeleteMapping("/{repoName}/{chartName}")
   @RepoOperation(permission = Permission.MANAGE)
   public RestResponse<Void> deleteAllHelmChartVersions(
-      final RepoInfo repoInfo, @PathVariable final String name) throws IOException {
+      final RepoInfo repoInfo, @PathVariable final String chartName) throws IOException {
 
-    final var usages = this.helmApiFacade.deleteAllVersions(repoInfo, name);
+    final var usages = this.helmApiFacade.deleteAllVersions(repoInfo, chartName);
     this.usageUpdateService.updateUsage(new UsageChangedInfo(repoInfo.getId(), usages));
 
     return this.restResponseFactory.success("chartDeleted");
   }
 
-  @DeleteMapping("/{repoName}/{name}/{version}")
+  @DeleteMapping("/{repoName}/{chartName}/{version}")
   @RepoOperation(permission = Permission.MANAGE)
   public RestResponse<Void> deleteHelmChart(
-      final RepoInfo repoInfo, @PathVariable final String name, @PathVariable final String version)
+      final RepoInfo repoInfo,
+      @PathVariable final String chartName,
+      @PathVariable final String version)
       throws IOException {
 
-    final var usages = this.helmApiFacade.delete(repoInfo, name, version);
+    final var usages = this.helmApiFacade.delete(repoInfo, chartName, version);
     this.usageUpdateService.updateUsage(new UsageChangedInfo(repoInfo.getId(), usages));
 
     return this.restResponseFactory.success("chartDeleted");
   }
 
-  @GetMapping("/{repoName}/{name}/tags")
+  @GetMapping("/{repoName}/{chartName}/tags")
   @RepoOperation
   public RestResponse<List<String>> getHelmChartOciTags(
-      final RepoInfo repoInfo, @PathVariable final String name) {
+      final RepoInfo repoInfo, @PathVariable final String chartName) {
 
-    final var tags = this.helmApiFacade.getOciTags(repoInfo, name);
+    final var tags = this.helmApiFacade.getOciTags(repoInfo, chartName);
 
     return this.restResponseFactory.success("chartTagsFetched", tags);
   }

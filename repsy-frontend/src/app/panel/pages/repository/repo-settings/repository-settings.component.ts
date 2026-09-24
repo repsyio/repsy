@@ -103,7 +103,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
         filter((context) => !!context),
         switchMap((context) => {
           this.repoType = context.repoType;
-          return this.protocolRepoControllerService.getPermission(context.repoName).pipe(map((r) => r.data!));
+          return this.protocolRepoControllerService.getRepoPermissions(context.repoName).pipe(map((r) => r.data!));
         }),
       )
       .subscribe((repo: RepoPermissionInfo) => {
@@ -125,7 +125,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
 
   public getRepoSettings() {
     this.protocolRepoControllerService
-      .getSettings(this.activeRepository.repoName)
+      .getRepoSettings(this.activeRepository.repoName)
       .pipe(
         map((r) => r.data!),
         finalize(() => {

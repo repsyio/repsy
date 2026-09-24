@@ -131,6 +131,14 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
     return tokenUrl(repo.getName(), tokenId);
   }
 
+  private static String rotateUrl(final String repoName, final Object tokenId) {
+    return tokenUrl(repoName, tokenId) + "/actions/rotate";
+  }
+
+  private static String rotateUrl(final RepoInfo repo, final Object tokenId) {
+    return rotateUrl(repo.getName(), tokenId);
+  }
+
   private RepoInfo createRepo(final RepoType type) {
     return this.repoTxService.createRepo(uniqueName("repo"), type, false, null);
   }
@@ -339,7 +347,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
                       post(tokensUrl(repo))
                           .contentType(MediaType.APPLICATION_JSON)
                           .content(form(uniqueName("probe")))),
-          new Endpoint("PUT", repo -> id -> put(tokenUrl(repo, id))),
+          new Endpoint("POST rotate", repo -> id -> post(rotateUrl(repo, id))),
           new Endpoint("DELETE", repo -> id -> delete(tokenUrl(repo, id))));
     }
 
@@ -1234,11 +1242,11 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // PUT /api/repos/{repoName}/deploy-tokens/{tokenId}  (rotate)
+  // POST /api/repos/{repoName}/deploy-tokens/{tokenId}/actions/rotate  (rotate)
   // ---------------------------------------------------------------------------------------------
 
   @Nested
-  @DisplayName("PUT /api/repos/{repoName}/deploy-tokens/{tokenId}")
+  @DisplayName("POST /api/repos/{repoName}/deploy-tokens/{tokenId}/actions/rotate")
   class RotateToken {
 
     @ParameterizedTest(name = "{0}")
@@ -1257,7 +1265,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var body =
           expectSuccess(
               it.perform(
-                  put(tokenUrl(repo, before.id())).header(AUTHORIZATION, it.adminBearerToken())),
+                  post(rotateUrl(repo, before.id())).header(AUTHORIZATION, it.adminBearerToken())),
               "tokenRotated");
 
       final String newSecret = JsonPath.read(body, "$.data");
@@ -1289,7 +1297,8 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var rotatedAt = Instant.now();
 
       expectSuccess(
-          it.perform(put(tokenUrl(repo, before.id())).header(AUTHORIZATION, it.adminBearerToken())),
+          it.perform(
+              post(rotateUrl(repo, before.id())).header(AUTHORIZATION, it.adminBearerToken())),
           "tokenRotated");
 
       final var after = it.stateOf(before.id());
@@ -1315,7 +1324,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
 
       expectSuccess(
           it.perform(
-              put(tokenUrl(repo, target.getId())).header(AUTHORIZATION, it.adminBearerToken())),
+              post(rotateUrl(repo, target.getId())).header(AUTHORIZATION, it.adminBearerToken())),
           "tokenRotated");
 
       assertThat(it.stateOf(bystanderBefore.id())).isEqualTo(bystanderBefore);
@@ -1329,7 +1338,8 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
 
       expectTokenNotFound(
           it.perform(
-              put(tokenUrl(repo, UUID.randomUUID())).header(AUTHORIZATION, it.adminBearerToken())));
+              post(rotateUrl(repo, UUID.randomUUID()))
+                  .header(AUTHORIZATION, it.adminBearerToken())));
     }
 
     @Test
@@ -1343,7 +1353,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
 
       expectTokenNotFound(
           it.perform(
-              put(tokenUrl(repo, foreignBefore.id()))
+              post(rotateUrl(repo, foreignBefore.id()))
                   .header(AUTHORIZATION, it.adminBearerToken())));
 
       assertThat(it.stateOf(foreignBefore.id())).isEqualTo(foreignBefore);
@@ -1357,7 +1367,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
 
       expectValidationError(
           it.perform(
-              put(tokenUrl(repo, "not-a-uuid")).header(AUTHORIZATION, it.adminBearerToken())),
+              post(rotateUrl(repo, "not-a-uuid")).header(AUTHORIZATION, it.adminBearerToken())),
           "tokenId");
     }
   }
@@ -1491,7 +1501,16 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
           Arguments.of("POST .../deploy-tokens/{id}", post("/api/repos/any/deploy-tokens/" + id)),
           Arguments.of("PATCH .../deploy-tokens/{id}", patch("/api/repos/any/deploy-tokens/" + id)),
           Arguments.of("DELETE .../deploy-tokens", delete("/api/repos/any/deploy-tokens")),
-          Arguments.of("PUT .../deploy-tokens", put("/api/repos/any/deploy-tokens")));
+          Arguments.of("PUT .../deploy-tokens", put("/api/repos/any/deploy-tokens")),
+          // RPS-1269: rotate moved to POST .../actions/rotate; the old PUT is gone for good.
+          Arguments.of(
+              "PUT .../deploy-tokens/{id} (old rotate)", put("/api/repos/any/deploy-tokens/" + id)),
+          Arguments.of(
+              "GET .../deploy-tokens/{id}/actions/rotate",
+              get("/api/repos/any/deploy-tokens/" + id + "/actions/rotate")),
+          Arguments.of(
+              "PUT .../deploy-tokens/{id}/actions/rotate",
+              put("/api/repos/any/deploy-tokens/" + id + "/actions/rotate")));
     }
   }
 }

@@ -130,7 +130,7 @@ docker run \
 
 Repsy can scan pushed artifacts (Maven, npm, PyPI, Docker) for known vulnerabilities using a separate `repsy-scanner-trivy` service. This is **disabled by default** (`SECURITY_SCANNER=disabled`) and adds no dependency to a plain install. To enable it, run the `repsy-scanner-trivy` service (see [Option 3](#option-3-docker-compose-with-postgresql) and [`repsy-scanner-trivy/README.md`](./repsy-scanner-trivy/README.md)) and set `SECURITY_SCANNER=enabled` along with the `TRIVY_*`/`DOCKER_INTERNAL_REGISTRY_BASE_URL` variables above.
 
-Each repository has a security scan setting that controls whether newly pushed versions are scanned automatically. It does not block manual scans: a version can always be scanned on demand from the panel or with `POST /api/repos/{repoName}/artifacts/{artifactName}/versions/{artifactVersion}/scan`, even when the repository's setting is off.
+Each repository has a security scan setting that controls whether newly pushed versions are scanned automatically. It does not block manual scans: a version can always be scanned on demand from the panel or with `POST /api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scan`, even when the repository's setting is off.
 
 ## Installation
 

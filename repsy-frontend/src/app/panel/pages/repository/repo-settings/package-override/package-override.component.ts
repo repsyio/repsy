@@ -76,7 +76,7 @@ export class PackageOverrideComponent implements OnInit {
       form = generalForm;
     }
 
-    this.protocolRepoControllerService.updateSettings(this.repoName, form).subscribe({
+    this.protocolRepoControllerService.updateRepoSettings(this.repoName, form).subscribe({
       next: () => {
         this.parentForm.get('allowOverride')?.setValue(this.allowOverride);
         this.toastService.show(`Package override is now ${this.allowOverride ? 'allowed' : 'blocked'}`, 'success');

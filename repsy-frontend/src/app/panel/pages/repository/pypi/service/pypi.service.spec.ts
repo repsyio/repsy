@@ -41,7 +41,9 @@ describe('PypiService', () => {
   let service: PypiService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['getPermission']);
+    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'getRepoPermissions',
+    ]);
     pypiApi = jasmine.createSpyObj<PypiPackageControllerService>('PypiPackageControllerService', [
       'listPypiPackages',
       'listReleases',
@@ -61,7 +63,7 @@ describe('PypiService', () => {
   // PyPI names the entry point selectRepository where the other services call it getRepository.
   describeRepoSelection({
     service: () => service,
-    getPermission: () => repoApi.getPermission,
+    getPermission: () => repoApi.getRepoPermissions,
     probe: (s) => s.deletePackage(PACKAGE),
     probeApi: () => pypiApi.deletePypiPackage,
     probeRepoArg: 1,
@@ -69,7 +71,7 @@ describe('PypiService', () => {
   });
 
   describe('with a selected repository', () => {
-    beforeEach(() => selectRepo(service, repoApi.getPermission, REPO));
+    beforeEach(() => selectRepo(service, repoApi.getRepoPermissions, REPO));
 
     const paged: PagedCase<PypiService>[] = [
       {

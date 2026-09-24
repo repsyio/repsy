@@ -72,7 +72,7 @@ export class RepoLookupService {
   }
 
   private fetchRepoType(repoName: string): Observable<RepoType> {
-    return this.protocolRepoControllerService.getRepoType(repoName).pipe(
+    return this.protocolRepoControllerService.getRepoFormat(repoName).pipe(
       map((r) => {
         const slug = toRouteSlug(r.data);
         if (!slug) {

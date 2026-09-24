@@ -88,7 +88,7 @@ paths:
     get:
       tags:
         - protocol-repo-controller
-      operationId: getSettings
+      operationId: getRepoSettings
       responses:
         '200':
           description: OK
@@ -108,7 +108,7 @@ paths:
     put:
       tags:
         - protocol-repo-controller
-      operationId: updateSettings
+      operationId: updateRepoSettings
       requestBody:
         content:
           application/json:
@@ -143,39 +143,10 @@ paths:
         schema:
           type: string
   "/api/repos/{repoName}/deploy-tokens/{tokenId}":
-    put:
-      tags:
-        - protocol-deploy-token-controller
-      operationId: rotate
-      parameters:
-        - name: tokenId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseString"
-        '400':
-          "$ref": "#/components/responses/BadRequest"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Regenerate a deploy token
     delete:
       tags:
         - protocol-deploy-token-controller
-      operationId: revoke
+      operationId: revokeDeployToken
       parameters:
         - name: tokenId
           in: path
@@ -201,6 +172,42 @@ paths:
         '429':
           "$ref": "#/components/responses/TooManyRequests"
       summary: Delete a deploy token
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
+  "/api/repos/{repoName}/deploy-tokens/{tokenId}/actions/rotate":
+    post:
+      tags:
+        - protocol-deploy-token-controller
+      operationId: rotateDeployToken
+      parameters:
+        - name: tokenId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseString"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Regenerate a deploy token
     parameters:
       - name: repoName
         in: path
@@ -763,7 +770,7 @@ paths:
     patch:
       tags:
         - protocol-repo-controller
-      operationId: rename
+      operationId: renameRepo
       requestBody:
         content:
           application/json:
@@ -800,7 +807,7 @@ paths:
     patch:
       tags:
         - protocol-repo-controller
-      operationId: updateDescription
+      operationId: updateRepoDescription
       requestBody:
         content:
           application/json:
@@ -850,7 +857,7 @@ paths:
     get:
       tags:
         - protocol-repo-controller
-      operationId: getUsage
+      operationId: getRepoUsage
       responses:
         '200':
           description: OK
@@ -877,7 +884,7 @@ paths:
     get:
       tags:
         - protocol-repo-controller
-      operationId: getPermission
+      operationId: getRepoPermissions
       security:
         - { }
         - bearerAuth: []
@@ -905,7 +912,7 @@ paths:
     get:
       tags:
         - protocol-repo-controller
-      operationId: getRepoType
+      operationId: getRepoFormat
       security:
         - { }
         - bearerAuth: []
@@ -1093,7 +1100,7 @@ paths:
         required: true
         schema:
           type: string
-  "/api/pypi/packages/{repoName}/{packageName}/releases/{releaseVersion}":
+  "/api/pypi/packages/{repoName}/{packageName}/releases/{version}":
     get:
       tags:
         - pypi-package-controller
@@ -1104,7 +1111,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: releaseVersion
+        - name: version
           in: path
           required: true
           schema:
@@ -1136,7 +1143,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: releaseVersion
+        - name: version
           in: path
           required: true
           schema:
@@ -1294,7 +1301,7 @@ paths:
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/{packageName}/versions/{versionName}":
+  "/api/npm/packages/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
         - npm-package-api-controller
@@ -1305,7 +1312,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: versionName
+        - name: version
           in: path
           required: true
           schema:
@@ -1337,7 +1344,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: versionName
+        - name: version
           in: path
           required: true
           schema:
@@ -1364,7 +1371,7 @@ paths:
         required: true
         schema:
           type: string
-  "/api/npm/packages/{repoName}/{scope}/{packageName}/versions/{versionName}":
+  "/api/npm/packages/{repoName}/{scope}/{packageName}/versions/{version}":
     get:
       tags:
         - npm-package-api-controller
@@ -1380,7 +1387,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: versionName
+        - name: version
           in: path
           required: true
           schema:
@@ -1417,7 +1424,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: versionName
+        - name: version
           in: path
           required: true
           schema:
@@ -1886,13 +1893,13 @@ paths:
         schema:
           type: string
 
-  "/api/nuget/packages/{repoName}/{packageId}":
+  "/api/nuget/packages/{repoName}/{packageName}":
     get:
       tags:
         - nuget-package-controller
       operationId: getNugetPackage
       parameters:
-        - name: packageId
+        - name: packageName
           in: path
           required: true
           schema:
@@ -1919,7 +1926,7 @@ paths:
         - nuget-package-controller
       operationId: deleteNugetPackage
       parameters:
-        - name: packageId
+        - name: packageName
           in: path
           required: true
           schema:
@@ -1947,7 +1954,7 @@ paths:
         schema:
           type: string
 
-  "/api/nuget/packages/{repoName}/{packageId}/versions":
+  "/api/nuget/packages/{repoName}/{packageName}/versions":
     get:
       tags:
         - nuget-package-controller
@@ -1955,7 +1962,7 @@ paths:
       description: >-
         Sortable by `version`, `publishedAt` (`property,direction`).
       parameters:
-        - name: packageId
+        - name: packageName
           in: path
           required: true
           schema:
@@ -1997,13 +2004,13 @@ paths:
         schema:
           type: string
 
-  "/api/nuget/packages/{repoName}/{packageId}/{version}":
+  "/api/nuget/packages/{repoName}/{packageName}/{version}":
     get:
       tags:
         - nuget-package-controller
       operationId: getNugetVersion
       parameters:
-        - name: packageId
+        - name: packageName
           in: path
           required: true
           schema:
@@ -2035,7 +2042,7 @@ paths:
         - nuget-package-controller
       operationId: deleteNugetVersion
       parameters:
-        - name: packageId
+        - name: packageName
           in: path
           required: true
           schema:
@@ -2071,7 +2078,7 @@ paths:
     get:
       tags:
         - maven-artifact-controller
-      operationId: listContainsGroupName
+      operationId: listMavenGroups
       description: >-
         Sortable by `id`, `groupName`, `artifactName`, `lastUpdatedAt` (`property,direction`). The
         default is `id,desc`.
@@ -2115,7 +2122,7 @@ paths:
     get:
       tags:
         - maven-artifact-controller
-      operationId: listContainsArtifactName
+      operationId: listMavenArtifacts
       description: >-
         Sortable by `id`, `groupName`, `artifactName`, `lastUpdatedAt` (`property,direction`). The
         default is `id,desc`.
@@ -2310,7 +2317,7 @@ paths:
         required: true
         schema:
           type: string
-  "/api/mvn/artifacts/{repoName}/{groupName}/{artifactName}/versions/{versionName}":
+  "/api/mvn/artifacts/{repoName}/{groupName}/{artifactName}/versions/{version}":
     get:
       tags:
         - maven-artifact-controller
@@ -2326,7 +2333,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: versionName
+        - name: version
           in: path
           required: true
           schema:
@@ -2363,7 +2370,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: versionName
+        - name: version
           in: path
           required: true
           schema:
@@ -3158,7 +3165,7 @@ paths:
         required: true
         schema:
           type: string
-  "/api/cargo/crates/{repoName}/{crateName}/{vers}":
+  "/api/cargo/crates/{repoName}/{crateName}/{version}":
     get:
       tags:
         - cargo-crate-controller
@@ -3169,7 +3176,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: vers
+        - name: version
           in: path
           required: true
           schema:
@@ -3201,7 +3208,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: vers
+        - name: version
           in: path
           required: true
           schema:
@@ -3400,7 +3407,7 @@ paths:
         required: true
         schema:
           type: string
-  "/api/ruby/gems/{repoName}/{gemName}/versions/{versionName}":
+  "/api/ruby/gems/{repoName}/{gemName}/versions/{version}":
     get:
       tags:
         - ruby-gem-api-controller
@@ -3411,7 +3418,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: versionName
+        - name: version
           in: path
           required: true
           schema:
@@ -3449,7 +3456,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: versionName
+        - name: version
           in: path
           required: true
           schema:
@@ -3526,7 +3533,7 @@ paths:
         required: true
         schema:
           type: string
-  "/api/helm/charts/{repoName}/{name}":
+  "/api/helm/charts/{repoName}/{chartName}":
     get:
       tags:
         - helm-chart-controller
@@ -3576,12 +3583,12 @@ paths:
         required: true
         schema:
           type: string
-      - name: name
+      - name: chartName
         in: path
         required: true
         schema:
           type: string
-  "/api/helm/charts/{repoName}/{name}/tags":
+  "/api/helm/charts/{repoName}/{chartName}/tags":
     get:
       tags:
         - helm-chart-controller
@@ -3610,12 +3617,12 @@ paths:
         required: true
         schema:
           type: string
-      - name: name
+      - name: chartName
         in: path
         required: true
         schema:
           type: string
-  "/api/helm/charts/{repoName}/{name}/{version}":
+  "/api/helm/charts/{repoName}/{chartName}/{version}":
     get:
       tags:
         - helm-chart-controller
@@ -3665,7 +3672,7 @@ paths:
         required: true
         schema:
           type: string
-      - name: name
+      - name: chartName
         in: path
         required: true
         schema:
@@ -3738,7 +3745,7 @@ paths:
         required: true
         schema:
           type: string
-  "/api/repos/{repoName}/artifacts/{artifactName}/versions/{artifactVersion}/scans":
+  "/api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scans":
     get:
       tags:
         - vulnerability-scan-controller
@@ -3751,7 +3758,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: artifactVersion
+        - name: version
           in: path
           required: true
           schema:
@@ -3784,7 +3791,7 @@ paths:
         required: true
         schema:
           type: string
-  "/api/repos/{repoName}/artifacts/{artifactName}/versions/{artifactVersion}/scan-overview":
+  "/api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scan-overview":
     get:
       tags:
         - vulnerability-scan-controller
@@ -3795,7 +3802,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: artifactVersion
+        - name: version
           in: path
           required: true
           schema:
@@ -3828,7 +3835,7 @@ paths:
         required: true
         schema:
           type: string
-  "/api/repos/{repoName}/artifacts/{artifactName}/versions/{artifactVersion}/scan":
+  "/api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scan":
     post:
       tags:
         - vulnerability-scan-controller
@@ -3839,7 +3846,7 @@ paths:
           required: true
           schema:
             type: string
-        - name: artifactVersion
+        - name: version
           in: path
           required: true
           schema:

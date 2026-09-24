@@ -1655,7 +1655,7 @@ search`/`install`/`pull <repo>/<chart>`, or a raw `helm pull --repo`) 404s (`cha
 - **B-H3 (filed as [RPS-1219](https://zyfera.atlassian.net/browse/RPS-1219))** — There is no
   `GET /v2/<repo>/<name>/tags/list` handler at all (`404` with OCI code `NAME_UNKNOWN`, msgId
   `unknownPath`), although `HelmFacade.listTags`/`HelmOciTagListDto` exist (used only by the panel's
-  own `GET /api/helm/charts/{repo}/{name}/tags`). Helm's own `ValidateReference` calls `Tags(...)`
+  own `GET /api/helm/charts/{repo}/{chartName}/tags`). Helm's own `ValidateReference` calls `Tags(...)`
   whenever `--version` is empty or a semver CONSTRAINT, so a real `helm pull`/`install`/`show
 oci://.../<chart>` without an EXACT version fails outright against Repsy. Confirmed live: "HL2",
   "R8".
@@ -2959,7 +2959,7 @@ Facts the tests rely on (probed, RPS-1256):
 
 `tests/ui/packages/permissions-once.spec.ts` (PKG-perm-01, one test per protocol over `DESCRIPTORS`): a cold
 load of the list page of a repository with one seeded package sends exactly one request to
-`/api/repos/{name}/permissions`. The protocol shell components used to subscribe to the replaying
+`/api/repos/{repoName}/permissions`. The protocol shell components used to subscribe to the replaying
 `currentRepo$` and also load by hand, which sent it twice.
 
 ### Package tests: Cargo, NuGet, Helm, Go, Ruby (RPS-1257)
@@ -3233,7 +3233,8 @@ host-matching uid even though the packages themselves only need to be read.
   page, `listAllRepos` all pages), `GET /api/repos/counts` (`PanelApi.repoCounts`), `GET`/`PUT
 /api/repos/{repoName}/settings`.
 - `POST /api/repos/{repoName}/deploy-tokens` (`name`, `readOnly`, `expirationDate`, `username`),
-  `DELETE .../deploy-tokens/{tokenId}`, `PUT .../deploy-tokens/{tokenId}` (rotate), `GET
+  `DELETE .../deploy-tokens/{tokenId}`, `POST .../deploy-tokens/{tokenId}/actions/rotate` (rotate; the old
+  `PUT .../deploy-tokens/{tokenId}` is gone, RPS-1269), `GET
 .../deploy-tokens` (the create response has no token id; `seeder.ts` looks it up by name right
   after creating it).
 - A **past `expirationDate` is accepted** — `DeployTokenService.createDeployToken` does not

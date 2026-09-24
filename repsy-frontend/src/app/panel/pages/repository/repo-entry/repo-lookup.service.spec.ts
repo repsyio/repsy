@@ -20,14 +20,14 @@ import { ProtocolRepoControllerService, RepoType } from '../../../../../generate
 import { RepoLookupService } from './repo-lookup.service';
 
 describe('RepoLookupService', () => {
-  let getRepoType: jasmine.Spy;
+  let getRepoFormat: jasmine.Spy;
   let service: RepoLookupService;
 
   beforeEach(() => {
-    getRepoType = jasmine
-      .createSpy('getRepoType')
+    getRepoFormat = jasmine
+      .createSpy('getRepoFormat')
       .and.callFake((repoName: string) => of({ data: repoName.startsWith('npm') ? 'NPM' : 'MAVEN' }));
-    service = new RepoLookupService({ getRepoType } as unknown as ProtocolRepoControllerService);
+    service = new RepoLookupService({ getRepoFormat } as unknown as ProtocolRepoControllerService);
   });
 
   it('has no current repo until one is looked up', () => {
@@ -38,20 +38,20 @@ describe('RepoLookupService', () => {
     it('fetches the type and publishes it as the current repo', async () => {
       expect(await firstValueFrom(service.getRepoType('acme-maven'))).toBe('maven');
 
-      expect(getRepoType).toHaveBeenCalledOnceWith('acme-maven');
+      expect(getRepoFormat).toHaveBeenCalledOnceWith('acme-maven');
       expect(service.currentRepo).toEqual({ repoName: 'acme-maven', repoType: 'maven' });
     });
 
     it('maps the API type (upper case) to the lower-case route slug, for every type', async () => {
       for (const type of Object.values(RepoType)) {
-        getRepoType.and.returnValue(of({ data: type }));
+        getRepoFormat.and.returnValue(of({ data: type }));
 
         expect(await firstValueFrom(service.checkRepoType(`repo-${type}`))).toBe(type.toLowerCase());
       }
     });
 
     it('fails a lookup that answers a type it does not know', async () => {
-      getRepoType.and.returnValue(of({ data: 'BOGUS' }));
+      getRepoFormat.and.returnValue(of({ data: 'BOGUS' }));
 
       await expectAsync(firstValueFrom(service.getRepoType('acme-maven'))).toBeRejectedWithError(
         'Unknown repository type "BOGUS" for acme-maven',
@@ -63,7 +63,7 @@ describe('RepoLookupService', () => {
       await firstValueFrom(service.getRepoType('acme-maven'));
       expect(await firstValueFrom(service.getRepoType('acme-maven'))).toBe('maven');
 
-      expect(getRepoType).toHaveBeenCalledTimes(1);
+      expect(getRepoFormat).toHaveBeenCalledTimes(1);
     });
 
     it('still switches the current repo when the type comes from the cache', async () => {
@@ -73,7 +73,7 @@ describe('RepoLookupService', () => {
 
       await firstValueFrom(service.getRepoType('acme-maven'));
 
-      expect(getRepoType).toHaveBeenCalledTimes(2);
+      expect(getRepoFormat).toHaveBeenCalledTimes(2);
       expect(service.currentRepo).toEqual({ repoName: 'acme-maven', repoType: 'maven' });
     });
 
@@ -88,7 +88,7 @@ describe('RepoLookupService', () => {
     });
 
     it('does not cache or publish a failed lookup, so the next call retries', async () => {
-      getRepoType.and.returnValues(
+      getRepoFormat.and.returnValues(
         throwError(() => new Error('not found')),
         of({ data: 'MAVEN' }),
       );
@@ -97,7 +97,7 @@ describe('RepoLookupService', () => {
       expect(service.currentRepo).toBeNull();
 
       expect(await firstValueFrom(service.getRepoType('acme-maven'))).toBe('maven');
-      expect(getRepoType).toHaveBeenCalledTimes(2);
+      expect(getRepoFormat).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -106,7 +106,7 @@ describe('RepoLookupService', () => {
       expect(await firstValueFrom(service.checkRepoType('acme-maven'))).toBe('maven');
       expect(await firstValueFrom(service.checkRepoType('acme-maven'))).toBe('maven');
 
-      expect(getRepoType).toHaveBeenCalledTimes(1);
+      expect(getRepoFormat).toHaveBeenCalledTimes(1);
       expect(service.currentRepo).toBeNull();
     });
 
@@ -114,7 +114,7 @@ describe('RepoLookupService', () => {
       await firstValueFrom(service.checkRepoType('acme-maven'));
       await firstValueFrom(service.getRepoType('acme-maven'));
 
-      expect(getRepoType).toHaveBeenCalledTimes(1);
+      expect(getRepoFormat).toHaveBeenCalledTimes(1);
       expect(service.currentRepo).toEqual({ repoName: 'acme-maven', repoType: 'maven' });
     });
   });

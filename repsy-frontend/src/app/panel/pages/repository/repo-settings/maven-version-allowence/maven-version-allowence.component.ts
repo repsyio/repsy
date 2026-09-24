@@ -70,7 +70,7 @@ export class VersionAllowanceComponent implements OnInit {
     form.securityScanEnabled = this.parentForm.get('securityScanEnabled')!.value;
 
     if (this.repoType === RepoType.NUGET) {
-      this.protocolRepoControllerService.updateSettings(this.repoName, form).subscribe({
+      this.protocolRepoControllerService.updateRepoSettings(this.repoName, form).subscribe({
         next: () => {
           this.fetch.emit();
           this.toastService.show(`Version allowance has changed to ${option}`, 'success');

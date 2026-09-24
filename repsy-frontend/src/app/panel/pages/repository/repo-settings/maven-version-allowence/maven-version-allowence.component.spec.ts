@@ -34,10 +34,12 @@ describe('VersionAllowanceComponent', () => {
 
   beforeEach(() => {
     mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['updateRepoSettings']);
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['updateSettings']);
+    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'updateRepoSettings',
+    ]);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     mavenService.updateRepoSettings.and.returnValue(of(undefined));
-    repoApi.updateSettings.and.returnValue(of({}) as never);
+    repoApi.updateRepoSettings.and.returnValue(of({}) as never);
 
     component = new VersionAllowanceComponent(mavenService, repoApi, toastService);
     component.repoName = REPO;
@@ -109,7 +111,7 @@ describe('VersionAllowanceComponent', () => {
       it(`saves snapshots=${snapshots} and releases=${releases} for "${option}", keeping the other settings`, () => {
         component.selectType(option);
 
-        expect(repoApi.updateSettings).not.toHaveBeenCalled();
+        expect(repoApi.updateRepoSettings).not.toHaveBeenCalled();
         expect(mavenService.updateRepoSettings).toHaveBeenCalledTimes(1);
         expect(lastSentForm(mavenService.updateRepoSettings, 0)).toEqual({
           privateRepo: true,
@@ -152,9 +154,9 @@ describe('VersionAllowanceComponent', () => {
         component.selectType(option);
 
         expect(mavenService.updateRepoSettings).not.toHaveBeenCalled();
-        expect(repoApi.updateSettings).toHaveBeenCalledTimes(1);
-        expect(repoApi.updateSettings.calls.mostRecent().args[0]).toBe(REPO);
-        expect(lastSentForm(repoApi.updateSettings, 1)).toEqual({
+        expect(repoApi.updateRepoSettings).toHaveBeenCalledTimes(1);
+        expect(repoApi.updateRepoSettings.calls.mostRecent().args[0]).toBe(REPO);
+        expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({
           privateRepo: true,
           allowOverride: false,
           snapshots,
@@ -172,7 +174,7 @@ describe('VersionAllowanceComponent', () => {
     });
 
     it('does nothing further when saving fails', () => {
-      repoApi.updateSettings.and.returnValue(throwError(() => new Error('boom')));
+      repoApi.updateRepoSettings.and.returnValue(throwError(() => new Error('boom')));
 
       component.selectType(RepoSupport.STABLE);
 
