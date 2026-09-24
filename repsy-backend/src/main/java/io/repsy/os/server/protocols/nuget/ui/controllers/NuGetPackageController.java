@@ -85,11 +85,14 @@ public class NuGetPackageController {
   @GetMapping("/{repoName}/{packageId}/versions")
   @RepoOperation
   public RestResponse<PagedModel<NuGetVersionListItem>> listVersions(
-      final RepoInfo repoInfo, @PathVariable final String packageId, final Pageable pageable) {
+      final RepoInfo repoInfo,
+      @PathVariable final String packageId,
+      @RequestParam(defaultValue = "") final String query,
+      final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
 
-    final var versions = this.nugetApiFacade.getVersions(repoInfo, packageId, pageable);
+    final var versions = this.nugetApiFacade.getVersions(repoInfo, packageId, query, pageable);
 
     return this.responseFactory.success("nugetVersionsFetched", new PagedModel<>(versions));
   }

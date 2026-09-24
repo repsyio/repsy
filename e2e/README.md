@@ -2784,12 +2784,7 @@ protocol-only scenarios. The template is `src/ui/package-scenarios.ts`, the UI c
 `scenarios/loop.ts`:
 
 ```ts
-registerPackageScenarios(DESCRIPTORS.nuget, {
-  knownFailures: {
-    '02-versions-search':
-      'RPS-1262: the NuGet version list has no search box (the API has no search parameter)',
-  },
-});
+registerPackageScenarios(DESCRIPTORS.nuget);
 ```
 
 It registers `PKG-<proto>-01..06` for whatever the descriptor (`pages/protocols/<proto>.ts`) says and
@@ -2808,8 +2803,9 @@ differs the descriptor carries the value (`repoUrlIn`, `detail.delete.landsOn`,
 | 06  | Configure modal (repo name, `YOUR_PASSWORD` where the protocol has one) and the deploy-token variant opened from a token row in the settings                     |
 
 `knownFailures` keys (`PackageScenarioKey`) run their step under `test.fail`, so a fix turns it red and
-the title carries the reason. Pinned today: NuGet `02-versions-search` (RPS-1262, the API has no
-version search). The RPS-1261 (Maven Gradle Groovy block, Docker desktop Digest/Config Digest cells,
+the title carries the reason. Nothing is pinned this way today: NuGet `02-versions-search` was the last
+one, and RPS-1304 fixed it (the version list has a search box and `GET /api/nuget/packages/{repo}/{id}/versions`
+takes a `query`). The RPS-1261 (Maven Gradle Groovy block, Docker desktop Digest/Config Digest cells,
 npm Bugs URL/Keywords, PyPI "Post release:" and the mobile "Latest" link), RPS-1262 (mobile Delete
 gate, Cargo/NuGet mobile cards, Helm pager, Go empty pager, the Maven browser's Settings button) and
 RPS-1297 (first click after a cold load) specs are fixed and assert unpinned.
@@ -2873,7 +2869,6 @@ Pinned with `test.fail` / `knownFailures` (each still fails for the stated reaso
 
 | Where                             | Bug                                                                                                                                                                                                                                           |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| nuget `02-versions-search`        | RPS-1262 (3): no search box on the version list: the API has no version search parameter                                                                                                                                                      |
 | cargo-07 Newest by publish time   | RPS-1301: Newest/Oldest order by `max_version` (a text column), not by when a crate was published; the seeder gives each crate its own version so the sort has distinct keys (RPS-1298: ties go by id), and cargo-07 asserts sorts by version |
 | helm-07 deleting the last version | RPS-1302: the versions page of the deleted chart raises two error toasts, "Chart not found." and "[object Object]"                                                                                                                            |
 

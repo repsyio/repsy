@@ -563,4 +563,106 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
       PagingAssertions.expectInvalidParameter(this.list(this.seed(), path, param, value), param);
     }
   }
+
+  @Nested
+  @DisplayName("version search of GET /api/nuget/packages/{repo}/{id}/versions")
+  class VersionSearch {
+
+    private static final String VERSIONS = "/api/nuget/packages/{repo}/fixture.package/versions";
+
+    private record Seed(RepoInfo repo, String token) {}
+
+    /** Seven versions of one package, and one version of another that also contains "2.". */
+    private Seed seed() {
+      final var it = NuGetPackageControllerIT.this;
+      final var user = it.createUser(uniqueUsername("nuget"), UserRole.USER);
+      final var repo = it.createRepo(RepoType.NUGET, true);
+
+      for (final var version :
+          List.of("1.0.0", "1.0.1-Beta.1", "1.1.0", "2.0.0", "2.1.0", "2.2.0", "3.0.0")) {
+        it.publish(repo.getName(), "Fixture.Package", version);
+      }
+      it.publish(repo.getName(), "Other.Package", "2.0.0");
+
+      return new Seed(repo, it.bearerTokenFor(user));
+    }
+
+    private ResultActions list(final Seed seed, final String... params) throws Exception {
+      var request =
+          get(VERSIONS, seed.repo().getName()).with(apiPort()).header(AUTHORIZATION, seed.token());
+      for (int i = 0; i < params.length; i += 2) {
+        request = request.param(params[i], params[i + 1]);
+      }
+      return NuGetPackageControllerIT.this.mockMvc.perform(request);
+    }
+
+    private static Matcher<Iterable<? extends String>> inOrder(final String... values) {
+      return contains(values);
+    }
+
+    @Test
+    @DisplayName("finds the versions that contain the text, ignoring case")
+    void findsVersionsCaseInsensitively() throws Exception {
+      final var seed = this.seed();
+
+      this.list(seed, "query", "beta", "sort", "version,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[*].version", inOrder("1.0.1-Beta.1")))
+          .andExpect(jsonPath("$.data.page.totalElements").value(1));
+      this.list(seed, "query", "BETA")
+          .andExpect(jsonPath("$.data.content[*].version", inOrder("1.0.1-Beta.1")));
+      this.list(seed, "query", "1.0.", "sort", "version,asc")
+          .andExpect(jsonPath("$.data.content[*].version", inOrder("1.0.0", "1.0.1-Beta.1")))
+          .andExpect(jsonPath("$.data.page.totalElements").value(2));
+      // A substring anywhere in the version counts, not only a prefix: "1.0" is inside "2.1.0".
+      this.list(seed, "query", "1.0", "sort", "version,asc")
+          .andExpect(
+              jsonPath(
+                  "$.data.content[*].version", inOrder("1.0.0", "1.0.1-Beta.1", "1.1.0", "2.1.0")));
+    }
+
+    @Test
+    @DisplayName("answers an empty page when no version contains the text")
+    void missAnswersEmptyPage() throws Exception {
+      this.list(this.seed(), "query", "zzz")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content", hasSize(0)))
+          .andExpect(jsonPath("$.data.page.totalElements").value(0));
+    }
+
+    @Test
+    @DisplayName("lists every version of the package for an empty or absent query")
+    void emptyQueryListsEverything() throws Exception {
+      final var seed = this.seed();
+
+      this.list(seed, "query", "", "size", "20")
+          .andExpect(jsonPath("$.data.content", hasSize(7)))
+          .andExpect(jsonPath("$.data.page.totalElements").value(7));
+      this.list(seed, "size", "20")
+          .andExpect(jsonPath("$.data.content", hasSize(7)))
+          .andExpect(jsonPath("$.data.page.totalElements").value(7));
+    }
+
+    @Test
+    @DisplayName("applies the search before paging, so it spans all pages")
+    void searchSpansAllPages() throws Exception {
+      final var seed = this.seed();
+
+      this.list(seed, "query", "2.", "size", "2", "page", "0", "sort", "version,asc")
+          .andExpect(jsonPath("$.data.content[*].version", inOrder("2.0.0", "2.1.0")))
+          .andExpect(jsonPath("$.data.page.totalElements").value(3))
+          .andExpect(jsonPath("$.data.page.totalPages").value(2));
+      this.list(seed, "query", "2.", "size", "2", "page", "1", "sort", "version,asc")
+          .andExpect(jsonPath("$.data.content[*].version", inOrder("2.2.0")));
+    }
+
+    @Test
+    @DisplayName("takes the LIKE wildcards of the text literally")
+    void wildcardsAreLiteral() throws Exception {
+      final var seed = this.seed();
+
+      this.list(seed, "query", "%").andExpect(jsonPath("$.data.page.totalElements").value(0));
+      this.list(seed, "query", "_.0.0").andExpect(jsonPath("$.data.page.totalElements").value(0));
+    }
+  }
 }

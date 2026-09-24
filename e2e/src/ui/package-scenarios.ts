@@ -20,7 +20,7 @@
  * for the protocol the descriptor (`pages/protocols/<proto>.ts`) describes, and a spec is one line:
  *
  * ```ts
- * registerPackageScenarios(DESCRIPTORS.nuget, { knownFailures: { '02-versions-search': 'RPS-1262' } });
+ * registerPackageScenarios(DESCRIPTORS.nuget);
  * ```
  *
  * Everything that differs between protocols is DATA in the descriptor (routes, row keys, search terms,

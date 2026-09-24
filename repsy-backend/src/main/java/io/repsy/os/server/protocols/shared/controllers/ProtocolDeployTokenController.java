@@ -28,7 +28,9 @@ import io.repsy.os.server.shared.token.dtos.DeployTokenInfoListItem;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.os.shared.utils.SortValidator;
 import jakarta.validation.Valid;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -51,6 +53,13 @@ import org.springframework.web.bind.annotation.RestController;
 @NullMarked
 @SuppressWarnings("java:S6856")
 public class ProtocolDeployTokenController {
+
+  /**
+   * The properties of a listed token the list can be sorted by. The token hash and the internal
+   * bookkeeping columns are left out.
+   */
+  private static final Set<String> SORT_PROPERTIES =
+      Set.of("id", "name", "username", "description", "readOnly", "expirationDate", "createdAt");
 
   private final DeployTokenService deployTokenService;
   private final RestResponseFactory restResponseFactory;
@@ -90,6 +99,8 @@ public class ProtocolDeployTokenController {
   public RestResponse<PagedModel<DeployTokenInfoListItem>> list(
       @PageableDefault(sort = "id", direction = DESC) final Pageable pageable,
       final RepoInfo repoInfo) {
+
+    SortValidator.requireSortableBy(pageable, SORT_PROPERTIES);
 
     final var deployTokenInfoList =
         this.deployTokenService.getDeployTokensByRepoInfo(repoInfo.getStorageKey(), pageable);
