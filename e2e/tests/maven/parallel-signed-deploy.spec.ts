@@ -23,12 +23,13 @@
  * signature routinely overtakes the large file it signs (here a 4 MB javadoc jar). `deploy-file`
  * takes the same list of artifacts from its `-Dfiles`/`-Dclassifiers`/`-Dtypes`, so the run below
  * uploads exactly what a signed `mvn deploy` does, with the signatures made in-process by OpenPGP.js
- * (`src/clients/pgp.ts`): there is no `gpg` binary in this harness.
+ * (`src/clients/pgp.ts`): this spec's key never touches a `gpg` binary.
  *
  * Before deferred verification such a deploy could fail with `404 itemNotFound` on the signature
  * that overtook its file. Now a signature that arrives first is parked, and verified when its file
  * arrives, so the deploy always ends complete: exit 0, every `.asc` stored byte-equal, the version
- * `signed`. Gradle is not part of this harness, so its `signing` plugin is not exercised.
+ * `signed`. `gpg-signed-deploy.spec.ts` is the counterpart with a real `gpg` key, `maven-gpg-plugin` and
+ * Gradle's `signing` plugin.
  */
 import { randomBytes } from 'node:crypto';
 import fs from 'node:fs/promises';

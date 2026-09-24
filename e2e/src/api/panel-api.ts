@@ -174,6 +174,33 @@ export class PanelApi {
     return unwrap(res.data, 'createRepo');
   }
 
+  /** `GET /api/repos/{repoName}/format`: the repository's type, in the API's canonical upper case. */
+  async getRepoFormat(repoName: string): Promise<RepoType> {
+    const res = await this.client.protocolRepoController.getRepoFormat({ repoName });
+    return unwrap(res.data, 'getRepoFormat');
+  }
+
+  /**
+   * A panel request the generated client cannot make: it only sends the enum spellings, so a
+   * repository type written in another case (`maven`) has to go over raw `fetch` (RPS-1269). The
+   * answer is the HTTP status and the JSON envelope.
+   */
+  async rawRequest(
+    method: 'GET' | 'POST',
+    path: string,
+    body?: unknown,
+  ): Promise<{ status: number; body: { data?: unknown } }> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method,
+      headers: {
+        Authorization: this.authorization(),
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { status: res.status, body: (await res.json()) as { data?: unknown } };
+  }
+
   async deleteRepo(repoName: string): Promise<void> {
     await this.client.protocolRepoController.deleteRepo({ repoName });
   }

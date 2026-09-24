@@ -29,8 +29,6 @@ import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.validation.Valid;
-import java.beans.PropertyEditorSupport;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -40,9 +38,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
-import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -74,30 +70,6 @@ public class RepoCollectionController {
   private final RepoTxService repoTxService;
   private final RestResponseFactory responseFactory;
   private final Map<RepoType, ProtocolApiFacade> apiFacadeMap;
-
-  /**
-   * Reads the {@code type} query parameter without regard to case ({@code maven} is {@code MAVEN}).
-   * A value that names no type fails the conversion, which answers 400 {@code validationError} with
-   * {@code type} as the data, like any other bad parameter.
-   */
-  @InitBinder("type")
-  void bindRepoType(final WebDataBinder binder) {
-    binder.registerCustomEditor(
-        RepoType.class,
-        new PropertyEditorSupport() {
-          @Override
-          public void setAsText(final @Nullable String text) {
-            if (text == null || text.isBlank()) {
-              this.setValue(null);
-              return;
-            }
-
-            this.setValue(
-                RepoType.fromString(text.strip().toUpperCase(Locale.ROOT))
-                    .orElseThrow(() -> new IllegalArgumentException("Unknown repo type " + text)));
-          }
-        });
-  }
 
   @GetMapping
   public RestResponse<PagedModel<RepoListInfo>> list(
@@ -133,7 +105,7 @@ public class RepoCollectionController {
     final var user = this.panelAuthHelper.authenticate(authHeader);
     this.panelAuthHelper.requireAdmin(user);
 
-    final var repoType = RepoType.valueOf(form.getType().name());
+    final var repoType = form.getType();
 
     final var repoInfo =
         this.repoTxService.createRepo(

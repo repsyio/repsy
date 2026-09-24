@@ -22,7 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { GemVersionInfo, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { GemVersionInfo, RepoPermissionInfo, RepoType } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -45,6 +45,7 @@ import { RubyService } from '../../service/ruby.service';
   templateUrl: './ruby-gems-version-detail.component.html',
 })
 export class RubyGemsVersionDetailComponent implements OnDestroy {
+  public readonly securityRepoType = RepoType.Ruby;
   public loading = true;
   public error: string;
   public gemName: string;
@@ -90,7 +91,11 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
     this.loading = true;
     this.rubyService
       .fetchGemVersion(gemName, version)
-      .pipe(finalize(() => { this.loading = false; }))
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+      )
       .subscribe({
         next: (gemVersion) => {
           this.gemVersion = gemVersion;
@@ -106,7 +111,11 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
       this.loading = true;
       this.rubyService
         .deleteGemVersion(this.gemName, this.versionName, this.gemVersion?.platform ?? 'ruby')
-        .pipe(finalize(() => { this.loading = false; }))
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+          }),
+        )
         .subscribe({
           next: () => {
             this.router.navigate(['../..'], { relativeTo: this.route }).then(() => {

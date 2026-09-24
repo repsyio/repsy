@@ -23,7 +23,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { ArtifactVersionInfo, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { ArtifactVersionInfo, RepoPermissionInfo, RepoType } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -36,10 +36,18 @@ import { MavenService } from '../../service/maven.service';
 @Component({
   selector: 'app-maven-artifacts-version-detail',
   standalone: true,
-  imports: [CopyClipboardComponent, NgOptimizedImage, SpinnerComponent, HighlightLineNumbers, Highlight, SecurityScanSectionComponent],
+  imports: [
+    CopyClipboardComponent,
+    NgOptimizedImage,
+    SpinnerComponent,
+    HighlightLineNumbers,
+    Highlight,
+    SecurityScanSectionComponent,
+  ],
   templateUrl: './maven-artifacts-version-detail.component.html',
 })
 export class MavenArtifactsVersionDetailComponent implements OnDestroy {
+  public readonly securityRepoType = RepoType.Maven;
   public loading = true;
   public baseUrl: string;
   public groupName: string;
@@ -78,7 +86,7 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
         this.loadVersion();
       }
     });
-    this.breadcrumbSecurityLinkService.show('MAVEN');
+    this.breadcrumbSecurityLinkService.show(RepoType.Maven);
   }
 
   public ngOnDestroy(): void {

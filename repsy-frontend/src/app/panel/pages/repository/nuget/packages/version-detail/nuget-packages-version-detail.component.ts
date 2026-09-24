@@ -27,6 +27,7 @@ import {
   NuGetDependencyInfo,
   NuGetVersionInfo,
   RepoPermissionInfo,
+  RepoType,
 } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
@@ -51,6 +52,7 @@ import { NugetService } from '../../service/nuget.service';
   templateUrl: './nuget-packages-version-detail.component.html',
 })
 export class NugetPackagesVersionDetailComponent implements OnDestroy {
+  public readonly securityRepoType = RepoType.Nuget;
   public loading = true;
   public error: string;
   public packageId: string;

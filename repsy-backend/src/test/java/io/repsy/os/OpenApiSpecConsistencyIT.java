@@ -23,6 +23,7 @@ import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.repo.utils.RepoUtils;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -554,6 +555,18 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
     assertThat(envelope).containsEntry("type", "ERROR");
     assertThat(asMap(asMap(schema.get("properties")).get("type")).get("$ref"))
         .isEqualTo("#/components/schemas/ResponseType");
+  }
+
+  @Test
+  @DisplayName("the RepoType schema lists exactly the values of the RepoType enum, upper case")
+  void repoTypeSchemaIsTheJavaEnum() throws Exception {
+    final var doc = loadSpec();
+    final var schema = asMap(asMap(asMap(doc.get("components")).get("schemas")).get("RepoType"));
+
+    assertThat(schema).containsEntry("type", "string");
+    assertThat(asList(schema.get("enum")))
+        .containsExactlyInAnyOrderElementsOf(
+            Arrays.stream(RepoType.values()).map(RepoType::name).collect(Collectors.toList()));
   }
 
   // ---------------------------------------------------------------------------------------------

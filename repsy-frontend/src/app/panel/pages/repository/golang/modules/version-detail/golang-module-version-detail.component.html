@@ -4,7 +4,7 @@
   @if (!this.error) {
     <div data-testid="pkg-detail" class="mb-4" animate.enter="fade-in-up">
       <app-security-scan-section
-        [repoType]="'GOLANG'"
+        [repoType]="securityRepoType"
         [repoName]="activeRepo.repoName"
         [artifactName]="securityArtifactName"
         [artifactVersion]="versionName"
