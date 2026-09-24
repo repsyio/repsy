@@ -32,13 +32,13 @@ import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
 
 const maven = DESCRIPTORS.maven;
 
-// RPS-TBD (not filed yet): the version detail of a version that is not the artifact's latest shows
+// RPS-1296: the version detail of a version that is not the artifact's latest shows
 // the LATEST version's coordinates (the API's `artifactVersionName` is mapped from `artifact.latest`,
 // `ArtifactConverter.toArtifactVersionInfo`), and its Delete button deletes the latest version, not
 // the one on screen. So deleting 1.0.0 from its detail page while 2.0.0 exists removes 2.0.0.
 registerPackageScenarios(maven, {
   knownFailures: {
-    '04-detail': 'RPS-TBD: the detail of an older version deletes the LATEST version',
+    '04-detail': 'RPS-1296: the detail of an older version deletes the LATEST version',
   },
 });
 
@@ -58,7 +58,7 @@ async function openBrowser(page: Page, path: string): Promise<void> {
 
 /**
  * Opens the directory `dir` of the current listing and waits for its breadcrumb. It clicks until that
- * shows, because the FIRST click on a cold-loaded browser does not descend (RPS-TBD, pinned below):
+ * shows, because the FIRST click on a cold-loaded browser does not descend (RPS-1297, pinned below):
  * the repository's permissions load twice, the second load empties the directory stack while the first
  * listing is still in flight, and the next `go()` then only re-creates the root entry and re-reads it.
  */
@@ -201,10 +201,10 @@ test.describe('Maven file browser', { tag: '@packages' }, () => {
     await expect(adminPage.getByTestId('maven-browser-grid')).toBeVisible();
   });
 
-  // RPS-TBD: the first click on a directory of a freshly loaded browser does not open it (the page
+  // RPS-1297: the first click on a directory of a freshly loaded browser does not open it (the page
   // loads the repository's permissions twice; see `enterDirectory`).
   test.fail(
-    'PKG-maven-07 the first click on a directory of a freshly loaded browser opens it (RPS-TBD)',
+    'PKG-maven-07 the first click on a directory of a freshly loaded browser opens it (RPS-1297)',
     async ({ adminPage, seeder, seedPackage }) => {
       const repo = await seeder.createRepo(RepoType.MAVEN);
       const pkg = await seedPackage(repo);
@@ -318,10 +318,10 @@ test.describe('Maven version detail', { tag: '@packages' }, () => {
       ['bazel', 'Bazel', `artifact = "${group}:${artifact}:${version}"`],
     ] as const;
 
-  // RPS-TBD (see the top of this file): the same defect as the pinned PKG-maven-04 detail delete, seen
+  // RPS-1296 (see the top of this file): the same defect as the pinned PKG-maven-04 detail delete, seen
   // as content: every snippet of an older version's detail names the latest version.
   test.fail(
-    'PKG-maven-07 the detail of an older version shows that version, not the latest (RPS-TBD)',
+    'PKG-maven-07 the detail of an older version shows that version, not the latest (RPS-1296)',
     async ({ adminPage, seeder, seedVersions }) => {
       const repo = await seeder.createRepo(RepoType.MAVEN);
       const [older] = await seedVersions(repo, ['1.0.0', '2.0.0']);

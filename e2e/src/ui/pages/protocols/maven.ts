@@ -40,7 +40,7 @@ function coordinates(target: PackageRef | undefined): {
  *    duplicate), which PKG-maven-07 pins. All values here were confirmed in a browser (RPS-1256).
  *  - The detail page of a version that is not the latest shows, and its Delete deletes, the LATEST
  *    version (`ArtifactConverter` maps `artifactVersionName` from `artifact.latest`): PKG-maven-04 and
- *    PKG-maven-07 pin it (RPS-TBD, to be filed).
+ *    PKG-maven-07 pin it (RPS-1296).
  *  - The detail page has no version badge and no "published" line, so those ids do not exist here.
  */
 export const mavenDescriptor: ProtocolDescriptor = {

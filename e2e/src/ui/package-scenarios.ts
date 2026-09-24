@@ -421,7 +421,7 @@ export function registerPackageScenarios(
         const repo = await seeder.createRepo(type);
         // One after the other, not `seedPackages` (four at a time): packages published in the same
         // instant tie on the sort key, and the pager then has no stable order to cut pages from
-        // (embedded H2 showed one package on both pages and another on none; finding, not fixed here).
+        // (embedded H2 showed one package on both pages and another on none; RPS-1298, not fixed here).
         const seeded: SeededPackage[] = [];
         for (let index = 1; index <= 12; index += 1) {
           seeded.push(await seedPackage(repo, { index }));

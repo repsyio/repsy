@@ -298,7 +298,7 @@ export class ProtocolListPage extends UiPage {
     // class keeps `animation: ... forwards`, so it is a stacking context of its own) paints above the
     // menu, so a real click on the middle of "Delete" lands on the next row (and Playwright refuses it:
     // "<div class=grid ...> intercepts pointer events"). The button's own click handler is what the
-    // user's click would reach, so dispatch that. (Finding, not fixed here.)
+    // user's click would reach, so dispatch that. (RPS-1299, not fixed here.)
     await this.tid('row-delete', menu).dispatchEvent('click');
     await this.dangerModal.expectOpen(affordance.dialogTitle);
     return this.dangerModal;
