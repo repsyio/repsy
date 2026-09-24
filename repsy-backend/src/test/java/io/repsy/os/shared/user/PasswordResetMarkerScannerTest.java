@@ -215,6 +215,67 @@ class PasswordResetMarkerScannerTest {
     }
   }
 
+  private static final String UNREADABLE = "Could not read the password reset marker directory";
+
+  /**
+   * A regular file where the directory should be: listing it fails, whatever user runs the test.
+   */
+  private Path unreadableDirectory() throws IOException {
+    final var path = this.dir.resolve("unreadable");
+    Files.deleteIfExists(path);
+    return Files.createFile(path);
+  }
+
+  @Test
+  @DisplayName("an unreadable marker directory is logged once, not on every poll (RPS-1321)")
+  void logsAnUnreadableDirectoryOnce(final CapturedOutput output) throws IOException {
+    final var unreadable = this.unreadableDirectory();
+
+    this.scanner.scan(unreadable);
+    this.scanner.scan(unreadable);
+    this.scanner.scan(unreadable);
+
+    assertThat(count(output.getAll(), UNREADABLE)).as("WARN lines").isEqualTo(1);
+    verifyNoInteractions(this.userRepository, this.userTxService);
+  }
+
+  @Test
+  @DisplayName("an unreadable marker directory is logged again once it was readable in between")
+  void logsAnUnreadableDirectoryAgainAfterItWasReadable(final CapturedOutput output)
+      throws IOException {
+    final var path = this.unreadableDirectory();
+    this.scanner.scan(path);
+    this.scanner.scan(path);
+    assertThat(count(output.getAll(), UNREADABLE)).isEqualTo(1);
+
+    // It becomes readable (nothing is logged) ...
+    Files.delete(path);
+    Files.createDirectory(path);
+    this.scanner.scan(path);
+    assertThat(count(output.getAll(), UNREADABLE)).isEqualTo(1);
+
+    // ... and unreadable again: a new condition, a new WARN, once.
+    Files.delete(path);
+    Files.createFile(path);
+    this.scanner.scan(path);
+    this.scanner.scan(path);
+    assertThat(count(output.getAll(), UNREADABLE)).as("WARN lines in total").isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("a marker directory that went missing also counts as readable again")
+  void aMissingDirectoryResetsTheUnreadableCondition(final CapturedOutput output)
+      throws IOException {
+    final var path = this.unreadableDirectory();
+    this.scanner.scan(path);
+    Files.delete(path);
+    this.scanner.scan(path);
+    Files.createFile(path);
+    this.scanner.scan(path);
+
+    assertThat(count(output.getAll(), UNREADABLE)).isEqualTo(2);
+  }
+
   @Test
   @DisplayName("a marker for a user that does not exist is removed and resets nothing")
   void removesAMarkerOfAnUnknownUser(final CapturedOutput output) throws IOException {

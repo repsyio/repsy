@@ -53,6 +53,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -354,6 +355,48 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   }
 
   @Test
+  @DisplayName("runs the whole save again when it loses an optimistic-lock race (RPS-1322)")
+  void retriesTheSaveThatLostAVersionCheck() throws Exception {
+    final var context = context();
+    final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
+    when(this.imageService.findOrCreateImage(REPO_ID, "app")).thenReturn(imageInfo);
+    when(this.dockerFacade.saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class)))
+        .thenThrow(new OptimisticLockingFailureException("docker_tag version"))
+        .thenReturn("sha256:manifest");
+    when(this.layerRenamer.findLayersToRename(any(BaseRepoInfo.class), eq(MANIFEST_JSON)))
+        .thenReturn(Map.of());
+    when(this.layerRenamer.renameLayers(any(BaseRepoInfo.class), any()))
+        .thenReturn(BaseUsages.ofDisk(0));
+
+    final var response =
+        this.handler().handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    verify(this.dockerFacade, times(2))
+        .saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class));
+  }
+
+  @Test
+  @DisplayName("gives up after three optimistic-lock failures")
+  void givesUpAfterThreeVersionCheckFailures() throws Exception {
+    final var context = context();
+    final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
+    when(this.imageService.findOrCreateImage(REPO_ID, "app")).thenReturn(imageInfo);
+    when(this.dockerFacade.saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class)))
+        .thenThrow(new OptimisticLockingFailureException("still stale"));
+
+    assertThatThrownBy(
+            () ->
+                this.handler()
+                    .handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse()))
+        .isInstanceOf(OptimisticLockingFailureException.class);
+
+    verify(this.dockerFacade, times(3))
+        .saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class));
+    verifyNoInteractions(this.layerRenamer);
+  }
+
+  @Test
   @DisplayName("gives up after three attempts and does not touch the image or the layers")
   void givesUpAfterThreeAttempts() throws Exception {
     final var context = context();
@@ -375,7 +418,7 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   }
 
   @Test
-  @DisplayName("does not retry a failure that is not a data-integrity violation")
+  @DisplayName("does not retry a failure that is not a lost race")
   void doesNotRetryOtherFailures() throws Exception {
     final var context = context();
     final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();

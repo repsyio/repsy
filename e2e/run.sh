@@ -126,7 +126,17 @@ cmd_local_up() {
   file="$(stack_file "$use_h2")"
   db_label="postgres"
   [ "$use_h2" = "true" ] || [ "${REPSY_E2E_STACK:-}" = "h2" ] && db_label="h2"
-  docker compose -f "$file" up -d --wait
+  # `up` alone builds the Repsy image only when repsy-os-e2e:local does not exist yet, so a stale one
+  # from an earlier checkout was reused and the runners tested old code (RPS-1321). Build every time
+  # instead: Docker's layer cache makes it a near no-op when nothing under the build context
+  # changed, and a changed source is never missed (an mtime check would miss e.g. a branch switch
+  # or a core submodule bump). Not with REPSY_IMAGE: that names a published image to test as it is,
+  # and `--build` would replace it with a local build under the same tag.
+  if [ -n "${REPSY_IMAGE:-}" ]; then
+    docker compose -f "$file" up -d --wait
+  else
+    docker compose -f "$file" up -d --wait --build
+  fi
   echo "Repsy is up ($db_label): panel API on http://localhost:8080, repo protocols on http://localhost:9090"
 }
 
