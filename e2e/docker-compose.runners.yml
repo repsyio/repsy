@@ -64,6 +64,8 @@ services:
       args:
         TEMURIN_VERSION: '21'
         MAVEN_VERSION: '3.9.9'
+        GRADLE_VERSION: '8.14.3'
+        GRADLE_SHA256: 'bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531'
     environment:
       <<: *runner-environment
       # Read by clients/maven.ts: Maven's shared, third-party-only "local repository tail" (see that
