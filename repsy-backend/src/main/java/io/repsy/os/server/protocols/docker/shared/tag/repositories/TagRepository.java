@@ -48,6 +48,9 @@ public interface TagRepository extends JpaRepository<Tag, UUID> {
 
   Optional<Tag> findByImageIdAndName(UUID imageId, String name);
 
+  /** The tag of an image that was created or moved last. */
+  Optional<Tag> findFirstByImageIdOrderByLastUpdatedAtDescIdDesc(UUID imageId);
+
   @Query("select t.name from Tag t where t.image.id = :imageId and t.digest = :digest")
   List<String> findNamesByImageIdAndDigest(UUID imageId, String digest);
 
