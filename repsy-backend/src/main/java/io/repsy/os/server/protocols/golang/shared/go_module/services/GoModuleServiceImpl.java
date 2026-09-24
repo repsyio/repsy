@@ -57,6 +57,9 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
   /** The unique index on (module, version), created in {@code V0002__Golang_Protocol.sql}. */
   private static final String VERSION_UNIQUE_CONSTRAINT = "ux_go_module_version__module_id_version";
 
+  /** How often a publish takes the module row again after a delete removed it. */
+  private static final int MAX_MODULE_LOCK_ATTEMPTS = 5;
+
   private final RepoRepository repoRepository;
   private final GoModuleRepository goModuleRepository;
   private final GoModuleVersionRepository goModuleVersionRepository;
@@ -116,7 +119,15 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
   }
 
   /**
-   * Returns the module row, inserting it when this is the first version of the module path.
+   * Returns the module row, share-locked, inserting it when this is the first version of the module
+   * path.
+   *
+   * <p>The share lock is what serialises a publish with the delete of the module's last version
+   * (RPS-1288), which removes the module row: the delete locks the row for update, so it waits for
+   * the publishes that hold the row, and a publish waits for a delete that holds it. The lock is
+   * held until the publish commits, so a version that is being written is always counted by a
+   * delete that follows. A publish that waited for a delete which removed the row finds it gone
+   * once the lock is granted, and inserts the row again.
    *
    * <p>The insert skips a row that already exists instead of failing on the unique index: on
    * PostgreSQL a failed statement aborts the transaction, which also holds the version row and the
@@ -124,18 +135,28 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
    * statement waits for it, and then finds the committed row.
    */
   private GoModule findOrCreateModule(final Repo repo, final String modulePath) {
-    final var existing =
-        this.goModuleRepository.findByRepoIdAndModulePath(repo.getId(), modulePath);
-    if (existing.isPresent()) {
-      return existing.get();
+    for (var attempt = 0; attempt < MAX_MODULE_LOCK_ATTEMPTS; attempt++) {
+      final var existing =
+          this.goModuleRepository.findSharedByRepoIdAndModulePath(repo.getId(), modulePath);
+      if (existing.isPresent()) {
+        return existing.get();
+      }
+
+      this.goModuleRepository.insertIfAbsent(
+          UuidCreator.getTimeOrderedEpoch(), repo.getId(), modulePath, Instant.now());
+
+      // The row that was just inserted, or the one a concurrent upload inserted, is locked here.
+      // It is absent only when a delete removed it again in between: then go round once more.
+      final var inserted =
+          this.goModuleRepository.findSharedByRepoIdAndModulePath(repo.getId(), modulePath);
+      if (inserted.isPresent()) {
+        return inserted.get();
+      }
     }
 
-    this.goModuleRepository.insertIfAbsent(
-        UuidCreator.getTimeOrderedEpoch(), repo.getId(), modulePath, Instant.now());
-
-    return this.goModuleRepository
-        .findByRepoIdAndModulePath(repo.getId(), modulePath)
-        .orElseThrow(() -> new ItemNotFoundException("moduleNotFound"));
+    // Every attempt lost its row to a concurrent delete of the module: a conflict that a retry
+    // resolves.
+    throw new ItemAlreadyExistException("goModuleBusy");
   }
 
   @Override

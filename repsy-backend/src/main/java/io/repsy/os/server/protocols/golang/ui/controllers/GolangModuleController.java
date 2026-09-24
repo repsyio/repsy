@@ -18,12 +18,15 @@ package io.repsy.os.server.protocols.golang.ui.controllers;
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.GoModuleInfo;
 import io.repsy.os.generated.model.GoModuleListItem;
 import io.repsy.os.generated.model.GoModuleVersionListItem;
 import io.repsy.os.server.protocols.golang.ui.facades.GolangApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
+import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -56,6 +59,7 @@ public class GolangModuleController {
 
   private final GolangApiFacade golangApiFacade;
   private final RestResponseFactory restResponseFactory;
+  private final UsageUpdateService usageUpdateService;
 
   /**
    * Signals to the Go toolchain that this proxy does not relay checksum database requests.
@@ -126,7 +130,9 @@ public class GolangModuleController {
   @RepoOperation(permission = Permission.MANAGE)
   public RestResponse<Void> delete(final RepoInfo repoInfo, @RequestParam final String modulePath) {
 
-    this.golangApiFacade.deleteModule(repoInfo, modulePath);
+    final var usages = this.golangApiFacade.deleteModule(repoInfo, modulePath);
+
+    this.updateUsage(repoInfo, usages);
 
     return this.restResponseFactory.success("moduleDeleted");
   }
@@ -138,8 +144,14 @@ public class GolangModuleController {
       @RequestParam final String modulePath,
       @RequestParam final String version) {
 
-    this.golangApiFacade.deleteModuleVersion(repoInfo, modulePath, version);
+    final var usages = this.golangApiFacade.deleteModuleVersion(repoInfo, modulePath, version);
+
+    this.updateUsage(repoInfo, usages);
 
     return this.restResponseFactory.success("moduleVersionDeleted");
+  }
+
+  private void updateUsage(final RepoInfo repoInfo, final BaseUsages usages) {
+    this.usageUpdateService.updateUsage(new UsageChangedInfo(repoInfo.getStorageKey(), usages));
   }
 }

@@ -586,6 +586,20 @@ instance per team.
     untagged manifests", which runs that sweep) removes the ones no manifest uses any more.
 - There is no `tags/list` or referrers API yet.
 
+### Go Module Semantics
+
+- **A module lasts as long as it has a version.** Deleting the last version of a Go module in the
+  web UI (or with `DELETE /api/go/modules/{repoName}/versions`) also deletes the module: it leaves
+  the module list and its stored files are moved to the trash, like the version's own. Publishing a
+  version of that path again creates the module again. Deleting a module as a whole is the same
+  operation for all of its versions. The disk usage of what was deleted is given back to the
+  repository, and a deleted version is reported to the vulnerability scanner as deleted.
+- **The Go proxy answers as it does for a module that was never published.** `@v/list` of a module
+  without versions is `200` with an empty body (not `404`, which would make the `go` command try the
+  next `GOPROXY` entry), and `@latest` is `404`.
+- A delete and a publish of the same module take turns, so a publish that arrives while the last
+  version is being deleted is stored, in a module that is created again, and never fails.
+
 ### Signed Maven Deploys
 
 A Maven repository's key store (panel API, `/api/mvn/key-stores/{repoName}/public-keys`) can hold
