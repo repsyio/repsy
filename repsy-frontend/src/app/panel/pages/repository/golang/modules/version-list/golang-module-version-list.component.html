@@ -229,12 +229,16 @@
             </div>
           }
         </div>
+        <!-- Pagination -->
+        <app-pagination
+          (pageNumChange)="loadPage($event)"
+          [(pageNum)]="pageNum"
+          [totalPages]="pagedData.page.totalPages"
+        />
       </div>
     } @else {
       <app-empty-list />
     }
-    <!-- Pagination -->
-    <app-pagination (pageNumChange)="loadPage($event)" [(pageNum)]="pageNum" [totalPages]="pagedData.page.totalPages" />
   } @else {
     <div data-testid="pkg-error" animate.enter="fade-in-up" class="p-8 text-center">
       <img

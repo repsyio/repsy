@@ -24,6 +24,7 @@ import { finalize } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { LoginForm } from '../../../../generated/api';
 import { ToastService } from '../../../panel/shared/components/toast/toast.service';
+import { RETURN_URL_PARAM, safeReturnUrl } from '../../util/return-url';
 import { AuthService } from '../service/auth.service';
 
 @Component({
@@ -92,7 +93,7 @@ export class LoginComponent implements OnInit {
         }),
       )
       .subscribe({
-        next: () => this.router.navigateByUrl('/'),
+        next: () => this.router.navigateByUrl(this._returnUrl()),
         error: (error: HttpErrorResponse) => {
           // errorHandlerInterceptor leaves 401 responses to their callers, so show invalidCredentials here.
           if (error.status === 401) {
@@ -115,5 +116,10 @@ export class LoginComponent implements OnInit {
   public setRandomImage() {
     const randomIndex = Math.floor(Math.random() * this.images.length);
     this.randomImage = `/assets/images/${this.images[randomIndex]}`;
+  }
+
+  // The page the visitor asked for before AuthGuard sent them to the form (RPS-1278), or "/".
+  private _returnUrl(): string {
+    return safeReturnUrl(this.router.parseUrl(this.router.url).queryParams[RETURN_URL_PARAM]) ?? '/';
   }
 }

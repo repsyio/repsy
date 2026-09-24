@@ -13,6 +13,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { BehaviorSubject, NEVER, of, Subject, throwError } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
@@ -107,6 +109,38 @@ describe('MavenBrowserComponent', () => {
 
       expect(component.forwardStack).toEqual([]);
       expect(paths()).toEqual(['/']);
+      expect(mavenService.getPathContent).not.toHaveBeenCalled();
+    });
+
+    it('keeps the path when the permissions of the open repository are emitted again (RPS-1297)', () => {
+      const answer = new Subject<FsItemInfo[]>();
+      mavenService.getPathContent.and.returnValue(answer);
+      open();
+      const root = component.directoryStack[0];
+
+      // The second load of a cold page arrives while the first listing is still in flight.
+      open();
+      answer.next(contents['/']);
+      answer.complete();
+
+      expect(component.directoryStack).toEqual([root]);
+      expect(mavenService.getPathContent).toHaveBeenCalledOnceWith('/');
+
+      mavenService.getPathContent.and.callFake((path: string) => of(contents[path] ?? []));
+      component.go(dir('org/'));
+
+      expect(paths()).toEqual(['/', '/org/']);
+    });
+
+    it('takes over the new permissions of the open repository without leaving its directory', () => {
+      open();
+      component.go(dir('org/'));
+      mavenService.getPathContent.calls.reset();
+
+      repoChanges.next(permission(REPO, { canManage: false }));
+
+      expect(component.activeRepo.canManage).toBeFalse();
+      expect(paths()).toEqual(['/', '/org/']);
       expect(mavenService.getPathContent).not.toHaveBeenCalled();
     });
 
@@ -325,5 +359,36 @@ describe('MavenBrowserComponent', () => {
 
       expect(mavenService.getPathContent).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('MavenBrowserComponent template', () => {
+  function render(flags: { canManage: boolean }): HTMLElement {
+    const repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO, flags));
+    const mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['getPathContent', 'createDownloadToken'], {
+      repoChanges,
+    });
+    mavenService.getPathContent.and.returnValue(of([]));
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: MavenService, useValue: mavenService },
+        { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+      ],
+    });
+    const fixture = TestBed.createComponent(MavenBrowserComponent);
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('renders the Settings button for a repository manager', () => {
+    const settings = render({ canManage: true }).querySelector('[data-testid="pkg-settings"]');
+
+    expect(settings).not.toBeNull();
+    expect(settings?.hasAttribute('disabled')).toBeFalse();
+  });
+
+  it('renders no Settings button at all for a user who cannot manage the repository (RPS-1262)', () => {
+    expect(render({ canManage: false }).querySelector('[data-testid="pkg-settings"]')).toBeNull();
   });
 });

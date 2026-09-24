@@ -34,6 +34,8 @@ export class PanelHeaderComponent {
   public email: string;
   // Owned by the layout: the burger only asks for a state, it never keeps one of its own.
   @Input() public isMobileMenuOpen = false;
+  // The burger opens the sidebar, so it only exists where there is one (not without a session).
+  @Input() public hasMobileMenu = true;
 
   @Output() mobileMenuToggle = new EventEmitter<boolean>();
 
@@ -43,12 +45,6 @@ export class PanelHeaderComponent {
     viewportScroller: ViewportScroller,
   ) {
     this.username = this.authService.username;
-
-
-
-
-
-
 
     viewportScroller.setOffset(() => [0, document.querySelector('header')?.getBoundingClientRect().height ?? 0]);
   }

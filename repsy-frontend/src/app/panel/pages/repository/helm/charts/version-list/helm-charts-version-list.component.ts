@@ -27,6 +27,7 @@ import { SpinnerComponent } from '../../../../../../shared/components/spinner/sp
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { PaginationComponent } from '../../../../../shared/components/pagination/pagination.component';
 import { SearchboxComponent } from '../../../../../shared/components/searchbox/searchbox.component';
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
@@ -48,6 +49,7 @@ import { HelmService } from '../../service/helm.service';
     SpinnerComponent,
     HelmConfigComponent,
     SearchboxComponent,
+    PaginationComponent,
     SortSelectorComponent,
     DropdownComponent,
     TooltipComponent,
@@ -64,6 +66,9 @@ export class HelmChartsVersionListComponent implements OnDestroy {
   public chartName: string;
   public versions: HelmChartVersionItem[] = [];
   public searchText = '';
+  public pageNum = 0;
+  public pageSize = 10;
+  public totalPages = 0;
   public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
   public sortOptions: Sort[] = [
     { name: 'Newest', column: 'createdAt', type: 'DESC' },
@@ -75,6 +80,7 @@ export class HelmChartsVersionListComponent implements OnDestroy {
   public securitySummary: Record<string, VersionSecuritySummary> = {};
 
   private allVersions: HelmChartVersionItem[] = [];
+  private filteredVersions: HelmChartVersionItem[] = [];
   private readonly repositoryChanges$: Subscription;
   private securitySummarySubscription?: Subscription;
 
@@ -106,12 +112,19 @@ export class HelmChartsVersionListComponent implements OnDestroy {
 
   public search(text: string): void {
     this.searchText = text;
+    this.pageNum = 0;
     this.applyFilterAndSort();
   }
 
   public sort(option: Sort): void {
     this.sortOption = option;
+    this.pageNum = 0;
     this.applyFilterAndSort();
+  }
+
+  public loadPage(pageNum: number): void {
+    this.pageNum = pageNum;
+    this.applyPage();
   }
 
   public openConfig(open: boolean): void {
@@ -127,7 +140,7 @@ export class HelmChartsVersionListComponent implements OnDestroy {
   }
 
   public deleteVersion(version: HelmChartVersionItem): void {
-    const isLastVersion = this.versions.length === 1;
+    const isLastVersion = this.allVersions.length === 1;
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
       this.helmService
@@ -191,9 +204,17 @@ export class HelmChartsVersionListComponent implements OnDestroy {
     const filtered = text
       ? this.allVersions.filter((v) => v.version.toLowerCase().includes(text))
       : [...this.allVersions];
-    this.versions = filtered.sort((a, b) => {
+    this.filteredVersions = filtered.sort((a, b) => {
       const diff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       return this.sortOption.type === 'DESC' ? -diff : diff;
     });
+    this.applyPage();
+  }
+
+  /** The client-side pager: the API returns every version, so the current page is a slice of the filtered list. */
+  private applyPage(): void {
+    this.totalPages = Math.ceil(this.filteredVersions.length / this.pageSize);
+    this.pageNum = Math.max(0, Math.min(this.pageNum, this.totalPages - 1));
+    this.versions = this.filteredVersions.slice(this.pageNum * this.pageSize, (this.pageNum + 1) * this.pageSize);
   }
 }

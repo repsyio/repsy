@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 
 import { AuthService } from '../../../auth/pages/service/auth.service';
 import { PanelHeaderComponent } from './panel-header.component';
@@ -48,6 +48,13 @@ describe('PanelHeaderComponent burger', () => {
     expect(burger().getAttribute('aria-expanded')).toBe('false');
   });
 
+  it('has no burger where there is no sidebar to open', () => {
+    fixture.componentRef.setInput('hasMobileMenu', false);
+    fixture.detectChanges();
+
+    expect(burger()).toBeNull();
+  });
+
   it('asks for the opposite of the current state and leaves aria-expanded to its parent', () => {
     burger().click();
     fixture.detectChanges();
@@ -57,5 +64,60 @@ describe('PanelHeaderComponent burger', () => {
     fixture.componentRef.setInput('isMobileMenuOpen', true);
     burger().click();
     expect(emitted).toEqual([true, false]);
+  });
+});
+
+// RPS-1264: the Profile entry is a router link, not a document navigation that boots the SPA again.
+describe('PanelHeaderComponent profile link', () => {
+  let fixture: ComponentFixture<PanelHeaderComponent>;
+  let router: Router;
+
+  const query = (testId: string): HTMLElement | null =>
+    fixture.nativeElement.querySelector(`[data-testid="${testId}"]`);
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [PanelHeaderComponent],
+      providers: [
+        provideRouter([{ path: 'profile', component: PanelHeaderComponent }]),
+        { provide: AuthService, useValue: { username: 'admin' } },
+      ],
+    });
+    router = TestBed.inject(Router);
+    fixture = TestBed.createComponent(PanelHeaderComponent);
+    fixture.detectChanges();
+    query('header-avatar')!.click();
+    fixture.detectChanges();
+  });
+
+  it('points at the absolute /profile route, whatever page the header is on', () => {
+    expect(query('header-menu-profile')!.getAttribute('href')).toBe('/profile');
+  });
+
+  it('navigates through the router without a document load, and closes the menu', async () => {
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
+
+    query('header-menu-profile')!.dispatchEvent(click);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    // RouterLink cancels the browser's own navigation, which is what would reload the page.
+    expect(click.defaultPrevented).toBeTrue();
+    expect(router.url).toBe('/profile');
+    expect(query('header-menu')).toBeNull();
+  });
+});
+
+// RPS-1294: the header also renders on the not-found page of an anonymous visitor, who has no username.
+describe('PanelHeaderComponent without a session', () => {
+  it('renders with a fallback avatar character instead of failing on the missing username', () => {
+    TestBed.configureTestingModule({
+      imports: [PanelHeaderComponent],
+      providers: [provideRouter([]), { provide: AuthService, useValue: { username: null } }],
+    });
+    const fixture = TestBed.createComponent(PanelHeaderComponent);
+
+    expect(() => fixture.detectChanges()).not.toThrow();
+    expect(fixture.nativeElement.querySelector('[data-testid="header-avatar"]')).not.toBeNull();
   });
 });

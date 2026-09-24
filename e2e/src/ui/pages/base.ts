@@ -32,8 +32,8 @@ export abstract class UiPage {
 
   /**
    * Navigates to the page and waits for the element that proves the view rendered, never a fixed
-   * sleep: `PanelLayoutComponent` hides `<router-outlet>` for a fixed 500 ms after load, and a
-   * splash screen covers it, so "navigation finished" does not mean "view is there".
+   * sleep: a routed view renders after its own requests answer, so "navigation finished" does not
+   * mean "view is there".
    */
   abstract goto(): Promise<void>;
 }

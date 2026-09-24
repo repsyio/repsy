@@ -24,6 +24,7 @@ import {
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { permission } from '../../testing/protocol-service-spec-helpers';
+import { renderComponent } from '../../testing/render-spec-helpers';
 import { DeployTokenComponent } from './deploy-token.component';
 import { DeployTokenInfo } from './dto/deploy-token-info';
 
@@ -322,5 +323,44 @@ describe('DeployTokenComponent', () => {
     it('renders a relative time', () => {
       expect(component.timeAgo(moment().subtract(3, 'days').toDate())).toBe('3 days ago');
     });
+  });
+});
+
+describe('DeployTokenComponent template', () => {
+  async function render(canManage: boolean): Promise<HTMLElement> {
+    const tokenService = jasmine.createSpyObj<ProtocolDeployTokenControllerService>(
+      'ProtocolDeployTokenControllerService',
+      ['listDeployTokens'],
+    );
+    tokenService.listDeployTokens.and.returnValue(of(listing([token('a')])) as never);
+    const repoService = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'getUsage',
+    ]);
+    repoService.getUsage.and.returnValue(of({ data: USAGE }) as never);
+
+    const { el } = await renderComponent(
+      DeployTokenComponent,
+      [
+        { provide: ProtocolDeployTokenControllerService, useValue: tokenService },
+        { provide: ProtocolRepoControllerService, useValue: repoService },
+        { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+      ],
+      { activeRepository: permission(REPO, { canManage }), repoType: 'MAVEN' },
+    );
+    return el;
+  }
+
+  it('offers Create Token to a repository manager', async () => {
+    const el = await render(true);
+
+    expect(el.querySelector('[data-testid="token-create"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="token-table"]')).not.toBeNull();
+  });
+
+  it('offers neither the Create Token button nor the token list to anyone else (RPS-1262)', async () => {
+    const el = await render(false);
+
+    expect(el.querySelector('[data-testid="token-create"]')).toBeNull();
+    expect(el.querySelector('[data-testid="token-table"]')).toBeNull();
   });
 });

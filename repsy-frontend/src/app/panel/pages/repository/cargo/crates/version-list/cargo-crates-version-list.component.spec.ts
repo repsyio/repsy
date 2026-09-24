@@ -13,7 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-import { fakeAsync, flushMicrotasks } from '@angular/core/testing';
+import { fakeAsync, flushMicrotasks, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import moment from 'moment';
 import { BehaviorSubject, of, throwError } from 'rxjs';
@@ -24,6 +24,7 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { SecurityService } from '../../../../security/service/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
+import { renderComponent, testIds } from '../../../testing/render-spec-helpers';
 import {
   describeLastVersionDelete,
   describeRepoListBehavior,
@@ -146,5 +147,49 @@ describe('CargoCratesVersionListComponent', () => {
       component.openConfig(false);
       expect(component.showConfig).toBeFalse();
     });
+  });
+});
+
+describe('CargoCratesVersionListComponent template', () => {
+  async function render(canManage: boolean): Promise<HTMLElement> {
+    const cargoService = jasmine.createSpyObj<CargoService>('CargoService', ['fetchCrate', 'fetchCrateVersions'], {
+      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, { canManage })),
+    });
+    cargoService.fetchCrate.and.returnValue(of(CRATE));
+    cargoService.fetchCrateVersions.and.returnValue(
+      of(pageOf([{ version: '1.0.0', created_at: '2026-01-01T00:00:00Z' }, { version: '2.0.0' }], 1) as never),
+    );
+    const securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
+    securityService.watchVersionSecuritySummary.and.returnValue(of({}));
+
+    const { el } = await renderComponent(CargoCratesVersionListComponent, [
+      { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ crate: 'serde' }) } } },
+      { provide: AuthService, useValue: { username: 'alice' } },
+      { provide: CargoService, useValue: cargoService },
+      { provide: SecurityService, useValue: securityService },
+    ]);
+    return el;
+  }
+
+  it('renders a mobile card per version next to the desktop row (RPS-1262)', async () => {
+    const el = await render(true);
+
+    expect(testIds(el, 'pkg-versions-card-')).toEqual(['pkg-versions-card-1.0.0', 'pkg-versions-card-2.0.0']);
+    expect(testIds(el, 'pkg-versions-row-')).toEqual(['pkg-versions-row-1.0.0', 'pkg-versions-row-2.0.0']);
+    const card = el.querySelector('[data-testid="pkg-versions-card-1.0.0"]');
+    expect(card?.querySelector('[data-testid="row-name"]')?.textContent).toBe('1.0.0');
+    expect(card?.querySelector('[data-testid="row-security"]')).not.toBeNull();
+    expect(card?.querySelector('[data-testid="row-updated"]')).not.toBeNull();
+    // The cards live in a wrapper that only shows below lg.
+    expect(card?.closest('[data-testid="pkg-versions-cards"]')).not.toBeNull();
+    expect(card?.parentElement?.classList).toContain('lg:hidden');
+  });
+
+  it('offers the row menu on a card to a manager only', async () => {
+    const menus = '[data-testid^="pkg-versions-card-"] [data-testid="row-menu"]';
+    expect((await render(true)).querySelectorAll(menus)).toHaveSize(2);
+
+    TestBed.resetTestingModule();
+    expect((await render(false)).querySelectorAll(menus)).toHaveSize(0);
   });
 });

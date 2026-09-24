@@ -178,6 +178,88 @@ describe('HelmChartsVersionListComponent', () => {
     });
   });
 
+  describe('paging', () => {
+    /** Twelve versions, 1.0.0 (oldest) to 1.0.11 (newest). */
+    const twelve = Array.from({ length: 12 }, (_, i) =>
+      version(`1.0.${i}`, `2026-01-${String(i + 1).padStart(2, '0')}T00:00:00Z`),
+    );
+
+    beforeEach(() => helmService.getChartVersions.and.returnValue(of(twelve)));
+
+    it('shows ten versions on the first page and the rest on the second (RPS-1262)', fakeAsync(() => {
+      selectRepo();
+
+      expect(component.totalPages).toBe(2);
+      expect(component.pageNum).toBe(0);
+      expect(component.versions.map((v) => v.version)).toEqual([
+        '1.0.11',
+        '1.0.10',
+        '1.0.9',
+        '1.0.8',
+        '1.0.7',
+        '1.0.6',
+        '1.0.5',
+        '1.0.4',
+        '1.0.3',
+        '1.0.2',
+      ]);
+
+      component.loadPage(1);
+
+      expect(component.pageNum).toBe(1);
+      expect(component.versions.map((v) => v.version)).toEqual(['1.0.1', '1.0.0']);
+    }));
+
+    it('has a single page for up to ten versions', fakeAsync(() => {
+      selectRepo();
+      helmService.getChartVersions.and.returnValue(of(twelve.slice(0, 10)));
+      component.refreshPage();
+      flushMicrotasks();
+
+      expect(component.totalPages).toBe(1);
+      expect(component.versions.length).toBe(10);
+    }));
+
+    it('goes back to the first page when the search or the sort changes', fakeAsync(() => {
+      selectRepo();
+      component.loadPage(1);
+
+      component.search('1.0.1');
+      expect(component.pageNum).toBe(0);
+      expect(component.versions.map((v) => v.version)).toEqual(['1.0.11', '1.0.10', '1.0.1']);
+      expect(component.totalPages).toBe(1);
+
+      component.search('');
+      component.loadPage(1);
+      component.sort(component.sortOptions[1]);
+      expect(component.pageNum).toBe(0);
+      expect(component.versions[0].version).toBe('1.0.0');
+    }));
+
+    it('stays on the last page that still exists after a refresh returns fewer versions', fakeAsync(() => {
+      selectRepo();
+      component.loadPage(1);
+
+      helmService.getChartVersions.and.returnValue(of(twelve.slice(0, 5)));
+      component.refreshPage();
+      flushMicrotasks();
+
+      expect(component.pageNum).toBe(0);
+      expect(component.versions.length).toBe(5);
+    }));
+
+    it('keeps the listing when a version is deleted while other versions remain on other pages', fakeAsync(() => {
+      selectRepo();
+      component.loadPage(1);
+      component.deleteVersion(component.versions[0]);
+
+      dangerModalService.call();
+
+      expect(helmService.deleteChart).toHaveBeenCalledOnceWith('nginx', '1.0.1');
+      expect(router.navigate).not.toHaveBeenCalled();
+    }));
+  });
+
   describe('the security summary', () => {
     it('is watched for the chart and shown as it changes', fakeAsync(() => {
       const watched = new Subject<Record<string, VersionSecuritySummary>>();

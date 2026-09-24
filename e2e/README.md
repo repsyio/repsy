@@ -2465,15 +2465,19 @@ so `panelApi` and `seeder` (per-test run id, cleanup) work unchanged, and adds:
   the UI, API or repo base URL is aborted (Google Tag Manager, gtag, the Font Awesome CDN and Gravatar
   today), so runs are offline-safe. A test's own `page.route()` mock still wins over it.
 - **Guards redirect to `/`, not `/login`.** `AuthGuard` sends an anonymous visitor of a protected route
-  to `/`, and `/` renders the login form _in place_ (`AuthRedirectComponent` picks `LoginComponent` or
-  the dashboard from the session), so the URL stays `/`. Only logout and a direct visit navigate to
-  `/login`. Assert the login form is visible, not a `/login` URL, for a guard redirect.
-- **Timing facts a test must respect.** `PanelLayoutComponent` hides `<router-outlet>` for a fixed
-  500 ms after load, and a splash screen covers it: never assert "navigation finished", wait for the
-  element or response that drives the view (`Shell.waitForView`, `expect(...).toBeVisible()`); there
-  are no fixed sleeps (`eslint-plugin-playwright` errors on `waitForTimeout`). Toasts live 3 s and at
-  most 3 are kept: assert a toast right after the action. The header "Profile" link is a raw relative
-  `href` (a full reload, and from a nested route it resolves under the repo): state does not survive it.
+  to `/?returnUrl=<the route>`, and `/` renders the login form _in place_ (`AuthRedirectComponent`
+  follows the session: the login form, then the dashboard as soon as a login stores one), so the path
+  stays `/`. A login there returns the visitor to the remembered route (only an in-app path is followed,
+  never `https://...` or `//host`), or to the dashboard. Only logout and a direct visit navigate to
+  `/login`. Assert the login form is visible, not a `/login` URL, for a guard redirect, and read
+  `returnUrl` with a `toHaveURL((url) => ...)` predicate.
+- **Timing facts a test must respect.** A routed view renders after its own requests answer: never
+  assert "navigation finished", wait for the element or response that drives the view
+  (`Shell.waitForView`, `expect(...).toBeVisible()`); there are no fixed sleeps
+  (`eslint-plugin-playwright` errors on `waitForTimeout`). Toasts live 3 s and at most 3 are kept:
+  assert a toast right after the action. (`PanelLayoutComponent` used to hide the outlet for a fixed
+  500 ms and the header "Profile" link used to be a full reload, RPS-1264; both are fixed, PRO-04
+  proves the link with `src/ui/document-marker.ts`.)
 - **Opt-in suites** (`@throttle`, `@scanner`, ...) skip themselves with
   `test.skip(!optedIn('throttle'), 'set REPSY_UI_OPT_IN=throttle')`, never through a `grepInvert` in
   the config.
@@ -2518,19 +2522,22 @@ own credentials (AUTH-01), and negative logins use a seeded user or a name that 
 `src/ui/pages/login-validation.ts` (composed on `LoginPage`) holds the validation helpers and the
 visible message texts; `tests/ui/auth/stored-session.ts` reads the three `localStorage` keys.
 
-| Spec      | Scenarios | What is pinned                                                                                                                                                                                         |
-| --------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `login`   | 01-04, 11 | valid login and its 3 storage keys; 401 toast `Username or password is incorrect.` (wrong password and unknown user alike); every client-side rule with its message; the eye toggle; throttle (opt-in) |
-| `guards`  | 05-07     | anonymous visit of `/repositories`, `/users`, `/security`, `/profile`, `/<repo>` shows the login form at `/`; `/login` bounces a logged-in user; a USER is sent to `/` from `/users` and `/security`   |
-| `session` | 08-10     | expired access token is refreshed transparently; a refused refresh token logs out; sidebar and header logout clear the session                                                                         |
+| Spec      | Scenarios | What is pinned                                                                                                                                                                                                                                                                                             |
+| --------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `login`   | 01-04, 11 | valid login and its 3 storage keys; 401 toast `Username or password is incorrect.` (wrong password and unknown user alike); every client-side rule with its message; the eye toggle; throttle (opt-in)                                                                                                     |
+| `guards`  | 05-07     | anonymous visit of `/repositories`, `/users`, `/security`, `/profile`, `/<repo>` shows the login form at `/` (with `returnUrl`) and a login returns to that page without a reload; unsafe `returnUrl`s are ignored; `/login` bounces a logged-in user; a USER is sent to `/` from `/users` and `/security` |
+| `session` | 08-10     | expired access token is refreshed transparently; a tampered one logs out with a toast, no refresh; a refused refresh token logs out; sidebar and header logout clear the session                                                                                                                           |
 
 Things a later author must know:
 
-- **The 401 of AUTH-08/09 is stubbed, everything after it is real.** An access token lives 30 minutes
-  (not configurable) and only an _expired_ one is answered `sessionExpired`, the one answer that makes
-  `RefreshTokenInterceptor` refresh; a token with a bad signature is answered `accessNotAllowed`, which
-  it ignores. `expireAccessToken()` (`session.spec.ts`) answers calls carrying one given token with that
-  401 (never the `/api/auth/` calls); the refresh, the rotation and the logout run on the real backend.
+- **The 401 of the expired-token AUTH-08 test and of AUTH-09 is stubbed, everything after it is real.**
+  An access token lives 30 minutes (not configurable) and only an _expired_ one is answered
+  `sessionExpired`, the one answer that makes `RefreshTokenInterceptor` refresh once and retry once.
+  Every other 401 logs out at once with a toast, no refresh (RPS-1279): a token with a bad signature is
+  answered `accessNotAllowed`, so the tampered-token AUTH-08 test needs no stub. The rule per `msgId` is
+  documented on `RefreshTokenInterceptor`. `expireAccessToken()` (`session.spec.ts`) answers calls
+  carrying one given token with that 401 (never the `/api/auth/` calls); the refresh, the rotation and
+  the logout run on the real backend.
   The AUTH-09 cases: a refresh token that is garbage, one that was already used (single use), and a
   stubbed `refreshTokenExpired` answer.
 - **The SPA reads `localStorage` once, at boot** (`AuthService`), and `seedSession()` writes once per
@@ -2547,10 +2554,9 @@ Things a later author must know:
   throwaway stack: `AUTH_THROTTLE_MAX_FAILURES=20` in the `repsy` service environment, then
   `REPSY_UI_OPT_IN=throttle ./run.sh test --protocol ui --grep AUTH-11`. Not run by CI or by default.
 - **Known product bugs are `test.fail(true, ...)`**, written for the intended behaviour so the test
-  turns red (and tells you to remove the line) when the bug is fixed: logging in from the in-place form
-  a guard redirect shows (the URL is `/`, and `LoginComponent` navigates to `/` again) stores the session
-  but does not render the dashboard until a reload; and a tampered (not expired) access token is never
-  refreshed or logged out, the dashboard just stays empty.
+  turns red (and tells you to remove the line) when the bug is fixed. None is pinned in the auth specs
+  any more: RPS-1278 (a login from the in-place form at `/` left the user on the form until a reload)
+  and RPS-1279 (a tampered access token was never refreshed or logged out) are fixed.
 
 ### Repositories and dashboard (RPS-1252)
 
@@ -2601,17 +2607,18 @@ Specs: `tests/ui/users/{users-create,users-edit-delete,users-reset-password,user
 of the foundation: `src/ui/users-fixtures.ts` (`usersPage`, and `trackUiUser(name)`, which registers a
 user the UI is about to create so a failing test still cleans it up).
 
-| Scenario | Where                                                                                                                          |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| USR-01   | create a USER and an Admin, log in as each from a fresh context (an Admin sees Users, a USER does not), cancel resets the form |
-| USR-02   | one test per validator of the create form, the message texts, a valid form, a duplicate username                               |
-| USR-03   | rename, promote, demote next to another admin, the last-admin warning and locked switch, edit validation, taken name, cancel   |
-| USR-04   | reset password: one-time modal, the new password logs in, the old one is refused, cancel resets nothing                        |
-| USR-05   | delete (cancel, then confirm), delete next to another admin, the last-admin toast                                              |
-| USR-06   | 11 users: search (incl. case-insensitive, no match with its `No user matches` message), pagination both ways, refresh          |
-| PRO-01   | change password: mismatch, cancel, confirm, re-login with the new one, the old one refused; field validation                   |
-| PRO-02   | change username: reload as the new name, same account, repo protocol URL and repo page still work; validation; taken name      |
-| PRO-03   | delete account: cancel, confirm, logged out, login refused                                                                     |
+| Scenario | Where                                                                                                                                |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| USR-01   | create a USER and an Admin, log in as each from a fresh context (an Admin sees Users, a USER does not), cancel resets the form       |
+| USR-02   | one test per validator of the create form, the message texts, a valid form, a duplicate username                                     |
+| USR-03   | rename, promote, demote next to another admin, the last-admin warning and locked switch, edit validation, taken name, cancel         |
+| USR-04   | reset password: one-time modal, the new password logs in, the old one is refused, cancel resets nothing                              |
+| USR-05   | delete (cancel, then confirm), delete next to another admin, the last-admin toast                                                    |
+| USR-06   | 11 users: search (incl. case-insensitive, no match with its `No user matches` message), pagination both ways, refresh                |
+| PRO-01   | change password: mismatch, cancel, confirm, re-login with the new one, the old one refused; field validation                         |
+| PRO-02   | change username: reload as the new name, same account, repo protocol URL and repo page still work; validation; taken name            |
+| PRO-03   | delete account: cancel, confirm, logged out, login refused                                                                           |
+| PRO-04   | the header Profile link is a router link: no document load from the dashboard, the repository list or a repository page, menu closes |
 
 Rules these specs follow (and a later spec on these pages should too):
 
@@ -2639,8 +2646,8 @@ Rules these specs follow (and a later spec on these pages should too):
   Font Awesome CDN, so the buttons have no box: they are activated with `dispatchEvent('click')`.
 - **Timing.** The username change ends in `location.reload()` in the tick that raises its toast, so that
   toast is not observable: assert the reload (`ProfilePage.changeUsername`) and the outcome.
-- **Known bugs, pinned with `test.fail`**: RPS-1261 (create-user messages start with mojibake `â€¢`),
-  RPS-1246 (last-admin check counts one page). The spec text of a `test.fail` states the key.
+- **Known bugs, pinned with `test.fail`**: RPS-1246 (last-admin check counts one page). The mojibake
+  `â€¢` of the create-user messages (RPS-1261) is fixed and asserted unpinned. The spec text of a `test.fail` states the key.
 
 ### Repository settings and deploy tokens (RPS-1254)
 
@@ -2700,9 +2707,11 @@ How the tests are written, and what they had to work around:
   nine types with `toHaveCount`, so an absent section and a hidden one are told apart.
 
 Known product bugs are pinned with `test.fail('... RPS-nnnn')`, so the test turns red the day the
-bug is fixed and the marker has to go: the Visibility and Package Override help texts describe the
-opposite of the toggle (RPS-1261, two tests), and `#name`/`#description` are duplicated between the
-rename form and the create-token modal (RPS-1266). TOK-03 (RPS-1285, fixed) revokes the only token on page 2 with the page-2 answer delayed and asserts a single list request (the first page) and the three remaining rows. Not covered here: the Vulnerability Scanning toggle
+bug is fixed and the marker has to go: `#name`/`#description` are duplicated between the
+rename form and the create-token modal (RPS-1266). The Visibility and Package Override help texts
+(RPS-1261) are fixed and asserted unpinned, and so is RPS-1285: TOK-03 revokes the only token on page 2
+with the page-2 answer delayed and asserts a single list request (the first page) and the three
+remaining rows. Not covered here: the Vulnerability Scanning toggle
 (hidden without a scanner, RPS-1259), the per-protocol "configure" modal behind a token row, the
 `reservedName` rename error (it has no test id), the expiration-date range messages (no test id) and
 the token-name `minLength` branch, which is unreachable (`required` already covers an empty name, RPS-1265).
@@ -2781,9 +2790,10 @@ protocol-only scenarios. The template is `src/ui/package-scenarios.ts`, the UI c
 `scenarios/loop.ts`:
 
 ```ts
-registerPackageScenarios(DESCRIPTORS.npm, {
+registerPackageScenarios(DESCRIPTORS.nuget, {
   knownFailures: {
-    '05-mobile-sublist': 'RPS-1262: mobile scope-list cards gate Delete on canWrite',
+    '02-versions-search':
+      'RPS-1262: the NuGet version list has no search box (the API has no search parameter)',
   },
 });
 ```
@@ -2804,12 +2814,11 @@ differs the descriptor carries the value (`repoUrlIn`, `detail.delete.landsOn`,
 | 06  | Configure modal (repo name, `YOUR_PASSWORD` where the protocol has one) and the deploy-token variant opened from a token row in the settings                     |
 
 `knownFailures` keys (`PackageScenarioKey`) run their step under `test.fail`, so a fix turns it red and
-the title carries the reason. Pinned today: `05-mobile-*` (RPS-1262: npm scope list and version list,
-PyPI list and version list gate the mobile Delete on `canWrite`), and in the
-specs Maven Gradle Groovy = Grape block (RPS-1261), Docker desktop manifest Digest/Config Digest cells
-(RPS-1261), npm Bugs URL and Keywords (RPS-1261), PyPI "Pre release:" for a post release and the mobile
-"Latest" link (RPS-1261), the Maven browser's Settings button for a USER (RPS-1262) and its first click
-after a cold load (RPS-1297).
+the title carries the reason. Pinned today: NuGet `02-versions-search` (RPS-1262, the API has no
+version search). The RPS-1261 (Maven Gradle Groovy block, Docker desktop Digest/Config Digest cells,
+npm Bugs URL/Keywords, PyPI "Post release:" and the mobile "Latest" link), RPS-1262 (mobile Delete
+gate, Cargo/NuGet mobile cards, Helm pager, Go empty pager, the Maven browser's Settings button) and
+RPS-1297 (first click after a cold load) specs are fixed and assert unpinned.
 
 Facts the tests rely on (probed, RPS-1256):
 
@@ -2868,37 +2877,36 @@ now: absent = same body, only the title differs), Ruby's title is the same in bo
 
 Pinned with `test.fail` / `knownFailures` (each still fails for the stated reason, checked un-pinned):
 
-| Where                                                  | Bug                                                                                                                                                                                                                                           |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| cargo `05-mobile-versions`, nuget `05-mobile-versions` | RPS-1262 (2): the version list has no `lg:hidden` cards, a phone shows nothing                                                                                                                                                                |
-| nuget `02-versions-search`                             | RPS-1262 (3): no search box on the version list                                                                                                                                                                                               |
-| helm-07 twelve versions                                | RPS-1262 (3): no pager on the version list, all twelve render                                                                                                                                                                                 |
-| golang-07 empty versions page                          | RPS-1262 (3): `<app-pagination>` renders under the empty state of an unknown module, printing "1 NaN"                                                                                                                                         |
-| cargo-07 row menu real click                           | RPS-1299: the menu of a non-last row paints under the next row, Playwright's click is refused ("subtree intercepts pointer events")                                                                                                           |
-| cargo-07 Newest by publish time                        | RPS-1301: Newest/Oldest order by `max_version` (a text column), not by when a crate was published; the seeder gives each crate its own version so the sort and pager have distinct keys (RPS-1298), and cargo-07 asserts the sorts by version |
-| helm-07 deleting the last version                      | RPS-1302: the versions page of the deleted chart raises two error toasts, "Chart not found." and "[object Object]"                                                                                                                            |
+| Where                             | Bug                                                                                                                                                                                                                                           |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| nuget `02-versions-search`        | RPS-1262 (3): no search box on the version list: the API has no version search parameter                                                                                                                                                      |
+| cargo-07 row menu real click      | RPS-1299: the menu of a non-last row paints under the next row, Playwright's click is refused ("subtree intercepts pointer events")                                                                                                           |
+| cargo-07 Newest by publish time   | RPS-1301: Newest/Oldest order by `max_version` (a text column), not by when a crate was published; the seeder gives each crate its own version so the sort and pager have distinct keys (RPS-1298), and cargo-07 asserts the sorts by version |
+| helm-07 deleting the last version | RPS-1302: the versions page of the deleted chart raises two error toasts, "Chart not found." and "[object Object]"                                                                                                                            |
 
 `seed-proof.spec.ts` (RPS-1255) now covers all nine protocols; its generic search/sort/delete walk stays on
 the first four (the other five have the protocol-aware version of it in PKG-<proto>-02 and -04).
 RPS-1298 (a pager without a tie-breaker) is avoided as in the template, by seeding sequentially. The
-mobile-Delete `canWrite` bug of RPS-1262 (1) does not exist in these five protocols (only PyPI and npm).
+mobile-Delete `canWrite` bug of RPS-1262 (1) never existed in these five protocols (only PyPI and npm; fixed).
 
 ### Errors, navigation, mobile and accessibility (RPS-1258)
 
-`tests/ui/{errors,nav,a11y}/*.spec.ts` (ERR-01..03, NAV-01..02, A11Y-01) plus `src/ui/a11y.ts` (the axe
+`tests/ui/{errors,nav,a11y}/*.spec.ts` (ERR-01..04, NAV-01..03, A11Y-01) plus `src/ui/a11y.ts` (the axe
 helper) and `tests/ui/nav/breadcrumb.ts` (the breadcrumb page object). Run them with
 `./run.sh test --protocol ui --grep "ERR-|NAV-|A11Y-"`. `@axe-core/playwright` is the only dependency
 this story added (`package.json`, `pnpm-lock.yaml`), so the `ui` runner image must be rebuilt once
 (`./run.sh test --protocol ui -b`).
 
-| Spec              | Scenarios | What is pinned                                                                                                                                                                                                                                                                                                                                                         |
-| ----------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `errors/errors`   | ERR-01    | all nine `.../{TYPE}/info` calls answered 500: exactly `Server error` (never the body's text), no rows, page alive; ONE type (NPM) failing: the toast plus the `repo-warning`, others still list; all types failing: `repo-error`, not `empty-list`, and the refresh button retries; a failing NuGet package list: `pkg-error` with `Error Occurred` next to the toast |
-| `errors/errors`   | ERR-02    | an aborted request (status 0): `Connection error`, on the repository list and on the users page                                                                                                                                                                                                                                                                        |
-| `errors/errors`   | ERR-03    | 403 on `GET /api/users`: `Access denied` (no body) or the server's own `text`; 403 on `/security`: `Access denied` plus `You do not have permission to view this page`, and the redirect to the dashboard                                                                                                                                                              |
-| `nav/breadcrumbs` | NAV-01    | Maven: version -> artifact -> group -> repository -> Repositories, URL, remaining crumbs and the rendered page after each click; npm scoped package: the `@scope` crumb over a URL without `@`                                                                                                                                                                         |
-| `nav/mobile`      | NAV-02    | 390x844: desktop sidebar hidden and burger present (and the reverse at 1440); repository, users, Maven list/group/versions show `<page>-cards` and hide `<page>-table`; `test.fail`: the burger never opens the mobile sidebar (x2: admin flow, USER flow)                                                                                                             |
-| `a11y/a11y`       | A11Y-01   | axe on login, dashboard, repository list, repository settings, users (admin); report-only                                                                                                                                                                                                                                                                              |
+| Spec               | Scenarios | What is pinned                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------ | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `errors/errors`    | ERR-01    | all nine `.../{TYPE}/info` calls answered 500: exactly `Server error` (never the body's text), no rows, page alive; ONE type (NPM) failing: the toast plus the `repo-warning`, others still list; all types failing: `repo-error`, not `empty-list`, and the refresh button retries; a failing NuGet package list: `pkg-error` with `Error Occurred` next to the toast |
+| `errors/errors`    | ERR-02    | an aborted request (status 0): `Connection error`, on the repository list and on the users page                                                                                                                                                                                                                                                                        |
+| `errors/errors`    | ERR-03    | 403 on `GET /api/users`: `Access denied` (no body) or the server's own `text`; 403 on `/security`: `Access denied` plus `You do not have permission to view this page`, and the redirect to the dashboard                                                                                                                                                              |
+| `nav/breadcrumbs`  | NAV-01    | Maven: version -> artifact -> group -> repository -> Repositories, URL, remaining crumbs and the rendered page after each click; npm scoped package: the `@scope` crumb over a URL without `@`                                                                                                                                                                         |
+| `nav/mobile`       | NAV-02    | 390x844: desktop sidebar hidden and burger present (and the reverse at 1440); the burger opens the mobile sidebar, its links, the X, the backdrop and Escape close it (admin, and a USER without Users/Security); repository, users, Maven list/group/versions show `<page>-cards` and hide `<page>-table`                                                             |
+| `nav/mobile`       | NAV-03    | the mobile menu closes when the viewport widens past `md` and stays closed when it narrows again; `document.body.style.overflow` is `hidden` (and the wheel does not scroll the page) while it is open, `''` after every way of closing it                                                                                                                             |
+| `errors/not-found` | ERR-04    | `/not-found` in the panel layout: an anonymous visitor (phone and desktop) gets no sidebar, no burger and no `/api/profile` request; an admin and a USER at phone width open the mobile sidebar from it; at desktop the sidebar shows and the burger does not                                                                                                          |
+| `a11y/a11y`        | A11Y-01   | axe on login, dashboard, repository list, repository settings, users (admin); report-only                                                                                                                                                                                                                                                                              |
 
 Things a later author must know:
 
@@ -2909,10 +2917,12 @@ Things a later author must know:
 - **The repository list renders whatever arrives** of its nine parallel `info` calls, so one failing type
   loses only its own rows and the page shows `repo-warning`; only when EVERY request failed does it show
   `repo-error` (never the empty state), and the refresh button retries.
-- **The mobile sidebar cannot be opened.** `PanelLayoutComponent` renders `<app-panel-header />` without a
-  `(mobileMenuToggle)` handler, so `isMobileMenuOpen` stays false. The two `test.fail` NAV-02 tests are
-  written from the templates (open, link, X, backdrop, USER without Users/Security, logout); the steps after
-  the burger have not run against a working sidebar and may need adjusting when it is fixed.
+- **One layout owns the mobile menu.** `PanelLayoutComponent` (routed pages and, through content projection,
+  the dashboard) keeps `isMobileMenuOpen`; the header burger only asks for a state and exists only when the
+  layout has a sidebar, i.e. with a session. The sidebar closes it (X, backdrop, Escape, a link, any
+  navigation), the layout closes it when the viewport reaches `md` and while it is open sets
+  `document.body.style.overflow = 'hidden'` (the same style the splash screen uses, so NAV-03 checks that
+  style rather than a class).
 - **axe, report-only by default.** `scanPage()` (`src/ui/a11y.ts`) runs the WCAG 2.0/2.1 A and AA rules,
   attaches `axe-<page>.json` (summary + every violation with its nodes) and `axe-<page>.txt` to the report,
   writes the JSON to `test-results/<test>/axe-<page>.json` and prints one `AXE <page> [report]: ...` line, and

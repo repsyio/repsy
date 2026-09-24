@@ -14,7 +14,7 @@
 /// limitations under the License.
 
 import { HttpErrorResponse } from '@angular/common/http';
-import { fakeAsync, flushMicrotasks } from '@angular/core/testing';
+import { fakeAsync, flushMicrotasks, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import moment from 'moment';
 import { BehaviorSubject, of } from 'rxjs';
@@ -30,6 +30,7 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { SecurityService } from '../../../../security/service/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
+import { renderComponent, testIds } from '../../../testing/render-spec-helpers';
 import {
   describeLastVersionDelete,
   describeRepoListBehavior,
@@ -176,5 +177,54 @@ describe('NugetPackagesVersionListComponent', () => {
       component.openConfig(false);
       expect(component.showConfig).toBeFalse();
     });
+  });
+});
+
+describe('NugetPackagesVersionListComponent template', () => {
+  async function render(canManage: boolean): Promise<HTMLElement> {
+    const nugetService = jasmine.createSpyObj<NugetService>('NugetService', ['fetchPackage', 'fetchPackageVersions'], {
+      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, { canManage })),
+    });
+    nugetService.fetchPackage.and.resolveTo(PACKAGE);
+    nugetService.fetchPackageVersions.and.resolveTo(
+      pageOf(
+        [
+          { version: '1.0.0', publishedAt: '2026-01-01T00:00:00Z' },
+          { version: '2.0.0', publishedAt: '2026-02-01T00:00:00Z' },
+        ],
+        1,
+      ) as never,
+    );
+    const securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
+    securityService.watchVersionSecuritySummary.and.returnValue(of({}));
+
+    const { el } = await renderComponent(NugetPackagesVersionListComponent, [
+      { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ packageId: 'Acme.Lib' }) } } },
+      { provide: AuthService, useValue: { username: 'alice' } },
+      { provide: NugetService, useValue: nugetService },
+      { provide: SecurityService, useValue: securityService },
+    ]);
+    return el;
+  }
+
+  it('renders a mobile card per version next to the desktop row (RPS-1262)', async () => {
+    const el = await render(true);
+
+    expect(testIds(el, 'pkg-versions-card-')).toEqual(['pkg-versions-card-1.0.0', 'pkg-versions-card-2.0.0']);
+    expect(testIds(el, 'pkg-versions-row-')).toEqual(['pkg-versions-row-1.0.0', 'pkg-versions-row-2.0.0']);
+    const card = el.querySelector('[data-testid="pkg-versions-card-1.0.0"]');
+    expect(card?.querySelector('[data-testid="row-name"]')?.textContent).toBe('1.0.0');
+    expect(card?.querySelector('[data-testid="row-security"]')).not.toBeNull();
+    expect(card?.querySelector('[data-testid="row-published"]')).not.toBeNull();
+    expect(card?.closest('[data-testid="pkg-versions-cards"]')).not.toBeNull();
+    expect(card?.parentElement?.classList).toContain('lg:hidden');
+  });
+
+  it('offers the row menu on a card to a manager only', async () => {
+    const menus = '[data-testid^="pkg-versions-card-"] [data-testid="row-menu"]';
+    expect((await render(true)).querySelectorAll(menus)).toHaveSize(2);
+
+    TestBed.resetTestingModule();
+    expect((await render(false)).querySelectorAll(menus)).toHaveSize(0);
   });
 });

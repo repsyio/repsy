@@ -31,14 +31,7 @@ import { rowKeys } from '../../../src/ui/package-scenarios.js';
 
 const npm = DESCRIPTORS.npm;
 
-// RPS-1262 (1): the mobile cards of the scope page and of the version list gate Delete on `canWrite`
-// (a USER may write in this edition), where the desktop rows and the other lists use `canManage`.
-registerPackageScenarios(npm, {
-  knownFailures: {
-    '05-mobile-sublist': 'RPS-1262: mobile scope-list cards gate Delete on canWrite',
-    '05-mobile-versions': 'RPS-1262: mobile version-list cards gate Delete on canWrite',
-  },
-});
+registerPackageScenarios(npm);
 
 /** What a package of a real `package.json` carries and the seeder's minimal publish does not. */
 interface RichPackage {
@@ -218,35 +211,35 @@ test.describe('npm version detail', { tag: '@packages' }, () => {
     ).toBeVisible();
   });
 
-  // RPS-1261 (4): the "Bugs URL" line prints the package NAME, and "Keywords" is the literal
+  // RPS-1261 (4): the "Bugs URL" line used to print the package NAME, and "Keywords" was the literal
   // "No keywords found!" whatever the package.json says.
-  test.fail(
-    'PKG-npm-07 the detail shows the Bugs URL of the package.json (RPS-1261)',
-    async ({ adminPage, seeder }) => {
-      const repo = await seeder.createRepo(RepoType.NPM);
-      const pkg = await publishRich(repo.name, `@e2e-${seeder.runId}/bugs`, {
-        bugsUrl: 'https://example.com/bugs',
-      });
-      const detail = protocolPages(adminPage, npm, repo.name).detail(pkg);
-      await detail.goto();
-      await expect(
-        detail.byId('pkg-detail-metadata').getByText('Bugs URL:').locator('..'),
-      ).toContainText('https://example.com/bugs');
-    },
-  );
+  test('PKG-npm-07 the detail shows the Bugs URL of the package.json (RPS-1261)', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.NPM);
+    const pkg = await publishRich(repo.name, `@e2e-${seeder.runId}/bugs`, {
+      bugsUrl: 'https://example.com/bugs',
+    });
+    const detail = protocolPages(adminPage, npm, repo.name).detail(pkg);
+    await detail.goto();
+    await expect(
+      detail.byId('pkg-detail-metadata').getByText('Bugs URL:').locator('..'),
+    ).toContainText('https://example.com/bugs');
+  });
 
-  test.fail(
-    'PKG-npm-07 the detail shows the keywords of the package.json (RPS-1261)',
-    async ({ adminPage, seeder }) => {
-      const repo = await seeder.createRepo(RepoType.NPM);
-      const pkg = await publishRich(repo.name, `@e2e-${seeder.runId}/keys`, {
-        keywords: ['alpha', 'beta'],
-      });
-      const detail = protocolPages(adminPage, npm, repo.name).detail(pkg);
-      await detail.goto();
-      const keywords = detail.byId('pkg-detail-metadata').getByText('Keywords:').locator('..');
-      await expect(keywords).toContainText('alpha');
-      await expect(keywords).toContainText('beta');
-    },
-  );
+  test('PKG-npm-07 the detail shows the keywords of the package.json (RPS-1261)', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.NPM);
+    const pkg = await publishRich(repo.name, `@e2e-${seeder.runId}/keys`, {
+      keywords: ['alpha', 'beta'],
+    });
+    const detail = protocolPages(adminPage, npm, repo.name).detail(pkg);
+    await detail.goto();
+    const keywords = detail.byId('pkg-detail-metadata').getByText('Keywords:').locator('..');
+    await expect(keywords).toContainText('alpha');
+    await expect(keywords).toContainText('beta');
+  });
 });

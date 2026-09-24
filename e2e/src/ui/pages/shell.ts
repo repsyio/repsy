@@ -113,9 +113,8 @@ export class Shell {
 
   /**
    * Runs `action` and resolves with its result once the first response whose URL matches `url` has
-   * arrived: the call that drives a view. Prefer this (or an element assertion) over any fixed wait;
-   * `PanelLayoutComponent` hides the router outlet for a fixed 500 ms after load, so "the click
-   * returned" says nothing about the view.
+   * arrived: the call that drives a view. Prefer this (or an element assertion) over any fixed wait:
+   * "the click returned" says nothing about the view.
    */
   async waitForView<T>(url: string | RegExp, action: () => Promise<T>): Promise<T> {
     const response = this.page.waitForResponse(url);
