@@ -101,6 +101,84 @@ test.describe('USR-06 users list', () => {
     expect((await panelApi.listUsers({ size: 100 })).length).toBeGreaterThan(PAGE_SIZE);
   });
 
+  test('a slow answer of an earlier search never overwrites the newer search (RPS-1319)', async ({
+    adminPage,
+    usersPage,
+    seeder,
+  }) => {
+    const mine = await seeder.createUser();
+    const held = `${seeder.runId}-held`;
+    await usersPage.goto();
+
+    // Hold the answer of the search for `held` (it matches nothing) until the newer search is done.
+    let releaseHeld!: () => void;
+    const heldAnswer = new Promise<void>((resolve) => {
+      releaseHeld = resolve;
+    });
+    // Resolves once the held answer has been handed to the page (or the page had cancelled the request).
+    let delivered!: () => void;
+    const heldDelivered = new Promise<void>((resolve) => {
+      delivered = resolve;
+    });
+    const heldRequested = adminPage.waitForRequest((request) => {
+      const url = new URL(request.url());
+      return url.pathname === '/api/users' && url.searchParams.get('search') === held;
+    });
+    await adminPage.route(/\/api\/users\?/, async (route) => {
+      if (new URL(route.request().url()).searchParams.get('search') === held) {
+        await heldAnswer;
+        // The panel cancels the held request when the newer search starts: handing it the answer fails then.
+        const answer = await route.fetch().catch(() => undefined);
+        if (answer) {
+          await route.fulfill({ response: answer }).catch(() => undefined);
+        }
+        delivered();
+        return;
+      }
+      await route.fallback();
+    });
+
+    await usersPage.searchInput.fill(held);
+    await heldRequested;
+    await usersPage.search(mine.username);
+    await expect(usersPage.rows()).toHaveCount(1);
+    await expect(usersPage.row(mine.username)).toBeVisible();
+
+    releaseHeld();
+    await heldDelivered;
+    await usersPage.settle();
+    // A stale answer would have emptied the list now (nothing matches `held`).
+
+    await expect(usersPage.rows()).toHaveCount(1);
+    await expect(usersPage.row(mine.username)).toBeVisible();
+    await expect(usersPage.empty).toBeHidden();
+  });
+
+  test('typing sends one list request after a pause, not one per keystroke (RPS-1319)', async ({
+    adminPage,
+    usersPage,
+    seeder,
+  }) => {
+    const mine = await seeder.createUser();
+    await usersPage.goto();
+
+    const searches: string[] = [];
+    adminPage.on('request', (request) => {
+      const url = new URL(request.url());
+      if (url.pathname === '/api/users' && url.searchParams.has('search')) {
+        searches.push(url.searchParams.get('search') ?? '');
+      }
+    });
+
+    const answered = usersPage.listResponse(mine.username, 0);
+    await usersPage.searchInput.pressSequentially(mine.username, { delay: 20 });
+    await answered;
+    await expect(usersPage.row(mine.username)).toBeVisible();
+    await usersPage.settle();
+
+    expect(searches).toEqual([mine.username]);
+  });
+
   test('a lone user has no pagination and the list shows what the server holds', async ({
     usersPage,
     seededUser,
