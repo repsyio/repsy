@@ -216,7 +216,8 @@ pnpm gen:api            # generates src/api/generated from ../repsy-backend's op
 
 - **local** — a stack this harness starts and owns (`./run.sh local up`); throttle limits can be
   raised freely for negative-auth scenarios.
-- **ci** — a pipeline-started stack; same freedoms as `local`. Wiring is deferred (see the plan).
+- **ci** — a pipeline-started stack; same freedoms as `local`. `.github/workflows/e2e-nightly.yml` passes
+  `--target ci` (see "CI" below).
 - **remote** — an already-running instance the harness does not own or reset. Throttle cannot be
   tuned and nothing global is touched; later steps add a failure budget and a preflight check.
 
@@ -2527,7 +2528,8 @@ runtime that forbids unprivileged user namespaces even so, set `REPSY_UI_NO_SAND
 the shell); that is the only way to turn the sandbox off. Verified locally on Linux 7.0 with
 `kernel.apparmor_restrict_unprivileged_userns=1` as a non-root uid (with the shipped profile the
 sandbox works; with Docker's default profile it fails; `REPSY_UI_NO_SANDBOX=1` then passes); **not**
-verified on a CI-hosted runner, which is the CI story's (RPS-1260) to check.
+verified on a CI-hosted runner. `.github/workflows/e2e-nightly.yml` therefore probes the sandbox on
+its runner and falls back to `REPSY_UI_NO_SANDBOX=1` by itself (see "CI" below).
 
 ### Fixtures (`src/ui/fixtures.ts`)
 
@@ -3220,6 +3222,124 @@ come out owned by that user on the host, not root. `entrypoint.sh` calls the ins
 directly (`node_modules/.bin/...`) rather than through `pnpm run`/`pnpm exec`: pnpm's script runner
 re-verifies `node_modules` against its store on every invocation, which fails under that non-root,
 host-matching uid even though the packages themselves only need to be read.
+
+## CI
+
+`.github/workflows/e2e-nightly.yml` ("E2E Nightly") runs this harness on GitHub Actions: the panel UI
+suite, the wire-level protocol runners and the embedded-H2 smoke run. **It runs nightly (01:23 UTC)
+and on demand only, by the product owner's decision (RPS-1260): it has no `pull_request`, `push` or
+`merge_group` trigger.** PR checks are switched off in this repo on purpose (`pr-checks.yml` is
+`workflow_dispatch` only, `AGENTS.md` "Merging to main"), and this workflow is not a required check.
+
+### Triggering it
+
+```bash
+gh workflow run e2e-nightly.yml                            # everything, like the nightly run
+gh workflow run e2e-nightly.yml -f suite=ui                # one leg: ui | wire | h2 | all
+gh workflow run e2e-nightly.yml -f protocol=maven,npm      # only these runners (of the chosen legs)
+gh workflow run e2e-nightly.yml -f grep=@smoke             # a Playwright --grep for every leg
+gh workflow run e2e-nightly.yml -f keep_stack_logs=true    # upload the container logs of a green run too
+gh workflow run e2e-nightly.yml --ref some-branch -f suite=ui   # a branch (the file must exist there)
+gh run watch                                               # follow the run started last
+```
+
+`suite=ui` with `protocol=maven` selects nothing and fails the plan job with a message. A scheduled
+run is always "everything". Only one run is active at a time (`concurrency: e2e-nightly`, no
+cancelling): a second one waits.
+
+### What runs
+
+| Job / leg | Stack                                       | Runs                                                                                                                          | Timeout |
+| --------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `image`   |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                | 40 min  |
+| `ui`      | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                     | 60 min  |
+| `wire`    | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, one `run.sh test` each | 120 min |
+| `h2`      | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every runner above plus `ui` (the "Scope decision" above: the catalogs are not repeated per database)             | 90 min  |
+
+The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the
+others. Every leg does the same: load the image, `./run.sh local up [--h2]` (with `REPSY_IMAGE` set, so
+`run.sh` starts the loaded image as it is instead of building), `./run.sh test --target ci --protocol
+<runner>` per runner, `./run.sh sweep --all --dry-run` as a **leak check**, a job summary, the
+artifacts, and `./run.sh local down`. The leg fails when a runner fails, **or** when the leak check
+lists an `e2e-*` repository or user that a run left behind (the dry run always exits 0, so the step
+greps its `[dry-run] would delete` lines). `CI=true` reaches the `ui` runner (`retries: 1`,
+`forbidOnly`, `trace: on-first-retry`); a test that only passes on its retry is listed in the summary
+as a flake candidate and should get a ticket, it is not a pass to ignore.
+
+Each runner gets its own `run.sh test` invocation because every invocation overwrites `test-results/`
+and `playwright-report/` (see "Running"); the workflow copies each runner's output aside first.
+
+### Reading the result
+
+- **Job summary** (the run page, one section per leg): a table per runner with tests, passed, failed,
+  skipped, time and retried tests, built from `junit.xml`, the names of the failing tests, the tests that
+  needed a retry, the leak check outcome and whether Chromium's sandbox was on.
+- **Artifacts** (run page, "Artifacts"):
+  - `e2e-<leg>-results` (14 days): `<runner>/junit.xml`, `<runner>/playwright-report/` (the HTML report,
+    open `index.html` after unzipping, or `pnpm exec playwright show-report <dir>`) and
+    `<runner>/test-results/` (per failed test: `trace.zip`, screenshot and, for the `ui` runner, the video;
+    `pnpm exec playwright show-trace <trace.zip>`).
+  - `e2e-<leg>-stack-logs` (7 days): `docker compose logs` and `ps` of the stack, uploaded when the leg
+    failed, or always with `keep_stack_logs=true`.
+  - `e2e-repsy-image` (1 day): the image the legs ran, `gunzip -c repsy-image.tar.gz | docker load`
+    reproduces the stack locally (`REPSY_IMAGE=repsy-os-e2e:ci ./run.sh local up`).
+- A failure has no other notification: the run status is it (no Slack, no secrets). Watch the workflow's
+  page, or subscribe to its failures in the GitHub notification settings.
+
+### Running the same commands locally
+
+The workflow only calls `run.sh`; nothing in it is CI-specific. From `e2e/`, with `.env` set up as under
+"Setup":
+
+```bash
+./run.sh local up                                          # postgres profile; add --h2 for the H2 one
+./run.sh test --target ci --protocol ui                    # the `ui` leg
+for p in skeleton maven npm cargo nuget docker helm pypi golang ruby; do ./run.sh test --target ci --protocol "$p"; done
+./run.sh sweep --all --dry-run                             # the leak check: it must print no "would delete" line
+./run.sh local down
+CI=true ./run.sh test --protocol ui --grep @smoke          # with the CI retry/trace behaviour of the ui runner
+```
+
+The `h2` leg is the same with `./run.sh local up --h2` and `--grep @smoke` on every runner (and `ui`).
+To run against an image you already built, set `REPSY_IMAGE` to its tag.
+
+### Runner requirements and the Chromium sandbox
+
+- Linux with a Docker daemon (Compose v2, Buildx), about 4 vCPU and 8 GB or more: the `ui` leg starts
+  the Repsy JVM, PostgreSQL and `REPSY_UI_WORKERS` (4) Chromiums. The runner runs the ui container with
+  `network_mode: host` and `ipc: host`, as it does locally, so a runner that forbids either (some
+  container-based or rootless runners) cannot run it.
+- The jobs use `runs-on: ${{ vars.E2E_RUNNER || 'ubuntu-latest' }}` (the same GitHub-hosted image
+  `release.yml` uses). Set the repository variable `E2E_RUNNER` (Settings, Secrets and variables,
+  Actions, Variables) to another label, for example a larger WarpBuild size than the `warp-ubuntu-latest-x64-2x` that
+  `pr-checks.yml` uses (2 vCPU is too small for the `ui` leg), without editing the workflow.
+- Images come from Docker Hub (`postgres:18`, the `node`, `maven`, `rust`, ... bases of the runner
+  images), the OpenAPI generator jar comes from the cache that `openapi-generator-cache.yml` seeds
+  (else Maven Central), and the wire clients download their own toolchains at image-build time.
+- **Sandbox**: the `ui` runner uses Chromium's sandbox with `runners/ui-seccomp.json`. Before the UI
+  tests, the workflow launches Chromium once with the sandbox on ("Probe the Chromium sandbox" step). If
+  that fails (a kernel or runner that forbids unprivileged user namespaces), it sets
+  `REPSY_UI_NO_SANDBOX=1` for that leg only, prints a warning annotation and says so in the job summary;
+  otherwise the sandbox stays on. Never an unconditional `--no-sandbox`. Look at that line of the summary
+  on the first run of a new runner type.
+- There are no secrets: the stack is a throwaway one per leg, its admin password is a literal in the
+  workflow (`E2eAdmin-Pass1`, which also satisfies the panel login form).
+
+### Adding a PR smoke gate later (not enabled)
+
+The nightly workflow is deliberately not on the PR path. If the maintainers restore PR checks and want
+a fast gate, add a job that runs only `@smoke` of the `ui` runner (about 1 min of stack boot plus about
+5 min of tests, once the image is built) to a workflow that has the `merge_group` trigger (see
+`AGENTS.md`: a required check must report on `merge_group` within 60 minutes). Copy the `image` job and
+the `ui` leg of `e2e-nightly.yml` (a matrix of one: `stack: ""`, `protocols: ui`, `grep: @smoke`,
+`ui: true`), add `pull_request` and `merge_group` triggers, and add the job's name to the required checks
+of the `protect default` ruleset. Do not enable it while `pr-checks.yml` stays off.
+
+### Not covered yet
+
+A `scanner` leg (the Trivy stub profile and the `REPSY_UI_OPT_IN=scanner` tests, RPS-1270) is a
+placeholder comment in the workflow's `workflow_dispatch` inputs; nothing runs it. The H2 leg runs
+`@smoke` only, not one full catalog on H2.
 
 ## Panel API facts this step verified against a running instance
 

@@ -1,0 +1,380 @@
+name: E2E Nightly
+
+# Runs the e2e harness (e2e/, README.md "CI"): the panel UI suite in headless Chromium and the
+# wire-level protocol runners (real mvn/npm/cargo/... clients) against a Repsy image built from this
+# checkout. NIGHTLY AND MANUAL ONLY, by the product owner's decision (RPS-1260): there is
+# deliberately no pull_request, push or merge_group trigger, because PR checks are switched off in
+# this repo (see pr-checks.yml and AGENTS.md "Merging to main"). Do not add one here; a PR gate is a
+# separate, later decision (README.md "CI" says how to add a smoke gate).
+#
+# Run it by hand: gh workflow run e2e-nightly.yml [-f suite=ui] [-f protocol=maven,npm] [-f grep=@smoke]
+permissions:
+  contents: read
+
+on:
+  schedule:
+    # 01:23 UTC, off-peak and off the round hour, when scheduled runs are delayed the most.
+    - cron: "23 1 * * *"
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "Which legs to run: ui (panel UI, PostgreSQL), wire (protocol runners, PostgreSQL), h2 (@smoke on the embedded-H2 stack) or all"
+        type: choice
+        options: [all, ui, wire, h2]
+        default: all
+      protocol:
+        description: "Only these runner services, comma separated (skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby,ui). Empty: every runner of the chosen legs"
+        type: string
+        default: ""
+      grep:
+        description: "Playwright --grep pattern, e.g. @smoke. Empty: the whole suite (the h2 leg then keeps its default, @smoke)"
+        type: string
+        default: ""
+      keep_stack_logs:
+        description: "Upload the Repsy and PostgreSQL container logs even when the run is green"
+        type: boolean
+        default: false
+      # A `scanner` input belongs here once RPS-1270 lands the scanner stack profile (Trivy stub,
+      # `REPSY_UI_OPT_IN=scanner`): a further leg in the plan job below that starts that profile and
+      # runs `--protocol ui --grep @scanner`. Not implemented yet.
+
+# One run at a time: the legs are heavy and a manual run must not overlap the nightly one. A run
+# that arrives while another is in progress waits (only the newest waiting run is kept).
+concurrency:
+  group: e2e-nightly
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # Tag of the image the `image` job builds and every leg loads; run.sh then starts it as it is
+  # (REPSY_IMAGE) instead of building again.
+  REPSY_IMAGE: repsy-os-e2e:ci
+
+jobs:
+  # Decides which legs run, from the dispatch inputs (a scheduled run has none: everything).
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - name: Build the leg matrix
+        id: plan
+        env:
+          SUITE: ${{ inputs.suite || 'all' }}
+          ONLY: ${{ inputs.protocol }}
+          GREP: ${{ inputs.grep }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, sys
+
+          WIRE = "skeleton maven npm cargo nuget docker helm pypi golang ruby".split()
+          # leg -> (suite it belongs to, stack flag for run.sh local up, runners, default --grep, timeout)
+          LEGS = {
+              "ui": ("ui", "", ["ui"], "", 60),
+              "wire": ("wire", "", WIRE, "", 120),
+              # Embedded H2: @smoke of every runner (README.md "Scope decision"), not the catalogs.
+              "h2": ("h2", "--h2", WIRE + ["ui"], "@smoke", 90),
+          }
+
+          def fail(msg):
+              print(f"::error::{msg}")
+              sys.exit(1)
+
+          suite = os.environ["SUITE"]
+          only = [p for p in re.split(r"[,\s]+", os.environ["ONLY"]) if p]
+          unknown = [p for p in only if p not in WIRE + ["ui"]]
+          if unknown:
+              fail(f"unknown protocol(s): {', '.join(unknown)}")
+
+          include = []
+          for leg, (owner, stack, runners, default_grep, timeout) in LEGS.items():
+              if suite not in ("all", owner):
+                  continue
+              runners = [r for r in runners if not only or r in only]
+              if not runners:
+                  continue
+              include.append({
+                  "leg": leg,
+                  "stack": stack,
+                  "protocols": " ".join(runners),
+                  "ui": "ui" in runners,
+                  "grep": os.environ["GREP"] or default_grep,
+                  "timeout": timeout,
+              })
+
+          if not include:
+              fail("the suite and protocol inputs select no runner")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write("matrix=" + json.dumps({"include": include}) + "\n")
+          print(json.dumps(include, indent=2))
+          PY
+
+  # The Repsy image, built once from this checkout with the layer cache, and handed to the legs as
+  # an artifact: three legs each rebuilding it would triple the slowest step of the run.
+  image:
+    name: Build Repsy image
+    runs-on: ${{ vars.E2E_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: recursive
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      # Same restore-only cache and build context as release.yml (keep the path literal: it is part
+      # of the cache version). A miss only makes the image build download the generator jar.
+      - name: Restore OpenAPI generator jar
+        id: openapi-jar
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/openapi-generator-cli
+          key: openapi-generator-${{ runner.os }}-${{ hashFiles('repsy-frontend/openapitools.json') }}
+
+      - name: Prepare OpenAPI generator jar build context
+        env:
+          CACHE_HIT: ${{ steps.openapi-jar.outputs.cache-hit }}
+        run: |
+          mkdir -p "$HOME/.cache/openapi-generator-cli"
+          echo "OPENAPI_JAR_DIR=$HOME/.cache/openapi-generator-cli" >> "$GITHUB_ENV"
+          if [ "$CACHE_HIT" != "true" ]; then
+            echo "::warning::OpenAPI generator jar cache miss: the image build will download it from Maven Central"
+          fi
+
+      - name: Build the image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: Dockerfile
+          build-contexts: |
+            openapi-jar=${{ env.OPENAPI_JAR_DIR }}
+          load: true
+          push: false
+          tags: ${{ env.REPSY_IMAGE }}
+          cache-from: type=gha,scope=e2e-image
+          cache-to: type=gha,scope=e2e-image,mode=max
+
+      - name: Export the image
+        run: docker save "$REPSY_IMAGE" | gzip -1 > "$RUNNER_TEMP/repsy-image.tar.gz"
+
+      - name: Upload the image
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: e2e-repsy-image
+          path: ${{ runner.temp }}/repsy-image.tar.gz
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+
+  e2e:
+    name: E2E ${{ matrix.leg }}
+    needs: [plan, image]
+    runs-on: ${{ vars.E2E_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: ${{ matrix.timeout }}
+    strategy:
+      # A red leg must not hide the result of the others.
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: e2e
+    env:
+      # A throwaway stack that lives for this job only, so a literal is fine. It must also satisfy
+      # the panel's login form (6-50 chars, lower + upper case, a digit), or no UI test can log in.
+      REPSY_ADMIN_PASSWORD: E2eAdmin-Pass1
+      # Where the legs' reports are collected: e2e-artifacts/<leg>/<runner>/{junit.xml,playwright-report,test-results}
+      ARTIFACTS: ${{ github.workspace }}/e2e/e2e-artifacts/${{ matrix.leg }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # e2e/ runs from the checkout; the image comes from the artifact, so no submodule.
+          submodules: false
+
+      - name: Download the image
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: e2e-repsy-image
+          path: ${{ runner.temp }}
+
+      - name: Load the image
+        run: gunzip -c "$RUNNER_TEMP/repsy-image.tar.gz" | docker load
+
+      - name: Start the stack
+        id: up
+        env:
+          STACK: ${{ matrix.stack }}
+        # REPSY_IMAGE is set (workflow env), so run.sh starts the loaded image and does not build.
+        # $STACK is empty (PostgreSQL profile) or --h2, deliberately unquoted.
+        # shellcheck disable=SC2086
+        run: |
+          ./run.sh local up $STACK
+          docker compose ls
+
+      # The UI runner drives Chromium with its sandbox ON under a seccomp profile that allows user
+      # namespaces (README.md "Chromium sandbox"). A runner whose kernel forbids unprivileged user
+      # namespaces cannot do that; probe once and, only then, turn the sandbox off for this job with
+      # REPSY_UI_NO_SANDBOX=1 (never a bare --no-sandbox). It is a throwaway VM running our own
+      # tests against our own stack, so the sandbox adds little there, but it stays on wherever it
+      # works. The outcome is written to the job summary.
+      - name: Probe the Chromium sandbox
+        if: matrix.ui
+        run: |
+          mkdir -p test-results playwright-report
+          export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
+          docker compose -f docker-compose.runners.yml build ui
+          if docker compose -f docker-compose.runners.yml run --rm --no-deps ui \
+            node --input-type=module -e "
+              import { chromium } from '@playwright/test';
+              const b = await chromium.launch({ chromiumSandbox: true });
+              await (await b.newPage()).goto('about:blank');
+              await b.close();
+              console.log('chromium sandbox ok');"; then
+            echo "- Chromium sandbox: on (works on this runner)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Chromium cannot use its sandbox on this runner; running the UI suite with REPSY_UI_NO_SANDBOX=1"
+            echo "REPSY_UI_NO_SANDBOX=1" >> "$GITHUB_ENV"
+            echo "- Chromium sandbox: OFF (REPSY_UI_NO_SANDBOX=1, the probe failed on this runner)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # One ./run.sh test per runner, because every invocation overwrites test-results/ and
+      # playwright-report/ (README.md "Running"); each runner's reports are copied aside before the
+      # next one starts. A red runner does not stop the others; the step fails at the end.
+      - name: Run the tests
+        id: tests
+        env:
+          PROTOCOLS: ${{ matrix.protocols }}
+          GREP: ${{ matrix.grep }}
+          # Read by playwright.config.ts (retries: 1, forbidOnly, trace on first retry); run.sh
+          # forwards it to the ui runner only. GitHub sets it already; explicit for the reader.
+          CI: "true"
+        run: |
+          grep_args=()
+          if [ -n "$GREP" ]; then
+            grep_args=(--grep "$GREP")
+          fi
+          failed=0
+          for protocol in $PROTOCOLS; do
+            echo "::group::$protocol"
+            ./run.sh test --target ci --protocol "$protocol" "${grep_args[@]}" || failed=1
+            mkdir -p "$ARTIFACTS/$protocol"
+            cp -a test-results "$ARTIFACTS/$protocol/test-results" || true
+            cp -a playwright-report "$ARTIFACTS/$protocol/playwright-report" || true
+            mv "$ARTIFACTS/$protocol/test-results/junit.xml" "$ARTIFACTS/$protocol/junit.xml" || true
+            echo "::endgroup::"
+          done
+          exit "$failed"
+
+      # Fails the leg when a run left e2e-* repos or users behind. --dry-run prints
+      # "[dry-run] would delete ..." for each and always exits 0, so read its output.
+      - name: Leak check
+        id: leaks
+        if: ${{ !cancelled() && steps.up.outcome == 'success' }}
+        run: |
+          out="$(./run.sh sweep --all --dry-run 2>&1)"
+          echo "$out"
+          if grep -q '^\[dry-run\] would delete' <<< "$out"; then
+            echo "::error::the run left e2e-* repositories or users behind (listed above)"
+            exit 1
+          fi
+
+      - name: Job summary
+        if: ${{ !cancelled() }}
+        env:
+          LEG: ${{ matrix.leg }}
+          LEAKS: ${{ steps.leaks.outcome }}
+        run: |
+          python3 - >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import glob, os
+          import xml.etree.ElementTree as ET
+
+          base = os.environ["ARTIFACTS"]
+          print(f"### E2E `{os.environ['LEG']}`\n")
+          print("| runner | tests | passed | failed | skipped | wall time (s) | retried |")
+          print("| --- | ---: | ---: | ---: | ---: | ---: | ---: |")
+          failures, retried, totals = [], [], [0, 0, 0, 0]
+          for folder in sorted(glob.glob(f"{base}/*/")):
+              name = os.path.basename(folder.rstrip("/"))
+              try:
+                  root = ET.parse(f"{folder}junit.xml").getroot()
+              except (OSError, ET.ParseError):
+                  print(f"| {name} | no junit.xml: the runner did not finish | | | | | |")
+                  failures.append(f"{name}: no junit.xml (the runner crashed or could not start)")
+                  continue
+              n = f = s = 0
+              for case in root.iter("testcase"):
+                  n += 1
+                  if case.find("failure") is not None or case.find("error") is not None:
+                      f += 1
+                      failures.append(f"{name}: {case.get('name')}")
+                  elif case.find("skipped") is not None:
+                      s += 1
+              # Playwright keeps a directory per retry attempt. A test that needed one is a flake to
+              # ticket, even when it passed the second time.
+              retries = sorted(
+                  os.path.basename(p.rstrip("/"))
+                  for p in glob.glob(f"{folder}test-results/*-retry[0-9]*")
+              )
+              retried += [f"{name}: {r}" for r in retries]
+              secs = float(root.get("time") or 0)
+              print(f"| {name} | {n} | {n - f - s} | {f} | {s} | {secs:.0f} | {len(retries)} |")
+              for i, v in enumerate((n, n - f - s, f, s)):
+                  totals[i] += v
+          print(f"| **total** | {totals[0]} | {totals[1]} | {totals[2]} | {totals[3]} | | {len(retried)} |")
+          if failures:
+              print("\n**Failing tests**\n")
+              for line in failures[:50]:
+                  print("- " + line.replace("|", "\\|"))
+              if len(failures) > 50:
+                  print(f"- ... and {len(failures) - 50} more (see the junit.xml artifacts)")
+          if retried:
+              print("\n**Needed a retry (flake candidates)**\n")
+              for line in retried[:50]:
+                  print("- " + line)
+          print("\nLeak check: " + {"success": "clean", "failure": "LEFTOVER e2e-* repos/users"}.get(
+              os.environ["LEAKS"], "not run"))
+          PY
+
+      - name: Collect the stack logs
+        if: ${{ !cancelled() && (failure() || inputs.keep_stack_logs) }}
+        env:
+          STACK: ${{ matrix.stack }}
+        run: |
+          file=docker-compose.stack.yml
+          [ "$STACK" = "--h2" ] && file=docker-compose.stack-h2.yml
+          mkdir -p stack-logs
+          docker compose -f "$file" ps -a > stack-logs/ps.txt 2>&1 || true
+          docker compose -f "$file" logs --no-color --timestamps > stack-logs/stack.log 2>&1 || true
+
+      - name: Upload the reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          # HTML report, junit.xml, and per failed test the trace, screenshot and video.
+          name: e2e-${{ matrix.leg }}-results
+          path: e2e/e2e-artifacts/${{ matrix.leg }}
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload the stack logs
+        if: ${{ !cancelled() && (failure() || inputs.keep_stack_logs) }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: e2e-${{ matrix.leg }}-stack-logs
+          path: e2e/stack-logs
+          retention-days: 7
+          if-no-files-found: warn
+
+      # The runner VM is discarded anyway; this only keeps a self-hosted runner (E2E_RUNNER) clean.
+      - name: Stop the stack
+        if: always()
+        env:
+          STACK: ${{ matrix.stack }}
+        # shellcheck disable=SC2086
+        run: ./run.sh local down $STACK
