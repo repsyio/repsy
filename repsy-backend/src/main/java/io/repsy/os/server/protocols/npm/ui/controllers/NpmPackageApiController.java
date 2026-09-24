@@ -160,7 +160,7 @@ public class NpmPackageApiController {
       final RepoInfo repoInfo,
       @PathVariable(required = false) final @Nullable String scope,
       @PathVariable final String packageName,
-      @RequestParam(required = false, defaultValue = "") final String version,
+      @RequestParam(name = "q", required = false, defaultValue = "") final String version,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);

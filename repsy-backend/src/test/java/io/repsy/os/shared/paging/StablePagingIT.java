@@ -150,7 +150,7 @@ class StablePagingIT extends AbstractIntegrationTest {
           this.perform(
                   get("/api/users")
                       .header(AUTHORIZATION, bearer)
-                      .param("search", search)
+                      .param("q", search)
                       .param("page", String.valueOf(page))
                       .param("size", String.valueOf(PAGE_SIZE)))
               .andExpect(status().isOk())

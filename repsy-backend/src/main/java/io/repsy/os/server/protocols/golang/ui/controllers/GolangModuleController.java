@@ -84,7 +84,7 @@ public class GolangModuleController {
   @RepoOperation
   public RestResponse<PagedModel<GoModuleListItem>> search(
       final RepoInfo repoInfo,
-      @RequestParam(required = false, defaultValue = "") final String search,
+      @RequestParam(name = "q", required = false, defaultValue = "") final String search,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, MODULE_SORT_PROPERTIES);
@@ -100,7 +100,7 @@ public class GolangModuleController {
   public RestResponse<PagedModel<GoModuleVersionListItem>> listVersions(
       final RepoInfo repoInfo,
       @RequestParam final String modulePath,
-      @RequestParam(required = false, defaultValue = "") final String search,
+      @RequestParam(name = "q", required = false, defaultValue = "") final String search,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);

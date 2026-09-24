@@ -27,16 +27,16 @@ import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
 import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.utils.MultiPortNames;
-import io.repsy.os.shared.utils.PagingOffsetValidator;
+import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -50,7 +50,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 final class SecurityScanController {
 
-  private static final int MAX_PAGE_SIZE = 100;
+  private static final Set<String> SCAN_SORT_PROPERTIES = Set.of("createdAt");
 
   private final @NonNull PanelAuthHelper panelAuthHelper;
   private final @NonNull VulnerabilityScanTxService scanTxService;
@@ -63,13 +63,13 @@ final class SecurityScanController {
       @RequestParam(required = false) final @Nullable Severity severity,
       @RequestParam(required = false) final @Nullable RepoType repoType,
       @RequestParam(required = false) final @Nullable String repoName,
-      @RequestParam(defaultValue = "0") @Min(0) final int page,
-      @RequestParam(defaultValue = "10") @Min(1) @Max(MAX_PAGE_SIZE) final int size) {
+      @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)
+          final @NonNull Pageable pageable) {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
-    PagingOffsetValidator.requireNoOffsetOverflow(page, size);
-    final var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+    SortValidator.requireSortableBy(pageable, SCAN_SORT_PROPERTIES);
+
     final var scans = this.scanTxService.listAllScans(severity, repoType, repoName, pageable);
 
     return this.resp.success("scansFetched", new PagedModel<>(scans));

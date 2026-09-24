@@ -62,7 +62,7 @@ public class NpmScopeApiController {
   public RestResponse<PagedModel<NpmPackageListItem>> listByScope(
       final RepoInfo repoInfo,
       @PathVariable(required = false) final @Nullable String scope,
-      @RequestParam(required = false, defaultValue = "") final String name,
+      @RequestParam(name = "q", required = false, defaultValue = "") final String name,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
 
     final var packages =

@@ -43,10 +43,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -417,6 +419,47 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName("the query parameters of an operation are the ones its controller binds (RPS-1269)")
+  void queryParametersMatchTheController() throws IOException {
+    final var doc = loadSpec();
+    final var routes = this.panelRoutes();
+    final var findings = new TreeSet<String>();
+
+    for (final var operation : specOperations(doc).values()) {
+      final var handlers =
+          routes.stream().filter(route -> route.key().equals(operation.key())).toList();
+
+      if (handlers.isEmpty()) {
+        continue;
+      }
+
+      // One (method, path) can be served by several handlers that differ in a required parameter
+      // (a list with and without its filter), so the spec documents the union of what they bind.
+      final var bound = new TreeSet<String>();
+      handlers.forEach(route -> bound.addAll(route.boundQueryParameters()));
+
+      final var documented = new TreeSet<String>();
+
+      for (final var parameter : operation.parameters(doc)) {
+        if ("query".equals(parameter.get("in"))) {
+          documented.add(String.valueOf(parameter.get("name")));
+        }
+      }
+
+      if (!documented.equals(bound)) {
+        findings.add(
+            operation.key()
+                + ": spec documents "
+                + documented
+                + " but the controller binds "
+                + bound);
+      }
+    }
+
+    assertNoNewFindings("query parameters", findings, Map.of());
+  }
+
+  @Test
   @DisplayName("every $ref in the spec resolves")
   void referencesResolve() throws IOException {
     final var doc = loadSpec();
@@ -454,8 +497,13 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
   // ---------------------------------------------------------------------------------------------
 
   private static Map<String, Object> loadSpec() throws IOException {
+    final var options = new LoaderOptions();
+    // A key written twice in one mapping is silently last-wins for a parser that allows it, and
+    // the OpenAPI generator rejects the whole spec (an operation with two descriptions).
+    options.setAllowDuplicateKeys(false);
+
     try (var in = new ClassPathResource(SPEC_RESOURCE).getInputStream()) {
-      return asMap(new Yaml(new SafeConstructor(new LoaderOptions())).load(in));
+      return asMap(new Yaml(new SafeConstructor(options)).load(in));
     }
   }
 
@@ -717,6 +765,36 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
               header ->
                   HttpHeaders.AUTHORIZATION.equalsIgnoreCase(
                       header.name().isEmpty() ? header.value() : header.name()));
+    }
+
+    /**
+     * The query parameters the handler binds: its {@code @RequestParam} names, and {@code page},
+     * {@code size} and {@code sort} for a Spring Data {@link Pageable}.
+     */
+    List<String> boundQueryParameters() {
+      final var names = new ArrayList<String>();
+      final var discoverer = new DefaultParameterNameDiscoverer();
+
+      for (final var parameter : this.handler.getMethodParameters()) {
+        if (Pageable.class.isAssignableFrom(parameter.getParameterType())) {
+          names.addAll(List.of("page", "size", "sort"));
+          continue;
+        }
+
+        final var annotation = parameter.getParameterAnnotation(RequestParam.class);
+
+        if (annotation == null) {
+          continue;
+        }
+
+        parameter.initParameterNameDiscovery(discoverer);
+
+        final var explicit = annotation.name().isEmpty() ? annotation.value() : annotation.name();
+
+        names.add(explicit.isEmpty() ? parameter.getParameterName() : explicit);
+      }
+
+      return names;
     }
 
     /** The names the handler's {@code @PathVariable} parameters bind. */

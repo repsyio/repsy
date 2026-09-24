@@ -54,6 +54,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -201,7 +202,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(
               get("/api/mvn/artifacts/{repo}", MavenArtifactControllerIT.this.repoName)
-                  .param("groupName", "example")
+                  .param("q", "example")
                   .with(apiPort()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.*", hasSize(5)))
@@ -225,7 +226,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                       "/api/mvn/artifacts/{repo}/{group}",
                       MavenArtifactControllerIT.this.repoName,
                       GROUP)
-                  .param("artifactName", "dem")
+                  .param("q", "dem")
                   .with(apiPort()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.msgId").value("artifactsFetched"))
@@ -245,7 +246,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
             .mockMvc
             .perform(
                 get("/api/mvn/artifacts/{repo}", MavenArtifactControllerIT.this.repoName)
-                    .param("groupName", term)
+                    .param("q", term)
                     .with(apiPort()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.content", hasSize(1)))
@@ -258,7 +259,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
                       "/api/mvn/artifacts/{repo}/{group}",
                       MavenArtifactControllerIT.this.repoName,
                       GROUP)
-                  .param("artifactName", key)
+                  .param("q", key)
                   .with(apiPort()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content", hasSize(1)));
@@ -266,7 +267,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(
               get("/api/mvn/artifacts/{repo}", MavenArtifactControllerIT.this.repoName)
-                  .param("groupName", ARTIFACT + ":" + GROUP)
+                  .param("q", ARTIFACT + ":" + GROUP)
                   .with(apiPort()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content", hasSize(0)));
@@ -497,7 +498,7 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
     private static final String ARTIFACTS = "/api/mvn/artifacts/{repo}";
     private static final String GROUP_ARTIFACTS = "/api/mvn/artifacts/{repo}/{group}";
     private static final String VERSIONS = "/api/mvn/artifacts/{repo}/{group}/{artifact}/versions";
-    private static final String VERSIONS_LIKE = VERSIONS + "?version=1";
+    private static final String VERSIONS_LIKE = VERSIONS + "?q=1";
 
     static Stream<String> endpoints() {
       return Stream.of(ARTIFACTS, GROUP_ARTIFACTS, VERSIONS, VERSIONS_LIKE);
@@ -553,6 +554,16 @@ class MavenArtifactControllerIT extends AbstractIntegrationTest {
       this.list(VERSIONS, "sort", "versionName,desc")
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].versionName").value("1.1.0-SNAPSHOT"));
+    }
+
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource({ARTIFACTS + ",groupName", GROUP_ARTIFACTS + ",artifactName", VERSIONS + ",version"})
+    @DisplayName("filters by q only: the old name of the filter is an unknown parameter")
+    void filtersByQOnly(final String path, final String oldName) throws Exception {
+      PagingAssertions.expectFilterIsQ(
+          this.list(path, "page", "0"),
+          this.list(path, oldName, PagingAssertions.NO_MATCH),
+          this.list(path, "q", PagingAssertions.NO_MATCH));
     }
 
     @ParameterizedTest(name = "{0}")

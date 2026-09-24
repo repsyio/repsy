@@ -33,6 +33,7 @@ import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -60,8 +61,8 @@ public class RubyGemApiController {
   @RepoOperation
   public RestResponse<PagedModel<GemListItem>> listGems(
       final RepoInfo repoInfo,
-      @RequestParam(defaultValue = "") final String name,
-      final Pageable pageable) {
+      @RequestParam(name = "q", defaultValue = "") final String name,
+      @PageableDefault final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, GEM_SORT_PROPERTIES);
 
@@ -74,8 +75,8 @@ public class RubyGemApiController {
   public RestResponse<PagedModel<GemVersionListItem>> listVersions(
       final RepoInfo repoInfo,
       @PathVariable final String gemName,
-      @RequestParam(defaultValue = "") final String version,
-      final Pageable pageable) {
+      @RequestParam(name = "q", defaultValue = "") final String version,
+      @PageableDefault final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
 

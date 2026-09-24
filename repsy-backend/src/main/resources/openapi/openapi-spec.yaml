@@ -275,30 +275,19 @@ paths:
       tags:
         - user-controller
       operationId: listUsers
+      description: >-
+        Sortable by `createdAt`, `username` (`property,direction`). The default is `createdAt,desc`.
       parameters:
-        - name: search
+        - name: q
           in: query
           required: false
+          description: >-
+            Only users whose username contains this text, case-insensitive.
           schema:
             type: string
-            default: ''
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 0
-            minimum: 0
-        - name: size
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 10
-            minimum: 1
-            maximum: 100
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       responses:
         '200':
           description: OK
@@ -377,6 +366,10 @@ paths:
 
         Answers 400 `validationError` for an unknown `type`, a `page` below 0, a `size` outside 1-100
         or a `sort` property that is not allowed; `data` names the parameter.
+
+
+        Sortable by `createdAt`, `name`, `type`, `diskUsage` (`property,direction`). The default is
+        `createdAt,desc`.
       parameters:
         - name: type
           in: query
@@ -392,36 +385,9 @@ paths:
             `%`, `_` and `\` match themselves.
           schema:
             type: string
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 0
-            minimum: 0
-        - name: size
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 10
-            minimum: 1
-            maximum: 100
-        - name: sort
-          in: query
-          required: false
-          description: >-
-            `property,direction`, with the property one of `createdAt`, `name`, `type` and
-            `diskUsage`. The default is `createdAt,desc`. Ties are broken by id, so pages never
-            repeat or skip a repository.
-          style: form
-          explode: true
-          schema:
-            type: array
-            items:
-              type: string
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       responses:
         '200':
           description: OK
@@ -493,12 +459,13 @@ paths:
       tags:
         - protocol-deploy-token-controller
       operationId: listDeployTokens
+      description: >-
+        Sortable by `id`, `name`, `username`, `description`, `readOnly`, `expirationDate`, `createdAt`
+        (`property,direction`). The default is `id,desc`.
       parameters:
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       responses:
         '200':
           description: OK
@@ -571,12 +538,12 @@ paths:
       tags:
         - key-store-controller
       operationId: listMavenKeyStores
+      description: >-
+        Sortable by `id`, `host`, `displayName` (`property,direction`). The default is `id,desc`.
       parameters:
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       responses:
         '200':
           description: OK
@@ -637,11 +604,9 @@ paths:
         - key-store-controller
       operationId: listMavenPgpPublicKeys
       parameters:
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       responses:
         '200':
           description: OK
@@ -664,6 +629,10 @@ paths:
         Registered keys are tried first when a .pom.asc is verified, then the repo's allowed
         key-server hosts, then the two public default servers. A signature whose key is nowhere
         among those is refused with 404 and nothing is stored.
+
+
+        Sortable by `id`, `keyId`, `fingerprint`, `userId`, `createdAt` (`property,direction`). The
+        default is `id,desc`.
     post:
       tags:
         - key-store-controller
@@ -1037,18 +1006,20 @@ paths:
       tags:
         - pypi-package-controller
       operationId: listPypiPackages
+      description: >-
+        Sortable by `id`, `name`, `latestVersion`, `updatedAt` (`property,direction`). The default is
+        `id,desc`.
       parameters:
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
-        - name: name
+        - name: q
           in: query
           required: false
+          description: >-
+            Only packages whose name contains this text.
           schema:
             type: string
-            default: ''
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -1079,23 +1050,24 @@ paths:
       tags:
         - pypi-package-controller
       operationId: listReleases
+      description: >-
+        Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `id,desc`.
       parameters:
         - name: packageName
           in: path
           required: true
           schema:
             type: string
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
-        - name: version
+        - name: q
           in: query
           required: false
+          description: >-
+            Only releases whose version contains this text.
           schema:
             type: string
-            default: ''
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -1285,17 +1257,18 @@ paths:
       tags:
         - npm-package-api-controller
       operationId: listNpmPackages
+      description: >-
+        Sortable by `id`, `name`, `scope`, `latestVersion`, `updatedAt` (`property,direction`). The
+        default is `id,desc`.
       parameters:
         - name: scope
           in: query
           required: false
           schema:
             type: string
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -1606,18 +1579,20 @@ paths:
       tags:
         - npm-scope-api-controller
       operationId: listUnscopedNpmPackages
+      description: >-
+        Sortable by `id`, `name`, `scope`, `latestVersion`, `updatedAt` (`property,direction`). The
+        default is `id,desc`.
       parameters:
-        - name: name
+        - name: q
           in: query
           required: false
+          description: >-
+            Only packages whose name contains this text.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -1648,23 +1623,25 @@ paths:
       tags:
         - npm-scope-api-controller
       operationId: listNpmPackagesByScope
+      description: >-
+        Sortable by `id`, `name`, `scope`, `latestVersion`, `updatedAt` (`property,direction`). The
+        default is `id,desc`.
       parameters:
         - name: scope
           in: path
           required: true
           schema:
             type: string
-        - name: name
+        - name: q
           in: query
           required: false
+          description: >-
+            Only packages whose name contains this text.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -1695,23 +1672,24 @@ paths:
       tags:
         - npm-package-api-controller
       operationId: listNpmPackageVersions
+      description: >-
+        Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `id,desc`.
       parameters:
         - name: packageName
           in: path
           required: true
           schema:
             type: string
-        - name: version
+        - name: q
           in: query
           required: false
+          description: >-
+            Only versions that contain this text.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -1742,6 +1720,8 @@ paths:
       tags:
         - npm-package-api-controller
       operationId: listNpmScopedPackageVersions
+      description: >-
+        Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `id,desc`.
       parameters:
         - name: scope
           in: path
@@ -1753,17 +1733,16 @@ paths:
           required: true
           schema:
             type: string
-        - name: version
+        - name: q
           in: query
           required: false
+          description: >-
+            Only versions that contain this text.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -1867,18 +1846,20 @@ paths:
       tags:
         - nuget-package-controller
       operationId: searchNugetPackages
+      description: >-
+        Sortable by `packageId` (`property,direction`).
       parameters:
-        - name: query
+        - name: q
           in: query
           required: false
+          description: >-
+            Only packages whose id contains this text, case-insensitive. The characters `%`, `_` and `\`
+            match themselves.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -1971,23 +1952,25 @@ paths:
       tags:
         - nuget-package-controller
       operationId: listNugetVersions
+      description: >-
+        Sortable by `version`, `publishedAt` (`property,direction`).
       parameters:
         - name: packageId
           in: path
           required: true
           schema:
             type: string
-        - name: query
+        - name: q
           in: query
           required: false
+          description: >-
+            Only versions that contain this text, case-insensitive. The characters `%`, `_` and `\`
+            match themselves.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -2089,18 +2072,20 @@ paths:
       tags:
         - maven-artifact-controller
       operationId: listContainsGroupName
+      description: >-
+        Sortable by `id`, `groupName`, `artifactName`, `lastUpdatedAt` (`property,direction`). The
+        default is `id,desc`.
       parameters:
-        - name: groupName
+        - name: q
           in: query
           required: false
+          description: >-
+            Only artifacts whose `group:artifact` name contains this text.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -2131,23 +2116,25 @@ paths:
       tags:
         - maven-artifact-controller
       operationId: listContainsArtifactName
+      description: >-
+        Sortable by `id`, `groupName`, `artifactName`, `lastUpdatedAt` (`property,direction`). The
+        default is `id,desc`.
       parameters:
         - name: groupName
           in: path
           required: true
           schema:
             type: string
-        - name: artifactName
+        - name: q
           in: query
           required: false
+          description: >-
+            Only artifacts of the group whose `group:artifact` name contains this text.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -2204,6 +2191,9 @@ paths:
       tags:
         - maven-artifact-controller
       operationId: listMavenArtifactVersions
+      description: >-
+        Sortable by `id`, `versionName`, `lastUpdatedAt` (`property,direction`). The default is
+        `id,desc`.
       parameters:
         - name: groupName
           in: path
@@ -2215,17 +2205,16 @@ paths:
           required: true
           schema:
             type: string
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
-        - name: version
+        - name: q
           in: query
           required: false
+          description: >-
+            Only versions that contain this text.
           schema:
             type: string
-            default: ''
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -2406,12 +2395,12 @@ paths:
       tags:
         - golang-module-controller
       operationId: listGolangModules
+      description: >-
+        Sortable by `id`, `modulePath`, `createdAt` (`property,direction`). The default is `id,desc`.
       parameters:
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -2470,23 +2459,24 @@ paths:
       tags:
         - golang-module-controller
       operationId: listGolangModuleVersions
+      description: >-
+        Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `id,desc`.
       parameters:
         - name: modulePath
           in: query
           required: true
           schema:
             type: string
-        - name: search
+        - name: q
           in: query
           required: false
+          description: >-
+            Only versions that contain this text, case-insensitive.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -2570,18 +2560,19 @@ paths:
       tags:
         - golang-module-controller
       operationId: searchGolangModules
+      description: >-
+        Sortable by `id`, `modulePath`, `createdAt` (`property,direction`). The default is `id,desc`.
       parameters:
-        - name: search
+        - name: q
           in: query
           required: false
+          description: >-
+            Only modules whose path contains this text, case-insensitive.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -2648,18 +2639,20 @@ paths:
       tags:
         - docker-image-controller
       operationId: listDockerImages
+      description: >-
+        Sortable by `id`, `name`, `updatedAt`, `lastUpdatedAt` (`property,direction`). The default is
+        `id,desc`.
       parameters:
-        - name: name
+        - name: q
           in: query
           required: false
+          description: >-
+            Only images whose name contains this text.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -2757,23 +2750,24 @@ paths:
       tags:
         - docker-image-controller
       operationId: listDockerImageTags
+      description: >-
+        Sortable by `id`, `name`, `createdAt` (`property,direction`). The default is `id,desc`.
       parameters:
         - name: imageName
           in: path
           required: true
           schema:
             type: string
-        - name: name
+        - name: q
           in: query
           required: false
+          description: >-
+            Only tags whose name contains this text.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -2804,6 +2798,8 @@ paths:
       tags:
         - docker-image-controller
       operationId: listTagManifests
+      description: >-
+        Sortable by `id`, `name`, `createdAt` (`property,direction`). The default is `id,desc`.
       parameters:
         - name: imageName
           in: path
@@ -2815,17 +2811,16 @@ paths:
           required: true
           schema:
             type: string
-        - name: name
+        - name: q
           in: query
           required: false
+          description: >-
+            Only manifests whose name contains this text.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -3064,18 +3059,20 @@ paths:
       tags:
         - cargo-crate-controller
       operationId: searchCargoCrates
+      description: >-
+        Sortable by `id`, `name`, `maxVersion`, `downloads`, `totalDownloads`, `lastUpdatedAt`
+        (`property,direction`).
       parameters:
-        - name: query
+        - name: q
           in: query
           required: false
+          description: >-
+            Only crates whose name contains this text.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -3236,23 +3233,24 @@ paths:
       tags:
         - cargo-crate-controller
       operationId: listCargoCrateVersions
+      description: >-
+        Sortable by `version`, `createdAt` (`property,direction`).
       parameters:
         - name: crateName
           in: path
           required: true
           schema:
             type: string
-        - name: query
+        - name: q
           in: query
           required: false
+          description: >-
+            Only versions that contain this text.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -3283,18 +3281,19 @@ paths:
       tags:
         - ruby-gem-api-controller
       operationId: listGems
+      description: >-
+        Sortable by `id`, `name`, `updatedAt` (`property,direction`).
       parameters:
-        - name: name
+        - name: q
           in: query
           required: false
+          description: >-
+            Only gems whose name contains this text.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -3358,23 +3357,24 @@ paths:
       tags:
         - ruby-gem-api-controller
       operationId: listGemVersions
+      description: >-
+        Sortable by `id`, `version`, `createdAt` (`property,direction`).
       parameters:
         - name: gemName
           in: path
           required: true
           schema:
             type: string
-        - name: version
+        - name: q
           in: query
           required: false
+          description: >-
+            Only versions that contain this text.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -3487,18 +3487,20 @@ paths:
       tags:
         - helm-chart-controller
       operationId: searchHelmCharts
+      description: >-
+        Sortable by `name`, `latestVersion`, `updatedAt`, `createdAt`, `lastUpdatedAt`
+        (`property,direction`). The default is `lastUpdatedAt,desc`.
       parameters:
-        - name: query
+        - name: q
           in: query
           required: false
+          description: >-
+            Only charts whose name contains this text, case-insensitive.
           schema:
             type: string
-            default: ''
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -3741,6 +3743,8 @@ paths:
       tags:
         - vulnerability-scan-controller
       operationId: listVulnerabilityScans
+      description: >-
+        Sortable by `createdAt` (`property,direction`). The default is `createdAt,desc`.
       parameters:
         - name: artifactName
           in: path
@@ -3752,11 +3756,9 @@ paths:
           required: true
           schema:
             type: string
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -3971,6 +3973,9 @@ paths:
       tags:
         - vulnerability-scan-controller
       operationId: getVulnerabilityScanFindings
+      description: >-
+        Sortable by `id`, `cveId`, `severity`, `packageName`, `packageVersion`, `fixedVersion`,
+        `description`, `referenceUrl`, `fixStatus`, `cvssScore`, `cvssVector` (`property,direction`).
       parameters:
         - name: scanId
           in: path
@@ -3978,11 +3983,9 @@ paths:
           schema:
             type: string
             format: uuid
-        - name: pageable
-          in: query
-          required: true
-          schema:
-            "$ref": "#/components/schemas/Pageable"
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       security:
         - { }
         - bearerAuth: []
@@ -4100,6 +4103,8 @@ paths:
       tags:
         - security-scan-controller
       operationId: listSecurityScans
+      description: >-
+        Sortable by `createdAt` (`property,direction`). The default is `createdAt,desc`.
       parameters:
         - name: severity
           in: query
@@ -4116,23 +4121,9 @@ paths:
           required: false
           schema:
             type: string
-        - name: page
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 0
-            minimum: 0
-        - name: size
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int32
-            default: 10
-            minimum: 1
-            maximum: 100
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
       responses:
         '200':
           description: OK
@@ -4206,7 +4197,7 @@ components:
       name: page
       in: query
       required: false
-      description: Zero-based page index.
+      description: Zero-based page index. The default is 0.
       schema:
         type: integer
         format: int32
@@ -4216,7 +4207,7 @@ components:
       name: size
       in: query
       required: false
-      description: Page size.
+      description: Page size, 1 to 100. The default is 10.
       schema:
         type: integer
         format: int32
@@ -4229,8 +4220,9 @@ components:
       required: false
       description: >-
         Sort order as `property,direction` (`asc` or `desc`); repeat the parameter for more than one
-        property. The properties a paged operation accepts differ, and any other one is answered
-        with 400 `validationError`.
+        property. The properties a paged operation accepts differ (the operation lists them), and
+        any other one is answered with 400 `validationError`. Ties are broken by id, so the pages of
+        one query never repeat or skip a row.
       style: form
       explode: true
       schema:
@@ -5231,21 +5223,6 @@ components:
           type: string
         text:
           type: string
-    Pageable:
-      type: object
-      properties:
-        page:
-          type: integer
-          format: int32
-          minimum: 0
-        size:
-          type: integer
-          format: int32
-          minimum: 1
-        sort:
-          type: array
-          items:
-            type: string
     DeployTokenInfoListItem:
       type: object
       properties:

@@ -46,7 +46,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   select u from User u
   where (:search is null or :search = ''
     or LOWER(u.username) like LOWER(CONCAT('%', :search, '%')))
-  order by u.createdAt desc
   """)
   @NonNull Page<User> findAllWithSearch(
       @NonNull @Param("search") String search, @NonNull Pageable pageable);
