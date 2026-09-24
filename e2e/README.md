@@ -149,6 +149,7 @@ e2e/
       publish-consume.spec.ts   # registerPublishConsumeLoop(mavenAdapter) + the RPS-1196 real-client test
       upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules
       pgp-signature.spec.ts     # registered PGP public keys (RPS-1189): verify, reject, isolate, delete; every-signature verification (RPS-1188); key-server lookup off (RPS-1204)
+      parallel-signed-deploy.spec.ts  # a REAL parallel `mvn deploy:deploy-file` of a signed release to a verify-all repo (RPS-1188), plus the one-thread control
       remote-throttle.spec.ts   # sanity check of RemoteAuthBudget/withBackoff429, no server needed
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
@@ -434,7 +435,10 @@ What the server does, per rule (all pinned above or in `tests/maven/upload-rules
   version, the artifact and the group deleted on a refusal (a 500 for a timestamped snapshot with
   other versions). A `.pom.asc` that arrives before its `.pom` answers `404 itemNotFound` and stores
   nothing. By default only a `.pom.asc` is verified and a `.jar.asc` is stored as sent, unless the
-  repo turns on `pgpVerifyAllSignaturesEnabled` (RPS-1188, see `pgp-signature.spec.ts`). The pin sends an `.asc`
+  repo turns on `pgpVerifyAllSignaturesEnabled` (RPS-1188, see `pgp-signature.spec.ts`): on such a repo a
+  signature that arrives before its file is parked (200, not served) and verified when the file arrives, and a
+  real parallel `mvn deploy:deploy-file` of a signed release, with a 4 MB javadoc jar, is pinned in
+  `parallel-signed-deploy.spec.ts`. The pin sends an `.asc`
   with no signature packet, which is refused before any key server is asked, so no network and no
   `gpg` are needed; a signature that verifies (or fails against a real key) is covered by
   `MavenPomSignatureIT` on the backend side.

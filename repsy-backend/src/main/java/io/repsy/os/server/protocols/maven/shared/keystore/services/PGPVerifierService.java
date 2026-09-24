@@ -174,6 +174,27 @@ public class PGPVerifierService {
     }
   }
 
+  /**
+   * Reads the id of the key that made a detached signature, in upper-case hex, without looking the
+   * key up: no registered key is read and no key server is asked. It is what a signature that
+   * arrives before its file is parked with (RPS-1188), and it refuses what is not an OpenPGP
+   * signature at all, as {@link #verify} does.
+   *
+   * @throws SignatureNotVerifiedException {@code artifactSignatureNotVerified} when {@code
+   *     signature} holds no parseable OpenPGP signature
+   */
+  public @NonNull String readSignerKeyId(final @NonNull Resource signature) {
+
+    ensureBouncyCastleProvider();
+
+    try (final var signatureStream = signature.getInputStream()) {
+      return String.format(KEY_ID_FORMAT, this.extractSignature(signatureStream).getKeyID());
+    } catch (final IOException | PGPException exception) {
+      log.warn("signature could not be parsed. Cause: {}", exception.toString());
+      throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
+    }
+  }
+
   private @NonNull Optional<MatchedKey> getPublicKey(
       final long keyId, @Nullable final PublicKeySources sources) {
 

@@ -402,6 +402,9 @@ and after the upgrade. A manifest whose file is missing or does not match its di
 | `ABANDONED_UPLOAD_TTL` | How long an upload can go without receiving data before it counts as abandoned (ISO-8601 duration) | `PT24H` |
 | `ABANDONED_UPLOAD_CLEANUP_INTERVAL` | How often the cleanup runs (ISO-8601 duration) | `PT1H` |
 | `ABANDONED_UPLOAD_CLEANUP_INITIAL_DELAY` | How long after startup the first cleanup runs (ISO-8601 duration) | `PT10M` |
+| `PENDING_SIGNATURE_TTL` | How long a Maven signature that arrived before the file it signs is held (ISO-8601 duration, see [Signed Maven Deploys](#signed-maven-deploys)); older ones are deleted | `PT24H` |
+| `PENDING_SIGNATURE_PURGE_INTERVAL` | How often the held signatures older than `PENDING_SIGNATURE_TTL` are deleted (ISO-8601 duration) | `PT15M` |
+| `PENDING_SIGNATURE_PURGE_ENABLED` | Delete the expired held Maven signatures; set to `false` to keep them | `true` |
 | `TRASH_CLEANUP_ENABLED` | Periodically empty the storage trash: what you delete (a repo, a package or a version) is moved into a `trash/` directory of its protocol first, and this job removes it from the disk for good once it is older than `TRASH_RETENTION`. **The first run after an upgrade deletes all the trash older than `TRASH_RETENTION` that has piled up so far, and that cannot be undone.** Set it to `false` to keep the trash | `true` |
 | `TRASH_RETENTION` | How long deleted items stay in the trash before they are removed for good (ISO-8601 duration, at least `P1D`; a shorter value stops the application from starting). Raise it to keep deleted items recoverable for longer | `P7D` |
 | `TRASH_CLEANUP_INTERVAL` | How often the trash is emptied (ISO-8601 duration) | `PT24H` |
@@ -574,18 +577,25 @@ what is verified and where keys are looked up:
   not match answers `422` and stores nothing. A version then shows *Signed* only when every file of
   it that a signing tool signs (the POM, the jar, every classifier jar, the `.module`, ... but not
   checksums, signatures or `maven-metadata.xml`) has a verified signature, so a partly signed
-  release stays *Unsigned*. Files and signatures may arrive in any order, but a signature is
-  refused with `404 itemNotFound` before the file it signs, and with `404 artifactVersionNotFound`
-  before the version's POM was uploaded (`mvn deploy` uploads the POM first). Maven 3.9 uploads the
-  other files in parallel by default, so the signature of a large file can reach Repsy before the
-  file has been stored and fail the deploy with that `404`: deploy sequentially with
-  `-Daether.connector.basic.threads=1` (as a Maven argument, or in `.mvn/maven.config`) on a
-  repository that verifies every signature. Uploading a
-  new file, or storing a file again (with *Allow override*), makes the version *Unsigned* until that
-  file's signature is uploaded and verified. For a snapshot only the files of its newest build
-  count. Turning the setting on is not retroactive: a version keeps the *Signed* value it had until
-  the next file is uploaded into it, which recomputes it under this rule (so an already *Signed*
-  version can show *Unsigned* after a redeploy that does not sign every file).
+  release stays *Unsigned*. Files and signatures may arrive in **any order**, which a real
+  `mvn deploy` needs: Maven uploads the files of a deploy in parallel, so the signature of a large
+  file can reach Repsy before the file, or before the POM that registers the version. Such a
+  signature is answered `200` and held: it is not stored, not served (`GET` answers `404`) and not
+  charged, and it is verified when the file it signs arrives (or when the POM registers the
+  version), then stored and recorded. If it does not verify, the file's upload fails with
+  `422 pendingSignatureNotVerified` (a new file is taken back out of the repository, and the held
+  signature is dropped so an upload of both again starts clean); if the signer's key cannot be found
+  then, it fails with `404` and the signature stays held. A held signature that no file claims is
+  deleted after `PENDING_SIGNATURE_TTL` (`PT24H`, see the configuration table); a re-sent signature
+  replaces the one that is held. A signature that is not an OpenPGP signature at all is still
+  refused at once with `422 artifactSignatureNotVerified`. A repository that does not verify every
+  signature holds nothing: there a `.pom.asc` before its POM is refused with `404` as before.
+  Uploading a new file, or storing a file again (with *Allow override*), makes the version
+  *Unsigned* until that file's signature is uploaded and verified. For a snapshot only the files of
+  its newest build count. Turning the setting on is not retroactive: a version keeps the *Signed*
+  value it had until the next file is uploaded into it, which recomputes it under this rule (so an
+  already *Signed* version can show *Unsigned* after a redeploy that does not sign every file).
+  Turning it off again leaves held signatures alone: they are deleted when they expire.
 - **Air-gapped registries (`pgpKeyServerLookupEnabled` off):** the repository consults its
   registered keys only. A signature made with a key that is not registered is refused at once with
   `404 artifactSigningKeyNotRegistered`, without contacting any key server (custom hosts,
