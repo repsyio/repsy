@@ -17,12 +17,14 @@ package io.repsy.protocols.npm.shared.storage.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
+import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
@@ -72,9 +74,52 @@ public interface NpmStorageService {
 
   /**
    * Puts the package metadata back to {@code metadata}, as {@link #readMetadataBytes} returned it,
-   * after a change that wrote it has to be undone.
+   * after a change that wrote it has to be undone. {@code null} means there was none: a file that
+   * is there now is removed.
    */
-  void restoreMetadataBytes(UUID repoId, String repoName, Path packageBasePath, byte[] metadata)
+  void restoreMetadataBytes(
+      UUID repoId, String repoName, Path packageBasePath, byte @Nullable [] metadata)
+      throws IOException;
+
+  /** A change to the package metadata file that reports how many bytes the file grew by. */
+  @FunctionalInterface
+  interface MetadataChange {
+
+    long apply() throws IOException;
+  }
+
+  /**
+   * Runs {@code change} on the package metadata file and puts the file back as it was when the
+   * change fails, so the file never keeps what the rolled-back rows do not have.
+   *
+   * <p>A package whose metadata file is gone from storage has its rows as the only record of what
+   * it holds (RPS-1300), so the file is rebuilt from them first, from {@code snapshot}, and the
+   * change is made to that. Being put back then means being removed again, as the file was not
+   * there before. The rebuild is a write like any other and counts in the growth that is returned.
+   *
+   * <p>The caller holds the package row locked, so no other write can change the file in between.
+   *
+   * @param snapshot the rows of the package as they are now, with the change the caller is making
+   *     already in them; asked for only when the file is missing
+   * @return the growth of the file: what {@code change} reports, plus the size of a rebuilt file
+   */
+  long changeMetadata(
+      UUID repoId,
+      String repoName,
+      Path packageBasePath,
+      Supplier<NpmPackageSnapshot> snapshot,
+      MetadataChange change)
+      throws IOException;
+
+  /**
+   * The package metadata as stored or, when the file is gone, as the rows {@code snapshot} gives
+   * would have it written. Nothing is written.
+   *
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the file is gone and
+   *     {@code snapshot} finds no package either
+   */
+  Map<String, Object> readMetadataOrRebuild(
+      UUID repoId, String repoName, Path packageBasePath, Supplier<NpmPackageSnapshot> snapshot)
       throws IOException;
 
   /**
@@ -112,8 +157,12 @@ public interface NpmStorageService {
    * is a failure of the caller's own commit after this returned: the tarball is then gone and its
    * row remains.
    *
+   * <p>The package metadata is rebuilt from {@code snapshot} when its file is gone: see {@link
+   * #changeMetadata}.
+   *
    * @param newLatest the version {@code latest} moves to, or {@code null} when the removed version
    *     was not the latest
+   * @param snapshot the rows of the package with the removal already made in them
    */
   long removeVersion(
       UUID repoId,
@@ -121,7 +170,8 @@ public interface NpmStorageService {
       Path packageBasePath,
       String packageName,
       String versionName,
-      @Nullable String newLatest)
+      @Nullable String newLatest,
+      Supplier<NpmPackageSnapshot> snapshot)
       throws IOException;
 
   /**
@@ -140,6 +190,23 @@ public interface NpmStorageService {
       @Nullable String scopeName,
       String packageName,
       boolean isAbbreviated)
+      throws IOException;
+
+  /**
+   * Like {@link #getMetadata(UUID, String, String, String, boolean)}, but a package whose row
+   * exists and whose metadata file is gone is served from its rows (RPS-1300), so a client can read
+   * the package it is about to change. Nothing is written.
+   *
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the file is gone and
+   *     {@code snapshot} finds no package either
+   */
+  Map<String, Object> getMetadata(
+      UUID repoId,
+      String repoName,
+      @Nullable String scopeName,
+      String packageName,
+      boolean isAbbreviated,
+      Supplier<NpmPackageSnapshot> snapshot)
       throws IOException;
 
   Map<String, Object> createAbbreviatedMetadata(Map<String, Object> fullMetadata);

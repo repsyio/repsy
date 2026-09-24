@@ -17,6 +17,7 @@ package io.repsy.protocols.npm.shared.npm_package.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.npm.shared.npm_package.dtos.BasePackageInfo;
+import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
@@ -78,6 +79,17 @@ public interface NpmPackageService<ID> {
   }
 
   BasePackageInfo<ID> getPackage(
+      UUID storageKey, @Nullable String scopeName, @NonNull String packageName);
+
+  /**
+   * The package as the rows have it, for rebuilding its metadata file when storage lost it
+   * (RPS-1300). Called inside the transaction of a change, it sees that change: the rows are
+   * written before the files.
+   *
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the package does not
+   *     exist
+   */
+  @NonNull NpmPackageSnapshot getSnapshot(
       UUID storageKey, @Nullable String scopeName, @NonNull String packageName);
 
   /** The names of the versions the package has. */

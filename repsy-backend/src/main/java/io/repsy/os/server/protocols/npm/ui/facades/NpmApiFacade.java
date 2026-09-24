@@ -144,7 +144,10 @@ public class NpmApiFacade implements ProtocolApiFacade {
                         packageBasePath,
                         packageName,
                         versionName,
-                        newLatest)),
+                        newLatest,
+                        () ->
+                            this.npmPackageService.getSnapshot(
+                                repoInfo.getStorageKey(), scopeName, packageName))),
             () -> this.removePackageFiles(repoInfo, packageBasePath));
 
     this.publishVersionsDeleted(repoInfo, scopeName, packageName, deletion.versions());
