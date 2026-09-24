@@ -26,10 +26,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
@@ -63,6 +64,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.apache.maven.artifact.repository.metadata.Versioning;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -151,6 +153,15 @@ class ArtifactServiceImplTest {
   @Mock StorageStrategy storageStrategy;
 
   @InjectMocks ArtifactServiceImpl artifactService;
+
+  /**
+   * The setting as it is committed once the version is locked (RPS-1323): on unless a test says
+   * otherwise, as almost all the tests here are about a repo that verifies every signature.
+   */
+  @BeforeEach
+  void theSettingReadUnderTheLockIsOn() {
+    lenient().when(this.versionSignatureService.lockAndIsVerifyAll(any())).thenReturn(true);
+  }
 
   private static RepoInfo repoVerifyingAllSignatures(final UUID id) {
     return RepoInfo.builder()
@@ -649,17 +660,82 @@ class ArtifactServiceImplTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
+    when(this.versionSignatureService.lockAndIsVerifyAll(version)).thenReturn(false);
 
     this.artifactService.createOrUpdateArtifact(
         repo(id, true, true, true),
         StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
         new ByteArrayResource(new byte[0]));
 
-    assertThat(version.isSigned()).isTrue();
-    verify(this.artifactVersionRepository).save(version);
+    // Signed by the POM rule of the setting, from the row that was just recorded.
     verify(this.versionSignatureService).recordVerified(version, "lib-1.0.pom");
-    verifyNoMoreInteractions(this.versionSignatureService);
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0", false);
+    verify(this.artifactVersionRepository, never()).save(any());
     verifyNoInteractions(this.repoRepository, this.pgpVerifierService, this.keyStoreService);
+  }
+
+  @Test
+  @DisplayName("a signature request reads the setting under the version's lock, not at its start")
+  void aSignatureRequestReadsTheSettingAfterTheLock() {
+    final var id = UUID.randomUUID();
+    final var artifact = this.stubArtifact(id);
+    final var version = new ArtifactVersion();
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(version));
+    // repoInfo, read when the request started, says on; a toggle committed since.
+    when(this.versionSignatureService.lockAndIsVerifyAll(version)).thenReturn(false);
+
+    this.artifactService.createOrUpdateArtifact(
+        repoVerifyingAllSignatures(id),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0-sources.jar.asc"),
+        new ByteArrayResource(new byte[0]));
+
+    final var order = inOrder(this.pendingSignatureService, this.versionSignatureService);
+    order.verify(this.pendingSignatureService).claim(id, "com/acme/lib/1.0/lib-1.0-sources.jar");
+    order.verify(this.versionSignatureService).lockAndIsVerifyAll(version);
+    order.verify(this.versionSignatureService).recordVerified(version, "lib-1.0-sources.jar");
+    order
+        .verify(this.versionSignatureService)
+        .refreshSigned(id, version, "com/acme/lib/1.0", false);
+  }
+
+  @Test
+  @DisplayName("a POM signature of a repo that was toggled on since the request began is by all")
+  void aPomSignatureIsRecomputedByTheSettingThatIsCommitted() {
+    final var id = UUID.randomUUID();
+    final var artifact = this.stubArtifact(id);
+    final var version = new ArtifactVersion();
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(version));
+    // repoInfo says off; the toggle committed after it was read.
+    when(this.versionSignatureService.lockAndIsVerifyAll(version)).thenReturn(true);
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
+        new ByteArrayResource(new byte[0]));
+
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0", true);
+    verify(this.artifactVersionRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("a stored file of a repo that was toggled off since the request began is not judged")
+  void aStoredFileIsNotForgottenWhenTheSettingIsOffByNow() {
+    final var id = UUID.randomUUID();
+    final var artifact = this.stubArtifact(id);
+    final var version = new ArtifactVersion();
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(version));
+    when(this.versionSignatureService.lockAndIsVerifyAll(version)).thenReturn(false);
+
+    this.artifactService.createOrUpdateArtifact(
+        repoVerifyingAllSignatures(id),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0-sources.jar"),
+        new ByteArrayResource(new byte[0]));
+
+    verify(this.versionSignatureService, never()).forget(any(), any());
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0", false);
   }
 
   @Test
@@ -699,7 +775,7 @@ class ArtifactServiceImplTest {
         new ByteArrayResource(new byte[0]));
 
     verify(this.versionSignatureService).recordVerified(version, "lib-1.0-sources.jar");
-    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0");
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0", true);
     verify(this.artifactVersionRepository, never()).save(any());
   }
 
@@ -719,7 +795,7 @@ class ArtifactServiceImplTest {
 
     assertThat(version.isSigned()).isFalse();
     verify(this.versionSignatureService).recordVerified(version, "lib-1.0.pom");
-    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0");
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0", true);
   }
 
   @Test
@@ -737,7 +813,7 @@ class ArtifactServiceImplTest {
         new ByteArrayResource(new byte[0]));
 
     verify(this.versionSignatureService).forget(version, "lib-1.0-sources.jar");
-    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0");
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0", true);
   }
 
   @Test
@@ -766,7 +842,7 @@ class ArtifactServiceImplTest {
 
     verify(this.pgpVerifierService).verify(jar, signature, sources);
     verify(this.versionSignatureService, never()).forget(any(), any());
-    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0");
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0", true);
   }
 
   @Test
@@ -796,7 +872,7 @@ class ArtifactServiceImplTest {
         new ByteArrayResource(new byte[0]));
 
     verify(this.versionSignatureService).forget(version, "lib-1.0.jar");
-    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0");
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0", true);
   }
 
   @Test
@@ -1049,7 +1125,7 @@ class ArtifactServiceImplTest {
         new ByteArrayResource(new byte[0]));
 
     verify(this.versionSignatureService, never()).forget(any(), any());
-    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0");
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0", true);
   }
 
   @Test

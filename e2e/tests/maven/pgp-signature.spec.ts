@@ -39,6 +39,10 @@
  *  - `pgpKeyServerLookupEnabled` (RPS-1204): with it off, a signature by a key that is not
  *    registered on the repo is refused at once with 404 `artifactSigningKeyNotRegistered`, without
  *    asking any key server.
+ *
+ * Turning `pgpVerifyAllSignaturesEnabled` on or off recomputes `signed` of every existing version
+ * of the repo in the background (RPS-1316), and turning it on verifies the `.asc` files that were
+ * stored while it was off, so an honest publisher's versions stay signed (RPS-1323).
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import {
@@ -393,4 +397,91 @@ test.describe('maven key-server lookup switched off (RPS-1204)', () => {
 
     expect(put.status, `PUT ${layout.ascPath} answered ${put.status} ${put.msgId ?? ''}`).toBe(200);
   });
+});
+
+/**
+ * Uploads a release with a good POM signature and a jar whose `.asc` is a good one, one over other
+ * bytes, or none. Nothing verifies the jar's while the repo does not verify every signature.
+ */
+async function uploadRelease(
+  repoName: string,
+  key: Awaited<ReturnType<typeof generateKeyPair>>,
+  groupId: string,
+  version: string,
+  jarSignature: 'good' | 'forged' | 'none',
+): Promise<void> {
+  const admin = adminCredential();
+  const dir = versionDir(groupId, ARTIFACT_ID, version);
+  const pomPath = `${dir}/${ARTIFACT_ID}-${version}.pom`;
+  const jarPath = `${dir}/${ARTIFACT_ID}-${version}.jar`;
+  const jarBody = `jar of ${version} of ${repoName}`;
+  const pomBody = minimalPom(groupId, ARTIFACT_ID, version);
+  const uploads: [string, string][] = [
+    [pomPath, pomBody],
+    [`${pomPath}.asc`, await detachedSign(key.privateKeyArmored, Buffer.from(pomBody))],
+    [jarPath, jarBody],
+  ];
+  if (jarSignature !== 'none') {
+    const over = jarSignature === 'good' ? jarBody : `not the jar of ${version}`;
+    uploads.push([`${jarPath}.asc`, await detachedSign(key.privateKeyArmored, Buffer.from(over))]);
+  }
+  for (const [path, body] of uploads) {
+    const res = await rawPut(repoName, admin, path, body, OCTET);
+    expect(res.status, `PUT ${path} answered ${res.status} ${res.msgId ?? ''}`).toBe(200);
+  }
+}
+
+test.describe('maven recomputes signed when verify-all is toggled (RPS-1316, RPS-1323)', () => {
+  /** The background recompute is quick on a handful of versions; the bound is generous. */
+  const RECOMPUTE_TIMEOUT_MS = 30_000;
+
+  test(
+    'turning verify-all on keeps an honest version signed, unsigns a forged one, and off restores it',
+    { tag: ['@settings'] },
+    async ({ seeder, panelApi }) => {
+      const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+      const groupId = `io.repsy.e2e.${seeder.runId}`;
+      // Nothing may ask a key server on this offline instance: only the registered key is known.
+      await seeder.setSettings(repo.name, { pgpKeyServerLookupEnabled: false });
+      const key = await generateKeyPair();
+      await seeder.registerPgpPublicKey(repo.name, key.publicKeyArmored);
+
+      const signedOf = async (version: string) =>
+        (await panelApi.getMavenArtifactVersion(repo.name, groupId, ARTIFACT_ID, version)).signed;
+
+      // Uploaded while only the POM's signature is verified, the jar's is stored as sent.
+      await uploadRelease(repo.name, key, groupId, '1.0', 'good');
+      await uploadRelease(repo.name, key, groupId, '2.0', 'forged');
+      await uploadRelease(repo.name, key, groupId, '3.0', 'none');
+      expect(await signedOf('1.0'), '1.0 before the toggle').toBe(true);
+      expect(await signedOf('2.0'), '2.0 before the toggle').toBe(true);
+      expect(await signedOf('3.0'), '3.0 before the toggle').toBe(true);
+
+      await seeder.setSettings(repo.name, { pgpVerifyAllSignaturesEnabled: true });
+
+      // 2.0 and 3.0 have a jar without a verified signature; 1.0's stored signature verifies.
+      await expect
+        .poll(() => signedOf('2.0'), { timeout: RECOMPUTE_TIMEOUT_MS, message: '2.0 after on' })
+        .toBe(false);
+      await expect
+        .poll(() => signedOf('3.0'), { timeout: RECOMPUTE_TIMEOUT_MS, message: '3.0 after on' })
+        .toBe(false);
+      expect(await signedOf('1.0'), '1.0 after on: its stored jar signature was verified').toBe(
+        true,
+      );
+
+      await seeder.setSettings(repo.name, { pgpVerifyAllSignaturesEnabled: false });
+
+      // Only the POM's signature counts again.
+      for (const version of ['2.0', '3.0']) {
+        await expect
+          .poll(() => signedOf(version), {
+            timeout: RECOMPUTE_TIMEOUT_MS,
+            message: `${version} after off`,
+          })
+          .toBe(true);
+      }
+      expect(await signedOf('1.0'), '1.0 after off').toBe(true);
+    },
+  );
 });
