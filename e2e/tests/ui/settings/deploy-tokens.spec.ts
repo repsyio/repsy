@@ -24,6 +24,12 @@
  * package-manager client, answers 200 for a live token and 401 for a revoked or rotated-away one.
  */
 import { RepoType } from '../../../src/api/panel-api.js';
+import {
+  DESCRIPTION_MAX_TEXT,
+  REQUIRED_TEXT,
+  USERNAME_TEXT,
+  bulleted,
+} from '../../../src/ui/credential-messages.js';
 import type { SeededToken } from '../../../src/seed/seeder.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
@@ -350,7 +356,7 @@ test.describe('Deploy tokens: the create form', { tag: SETTINGS }, () => {
     await expect(modal.nameError('required')).toHaveCount(0);
 
     await modal.touch(modal.name);
-    await expect(modal.nameError('required')).toBeVisible();
+    await expect(modal.nameError('required')).toHaveText(bulleted(REQUIRED_TEXT));
     await expect(modal.submitButton).toBeDisabled();
 
     await modal.name.fill('a'.repeat(81));
@@ -365,17 +371,18 @@ test.describe('Deploy tokens: the create form', { tag: SETTINGS }, () => {
     // The username is optional, but when given it is 3-25 of [a-z0-9_-].
     await modal.username.fill('ab');
     await modal.username.blur();
-    await expect(modal.usernameError('minlength')).toBeVisible();
+    // The same sentences as the create-user modal and the profile (RPS-1265).
+    await expect(modal.usernameError('minlength')).toHaveText(bulleted(USERNAME_TEXT.minlength));
     await expect(modal.submitButton).toBeDisabled();
 
     for (const bad of ['Has Space', 'UPPER', 'dot.name', 'semi;colon']) {
       await modal.username.fill(bad);
-      await expect(modal.usernameError('pattern'), bad).toBeVisible();
+      await expect(modal.usernameError('pattern'), bad).toHaveText(bulleted(USERNAME_TEXT.pattern));
       await expect(modal.submitButton, bad).toBeDisabled();
     }
 
     await modal.username.fill('a'.repeat(26));
-    await expect(modal.usernameError('maxlength')).toBeVisible();
+    await expect(modal.usernameError('maxlength')).toHaveText(bulleted(USERNAME_TEXT.maxlength));
     await expect(modal.submitButton).toBeDisabled();
 
     await modal.username.fill('ok_user-1');
@@ -384,13 +391,17 @@ test.describe('Deploy tokens: the create form', { tag: SETTINGS }, () => {
     await expect(modal.usernameError('minlength')).toHaveCount(0);
     await expect(modal.submitButton).toBeEnabled();
 
-    // The description is capped at 500.
+    // The description is capped at 500: a counter and a message, and no maxlength attribute that would
+    // cut the text (RPS-1265).
+    await expect(modal.description).not.toHaveAttribute('maxlength', /.*/);
     await modal.description.fill('x'.repeat(501));
     await modal.description.blur();
-    await expect(modal.descriptionError()).toBeVisible();
+    await expect(modal.descriptionError()).toHaveText(bulleted(DESCRIPTION_MAX_TEXT));
+    await expect(modal.descriptionCounter()).toHaveText('501/500');
     await expect(modal.submitButton).toBeDisabled();
     await modal.description.fill('x'.repeat(500));
     await expect(modal.descriptionError()).toHaveCount(0);
+    await expect(modal.descriptionCounter()).toHaveText('500/500');
     await expect(modal.submitButton).toBeEnabled();
 
     // Cancel closes without creating anything.

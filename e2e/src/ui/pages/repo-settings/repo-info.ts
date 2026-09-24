@@ -31,6 +31,7 @@ export class RepoInfoSection {
   readonly descriptionSave: Locator;
   readonly descriptionReset: Locator;
   readonly descriptionError: Locator;
+  readonly descriptionCounter: Locator;
 
   constructor(page: Page) {
     this.root = page.getByTestId('settings-info');
@@ -40,6 +41,7 @@ export class RepoInfoSection {
     this.descriptionSave = this.root.getByTestId('settings-description-save');
     this.descriptionReset = this.root.getByTestId('settings-description-reset');
     this.descriptionError = this.root.getByTestId('settings-description-error-maxlength');
+    this.descriptionCounter = this.root.getByTestId('settings-description-counter');
   }
 
   renameError(validator: RenameError): Locator {

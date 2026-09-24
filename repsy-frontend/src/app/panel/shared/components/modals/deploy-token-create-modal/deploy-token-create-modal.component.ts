@@ -21,6 +21,12 @@ import moment, { Moment } from 'moment';
 import { finalize } from 'rxjs/operators';
 
 import { DeployTokenForm, ProtocolDeployTokenControllerService } from '../../../../../../generated/api';
+import { USERNAME_MESSAGES, usernameValidators } from '../../../../../shared/validators/credentials.validators';
+import {
+  DESCRIPTION_MAX_LENGTH,
+  DESCRIPTION_MAX_MESSAGE,
+  descriptionValidators,
+} from '../../../../../shared/validators/description.validators';
 import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dto/token-create-info';
 import { RadioGroupComponent, RadioOption } from '../../radio-group/radio-group.component';
 import { ToastService } from '../../toast/toast.service';
@@ -40,6 +46,9 @@ export class DeployTokenCreateModalComponent implements OnInit {
   @Input() public repoName: string;
 
   public loading = false;
+  public readonly usernameMessages = USERNAME_MESSAGES;
+  public readonly descriptionMaxLength = DESCRIPTION_MAX_LENGTH;
+  public readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
 
   public form: FormGroup;
   public minDate: string;
@@ -59,9 +68,10 @@ export class DeployTokenCreateModalComponent implements OnInit {
     private readonly toastService: ToastService,
   ) {
     this.form = this.fb.group({
-      name: ['', [Validators.required, Validators.minLength(1), Validators.maxLength(80)]],
-      username: ['', [Validators.minLength(3), Validators.maxLength(25), Validators.pattern(/^[a-z0-9_\-]+$/)]],
-      description: ['', [Validators.maxLength(500)]],
+      name: ['', [Validators.required, Validators.maxLength(80)]],
+      // Optional; the same rule as the username of a user (the backend accepts up to 80 characters).
+      username: ['', usernameValidators({ required: false })],
+      description: ['', descriptionValidators()],
       readOnly: [false],
       expirationDate: [null, [this.expirationDateRangeValidator()]],
     });

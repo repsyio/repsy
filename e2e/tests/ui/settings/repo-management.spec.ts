@@ -24,6 +24,7 @@
  */
 import { RepoType } from '../../../src/api/panel-api.js';
 import { adminCredential, minimalPom, rawPut, versionDir } from '../../../src/clients/maven-raw.js';
+import { DESCRIPTION_MAX_TEXT, bulleted } from '../../../src/ui/credential-messages.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
 import { RepoSettingsReadback } from '../../../src/ui/pages/repo-settings/readback.js';
@@ -150,12 +151,15 @@ test.describe('Repository settings: rename and description', { tag: SETTINGS }, 
     await expect(info.descriptionInput).toHaveValue('a new description');
 
     // More than 500 characters is refused before anything is sent.
+    await expect(info.descriptionInput).not.toHaveAttribute('maxlength', /.*/);
     await info.descriptionInput.fill('x'.repeat(501));
     await info.descriptionInput.blur();
-    await expect(info.descriptionError).toBeVisible();
+    await expect(info.descriptionError).toHaveText(bulleted(DESCRIPTION_MAX_TEXT));
+    await expect(info.descriptionCounter).toHaveText('501/500');
     await expect(info.descriptionSave).toBeDisabled();
     await info.descriptionInput.fill('x'.repeat(500));
     await expect(info.descriptionError).toHaveCount(0);
+    await expect(info.descriptionCounter).toHaveText('500/500');
     await expect(info.descriptionSave).toBeEnabled();
   });
 });
