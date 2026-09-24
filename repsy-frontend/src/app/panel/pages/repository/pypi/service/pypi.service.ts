@@ -71,11 +71,7 @@ export class PypiService {
     pageSize: number,
   ): Observable<PagedData<PypiPackageListItem>> {
     return this.pypiPackageControllerService
-      .listPypiPackages(
-        { page: pageIndex, size: pageSize, sort: [`${sort.column},${sort.type}`] },
-        this.repoName,
-        name || undefined,
-      )
+      .listPypiPackages(this.repoName, name || undefined, pageIndex, pageSize, [`${sort.column},${sort.type}`])
       .pipe(
         map(
           (r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<PypiPackageListItem>,
@@ -91,12 +87,9 @@ export class PypiService {
     pageSize: number,
   ): Observable<PagedData<ReleaseListItem>> {
     return this.pypiPackageControllerService
-      .listReleases(
-        packageName,
-        { page: pageIndex, size: pageSize, sort: [`${sort.column},${sort.type}`] },
-        this.repoName,
-        version || undefined,
-      )
+      .listReleases(packageName, this.repoName, version || undefined, pageIndex, pageSize, [
+        `${sort.column},${sort.type}`,
+      ])
       .pipe(
         map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<ReleaseListItem>),
       );

@@ -28,8 +28,12 @@ export const REPO = 'acme-repo';
 export const SORT: Sort = { name: 'Name', column: 'name', type: 'DESC' };
 export const PAGE_INDEX = 2;
 export const PAGE_SIZE = 25;
-/** The `Pageable` the services must build from {@link SORT}, {@link PAGE_INDEX} and {@link PAGE_SIZE}. */
-export const PAGEABLE = { page: PAGE_INDEX, size: PAGE_SIZE, sort: ['name,DESC'] };
+/**
+ * The trailing `page`, `size`, `sort` arguments, in that order, the services must pass to a generated list method,
+ * built from {@link SORT}, {@link PAGE_INDEX} and {@link PAGE_SIZE}. They follow the path parameters and the filters
+ * (`q`, `scope`), so a spec spreads them last: `[REPO, search, ...PAGE_ARGS]`.
+ */
+export const PAGE_ARGS: readonly unknown[] = [PAGE_INDEX, PAGE_SIZE, ['name,DESC']];
 export const PAGE_METADATA: PageMetadata = { number: PAGE_INDEX, size: PAGE_SIZE, totalElements: 60, totalPages: 3 };
 
 /** The `RestResponse*` envelope of the generated client. */

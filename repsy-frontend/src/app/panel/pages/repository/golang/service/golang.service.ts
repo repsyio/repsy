@@ -67,10 +67,7 @@ export class GolangService {
 
   public fetchModules(sortOption: Sort, pageIndex: number, pageSize: number): Observable<PagedData<GoModuleListItem>> {
     return this.golangModuleControllerService
-      .listGolangModules(
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-      )
+      .listGolangModules(this.repoName, pageIndex, pageSize, [`${sortOption.column},${sortOption.type}`])
       .pipe(
         map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GoModuleListItem>),
       );
@@ -83,11 +80,9 @@ export class GolangService {
     pageSize: number,
   ): Observable<PagedData<GoModuleListItem>> {
     return this.golangModuleControllerService
-      .searchGolangModules(
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        search || undefined,
-      )
+      .searchGolangModules(this.repoName, search || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
       .pipe(
         map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<GoModuleListItem>),
       );
@@ -105,12 +100,9 @@ export class GolangService {
     pageSize: number,
   ): Observable<PagedData<GoModuleVersionListItem>> {
     return this.golangModuleControllerService
-      .listGolangModuleVersions(
-        modulePath,
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        search || undefined,
-      )
+      .listGolangModuleVersions(modulePath, this.repoName, search || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
       .pipe(
         map(
           (r) =>

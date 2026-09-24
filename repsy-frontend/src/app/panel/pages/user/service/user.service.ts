@@ -26,8 +26,8 @@ import { UserControllerService } from '../../../../../generated/api';
 export class UserService {
   constructor(private readonly userControllerService: UserControllerService) {}
 
-  public listUsers(search?: string, page?: number, size?: number): Observable<PagedModelUserResponse> {
-    return this.userControllerService.listUsers(search, page, size).pipe(map((r) => r.data!));
+  public listUsers(q?: string, page?: number, size?: number): Observable<PagedModelUserResponse> {
+    return this.userControllerService.listUsers(q, page, size).pipe(map((r) => r.data!));
   }
 
   /** The number of admins on the server, whatever page or search the list shows. */

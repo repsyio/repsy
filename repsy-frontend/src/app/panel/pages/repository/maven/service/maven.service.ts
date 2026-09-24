@@ -89,11 +89,9 @@ export class MavenService {
     pageSize: number,
   ): Observable<PagedData<ArtifactListItem>> {
     return this.mavenArtifactControllerService
-      .listContainsGroupName(
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        groupName || undefined,
-      )
+      .listContainsGroupName(this.repoName, groupName || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
       .pipe(
         map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<ArtifactListItem>),
       );
@@ -107,12 +105,9 @@ export class MavenService {
     pageSize: number,
   ): Observable<PagedData<ArtifactListItem>> {
     return this.mavenArtifactControllerService
-      .listContainsArtifactName(
-        groupName,
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        artifactName || undefined,
-      )
+      .listContainsArtifactName(groupName, this.repoName, artifactName || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
       .pipe(
         map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<ArtifactListItem>),
       );
@@ -127,13 +122,9 @@ export class MavenService {
     pageSize: number,
   ): Observable<PagedData<ArtifactVersionListItem>> {
     return this.mavenArtifactControllerService
-      .listMavenArtifactVersions(
-        groupName,
-        artifactName,
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        version || undefined,
-      )
+      .listMavenArtifactVersions(groupName, artifactName, this.repoName, version || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
       .pipe(
         map(
           (r) =>
