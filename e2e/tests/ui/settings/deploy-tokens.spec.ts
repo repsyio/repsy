@@ -257,7 +257,7 @@ test.describe('Deploy tokens: rotate, revoke and paging', { tag: SETTINGS }, () 
   // wins, so when the empty page-2 answer is the slower one the section shows "Your list is empty"
   // while three tokens exist. The delay below makes that order certain instead of a coin toss.
   test.fail(
-    'TOK-03 revoking the last token on page 2 shows the remaining tokens, whatever order the lists arrive in (unfiled)',
+    'TOK-03 revoking the last token on page 2 shows the remaining tokens, whatever order the lists arrive in (RPS-1285)',
     async ({ adminPage, seeder }) => {
       const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
       for (const name of ['tok-a', 'tok-b', 'tok-c', 'tok-d']) {
