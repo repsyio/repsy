@@ -424,16 +424,12 @@ export function registerPackageScenarios(
           : 'twelve packages all show on one page, there is no pager',
         '02-pagination',
       ),
-      async ({ adminPage, seeder, seedPackage }) => {
+      async ({ adminPage, seeder, seedPackages }) => {
         pin('02-pagination');
         const repo = await seeder.createRepo(type);
-        // One after the other, not `seedPackages` (four at a time): packages published in the same
-        // instant tie on the sort key, and the pager then has no stable order to cut pages from
-        // (embedded H2 showed one package on both pages and another on none; RPS-1298, not fixed here).
-        const seeded: SeededPackage[] = [];
-        for (let index = 1; index <= 12; index += 1) {
-          seeded.push(await seedPackage(repo, { index }));
-        }
+        // Four at a time: packages published in the same instant tie on the sort key, and the pager
+        // still cuts stable pages because every paged list ends its sort on the row id (RPS-1298).
+        const seeded = await seedPackages(repo, 12);
         const list = protocolPages(adminPage, descriptor, repo.name).list();
         await list.goto();
         const all = sorted(seeded.map((pkg) => list.keyOf(pkg)));

@@ -2874,12 +2874,13 @@ Pinned with `test.fail` / `knownFailures` (each still fails for the stated reaso
 | Where                             | Bug                                                                                                                                                                                                                                           |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | nuget `02-versions-search`        | RPS-1262 (3): no search box on the version list: the API has no version search parameter                                                                                                                                                      |
-| cargo-07 Newest by publish time   | RPS-1301: Newest/Oldest order by `max_version` (a text column), not by when a crate was published; the seeder gives each crate its own version so the sort and pager have distinct keys (RPS-1298), and cargo-07 asserts the sorts by version |
+| cargo-07 Newest by publish time   | RPS-1301: Newest/Oldest order by `max_version` (a text column), not by when a crate was published; the seeder gives each crate its own version so the sort has distinct keys (RPS-1298: ties go by id), and cargo-07 asserts sorts by version |
 | helm-07 deleting the last version | RPS-1302: the versions page of the deleted chart raises two error toasts, "Chart not found." and "[object Object]"                                                                                                                            |
 
 `seed-proof.spec.ts` (RPS-1255) now covers all nine protocols; its generic search/sort/delete walk stays on
 the first four (the other five have the protocol-aware version of it in PKG-<proto>-02 and -04).
-RPS-1298 (a pager without a tie-breaker) is avoided as in the template, by seeding sequentially. The
+RPS-1298 (a pager without a tie-breaker) is fixed: every paged list ends its sort on the row id, so the
+`02-pagination` scenario seeds its twelve packages with `seedPackages` (four at a time). The
 mobile-Delete `canWrite` bug of RPS-1262 (1) never existed in these five protocols (only PyPI and npm; fixed).
 
 ### Errors, navigation, mobile and accessibility (RPS-1258)
