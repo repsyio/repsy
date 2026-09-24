@@ -31,6 +31,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersi
 import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactConverter;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
+import io.repsy.os.server.protocols.maven.shared.artifact.repositories.PendingSignatureRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionDeveloperRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionLicenseRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
@@ -40,12 +41,14 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
@@ -98,6 +101,8 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   private final ArtifactUpsertHelper artifactUpsertHelper;
   private final ArtifactVersionWriteService artifactVersionWriteService;
   private final VersionSignatureService versionSignatureService;
+  private final PendingSignatureService pendingSignatureService;
+  private final PendingSignatureRepository pendingSignatureRepository;
 
   @Qualifier("osStorageStrategyMaven")
   private final StorageStrategy storageStrategy;
@@ -252,8 +257,6 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
             .findByNameAndType(repoInfo.getName(), RepoType.MAVEN)
             .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
 
-    final var versionPath = versionPathOf(storagePath);
-
     final var gav = ArtifactUtils.convertPathToGav(storagePath.getRelativePath().getPath());
     final var pomModel = ArtifactUtils.readModel(resource);
 
@@ -262,27 +265,83 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       // After the checks above, which read the parent: an over-long descriptive value is dropped
       // rather than failing the row insert (RPS-1138).
       MavenPublishLimits.dropOverLongFields(pomModel);
-      this.createOrUpdateArtifactByPomFile(repo, gav, versionPath, pomModel);
-      this.refreshSignedForFile(repoInfo, storagePath);
+      this.registerPom(repoInfo, storagePath, repo, gav, pomModel);
     }
   }
 
   /**
-   * A signable file was stored into a repo that verifies every signature (RPS-1188): its bytes are
-   * new, so the verified signature of the previous ones is forgotten, and whether the version is
-   * signed is recomputed. A file of a version that is not registered yet (a jar before its POM) is
-   * skipped: the POM's registration recomputes.
+   * Registers the version of a stored POM. On a repo that verifies every signature (RPS-1188) the
+   * signatures that arrived before it are dealt with around that: the ones of files that are stored
+   * are verified before anything is registered, so one that does not verify fails the POM's upload
+   * and leaves no version behind, and are written and recorded once the version exists. The POM's
+   * own row is then not forgotten: its signature, if it was parked, was just recorded.
+   */
+  private void registerPom(
+      final BaseRepoInfo<UUID> repoInfo,
+      final StoragePath storagePath,
+      final Repo repo,
+      final Gav gav,
+      final @Nullable Model pomModel) {
+
+    final var versionPath = versionPathOf(storagePath);
+    final var verifyAll = repoInfo.isPgpVerifyAllSignaturesEnabled();
+
+    if (verifyAll) {
+      this.pendingSignatureService.verifyDirectory(repoInfo, versionPath);
+    }
+
+    this.createOrUpdateArtifactByPomFile(repo, gav, versionPath, pomModel);
+
+    final var recorded =
+        verifyAll
+            && this.pendingSignatureService
+                .reconcileDirectory(repoInfo, versionPath)
+                .contains(PendingSignatureService.pathOf(storagePath));
+
+    this.updateSignedForFile(repoInfo, storagePath, recorded);
+  }
+
+  /**
+   * A signable file was stored into a repo that verifies every signature (RPS-1188). The signature
+   * that arrived before it, if any, is checked now and recorded ({@link
+   * PendingSignatureService#reconcileFile}); otherwise its bytes are new, so the verified signature
+   * of the previous ones is forgotten. Whether the version is signed is recomputed either way. A
+   * file of a version that is not registered yet (a jar before its POM) is left to the POM's
+   * registration.
    */
   private void refreshSignedForFile(
       final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath) {
 
-    final var relativePath = storagePath.getRelativePath();
-
-    if (!repoInfo.isPgpVerifyAllSignaturesEnabled()
-        || !ArtifactUtils.isSignableFile(relativePath.getFileName())) {
+    if (!this.isSignableInVerifyAllRepo(repoInfo, storagePath)) {
       return;
     }
 
+    final var recorded =
+        this.pendingSignatureService.reconcileFile(
+            repoInfo, PendingSignatureService.pathOf(storagePath));
+
+    this.updateSignedForFile(repoInfo, storagePath, recorded);
+  }
+
+  private boolean isSignableInVerifyAllRepo(
+      final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath) {
+
+    return repoInfo.isPgpVerifyAllSignaturesEnabled()
+        && ArtifactUtils.isSignableFile(storagePath.getRelativePath().getFileName());
+  }
+
+  /**
+   * Forgets the verified signature of a signable file that was stored again, unless it was just
+   * recorded for the new bytes, and recomputes whether the version is signed.
+   */
+  private void updateSignedForFile(
+      final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath, final boolean recorded) {
+
+    if (!this.isSignableInVerifyAllRepo(repoInfo, storagePath)) {
+      return;
+    }
+
+    final var relativePath = storagePath.getRelativePath();
     final var gav = ArtifactUtils.convertPathToGav(relativePath.getPath());
     final var version =
         gav == null ? null : this.findArtifactVersion(repoInfo.getStorageKey(), gav);
@@ -291,7 +350,10 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       return;
     }
 
-    this.versionSignatureService.forget(version, relativePath.getFileName());
+    if (!recorded) {
+      this.versionSignatureService.forget(version, relativePath.getFileName());
+    }
+
     this.versionSignatureService.refreshSigned(
         repoInfo.getStorageKey(), version, versionPathOf(storagePath));
   }
@@ -351,6 +413,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
             .orElseThrow(() -> new ItemNotFoundException(ERR_ARTIFACT_NOT_FOUND));
 
     this.artifactRepository.delete(artifact);
+    this.dropPendingSignatures(repoId, groupPath(groupName) + "/" + artifactName + "/");
   }
 
   @Transactional
@@ -373,6 +436,9 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
             .orElseThrow(() -> new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND));
 
     this.artifactVersionRepository.delete(artifactVersion);
+    this.dropPendingSignatures(
+        repoInfo.getStorageKey(),
+        groupPath(groupName) + "/" + artifactName + "/" + versionName + "/");
 
     if (!Objects.equals(artifact.getLatest(), versioning.getLatest())
         || !Objects.equals(artifact.getRelease(), versioning.getRelease())) {
@@ -398,7 +464,24 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
     for (final Artifact artifact : artifacts) {
       // Do not change this with delete all method.
       this.artifactRepository.delete(artifact);
+      this.dropPendingSignatures(
+          repoId, groupPath(groupName) + "/" + artifact.getArtifactName() + "/");
     }
+  }
+
+  /**
+   * Drops the signatures parked for files under {@code directoryPrefix}: a version that is deleted
+   * and uploaded again must not meet the signature of the old one (RPS-1188).
+   */
+  private void dropPendingSignatures(final UUID repoId, final String directoryPrefix) {
+
+    this.pendingSignatureRepository.deleteByRepoIdAndSignedFilePathStartingWith(
+        repoId, directoryPrefix);
+  }
+
+  private static String groupPath(final String groupName) {
+
+    return groupName.replace('.', '/');
   }
 
   public ArtifactVersionInfo getArtifactVersion(
@@ -665,6 +748,12 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       throw new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND);
     }
 
+    if (repoInfo.isPgpVerifyAllSignaturesEnabled()) {
+      // A copy of this signature parked earlier goes, after any check of it that is running.
+      this.pendingSignatureService.claim(
+          repoInfo.getStorageKey(), PendingSignatureService.pathOf(signedStoragePath));
+    }
+
     this.versionSignatureService.recordVerified(
         artifactVersion, signedStoragePath.getRelativePath().getFileName());
 
@@ -698,42 +787,101 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    * signature leaves no trace: nothing is written and no row or file is deleted (RPS-1186). It used
    * to run after the signature was stored, and the facade then rolled the whole version back.
    *
+   * <p>On a repo that verifies every signature (RPS-1188) a signature whose file is not stored, or
+   * whose version is not registered, is parked instead of refused: Maven uploads in parallel, so it
+   * may overtake either. It is parked in a transaction of its own that commits first, and the file
+   * and the version are looked at once more after that, so a file that landed in between is not
+   * missed: the file's own upload finds the parked row if it comes later, this request finds the
+   * file if it came earlier.
+   *
    * @throws ItemNotFoundException {@code itemNotFound} when the signed file is not stored
-   * @throws ItemNotFoundException {@code artifactVersionNotFound} when the version of the signed
-   *     file is not registered, which the POM's upload does (RPS-1191)
-   * @throws ItemNotFoundException {@code artifactSigningKeyNotRegistered} when the repo switched
-   *     the key-server lookup off and the signer's key is not registered (RPS-1204)
+   * @throws ItemNotFoundException {@code artifactVersionNotFound} when the POM is stored but its
+   *     version is not registered (RPS-1191)
    */
   @Override
-  public void verifySignature(
+  public SignatureOutcome verifySignature(
       final BaseRepoInfo<UUID> repoInfo,
       final StoragePath signedStoragePath,
       final Resource signature) {
 
     final var nonSignedStoragePath = this.getNonSignedStoragePath(signedStoragePath);
+    final var storedFile = this.storageStrategy.get(nonSignedStoragePath, repoInfo.getName());
 
-    final var nonSignedFileResource =
-        this.storageStrategy
-            .get(nonSignedStoragePath, repoInfo.getName())
-            .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
+    if (storedFile.isPresent() && this.isVersionRegistered(repoInfo, nonSignedStoragePath)) {
+      this.verifyAgainst(repoInfo, storedFile.get(), signature);
 
-    // A POM stored before RPS-1193, or whose rows are gone, can lack a registered version (a POM of
-    // another group was stored but skipped by checkExtractedInfos), and so does a file whose POM
-    // was
-    // not uploaded yet. A signature could then not be recorded, so it is refused here, before the
-    // key lookup and before anything is stored (RPS-1191, RPS-1188).
+      return SignatureOutcome.VERIFIED;
+    }
+
+    if (!repoInfo.isPgpVerifyAllSignaturesEnabled()) {
+      // A POM stored before RPS-1193, or whose rows are gone, can lack a registered version (a POM
+      // of another group was stored but skipped by checkExtractedInfos). A signature could then
+      // not be recorded, so it is refused here, before the key lookup and before anything is
+      // stored (RPS-1191).
+      throw new ItemNotFoundException(
+          storedFile.isPresent() ? ERR_ARTIFACT_VERSION_NOT_FOUND : "itemNotFound");
+    }
+
+    return this.parkOrVerify(repoInfo, nonSignedStoragePath, signature);
+  }
+
+  private boolean isVersionRegistered(
+      final BaseRepoInfo<UUID> repoInfo, final StoragePath nonSignedStoragePath) {
+
     final var gav =
         ArtifactUtils.convertPathToGav(nonSignedStoragePath.getRelativePath().getPath());
 
-    if (gav == null || this.findArtifactVersion(repoInfo.getStorageKey(), gav) == null) {
-      throw new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND);
-    }
+    return gav != null && this.findArtifactVersion(repoInfo.getStorageKey(), gav) != null;
+  }
+
+  private void verifyAgainst(
+      final BaseRepoInfo<UUID> repoInfo, final Resource storedFile, final Resource signature) {
 
     final var sources =
         this.keyStoreService.findPublicKeySources(
             repoInfo.getStorageKey(), repoInfo.isPgpKeyServerLookupEnabled());
 
-    this.pgpVerifierService.verify(nonSignedFileResource, signature, sources);
+    this.pgpVerifierService.verify(storedFile, signature, sources);
+  }
+
+  /**
+   * Parks the signature, then looks for the file and the version once more: if both are there now,
+   * the signature is verified after all and the request stores it like any other (its parked copy
+   * is dropped when it is recorded, or here when it does not verify).
+   */
+  private SignatureOutcome parkOrVerify(
+      final BaseRepoInfo<UUID> repoInfo,
+      final StoragePath nonSignedStoragePath,
+      final Resource signature) {
+
+    final var filePath = PendingSignatureService.pathOf(nonSignedStoragePath);
+
+    this.pendingSignatureService.park(repoInfo.getStorageKey(), filePath, readBytes(signature));
+
+    final var storedFile = this.storageStrategy.get(nonSignedStoragePath, repoInfo.getName());
+
+    if (storedFile.isEmpty() || !this.isVersionRegistered(repoInfo, nonSignedStoragePath)) {
+      return SignatureOutcome.PARKED;
+    }
+
+    try {
+      this.verifyAgainst(repoInfo, storedFile.get(), signature);
+    } catch (final RuntimeException e) {
+      this.pendingSignatureService.discard(repoInfo.getStorageKey(), filePath);
+
+      throw e;
+    }
+
+    return SignatureOutcome.VERIFIED;
+  }
+
+  private static byte[] readBytes(final Resource signature) {
+
+    try {
+      return signature.getContentAsByteArray();
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   private @Nullable ArtifactVersion getArtifactVersionByGav(final UUID artifactId, final Gav gav) {

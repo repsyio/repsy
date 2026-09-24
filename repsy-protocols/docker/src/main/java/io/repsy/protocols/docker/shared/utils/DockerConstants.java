@@ -23,9 +23,7 @@ public final class DockerConstants {
   private DockerConstants() {}
 
   public static final String IMAGE_NAME_REGEX = "(?<imageName>[a-zA-Z0-9_\\-]+)";
-  public static final String SHA_REGEX = "(?<sha>sha256:[0-9a-fA-F]{64})$";
   public static final String BLOBS = "blobs";
-  public static final String SHA256_PREFIX = "sha256:";
   public static final String MANIFESTS = "manifests";
   public static final String BASIC_PREFIX = "Basic ";
 

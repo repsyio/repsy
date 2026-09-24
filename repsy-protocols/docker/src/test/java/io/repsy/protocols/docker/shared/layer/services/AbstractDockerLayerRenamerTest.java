@@ -131,6 +131,31 @@ class AbstractDockerLayerRenamerTest {
   }
 
   @Test
+  @DisplayName("finds a sha512 layer at its digest name, like a sha256 one (RPS-1244)")
+  void findsASha512LayerAtItsDigest() {
+    final var layer = layer("sha512:" + "b".repeat(128));
+    // A path that names some other digest: the layer's own digest name is what is looked up.
+    final var stale = StoragePath.of(STORAGE_KEY, "blobs/sha512:" + "a".repeat(128));
+    final var atDigest = "blobs/" + layer.getDigest();
+    when(this.dockerStorageService.existsResource(any(StoragePath.class), eq(REPO_NAME)))
+        .thenAnswer(
+            invocation ->
+                invocation
+                    .<StoragePath>getArgument(0)
+                    .getRelativePath()
+                    .getPath()
+                    .endsWith(atDigest));
+    when(this.dockerStorageService.rename(eq(STORAGE_KEY), any(RelativePath.class), any()))
+        .thenReturn(BaseUsages.ofDisk(-7));
+
+    final var usages = this.renamer().renameLayers(repoInfo(), Map.of(layer, stale));
+
+    assertThat(usages.getDiskUsage()).isEqualTo(-7);
+    verify(this.dockerStorageService)
+        .rename(eq(STORAGE_KEY), any(RelativePath.class), eq(layer.getDigest()));
+  }
+
+  @Test
   @DisplayName("reports no usage change for an empty layer set")
   void emptyLayerSet() {
     assertThat(this.renamer().renameLayers(repoInfo(), Map.of()).getDiskUsage()).isZero();

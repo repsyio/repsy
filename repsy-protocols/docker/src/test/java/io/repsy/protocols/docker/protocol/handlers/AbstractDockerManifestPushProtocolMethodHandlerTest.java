@@ -41,11 +41,14 @@ import io.repsy.protocols.docker.shared.utils.BaseParsedPath;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -114,6 +117,10 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   }
 
   private static ProtocolContext context(final String manifestJson) {
+    return context(manifestJson, "latest");
+  }
+
+  private static ProtocolContext context(final String manifestJson, final String reference) {
     final var repoInfo = new BaseRepoInfo<UUID>();
     repoInfo.setId(REPO_ID);
     repoInfo.setStorageKey(REPO_ID);
@@ -124,7 +131,7 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
         "urlProperties",
         BaseUrlParserProperties.<UUID, BaseRepoInfo<UUID>>builder()
             .repoName(REPO_NAME)
-            .relativePath(new RelativePath("/app/manifests/latest"))
+            .relativePath(new RelativePath("/app/manifests/" + reference))
             .repoInfo(repoInfo)
             .build());
     context.addProperty("manifestJson", manifestJson);
@@ -132,8 +139,13 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   }
 
   private static MockHttpServletRequest request(final String contentType) {
-    final var request = new MockHttpServletRequest("PUT", "/v2/images/app/manifests/latest");
-    request.setServletPath("/v2/images/app/manifests/latest");
+    return request(contentType, "latest");
+  }
+
+  private static MockHttpServletRequest request(final String contentType, final String reference) {
+    final var path = "/v2/images/app/manifests/" + reference;
+    final var request = new MockHttpServletRequest("PUT", path);
+    request.setServletPath(path);
     request.addHeader("Content-Type", contentType);
     return request;
   }
@@ -217,6 +229,49 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     assertThat(this.usageOf(context)).isEqualTo(400);
     verify(this.layerRenamer, never()).renameLayers(any(), any());
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"sha256", "sha512"})
+  @DisplayName(
+      "answers a push by a digest reference with that digest, in its algorithm, in"
+          + " Docker-Content-Digest and Location (RPS-1244)")
+  void answersADigestPushInTheAlgorithmOfTheReference(final String algorithm) throws Exception {
+    // Upper-case hex: the answer is the normalized (lower-cased) reference.
+    final var reference = algorithm + ":" + "AB".repeat("sha256".equals(algorithm) ? 32 : 64);
+    final var context = context(MANIFEST_JSON, reference);
+    this.stubImageAndSave(context, BaseUsages.ofDisk(400));
+    when(this.layerRenamer.findLayersToRename(any(BaseRepoInfo.class), eq(MANIFEST_JSON)))
+        .thenReturn(Map.of());
+    when(this.layerRenamer.renameLayers(any(BaseRepoInfo.class), any()))
+        .thenReturn(BaseUsages.ofDisk(0));
+    final var expected = reference.toLowerCase(Locale.ROOT);
+
+    final var response =
+        this.handler()
+            .handle(context, request(MANIFEST_TYPE, reference), new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(response.getHeaders().getFirst("Docker-Content-Digest")).isEqualTo(expected);
+    assertThat(response.getHeaders().getFirst("Location"))
+        .isEqualTo("/v2/images/app/manifests/" + expected);
+  }
+
+  @Test
+  @DisplayName("answers a push by tag with the canonical sha256 digest")
+  void answersATagPushWithTheSha256Digest() throws Exception {
+    final var context = context();
+    this.stubImageAndSave(context, BaseUsages.ofDisk(400));
+    when(this.layerRenamer.findLayersToRename(any(BaseRepoInfo.class), eq(MANIFEST_JSON)))
+        .thenReturn(Map.of());
+    when(this.layerRenamer.renameLayers(any(BaseRepoInfo.class), any()))
+        .thenReturn(BaseUsages.ofDisk(0));
+
+    final var response =
+        this.handler().handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse());
+
+    assertThat(response.getHeaders().getFirst("Docker-Content-Digest"))
+        .isEqualTo("sha256:manifest");
   }
 
   @Test

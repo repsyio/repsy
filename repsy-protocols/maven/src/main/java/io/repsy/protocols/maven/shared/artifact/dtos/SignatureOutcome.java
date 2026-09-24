@@ -13,14 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.docker.shared.tag.dtos;
+package io.repsy.protocols.maven.shared.artifact.dtos;
 
-/**
- * A manifest as it is served.
- *
- * @param mediaType the manifest's {@code Content-Type}
- * @param digest the digest reported in {@code Docker-Content-Digest}: in the algorithm the request
- *     named, {@code sha512} for a {@code sha512:} reference and {@code sha256} otherwise
- * @param body the manifest JSON
- */
-public record ManifestDetails(String mediaType, String digest, String body) {}
+/** What became of a signature that was offered for verification (RPS-1188). */
+public enum SignatureOutcome {
+
+  /** It was verified against the stored file, and is to be stored like any file. */
+  VERIFIED,
+
+  /**
+   * It reached a repo verifying every signature before the file it signs (or the POM that registers
+   * its version) and was kept back unverified. Nothing is stored for it: it is verified, written
+   * and recorded when that file arrives.
+   */
+  PARKED
+}

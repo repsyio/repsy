@@ -264,20 +264,78 @@ test.describe('maven verifies every signature when the repo asks for it (RPS-118
   );
 
   test(
-    'a signature before the file it signs answers 404 itemNotFound and stores nothing',
+    'a signature before the file it signs is parked, unserved, and verified when the file arrives (RPS-1188)',
+    { tag: ['@settings'] },
+    async ({ seeder, panelApi }) => {
+      const { layout } = await newRepoWithPomAndJar(seeder);
+      const key = await generateKeyPair();
+      await seeder.registerPgpPublicKey(layout.repoName, key.publicKeyArmored);
+      const admin = adminCredential();
+      const sourcesPath = `${versionDir(layout.groupId, ARTIFACT_ID, VERSION)}/${ARTIFACT_ID}-${VERSION}-sources.jar`;
+      const sourcesBody = `sources of ${layout.repoName}`;
+      const signature = await detachedSign(key.privateKeyArmored, Buffer.from(sourcesBody));
+
+      const parked = await layout.put(`${sourcesPath}.asc`, signature, OCTET);
+      expect(parked.status, `PUT ${sourcesPath}.asc answered ${parked.status}`).toBe(200);
+      const whilePending = await rawGet(layout.repoName, admin, `${sourcesPath}.asc`);
+      expect(whilePending.status, 'GET of a parked signature').toBe(404);
+
+      const file = await layout.put(sourcesPath, sourcesBody, OCTET);
+      expect(file.status, `PUT ${sourcesPath} answered ${file.status} ${file.msgId ?? ''}`).toBe(
+        200,
+      );
+      const afterwards = await rawGet(layout.repoName, admin, `${sourcesPath}.asc`);
+      expect(afterwards.status, 'GET after the file arrived').toBe(200);
+      expect(afterwards.body.toString('utf8'), 'stored .asc bytes').toBe(signature);
+      // The version is not signed yet: its POM and jar have no verified signature.
+      const version = await panelApi.getMavenArtifactVersion(
+        layout.repoName,
+        layout.groupId,
+        ARTIFACT_ID,
+        VERSION,
+      );
+      expect(version.signed, 'signed with the POM and the jar unsigned').toBe(false);
+    },
+  );
+
+  test(
+    'a parked signature that does not verify fails the file with 422 pendingSignatureNotVerified (RPS-1188)',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const { layout } = await newRepoWithPomAndJar(seeder);
+      const key = await generateKeyPair();
+      await seeder.registerPgpPublicKey(layout.repoName, key.publicKeyArmored);
+      const sourcesPath = `${versionDir(layout.groupId, ARTIFACT_ID, VERSION)}/${ARTIFACT_ID}-${VERSION}-sources.jar`;
+      const wrong = await detachedSign(key.privateKeyArmored, Buffer.from('not the sources'));
+      expect((await layout.put(`${sourcesPath}.asc`, wrong, OCTET)).status, 'parking').toBe(200);
+      const before = await repoTree(layout.repoName);
+
+      const file = await layout.put(sourcesPath, 'the sources', OCTET);
+
+      expect(file.status, `PUT ${sourcesPath} answered ${file.status}`).toBe(422);
+      expect(file.msgId, 'error message id').toBe('pendingSignatureNotVerified');
+      expect(
+        await repoTree(layout.repoName),
+        'repo tree unchanged: the file was taken back',
+      ).toEqual(before);
+    },
+  );
+
+  test(
+    'garbage that is not a signature is refused at once, even before its file',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const { layout, jarPath } = await newRepoWithPomAndJar(seeder);
-      const key = await generateKeyPair();
-      await seeder.registerPgpPublicKey(layout.repoName, key.publicKeyArmored);
       const before = await repoTree(layout.repoName);
 
-      const sourcesPath = jarPath.replace(/\.jar$/, '-sources.jar');
-      const signature = await detachedSign(key.privateKeyArmored, Buffer.from('sources'));
-      const put = await layout.put(`${sourcesPath}.asc`, signature, OCTET);
+      const put = await layout.put(
+        `${jarPath.replace(/\.jar$/, '-javadoc.jar')}.asc`,
+        '-----BEGIN PGP SIGNATURE-----\n\n-----END PGP SIGNATURE-----\n',
+        OCTET,
+      );
 
-      expect(put.status, `PUT ${sourcesPath}.asc answered ${put.status}`).toBe(404);
-      expect(put.msgId, 'error message id').toBe('itemNotFound');
+      expect(put.status, 'an armor-only .asc before its file').toBe(422);
+      expect(put.msgId).toBe('artifactSignatureNotVerified');
       expect(await repoTree(layout.repoName), 'repo tree unchanged').toEqual(before);
     },
   );
