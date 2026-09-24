@@ -22,6 +22,7 @@
 import { RepoType } from '../../../src/api/panel-api.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { rawGetManifest } from '../../../src/clients/docker-raw.js';
+import { scanPage } from '../../../src/ui/a11y.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { asDetailPage, registerPackageScenarios } from '../../../src/ui/package-scenarios.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
@@ -200,7 +201,7 @@ test.describe('Docker image, tags, manifests and tag detail', { tag: '@packages'
       adminPage,
       seeder,
       seedPackage,
-    }) => {
+    }, testInfo) => {
       const repo = await seeder.createRepo(RepoType.DOCKER);
       const image = await seedPackage(repo);
       const pages = protocolPages(adminPage, docker, repo.name);
@@ -218,6 +219,7 @@ test.describe('Docker image, tags, manifests and tag detail', { tag: '@packages'
       await expect(tags.emptyList.root).toBeHidden();
       await expect(adminPage.getByTestId('pkg-delete-untagged')).toBeVisible();
       await expect(adminPage.getByTestId('pkg-no-tags-delete-image')).toBeVisible();
+      await scanPage(adminPage, testInfo, 'docker-no-tags-page');
 
       // The manifest is still pullable by digest, and the panel counts it.
       expect(
@@ -233,6 +235,7 @@ test.describe('Docker image, tags, manifests and tag detail', { tag: '@packages'
       await expect(images.inRow(image, 'row-untagged')).toHaveText('1 untagged manifest');
       await expect(images.inRow(image, 'row-size')).toContainText('untagged');
       await expect(images.inRow(image, 'row-size')).not.toContainText(/^\s*0 B/);
+      await scanPage(adminPage, testInfo, 'docker-no-tags-list');
 
       // The row still opens the image page with the explanation, through its one link.
       await images.openRow(image);
