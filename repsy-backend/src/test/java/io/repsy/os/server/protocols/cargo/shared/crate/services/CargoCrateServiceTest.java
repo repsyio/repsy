@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -81,6 +82,11 @@ class CargoCrateServiceTest {
   @Mock ObjectMapper objectMapper;
 
   @InjectMocks CargoCrateServiceImpl cargoCrateService;
+
+  @BeforeEach
+  void stubGlobalRows() {
+    this.stubGlobalRowsRead();
+  }
 
   @Nested
   @DisplayName("publish()")
@@ -157,21 +163,6 @@ class CargoCrateServiceTest {
               any()))
           .thenReturn(1);
 
-      when(CargoCrateServiceTest.this.authorRepository.findByAuthor(anyString()))
-          .thenReturn(Optional.empty());
-      when(CargoCrateServiceTest.this.authorRepository.save(any(CargoAuthor.class)))
-          .thenAnswer(i -> i.getArgument(0));
-
-      when(CargoCrateServiceTest.this.keywordRepository.findByKeyword(anyString()))
-          .thenReturn(Optional.empty());
-      when(CargoCrateServiceTest.this.keywordRepository.save(any(CargoKeyword.class)))
-          .thenAnswer(i -> i.getArgument(0));
-
-      when(CargoCrateServiceTest.this.categoryRepository.findByCategory(anyString()))
-          .thenReturn(Optional.empty());
-      when(CargoCrateServiceTest.this.categoryRepository.save(any(CargoCategory.class)))
-          .thenAnswer(i -> i.getArgument(0));
-
       when(CargoCrateServiceTest.this.crateRepository.save(any(CargoCrate.class)))
           .thenAnswer(i -> i.getArgument(0));
 
@@ -187,6 +178,53 @@ class CargoCrateServiceTest {
 
       verify(CargoCrateServiceTest.this.crateIndexRepository).save(any(CargoCrateIndex.class));
       verify(CargoCrateServiceTest.this.crateMetaRepository).save(any(CargoCrateMeta.class));
+    }
+
+    @Test
+    @DisplayName("inserts the global authors, keywords and categories with insert-if-absent")
+    void insertsGlobalRowsWithInsertIfAbsent() {
+      final var repoId = UUID.randomUUID();
+      final var repoInfo = CargoCrateServiceTest.this.createRepoInfo(repoId);
+      final var request = CargoCrateServiceTest.this.createPublishRequest("test-crate", "1.0.0");
+
+      final var existingCrate = new CargoCrate();
+      existingCrate.setId(UUID.randomUUID());
+      when(CargoCrateServiceTest.this.repoRepository.findById(repoId))
+          .thenReturn(Optional.of(new Repo()));
+      when(CargoCrateServiceTest.this.crateRepository.findByRepoIdAndName(repoId, "test_crate"))
+          .thenReturn(Optional.of(existingCrate));
+      when(CargoCrateServiceTest.this.crateIndexRepository.findByCrateIdAndVers(
+              existingCrate.getId(), "1.0.0"))
+          .thenReturn(Optional.empty());
+      CargoCrateServiceTest.this.cargoCrateService.publish(repoInfo, request);
+
+      // The values are inserted in a fixed order, so two publishes cannot wait on each other.
+      final var order =
+          inOrder(
+              CargoCrateServiceTest.this.authorRepository,
+              CargoCrateServiceTest.this.keywordRepository,
+              CargoCrateServiceTest.this.categoryRepository);
+      order
+          .verify(CargoCrateServiceTest.this.authorRepository)
+          .insertIfAbsent(any(UUID.class), eq("Author1"));
+      order
+          .verify(CargoCrateServiceTest.this.authorRepository)
+          .insertIfAbsent(any(UUID.class), eq("Author2"));
+      order
+          .verify(CargoCrateServiceTest.this.keywordRepository)
+          .insertIfAbsent(any(UUID.class), eq("db"));
+      order
+          .verify(CargoCrateServiceTest.this.keywordRepository)
+          .insertIfAbsent(any(UUID.class), eq("web"));
+      order
+          .verify(CargoCrateServiceTest.this.categoryRepository)
+          .insertIfAbsent(any(UUID.class), eq("api"));
+      verify(CargoCrateServiceTest.this.authorRepository, never()).save(any(CargoAuthor.class));
+      verify(CargoCrateServiceTest.this.keywordRepository, never()).save(any(CargoKeyword.class));
+      verify(CargoCrateServiceTest.this.categoryRepository, never()).save(any(CargoCategory.class));
+      assertThat(existingCrate.getAuthors()).hasSize(2);
+      assertThat(existingCrate.getKeywords()).hasSize(2);
+      assertThat(existingCrate.getCategories()).hasSize(1);
     }
 
     @Test
@@ -648,6 +686,37 @@ class CargoCrateServiceTest {
   }
 
   // Helpers
+
+  /** Reads every global author, keyword and category back as a row of its own, like the insert. */
+  private void stubGlobalRowsRead() {
+    lenient()
+        .when(this.authorRepository.findByAuthor(anyString()))
+        .thenAnswer(
+            i -> {
+              final var author = new CargoAuthor();
+              author.setId(UUID.randomUUID());
+              author.setAuthor(i.getArgument(0));
+              return Optional.of(author);
+            });
+    lenient()
+        .when(this.keywordRepository.findByKeyword(anyString()))
+        .thenAnswer(
+            i -> {
+              final var keyword = new CargoKeyword();
+              keyword.setId(UUID.randomUUID());
+              keyword.setKeyword(i.getArgument(0));
+              return Optional.of(keyword);
+            });
+    lenient()
+        .when(this.categoryRepository.findByCategory(anyString()))
+        .thenAnswer(
+            i -> {
+              final var category = new CargoCategory();
+              category.setId(UUID.randomUUID());
+              category.setCategory(i.getArgument(0));
+              return Optional.of(category);
+            });
+  }
 
   private BaseRepoInfo<UUID> createRepoInfo(final UUID repoId) {
     return BaseRepoInfo.<UUID>builder().id(repoId).name("test-repo").build();
