@@ -15,18 +15,28 @@
  */
 package io.repsy.os.server.protocols.maven.shared.artifact.services;
 
+import com.google.common.base.Suppliers;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.VersionSignature;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionSignatureRepository;
+import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
+import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -41,17 +51,23 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>It joins the transaction of the upload it is called from.
  */
+@Slf4j
 @Component
 @Transactional
 @RequiredArgsConstructor
 @NullMarked
 public class VersionSignatureService {
 
+  private static final String SIGNATURE_SUFFIX = ".asc";
+
   private final VersionSignatureRepository versionSignatureRepository;
   private final ArtifactVersionRepository artifactVersionRepository;
 
   @Qualifier("osStorageStrategyMaven")
   private final StorageStrategy storageStrategy;
+
+  private final KeyStoreService keyStoreService;
+  private final PGPVerifierService pgpVerifierService;
 
   /** Records that the signature of {@code signedFileName} verified now (an upsert). */
   public void recordVerified(final ArtifactVersion version, final String signedFileName) {
@@ -80,6 +96,23 @@ public class VersionSignatureService {
   public void lock(final ArtifactVersion version) {
 
     this.artifactVersionRepository.lockForSignedUpdate(version.getId());
+  }
+
+  /**
+   * Takes the version's row lock and then reads the repo's {@code pgpVerifyAllSignaturesEnabled}
+   * setting as it is committed at that moment. A request that decides what to do from the setting
+   * must do it from this answer and not from the one it read when it started: a toggle may have
+   * committed since, and a stale answer would write a {@code signed} that the recomputation of that
+   * toggle has already replaced. A toggle that commits after this read starts its recomputation
+   * only then, and that takes the lock after this request has released it (RPS-1323).
+   */
+  public boolean lockAndIsVerifyAll(final ArtifactVersion version) {
+
+    this.lock(version);
+
+    return this.artifactVersionRepository
+        .findVerifyAllSignaturesEnabledByVersionId(version.getId())
+        .orElse(false);
   }
 
   /** Whether a verified signature is recorded for the file. */
@@ -133,6 +166,13 @@ public class VersionSignatureService {
 
     // The directory is listed before the rows are read, as it always was: both come after the lock.
     final var toSign = verifyAll ? this.filesToSign(storageKey, versionPath) : List.<String>of();
+
+    this.updateSigned(version, toSign, verifyAll);
+  }
+
+  private void updateSigned(
+      final ArtifactVersion version, final List<String> toSign, final boolean verifyAll) {
+
     final var verified =
         this.versionSignatureRepository.findFileNamesByArtifactVersionId(version.getId());
 
@@ -147,6 +187,19 @@ public class VersionSignatureService {
    * transaction of its own when it is not called from one. The row lock comes first and the repo's
    * setting is read after it, so a request that holds the lock and a toggle that commits meanwhile
    * cannot leave the version computed by the setting that was replaced.
+   *
+   * <p>The signatures that are stored but were never verified are verified first, by the key rules
+   * of the upload path (the repo's registered keys, then its key servers if it looks them up),
+   * under the lock: a repo that verifies every signature counts a {@code .asc} that was stored
+   * while it did not, so an honest publisher's version is not turned unsigned by the toggle alone
+   * (RPS-1323). A signature that does not verify, or whose key is not found, is not recorded and
+   * counts for nothing. What was recorded for a file and does not verify against the stored bytes
+   * any more (they were replaced while the setting was off) is forgotten; when the key cannot be
+   * found the record is left as it is, so an outage of a key server cannot unsign a version.
+   *
+   * <p>Without the setting only the POM's signature counts, and a version that has none recorded
+   * has the stored {@code .pom.asc} files verified (a snapshot signed before RPS-1188 has no row,
+   * V0023 backfilled the releases only).
    *
    * @return {@code false} when the version is gone
    */
@@ -169,9 +222,120 @@ public class VersionSignatureService {
             + "/"
             + version.getVersionName();
 
-    this.refreshSigned(repo.getId(), version, versionPath, repo.isPgpVerifyAllSignaturesEnabled());
+    if (repo.isPgpVerifyAllSignaturesEnabled()) {
+      final var toSign = this.filesToSign(repo.getId(), versionPath);
+
+      this.verifyStoredSignatures(repo, version, versionPath, toSign);
+      this.updateSigned(version, toSign, true);
+    } else {
+      this.verifyStoredPomSignatures(repo, version, versionPath);
+      this.updateSigned(version, List.of(), false);
+    }
 
     return true;
+  }
+
+  /** Legacy: a version whose POM signature is not recorded gets its stored ones verified. */
+  private void verifyStoredPomSignatures(
+      final Repo repo, final ArtifactVersion version, final String versionPath) {
+
+    final var recorded =
+        this.versionSignatureRepository.findFileNamesByArtifactVersionId(version.getId());
+
+    if (isSignedByPom(recorded)) {
+      return;
+    }
+
+    final var items =
+        this.storageStrategy.listStorageItems(StoragePath.of(repo.getId(), versionPath));
+    final var poms =
+        ArtifactUtils.versionDirFileNames(versionPath, items).stream()
+            .filter(ArtifactUtils::isPomFile)
+            .toList();
+
+    this.verifyStoredSignatures(repo, version, versionPath, poms);
+  }
+
+  /**
+   * Verifies the stored {@code .asc} of each of the files that has one, against the file as stored,
+   * and records the ones that verify (see {@link #recompute}).
+   */
+  private void verifyStoredSignatures(
+      final Repo repo,
+      final ArtifactVersion version,
+      final String versionPath,
+      final Collection<String> fileNames) {
+
+    final var recorded =
+        new HashSet<>(
+            this.versionSignatureRepository.findFileNamesByArtifactVersionId(version.getId()));
+    // Read once, and only when there is a signature to verify.
+    final Supplier<PublicKeySources> sources =
+        Suppliers.memoize(
+            () ->
+                this.keyStoreService.findPublicKeySources(
+                    repo.getId(), repo.isPgpKeyServerLookupEnabled()));
+
+    for (final var fileName : fileNames) {
+      final var outcome = this.verifyStored(repo, versionPath, fileName, sources);
+
+      if (outcome == StoredOutcome.VERIFIED && recorded.add(fileName)) {
+        this.recordVerified(version, fileName);
+      } else if (outcome == StoredOutcome.NOT_VERIFIED && recorded.remove(fileName)) {
+        this.forget(version, fileName);
+      }
+    }
+  }
+
+  /** What the stored signature of a file amounts to. */
+  private enum StoredOutcome {
+    /** The file or its signature is not stored. */
+    NOTHING_STORED,
+    VERIFIED,
+    /** It is stored and does not verify. */
+    NOT_VERIFIED,
+    /** It is stored, and could not be verified: the signer's key is not to be found. */
+    UNKNOWN
+  }
+
+  private StoredOutcome verifyStored(
+      final Repo repo,
+      final String versionPath,
+      final String fileName,
+      final Supplier<PublicKeySources> sources) {
+
+    final var filePath = versionPath + "/" + fileName;
+    final var signature =
+        this.storageStrategy.get(
+            StoragePath.of(repo.getId(), filePath + SIGNATURE_SUFFIX), repo.getName());
+    final var file =
+        this.storageStrategy.get(StoragePath.of(repo.getId(), filePath), repo.getName());
+
+    if (signature.isEmpty() || file.isEmpty()) {
+      return StoredOutcome.NOTHING_STORED;
+    }
+
+    try {
+      this.pgpVerifierService.verify(file.get(), signature.get(), sources.get());
+
+      return StoredOutcome.VERIFIED;
+    } catch (final SignatureNotVerifiedException e) {
+      log.info(
+          "The stored signature of {} in Maven repo {} does not verify: {}",
+          filePath,
+          repo.getName(),
+          e.getMessage());
+
+      return StoredOutcome.NOT_VERIFIED;
+    } catch (final ItemNotFoundException e) {
+      log.info(
+          "The stored signature of {} in Maven repo {} could not be verified: {}",
+          filePath,
+          repo.getName(),
+          e.getMessage());
+
+      return StoredOutcome.UNKNOWN;
+    }
   }
 
   private List<String> filesToSign(final UUID storageKey, final String versionPath) {

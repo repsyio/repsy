@@ -592,6 +592,20 @@ instance per team.
     untagged manifests", which runs that sweep) removes the ones no manifest uses any more.
 - There is no `tags/list` or referrers API yet.
 
+### Go Module Semantics
+
+- **A module lasts as long as it has a version.** Deleting the last version of a Go module in the
+  web UI (or with `DELETE /api/go/modules/{repoName}/versions`) also deletes the module: it leaves
+  the module list and its stored files are moved to the trash, like the version's own. Publishing a
+  version of that path again creates the module again. Deleting a module as a whole is the same
+  operation for all of its versions. The disk usage of what was deleted is given back to the
+  repository, and a deleted version is reported to the vulnerability scanner as deleted.
+- **The Go proxy answers as it does for a module that was never published.** `@v/list` of a module
+  without versions is `200` with an empty body (not `404`, which would make the `go` command try the
+  next `GOPROXY` entry), and `@latest` is `404`.
+- A delete and a publish of the same module take turns, so a publish that arrives while the last
+  version is being deleted is stored, in a module that is created again, and never fails.
+
 ### Signed Maven Deploys
 
 A Maven repository's key store (panel API, `/api/mvn/key-stores/{repoName}/public-keys`) can hold
@@ -635,9 +649,12 @@ what is verified and where keys are looked up:
   version is *Signed* when its POM signature is verified; with it on, when every file has a
   verified signature). The settings request does not wait for it, so a large repository shows the
   new values within moments, not at once. A signature that was stored while the setting was off was
-  never verified, so it does not count when the setting is turned on: it counts once its file and
-  signature are uploaded again (so an already *Signed* version can show *Unsigned* after turning
-  the setting on). Turning it off leaves held signatures alone: they are deleted when they expire.
+  never verified, so turning the setting on verifies it then, in that same background run, file by
+  file and with the same key rules as an upload (registered keys first, key servers if the lookup
+  is on): an honest publisher's versions stay *Signed*. A stored signature that does not verify, or
+  whose key cannot be found, does not count and its version shows *Unsigned* until the file and
+  signature are uploaded again (or the key is registered and the setting turned off and on again). Turning it off
+  leaves held signatures alone: they are deleted when they expire.
 - **Air-gapped registries (`pgpKeyServerLookupEnabled` off):** the repository consults its
   registered keys only. A signature made with a key that is not registered is refused at once with
   `404 artifactSigningKeyNotRegistered`, without contacting any key server (custom hosts,

@@ -49,6 +49,9 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
   public activeRepo: RepoPermissionInfo;
   public readonly repoBaseUrl: string;
 
+  /** How many versions the module had when the page loaded: deleting the only one removes the module. */
+  private versionCount = 0;
+
   private readonly repositoryChanges$: Subscription;
 
   constructor(
@@ -108,13 +111,16 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
         )
         .subscribe({
           next: () => {
-            this.router
-              .navigate(['/' + this.activeRepo.repoName + '/modules'], {
-                queryParams: { modulePath: this.modulePath },
-              })
-              .then(() => {
-                this.toastService.show('Version deleted successfully', 'success');
-              });
+            // Deleting the last version deletes the module, so there is no versions page to land on.
+            const navigation =
+              this.versionCount <= 1
+                ? this.router.navigate(['/' + this.activeRepo.repoName])
+                : this.router.navigate(['/' + this.activeRepo.repoName + '/modules'], {
+                    queryParams: { modulePath: this.modulePath },
+                  });
+            navigation.then(() => {
+              this.toastService.show('Version deleted successfully', 'success');
+            });
           },
           error: () => {},
         });
@@ -132,6 +138,7 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
       )
       .subscribe({
         next: (info) => {
+          this.versionCount = info.versions.length;
           const found = info.versions.find((v) => v.version === this.versionName);
           if (!found) {
             this.error = `Version '${this.versionName}' not found`;

@@ -23,6 +23,7 @@ import io.repsy.os.generated.model.LoginInfo;
 import io.repsy.os.generated.model.RefreshTokenForm;
 import io.repsy.os.panel.auth.services.AuthUserService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.utils.MultiPortNames;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,9 @@ class AuthController {
 
   @PostMapping("/login")
   public @NonNull RestResponse<LoginInfo> login(@RequestBody @Valid final @NonNull LoginForm form) {
+
+    // The form only limits the characters; BCrypt reads bytes. No account has a longer password.
+    PasswordHasher.requireFitsBcrypt(form.getPassword());
 
     final var loginInfo = this.authUserService.login(form);
 

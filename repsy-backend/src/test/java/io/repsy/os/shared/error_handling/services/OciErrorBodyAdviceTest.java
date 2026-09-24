@@ -17,6 +17,7 @@ package io.repsy.os.shared.error_handling.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.http.MediaType;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -101,6 +103,19 @@ class OciErrorBodyAdviceTest {
   }
 
   @Test
+  @DisplayName("answers a lost version race with 503, Retry-After and the distribution body")
+  void lostVersionRaceIsARetryableRegistryError() throws Exception {
+    this.mockMvc
+        .perform(protocol("/v2/repo/app/manifests/contended"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(header().string("Retry-After", "1"))
+        .andExpect(jsonPath("$.errors.length()").value(1))
+        .andExpect(jsonPath("$.errors[0].code").value("UNKNOWN"))
+        .andExpect(jsonPath("$.errors[0].detail").value("concurrentModification"))
+        .andExpect(jsonPath("$.msgId").doesNotExist());
+  }
+
+  @Test
   @DisplayName("keeps the content type JSON")
   void keepsContentType() throws Exception {
     final var result =
@@ -151,6 +166,11 @@ class OciErrorBodyAdviceTest {
     @GetMapping("/v2/repo/app/manifests/denied")
     String denied() {
       throw new AccessNotAllowedException("packageOverrideDisabled");
+    }
+
+    @GetMapping("/v2/repo/app/manifests/contended")
+    String contended() {
+      throw new ObjectOptimisticLockingFailureException(Object.class, "id");
     }
 
     @GetMapping("/v2/repo/app/manifests/crash")

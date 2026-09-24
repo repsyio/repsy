@@ -15,10 +15,12 @@
  */
 package io.repsy.protocols.golang.shared.storage.services;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -139,5 +141,52 @@ class AbstractGoStorageServiceTest {
     service.deleteVersionFiles(StoragePath.of(STORAGE_KEY, "no-slash"), REPO_NAME);
 
     verify(storageStrategy, never()).listDirectoryContents(any(StoragePath.class));
+  }
+
+  @Test
+  @DisplayName(
+      "deleteVersionFiles() answers the bytes of the files it removed, not of a failed one")
+  void answersTheBytesOfTheRemovedFiles() {
+    when(storageStrategy.listDirectoryContents(any(StoragePath.class)))
+        .thenReturn(
+            List.of(
+                sizedFile("v1.0.0.info", 10L),
+                sizedFile("v1.0.0.mod", 20L),
+                sizedFile("v1.0.0.zip", 300L),
+                sizedFile("v1.0.1.zip", 4000L)));
+    lenient()
+        .doThrow(new IllegalStateException("disk error"))
+        .when(storageStrategy)
+        .delete(pathEndingWith("/@v/v1.0.0.mod"));
+
+    assertThat(service.deleteVersionFiles(VERSION_BASE, REPO_NAME)).isEqualTo(310L);
+  }
+
+  @Test
+  @DisplayName("deleteVersionFiles() counts a file of unknown size as zero bytes")
+  void countsAFileWithoutASizeAsZero() {
+    when(storageStrategy.listDirectoryContents(any(StoragePath.class)))
+        .thenReturn(List.of(file("v1.0.0.info"), sizedFile("v1.0.0.zip", 5L)));
+
+    assertThat(service.deleteVersionFiles(VERSION_BASE, REPO_NAME)).isEqualTo(5L);
+    assertThat(service.deleteVersionFiles(StoragePath.of(STORAGE_KEY, "no-slash"), REPO_NAME))
+        .isZero();
+  }
+
+  @Test
+  @DisplayName("deleteDirectory() answers what the directory held and then removes it")
+  void deleteDirectoryAnswersTheFreedBytes() {
+    final var directory = StoragePath.of(STORAGE_KEY, "/example.com/mod/@v");
+    when(storageStrategy.calculatePathUsage(directory)).thenReturn(1234L);
+
+    assertThat(service.deleteDirectory(directory)).isEqualTo(1234L);
+
+    final var order = org.mockito.Mockito.inOrder(storageStrategy);
+    order.verify(storageStrategy).calculatePathUsage(directory);
+    order.verify(storageStrategy).delete(directory);
+  }
+
+  private static StorageItemInfo sizedFile(final String name, final long size) {
+    return StorageItemInfo.builder().name(name).directory(false).size(size).build();
   }
 }

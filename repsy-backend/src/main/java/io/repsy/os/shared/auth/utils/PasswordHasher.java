@@ -72,24 +72,39 @@ public class PasswordHasher {
    */
   public static @NonNull String hash(final @NonNull String password) {
 
+    requireFitsBcrypt(password);
+
+    return encode(password);
+  }
+
+  /**
+   * Rejects a password BCrypt would only read the first {@link #MAX_PASSWORD_BYTES} bytes of. A
+   * hash can never be made from such a password, so no account has one; a login that sends one is
+   * malformed input, not a wrong password.
+   *
+   * @throws BadRequestException if the password is longer than {@link #MAX_PASSWORD_BYTES}
+   */
+  public static void requireFitsBcrypt(final @NonNull String password) {
+
     if (!fitsBcrypt(password)) {
       throw new BadRequestException(PASSWORD_TOO_LONG);
     }
-
-    return encode(password);
   }
 
   /**
    * Checks a password against a stored hash without leaking, through timing, how much of it
    * matched.
    *
-   * @param password the password to check
+   * @param password the password to check; one over {@link #MAX_PASSWORD_BYTES} never matches
    * @param hash the stored hash
    * @return whether the password is the one the hash was made from
    */
   public static boolean matches(final @NonNull String password, final @Nullable String hash) {
 
-    if (hash == null) {
+    // BCrypt ignores everything past 72 bytes, so it would accept the right password with any tail
+    // added to it. No password of that length was ever hashed (hash() refuses one), so none
+    // matches.
+    if (hash == null || !fitsBcrypt(password)) {
       verifyDummy(password);
       return false;
     }

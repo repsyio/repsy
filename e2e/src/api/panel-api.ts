@@ -34,10 +34,13 @@ import type { PgpPublicKeyItem } from './generated/models/PgpPublicKeyItem.js';
 import type { RepoCreateRequest } from './generated/models/RepoCreateRequest.js';
 import type { RepoListInfo } from './generated/models/RepoListInfo.js';
 import type { RepoSettingsForm } from './generated/models/RepoSettingsForm.js';
+import type { RepoSecuritySummary } from './generated/models/RepoSecuritySummary.js';
 import type { RepoSettingsInfo } from './generated/models/RepoSettingsInfo.js';
+import type { SecurityScansSummary } from './generated/models/SecurityScansSummary.js';
 import type { TokenInfo } from './generated/models/TokenInfo.js';
 import type { UserCreateForm } from './generated/models/UserCreateForm.js';
 import type { UserResponse } from './generated/models/UserResponse.js';
+import type { VulnerabilityScanInfo } from './generated/models/VulnerabilityScanInfo.js';
 
 export { ApiError, RepoType, UserRole };
 export type {
@@ -49,11 +52,14 @@ export type {
   PagedModelRepoListInfo,
   PgpPublicKeyItem,
   RepoListInfo,
+  RepoSecuritySummary,
   RepoSettingsForm,
   RepoSettingsInfo,
+  SecurityScansSummary,
   TokenInfo,
   UserCreateForm,
   UserResponse,
+  VulnerabilityScanInfo,
 };
 
 /** The body of `POST /api/repos` without its `type`, which `createRepo` takes as its own argument. */
@@ -201,6 +207,46 @@ export class PanelApi {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     return { status: res.status, body: (await res.json()) as { data?: unknown } };
+  }
+
+  /** `GET /api/security/supported-repo-types`: the repo types that have a scanner (empty while it is off), sorted. */
+  async supportedScanRepoTypes(): Promise<string[]> {
+    const res = await this.client.securityScanController.getSupportedRepoTypes();
+    return [...unwrap(res.data, 'getSupportedRepoTypes')].sort();
+  }
+
+  /**
+   * `GET .../versions/{version}/scans`: the scan history of one version, newest first (up to 100). Over
+   * raw `fetch` because the generated client leaves a `/` in a path parameter as it is, and an npm
+   * scope (`@scope/name`) has one, which the panel sends as `%2F`.
+   */
+  async listVersionScans(
+    repoName: string,
+    artifactName: string,
+    version: string,
+  ): Promise<VulnerabilityScanInfo[]> {
+    const path = [repoName, 'artifacts', artifactName, 'versions', version]
+      .map((part) => encodeURIComponent(part))
+      .join('/');
+    const url = `${this.baseUrl}/api/repos/${path}/scans?size=100&sort=createdAt,desc`;
+    const res = await fetch(url, { headers: { Authorization: this.authorization() } });
+    if (!res.ok) {
+      throw new PanelApiError(`GET ${url} answered ${res.status}: ${await res.text()}`);
+    }
+    const body = (await res.json()) as { data?: { content?: VulnerabilityScanInfo[] } };
+    return body.data?.content ?? [];
+  }
+
+  /** `GET /api/security/scans/summary`: findings per severity over the latest completed scan of every version (admin only). */
+  async securityScansSummary(): Promise<SecurityScansSummary> {
+    const res = await this.client.securityScanController.getSecurityScansSummary({});
+    return unwrap(res.data, 'getSecurityScansSummary');
+  }
+
+  /** `GET /api/repos/security-summary[?repoNames=...]`: one entry per repo that has one (all repos when none are named). */
+  async repoSecuritySummary(repoNames?: string[]): Promise<Record<string, RepoSecuritySummary>> {
+    const res = await this.client.vulnerabilityScanController.getSecuritySummary({ repoNames });
+    return unwrap(res.data, 'getSecuritySummary');
   }
 
   async deleteRepo(repoName: string): Promise<void> {
