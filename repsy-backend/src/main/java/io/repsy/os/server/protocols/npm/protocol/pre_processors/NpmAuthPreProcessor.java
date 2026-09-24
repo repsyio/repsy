@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -44,6 +45,17 @@ public class NpmAuthPreProcessor extends ProtocolProcessor {
 
   private static final int PRIORITY = 100;
   private static final String CHALLENGE = "Basic realm=\"Repsy Managed Registry\"";
+
+  /**
+   * The challenge of a refused Bearer credential (RPS-1209). The npm client reads only the first
+   * value of {@code WWW-Authenticate}, splits it and takes the first scheme it knows: {@code
+   * Bearer} makes it print "your authentication token seems to be invalid ... npm login", while a
+   * lone {@code Basic} makes it tell a token user "Incorrect or missing password".
+   * registry.npmjs.org sends both schemes as well.
+   */
+  private static final String BEARER_CHALLENGE =
+      "Bearer realm=\"Repsy Managed Registry\", " + CHALLENGE;
+
   private static final String URL_PROPERTIES_KEY = "urlProperties";
   private static final String PERMISSION_KEY = "permission";
   private static final String SKIP_PRE_PROCESSOR_KEY = "skipPreProcessor";
@@ -77,19 +89,25 @@ public class NpmAuthPreProcessor extends ProtocolProcessor {
 
     final var permission = (Permission) properties.get(PERMISSION_KEY);
 
+    final var authHeader = this.authComponent.emulateAuthHeader(request);
+
     try {
-      this.authenticate(request, repoInfo.getStorageKey(), permission);
+      this.authenticate(authHeader, repoInfo.getStorageKey(), permission);
     } catch (final UnAuthorizedException ex) {
-      throw AuthChallenges.challenged(ex, CHALLENGE);
+      throw AuthChallenges.challenged(ex, challengeFor(authHeader));
     }
 
     return ProcessorResult.next();
   }
 
-  private void authenticate(
-      final HttpServletRequest request, final UUID repoId, final Permission permission) {
+  /** The challenge for a refused request: both schemes when it carried a Bearer credential. */
+  private static String challengeFor(final @Nullable String authHeader) {
 
-    final var authHeader = this.authComponent.emulateAuthHeader(request);
+    return authHeader != null && authHeader.startsWith(AUTH_BEARER) ? BEARER_CHALLENGE : CHALLENGE;
+  }
+
+  private void authenticate(
+      final @Nullable String authHeader, final UUID repoId, final Permission permission) {
 
     if (authHeader == null) {
       throw new UnAuthorizedException("unAuthorized");

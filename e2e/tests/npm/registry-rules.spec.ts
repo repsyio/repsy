@@ -193,6 +193,34 @@ test.describe('npm registry rules (raw HTTP)', () => {
   );
 
   test(
+    'RPS-1209: a revoked deploy token sent as Bearer is answered unAuthorized like a wrong password',
+    { tag: ['@auth', '@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'revoked');
+      const token = await seeder.createToken(layout.repoName);
+      const credential = {
+        transport: 'basic' as const,
+        kind: 'token' as const,
+        password: token.token,
+      };
+
+      // Alive, the same Bearer secret is accepted: the packument just does not exist yet.
+      const alive = await rawGetPackument(layout.repoName, credential, layout.packageName);
+      expect(alive.status, 'a live deploy token is authenticated (404, not 401)').toBe(404);
+
+      await seeder.revokeNow(layout.repoName, token.id);
+
+      // A Bearer value that is no live deploy token and no protocol JWT is a wrong credential: the
+      // same `unAuthorized` a wrong Basic password gets (it used to be `accessNotAllowed`), counted
+      // against the auth throttle like one. A server whose throttle this harness cannot tune
+      // (a remote target) reserves one failure slot for this `@negative` test.
+      const revoked = await rawGetPackument(layout.repoName, credential, layout.packageName);
+      expect(revoked.status, 'a revoked deploy token as Bearer').toBe(401);
+      expect(revoked.msgId, 'the error message id of a revoked Bearer token').toBe('unAuthorized');
+    },
+  );
+
+  test(
     'RPS-1205 (fixed): the packument dist.tarball URL matches the canonical stored path',
     { tag: ['@negative'] },
     async ({ seeder }) => {
