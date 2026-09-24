@@ -35,4 +35,10 @@ describe('getRepoDomain', () => {
 
     expect(getRepoDomain()).toBe('repo.example.com');
   });
+
+  it('keeps a non-default port, so the snippets follow the stack they are shown on', () => {
+    environment.repoBaseUrl = 'http://localhost:15090';
+
+    expect(getRepoDomain()).toBe('localhost:15090');
+  });
 });

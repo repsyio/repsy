@@ -158,7 +158,7 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
             .manifestBytes(manifestBytes)
             .build();
 
-    final var manifestDigest = this.dockerFacade.saveManifest(context, imageInfo, form);
+    final var manifestDigest = this.saveManifest(context, imageInfo, form);
 
     if (!contentType.equals(OCI_IMAGE_INDEX) && !contentType.equals(DOCKER_MANIFEST_LIST)) {
       final var storagePathMap = this.layerRenamer.findLayersToRename(repoInfo, manifestJson);
@@ -167,9 +167,11 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
       final var renameUsages = this.layerRenamer.renameLayers(repoInfo, storagePathMap);
 
       ProtocolContextUtils.addUsages(context, renameUsages);
-    } else {
-      this.imageTxService.updateImageSize(repoInfo.getId(), imageInfo.getId(), manifestDigest);
     }
+
+    // Every manifest push, single-platform or index (RPS-1314): the size and digest the panel
+    // lists the image with are computed the same way a delete computes them.
+    this.imageTxService.refreshImageSize(repoInfo.getId(), imageInfo.getId());
 
     // A push by a digest reference is answered in that reference's algorithm (RPS-1244): the
     // stored manifest is addressable by both, the client verifies against the one it named.
@@ -205,6 +207,39 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
         .path("/v2/{repoName}/{imageName}/manifests/{digest}")
         .buildAndExpand(urlProperties.getRepoName(), imageName, digest)
         .toUriString();
+  }
+
+  /**
+   * Saves the manifest in one transaction of the facade, and runs that whole transaction again when
+   * it loses a race (RPS-1314): two first pushes of the same digest into one image (or of one new
+   * tag) both find no row and both insert, and the loser fails on a unique index of {@code
+   * docker_manifest} or {@code docker_tag}. The second run sees the row the winner committed and
+   * reuses it, so the client gets its {@code 201} instead of a {@code 500}.
+   */
+  private String saveManifest(
+      final ProtocolContext context, final BaseImageInfo<ID> imageInfo, final ManifestForm form)
+      throws IOException {
+
+    for (var attempt = 1; ; attempt++) {
+      try {
+        return this.dockerFacade.saveManifest(context, imageInfo, form);
+      } catch (final DataIntegrityViolationException e) {
+        if (attempt >= RETRY_COUNT) {
+          throw e;
+        }
+
+        this.pauseBeforeRetry(WAIT_RETRY * attempt);
+      }
+    }
+  }
+
+  private void pauseBeforeRetry(final long millis) {
+    try {
+      Thread.sleep(millis);
+    } catch (final InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Interrupted while retrying the manifest save", e);
+    }
   }
 
   @SneakyThrows
