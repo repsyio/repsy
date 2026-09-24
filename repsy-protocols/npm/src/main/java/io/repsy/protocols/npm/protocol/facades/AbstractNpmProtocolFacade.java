@@ -144,29 +144,41 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final String versionName)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
+    final var version = versionName.replace("\"", "");
+    final var storagePath =
+        StoragePath.of(repoInfo.getStorageKey(), packageBasePath.resolve(PACKAGE_JSON).toString());
 
-    final var metadataAndUsage =
-        this.npmStorageService.addDistributionTag(
-            repoInfo.getStorageKey(),
-            repoInfo.getName(),
-            packageBasePath,
+    // The tag row is written first and the package metadata second, in one transaction that holds
+    // the package row locked (RPS-1272): see NpmPackageService#addDistributionTag.
+    final var usages =
+        this.npmPackageService.addDistributionTag(
+            repoInfo,
+            scopeName,
+            packageName,
             tagName,
-            versionName.replace("\"", ""));
+            version,
+            () ->
+                this.rewriteMetadata(
+                    repoInfo,
+                    packageBasePath,
+                    () -> {
+                      final var metadataAndUsage =
+                          this.npmStorageService.addDistributionTag(
+                              repoInfo.getStorageKey(),
+                              repoInfo.getName(),
+                              packageBasePath,
+                              tagName,
+                              version);
 
-    final var usage = BaseUsages.ofDisk(metadataAndUsage.getSecond());
+                      this.npmStorageService.writeMetadataToFile(
+                          repoInfo.getName(), metadataAndUsage.getFirst(), storagePath);
 
-    final var packageJsonPath = packageBasePath.resolve(PACKAGE_JSON);
-    final var storagePath = StoragePath.of(repoInfo.getStorageKey(), packageJsonPath.toString());
+                      return metadataAndUsage.getSecond();
+                    }));
 
-    this.npmStorageService.writeMetadataToFile(
-        repoInfo.getName(), metadataAndUsage.getFirst(), storagePath);
-
-    this.npmPackageService.addDistributionTag(
-        repoInfo.getStorageKey(), scopeName, packageName, tagName, versionName.replace("\"", ""));
-
-    context.addProperty(USAGES, usage);
+    context.addProperty(USAGES, usages);
   }
 
   @Override
@@ -182,14 +194,71 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
     }
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var path = this.npmStorageService.getPackageBasePath(scopeName, packageName);
-    final var diskUsage =
-        this.npmStorageService.removeDistributionTag(
-            repoInfo.getStorageKey(), repoInfo.getName(), path, tagName);
+    final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
 
-    this.npmPackageService.removeDistributionTag(repoInfo, scopeName, packageName, tagName);
+    final var usages =
+        this.npmPackageService.removeDistributionTag(
+            repoInfo,
+            scopeName,
+            packageName,
+            tagName,
+            () ->
+                this.rewriteMetadata(
+                    repoInfo,
+                    packageBasePath,
+                    () ->
+                        this.npmStorageService.removeDistributionTag(
+                            repoInfo.getStorageKey(),
+                            repoInfo.getName(),
+                            packageBasePath,
+                            tagName)));
 
-    context.addProperty(USAGES, BaseUsages.ofDisk(diskUsage));
+    context.addProperty(USAGES, usages);
+  }
+
+  /** A change to the package metadata file that reports how many bytes the file grew by. */
+  @FunctionalInterface
+  private interface MetadataChange {
+
+    long apply() throws IOException;
+  }
+
+  /**
+   * Runs {@code change} while {@link NpmPackageService} still holds the package row locked, and
+   * puts the metadata back as it was when the change fails, so the metadata never keeps a tag the
+   * rolled-back rows do not have. The metadata is read under the lock, so no other write can have
+   * changed it in between.
+   */
+  private BaseUsages rewriteMetadata(
+      final BaseRepoInfo<ID> repoInfo, final Path packageBasePath, final MetadataChange change)
+      throws IOException {
+
+    final var previousMetadata =
+        this.npmStorageService.readMetadataBytes(
+            repoInfo.getStorageKey(), repoInfo.getName(), packageBasePath);
+
+    try {
+      return BaseUsages.ofDisk(change.apply());
+    } catch (final IOException | RuntimeException e) {
+      this.restoreMetadata(repoInfo, packageBasePath, previousMetadata, e);
+      throw e;
+    }
+  }
+
+  private void restoreMetadata(
+      final BaseRepoInfo<ID> repoInfo,
+      final Path packageBasePath,
+      final byte[] previousMetadata,
+      final Exception cause) {
+
+    try {
+      this.npmStorageService.restoreMetadataBytes(
+          repoInfo.getStorageKey(), repoInfo.getName(), packageBasePath, previousMetadata);
+    } catch (final IOException | RuntimeException e) {
+      // The change's own failure is the one to report; the leftover is noted on it.
+      log.warn("Could not put back the metadata of npm package at {}", packageBasePath, e);
+      cause.addSuppressed(e);
+    }
   }
 
   @Override
@@ -346,6 +415,10 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final PublishKind kind)
       throws IOException, URISyntaxException {
 
+    if (kind != PublishKind.REPLACES_VERSION) {
+      this.noteOrphanedTarball(repoInfo, packageBasePath, packageName, versionName);
+    }
+
     // Read while the package row is locked, so no other publish can change it before this one has
     // written its own.
     final var previousMetadata =
@@ -364,6 +437,32 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
             repoInfo, packageBasePath, packageName, versionName, previousMetadata, e);
       }
       throw e;
+    }
+  }
+
+  /**
+   * Notes a tarball that is in storage although the database has no row for its version.
+   *
+   * <p>The rows are written before the files, under the package row lock, so a tarball without a
+   * row can only be what an earlier publish left behind when it failed (all publishes before
+   * RPS-1124 wrote the files first). The database is the authority on which versions exist, so the
+   * orphan is not a version that {@code allowOverride} protects: this publish replaces it, and if
+   * it fails the tarball is discarded with the rest of the partial version.
+   */
+  private void noteOrphanedTarball(
+      final BaseRepoInfo<ID> repoInfo,
+      final Path packageBasePath,
+      final String packageName,
+      final String versionName) {
+
+    if (this.npmStorageService.tarballExists(
+        repoInfo.getStorageKey(), repoInfo.getName(), packageBasePath, packageName, versionName)) {
+      log.warn(
+          "Replacing an orphaned tarball of npm package {} {} in repo {}: storage has it, the"
+              + " database has no such version",
+          packageName,
+          versionName,
+          repoInfo.getName());
     }
   }
 

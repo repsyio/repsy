@@ -271,6 +271,35 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
   }
 
   @Override
+  public void restoreMetadataBytes(
+      final UUID repoId, final String repoName, final Path packageBasePath, final byte[] metadata)
+      throws IOException {
+
+    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
+
+    try (final var inputStream = new ByteArrayInputStream(metadata)) {
+      this.storageStrategy.write(
+          repoName, StoragePath.of(repoId, metadataPath.toString()), inputStream);
+    }
+  }
+
+  @Override
+  public boolean tarballExists(
+      final UUID repoId,
+      final String repoName,
+      final Path packageBasePath,
+      final String packageName,
+      final String versionName) {
+
+    final var tarballPath =
+        packageBasePath.resolve(PackageUtils.getTarballFilename(packageName, versionName));
+
+    return this.storageStrategy
+        .get(StoragePath.of(repoId, tarballPath.toString()), repoName)
+        .isPresent();
+  }
+
+  @Override
   public void discardPublishedVersion(
       final UUID repoId,
       final String repoName,
