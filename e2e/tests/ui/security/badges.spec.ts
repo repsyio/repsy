@@ -326,7 +326,7 @@ test.describe('SEC-02a closing a security modal', { tag: MOCKED }, () => {
   }) => {
     test.fail(
       true,
-      'the X of the security modal does not stop the click, so it also opens the row it sits in (no ticket yet)',
+      'the X of the security modal does not stop the click, so it also opens the row it sits in RPS-1295',
     );
     const repo = await seeder.createRepo(RepoType.NPM);
     await stubSupportedRepoTypes(adminPage, [RepoType.NPM]);
@@ -355,7 +355,7 @@ test.describe('SEC-02a closing a security modal', { tag: MOCKED }, () => {
   }) => {
     test.fail(
       true,
-      'the X of the security modal does not stop the click, so it also opens the row it sits in (no ticket yet)',
+      'the X of the security modal does not stop the click, so it also opens the row it sits in RPS-1295',
     );
     const repo = await seeder.createRepo(RepoType.NPM);
     const pkg = await seedPackage(repo);
@@ -386,7 +386,7 @@ test.describe('SEC-02a closing a security modal', { tag: MOCKED }, () => {
   }) => {
     test.fail(
       true,
-      "the dialog's title and X are covered by the page header when the chart makes it tall, so a mouse cannot reach the X (no ticket yet)",
+      "the dialog's title and X are covered by the page header when the chart makes it tall, so a mouse cannot reach the X RPS-1295",
     );
     const repo = await seeder.createRepo(RepoType.NPM);
     await stubSupportedRepoTypes(adminPage, [RepoType.NPM]);

@@ -2887,7 +2887,7 @@ How the stubs are typed, and the rules they follow:
 Known product defects, pinned with `test.fail` so the test turns red the day it is fixed and the marker
 has to go (a `✘` in the list reporter with a passing summary is the expectation): the `/security`
 Refresh button clears the query but not the search box (RPS-1283 is the same defect on the repository
-list), and three security-modal defects that have no ticket yet: the X of a repository or package modal
+list), and three security-modal defects (RPS-1295): the X of a repository or package modal
 also opens the row it sits in (the modal is rendered inside the clickable row and only the backdrop and
 the links stop the click), and with a chart the dialog is tall enough that the page header covers its
 title and X at 1440x900.
