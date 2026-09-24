@@ -2880,6 +2880,8 @@ Pinned with `test.fail` / `knownFailures` (each still fails for the stated reaso
 | cargo-07 Newest by publish time                        | unfiled: Newest/Oldest order by `max_version` (a text column), not by when a crate was published; the seeder gives each crate its own version so the sort and pager have distinct keys (RPS-1298), and cargo-07 asserts the sorts by version |
 | helm-07 deleting the last version                      | unfiled: the versions page of the deleted chart raises two error toasts, "Chart not found." and "[object Object]"                                                                                                                            |
 
+`seed-proof.spec.ts` (RPS-1255) now covers all nine protocols; its generic search/sort/delete walk stays on
+the first four (the other five have the protocol-aware version of it in PKG-<proto>-02 and -04).
 RPS-1298 (a pager without a tie-breaker) is avoided as in the template, by seeding sequentially. The
 mobile-Delete `canWrite` bug of RPS-1262 (1) does not exist in these five protocols (only PyPI and npm).
 
