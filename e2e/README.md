@@ -2710,10 +2710,10 @@ because the section-per-repo-type check and the toggle check run once per type).
 | `src/ui/pages/deploy-token-modals.ts`          | `TokenCreateModal` (`create()`, field and per-validator error locators) and `TokenInfoModal` (`values()`, copy buttons)                   |
 | `src/ui/pages/repo-settings/pgp.ts`            | `PgpSection`: selector, add, per-host rows and delete, built-in servers                                                                   |
 | `src/ui/pages/repo-settings/repo-info.ts`      | `RepoInfoSection`: rename input/submit/errors, description save/reset                                                                     |
-| `src/ui/pages/repo-settings/danger-zone.ts`    | `StorageSection`, `OrphanLayersSection`, `DeleteRepoSection`                                                                              |
+| `src/ui/pages/repo-settings/danger-zone.ts`    | `StorageSection`, `UntaggedManifestsSection`, `OrphanLayersSection`, `DeleteRepoSection`                                                  |
 | `src/ui/pages/repo-settings/readback.ts`       | `RepoSettingsReadback` (permissions/description, disk usage, key stores, allowed key servers) and `repoRootStatus()`, the repo-PORT probe |
 | `tests/ui/settings/access-and-toggles.spec.ts` | SET-01 (access), SET-02 (visibility), SET-03 (override, sections per repo type), SET-04 (version allowance)                               |
-| `tests/ui/settings/repo-management.spec.ts`    | SET-05 (rename, description), SET-06 (delete), SET-07 (orphan layers), SET-09 (storage)                                                   |
+| `tests/ui/settings/repo-management.spec.ts`    | SET-05 (rename, description), SET-06 (delete), SET-07 (orphan layers), SET-07b (untagged manifests), SET-09 (storage)                     |
 | `tests/ui/settings/pgp.spec.ts`                | SET-08 (Maven PGP key stores)                                                                                                             |
 | `tests/ui/settings/deploy-tokens.spec.ts`      | TOK-01..05                                                                                                                                |
 

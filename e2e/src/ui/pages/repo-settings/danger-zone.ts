@@ -15,8 +15,8 @@
 ///
 
 /**
- * The remaining sections of `/:repo/settings`: Repository Storage (read only), Orphan Layers
- * (Docker only) and Delete Repository. The last two act through the danger modal.
+ * The remaining sections of `/:repo/settings`: Repository Storage (read only), Untagged Manifests
+ * and Orphan Layers (Docker only) and Delete Repository. The last three act through the danger modal.
  */
 import { type Locator, type Page } from '@playwright/test';
 
@@ -28,6 +28,24 @@ export class StorageSection {
   constructor(page: Page) {
     this.root = page.getByTestId('settings-storage');
     this.diskUsed = this.root.getByTestId('settings-storage-disk-used');
+  }
+}
+
+export class UntaggedManifestsSection {
+  readonly root: Locator;
+  /** The heading's self-link (`#delete-untagged-manifests`). */
+  readonly link: Locator;
+  readonly deleteButton: Locator;
+
+  constructor(page: Page) {
+    this.root = page.getByTestId('settings-untagged-manifests');
+    this.link = this.root.getByRole('link', { name: 'Untagged Manifests' });
+    this.deleteButton = this.root.getByTestId('settings-untagged-manifests-delete');
+  }
+
+  /** Clicks "Delete Untagged Manifests" with a normal (actionability-checked) click. */
+  async delete(): Promise<void> {
+    await this.deleteButton.click();
   }
 }
 
