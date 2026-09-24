@@ -16,7 +16,6 @@
 package io.repsy.protocols.npm.shared.storage.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -36,6 +35,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
@@ -49,9 +50,12 @@ import org.springframework.core.io.ByteArrayResource;
  * from the database and could still be shown. It now returns {@code null} in those three cases so
  * the page renders without a README.
  *
- * <p>A completely missing {@code metadata.json} is a different failure mode: it means storage
- * itself is broken for this package, so it is left to surface as {@link ItemNotFoundException}
- * rather than being swallowed.
+ * <p>RPS-1310 changed the one case that stayed an error then: a completely missing {@code
+ * metadata.json} was left to surface as {@link ItemNotFoundException}, on the reasoning that
+ * storage itself is broken for the package. Since RPS-1300 a package whose file is gone is an
+ * expected state that the rows stand in for everywhere else, and the caller (the version page) has
+ * found the version in the database, so the page renders without a README then too, and so does a
+ * file that is corrupt. The rows keep no readme, so there is nothing a rebuild could add.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractNpmStorageService.getReadmeContent (RPS-1143)")
@@ -158,18 +162,26 @@ class AbstractNpmStorageServiceTest {
   }
 
   @Nested
-  @DisplayName("when metadata.json itself is missing")
-  class MissingMetadataFile {
+  @DisplayName("when metadata.json itself is missing or corrupt (RPS-1310)")
+  class UnusableMetadataFile {
 
     @Test
-    @DisplayName(
-        "still throws ItemNotFoundException instead of being swallowed -- storage is broken")
-    void stillThrowsInsteadOfReturningNull() {
+    @DisplayName("returns null when the file is gone, instead of failing the version page")
+    void returnsNullWhenTheFileIsGone() throws Exception {
       when(storageStrategy.get(any(StoragePath.class), anyString())).thenReturn(Optional.empty());
 
-      assertThatThrownBy(
-              () -> service.getReadmeContent(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, VERSION_NAME))
-          .isInstanceOf(ItemNotFoundException.class);
+      assertThat(service.getReadmeContent(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, VERSION_NAME))
+          .isNull();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{\"versions\":{\"1.0.0\":", "", "not json", "null", "[]"})
+    @DisplayName("returns null when the file is corrupt, instead of failing the version page")
+    void returnsNullWhenTheFileIsCorrupt(final String corrupt) throws Exception {
+      stubMetadata(corrupt);
+
+      assertThat(service.getReadmeContent(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, VERSION_NAME))
+          .isNull();
     }
   }
 
@@ -203,12 +215,20 @@ class AbstractNpmStorageServiceTest {
     }
 
     @Test
-    @DisplayName("a package without metadata cannot be read")
-    void missingMetadataCannotBeRead() {
+    @DisplayName("a package without metadata has no bytes to read, and the publish undoes to that")
+    void missingMetadataHasNoBytes() throws Exception {
       when(storageStrategy.get(any(StoragePath.class), anyString())).thenReturn(Optional.empty());
 
-      assertThatThrownBy(() -> service.readMetadataBytes(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH))
-          .isInstanceOf(ItemNotFoundException.class);
+      assertThat(service.readMetadataBytes(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH)).isNull();
+    }
+
+    @Test
+    @DisplayName("a corrupt file is read as it is, so that it can be put back")
+    void corruptMetadataIsReadAsItIs() throws Exception {
+      stubMetadata("{corrupt");
+
+      assertThat(service.readMetadataBytes(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH))
+          .isEqualTo("{corrupt".getBytes());
     }
 
     @Test

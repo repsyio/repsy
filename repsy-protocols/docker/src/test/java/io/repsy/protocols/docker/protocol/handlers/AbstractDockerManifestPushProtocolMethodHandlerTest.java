@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -51,6 +52,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -301,5 +303,92 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
         .hasMessage("manifestInvalidJson");
 
     verifyNoInteractions(this.imageService, this.dockerFacade, this.layerRenamer);
+  }
+
+  @Test
+  @DisplayName("refreshes the image's size and digest after a single-platform push (RPS-1314)")
+  void refreshesTheImageAfterASinglePlatformPush() throws Exception {
+    final var context = context();
+    this.stubImageAndSave(context, BaseUsages.ofDisk(400));
+    when(this.layerRenamer.findLayersToRename(any(BaseRepoInfo.class), eq(MANIFEST_JSON)))
+        .thenReturn(Map.of());
+    when(this.layerRenamer.renameLayers(any(BaseRepoInfo.class), any()))
+        .thenReturn(BaseUsages.ofDisk(0));
+
+    this.handler().handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse());
+
+    verify(this.imageService).refreshImageSize(eq(REPO_ID), any(UUID.class));
+  }
+
+  @Test
+  @DisplayName("refreshes the image's size and digest after an index push (RPS-1314)")
+  void refreshesTheImageAfterAnIndexPush() throws Exception {
+    final var context = context(INDEX_JSON);
+    this.stubImageAndSave(context, BaseUsages.ofDisk(400));
+
+    this.handler().handle(context, request(INDEX_TYPE), new MockHttpServletResponse());
+
+    verify(this.imageService).refreshImageSize(eq(REPO_ID), any(UUID.class));
+  }
+
+  @Test
+  @DisplayName("runs the whole save again when it loses a unique-index race (RPS-1314)")
+  void retriesTheSaveThatLostARace() throws Exception {
+    final var context = context();
+    final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
+    when(this.imageService.findOrCreateImage(REPO_ID, "app")).thenReturn(imageInfo);
+    when(this.dockerFacade.saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class)))
+        .thenThrow(new DataIntegrityViolationException("ux_docker_manifest__image_id_digest"))
+        .thenReturn("sha256:manifest");
+    when(this.layerRenamer.findLayersToRename(any(BaseRepoInfo.class), eq(MANIFEST_JSON)))
+        .thenReturn(Map.of());
+    when(this.layerRenamer.renameLayers(any(BaseRepoInfo.class), any()))
+        .thenReturn(BaseUsages.ofDisk(0));
+
+    final var response =
+        this.handler().handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    verify(this.dockerFacade, times(2))
+        .saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class));
+  }
+
+  @Test
+  @DisplayName("gives up after three attempts and does not touch the image or the layers")
+  void givesUpAfterThreeAttempts() throws Exception {
+    final var context = context();
+    final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
+    when(this.imageService.findOrCreateImage(REPO_ID, "app")).thenReturn(imageInfo);
+    when(this.dockerFacade.saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class)))
+        .thenThrow(new DataIntegrityViolationException("still failing"));
+
+    assertThatThrownBy(
+            () ->
+                this.handler()
+                    .handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse()))
+        .isInstanceOf(DataIntegrityViolationException.class);
+
+    verify(this.dockerFacade, times(3))
+        .saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class));
+    verifyNoInteractions(this.layerRenamer);
+    verify(this.imageService, never()).refreshImageSize(any(), any());
+  }
+
+  @Test
+  @DisplayName("does not retry a failure that is not a data-integrity violation")
+  void doesNotRetryOtherFailures() throws Exception {
+    final var context = context();
+    final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
+    when(this.imageService.findOrCreateImage(REPO_ID, "app")).thenReturn(imageInfo);
+    when(this.dockerFacade.saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class)))
+        .thenThrow(new BadRequestException("digestMismatch"));
+
+    assertThatThrownBy(
+            () ->
+                this.handler()
+                    .handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse()))
+        .isInstanceOf(BadRequestException.class);
+
+    verify(this.dockerFacade).saveManifest(eq(context), eq(imageInfo), any(ManifestForm.class));
   }
 }
