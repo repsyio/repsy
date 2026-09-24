@@ -138,6 +138,12 @@ import type { Scenario } from './types.js';
  */
 const MAVEN_CLIENTS = ['maven', 'gradle-groovy', 'gradle-kotlin'];
 
+/**
+ * `MAVEN_CLIENTS` plus the Gradle plugin flow (RPS-133), which applies a published plugin from a Maven
+ * repo: the RELEASE version rules apply to it, the SNAPSHOT ones are not exercised for a plugin.
+ */
+const MAVEN_RELEASE_CLIENTS = [...MAVEN_CLIENTS, 'gradle-plugin-groovy', 'gradle-plugin-kotlin'];
+
 export const SCENARIOS: readonly Scenario[] = [
   {
     id: 'password-admin',
@@ -263,7 +269,7 @@ export const SCENARIOS: readonly Scenario[] = [
     repo: { privateRepo: true, releases: false },
     credential: 'token-rw',
     versionType: 'release',
-    protocols: [...MAVEN_CLIENTS, 'nuget'],
+    protocols: [...MAVEN_RELEASE_CLIENTS, 'nuget'],
     // Pinned: 403 ("releaseVersionsAreProhibited") for a first deploy of a version that does not
     // exist yet (`redeploy-releases-off` covers an existing one). nuget: 422 ("rejected") --
     // `checkVersionAllowance`, see the file-level comment's nuget bullet.
@@ -339,7 +345,7 @@ export const SCENARIOS: readonly Scenario[] = [
     credential: 'token-rw',
     versionType: 'release',
     reuseCoordinates: true,
-    protocols: [...MAVEN_CLIENTS, 'nuget'],
+    protocols: [...MAVEN_RELEASE_CLIENTS, 'nuget'],
     // Pinned (RPS-1174): 403 ("releaseVersionsAreProhibited"), as above. nuget: 422 ("rejected"),
     // as above.
     expect: { publish: 'forbidden', consume: 'ok' },

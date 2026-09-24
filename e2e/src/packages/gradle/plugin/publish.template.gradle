@@ -1,0 +1,36 @@
+// Rendered by clients/gradle-plugin.ts (mustache) next to settings.gradle (the Groovy DSL). A tiny
+// Gradle plugin, published the way a team publishes one to a private plugin repository:
+// java-gradle-plugin builds the plugin jar and, with maven-publish, both the `pluginMaven`
+// publication (the jar) and the plugin marker publication (`<plugin id>:<plugin id>.gradle.plugin`,
+// a POM that depends on the jar) a `plugins { id ... }` block resolves through.
+plugins {
+  id 'java-gradle-plugin'
+  id 'maven-publish'
+}
+
+group = '{{{groupId}}}'
+version = '{{{version}}}'
+
+gradlePlugin {
+  plugins {
+    e2e {
+      id = '{{{pluginId}}}'
+      implementationClass = 'io.repsy.e2e.plugin.MarkerPlugin'
+    }
+  }
+}
+
+publishing {
+  repositories {
+    maven {
+      url = uri('{{{repoUrl}}}')
+      allowInsecureProtocol = true
+      {{#hasCredential}}
+      credentials {
+        username = findProperty('repsyUsername')
+        password = findProperty('repsyPassword')
+      }
+      {{/hasCredential}}
+    }
+  }
+}
