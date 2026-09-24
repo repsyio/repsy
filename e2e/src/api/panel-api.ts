@@ -402,6 +402,35 @@ export class PanelApi {
       );
     }
   }
+
+  /**
+   * Deletes a Docker tag (`DELETE /api/docker/images/{repoName}/{imageName}/tags/{tagName}`,
+   * RPS-1216): only the tag pointer goes, its manifest stays stored, untagged. Called directly with
+   * `fetch`, like {@link deleteGolangModuleVersion}.
+   */
+  async deleteDockerTag(repoName: string, imageName: string, tagName: string): Promise<void> {
+    const url = new URL(
+      `${this.baseUrl}/api/docker/images/${encodeURIComponent(repoName)}/${encodeURIComponent(imageName)}/tags/${encodeURIComponent(tagName)}`,
+    );
+
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: { Authorization: this.authorization() },
+    });
+    if (!res.ok) {
+      throw new ApiError(
+        { method: 'DELETE', url: url.toString() },
+        {
+          status: res.status,
+          statusText: res.statusText,
+          url: url.toString(),
+          ok: false,
+          body: null,
+        },
+        `deleteDockerTag failed with status ${res.status}`,
+      );
+    }
+  }
 }
 
 const DEFAULT_TOKEN_LIST_PAGE_SIZE = 20;

@@ -2618,6 +2618,44 @@ paths:
         required: true
         schema:
           type: string
+  "/api/docker/images/manifests/{repoName}/untagged":
+    delete:
+      tags:
+        - docker-image-controller
+      operationId: deleteUntaggedManifests
+      description: >-
+        Deletes the manifests of the repository that no tag points to, directly or through an index,
+        together with their files, then deletes the layers no manifest uses any more. The manifests
+        stop being pullable by digest. The manifest rows and files are removed before the response;
+        the layer blobs are removed in the background. The layer sweep covers the whole repository,
+        also when `image` narrows the manifests.
+      parameters:
+        - name: image
+          in: query
+          required: false
+          description: Only delete the untagged manifests of this image.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseUntaggedManifestCleanupResult"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Delete the untagged manifests of a Docker repository
+    parameters:
+      - name: repoName
+        in: path
+        required: true
+        schema:
+          type: string
   "/api/docker/images/{repoName}/{imageName}/tags":
     get:
       tags:
@@ -5782,6 +5820,38 @@ components:
           "$ref": "#/components/schemas/ResponseType"
         data:
           "$ref": "#/components/schemas/GoModuleInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    UntaggedManifestCleanupResult:
+      type: object
+      properties:
+        deletedManifests:
+          type: integer
+          format: int32
+          description: Manifests deleted (rows and files).
+        freedManifestBytes:
+          type: integer
+          format: int64
+          description: Bytes of the manifest files deleted, already refunded to the repository usage.
+        orphanLayersScheduled:
+          type: integer
+          format: int32
+          description: Layers deleted from the database whose blobs are being deleted in the background.
+        orphanLayerBytes:
+          type: integer
+          format: int64
+          description: Sum of the sizes of those layers; refunded to the usage as the blobs go.
+    RestResponseUntaggedManifestCleanupResult:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/UntaggedManifestCleanupResult"
         errorCode:
           type: string
         text:
