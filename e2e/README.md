@@ -329,7 +329,7 @@ its `protocols` field — see `maven-releases-off`/`maven-snapshots-off`, maven-
 
 `fixtures.ts`'s `world(scenario, protocol)` fixture turns a scenario into a ready-to-test `World`
 (`src/scenarios/world.ts`): a fresh repo with the scenario's settings applied, the credential
-materialised through the panel API (expired = past `expiration_date`, revoked = create then revoke,
+materialised through the panel API (expired = past `expirationDate`, revoked = create then revoke,
 rotated-old = create, rotate, and deliberately keep the _old_ value, other-repo = a token from a
 second seeded repo, user-password = a seeded `USER`-role user, wrong-password = a real username with
 a wrong password, anonymous = no credential at all), and, for a scenario whose own credential cannot
@@ -3232,11 +3232,11 @@ host-matching uid even though the packages themselves only need to be read.
   `GET /api/repos` (`type`, `q`, `page`, `size` 1-100, `sort`: the paged list; `PanelApi.listRepos` reads a
   page, `listAllRepos` all pages), `GET /api/repos/counts` (`PanelApi.repoCounts`), `GET`/`PUT
 /api/repos/{repoName}/settings`.
-- `POST /api/repos/{repoName}/deploy-tokens` (`name`, `read_only`, `expiration_date`, `username`),
+- `POST /api/repos/{repoName}/deploy-tokens` (`name`, `readOnly`, `expirationDate`, `username`),
   `DELETE .../deploy-tokens/{tokenId}`, `PUT .../deploy-tokens/{tokenId}` (rotate), `GET
 .../deploy-tokens` (the create response has no token id; `seeder.ts` looks it up by name right
   after creating it).
-- A **past `expiration_date` is accepted** — `DeployTokenService.createDeployToken` does not
+- A **past `expirationDate` is accepted** — `DeployTokenService.createDeployToken` does not
   reject it — which is how `seeder.ts` creates an already-expired token.
 - Deleting an already-deleted repo or user answers `404` (`repoNotFound`/`userNotFound`); `Seeder.
 cleanup()` tolerates exactly that status.

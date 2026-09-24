@@ -21,12 +21,10 @@ import { Highlight } from 'ngx-highlightjs';
 import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
 import { BehaviorSubject, of } from 'rxjs';
 
-import { RepoPermissionInfo } from '../../../../../../../generated/api';
+import { CrateInfo, CrateVersionInfo, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { CrateInfo } from '../../dto/crate-info';
-import { CrateVersionInfo } from '../../dto/crate-version-info';
 import { CargoService } from '../../service/cargo.service';
 import { CargoCratesVersionDetailComponent } from './cargo-crates-version-detail.component';
 
@@ -55,17 +53,17 @@ describe('CargoCratesVersionDetailComponent README', () => {
   let cargoService: jasmine.SpyObj<CargoService>;
 
   function render(readme: string | undefined, yanked = false): HTMLElement {
-    const crateVersion = Object.assign(new CrateVersionInfo(), {
+    const crateVersion: CrateVersionInfo = {
       name: 'acme-lib',
       version: '1.2.3',
       hasLib: true,
       deps: [],
       downloads: 0,
-      created_at: new Date('2026-01-01T00:00:00Z'),
+      createdAt: '2026-01-01T00:00:00Z',
       yanked,
       readme,
-    });
-    cargoService.fetchCrate.and.returnValue(of(Object.assign(new CrateInfo(), { original_name: 'acme-lib' })));
+    };
+    cargoService.fetchCrate.and.returnValue(of({ originalName: 'acme-lib' } as CrateInfo));
     cargoService.fetchCrateVersion.and.returnValue(of(crateVersion));
 
     const fixture: ComponentFixture<CargoCratesVersionDetailComponent> = TestBed.createComponent(

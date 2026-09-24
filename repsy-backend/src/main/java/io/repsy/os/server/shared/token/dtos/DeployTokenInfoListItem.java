@@ -16,12 +16,10 @@
 package io.repsy.os.server.shared.token.dtos;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 
 public interface DeployTokenInfoListItem {
 
-  @JsonProperty("id")
   String getId();
 
   String getName();
@@ -32,13 +30,10 @@ public interface DeployTokenInfoListItem {
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   String getDescription();
 
-  @JsonProperty("read_only")
   boolean isReadOnly();
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  @JsonProperty("expiration_date")
   Instant getExpirationDate();
 
-  @JsonProperty("created_at")
   Instant getCreatedAt();
 }

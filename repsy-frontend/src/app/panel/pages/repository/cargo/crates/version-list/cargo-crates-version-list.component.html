@@ -108,8 +108,8 @@
                 <app-tooltip
                   data-testid="row-updated"
                   class="text-secondary-500 group-hover:underline"
-                  [text]="timeAgo(version.created_at)"
-                  [textHover]="version.created_at | date: 'medium'"
+                  [text]="timeAgo(version.createdAt)"
+                  [textHover]="version.createdAt | date: 'medium'"
                   [always]="true"
                 />
                 @if (activeRepo.canManage) {
@@ -189,7 +189,7 @@
                   <div class="flex justify-between gap-2">
                     <span class="text-sm text-[#9FA0A0]">Uploaded: </span>
                     <span data-testid="row-updated" class="text-secondary-500 text-right break-all">
-                      {{ version.created_at | date: 'medium' }} {{ '(' + timeAgo(version.created_at) + ')' }}
+                      {{ version.createdAt | date: 'medium' }} {{ '(' + timeAgo(version.createdAt) + ')' }}
                     </span>
                   </div>
                 </div>

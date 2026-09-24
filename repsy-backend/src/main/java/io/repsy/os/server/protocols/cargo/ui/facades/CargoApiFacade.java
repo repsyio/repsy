@@ -17,7 +17,9 @@ package io.repsy.os.server.protocols.cargo.ui.facades;
 
 import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.os.generated.model.CrateInfo;
 import io.repsy.os.generated.model.CrateListItem;
+import io.repsy.os.generated.model.CrateVersionInfo;
 import io.repsy.os.generated.model.CrateVersionListItem;
 import io.repsy.os.generated.model.RepoSettingsForm;
 import io.repsy.os.generated.model.RepoSettingsInfo;
@@ -27,8 +29,6 @@ import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
-import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
-import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import java.io.IOException;
 import java.util.List;
@@ -90,16 +90,17 @@ public class CargoApiFacade implements ProtocolApiFacade {
   }
 
   @Transactional(readOnly = true)
-  public BaseCrateInfo<UUID> getCrate(final RepoInfo repoInfo, final String name) {
+  public CrateInfo getCrate(final RepoInfo repoInfo, final String name) {
 
-    return this.cargoCrateService.getCrate(repoInfo, name);
+    return this.cargoCrateConverter.toCrateInfoDto(this.cargoCrateService.getCrate(repoInfo, name));
   }
 
   @Transactional(readOnly = true)
-  public BaseCrateVersionInfo<UUID> getCrateVersion(
+  public CrateVersionInfo getCrateVersion(
       final RepoInfo repoInfo, final String name, final String vers) {
 
-    return this.cargoCrateService.getCrateVersion(repoInfo, name, vers);
+    return this.cargoCrateConverter.toCrateVersionInfoDto(
+        this.cargoCrateService.getCrateVersion(repoInfo, name, vers));
   }
 
   @Transactional(readOnly = true)

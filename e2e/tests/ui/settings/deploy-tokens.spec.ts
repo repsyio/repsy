@@ -118,7 +118,7 @@ test.describe('Deploy tokens: create', { tag: SETTINGS }, () => {
       // Persisted, and the secret is not part of what the server lists (it is shown once).
       const listed = await panelApi.listDeployTokens(repo.name);
       expect(listed).toHaveLength(1);
-      expect(listed[0]).toMatchObject({ name, username, read_only: false });
+      expect(listed[0]).toMatchObject({ name, username, readOnly: false });
       expect(JSON.stringify(listed)).not.toContain(token);
 
       // Gone for good: a reload shows the row and no modal, and the token is nowhere on the page.
@@ -176,8 +176,8 @@ test.describe('Deploy tokens: create', { tag: SETTINGS }, () => {
 
     // The server kept the username, the access type and the chosen day.
     const stored = (await panelApi.listDeployTokens(repo.name)).find((t) => t.name === name);
-    expect(stored).toMatchObject({ username, read_only: true });
-    expect(stored?.expiration_date?.slice(0, 10)).toBe(expirationDate);
+    expect(stored).toMatchObject({ username, readOnly: true });
+    expect(stored?.expirationDate?.slice(0, 10)).toBe(expirationDate);
   });
 });
 

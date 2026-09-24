@@ -18,7 +18,7 @@ import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import moment from 'moment';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 
-import { CrateVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { CrateInfo, CrateVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
@@ -32,7 +32,6 @@ import {
   pageOf,
   REPO_NAME,
 } from '../../../testing/repo-list-spec-helpers';
-import { CrateInfo } from '../../dto/crate-info';
 import { CargoService } from '../../service/cargo.service';
 import { CargoCratesVersionListComponent } from './cargo-crates-version-list.component';
 
@@ -160,7 +159,7 @@ describe('CargoCratesVersionListComponent template', () => {
       of(
         pageOf(
           [
-            { version: '1.0.0', created_at: '2026-01-01T00:00:00Z', yanked: yankedVersion === '1.0.0' },
+            { version: '1.0.0', createdAt: '2026-01-01T00:00:00Z', yanked: yankedVersion === '1.0.0' },
             { version: '2.0.0', yanked: yankedVersion === '2.0.0' },
           ],
           1,

@@ -21,7 +21,12 @@ import { Subscription } from 'rxjs';
 import { finalize, switchMap } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { CrateVersionListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
+import {
+  CrateInfo,
+  CrateVersionListItem,
+  RepoPermissionInfo,
+  VersionSecuritySummary,
+} from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -37,7 +42,6 @@ import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { SecurityService } from '../../../../security/service/security.service';
 import { CargoConfigComponent } from '../../config/cargo-config.component';
-import { CrateInfo } from '../../dto/crate-info';
 import { CargoService } from '../../service/cargo.service';
 
 @Component({

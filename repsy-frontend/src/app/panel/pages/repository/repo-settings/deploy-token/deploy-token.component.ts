@@ -23,6 +23,7 @@ import { finalize, switchMap, tap } from 'rxjs/operators';
 
 import { environment } from '../../../../../../environments/environment';
 import {
+  DeployTokenInfoListItem,
   ProtocolDeployTokenControllerService,
   ProtocolRepoControllerService,
   RepoPermissionInfo,
@@ -47,7 +48,6 @@ import { NpmConfigComponent } from '../../npm/config/npm-config.component';
 import { NugetConfigComponent } from '../../nuget/config/nuget-config.component';
 import { PypiConfigComponent } from '../../pypi/config/pypi-config.component';
 import { RubyConfigComponent } from '../../ruby/config/ruby-config.component';
-import { DeployTokenInfo } from './dto/deploy-token-info';
 import { TokenCreateInfo } from './dto/token-create-info';
 
 @Component({
@@ -84,13 +84,13 @@ export class DeployTokenComponent implements OnInit {
   public operationLock = false;
   public pageNum = 0;
   public pageSize = 3;
-  public deployTokens: DeployTokenInfo[];
-  public pagedData: PagedData<DeployTokenInfo>;
+  public deployTokens: DeployTokenInfoListItem[];
+  public pagedData: PagedData<DeployTokenInfoListItem>;
   public createdDeployToken: TokenCreateInfo;
   public showCreateTokenModal = false;
   public showTokenInfoModal = false;
   public showConfig = false;
-  public selectedDeployToken: DeployTokenInfo;
+  public selectedDeployToken: DeployTokenInfoListItem;
   public repoUsage: RepoUsageInfo;
 
   constructor(
@@ -99,7 +99,7 @@ export class DeployTokenComponent implements OnInit {
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
   ) {
-    this.pagedData = new PagedData<DeployTokenInfo>();
+    this.pagedData = new PagedData<DeployTokenInfoListItem>();
   }
 
   ngOnInit(): void {
@@ -132,8 +132,8 @@ export class DeployTokenComponent implements OnInit {
   }
 
   private showTokens(r: RestResponsePagedModelDeployTokenInfoListItem) {
-    this.pagedData.page = { ...r.data?.page } as PagedData<DeployTokenInfo>['page'];
-    this.deployTokens = (r.data?.content ?? []) as unknown as DeployTokenInfo[];
+    this.pagedData.page = { ...r.data?.page } as PagedData<DeployTokenInfoListItem>['page'];
+    this.deployTokens = r.data?.content ?? [];
   }
 
   /**
@@ -155,7 +155,7 @@ export class DeployTokenComponent implements OnInit {
     this.showCreateTokenModal = true;
   }
 
-  public rotateDeployToken(deployToken: DeployTokenInfo) {
+  public rotateDeployToken(deployToken: DeployTokenInfoListItem) {
     const successMsg = 'Deploy token rotated successfully';
     this.dangerModalService.show('Rotate Deploy Token', 'Rotate', () => {
       this.operationLock = true;
@@ -184,7 +184,7 @@ export class DeployTokenComponent implements OnInit {
 
   // RPS-1285: one chained request. The list is fetched once, after the revoke has completed, for the
   // page that is left (never for a page past the end), so there is no second answer to race it.
-  public revokeDeployToken(deployToken: DeployTokenInfo) {
+  public revokeDeployToken(deployToken: DeployTokenInfoListItem) {
     this.dangerModalService.show('Delete Deploy Token', 'Delete', () => {
       this.operationLock = true;
 
@@ -208,7 +208,7 @@ export class DeployTokenComponent implements OnInit {
     });
   }
 
-  public configure(deployToken: DeployTokenInfo) {
+  public configure(deployToken: DeployTokenInfoListItem) {
     this.selectedDeployToken = deployToken;
     this.showConfig = true;
   }

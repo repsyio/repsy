@@ -18,7 +18,9 @@ package io.repsy.os.server.protocols.cargo.ui.controllers;
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
+import io.repsy.os.generated.model.CrateInfo;
 import io.repsy.os.generated.model.CrateListItem;
+import io.repsy.os.generated.model.CrateVersionInfo;
 import io.repsy.os.generated.model.CrateVersionListItem;
 import io.repsy.os.server.protocols.cargo.ui.facades.CargoApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
@@ -27,13 +29,10 @@ import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.os.shared.utils.SortValidator;
-import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
-import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Pageable;
@@ -56,19 +55,19 @@ public class CargoCrateController {
 
   /**
    * The sort keys of the crate list, mapped to the {@code CargoCrate} properties the query sorts
-   * by. The list item's own JSON names ({@code name}, {@code max_version}, {@code downloads},
-   * {@code updated_at}) are accepted next to the entity property names the endpoint took before,
-   * which stay for existing clients.
+   * by. The list item's own JSON names ({@code name}, {@code maxVersion}, {@code downloads}, {@code
+   * updatedAt}) are accepted next to the entity property names ({@code totalDownloads}, {@code
+   * lastUpdatedAt}). The former snake_case aliases ({@code max_version}, {@code updated_at}) are
+   * gone with the snake_case JSON: like any unknown key they answer 400.
    */
   private static final Map<String, String> CRATE_SORT_PATHS =
       Map.of(
           "id", "id",
           "name", "name",
-          "max_version", "maxVersion",
-          "downloads", "totalDownloads",
-          "updated_at", "lastUpdatedAt",
           "maxVersion", "maxVersion",
+          "downloads", "totalDownloads",
           "totalDownloads", "totalDownloads",
+          "updatedAt", "lastUpdatedAt",
           "lastUpdatedAt", "lastUpdatedAt");
 
   private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("version", "createdAt");
@@ -93,7 +92,7 @@ public class CargoCrateController {
 
   @GetMapping("/{repoName}/{crateName}")
   @RepoOperation
-  public RestResponse<BaseCrateInfo<UUID>> get(
+  public RestResponse<CrateInfo> get(
       final RepoInfo repoInfo, @PathVariable final String crateName) {
 
     final var crate = this.cargoApiFacade.getCrate(repoInfo, crateName);
@@ -103,7 +102,7 @@ public class CargoCrateController {
 
   @GetMapping("/{repoName}/{crateName}/{vers}")
   @RepoOperation
-  public RestResponse<BaseCrateVersionInfo<UUID>> getVersion(
+  public RestResponse<CrateVersionInfo> getVersion(
       final RepoInfo repoInfo,
       @PathVariable final String crateName,
       @PathVariable final String vers) {

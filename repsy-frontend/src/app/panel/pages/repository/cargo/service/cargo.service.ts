@@ -20,15 +20,15 @@ import { map, tap } from 'rxjs/operators';
 
 import {
   CargoCrateControllerService,
+  CrateInfo,
   CrateListItem,
+  CrateVersionInfo,
   CrateVersionListItem,
   ProtocolRepoControllerService,
   RepoPermissionInfo,
 } from '../../../../../../generated/api';
 import { PagedData } from '../../../../shared/dto/paged-data';
 import { Sort } from '../../../../shared/dto/sort';
-import { CrateInfo } from '../dto/crate-info';
-import { CrateVersionInfo } from '../dto/crate-version-info';
 
 @Injectable({
   providedIn: 'root',
@@ -84,13 +84,13 @@ export class CargoService {
   public fetchCrate(crateName: string): Observable<CrateInfo> {
     return this.cargoCrateControllerService
       .getCargoCrate(crateName, this.repoName)
-      .pipe(map((r) => r.data as unknown as CrateInfo));
+      .pipe(map((r) => r.data as CrateInfo));
   }
 
   public fetchCrateVersion(crateName: string, version: string): Observable<CrateVersionInfo> {
     return this.cargoCrateControllerService
       .getCargoCrateVersion(crateName, version, this.repoName)
-      .pipe(map((r) => r.data as unknown as CrateVersionInfo));
+      .pipe(map((r) => r.data as CrateVersionInfo));
   }
 
   public fetchCrateVersions(

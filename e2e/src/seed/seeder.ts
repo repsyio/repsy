@@ -173,11 +173,9 @@ export class Seeder {
 
     const created = await this.api.createDeployToken(repoName, {
       name,
-      read_only: opts.readOnly ?? false,
+      readOnly: opts.readOnly ?? false,
       username: opts.username,
-      expiration_date: opts.expirationDate
-        ? new Date(opts.expirationDate).toISOString()
-        : undefined,
+      expirationDate: opts.expirationDate ? new Date(opts.expirationDate).toISOString() : undefined,
     });
 
     // The create response carries the secret token but not its id; the id is only in the list.
@@ -199,7 +197,7 @@ export class Seeder {
       name,
       token: created.token ?? '',
       username: created.username ?? '',
-      readOnly: match.read_only,
+      readOnly: match.readOnly,
     };
   }
 
