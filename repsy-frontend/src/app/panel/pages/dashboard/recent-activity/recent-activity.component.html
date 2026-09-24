@@ -1,4 +1,4 @@
-<div class="h-full w-full rounded-[12px] border border-[#404141] bg-[#101112] p-[20px]">
+<div data-testid="recent-activity" class="h-full w-full rounded-[12px] border border-[#404141] bg-[#101112] p-[20px]">
   <h1 class="mb-6 text-[13px] text-[#FDFDFD]">Recent Activity</h1>
 
   <!-- Headers -->
@@ -11,6 +11,7 @@
   <!-- Activity Items -->
   @for (repo of repoListInfos; track repo.createdAt) {
     <div
+      [attr.data-testid]="'recent-activity-row-' + repo.name"
       [routerLink]="repo.name"
       role="button"
       appKeyboardActivate
@@ -190,7 +191,7 @@
           }
         }
 
-        <span class="break-all text-[#FDFDFD]">
+        <span data-testid="row-name" class="break-all text-[#FDFDFD]">
           {{ repo.name }}
         </span>
       </div>
@@ -198,13 +199,13 @@
       <!-- Disk Usage -->
       <div class="flex items-center justify-between lg:justify-start">
         <span class="text-sm text-[#9FA0A0] lg:hidden">Disk Usage:</span>
-        <span class="text-sm text-[#FDFDFD]">{{ formatBytes(repo.diskUsage) }}</span>
+        <span data-testid="row-disk-usage" class="text-sm text-[#FDFDFD]">{{ formatBytes(repo.diskUsage) }}</span>
       </div>
 
       <!-- Created Date -->
       <div class="flex items-center justify-between lg:justify-end">
         <span class="text-sm text-[#9FA0A0] lg:hidden">Created:</span>
-        <span class="text-sm text-[#9FA0A0]">{{ timeAgo(repo.createdAt) }}</span>
+        <span data-testid="row-created" class="text-sm text-[#9FA0A0]">{{ timeAgo(repo.createdAt) }}</span>
       </div>
     </div>
   }

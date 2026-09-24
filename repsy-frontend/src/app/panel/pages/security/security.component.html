@@ -1,15 +1,15 @@
-<div class="mb-4 flex items-center gap-2 text-[14px]">
+<div data-testid="security-title" class="mb-4 flex items-center gap-2 text-[14px]">
   <span class="text-secondary-500 outline-none hover:text-white focus:text-white">Security</span>
 </div>
 
-<div class="mb-7 overflow-x-auto rounded-lg bg-[#101112] p-[22px]">
+<div data-testid="security-distribution" class="mb-7 overflow-x-auto rounded-lg bg-[#101112] p-[22px]">
   <h3 class="mb-4 text-[16px] text-white">Severity Distribution</h3>
 
   @if (loadingSummary) {
     <app-spinner />
   } @else if (hasSummaryFindings) {
     <div class="flex flex-wrap items-center gap-8">
-      <div class="relative h-[180px] w-[180px] shrink-0">
+      <div data-testid="security-chart" class="relative h-[180px] w-[180px] shrink-0">
         <canvas #summaryChartCanvas></canvas>
       </div>
       <div class="flex flex-wrap gap-2">
@@ -31,7 +31,9 @@
       </div>
     </div>
   } @else {
-    <p class="text-[13px] text-success-400">No known vulnerabilities found.</p>
+    <p data-testid="security-distribution-empty" class="text-[13px] text-success-400">
+      No known vulnerabilities found.
+    </p>
   }
 </div>
 
@@ -40,9 +42,15 @@
   class="mb-7 flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-center"
 >
   <div class="flex w-full flex-col items-start gap-4 sm:w-auto sm:flex-row sm:items-center">
-    <app-searchbox placeholder="repository" (filter)="search($event)" class="w-full sm:max-w-[192px]" />
+    <app-searchbox
+      data-testid="security-search"
+      placeholder="repository"
+      (filter)="search($event)"
+      class="w-full sm:max-w-[192px]"
+    />
 
     <app-selector
+      data-testid="security-severity-filter"
       [(selectedOption)]="severityOption"
       [options]="severityOptions"
       (choose)="filterBySeverity($event)"
@@ -50,6 +58,7 @@
     />
 
     <app-selector
+      data-testid="security-type-filter"
       [(selectedOption)]="repoTypeOption"
       [options]="repoTypeOptions"
       (choose)="filterByRepoType($event)"
@@ -58,6 +67,7 @@
 
     <!-- Refresh Button -->
     <button
+      data-testid="security-refresh"
       (click)="refreshPage()"
       class="hover:text-secondary-500 flex h-[40px] w-[40px] flex-shrink-0 items-center justify-center text-neutral-200"
       title="Refresh"
@@ -76,11 +86,12 @@
 @if (loading) {
   <app-spinner />
 } @else if (scans.length === 0) {
-  <p class="text-[13px] text-[#9C9C9D]">No vulnerability scans match these filters.</p>
+  <p data-testid="security-empty" class="text-[13px] text-[#9C9C9D]">No vulnerability scans match these filters.</p>
 } @else {
-  <div class="flex flex-col gap-1">
+  <div data-testid="security-scan-list" class="flex flex-col gap-1">
     @for (scan of scans; track scan.id) {
       <div
+        [attr.data-testid]="'security-scan-row-' + scan.id"
         role="button"
         tabindex="0"
         (click)="openScan(scan)"
@@ -89,13 +100,18 @@
         class="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[#101112] p-[14px] text-[13px]"
       >
         <div class="flex flex-col gap-1">
-          <span class="font-medium text-white">{{ scan.repoName }} / {{ scan.artifactName }}</span>
-          <span class="text-[#9C9C9D]">{{ scan.repoType }} &middot; {{ scan.artifactVersion }}</span>
+          <span data-testid="row-artifact" class="font-medium text-white"
+            >{{ scan.repoName }} / {{ scan.artifactName }}</span
+          >
+          <span data-testid="row-meta" class="text-[#9C9C9D]"
+            >{{ scan.repoType }} &middot; {{ scan.artifactVersion }}</span
+          >
         </div>
 
         <div class="flex items-center gap-3">
           @if (scan.status === ScanStatus.Failed) {
             <span
+              data-testid="row-failed"
               class="inline-flex items-center gap-1.5 rounded-full border border-neutral-400 bg-neutral-700 px-2.5 py-1 text-[12px] font-medium text-neutral-200"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -111,6 +127,7 @@
             </span>
           } @else if (scan.status === ScanStatus.Completed && !scan.highestSeverity) {
             <span
+              data-testid="row-clean"
               class="inline-flex items-center gap-1.5 rounded-full border border-success-600 bg-success-900 px-2.5 py-1 text-[12px] font-medium text-success-400"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -129,8 +146,8 @@
           } @else {
             <span class="text-[#9C9C9D]">&mdash;</span>
           }
-          <span class="text-[#9C9C9D]">{{ scan.status }}</span>
-          <span class="text-[#9C9C9D]">{{ scan.createdAt | date: 'medium' }}</span>
+          <span data-testid="row-status" class="text-[#9C9C9D]">{{ scan.status }}</span>
+          <span data-testid="row-created" class="text-[#9C9C9D]">{{ scan.createdAt | date: 'medium' }}</span>
         </div>
       </div>
     }

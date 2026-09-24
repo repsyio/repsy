@@ -1,4 +1,4 @@
-<section id="repository-info" class="mt-[-100px] pt-[100px]">
+<section data-testid="settings-info" id="repository-info" class="mt-[-100px] pt-[100px]">
   <h3
     class="w-full rounded-t-[12px] border border-[#e8546a] border-b-[#404141] bg-[#101112] p-[24px] font-medium text-[#FDFDFD]"
   >
@@ -11,9 +11,10 @@
     </p>
     <div class="form-group">
       <label for="name" class="mb-2 block text-sm text-[#9FA0A0]">New Repository Name</label>
-      <form [formGroup]="renameForm" (submit)="renameForm.valid && renameRepo()">
+      <form data-testid="settings-rename-form" [formGroup]="renameForm" (submit)="renameForm.valid && renameRepo()">
         <div class="flex w-full flex-col gap-2 sm:w-2/3 sm:flex-row">
           <input
+            data-testid="settings-rename-input"
             type="text"
             id="name"
             formControlName="name"
@@ -22,6 +23,7 @@
             class="input-text-secondary w-full"
           />
           <button
+            data-testid="settings-rename-submit"
             type="submit"
             [disabled]="loading || renameForm.get('name').value === activeRepository.repoName || renameForm.invalid"
             class="repsy-btn-danger w-full sm:w-auto"
@@ -31,11 +33,15 @@
         </div>
         <div class="text-body2 text-error min-h-7 pt-1">
           @if (renameForm.get('name').errors?.['required'] && renameForm.get('name').touched) {
-            <p animate.enter="fade-in-up">• Should not be empty</p>
+            <p data-testid="settings-rename-error-required" animate.enter="fade-in-up">• Should not be empty</p>
           } @else if (renameForm.get('name').errors?.['maxlength'] && renameForm.get('name').touched) {
-            <p animate.enter="fade-in-up">• Should be maximum 25 characters</p>
+            <p data-testid="settings-rename-error-maxlength" animate.enter="fade-in-up">
+              • Should be maximum 25 characters
+            </p>
           } @else if (renameForm.get('name').errors?.['pattern'] && renameForm.get('name').touched) {
-            <p animate.enter="fade-in-up">• Should contain only letters, numbers, - and _, and not start with -</p>
+            <p data-testid="settings-rename-error-pattern" animate.enter="fade-in-up">
+              • Should contain only letters, numbers, - and _, and not start with -
+            </p>
           } @else if (renameForm.get('name').errors?.['reservedName'] && renameForm.get('name').touched) {
             <p animate.enter="fade-in-up">• This name is reserved for the panel. Please try another name.</p>
           }
@@ -44,8 +50,13 @@
     </div>
     <div class="form-group">
       <label for="description" class="mb-2 block text-sm text-[#9FA0A0]">Description</label>
-      <form [formGroup]="descriptionForm" (submit)="descriptionForm.valid && updateRepoDescription()">
+      <form
+        data-testid="settings-description-form"
+        [formGroup]="descriptionForm"
+        (submit)="descriptionForm.valid && updateRepoDescription()"
+      >
         <textarea
+          data-testid="settings-description-input"
           id="description"
           formControlName="description"
           placeholder="Enter description about your repository"
@@ -54,11 +65,14 @@
         ></textarea>
         <div class="text-body2 text-error min-h-7 pt-1">
           @if (descriptionForm.get('description').errors?.['maxlength'] && descriptionForm.get('description').touched) {
-            <p animate.enter="fade-in-up">• Should be maximum 500 characters</p>
+            <p data-testid="settings-description-error-maxlength" animate.enter="fade-in-up">
+              • Should be maximum 500 characters
+            </p>
           }
         </div>
         <div class="flex flex-col flex-col-reverse justify-end gap-2 sm:ml-auto sm:flex-row">
           <button
+            data-testid="settings-description-reset"
             type="button"
             class="repsy-btn-secondary w-full sm:w-auto"
             (click)="resetForms()"
@@ -69,6 +83,7 @@
             Reset
           </button>
           <button
+            data-testid="settings-description-save"
             type="submit"
             [disabled]="loading || descriptionForm.pristine || descriptionForm.invalid"
             class="repsy-btn-confirm w-full sm:w-auto"
