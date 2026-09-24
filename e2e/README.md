@@ -2646,8 +2646,8 @@ Rules these specs follow (and a later spec on these pages should too):
   Font Awesome CDN, so the buttons have no box: they are activated with `dispatchEvent('click')`.
 - **Timing.** The username change ends in `location.reload()` in the tick that raises its toast, so that
   toast is not observable: assert the reload (`ProfilePage.changeUsername`) and the outcome.
-- **Known bugs, pinned with `test.fail`**: RPS-1261 (create-user messages start with mojibake `â€¢`),
-  RPS-1246 (last-admin check counts one page). The spec text of a `test.fail` states the key.
+- **Known bugs, pinned with `test.fail`**: RPS-1246 (last-admin check counts one page). The mojibake
+  `â€¢` of the create-user messages (RPS-1261) is fixed and asserted unpinned. The spec text of a `test.fail` states the key.
 
 ### Repository settings and deploy tokens (RPS-1254)
 
@@ -2707,9 +2707,9 @@ How the tests are written, and what they had to work around:
   nine types with `toHaveCount`, so an absent section and a hidden one are told apart.
 
 Known product bugs are pinned with `test.fail('... RPS-nnnn')`, so the test turns red the day the
-bug is fixed and the marker has to go: the Visibility and Package Override help texts describe the
-opposite of the toggle (RPS-1261, two tests), and `#name`/`#description` are duplicated between the
-rename form and the create-token modal (RPS-1266). A third pin is RPS-1285: revoking the only token on page 2
+bug is fixed and the marker has to go: `#name`/`#description` are duplicated between the
+rename form and the create-token modal (RPS-1266). The Visibility and Package Override help texts
+(RPS-1261) are fixed and asserted unpinned. A second pin is RPS-1285: revoking the only token on page 2
 fires two list requests and the empty page-2 answer can land last, leaving "Your list is empty" over three tokens (the test
 slows that answer to make the order certain). Not covered here: the Vulnerability Scanning toggle
 (hidden without a scanner, RPS-1259), the per-protocol "configure" modal behind a token row, the
@@ -2790,9 +2790,10 @@ protocol-only scenarios. The template is `src/ui/package-scenarios.ts`, the UI c
 `scenarios/loop.ts`:
 
 ```ts
-registerPackageScenarios(DESCRIPTORS.npm, {
+registerPackageScenarios(DESCRIPTORS.nuget, {
   knownFailures: {
-    '05-mobile-sublist': 'RPS-1262: mobile scope-list cards gate Delete on canWrite',
+    '02-versions-search':
+      'RPS-1262: the NuGet version list has no search box (the API has no search parameter)',
   },
 });
 ```
@@ -2813,12 +2814,11 @@ differs the descriptor carries the value (`repoUrlIn`, `detail.delete.landsOn`,
 | 06  | Configure modal (repo name, `YOUR_PASSWORD` where the protocol has one) and the deploy-token variant opened from a token row in the settings                     |
 
 `knownFailures` keys (`PackageScenarioKey`) run their step under `test.fail`, so a fix turns it red and
-the title carries the reason. Pinned today: `05-mobile-*` (RPS-1262: npm scope list and version list,
-PyPI list and version list gate the mobile Delete on `canWrite`), and in the
-specs Maven Gradle Groovy = Grape block (RPS-1261), Docker desktop manifest Digest/Config Digest cells
-(RPS-1261), npm Bugs URL and Keywords (RPS-1261), PyPI "Pre release:" for a post release and the mobile
-"Latest" link (RPS-1261), the Maven browser's Settings button for a USER (RPS-1262) and its first click
-after a cold load (RPS-1297).
+the title carries the reason. Pinned today: NuGet `02-versions-search` (RPS-1262, the API has no
+version search). The RPS-1261 (Maven Gradle Groovy block, Docker desktop Digest/Config Digest cells,
+npm Bugs URL/Keywords, PyPI "Post release:" and the mobile "Latest" link), RPS-1262 (mobile Delete
+gate, Cargo/NuGet mobile cards, Helm pager, Go empty pager, the Maven browser's Settings button) and
+RPS-1297 (first click after a cold load) specs are fixed and assert unpinned.
 
 Facts the tests rely on (probed, RPS-1256):
 
@@ -2877,20 +2877,17 @@ now: absent = same body, only the title differs), Ruby's title is the same in bo
 
 Pinned with `test.fail` / `knownFailures` (each still fails for the stated reason, checked un-pinned):
 
-| Where                                                  | Bug                                                                                                                                                                                                                                           |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| cargo `05-mobile-versions`, nuget `05-mobile-versions` | RPS-1262 (2): the version list has no `lg:hidden` cards, a phone shows nothing                                                                                                                                                                |
-| nuget `02-versions-search`                             | RPS-1262 (3): no search box on the version list                                                                                                                                                                                               |
-| helm-07 twelve versions                                | RPS-1262 (3): no pager on the version list, all twelve render                                                                                                                                                                                 |
-| golang-07 empty versions page                          | RPS-1262 (3): `<app-pagination>` renders under the empty state of an unknown module, printing "1 NaN"                                                                                                                                         |
-| cargo-07 row menu real click                           | RPS-1299: the menu of a non-last row paints under the next row, Playwright's click is refused ("subtree intercepts pointer events")                                                                                                           |
-| cargo-07 Newest by publish time                        | RPS-1301: Newest/Oldest order by `max_version` (a text column), not by when a crate was published; the seeder gives each crate its own version so the sort and pager have distinct keys (RPS-1298), and cargo-07 asserts the sorts by version |
-| helm-07 deleting the last version                      | RPS-1302: the versions page of the deleted chart raises two error toasts, "Chart not found." and "[object Object]"                                                                                                                            |
+| Where                             | Bug                                                                                                                                                                                                                                           |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| nuget `02-versions-search`        | RPS-1262 (3): no search box on the version list: the API has no version search parameter                                                                                                                                                      |
+| cargo-07 row menu real click      | RPS-1299: the menu of a non-last row paints under the next row, Playwright's click is refused ("subtree intercepts pointer events")                                                                                                           |
+| cargo-07 Newest by publish time   | RPS-1301: Newest/Oldest order by `max_version` (a text column), not by when a crate was published; the seeder gives each crate its own version so the sort and pager have distinct keys (RPS-1298), and cargo-07 asserts the sorts by version |
+| helm-07 deleting the last version | RPS-1302: the versions page of the deleted chart raises two error toasts, "Chart not found." and "[object Object]"                                                                                                                            |
 
 `seed-proof.spec.ts` (RPS-1255) now covers all nine protocols; its generic search/sort/delete walk stays on
 the first four (the other five have the protocol-aware version of it in PKG-<proto>-02 and -04).
 RPS-1298 (a pager without a tie-breaker) is avoided as in the template, by seeding sequentially. The
-mobile-Delete `canWrite` bug of RPS-1262 (1) does not exist in these five protocols (only PyPI and npm).
+mobile-Delete `canWrite` bug of RPS-1262 (1) never existed in these five protocols (only PyPI and npm; fixed).
 
 ### Errors, navigation, mobile and accessibility (RPS-1258)
 

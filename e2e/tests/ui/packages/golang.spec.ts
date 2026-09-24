@@ -161,19 +161,19 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
     await versions.expectRow(nested);
   });
 
-  // RPS-1262 (3): `<app-pagination>` sits after the versions page's `@if/@else`, so it also renders
-  // under the empty state; for a module with no versions its total is undefined and it prints "1 NaN".
-  test.fail(
-    'PKG-golang-07 the empty versions page of an unknown module shows no pager (RPS-1262)',
-    async ({ adminPage, seeder }) => {
-      const repo = await seeder.createRepo(RepoType.GOLANG);
-      const versions = protocolPages(adminPage, golang, repo.name).versions({
-        name: `e2e.repsy.test/e2e-${seeder.runId}-none`,
-        version: 'v1.0.0',
-      });
-      await versions.goto();
-      await expect(versions.emptyList.root).toBeVisible();
-      await expect(versions.pagination.root).toBeHidden();
-    },
-  );
+  // RPS-1262 (3): `<app-pagination>` used to sit after the versions page's `@if/@else`, so it also
+  // rendered under the empty state and, for a module with no versions, printed "1 NaN".
+  test('PKG-golang-07 the empty versions page of an unknown module shows no pager (RPS-1262)', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.GOLANG);
+    const versions = protocolPages(adminPage, golang, repo.name).versions({
+      name: `e2e.repsy.test/e2e-${seeder.runId}-none`,
+      version: 'v1.0.0',
+    });
+    await versions.goto();
+    await expect(versions.emptyList.root).toBeVisible();
+    await expect(versions.pagination.root).toBeHidden();
+  });
 });

@@ -23,6 +23,7 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { SecurityService } from '../../../../security/service/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
+import { renderComponent } from '../../../testing/render-spec-helpers';
 import {
   describeEmptyingDelete,
   describeRepoListBehavior,
@@ -149,5 +150,47 @@ describe('NpmPackagesVersionListComponent', () => {
       component.openConfig(false);
       expect(component.showConfig).toBeFalse();
     });
+  });
+});
+
+describe('NpmPackagesVersionListComponent template', () => {
+  async function render(flags: Parameters<typeof permission>[1]): Promise<HTMLElement> {
+    const npmService = jasmine.createSpyObj<NpmService>('NpmService', ['searchPackageVersions', 'fetchPackageTags'], {
+      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, flags)),
+    });
+    npmService.fetchPackageTags.and.returnValue(of([]));
+    npmService.searchPackageVersions.and.returnValue(
+      of(pageOf([{ version: '1.0.0', createdAt: '2026-01-01T00:00:00Z' }], 1) as never),
+    );
+    const securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
+    securityService.watchVersionSecuritySummary.and.returnValue(of({}));
+
+    const { el } = await renderComponent(NpmPackagesVersionListComponent, [
+      {
+        provide: ActivatedRoute,
+        useValue: { snapshot: { paramMap: convertToParamMap({ scope: '~', package: 'ui' }) } },
+      },
+      { provide: NpmService, useValue: npmService },
+      { provide: SecurityService, useValue: securityService },
+    ]);
+    return el;
+  }
+
+  const cardMenu = '[data-testid="pkg-versions-card-1.0.0"] [data-testid="row-menu"]';
+
+  it('offers Delete on the mobile card to a manager', async () => {
+    expect((await render({ canWrite: true, canManage: true })).querySelector(cardMenu)).not.toBeNull();
+  });
+
+  it('offers no Delete on the mobile card to a user who can write but not manage (RPS-1262)', async () => {
+    expect((await render({ canWrite: true, canManage: false })).querySelector(cardMenu)).toBeNull();
+  });
+
+  it('labels the upload time "Uploaded:" on the mobile card (RPS-1261)', async () => {
+    const el = await render({ canManage: true });
+
+    const card = el.querySelector('[data-testid="pkg-versions-card-1.0.0"]');
+    expect(card?.textContent).toContain('Uploaded:');
+    expect(card?.textContent).not.toContain('Upladed');
   });
 });

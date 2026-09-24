@@ -120,6 +120,69 @@
             </div>
           }
         </div>
+
+        <!-- Version List (Mobile) -->
+        <div data-testid="pkg-versions-cards">
+          @for (version of versions; track version.version; let i = $index) {
+            <div animate.enter="fade-in-down" class="lg:hidden">
+              <div
+                class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+                [attr.data-testid]="'pkg-versions-card-' + version.version"
+                role="button"
+                appKeyboardActivate
+                [routerLink]="['/' + activeRepo.repoName + '/' + packageId + '/' + version.version]"
+                fragment="security"
+              >
+                @if (activeRepo.canManage) {
+                  <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
+                    <button
+                      data-testid="row-delete"
+                      (click)="deleteVersion(version)"
+                      [disabled]="loading"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
+                    >
+                      <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+                      Delete
+                    </button>
+                  </app-dropdown>
+                }
+
+                <div class="group text-secondary-500 flex items-start gap-2 text-[14px]">
+                  <img class="mt-[2px]" ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
+
+                  <span data-testid="row-name" class="text-right break-all text-[#FDFDFD]">{{ version.version }}</span>
+                </div>
+
+                <div class="space-y-2">
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Security: </span>
+                    <app-version-security-badge
+                      data-testid="row-security"
+                      [repoName]="activeRepo.repoName"
+                      repoType="nuget"
+                      [artifactName]="packageId"
+                      [versionName]="version.version"
+                      [severity]="securitySummary[version.version]?.severity ?? null"
+                      [scanStatus]="securitySummary[version.version]?.latestScanStatus ?? null"
+                      [scanned]="securitySummary[version.version]?.scanned ?? false"
+                    />
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Published: </span>
+                    <span data-testid="row-published" class="text-secondary-500 text-right break-all">
+                      {{ version.publishedAt | date: 'medium' }} {{ '(' + timeAgo(version.publishedAt) + ')' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              @if (i !== versions.length - 1) {
+                <div class="px-2 py-4">
+                  <div class="h-[1px] bg-[#404141]"></div>
+                </div>
+              }
+            </div>
+          }
+        </div>
         <app-pagination
           (pageNumChange)="loadPage($event)"
           [pageNum]="pageNum"

@@ -128,6 +128,11 @@ describe('RepoInfoComponent rename form error messages', () => {
     expect(element.textContent).not.toContain('Should be maximum 25 characters');
   });
 
+  it('warns about renaming in correct English (RPS-1261)', () => {
+    expect(element.textContent).toContain('Changing the repo name might break the setup of your current projects.');
+    expect(element.textContent).not.toContain('might your current projects set up');
+  });
+
   it('shows the reserved-name message for a name reserved by the panel routes', () => {
     setNameAndTouch('security');
 

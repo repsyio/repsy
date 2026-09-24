@@ -49,16 +49,13 @@ export class MavenComponent implements OnInit, OnDestroy {
   public ngOnInit(): void {
     this.isAuthenticated = this.authService.isAuthenticated();
 
+    // currentRepo$ is a BehaviorSubject: it replays the repository that is already current on
+    // subscribe, so the permissions load once here and need no second call for the current value.
     this.repoSubscription = this.repoLookupService.currentRepo$
       .pipe(filter((repo): repo is RepoContext => repo !== null && repo.repoType === 'maven'))
       .subscribe((repoContext) => {
         this.loadPermissions(repoContext.repoName);
       });
-
-    const currentRepo = this.repoLookupService.currentRepo;
-    if (currentRepo?.repoType === 'maven') {
-      this.loadPermissions(currentRepo.repoName);
-    }
   }
 
   public ngOnDestroy(): void {
