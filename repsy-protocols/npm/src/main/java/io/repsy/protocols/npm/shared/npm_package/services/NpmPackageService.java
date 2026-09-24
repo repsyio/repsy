@@ -99,16 +99,55 @@ public interface NpmPackageService<ID> {
 
   @NonNull List<PackageDistributionTagMapListItem> getDistributionTags(ID id);
 
-  void addDistributionTag(
-      UUID storageKey,
+  /**
+   * Points {@code tagName} at {@code versionName} and, while that write is still open, stores the
+   * package metadata through {@code writer}.
+   *
+   * <p>Like {@link #publishVersion}, the package row is locked first, the tag row is written and
+   * flushed second, and the metadata is written third, all in one transaction. So a tag change the
+   * database rejects never touches storage, it cannot lose an update against a concurrent publish
+   * of the package (both read-modify-write the one metadata file, and the lock makes them run one
+   * after another), and a metadata write that fails rolls the tag row back.
+   *
+   * @return the usages reported by {@code writer}
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the package does not
+   *     exist
+   * @throws io.repsy.core.error_handling.exceptions.BadRequestException when the version does not
+   *     exist
+   */
+  @NonNull BaseUsages addDistributionTag(
+      @NonNull BaseRepoInfo<ID> repoInfo,
       @Nullable String scopeName,
       @NonNull String packageName,
       @NonNull String tagName,
-      String replace);
+      @NonNull String versionName,
+      @NonNull MetadataWriter writer)
+      throws IOException;
 
-  void removeDistributionTag(
-      BaseRepoInfo<ID> repoInfo,
+  /**
+   * Removes {@code tagName} and, while that write is still open, stores the package metadata
+   * through {@code writer}, in the same way as {@link #addDistributionTag}.
+   *
+   * @return the usages reported by {@code writer}
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the package does not
+   *     exist
+   */
+  @NonNull BaseUsages removeDistributionTag(
+      @NonNull BaseRepoInfo<ID> repoInfo,
       @Nullable String scopeName,
       @NonNull String packageName,
-      @NonNull String tagName);
+      @NonNull String tagName,
+      @NonNull MetadataWriter writer)
+      throws IOException;
+
+  /** Rewrites the package metadata of a dist-tag change the rows of which are already written. */
+  @FunctionalInterface
+  interface MetadataWriter {
+
+    /**
+     * Writes the package metadata. A writer that fails must put back the metadata it found, so the
+     * rows that are rolled back with the failure and the metadata keep agreeing.
+     */
+    @NonNull BaseUsages write() throws IOException;
+  }
 }

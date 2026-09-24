@@ -70,6 +70,20 @@ public interface NpmStorageService {
   byte[] readMetadataBytes(UUID repoId, String repoName, Path packageBasePath) throws IOException;
 
   /**
+   * Puts the package metadata back to {@code metadata}, as {@link #readMetadataBytes} returned it,
+   * after a change that wrote it has to be undone.
+   */
+  void restoreMetadataBytes(UUID repoId, String repoName, Path packageBasePath, byte[] metadata)
+      throws IOException;
+
+  /**
+   * Tells whether the tarball of the version is in storage, whether or not the database knows the
+   * version.
+   */
+  boolean tarballExists(
+      UUID repoId, String repoName, Path packageBasePath, String packageName, String versionName);
+
+  /**
    * Removes what a publish that failed part-way left of a version it was adding: its tarball, and
    * the package metadata, which is put back to {@code previousMetadata} or, for a package the
    * publish was creating, removed. A file the publish never got to write is skipped.

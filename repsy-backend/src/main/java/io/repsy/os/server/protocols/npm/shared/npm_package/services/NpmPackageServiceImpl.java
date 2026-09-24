@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.npm.shared.npm_package.services;
 
 import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.server.protocols.npm.shared.constants.NpmConstants;
@@ -341,65 +342,96 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
     return this.getDistributionTags(npmPackage.getId());
   }
 
-  @Transactional
+  @Transactional(rollbackFor = IOException.class)
   @Override
-  public void addDistributionTag(
-      final UUID repoId,
+  public BaseUsages addDistributionTag(
+      final BaseRepoInfo<UUID> repoInfo,
       final @Nullable String scopeName,
       final String packageName,
       final String tagName,
-      final String versionName) {
+      final String versionName,
+      final MetadataWriter writer)
+      throws IOException {
 
-    final var npmPackage = this.findPackageByRepoIdAndScopeAndName(repoId, scopeName, packageName);
+    // The lock is held until the transaction ends, i.e. across the metadata write below, so a
+    // concurrent publish or tag change of the package waits instead of losing this update.
+    final var npmPackage = this.lockPackage(repoInfo, scopeName, packageName);
 
     final var packageVersion =
-        this.findPackageVersionByPackageIdAndVersion(npmPackage.getId(), versionName);
+        this.packageVersionRepository
+            .findByNpmPackageIdAndVersion(npmPackage.getId(), versionName)
+            .orElseThrow(() -> new BadRequestException(ErrorConstants.PACKAGE_VERSION_NOT_FOUND));
+
+    this.pointTagAt(npmPackage, packageVersion, tagName);
+
+    // Flush so a database failure surfaces here, before the metadata file is touched.
+    this.packageDistTagRepository.flush();
+
+    return writer.write();
+  }
+
+  private void pointTagAt(
+      final NpmPackage npmPackage, final PackageVersion packageVersion, final String tagName) {
 
     final var distTagOptional =
         this.packageDistTagRepository.findByPackageVersionNpmPackageIdAndTagName(
             npmPackage.getId(), tagName);
 
-    if (distTagOptional.isPresent()) {
-      final var distTag = distTagOptional.get();
+    if (distTagOptional.isEmpty()) {
+      final var distTag = new PackageDistTag();
 
+      distTag.setTagName(tagName);
       distTag.setPackageVersion(packageVersion);
+      distTag.setCreatedAt(Instant.now());
 
       this.packageDistTagRepository.save(distTag);
-
-      if (tagName.equals(NpmConstants.LATEST)) {
-        npmPackage.setLatest(packageVersion.getVersion());
-
-        this.npmPackageRepository.save(npmPackage);
-      }
 
       return;
     }
 
-    final var distTag = new PackageDistTag();
+    final var distTag = distTagOptional.get();
 
-    distTag.setTagName(tagName);
     distTag.setPackageVersion(packageVersion);
-    distTag.setCreatedAt(Instant.now());
 
     this.packageDistTagRepository.save(distTag);
+
+    if (tagName.equals(NpmConstants.LATEST)) {
+      npmPackage.setLatest(packageVersion.getVersion());
+
+      this.npmPackageRepository.save(npmPackage);
+    }
   }
 
-  @Transactional
+  @Transactional(rollbackFor = IOException.class)
   @Override
-  public void removeDistributionTag(
+  public BaseUsages removeDistributionTag(
       final BaseRepoInfo<UUID> repoInfo,
       final @Nullable String scopeName,
       final String packageName,
-      final String tagName) {
+      final String tagName,
+      final MetadataWriter writer)
+      throws IOException {
 
-    final var npmPackage =
-        this.findPackageByRepoIdAndScopeAndName(repoInfo.getId(), scopeName, packageName);
+    final var npmPackage = this.lockPackage(repoInfo, scopeName, packageName);
 
-    final var distTagOptional =
-        this.packageDistTagRepository.findByPackageVersionNpmPackageIdAndTagName(
-            npmPackage.getId(), tagName);
+    this.packageDistTagRepository
+        .findByPackageVersionNpmPackageIdAndTagName(npmPackage.getId(), tagName)
+        .ifPresent(this.packageDistTagRepository::delete);
 
-    distTagOptional.ifPresent(this.packageDistTagRepository::delete);
+    // Flush so the delete is executed, and a failure surfaces, before the metadata file is touched.
+    this.packageDistTagRepository.flush();
+
+    return writer.write();
+  }
+
+  private NpmPackage lockPackage(
+      final BaseRepoInfo<UUID> repoInfo,
+      final @Nullable String scopeName,
+      final String packageName) {
+
+    return this.npmPackageRepository
+        .findWithLockByRepoIdAndScopeAndName(repoInfo.getStorageKey(), scopeName, packageName)
+        .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.PACKAGE_NOT_FOUND));
   }
 
   public Page<io.repsy.os.generated.model.NpmPackageListItem> getPackagesContainsScope(

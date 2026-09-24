@@ -258,5 +258,40 @@ class AbstractNpmStorageServiceTest {
       verify(storageStrategy).write(eq(REPO_NAME), pathEnding(METADATA), any());
       assertThat(written.get()).isEqualTo(previous);
     }
+
+    @Test
+    @DisplayName("puts the given metadata bytes back without touching the tarball")
+    void restoresMetadataBytes() throws Exception {
+      final var previous = "{\"name\":\"my-package\"}".getBytes();
+      final var written = new java.util.concurrent.atomic.AtomicReference<byte[]>();
+      when(storageStrategy.write(anyString(), any(StoragePath.class), any()))
+          .thenAnswer(
+              invocation -> {
+                written.set(invocation.<java.io.InputStream>getArgument(2).readAllBytes());
+                return BaseUsages.ofDisk(0L);
+              });
+
+      service.restoreMetadataBytes(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, previous);
+
+      verify(storageStrategy).write(eq(REPO_NAME), pathEnding(METADATA), any());
+      verify(storageStrategy, never()).delete(any(StoragePath.class));
+      assertThat(written.get()).isEqualTo(previous);
+    }
+
+    @Test
+    @DisplayName("tells whether the tarball of a version is stored")
+    void tellsWhetherTheTarballExists() {
+      stubPresent(TARBALL, true);
+      assertThat(
+              service.tarballExists(
+                  REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, "my-package", VERSION_NAME))
+          .isTrue();
+
+      stubPresent(TARBALL, false);
+      assertThat(
+              service.tarballExists(
+                  REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, "my-package", VERSION_NAME))
+          .isFalse();
+    }
   }
 }
