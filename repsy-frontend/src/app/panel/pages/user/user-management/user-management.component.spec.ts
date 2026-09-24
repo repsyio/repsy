@@ -15,7 +15,7 @@
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import moment from 'moment';
-import { of, Subject } from 'rxjs';
+import { NEVER, of, Subject } from 'rxjs';
 
 import { PagedModelUserResponse, UserResponse } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/service/auth.service';
@@ -39,8 +39,14 @@ describe('UserManagementComponent', () => {
   let dangerModalService: DangerModalService;
 
   beforeEach(() => {
-    userService = jasmine.createSpyObj<UserService>('UserService', ['listUsers', 'deleteUser', 'resetPassword']);
+    userService = jasmine.createSpyObj<UserService>('UserService', [
+      'listUsers',
+      'countAdmins',
+      'deleteUser',
+      'resetPassword',
+    ]);
     userService.listUsers.and.returnValue(of(pageOf([user('1'), user('2', 'ADMIN'), user('3', 'ADMIN')], 3)));
+    userService.countAdmins.and.returnValue(of(2));
     userService.deleteUser.and.returnValue(of(undefined));
     userService.resetPassword.and.returnValue(of('N3w-Passw0rd'));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
@@ -63,6 +69,23 @@ describe('UserManagementComponent', () => {
       expect(userService.listUsers).toHaveBeenCalledOnceWith(undefined, 0, 10);
       expect(component.users.map((u) => u.id)).toEqual(['1', '2', '3']);
       expect(component.pagedData.page?.totalPages).toBe(3);
+    });
+
+    it('loads the admin count from the server together with the list', () => {
+      userService.countAdmins.and.returnValue(of(5));
+
+      component.ngOnInit();
+
+      expect(component.adminCount).toBe(5);
+    });
+
+    it('does not derive the admin count from the loaded page (RPS-1246)', () => {
+      userService.listUsers.and.returnValue(of(pageOf([user('1'), user('2', 'ADMIN')])));
+      userService.countAdmins.and.returnValue(of(4));
+
+      component.ngOnInit();
+
+      expect(component.adminCount).toBe(4);
     });
 
     it('shows an empty list when the page has no content', () => {
@@ -266,15 +289,26 @@ describe('UserManagementComponent', () => {
       expect(userService.listUsers).toHaveBeenCalledTimes(1);
     });
 
-    it('lets an admin be deleted while another admin is listed', () => {
+    it('lets an admin be deleted while another admin exists', () => {
       component.deleteUser(user('2', 'ADMIN'));
 
       expect(dangerModalService.modal?.title).toBe('Delete User');
       expect(toastService.show).not.toHaveBeenCalled();
     });
 
-    it('refuses to delete the only admin listed, without asking for confirmation', () => {
+    it('lets the only admin of the loaded page be deleted when the server counts more admins (RPS-1246)', () => {
       userService.listUsers.and.returnValue(of(pageOf([user('1'), user('2', 'ADMIN')])));
+      userService.countAdmins.and.returnValue(of(3));
+      component.ngOnInit();
+
+      component.deleteUser(user('2', 'ADMIN'));
+
+      expect(dangerModalService.modal?.title).toBe('Delete User');
+      expect(toastService.show).not.toHaveBeenCalled();
+    });
+
+    it('refuses to delete the last admin on the server, without asking for confirmation', () => {
+      userService.countAdmins.and.returnValue(of(1));
       component.ngOnInit();
 
       component.deleteUser(user('2', 'ADMIN'));
@@ -287,8 +321,28 @@ describe('UserManagementComponent', () => {
       expect(userService.deleteUser).not.toHaveBeenCalled();
     });
 
+    it('leaves the decision to the server while the admin count is unknown', () => {
+      userService.countAdmins.and.returnValue(NEVER);
+      component.ngOnInit();
+
+      component.deleteUser(user('2', 'ADMIN'));
+
+      expect(dangerModalService.modal?.title).toBe('Delete User');
+    });
+
+    it('reloads the admin count after a delete', () => {
+      component.deleteUser(user('2', 'ADMIN'));
+      userService.countAdmins.calls.reset();
+      userService.countAdmins.and.returnValue(of(1));
+
+      dangerModalService.call();
+
+      expect(userService.countAdmins).toHaveBeenCalledTimes(1);
+      expect(component.adminCount).toBe(1);
+    });
+
     it('never blocks deleting a plain user', () => {
-      userService.listUsers.and.returnValue(of(pageOf([user('1'), user('2', 'ADMIN')])));
+      userService.countAdmins.and.returnValue(of(1));
       component.ngOnInit();
 
       component.deleteUser(user('1'));
@@ -324,8 +378,14 @@ describe('UserManagementComponent search box', () => {
   }
 
   beforeEach(() => {
-    userService = jasmine.createSpyObj<UserService>('UserService', ['listUsers', 'deleteUser', 'resetPassword']);
+    userService = jasmine.createSpyObj<UserService>('UserService', [
+      'listUsers',
+      'countAdmins',
+      'deleteUser',
+      'resetPassword',
+    ]);
     userService.listUsers.and.returnValue(of(pageOf([user('1'), user('2', 'ADMIN')])));
+    userService.countAdmins.and.returnValue(of(2));
     TestBed.configureTestingModule({
       imports: [UserManagementComponent],
       providers: [

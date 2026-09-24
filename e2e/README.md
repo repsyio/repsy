@@ -2614,9 +2614,9 @@ user the UI is about to create so a failing test still cleans it up).
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | USR-01   | create a USER and an Admin, log in as each from a fresh context (an Admin sees Users, a USER does not), cancel resets the form       |
 | USR-02   | one test per validator of the create form, the message texts, a valid form, a duplicate username                                     |
-| USR-03   | rename, promote, demote next to another admin, the last-admin warning and locked switch, edit validation, taken name, cancel         |
+| USR-03   | rename, promote, demote next to another admin, no last-admin warning while another admin exists, edit validation, taken name, cancel |
 | USR-04   | reset password: one-time modal, the new password logs in, the old one is refused, cancel resets nothing                              |
-| USR-05   | delete (cancel, then confirm), delete next to another admin, the last-admin toast                                                    |
+| USR-05   | delete (cancel, then confirm), delete next to another admin, a lone admin in the view is still deletable                             |
 | USR-06   | 11 users: search (incl. case-insensitive, no match with its `No user matches` message), pagination both ways, refresh                |
 | PRO-01   | change password: mismatch, cancel, confirm, re-login with the new one, the old one refused; field validation                         |
 | PRO-02   | change username: reload as the new name, same account, repo protocol URL and repo page still work; validation; taken name            |
@@ -2632,12 +2632,13 @@ Rules these specs follow (and a later spec on these pages should too):
   The suite never edits, demotes or deletes the harness admin. Names a test creates or renames to come from
   `seeder.reserveUsername()`, so the `e2e-` prefix survives and sweep finds them; a renamed user is
   cleaned up by id.
-- **Last admin.** The panel decides "last admin" on the client from the admins in the page it shows
-  (RPS-1246); the server guards the real one, which the backend ITs cover. A shared stack always has the
-  harness admin, so the real last-admin state is unreachable here. What is reachable: search for a seeded
-  admin's exact username, and the view holds a single admin. Those tests pin what the panel does there
-  today, and two `test.fail(... RPS-1246)` tests assert what it should do. Two admins in one view (search
-  for `seeder.runId`, which is in both names) is the "not the last" case.
+- **Last admin.** The panel decides "last admin" from the server's admin count (`GET /api/users/admin-count`,
+  RPS-1246), not from the page it shows, and the server guards the real one, which the backend ITs cover.
+  A shared stack always has the harness admin, so the real last-admin state is unreachable here (the
+  component spec covers the panel's branch). What is reachable: search for a seeded admin's exact username,
+  and the view holds a single admin that must still be editable and deletable, which two tests assert.
+  `UsersPage.goto` waits for the admin-count response. Two admins in one view (search for `seeder.runId`,
+  which is in both names) is the "not the last" case.
 - **Search first.** The list is server-paged (10, newest first) and server-searched (case-insensitive
   substring), and other tests add users, so every list view is a search for a username or for
   `seeder.runId`, which is in exactly the names this test seeded (with 10 or more users, `-user-1` also
@@ -2649,8 +2650,9 @@ Rules these specs follow (and a later spec on these pages should too):
   Font Awesome CDN, so the buttons have no box: they are activated with `dispatchEvent('click')`.
 - **Timing.** The username change ends in `location.reload()` in the tick that raises its toast, so that
   toast is not observable: assert the reload (`ProfilePage.changeUsername`) and the outcome.
-- **Known bugs, pinned with `test.fail`**: RPS-1246 (last-admin check counts one page). The mojibake
-  `â€¢` of the create-user messages (RPS-1261) is fixed and asserted unpinned. The spec text of a `test.fail` states the key.
+- **Known bugs, pinned with `test.fail`**: none left in the users suite. The mojibake `â€¢` of the create-user
+  messages (RPS-1261) and the page-scoped last-admin check (RPS-1246) are fixed and asserted unpinned. The spec text
+  of a `test.fail` states the key.
 
 ### Repository settings and deploy tokens (RPS-1254)
 
