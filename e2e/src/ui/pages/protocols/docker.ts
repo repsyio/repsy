@@ -25,7 +25,7 @@ import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
  *  - The manifest list is read-only: its rows are not clickable and have no delete. Its row key is the
  *    manifest's `name`, which for a single-platform image pushed by tag IS THE TAG (probed: the row is
  *    `pkg-manifests-row-1.0.0`, not the digest); a multi-platform index may name its rows otherwise
- *    (RPS-1256 confirms when it seeds one).
+ *    (not seeded: the seeder pushes single-platform images). Confirmed in a browser by RPS-1256.
  *  - RPS-1261: the manifest table's DESKTOP columns show wrong values (UX-13), so assert a manifest
  *    row by its `pkg-manifests-row-<key>` id, never by its desktop cell text (the mobile card is right).
  *  - The tag and manifest lists carry the install bar `pkg-install-snippet` above the toolbar; the
@@ -97,5 +97,15 @@ export const dockerDescriptor: ProtocolDescriptor = {
   },
   lastVersionRemovesPackage: false,
   toolbar: { browseFiles: false },
+  configure: {
+    title: 'Docker Configuration',
+    deployTokenTitle: 'Deploy Token Usage',
+    // Docker prints the registry HOST, not the repo URL, and no password placeholder at all.
+    contains: (repoName, repoUrl) => [
+      `docker login ${new URL(repoUrl).host}`,
+      `docker pull ${new URL(repoUrl).host}/${repoName}/`,
+    ],
+    deployTokenMarker: '<repsy_deploy_token>',
+  },
   extraPaths: {},
 };

@@ -22,7 +22,8 @@ import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
  *    `row-latest-link` / `row-stable-link` the latest and the latest stable release.
  *  - Deleting a version is called a RELEASE here: the dialog is "Delete Release" both from the
  *    versions page and from the detail page, but both toast "Version deleted successfully".
- *  - The detail page renders `readme`; RPS-1142 tracks the missing long description.
+ *  - The detail page renders `readme` (the upload's long description; RPS-1142 is fixed, PKG-pypi-07
+ *    asserts it). Confirmed in a browser by RPS-1256.
  */
 export const pypiDescriptor: ProtocolDescriptor = {
   protocol: 'pypi',
@@ -85,5 +86,12 @@ export const pypiDescriptor: ProtocolDescriptor = {
   },
   lastVersionRemovesPackage: true,
   toolbar: { browseFiles: false },
+  configure: {
+    title: 'Pypi Configuration',
+    deployTokenTitle: 'Deploy Token Usage',
+    contains: (repoName, repoUrl) => [repoName, `repository=${repoUrl}`],
+    passwordMarker: 'YOUR_PASSWORD',
+    deployTokenMarker: 'your deploy token',
+  },
   extraPaths: {},
 };

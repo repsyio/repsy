@@ -87,6 +87,7 @@ export const npmDescriptor: ProtocolDescriptor = {
       rowOpens: 'versions',
       rowLinks: { versions: 'row-package-link', detail: 'row-latest-link' },
       installBar: false,
+      siblingName: (t, n) => `@${split(t).scope}/${split(t).pkg}-s${n}`,
     },
     versions: {
       path: (repo, t) => packageBase(repo, t),
@@ -117,5 +118,12 @@ export const npmDescriptor: ProtocolDescriptor = {
   },
   lastVersionRemovesPackage: true,
   toolbar: { browseFiles: false },
+  configure: {
+    title: 'NPM Configuration',
+    deployTokenTitle: 'Deploy Token Usage',
+    // The URL ends with a slash on purpose (RPS-1206). The modal has no password placeholder: npm asks for it.
+    contains: (repoName, repoUrl) => [repoName, `npm login --registry ${repoUrl}/`],
+    deployTokenMarker: 'YOUR_DEPLOY_TOKEN',
+  },
   extraPaths: {},
 };

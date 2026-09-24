@@ -36,8 +36,11 @@ function coordinates(target: PackageRef | undefined): {
  *  - `sublist` (`/:repo/:group`) lists that group's artifacts, keyed by the bare artifactId.
  *  - Every list page has a "Browse Files" button (`pkg-browse-files`, `/:repo/browser`).
  *  - The detail page's install block is the Apache Maven one: `pkg-detail-install-text` is on the
- *    highlighted `<code>`. RPS-1262: its Gradle Groovy snippet shows the Grape snippet (a
- *    duplicate), so assert the Groovy block by its own content only after that is fixed.
+ *    highlighted `<code>`. RPS-1261: its Gradle Groovy snippet shows the Grape snippet (a
+ *    duplicate), which PKG-maven-07 pins. All values here were confirmed in a browser (RPS-1256).
+ *  - The detail page of a version that is not the latest shows, and its Delete deletes, the LATEST
+ *    version (`ArtifactConverter` maps `artifactVersionName` from `artifact.latest`): PKG-maven-04 and
+ *    PKG-maven-07 pin it (RPS-TBD, to be filed).
  *  - The detail page has no version badge and no "published" line, so those ids do not exist here.
  */
 export const mavenDescriptor: ProtocolDescriptor = {
@@ -71,6 +74,7 @@ export const mavenDescriptor: ProtocolDescriptor = {
       rowOpens: 'detail',
       rowLinks: { versions: 'row-artifact-link', detail: 'row-latest-link' },
       installBar: false,
+      siblingName: (t, n) => `${coordinates(t).group}:${coordinates(t).artifact}-s${n}`,
     },
     versions: {
       path: (repo, t) => {
@@ -125,5 +129,12 @@ export const mavenDescriptor: ProtocolDescriptor = {
   },
   lastVersionRemovesPackage: true,
   toolbar: { browseFiles: true },
+  configure: {
+    title: 'Maven Configuration',
+    deployTokenTitle: 'Deploy Token Usage',
+    contains: (repoName, repoUrl) => [repoName, `<url>${repoUrl}</url>`, 'mvn compile deploy'],
+    passwordMarker: 'YOUR_PASSWORD',
+    deployTokenMarker: 'YOUR_DEPLOY_TOKEN',
+  },
   extraPaths: { browser: (repo) => `/${repo}/browser` },
 };
