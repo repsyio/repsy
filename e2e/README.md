@@ -2682,7 +2682,71 @@ the token-name `minLength` branch, which is unreachable (`required` already cove
 
 ### Package seeding and protocol page objects (RPS-1255)
 
-_Not implemented yet._
+The `ui` runner image has only Node and Chromium, so a package for a package page is **published over
+raw HTTP with the in-code builders** of `src/clients/*-raw.ts` (fflate jar, npm publish document,
+docker blob + manifest, PyPI wheel), never with `mvn`/`npm`/`docker`/`twine`. Publishing goes to the
+**protocol port** (`env.repoBaseUrl`, 9090 in the default stack, 15090 in a slot) as the harness admin;
+the panel port only serves the SPA. Everything lives inside a repo the test created with
+`seeder.createRepo(...)`, so deleting the repo is the whole cleanup (`./run.sh sweep --dry-run` finds
+no leftovers).
+
+| File                                           | What it is                                                                                                                                           |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/seed/packages.ts`                         | `SEEDERS: Record<PackageProtocol, PackageSeeder>` (all nine keys), `seedPackage`, `seedPackages`, `seedVersions`, `defaultPackageName`, `protocolOf` |
+| `src/seed/packages/{maven,npm,docker,pypi}.ts` | the four seeders; `shared.ts` holds `expectPublished`, `DEFAULT_VERSION`, `defaultPackageName`                                                       |
+| `src/ui/package-fixtures.ts`                   | `test` = `uiTest` + `seedPackage`, `seedPackages`, `seedVersions` fixtures bound to `seeder.runId`                                                   |
+| `src/ui/pages/protocol.ts`                     | `ProtocolListPage`, `VersionsPage`, `VersionDetailPage`, `protocolPages(page, descriptor, repo)`, `DESCRIPTORS`                                      |
+| `src/ui/pages/protocols/<proto>.ts`            | one descriptor per protocol (all nine); `types.ts` is their shape                                                                                    |
+| `tests/ui/packages/seed-proof.spec.ts`         | the proof: seeding, the four descriptors' data (search, sort, both deletes, mobile, pagination) and the special routes                               |
+
+```ts
+import { expect, test } from '../../../src/ui/package-fixtures.js';
+import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
+
+test('lists a seeded package', async ({ adminPage, seeder, seedPackage }) => {
+  const repo = await seeder.createRepo(RepoType.NPM);
+  const pkg = await seedPackage(repo); // SeededPackage: { protocol, repoName, name, version, extra }
+  const pages = protocolPages(adminPage, DESCRIPTORS.npm, repo.name);
+  const list = pages.list();
+  await list.goto();
+  await list.expectRow(pkg);
+  const detail = await list.openRow(pkg); // where the descriptor says a row click goes
+});
+```
+
+- **Seeding.** `seedPackage(repo, opts?)` publishes one version (`opts`: `name` = the full identity,
+  `version` default `1.0.0`, `index` for the default name, npm `scoped: false`, helm `variant`);
+  `seedPackages(repo, n)` publishes `n` distinct packages (pagination needs more than 10);
+  `seedVersions(repo, [...])` publishes versions of one package in order. The protocol is the repo's own
+  type. A seeder throws if the server refuses. RPS-1257 replaces the five `notImplemented(...)` entries
+  (cargo, nuget, helm, golang, ruby) with `src/seed/packages/<proto>.ts` modules; until then they throw
+  "not implemented yet (RPS-1257 ...)".
+- **Identity.** `PackageRef.name` is the raw row key: maven `group:artifact` (default: one group per
+  `index`, so deleting a group never takes a sibling), npm `@scope/name` or `name`, docker the image
+  (`version` = the tag), golang the module path.
+- **Descriptors are data.** `ProtocolDescriptor.levels` has `list`, `versions`, `detail` and, where the
+  protocol has them, `sublist` (maven group, npm scope) and `manifests` (docker). A list level says its
+  route (`path`, with any query string), `rowKey`, `search` (`placeholder` and the `term` that finds a
+  row), `sort` option names, `pagination`, `mobileCards`, `rowDelete` (dialog title and toast),
+  `rowOpens` (where a row click goes), `rowLinks` (in-row links to other levels) and `installBar`. The
+  detail level says `installContains`, `repoUrlIn` (`install`, `none` or `snippet:<slug>`), the snippet
+  slugs, extra ids, `readme` and `delete` (`landsOn`). Gaps are values (`search: null`,
+  `pagination: false`, `mobileCards: false`), so one scenario template needs no protocol `if`.
+  `lastVersionRemovesPackage` is `false` for docker. A value read from the Angular code but not yet run
+  in a browser says `unverified` in the descriptor's comment (or is the literal `'unverified'`): the
+  story that first runs that protocol confirms it, editing only its own `protocols/<proto>.ts`.
+- **Page objects.** Rows are `role=button` divs, not links; use `openRow`/`openLink`. `row`, `card`,
+  `inRow`, `search`/`searchFor`, `sortBy`, `openDeleteDialog`/`deleteRow` (which asserts the dialog title
+  and the toast), `pagination`, `installBar*`; the detail page has `install`, `installText`, `copyButton`,
+  `snippet(slug)`, `delete()`. `protocolPages(...).extraPath('browser')` is maven's file browser.
+- **Facts the proof pinned.** A maven group-list Delete removes the whole GROUP. Group and npm list
+  searches match the group / scope only (not `group:artifact` or `@scope/name`). The npm scope route
+  segment has no `@`. The sort menu stays open after a choice. Docker's manifest row is keyed by the tag,
+  and its last-tag delete leaves the image listed. Playwright's own click is refused by every detail
+  page's Delete button (the page host is reported above it), so `VersionDetailPage` clicks it with
+  `force`.
+- **Not covered here.** cargo, nuget, helm, golang and ruby seeders and their scenarios (RPS-1257); the
+  scenario template itself (RPS-1256).
 
 ### Package tests: Maven, npm, Docker, PyPI (RPS-1256)
 
