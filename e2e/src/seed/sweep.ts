@@ -29,7 +29,6 @@ import { env } from '../env.js';
 import { isRunPrefixed, RUN_PREFIX } from './run-id.js';
 
 const DEFAULT_SWEEP_HOURS = 24;
-const USER_PAGE_SIZE = 100;
 const MS_PER_HOUR = 60 * 60 * 1000;
 
 export interface SweepOptions {
@@ -97,36 +96,25 @@ export async function sweep(opts: SweepOptions): Promise<SweepResult> {
   }
 
   let deletedUsers = 0;
-  let page = 0;
 
-  for (;;) {
-    const users = await api.listUsers({ page, size: USER_PAGE_SIZE });
-    if (users.length === 0) {
-      break;
+  // Same rule for users: read every page first, then delete. Deleting while paging shifts the
+  // following users into the page already read (more than 100 e2e users is a normal leftover).
+  const staleUsers = (await api.listAllUsers({ search: `${RUN_PREFIX}-` })).filter(
+    (user) =>
+      user.username !== env.adminUsername &&
+      isRunPrefixed(user.username) &&
+      (opts.all || isOlderThan(user.createdAt, opts.hours)),
+  );
+
+  for (const user of staleUsers) {
+    if (opts.dryRun) {
+      console.log(`[dry-run] would delete user ${user.username}`);
+      continue;
     }
 
-    for (const user of users) {
-      if (user.username === env.adminUsername || !isRunPrefixed(user.username)) {
-        continue;
-      }
-      if (!opts.all && !isOlderThan(user.createdAt, opts.hours)) {
-        continue;
-      }
-
-      if (opts.dryRun) {
-        console.log(`[dry-run] would delete user ${user.username}`);
-        continue;
-      }
-
-      await api.deleteUser(user.id);
-      deletedUsers += 1;
-      console.log(`deleted user ${user.username}`);
-    }
-
-    if (users.length < USER_PAGE_SIZE) {
-      break;
-    }
-    page += 1;
+    await api.deleteUser(user.id);
+    deletedUsers += 1;
+    console.log(`deleted user ${user.username}`);
   }
 
   return { deletedRepos, deletedUsers };

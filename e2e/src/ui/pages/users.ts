@@ -17,8 +17,8 @@
 /**
  * The admin users page (`/users`) and its three modals (create, edit, reset password). The list is
  * SERVER-paged (10 a page, newest first) and SERVER-searched (case-insensitive substring of the
- * username, one request per input event), so the page object waits for the list response that a
- * search or refresh triggers instead of assuming the view is already updated.
+ * username; typing is debounced, so one request follows a pause in the typing), so the page object waits
+ * for the list response that a search or refresh triggers instead of assuming the view is already updated.
  *
  * Rows are addressed by username through the desktop grid (`DesktopList`); the mobile card list is a
  * hidden duplicate with other ids. Methods that delete a user or reset a password call
@@ -196,11 +196,24 @@ export class UsersPage extends UiPage {
     });
   }
 
-  /** Types into the search box and waits for the filtered list (one request per input event). */
+  /** Types into the search box and waits for the filtered list (sent once the typing pauses, 250 ms). */
   async search(text: string): Promise<void> {
     const response = this.listResponse(text, 0);
     await this.searchInput.fill(text);
     await response;
+  }
+
+  /**
+   * Two animation frames: Angular renders an answer a tick after the response arrived, so a negative
+   * assertion (a stale answer did not replace the rows) made straight after it could pass on the old view.
+   */
+  async settle(): Promise<void> {
+    await this.page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }),
+    );
   }
 
   /** The reload button: page 0 with no search, and the search box is emptied too. */

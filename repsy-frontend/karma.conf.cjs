@@ -29,7 +29,9 @@ module.exports = function (config) {
       require('karma-coverage'),
     ],
     client: {
-      jasmine: {},
+      // Specs run in a random order (jasmine's default) and the seed is printed at the start of a run.
+      // JASMINE_SEED=12345 replays that order, to reproduce an order-dependent failure.
+      jasmine: { random: true, ...(process.env.JASMINE_SEED ? { seed: process.env.JASMINE_SEED } : {}) },
     },
     jasmineHtmlReporter: {
       suppressAll: true, // removes the duplicated traces

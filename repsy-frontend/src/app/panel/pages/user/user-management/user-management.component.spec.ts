@@ -13,16 +13,16 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, fakeAsync, flush, TestBed, tick } from '@angular/core/testing';
 import moment from 'moment';
-import { NEVER, of, Subject } from 'rxjs';
+import { NEVER, of, Subject, throwError } from 'rxjs';
 
 import { PagedModelUserResponse, UserResponse } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { UserService } from '../service/user.service';
-import { UserManagementComponent } from './user-management.component';
+import { USER_SEARCH_DEBOUNCE_MS, UserManagementComponent } from './user-management.component';
 
 function user(id: string, role: 'ADMIN' | 'USER' = 'USER'): UserResponse {
   return { id, username: `user-${id}`, role } as UserResponse;
@@ -55,6 +55,8 @@ describe('UserManagementComponent', () => {
       username: 'admin',
     } as AuthService);
   });
+
+  afterEach(() => component.ngOnDestroy());
 
   describe('loading users', () => {
     it('starts with no users and a single empty page, and loads nothing before init', () => {
@@ -96,46 +98,189 @@ describe('UserManagementComponent', () => {
       expect(component.users).toEqual([]);
     });
 
-    it('loadPage fetches the requested page with the current search', () => {
+    it('loadPage fetches the requested page with the current search', fakeAsync(() => {
       component.search('ali');
+      tick(USER_SEARCH_DEBOUNCE_MS);
 
       component.loadPage(2);
 
       expect(component.pageNum).toBe(2);
       expect(userService.listUsers).toHaveBeenCalledWith('ali', 2, 10);
-    });
+    }));
 
-    it('search restarts from the first page with the text', () => {
+    it('search restarts from the first page with the text', fakeAsync(() => {
       component.loadPage(2);
 
       component.search('ali');
+      tick(USER_SEARCH_DEBOUNCE_MS);
 
       expect(component.searchQuery).toBe('ali');
+      expect(component.appliedQuery).toBe('ali');
       expect(component.pageNum).toBe(0);
       expect(userService.listUsers).toHaveBeenCalledWith('ali', 0, 10);
-    });
+    }));
 
-    it('an empty search is sent as no search at all', () => {
+    it('an empty search is sent as no search at all', fakeAsync(() => {
       component.search('');
+      tick(USER_SEARCH_DEBOUNCE_MS);
 
       expect(userService.listUsers).toHaveBeenCalledWith(undefined, 0, 10);
-    });
+    }));
 
-    it('refreshPage clears the search and goes back to the first page', () => {
+    it('refreshPage clears the search and goes back to the first page', fakeAsync(() => {
       component.search('ali');
+      tick(USER_SEARCH_DEBOUNCE_MS);
       component.loadPage(2);
 
       component.refreshPage();
 
       expect(component.searchQuery).toBe('');
+      expect(component.appliedQuery).toBe('');
       expect(component.pageNum).toBe(0);
       expect(userService.listUsers.calls.mostRecent().args).toEqual([undefined, 0, 10]);
+    }));
+  });
+
+  describe('typing into the search box', () => {
+    it('sends nothing while the typing goes on, and one request for the last text once it pauses', fakeAsync(() => {
+      component.search('a');
+      tick(USER_SEARCH_DEBOUNCE_MS - 50);
+      component.search('al');
+      tick(USER_SEARCH_DEBOUNCE_MS - 50);
+      component.search('ali');
+      tick(USER_SEARCH_DEBOUNCE_MS - 1);
+
+      expect(userService.listUsers).not.toHaveBeenCalled();
+
+      tick(1);
+
+      expect(userService.listUsers).toHaveBeenCalledOnceWith('ali', 0, 10);
+    }));
+
+    it('drops the text that a reload emptied the box of meanwhile', fakeAsync(() => {
+      component.search('ali');
+
+      component.refreshPage();
+      userService.listUsers.calls.reset();
+      tick(USER_SEARCH_DEBOUNCE_MS);
+
+      expect(userService.listUsers).not.toHaveBeenCalled();
+      expect(component.searchQuery).toBe('');
+    }));
+
+    it('drops the text when an edit reloaded the list meanwhile', fakeAsync(() => {
+      component.search('ali');
+
+      component.userUpdated();
+      userService.listUsers.calls.reset();
+      tick(USER_SEARCH_DEBOUNCE_MS);
+
+      expect(userService.listUsers).not.toHaveBeenCalled();
+    }));
+
+    it('keeps paging within the search that is shown, not the text still being typed', fakeAsync(() => {
+      component.search('ali');
+      tick(USER_SEARCH_DEBOUNCE_MS);
+      component.search('alic');
+
+      component.loadPage(1);
+
+      expect(userService.listUsers.calls.mostRecent().args).toEqual(['ali', 1, 10]);
+      flush();
+    }));
+
+    it('stops reacting once the page is gone', fakeAsync(() => {
+      component.search('ali');
+
+      component.ngOnDestroy();
+      tick(USER_SEARCH_DEBOUNCE_MS);
+
+      expect(userService.listUsers).not.toHaveBeenCalled();
+    }));
+  });
+
+  describe('overlapping requests', () => {
+    let answers: Subject<PagedModelUserResponse>[];
+
+    beforeEach(() => {
+      answers = [];
+      userService.listUsers.and.callFake(() => {
+        const answer = new Subject<PagedModelUserResponse>();
+        answers.push(answer);
+        return answer;
+      });
     });
+
+    it('never lets the slow answer of an old search overwrite the newer one', fakeAsync(() => {
+      component.search('a');
+      tick(USER_SEARCH_DEBOUNCE_MS);
+      component.search('ab');
+      tick(USER_SEARCH_DEBOUNCE_MS);
+      expect(userService.listUsers.calls.allArgs()).toEqual([
+        ['a', 0, 10],
+        ['ab', 0, 10],
+      ]);
+
+      answers[1].next(pageOf([user('ab')]));
+      answers[0].next(pageOf([user('a1'), user('a2')]));
+
+      expect(component.users.map((u) => u.id)).toEqual(['ab']);
+      expect(answers[0].observed).toBeFalse();
+    }));
+
+    it('shows the newer answer even when the older one never comes', fakeAsync(() => {
+      component.search('a');
+      tick(USER_SEARCH_DEBOUNCE_MS);
+      component.search('ab');
+      tick(USER_SEARCH_DEBOUNCE_MS);
+
+      answers[1].next(pageOf([user('ab')]));
+
+      expect(component.users.map((u) => u.id)).toEqual(['ab']);
+    }));
+
+    it('cancels the request of the page that was left when another page is asked for', () => {
+      component.loadPage(1);
+      component.loadPage(2);
+
+      answers[1].next(pageOf([user('p2')]));
+      answers[0].next(pageOf([user('p1')]));
+
+      expect(answers[0].observed).toBeFalse();
+      expect(component.users.map((u) => u.id)).toEqual(['p2']);
+    });
+
+    it('does not let a search answer overwrite the list a refresh loaded after it', fakeAsync(() => {
+      component.search('a');
+      tick(USER_SEARCH_DEBOUNCE_MS);
+
+      component.refreshPage();
+      answers[1].next(pageOf([user('all')]));
+      answers[0].next(pageOf([user('a1')]));
+
+      expect(component.users.map((u) => u.id)).toEqual(['all']);
+    }));
+
+    it('keeps the rows on screen and stays usable when a request fails', fakeAsync(() => {
+      component.ngOnInit();
+      answers[0].next(pageOf([user('1')]));
+      userService.listUsers.and.returnValues(
+        throwError(() => new Error('boom')),
+        of(pageOf([user('2')])),
+      );
+
+      component.loadPage(1);
+      expect(component.users.map((u) => u.id)).toEqual(['1']);
+
+      component.loadPage(2);
+      expect(component.users.map((u) => u.id)).toEqual(['2']);
+    }));
   });
 
   describe('after an edit', () => {
-    it('reloads without the old search, from the first page, so a renamed user stays listed', () => {
+    it('reloads without the old search, from the first page, so a renamed user stays listed', fakeAsync(() => {
       component.search('user-1');
+      tick(USER_SEARCH_DEBOUNCE_MS);
       component.loadPage(2);
       userService.listUsers.calls.reset();
 
@@ -144,7 +289,7 @@ describe('UserManagementComponent', () => {
       expect(component.searchQuery).toBe('');
       expect(component.pageNum).toBe(0);
       expect(userService.listUsers).toHaveBeenCalledOnceWith(undefined, 0, 10);
-    });
+    }));
 
     it('keeps the page when there was no search, since it is a page of the same list', () => {
       component.loadPage(2);
@@ -251,8 +396,9 @@ describe('UserManagementComponent', () => {
       expect(component.operationLock).toBeFalse();
     });
 
-    it('reloads without the old search, from the first page', () => {
+    it('reloads without the old search, from the first page', fakeAsync(() => {
       component.search('user-1');
+      tick(USER_SEARCH_DEBOUNCE_MS);
       component.loadPage(1);
       component.deleteUser(user('1'));
       userService.listUsers.calls.reset();
@@ -260,8 +406,8 @@ describe('UserManagementComponent', () => {
       dangerModalService.call();
 
       expect(component.searchQuery).toBe('');
-      expect(userService.listUsers.calls.allArgs()[0]).toEqual([undefined, 0, 10]);
-    });
+      expect(userService.listUsers.calls.allArgs()).toEqual([[undefined, 0, 10]]);
+    }));
 
     it('goes back to the first page when the last user of a later page is deleted', () => {
       userService.listUsers.and.returnValue(of(pageOf([user('9')], 2)));
@@ -272,10 +418,7 @@ describe('UserManagementComponent', () => {
       dangerModalService.call();
 
       expect(component.pageNum).toBe(0);
-      expect(userService.listUsers.calls.allArgs()).toEqual([
-        [undefined, 1, 10],
-        [undefined, 0, 10],
-      ]);
+      expect(userService.listUsers.calls.allArgs()).toEqual([[undefined, 0, 10]]);
     });
 
     it('stays on the first page when its last user is deleted', () => {
@@ -371,9 +514,11 @@ describe('UserManagementComponent search box', () => {
 
   const box = (): HTMLInputElement => fixture.nativeElement.querySelector('[data-testid="user-search"] input');
 
+  /** Types the text and lets the debounce pass, so the list request has gone out. */
   function type(text: string): void {
     box().value = text;
     box().dispatchEvent(new Event('input'));
+    tick(USER_SEARCH_DEBOUNCE_MS);
     fixture.detectChanges();
   }
 
@@ -397,7 +542,7 @@ describe('UserManagementComponent search box', () => {
     fixture.detectChanges();
   });
 
-  it('is emptied by the refresh button together with the query', () => {
+  it('is emptied by the refresh button together with the query', fakeAsync(() => {
     type('user-1');
     expect(userService.listUsers).toHaveBeenCalledWith('user-1', 0, 10);
 
@@ -406,9 +551,9 @@ describe('UserManagementComponent search box', () => {
 
     expect(box().value).toBe('');
     expect(userService.listUsers.calls.mostRecent().args).toEqual([undefined, 0, 10]);
-  });
+  }));
 
-  it('is emptied when the list reloads after an edit', () => {
+  it('is emptied when the list reloads after an edit', fakeAsync(() => {
     type('user-1');
 
     fixture.componentInstance.userUpdated();
@@ -416,11 +561,37 @@ describe('UserManagementComponent search box', () => {
 
     expect(box().value).toBe('');
     expect(userService.listUsers.calls.mostRecent().args).toEqual([undefined, 0, 10]);
-  });
+  }));
 
-  it('keeps the typed text while it is the query', () => {
+  it('keeps the typed text while it is the query', fakeAsync(() => {
     type('user-1');
 
     expect(box().value).toBe('user-1');
-  });
+  }));
+
+  it('does not send a request per keystroke', fakeAsync(() => {
+    userService.listUsers.calls.reset();
+
+    box().value = 'u';
+    box().dispatchEvent(new Event('input'));
+    box().value = 'us';
+    box().dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect(userService.listUsers).not.toHaveBeenCalled();
+    tick(USER_SEARCH_DEBOUNCE_MS);
+    expect(userService.listUsers).toHaveBeenCalledOnceWith('us', 0, 10);
+  }));
+
+  it('names the applied search, not the text still being typed, in the empty list message', fakeAsync(() => {
+    userService.listUsers.and.returnValue(of(pageOf([])));
+    type('nobody');
+
+    box().value = 'nobod';
+    box().dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('No user matches “nobody”.');
+    flush();
+  }));
 });

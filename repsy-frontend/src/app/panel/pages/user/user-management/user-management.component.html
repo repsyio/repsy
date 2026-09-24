@@ -332,7 +332,7 @@
   } @else {
     <!-- Empty State -->
     <div data-testid="user-empty">
-      <app-empty-list [message]="searchQuery ? 'No user matches “' + searchQuery + '”.' : 'No users found.'" />
+      <app-empty-list [message]="appliedQuery ? 'No user matches “' + appliedQuery + '”.' : 'No users found.'" />
     </div>
   }
 </section>
