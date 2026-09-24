@@ -20,7 +20,7 @@
  * for the protocol the descriptor (`pages/protocols/<proto>.ts`) describes, and a spec is one line:
  *
  * ```ts
- * registerPackageScenarios(DESCRIPTORS.maven, { knownFailures: { '05-mobile-list': 'RPS-1262' } });
+ * registerPackageScenarios(DESCRIPTORS.maven, { knownFailures: { '04-detail': 'RPS-1296' } });
  * ```
  *
  * Everything that differs between protocols is DATA in the descriptor (routes, row keys, search terms,

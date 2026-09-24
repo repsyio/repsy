@@ -126,6 +126,13 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
       });
   }
 
+  public get keywords(): string {
+    return (this.versionInfo?.keywords ?? [])
+      .map((item) => item.keyword)
+      .filter(Boolean)
+      .join(', ');
+  }
+
   public deleteVersion() {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;

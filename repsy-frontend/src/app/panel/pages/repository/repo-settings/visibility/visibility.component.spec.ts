@@ -14,11 +14,13 @@
 /// limitations under the License.
 ///
 
+import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 
 import { ProtocolRepoControllerService } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
+import { renderComponent } from '../../testing/render-spec-helpers';
 import { generalParentForm, lastSentForm, releaseAwareParentForm } from '../testing/repo-settings-spec-helpers';
 import { VisibilityComponent } from './visibility.component';
 
@@ -119,5 +121,41 @@ describe('VisibilityComponent', () => {
 
     expect(fetchCount).toBe(0);
     expect(toastService.show).not.toHaveBeenCalled();
+  });
+});
+
+describe('VisibilityComponent template', () => {
+  async function render(privateRepository: boolean): Promise<HTMLElement> {
+    const { el } = await renderComponent(
+      VisibilityComponent,
+      [
+        { provide: ProtocolRepoControllerService, useValue: {} },
+        { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+      ],
+      { repoName: REPO, repoType: RepoType.NPM, parentForm: generalParentForm({ privateRepository }) },
+    );
+    return el;
+  }
+
+  const text = (el: HTMLElement, testId: string): string | undefined =>
+    el.querySelector(`[data-testid="${testId}"]`)?.textContent?.trim();
+
+  it('describes the toggle by what Public and Private mean, not by "active" (RPS-1261)', async () => {
+    const el = await render(false);
+
+    expect(text(el, 'toggle-label')).toBe('Public');
+    expect(el.textContent).not.toContain('When active');
+    expect(el.textContent).not.toContain('only authorized users can access');
+    expect(el.textContent).toContain('Public: anyone can read the repository without signing in.');
+    expect(el.textContent).toContain('Private: access is limited to authorized users.');
+  });
+
+  it('hints at the switch to the OTHER state (RPS-1261)', async () => {
+    expect(text(await render(false), 'settings-visibility-hint')).toBe(
+      'Turn it off to restrict access to authorized users.',
+    );
+
+    TestBed.resetTestingModule();
+    expect(text(await render(true), 'settings-visibility-hint')).toBe('Turn it on to make the repository public.');
   });
 });

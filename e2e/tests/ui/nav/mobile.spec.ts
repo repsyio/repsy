@@ -21,8 +21,8 @@
  * menu"`) opens the mobile sidebar, which only exists in the DOM while open; below `lg` every list
  * shows its mobile card variant (`<page>-cards`, `<page>-card-<key>`) and its desktop grid is hidden.
  *
- * Known mobile gaps are not pinned here: the Cargo and NuGet version lists have no card variant and
- * npm/PyPI mobile lists gate Delete on the wrong permission (RPS-1262); the package stories own those.
+ * The per-protocol mobile card lists (including Cargo and NuGet versions and the mobile Delete gate of
+ * npm/PyPI, RPS-1262) are covered by the package stories' `05-mobile-*` steps.
  */
 import { RepoType } from '../../../src/api/panel-api.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
@@ -188,4 +188,28 @@ test.describe('Mobile viewport', () => {
       await expect(list.row(pkg)).toBeHidden();
     }
   });
+
+  // RPS-1262 (2): the Cargo and NuGet version lists rendered no cards below `lg`, only their pager.
+  for (const [repoType, descriptor] of [
+    [RepoType.CARGO, DESCRIPTORS.cargo],
+    [RepoType.NUGET, DESCRIPTORS.nuget],
+  ] as const) {
+    test(`NAV-02: the ${descriptor.label} version list shows cards, not the grid`, async ({
+      openUiPage,
+      adminSession,
+      seeder,
+      seedPackage,
+    }) => {
+      const page = await openUiPage({ session: adminSession, viewport: PHONE });
+      const repo = await seeder.createRepo(repoType);
+      const pkg = await seedPackage(repo);
+      const versions = protocolPages(page, descriptor, repo.name).versions(pkg);
+
+      await versions.goto();
+      await expect(versions.cards).toBeVisible();
+      await expect(versions.card(pkg)).toBeVisible();
+      await expect(versions.desktop.container).toBeHidden();
+      await expect(versions.row(pkg)).toBeHidden();
+    });
+  }
 });

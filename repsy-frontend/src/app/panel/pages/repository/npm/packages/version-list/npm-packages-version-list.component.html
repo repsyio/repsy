@@ -209,7 +209,7 @@
                   version.version
                 "
               >
-                @if (activeRegistry.canWrite) {
+                @if (activeRegistry.canManage) {
                   <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
                     <button
                       data-testid="row-delete"
@@ -244,7 +244,7 @@
                     />
                   </div>
                   <div class="flex justify-between gap-2">
-                    <span class="text-sm text-[#9FA0A0]">Upladed: </span>
+                    <span class="text-sm text-[#9FA0A0]">Uploaded: </span>
                     <span data-testid="row-updated" class="text-secondary-500 text-right break-all">
                       {{ version.createdAt | date: 'medium' }} {{ '(' + timeAgo(version.createdAt) + ')' }}
                     </span>

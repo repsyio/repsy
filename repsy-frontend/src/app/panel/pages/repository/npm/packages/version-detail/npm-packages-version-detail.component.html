@@ -38,11 +38,11 @@
         </div>
         <div class="inline-flex items-center gap-2 overflow-x-auto rounded-lg bg-[#101112] p-[14px]">
           <span class="text-white">Bugs URL: </span>
-          <span class="text-error">{{ versionInfo.packageName ? versionInfo.packageName : 'No bugs URL found!' }}</span>
+          <span class="text-error">{{ versionInfo.bugsUrl ? versionInfo.bugsUrl : 'No bugs URL found!' }}</span>
         </div>
         <div class="inline-flex items-center gap-2 overflow-x-auto rounded-lg bg-[#101112] p-[14px]">
           <span class="text-white">Keywords: </span>
-          <span class="text-error">No keywords found!</span>
+          <span class="text-error">{{ keywords ? keywords : 'No keywords found!' }}</span>
         </div>
       </div>
 

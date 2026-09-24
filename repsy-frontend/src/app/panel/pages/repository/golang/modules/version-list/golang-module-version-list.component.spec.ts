@@ -24,6 +24,7 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { SecurityService } from '../../../../security/service/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
+import { renderComponent } from '../../../testing/render-spec-helpers';
 import {
   describeEmptyingDelete,
   describeRepoListBehavior,
@@ -144,5 +145,42 @@ describe('GolangModuleVersionListComponent', () => {
       component.openConfig(false);
       expect(component.showConfig).toBeFalse();
     });
+  });
+});
+
+describe('GolangModuleVersionListComponent template', () => {
+  async function render(content: unknown[], totalPages: number): Promise<HTMLElement> {
+    const golangService = jasmine.createSpyObj<GolangService>('GolangService', ['fetchModuleVersions'], {
+      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, { canManage: true })),
+    });
+    golangService.fetchModuleVersions.and.returnValue(of(pageOf(content, totalPages) as never));
+    const securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
+    securityService.watchVersionSecuritySummary.and.returnValue(of({}));
+
+    const { el } = await renderComponent(GolangModuleVersionListComponent, [
+      {
+        provide: ActivatedRoute,
+        useValue: { snapshot: { queryParamMap: convertToParamMap({ modulePath: 'github.com/acme/lib' }) } },
+      },
+      { provide: AuthService, useValue: { username: 'alice' } },
+      { provide: GolangService, useValue: golangService },
+      { provide: SecurityService, useValue: securityService },
+    ]);
+    return el;
+  }
+
+  it('renders no pager under the empty state (RPS-1262: it printed "1 NaN")', async () => {
+    const el = await render([], 0);
+
+    expect(el.querySelector('app-empty-list')).not.toBeNull();
+    expect(el.querySelector('app-pagination')).toBeNull();
+  });
+
+  it('renders the pager under a page of versions', async () => {
+    const el = await render([{ id: 'v1', version: 'v1.0.0' }], 3);
+
+    expect(el.querySelector('app-empty-list')).toBeNull();
+    expect(el.querySelector('app-pagination')).not.toBeNull();
+    expect(el.querySelector('[data-testid="pagination"]')?.classList).not.toContain('hidden');
   });
 });

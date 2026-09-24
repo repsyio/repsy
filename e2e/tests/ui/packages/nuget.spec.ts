@@ -29,13 +29,13 @@ import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
 
 const nuget = DESCRIPTORS.nuget;
 
-// RPS-1262 (2): like Cargo's, the NuGet version list has only the `hidden ... lg:block` desktop table,
-// so a phone renders nothing but the pager. RPS-1262 (3): unlike every other version list it has no
-// search box (the sort is there).
+// RPS-1262 (3): unlike every other version list the NuGet one has no search box (the sort is there):
+// `GET /api/nuget/packages/{repo}/{id}/versions` takes no search parameter, so the box needs a backend
+// change first and stays pinned.
 registerPackageScenarios(nuget, {
   knownFailures: {
-    '02-versions-search': 'RPS-1262: the NuGet version list has no search box',
-    '05-mobile-versions': 'RPS-1262: the version list renders no cards below lg',
+    '02-versions-search':
+      'RPS-1262: the NuGet version list has no search box (the API has no search parameter)',
   },
 });
 

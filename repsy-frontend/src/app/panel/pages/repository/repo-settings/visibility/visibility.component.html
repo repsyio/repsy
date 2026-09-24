@@ -15,12 +15,14 @@
     />
 
     <div class="text-[13px]">
-      <p class="text-[#FDFDFD]">When active, only authorized users can access the repository.<br /></p>
+      <p class="text-[#FDFDFD]">
+        Public: anyone can read the repository without signing in. Private: access is limited to authorized users.<br />
+      </p>
       <p data-testid="settings-visibility-hint" class="text-[#9FA0A0]">
         {{
           this.parentForm.get('privateRepository').value
-            ? 'Deactivate it for private visibility.'
-            : 'Activate it for public visibility.'
+            ? 'Turn it on to make the repository public.'
+            : 'Turn it off to restrict access to authorized users.'
         }}
       </p>
     </div>

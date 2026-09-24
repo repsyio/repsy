@@ -57,22 +57,16 @@ async function openBrowser(page: Page, path: string): Promise<void> {
 }
 
 /**
- * Opens the directory `dir` of the current listing and waits for its breadcrumb. It clicks until that
- * shows, because the FIRST click on a cold-loaded browser does not descend (RPS-1297, pinned below):
- * the repository's permissions load twice, the second load empties the directory stack while the first
- * listing is still in flight, and the next `go()` then only re-creates the root entry and re-reads it.
+ * Opens the directory `dir` of the current listing with ONE click and waits for its breadcrumb. That
+ * click must work even on a cold-loaded browser (RPS-1297, fixed: the permissions load once and a
+ * reload of them no longer empties the directory stack).
  */
 async function enterDirectory(page: Page, dir: string): Promise<void> {
-  const crumb = page.getByTestId(`maven-browser-path-${dir}/`);
-  await expect(async () => {
-    if (!(await crumb.isVisible())) {
-      await page
-        .getByTestId(browserItem(`${dir}/`))
-        .getByTestId('row-open')
-        .click();
-    }
-    await expect(crumb).toBeVisible({ timeout: 2000 });
-  }).toPass({ timeout: 20_000 });
+  await page
+    .getByTestId(browserItem(`${dir}/`))
+    .getByTestId('row-open')
+    .click();
+  await expect(page.getByTestId(`maven-browser-path-${dir}/`)).toBeVisible();
 }
 
 test.describe('Maven file browser', { tag: '@packages' }, () => {
@@ -201,39 +195,41 @@ test.describe('Maven file browser', { tag: '@packages' }, () => {
     await expect(adminPage.getByTestId('maven-browser-grid')).toBeVisible();
   });
 
-  // RPS-1297: the first click on a directory of a freshly loaded browser does not open it (the page
-  // loads the repository's permissions twice; see `enterDirectory`).
-  test.fail(
-    'PKG-maven-07 the first click on a directory of a freshly loaded browser opens it (RPS-1297)',
-    async ({ adminPage, seeder, seedPackage }) => {
-      const repo = await seeder.createRepo(RepoType.MAVEN);
-      const pkg = await seedPackage(repo);
-      await openBrowser(adminPage, protocolPages(adminPage, maven, repo.name).extraPath('browser'));
-      const top = directories(pkg.name, pkg.version)[0];
-      await adminPage
-        .getByTestId(browserItem(`${top}/`))
-        .getByTestId('row-open')
-        .click();
-      await expect(adminPage.getByTestId(`maven-browser-path-${top}/`)).toBeVisible({
-        timeout: 3000,
-      });
-    },
-  );
+  // RPS-1297: the first click on a directory of a freshly loaded browser opens it (the page used to
+  // load the repository's permissions twice, and the second load emptied the directory stack).
+  test('PKG-maven-07 the first click on a directory of a freshly loaded browser opens it (RPS-1297)', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    const pkg = await seedPackage(repo);
+    await openBrowser(adminPage, protocolPages(adminPage, maven, repo.name).extraPath('browser'));
+    const top = directories(pkg.name, pkg.version)[0];
+    await adminPage
+      .getByTestId(browserItem(`${top}/`))
+      .getByTestId('row-open')
+      .click();
+    await expect(adminPage.getByTestId(`maven-browser-path-${top}/`)).toBeVisible({
+      timeout: 3000,
+    });
+  });
 
-  // RPS-1262 (4): the browser page always renders a Settings button, disabled for a USER, where every
+  // RPS-1262 (4): the browser page used to render a Settings button disabled for a USER, where every
   // other package page removes it (`@if (canManage)`).
-  test.fail(
-    'PKG-maven-05 a USER sees no Settings button on the file browser (RPS-1262)',
-    async ({ adminPage, userPage, seeder }) => {
-      const repo = await seeder.createRepo(RepoType.MAVEN);
-      const pages = protocolPages(userPage, maven, repo.name);
-      await adminPage.goto(pages.extraPath('browser'));
-      await expect(adminPage.getByTestId('pkg-settings')).toBeEnabled(); // the control
-      await userPage.goto(pages.extraPath('browser'));
-      await expect(userPage.getByTestId('pkg-toolbar')).toBeVisible();
-      await expect(userPage.getByTestId('pkg-settings')).toHaveCount(0);
-    },
-  );
+  test('PKG-maven-05 a USER sees no Settings button on the file browser (RPS-1262)', async ({
+    adminPage,
+    userPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    const pages = protocolPages(userPage, maven, repo.name);
+    await adminPage.goto(pages.extraPath('browser'));
+    await expect(adminPage.getByTestId('pkg-settings')).toBeEnabled(); // the control
+    await userPage.goto(pages.extraPath('browser'));
+    await expect(userPage.getByTestId('pkg-toolbar')).toBeVisible();
+    await expect(userPage.getByTestId('pkg-settings')).toHaveCount(0);
+  });
 });
 
 test.describe('Maven group page', { tag: '@packages' }, () => {
@@ -303,7 +299,7 @@ test.describe('Maven version detail', { tag: '@packages' }, () => {
   const SNIPPETS = (group: string, artifact: string, version: string) =>
     [
       ['pom', 'Pom XML', `<artifactId>${artifact}</artifactId>`],
-      ['gradle-groovy', 'Gradle Groovy DSL', 'Gradle Groovy DSL'], // content: see RPS-1261 below
+      ['gradle-groovy', 'Gradle Groovy DSL', 'Gradle Groovy DSL'], // content: see the RPS-1261 test below
       ['gradle-kotlin', 'Gradle Kotlin DSL', `implementation("${group}:${artifact}:${version}")`],
       ['sbt', 'Scala SBT', `libraryDependencies += "${group}" % "${artifact}" % "${version}"`],
       ['ivy', 'Apache Ivy', `<dependency org="${group}" name="${artifact}" rev="${version}" />`],
@@ -360,20 +356,21 @@ test.describe('Maven version detail', { tag: '@packages' }, () => {
     );
   });
 
-  // RPS-1261 (3): the "Gradle Groovy DSL" block is bound to the Groovy Grape snippet, so it repeats
-  // the Grape block and the `implementation '...'` line the component builds is never shown.
-  test.fail(
-    'PKG-maven-07 the Gradle Groovy DSL block shows the Gradle dependency, not the Grape one (RPS-1261)',
-    async ({ adminPage, seeder, seedPackage }) => {
-      const repo = await seeder.createRepo(RepoType.MAVEN);
-      const pkg = await seedPackage(repo);
-      const [group, artifact] = pkg.name.split(':');
-      const detail = protocolPages(adminPage, maven, repo.name).detail(pkg);
-      await detail.goto();
-      await expect(detail.snippet('gradle-groovy')).toContainText(
-        `implementation '${group}:${artifact}:${pkg.version}'`,
-      );
-      await expect(detail.snippet('gradle-groovy')).not.toContainText('@Grapes');
-    },
-  );
+  // RPS-1261 (3): the "Gradle Groovy DSL" block used to be bound to the Groovy Grape snippet, so the
+  // `implementation '...'` line the component builds was never shown.
+  test('PKG-maven-07 the Gradle Groovy DSL block shows the Gradle dependency, not the Grape one (RPS-1261)', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    const pkg = await seedPackage(repo);
+    const [group, artifact] = pkg.name.split(':');
+    const detail = protocolPages(adminPage, maven, repo.name).detail(pkg);
+    await detail.goto();
+    await expect(detail.snippet('gradle-groovy')).toContainText(
+      `implementation '${group}:${artifact}:${pkg.version}'`,
+    );
+    await expect(detail.snippet('gradle-groovy')).not.toContainText('@Grapes');
+  });
 });

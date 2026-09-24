@@ -26,8 +26,9 @@ import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
  *    manifest's `name`, which for a single-platform image pushed by tag IS THE TAG (probed: the row is
  *    `pkg-manifests-row-1.0.0`, not the digest); a multi-platform index may name its rows otherwise
  *    (not seeded: the seeder pushes single-platform images). Confirmed in a browser by RPS-1256.
- *  - RPS-1261: the manifest table's DESKTOP columns show wrong values (UX-13), so assert a manifest
- *    row by its `pkg-manifests-row-<key>` id, never by its desktop cell text (the mobile card is right).
+ *  - RPS-1261 (fixed): the manifest table's DESKTOP Digest / Config Digest cells used to show the
+ *    platform / the digest; PKG-docker-07 asserts them now. A manifest row is still found by its
+ *    `pkg-manifests-row-<key>` id.
  *  - The tag and manifest lists carry the install bar `pkg-install-snippet` above the toolbar; the
  *    image list does not. Detail deletes are titled "Delete Version" but toast "Tag deleted
  *    successfully"; the tag list's own dialog is "Delete Tag".

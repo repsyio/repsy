@@ -77,7 +77,14 @@ export class MavenBrowserComponent implements OnDestroy {
   ) {
     this.repoChanges$ = this.mavenService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
+        // A reload of the permissions of the repository that is already open must not send the user
+        // back to the root, or reset the path while its first listing is still in flight.
+        const sameRepo = this.activeRepo.repoName === repo.repoName && this.directoryStack.length > 0;
         this.activeRepo = repo;
+        if (sameRepo) {
+          return;
+        }
+
         this.repoUrl = '';
         this.baseUrl = environment.apiBaseUrl;
         this.directoryStack = [];

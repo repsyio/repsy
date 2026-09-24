@@ -30,14 +30,7 @@ import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
 
 const pypi = DESCRIPTORS.pypi;
 
-// RPS-1262 (1): the mobile cards of the package list and of the version list gate Delete on
-// `canWrite` (a USER may write in this edition), where the desktop rows and the other lists use `canManage`.
-registerPackageScenarios(pypi, {
-  knownFailures: {
-    '05-mobile-list': 'RPS-1262: mobile package-list cards gate Delete on canWrite',
-    '05-mobile-versions': 'RPS-1262: mobile version-list cards gate Delete on canWrite',
-  },
-});
+registerPackageScenarios(pypi);
 
 const DESCRIPTION = '# Long Title\n\nA **bold** description with `code`.\n';
 
@@ -145,18 +138,18 @@ test.describe('PyPI release detail', { tag: '@packages' }, () => {
     }
   });
 
-  // RPS-1261 (5): a post release (`1.0.0.post1`) is labelled "Pre release:".
-  test.fail(
-    'PKG-pypi-07 a post release is not labelled as a pre release (RPS-1261)',
-    async ({ adminPage, seeder }) => {
-      const repo = await seeder.createRepo(RepoType.PYPI);
-      const pkg = await uploadRich(repo.name, `e2e-${seeder.runId}-post`, '1.0.0.post1');
-      const detail = protocolPages(adminPage, pypi, repo.name).detail(pkg);
-      await detail.goto();
-      await expect(detail.byId('pkg-detail-version')).toHaveText('1.0.0.post1');
-      await expect(detail.byId('pkg-detail-release-kind')).not.toContainText('Pre release');
-    },
-  );
+  // RPS-1261 (5): a post release (`1.0.0.post1`) used to be labelled "Pre release:".
+  test('PKG-pypi-07 a post release is not labelled as a pre release (RPS-1261)', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.PYPI);
+    const pkg = await uploadRich(repo.name, `e2e-${seeder.runId}-post`, '1.0.0.post1');
+    const detail = protocolPages(adminPage, pypi, repo.name).detail(pkg);
+    await detail.goto();
+    await expect(detail.byId('pkg-detail-version')).toHaveText('1.0.0.post1');
+    await expect(detail.byId('pkg-detail-release-kind')).toHaveText('Post release:');
+  });
 });
 
 test.describe('PyPI package list', { tag: '@packages' }, () => {
@@ -173,19 +166,21 @@ test.describe('PyPI package list', { tag: '@packages' }, () => {
     await expect(list.inRow(latest, 'row-package-link')).toContainText(latest.name);
   });
 
-  // RPS-1261 (5): on the mobile card the "Latest" link prints the package NAME instead of its latest version.
-  test.fail(
-    'PKG-pypi-07 the mobile card shows the latest version in its Latest link (RPS-1261)',
-    async ({ openUiPage, adminSession, seeder, seedVersions }) => {
-      const repo = await seeder.createRepo(RepoType.PYPI);
-      const [, latest] = await seedVersions(repo, ['1.0.0', '2.0.0']);
-      const mobile = await openUiPage({
-        session: adminSession,
-        viewport: { width: 390, height: 844 },
-      });
-      const list = protocolPages(mobile, pypi, repo.name).list();
-      await list.goto();
-      await expect(list.card(latest).getByTestId('row-latest-link')).toContainText('2.0.0');
-    },
-  );
+  // RPS-1261 (5): on the mobile card the "Latest" link used to print the package NAME instead of its latest version.
+  test('PKG-pypi-07 the mobile card shows the latest version in its Latest link (RPS-1261)', async ({
+    openUiPage,
+    adminSession,
+    seeder,
+    seedVersions,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.PYPI);
+    const [, latest] = await seedVersions(repo, ['1.0.0', '2.0.0']);
+    const mobile = await openUiPage({
+      session: adminSession,
+      viewport: { width: 390, height: 844 },
+    });
+    const list = protocolPages(mobile, pypi, repo.name).list();
+    await list.goto();
+    await expect(list.card(latest).getByTestId('row-latest-link')).toContainText('2.0.0');
+  });
 });

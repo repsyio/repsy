@@ -23,6 +23,7 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { SecurityService } from '../../../../security/service/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
+import { renderComponent } from '../../../testing/render-spec-helpers';
 import {
   describeRepoListBehavior,
   describeSimpleDelete,
@@ -115,5 +116,47 @@ describe('PypiPackagesListComponent', () => {
       component.openConfig(false);
       expect(component.showConfig).toBeFalse();
     });
+  });
+});
+
+describe('PypiPackagesListComponent template', () => {
+  async function render(flags: Parameters<typeof permission>[1]): Promise<HTMLElement> {
+    const service = jasmine.createSpyObj<PypiService>('PypiService', ['fetchRepositoryPackagesLikeName'], {
+      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, flags)),
+    });
+    service.fetchRepositoryPackagesLikeName.and.returnValue(
+      of(pageOf([{ name: 'requests', latestVersion: '2.0.0', stableVersion: '1.0.0' }], 1) as never),
+    );
+    const securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchArtifactSecuritySummary']);
+    securityService.watchArtifactSecuritySummary.and.returnValue(of({}));
+
+    const { el } = await renderComponent(PypiPackagesListComponent, [
+      { provide: AuthService, useValue: { username: 'alice' } },
+      { provide: PypiService, useValue: service },
+      { provide: SecurityService, useValue: securityService },
+    ]);
+    return el;
+  }
+
+  const cardMenu = '[data-testid="pkg-list-card-requests"] [data-testid="row-menu"]';
+  const rowMenu = '[data-testid="pkg-list-row-requests"] [data-testid="row-menu"]';
+
+  it('offers Delete on the mobile card exactly where it does on the desktop row: to a manager (RPS-1262)', async () => {
+    const manager = await render({ canWrite: true, canManage: true });
+    expect(manager.querySelector(rowMenu)).not.toBeNull();
+    expect(manager.querySelector(cardMenu)).not.toBeNull();
+  });
+
+  it('offers no Delete on the mobile card to a user who can write but not manage (RPS-1262)', async () => {
+    const writer = await render({ canWrite: true, canManage: false });
+    expect(writer.querySelector(rowMenu)).toBeNull();
+    expect(writer.querySelector(cardMenu)).toBeNull();
+  });
+
+  it('shows the latest VERSION in the Latest link of the mobile card (RPS-1261)', async () => {
+    const el = await render({ canManage: true });
+
+    const latest = el.querySelector('[data-testid="pkg-list-card-requests"] [data-testid="row-latest-link"]');
+    expect(latest?.textContent?.trim()).toBe('2.0.0');
   });
 });
