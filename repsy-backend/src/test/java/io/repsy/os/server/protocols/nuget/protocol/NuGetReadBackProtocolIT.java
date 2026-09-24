@@ -39,7 +39,6 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DisplayName;
@@ -174,7 +173,7 @@ class NuGetReadBackProtocolIT extends AbstractIntegrationTest {
 
     try (final var zip = new ZipOutputStream(out)) {
       for (final var entry : entries) {
-        zip.putNextEntry(new ZipEntry(entry.name()));
+        zip.putNextEntry(FixtureZipEntry.named(entry.name()));
         zip.write(entry.content());
         zip.closeEntry();
       }
