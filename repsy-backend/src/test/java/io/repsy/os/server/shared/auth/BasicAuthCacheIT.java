@@ -48,8 +48,16 @@ import org.springframework.transaction.annotation.Transactional;
 @DisplayName("HTTP Basic remembers a successful password check")
 class BasicAuthCacheIT extends AbstractIntegrationTest {
 
-  /** Needs MANAGE, so the users below are admins; the Basic check itself is what is under test. */
-  private static final String COUNT_URL = "/api/repos/MAVEN/count";
+  /**
+   * A route that takes Basic credentials and needs an admin: {@code MANAGE} on a repo that does not
+   * exist. The auth interceptor authenticates the caller and checks the role as for a private repo
+   * before it answers {@code repoNotFound}, so {@link #AUTHENTICATED} (404) means "the credentials
+   * were accepted" and a 401 means they were not. No repo has to exist, which keeps the class free
+   * of rows other than its users.
+   */
+  private static final String PROBE_URL = "/api/repos/no-such-repo/settings";
+
+  private static final int AUTHENTICATED = 404;
 
   private static final String NEW_PASSWORD = "NewPassword1!";
 
@@ -75,7 +83,7 @@ class BasicAuthCacheIT extends AbstractIntegrationTest {
   private void basicRequest(final String username, final String password, final int expectedStatus)
       throws Exception {
 
-    this.perform(get(COUNT_URL).header(AUTHORIZATION, basicAuth(username, password)))
+    this.perform(get(PROBE_URL).header(AUTHORIZATION, basicAuth(username, password)))
         .andExpect(status().is(expectedStatus));
   }
 
@@ -85,11 +93,11 @@ class BasicAuthCacheIT extends AbstractIntegrationTest {
     final var username = this.createAdmin();
     final var hitsBefore = this.cache.hitCount();
 
-    this.basicRequest(username, VALID_PASSWORD, 200);
+    this.basicRequest(username, VALID_PASSWORD, AUTHENTICATED);
     assertThat(this.cache.hitCount()).isEqualTo(hitsBefore);
 
-    this.basicRequest(username, VALID_PASSWORD, 200);
-    this.basicRequest(username, VALID_PASSWORD, 200);
+    this.basicRequest(username, VALID_PASSWORD, AUTHENTICATED);
+    this.basicRequest(username, VALID_PASSWORD, AUTHENTICATED);
     assertThat(this.cache.hitCount()).isEqualTo(hitsBefore + 2);
   }
 
@@ -98,9 +106,9 @@ class BasicAuthCacheIT extends AbstractIntegrationTest {
   void wrongPasswordIsStillRejected() throws Exception {
     final var username = this.createAdmin();
 
-    this.basicRequest(username, VALID_PASSWORD, 200);
+    this.basicRequest(username, VALID_PASSWORD, AUTHENTICATED);
     this.basicRequest(username, "wrong", 401);
-    this.basicRequest(username, VALID_PASSWORD, 200);
+    this.basicRequest(username, VALID_PASSWORD, AUTHENTICATED);
   }
 
   @Test
@@ -109,8 +117,8 @@ class BasicAuthCacheIT extends AbstractIntegrationTest {
     final var username = this.createAdmin();
     final var user = this.userRepository.findByUsername(username).orElseThrow();
 
-    this.basicRequest(username, VALID_PASSWORD, 200);
-    this.basicRequest(username, VALID_PASSWORD, 200);
+    this.basicRequest(username, VALID_PASSWORD, AUTHENTICATED);
+    this.basicRequest(username, VALID_PASSWORD, AUTHENTICATED);
 
     this.perform(
             put("/api/profile/password")
@@ -120,7 +128,7 @@ class BasicAuthCacheIT extends AbstractIntegrationTest {
         .andExpect(status().isOk());
 
     this.basicRequest(username, VALID_PASSWORD, 401);
-    this.basicRequest(username, NEW_PASSWORD, 200);
+    this.basicRequest(username, NEW_PASSWORD, AUTHENTICATED);
   }
 
   @Test
@@ -129,8 +137,8 @@ class BasicAuthCacheIT extends AbstractIntegrationTest {
     final var username = this.createAdmin();
     final var user = this.userRepository.findByUsername(username).orElseThrow();
 
-    this.basicRequest(username, VALID_PASSWORD, 200);
-    this.basicRequest(username, VALID_PASSWORD, 200);
+    this.basicRequest(username, VALID_PASSWORD, AUTHENTICATED);
+    this.basicRequest(username, VALID_PASSWORD, AUTHENTICATED);
 
     this.userTxService.deleteUserById(user.getId());
 
@@ -143,8 +151,8 @@ class BasicAuthCacheIT extends AbstractIntegrationTest {
     final var username = this.createAdmin();
     final var user = this.userRepository.findByUsername(username).orElseThrow();
 
-    this.basicRequest(username, VALID_PASSWORD, 200);
-    this.basicRequest(username, VALID_PASSWORD, 200);
+    this.basicRequest(username, VALID_PASSWORD, AUTHENTICATED);
+    this.basicRequest(username, VALID_PASSWORD, AUTHENTICATED);
 
     user.setRole(UserRole.USER);
     this.userRepository.save(user);

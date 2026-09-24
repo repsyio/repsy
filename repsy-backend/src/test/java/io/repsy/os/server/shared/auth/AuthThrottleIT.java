@@ -74,7 +74,16 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 class AuthThrottleIT extends AbstractIntegrationTest {
 
   private static final int MAX_FAILURES = 20;
-  private static final String COUNT_URL = "/api/repos/MAVEN/count";
+
+  /**
+   * A route that takes Basic credentials and needs an admin: {@code MANAGE} on a repo that does not
+   * exist. The auth interceptor authenticates the caller and checks the role as for a private repo
+   * before it answers {@code repoNotFound}, so {@code AUTHENTICATED} (404) means "the credentials
+   * were accepted" and a 401 means they were not.
+   */
+  private static final String PROBE_URL = "/api/repos/no-such-repo/settings";
+
+  private static final int AUTHENTICATED = 404;
   private static final String PRIVATE_READ = "/{repo}/com/example/lib/1.0/lib-1.0.pom";
   private static final String NPM_BEARER_CHALLENGE =
       "Bearer realm=\"Repsy Managed Registry\", Basic realm=\"Repsy Managed Registry\"";
@@ -125,13 +134,13 @@ class AuthThrottleIT extends AbstractIntegrationTest {
   private MockHttpServletResponse apiBasic(final String user, final String password)
       throws Exception {
     return this.send(
-        get(COUNT_URL).header(AUTHORIZATION, basicAuth(user, password)).with(apiPort()));
+        get(PROBE_URL).header(AUTHORIZATION, basicAuth(user, password)).with(apiPort()));
   }
 
   private MockHttpServletResponse apiBasic(
       final String user, final String password, final String clientAddress) throws Exception {
     return this.send(
-        get(COUNT_URL)
+        get(PROBE_URL)
             .header(AUTHORIZATION, basicAuth(user, password))
             .with(apiPort())
             .with(remoteAddr(clientAddress)));
@@ -296,8 +305,8 @@ class AuthThrottleIT extends AbstractIntegrationTest {
   void countsOnlyFailures() throws Exception {
     this.failApi(MAX_FAILURES - 1);
 
-    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(200);
-    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(200);
+    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(AUTHENTICATED);
+    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(AUTHENTICATED);
     assertThat(this.apiBasic(this.username, "wrong").getStatus()).isEqualTo(401);
     expectThrottled(this.apiBasic(this.username, "wrong"));
   }
@@ -308,7 +317,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     this.failApi(MAX_FAILURES - 1);
 
     // The attacker's own valid account cannot buy more guesses.
-    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(200);
+    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(AUTHENTICATED);
 
     assertThat(this.apiBasic(this.username, "wrong").getStatus()).isEqualTo(401);
     expectThrottled(this.apiBasic(this.username, "wrong"));
@@ -320,7 +329,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     for (var i = 0; i < MAX_FAILURES; i++) {
       final var response =
           this.send(
-              get(COUNT_URL)
+              get(PROBE_URL)
                   .header(AUTHORIZATION, basicAuth(this.username, "wrong"))
                   .header("X-Forwarded-For", "203.0.113." + i)
                   .header("X-Real-IP", "203.0.113." + i)
@@ -338,7 +347,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     expectThrottled(this.apiBasic(this.username, VALID_PASSWORD));
 
     assertThat(this.apiBasic(this.username, VALID_PASSWORD, OTHER_CLIENT).getStatus())
-        .isEqualTo(200);
+        .isEqualTo(AUTHENTICATED);
     assertThat(this.apiBasic(this.username, "wrong", OTHER_CLIENT).getStatus()).isEqualTo(401);
   }
 
@@ -352,7 +361,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     expectThrottled(this.apiBasic(this.username, VALID_PASSWORD));
 
     this.advance(Duration.ofSeconds(1));
-    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(200);
+    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(AUTHENTICATED);
     this.failApi(MAX_FAILURES - 1);
     assertThat(this.apiBasic(this.username, "wrong").getStatus()).isEqualTo(401);
     expectThrottled(this.apiBasic(this.username, "wrong"));
@@ -362,12 +371,12 @@ class AuthThrottleIT extends AbstractIntegrationTest {
   @DisplayName("lets a remembered password through while the client is blocked, without a hash")
   void rememberedPasswordPassesWhileBlocked() throws Exception {
     // The first successful request remembers the password.
-    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(200);
+    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(AUTHENTICATED);
     this.failApi(MAX_FAILURES);
     expectThrottled(this.apiBasic(this.username, "wrong"));
     clearInvocations(this.cache);
 
-    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(200);
+    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(AUTHENTICATED);
 
     verify(this.cache, never()).matches(any(), anyString());
   }
@@ -375,7 +384,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
   @Test
   @DisplayName("stops letting even a remembered password through once the client keeps guessing")
   void guessingSaturatesTheThrottle() throws Exception {
-    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(200);
+    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(AUTHENTICATED);
     this.failApi(MAX_FAILURES);
 
     // A guess at a remembered password costs a lookup, so refused guesses count as well.
@@ -386,7 +395,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     expectThrottled(this.apiBasic(this.username, VALID_PASSWORD));
 
     this.advance(Duration.ofSeconds(60));
-    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(200);
+    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(AUTHENTICATED);
   }
 
   @Test

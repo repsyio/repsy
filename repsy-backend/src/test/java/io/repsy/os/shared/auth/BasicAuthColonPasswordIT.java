@@ -52,8 +52,16 @@ class BasicAuthColonPasswordIT extends AbstractIntegrationTest {
 
   private static final String COLON_PASSWORD = "Pass:Word1:tail";
 
-  /** Needs MANAGE, so the users below are admins; the Basic check itself is what is under test. */
-  private static final String COUNT_URL = "/api/repos/MAVEN/count";
+  /**
+   * A route that takes Basic credentials and needs an admin: {@code MANAGE} on a repo that does not
+   * exist. The auth interceptor authenticates the caller and checks the role as for a private repo
+   * before it answers {@code repoNotFound}, so {@link #AUTHENTICATED} (404) means "the credentials
+   * were accepted" and a 401 means they were not. No repo has to exist, which keeps the class free
+   * of rows other than its users.
+   */
+  private static final String PROBE_URL = "/api/repos/no-such-repo/settings";
+
+  private static final int AUTHENTICATED = 404;
 
   private final List<UUID> createdUserIds = new ArrayList<>();
 
@@ -75,7 +83,7 @@ class BasicAuthColonPasswordIT extends AbstractIntegrationTest {
   private void basicRequest(final String username, final String password, final int expectedStatus)
       throws Exception {
 
-    this.perform(get(COUNT_URL).header(AUTHORIZATION, basicAuth(username, password)))
+    this.perform(get(PROBE_URL).header(AUTHORIZATION, basicAuth(username, password)))
         .andExpect(status().is(expectedStatus));
   }
 
@@ -84,7 +92,7 @@ class BasicAuthColonPasswordIT extends AbstractIntegrationTest {
   void authenticatesWithAColonPassword() throws Exception {
     final var username = this.createAdminWithPassword(COLON_PASSWORD);
 
-    this.basicRequest(username, COLON_PASSWORD, 200);
+    this.basicRequest(username, COLON_PASSWORD, AUTHENTICATED);
   }
 
   @Test
@@ -131,7 +139,7 @@ class BasicAuthColonPasswordIT extends AbstractIntegrationTest {
                 .content("{\"password\":\"%s\"}".formatted(COLON_PASSWORD)))
         .andExpect(status().isOk());
 
-    this.basicRequest(username, COLON_PASSWORD, 200);
+    this.basicRequest(username, COLON_PASSWORD, AUTHENTICATED);
     this.basicRequest(username, VALID_PASSWORD, 401);
     assertThat(this.userRepository.findById(user.getId()).orElseThrow().getHash())
         .isNotEqualTo(user.getHash());

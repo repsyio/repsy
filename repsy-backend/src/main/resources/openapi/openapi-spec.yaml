@@ -488,43 +488,6 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Count the repositories of each type
-  "/api/repos/{repoType}":
-    post:
-      tags:
-        - protocol-repo-controller
-      operationId: createRepo
-      parameters:
-        - name: repoType
-          in: path
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoType"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/RepoCreateForm"
-        required: true
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseVoid"
-        '400':
-          "$ref": "#/components/responses/BadRequest"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '409':
-          "$ref": "#/components/responses/Conflict"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Create a new repository
   "/api/repos/{repoName}/deploy-tokens":
     get:
       tags:
@@ -914,58 +877,6 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Get total usage statistics
-  "/api/repos/{repoType}/info":
-    get:
-      tags:
-        - protocol-repo-controller
-      operationId: getInfo
-      parameters:
-        - name: repoType
-          in: path
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoType"
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseListRepoListInfo"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Get repository list info by type
-  "/api/repos/{repoType}/count":
-    get:
-      tags:
-        - protocol-repo-controller
-      operationId: getCount
-      parameters:
-        - name: repoType
-          in: path
-          required: true
-          schema:
-            "$ref": "#/components/schemas/RepoType"
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/RestResponseLong"
-        '401':
-          "$ref": "#/components/responses/Unauthorized"
-        '403':
-          "$ref": "#/components/responses/Forbidden"
-        '404':
-          "$ref": "#/components/responses/NotFound"
-        '429':
-          "$ref": "#/components/responses/TooManyRequests"
-      summary: Get repository count by type
   "/api/repos/{repoName}/usage":
     get:
       tags:
@@ -4832,22 +4743,6 @@ components:
         - username
         - role
     ProtocolApiFacade: { }
-    RepoCreateForm:
-      type: object
-      properties:
-        name:
-          type: string
-          maxLength: 25
-          minLength: 0
-          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_\\-]*$"
-        description:
-          type: string
-          maxLength: 500
-        privateRepo:
-          type: boolean
-          nullable: false
-      required:
-        - name
     DeployTokenForm:
       type: object
       properties:
@@ -5137,8 +5032,7 @@ components:
     RepoCreateRequest:
       type: object
       description: >-
-        A new repository. The same fields as RepoCreateForm plus the repository type, which
-        `POST /api/repos` takes from the body instead of the path.
+        A new repository: its name, description and visibility, and its type.
       properties:
         name:
           type: string
@@ -5208,21 +5102,6 @@ components:
           "$ref": "#/components/schemas/ResponseType"
         data:
           "$ref": "#/components/schemas/RepoCounts"
-        errorCode:
-          type: string
-        text:
-          type: string
-    RestResponseListRepoListInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: array
-          items:
-            "$ref": "#/components/schemas/RepoListInfo"
         errorCode:
           type: string
         text:

@@ -73,11 +73,13 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
     final var name = unique("cargo");
     this.mockMvc
         .perform(
-            post("/api/repos/" + type.name())
+            post("/api/repos")
                 .with(apiPort())
                 .header(AUTHORIZATION, this.bearerTokenFor(admin))
                 .contentType("application/json")
-                .content("{\"name\":\"%s\",\"privateRepo\":%s}".formatted(name, privateRepo)))
+                .content(
+                    "{\"name\":\"%s\",\"type\":\"%s\",\"privateRepo\":%s}"
+                        .formatted(name, type.name(), privateRepo)))
         .andExpect(status().isOk());
     this.entityManager.flush();
     return this.repoRepository.findByName(name).orElseThrow();

@@ -53,8 +53,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  * <p>The routes are not listed here: they are every panel handler of
  * {@code @RepoOperation(MANAGE)}, so a route added later is covered without touching the test. The
  * authorization runs in {@code ProtocolAuthInterceptor} before a handler is invoked, so the path
- * variables other than the repository (and its type) are placeholders and no request changes
- * anything.
+ * variables other than the repository are placeholders and no request changes anything.
  */
 @DisplayName("MANAGE routes: 403 for a user who is not allowed, 401 for a bad credential")
 class ManageRoutesStatusIT extends AbstractIntegrationTest {
@@ -76,7 +75,6 @@ class ManageRoutesStatusIT extends AbstractIntegrationTest {
               match ->
                   switch (match.group(1)) {
                     case "repoName" -> repoName;
-                    case "repoType" -> RepoType.MAVEN.name();
                     default -> "placeholder";
                   });
     }
@@ -162,7 +160,6 @@ class ManageRoutesStatusIT extends AbstractIntegrationTest {
         .as("route families with a MANAGE operation")
         .contains(
             "repos/{repoName}",
-            "repos/{repoType}",
             "mvn/key-stores",
             "mvn/artifacts",
             "npm/packages",

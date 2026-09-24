@@ -15,9 +15,7 @@
  */
 package io.repsy.os.server.protocols.shared.aop.resolvers;
 
-import static io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils.extractRepoType;
 import static org.springframework.web.context.request.RequestAttributes.SCOPE_REQUEST;
-import static org.springframework.web.servlet.HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils;
@@ -55,20 +53,14 @@ public class ApiFacadeResolver implements HandlerMethodArgumentResolver {
       final NativeWebRequest webRequest,
       final @Nullable WebDataBinderFactory binderFactory) {
 
+    // The auth interceptor resolves the repo of every @RepoOperation route before this runs.
     final var repoInfoAttr =
         (RepoInfo) webRequest.getAttribute(ResolverUtils.REPO_INFO, SCOPE_REQUEST);
 
-    if (repoInfoAttr != null) {
-      return this.apiFacadeMap.get(repoInfoAttr.getType());
+    if (repoInfoAttr == null) {
+      throw new ItemNotFoundException("repoNotFound");
     }
 
-    @SuppressWarnings("unchecked")
-    final var uriVariables =
-        (Map<String, String>)
-            webRequest.getAttribute(URI_TEMPLATE_VARIABLES_ATTRIBUTE, SCOPE_REQUEST);
-
-    return extractRepoType(uriVariables)
-        .map(this.apiFacadeMap::get)
-        .orElseThrow(() -> new ItemNotFoundException("repoTypeNotFound"));
+    return this.apiFacadeMap.get(repoInfoAttr.getType());
   }
 }
