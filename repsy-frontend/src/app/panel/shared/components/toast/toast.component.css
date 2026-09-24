@@ -25,7 +25,8 @@
   &.error {
     background-color: #211011;
     border-color: #952e2e;
-    color: #db3f3f;
+    /* #db3f3f on this background is 4.3:1, below the 4.5:1 WCAG AA needs for text (RPS-1266) */
+    color: #f05252;
   }
 
   &.error svg {

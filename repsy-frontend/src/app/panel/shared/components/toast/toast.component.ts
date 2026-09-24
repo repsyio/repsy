@@ -16,7 +16,9 @@
 
 import { Component } from '@angular/core';
 
-import { ToastService } from './toast.service';
+import { Toast, ToastService } from './toast.service';
+
+type Hold = 'hover' | 'focus';
 
 @Component({
   selector: 'app-toast',
@@ -25,9 +27,36 @@ import { ToastService } from './toast.service';
   styleUrls: ['./toast.component.css'],
 })
 export class ToastComponent {
+  /** What currently keeps an error toast on screen: the pointer over it and/or focus inside it. */
+  private readonly holds = new Map<number, Set<Hold>>();
+
   constructor(public toastService: ToastService) {}
 
   removeToast(index: number) {
+    this.holds.delete(index);
     this.toastService.remove(index);
+  }
+
+  /** An error toast stays while it is hovered or focused, so it can be read and its text selected. */
+  hold(toast: Toast, reason: Hold) {
+    if (toast.type !== 'error') {
+      return;
+    }
+    const reasons = this.holds.get(toast.id) ?? new Set<Hold>();
+    reasons.add(reason);
+    this.holds.set(toast.id, reasons);
+    this.toastService.pause(toast.id);
+  }
+
+  release(toast: Toast, reason: Hold) {
+    const reasons = this.holds.get(toast.id);
+    if (!reasons) {
+      return;
+    }
+    reasons.delete(reason);
+    if (reasons.size === 0) {
+      this.holds.delete(toast.id);
+      this.toastService.resume(toast.id);
+    }
   }
 }

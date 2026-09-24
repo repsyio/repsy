@@ -201,4 +201,56 @@ describe('DropdownComponent', () => {
 
     expect(menu('second').id).not.toBe(first);
   });
+
+  it('closes after an action is chosen, and after a click on a disabled one it stays', () => {
+    trigger('first').click();
+    fixture.detectChanges();
+    el('#two').click();
+    fixture.detectChanges();
+    expect(menu('first')).not.toBeNull();
+
+    el('#one').click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.picked).toBe('one');
+    expect(menu('first')).toBeNull();
+    expect(trigger('first').getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('closes after a click on a link item', () => {
+    trigger('first').click();
+    fixture.detectChanges();
+    el('#three').click();
+    fixture.detectChanges();
+
+    expect(menu('first')).toBeNull();
+  });
+
+  it('gives focus back to the trigger when an action is chosen with the keyboard', () => {
+    key(trigger('first'), 'ArrowDown');
+    // a keyboard-activated click carries detail 0, a pointer click detail 1
+    el('#one').dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+    fixture.detectChanges();
+
+    expect(menu('first')).toBeNull();
+    expect(document.activeElement).toBe(trigger('first'));
+  });
+
+  it('keeps the menu open when the click lands on the menu but not on an action', () => {
+    trigger('first').click();
+    fixture.detectChanges();
+    menu('first').click();
+    fixture.detectChanges();
+
+    expect(menu('first')).not.toBeNull();
+  });
+
+  it('is not a button itself: its trigger is the only button around the menu', () => {
+    trigger('second').click();
+    fixture.detectChanges();
+
+    expect(el('#second [data-testid="dropdown"]').tagName).toBe('DIV');
+    expect(menu('second').closest('button')).toBeNull();
+    expect(trigger('second').closest('button')).toBe(trigger('second'));
+  });
 });
