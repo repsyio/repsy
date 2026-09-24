@@ -89,7 +89,7 @@ export type PackageScenarioKey =
   | '06-deploy-token';
 
 export interface PackageScenarioOptions {
-  /** Steps that fail on the product today, by key, with the Jira key and a reason: `'RPS-1262: ...'`. */
+  /** Steps that fail on the product today, by key, with the Jira key and a reason: `'RPS-1304: ...'`. */
   knownFailures?: Readonly<Partial<Record<PackageScenarioKey, string>>>;
 }
 

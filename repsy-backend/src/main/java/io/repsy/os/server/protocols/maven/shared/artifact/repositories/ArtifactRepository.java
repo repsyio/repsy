@@ -39,18 +39,24 @@ public interface ArtifactRepository extends JpaRepository<Artifact, UUID> {
 
   long countByRepoIdAndGroupName(UUID repoId, String groupName);
 
+  /**
+   * The search term is matched against the whole {@code group:artifact} key the list shows, so it
+   * finds a row by its group, its artifact or the pair.
+   */
   @Query(
       """
           select a from Artifact a
-          where a.repo.id = :repoId and a.groupName like %:groupName%""")
+          where a.repo.id = :repoId
+          and concat(a.groupName, ':', a.artifactName) like %:groupName%""")
   Page<ArtifactListItem> findAllByRepoIdAndContainsGroupName(
       UUID repoId, String groupName, Pageable pageable);
 
+  /** Like the group search, the term is matched against the whole {@code group:artifact} key. */
   @Query(
       """
           select a from Artifact a
-          where a.repo.id = :repoId and a.groupName = :groupName and a.artifactName
-          like %:artifactName%""")
+          where a.repo.id = :repoId and a.groupName = :groupName
+          and concat(a.groupName, ':', a.artifactName) like %:artifactName%""")
   Page<ArtifactListItem> findAllByRepoIdContainsArtifactName(
       UUID repoId, String groupName, String artifactName, Pageable pageable);
 

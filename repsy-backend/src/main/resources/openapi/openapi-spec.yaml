@@ -4958,6 +4958,8 @@ components:
           format: int64
         hasLib:
           type: boolean
+        yanked:
+          type: boolean
         license_file:
           type: string
         rust_version:
@@ -5006,6 +5008,8 @@ components:
       properties:
         version:
           type: string
+        yanked:
+          type: boolean
         created_at:
           type: string
           format: date-time

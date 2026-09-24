@@ -77,16 +77,25 @@ public interface NpmPackageRepository extends JpaRepository<NpmPackage, UUID> {
   Page<PackageListItem> findAllByRepoIdAndLatestVersionAndScopeIsNullContainsName(
       UUID repoId, String name, Pageable pageable);
 
+  /**
+   * The name term is matched against the whole {@code @scope/name} key the list shows, so it finds
+   * a package by its name, its scope or the pair.
+   */
   @Query(
       """
       select p.scope as scope, p.name as name, p.latest as latest, pv.createdAt as updatedAt
       from NpmPackage p
       join p.packageVersions pv
       join p.repo r
-      where r.id = :repoId and p.scope = :scope and p.name like %:name% and p.latest = pv.version""")
+      where r.id = :repoId and p.scope = :scope and p.latest = pv.version
+      and concat(p.scope, '/', p.name) like %:name%""")
   Page<PackageListItem> findAllByRepoIdAndLatestVersionAndScopeContainsName(
       UUID repoId, String scope, String name, Pageable pageable);
 
+  /**
+   * The search term is matched against the whole {@code @scope/name} key the list shows (the bare
+   * name of an unscoped package), so it finds a package by its name, its scope or the pair.
+   */
   @Query(
       """
       select p.scope as scope, p.name as name, p.latest as latest, pv.createdAt as updatedAt
@@ -94,7 +103,9 @@ public interface NpmPackageRepository extends JpaRepository<NpmPackage, UUID> {
       join p.packageVersions pv
       join p.repo r
       where r.id = :repoId and p.latest = pv.version
-      and (:scope is null or p.scope like %:scope%)""")
+      and (:scope is null
+        or (case when p.scope is null then p.name else concat(p.scope, '/', p.name) end)
+          like %:scope%)""")
   Page<PackageListItem> findAllByRepoIdAndLatestVersionContainsScope(
       UUID repoId, @Nullable String scope, Pageable pageable);
 }

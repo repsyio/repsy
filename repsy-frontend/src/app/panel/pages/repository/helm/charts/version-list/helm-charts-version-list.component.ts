@@ -183,7 +183,8 @@ export class HelmChartsVersionListComponent implements OnDestroy {
           this.applyFilterAndSort();
           this.error = null;
         },
-        error: (err: string) => this.toastService.show(err, 'error'),
+        // The error interceptor has already shown the failure to the user.
+        error: () => {},
       });
   }
 
