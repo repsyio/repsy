@@ -29,6 +29,7 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService.PublishKind;
 import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
@@ -37,9 +38,12 @@ import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -162,7 +166,8 @@ class AbstractNpmProtocolFacadePublishTest {
     this.publishRuns(PublishKind.NEW_VERSION);
     when(this.storageService.readMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH))
         .thenReturn(PREVIOUS_METADATA);
-    when(this.storageService.processVersionPayload(payload, BASE_PATH, REPO_ID, REPO_NAME))
+    when(this.storageService.processVersionPayload(
+            eq(payload), eq(BASE_PATH), eq(REPO_ID), eq(REPO_NAME), any()))
         .thenReturn(Pair.of(Pair.of(1L, 2L), merged));
     when(this.storageService.writeTarballAndMetadata(
             REPO_ID, REPO_NAME, merged, BASE_PATH, PACKAGE, VERSION))
@@ -177,6 +182,50 @@ class AbstractNpmProtocolFacadePublishTest {
   }
 
   @Test
+  @DisplayName("hands the rows of the package to the merge, to rebuild a lost file from (RPS-1310)")
+  void handsTheRowsToTheMerge() throws Exception {
+    final var payload = payload();
+    final var rows =
+        new NpmPackageSnapshot(null, PACKAGE, VERSION, Instant.EPOCH, List.of(), Map.of());
+    this.publishRuns(PublishKind.NEW_VERSION);
+    when(this.packageService.getSnapshot(REPO_ID, null, PACKAGE)).thenReturn(rows);
+    when(this.storageService.processVersionPayload(any(), any(), any(), any(), any()))
+        .thenAnswer(
+            invocation -> {
+              // Asked for by the storage only when the file cannot be used: nothing is read before.
+              verify(this.packageService, never()).getSnapshot(any(), any(), any());
+              assertThat(invocation.<Supplier<NpmPackageSnapshot>>getArgument(4).get())
+                  .isSameAs(rows);
+              return Pair.of(Pair.of(1L, 2L), payload);
+            });
+    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any(), any()))
+        .thenReturn(BaseUsages.ofDisk(1L));
+
+    this.publish(payload);
+
+    verify(this.packageService).getSnapshot(REPO_ID, null, PACKAGE);
+  }
+
+  @Test
+  @DisplayName(
+      "a new version of a package whose metadata file is gone is stored, and undone as it was")
+  void undoesANewVersionOfAPackageWithoutAMetadataFile() throws Exception {
+    final var failure = new IOException("disk full");
+    this.publishRuns(PublishKind.NEW_VERSION);
+    when(this.storageService.readMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH)).thenReturn(null);
+    when(this.storageService.processVersionPayload(any(), any(), any(), any(), any()))
+        .thenReturn(Pair.of(Pair.of(1L, 2L), new LinkedHashMap<>()));
+    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any(), any()))
+        .thenThrow(failure);
+
+    assertThatThrownBy(() -> this.publish(payload())).isSameAs(failure);
+
+    // No previous file: the discard removes the one the publish wrote.
+    verify(this.storageService)
+        .discardPublishedVersion(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, VERSION, null);
+  }
+
+  @Test
   @DisplayName("replaces a tarball that has no version row (RPS-1272)")
   void replacesAnOrphanedTarball() throws Exception {
     final var payload = payload();
@@ -184,7 +233,7 @@ class AbstractNpmProtocolFacadePublishTest {
     this.publishRuns(PublishKind.NEW_VERSION);
     when(this.storageService.tarballExists(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, VERSION))
         .thenReturn(true);
-    when(this.storageService.processVersionPayload(any(), any(), any(), any()))
+    when(this.storageService.processVersionPayload(any(), any(), any(), any(), any()))
         .thenReturn(Pair.of(Pair.of(1L, 2L), payload));
     when(this.storageService.writeTarballAndMetadata(
             REPO_ID, REPO_NAME, payload, BASE_PATH, PACKAGE, VERSION))
@@ -202,7 +251,7 @@ class AbstractNpmProtocolFacadePublishTest {
   void doesNotLookForAnOrphanWhenReplacing() throws Exception {
     final var payload = payload();
     this.publishRuns(PublishKind.REPLACES_VERSION);
-    when(this.storageService.processVersionPayload(any(), any(), any(), any()))
+    when(this.storageService.processVersionPayload(any(), any(), any(), any(), any()))
         .thenReturn(Pair.of(Pair.of(1L, 2L), payload));
     when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any(), any()))
         .thenReturn(BaseUsages.ofDisk(1L));
@@ -251,7 +300,7 @@ class AbstractNpmProtocolFacadePublishTest {
     this.publishRuns(PublishKind.NEW_VERSION);
     when(this.storageService.readMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH))
         .thenReturn(PREVIOUS_METADATA);
-    when(this.storageService.processVersionPayload(any(), any(), any(), any()))
+    when(this.storageService.processVersionPayload(any(), any(), any(), any(), any()))
         .thenReturn(Pair.of(Pair.of(1L, 2L), new LinkedHashMap<>()));
     when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any(), any()))
         .thenThrow(failure);
@@ -283,7 +332,7 @@ class AbstractNpmProtocolFacadePublishTest {
   void keepsTheFilesOfAReplacedVersion() throws Exception {
     final var failure = new IllegalStateException("disk full");
     this.publishRuns(PublishKind.REPLACES_VERSION);
-    when(this.storageService.processVersionPayload(any(), any(), any(), any()))
+    when(this.storageService.processVersionPayload(any(), any(), any(), any(), any()))
         .thenReturn(Pair.of(Pair.of(1L, 2L), new LinkedHashMap<>()));
     when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any(), any()))
         .thenThrow(failure);
