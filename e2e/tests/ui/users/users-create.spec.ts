@@ -175,9 +175,14 @@ const CASES: ValidationCase[] = [
   { name: 'password over 50 characters', value: `Aa1${'x'.repeat(48)}`, ...password('maxlength') },
   { name: 'password without an upper-case letter', value: 'lower-only1', ...password('pattern') },
   { name: 'password without a digit', value: 'NoDigitsHere', ...password('pattern') },
-  // Only with an empty password too: with a password typed, the form-level match check replaces
-  // "required" with "mismatch" on an empty confirmation.
-  { name: 'empty confirmation', value: '', password: '', ...confirmation('required') },
+  // With a password typed the empty confirmation is "required", not a mismatch (RPS-1282).
+  { name: 'empty confirmation', value: '', ...confirmation('required') },
+  {
+    name: 'empty confirmation and empty password',
+    value: '',
+    password: '',
+    ...confirmation('required'),
+  },
   { name: 'confirmation that differs', value: 'Other-Pass1', ...confirmation('mismatch') },
 ];
 
@@ -201,6 +206,23 @@ test.describe('USR-02 create validation', () => {
       await expect(modal.submit).toBeDisabled();
     });
   }
+
+  test('an empty confirmation is required, not a mismatch, and turns into one once typed', async ({
+    usersPage,
+  }) => {
+    await usersPage.goto();
+    await usersPage.openCreateModal();
+    const modal = usersPage.createModal;
+
+    await modal.password.fill(VALID_PASSWORD);
+    await modal.confirmPassword.fill('x');
+    await modal.confirmPassword.blur();
+    await expect(modal.error('confirm-password', 'mismatch')).toBeVisible();
+
+    await modal.confirmPassword.fill('');
+    await expect(modal.error('confirm-password', 'required')).toBeVisible();
+    await expect(modal.error('confirm-password', 'mismatch')).toHaveCount(0);
+  });
 
   test('the messages carry their text', async ({ usersPage }) => {
     await usersPage.goto();

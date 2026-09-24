@@ -14,14 +14,14 @@
 /// limitations under the License.
 ///
 
-import { ActivatedRouteSnapshot, Router, RouterStateSnapshot } from '@angular/router';
+import { ActivatedRouteSnapshot, Router, RouterStateSnapshot, UrlTree } from '@angular/router';
 
 import { AuthService } from '../pages/service/auth.service';
 import { AuthGuard } from './auth.guard';
 
 describe('AuthGuard', () => {
   const route = {} as ActivatedRouteSnapshot;
-  const state = {} as RouterStateSnapshot;
+  const stateOf = (url: string) => ({ url }) as RouterStateSnapshot;
 
   let authService: jasmine.SpyObj<AuthService>;
   let router: jasmine.SpyObj<Router>;
@@ -29,14 +29,14 @@ describe('AuthGuard', () => {
 
   beforeEach(() => {
     authService = jasmine.createSpyObj<AuthService>('AuthService', ['isAuthenticated']);
-    router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
-    router.navigateByUrl.and.resolveTo(true);
+    router = jasmine.createSpyObj<Router>('Router', ['createUrlTree']);
+    router.createUrlTree.and.callFake((commands, extras) => ({ commands, extras }) as unknown as UrlTree);
     guard = new AuthGuard(router, authService);
   });
 
-  const activations: [string, () => unknown][] = [
-    ['canActivate', () => guard.canActivate(route, state)],
-    ['canActivateChild', () => guard.canActivateChild(route, state)],
+  const activations: [string, (url: string) => unknown][] = [
+    ['canActivate', (url) => guard.canActivate(route, stateOf(url))],
+    ['canActivateChild', (url) => guard.canActivateChild(route, stateOf(url))],
   ];
 
   activations.forEach(([name, activate]) => {
@@ -44,16 +44,27 @@ describe('AuthGuard', () => {
       it('lets an authenticated user through', () => {
         authService.isAuthenticated.and.returnValue(true);
 
-        expect(activate()).toBeTrue();
-        expect(router.navigateByUrl).not.toHaveBeenCalled();
+        expect(activate('/repositories')).toBeTrue();
+        expect(router.createUrlTree).not.toHaveBeenCalled();
       });
 
-      it('sends an unauthenticated user to the root and blocks the route', async () => {
+      it('redirects an unauthenticated user to the root, remembering the requested URL (RPS-1278)', () => {
         authService.isAuthenticated.and.returnValue(false);
-        router.navigateByUrl.and.resolveTo(false);
 
-        expect(await activate()).toBeFalse();
-        expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/');
+        const result = activate('/my-repo/packages?tab=1');
+
+        expect(router.createUrlTree).toHaveBeenCalledOnceWith(['/'], {
+          queryParams: { returnUrl: '/my-repo/packages?tab=1' },
+        });
+        expect(result).toEqual(jasmine.objectContaining({ commands: ['/'] }));
+      });
+
+      it('does not remember a URL that is not a safe in-app path', () => {
+        authService.isAuthenticated.and.returnValue(false);
+
+        activate('//evil.example');
+
+        expect(router.createUrlTree).toHaveBeenCalledOnceWith(['/'], {});
       });
     });
   });

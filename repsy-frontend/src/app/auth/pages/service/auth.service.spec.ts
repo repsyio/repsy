@@ -69,6 +69,30 @@ describe('AuthService', () => {
 
   afterEach(clearStorage);
 
+  describe('isAuthenticated$ (RPS-1278)', () => {
+    it('emits the session state, then every change of it once', () => {
+      const service = createService();
+      const states: boolean[] = [];
+      service.isAuthenticated$.subscribe((state) => states.push(state));
+
+      service.updateLoginInfo(SESSION);
+      service.updateLoginInfo({ ...SESSION, token: 'access-2', refreshToken: 'refresh-2' });
+      service.logOut();
+      service.logOut();
+
+      expect(states).toEqual([false, true, false]);
+    });
+
+    it('starts true when a stored session is restored', () => {
+      seedStorage(SESSION);
+      const service = createService();
+      const states: boolean[] = [];
+      service.isAuthenticated$.subscribe((state) => states.push(state));
+
+      expect(states).toEqual([true]);
+    });
+  });
+
   describe('restoring a session', () => {
     it('starts signed out with nothing stored', () => {
       const service = createService();

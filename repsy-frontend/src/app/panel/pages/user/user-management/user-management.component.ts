@@ -76,12 +76,10 @@ export class UserManagementComponent implements OnInit {
   }
 
   public fetchUsers(): void {
-    this.userService
-      .listUsers(this.searchQuery || undefined, this.pageNum, this.pageSize)
-      .subscribe((pagedModel) => {
-        this.pagedData = pagedModel;
-        this.users = pagedModel.content ?? [];
-      });
+    this.userService.listUsers(this.searchQuery || undefined, this.pageNum, this.pageSize).subscribe((pagedModel) => {
+      this.pagedData = pagedModel;
+      this.users = pagedModel.content ?? [];
+    });
   }
 
   public loadPage(pageNum: number): void {
@@ -98,6 +96,23 @@ export class UserManagementComponent implements OnInit {
   public refreshPage(): void {
     this.pageNum = 0;
     this.searchQuery = '';
+    this.fetchUsers();
+  }
+
+  /**
+   * After an edit or a delete the list reloads without the old search: the user that was just renamed
+   * or removed may no longer match it, which would empty the list. The page index goes back to the
+   * first page only when there was a search, since it was counted within the searched list.
+   */
+  public resetSearch(): void {
+    if (this.searchQuery) {
+      this.searchQuery = '';
+      this.pageNum = 0;
+    }
+  }
+
+  public userUpdated(): void {
+    this.resetSearch();
     this.fetchUsers();
   }
 
@@ -149,6 +164,7 @@ export class UserManagementComponent implements OnInit {
           }),
         )
         .subscribe(() => {
+          this.resetSearch();
           this.fetchUsers();
           this.toastService.show(successMsg, 'success');
 

@@ -56,7 +56,7 @@ public interface ArtifactConverter {
   @Mapping(target = "lastUpdatedAt", source = "version.lastUpdatedAt")
   @Mapping(target = "artifactName", source = "artifact.artifactName")
   @Mapping(target = "artifactGroupName", source = "artifact.groupName")
-  @Mapping(target = "artifactVersionName", source = "artifact.latest")
+  @Mapping(target = "artifactVersionName", source = "version.versionName")
   @Mapping(target = "scmUrl", source = "version.sourceCodeUrl")
   @Mapping(target = "developers", source = "version.versionDevelopers")
   @Mapping(target = "licenses", source = "version.versionLicenses")

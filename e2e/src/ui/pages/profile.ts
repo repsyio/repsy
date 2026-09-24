@@ -17,8 +17,8 @@
 /**
  * The self-service profile page (`/profile`, any role): the password form, the username form and the
  * delete-account button. Every action goes through the shared danger modal. Reach the page with
- * `goto()` (a direct navigation): the header's Profile link is a raw relative `href`, i.e. a full
- * reload that resolves under the repo from a nested route (RPS-1264).
+ * `goto()` (a direct navigation, fewer moving parts than the header's Profile link, which PRO-04
+ * covers).
  *
  * `submit*` methods call `assertPageNotAdmin`: they change the logged-in user's own credentials or
  * delete the account, and the harness admin must never be that user. A username change ends in
@@ -62,7 +62,7 @@ export class ProfilePage extends UiPage {
     this.deleteAccountButton = this.tid('profile-delete-account-submit');
   }
 
-  /** A direct navigation (never the header link) that waits for the username to be filled in. */
+  /** A direct navigation that waits for the username to be filled in. */
   async goto(): Promise<void> {
     await this.page.goto('/profile');
     await expect(this.title).toBeVisible();

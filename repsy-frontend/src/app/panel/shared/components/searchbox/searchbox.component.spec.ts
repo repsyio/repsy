@@ -67,4 +67,35 @@ describe('SearchboxComponent', () => {
 
     expect(emitted).toEqual(['lodash']);
   });
+
+  it('starts empty', () => {
+    fixture.detectChanges();
+
+    expect(input().value).toBe('');
+  });
+
+  it('shows the value it is given and clears the box when the parent resets it', () => {
+    component.value = 'lodash';
+    fixture.detectChanges();
+    expect(input().value).toBe('lodash');
+
+    input().value = 'lodash-es';
+    input().dispatchEvent(new Event('input'));
+    component.value = 'lodash-es';
+    fixture.detectChanges();
+    component.value = '';
+    fixture.detectChanges();
+
+    expect(input().value).toBe('');
+  });
+
+  it('leaves the typed text alone when the parent does not bind a value', () => {
+    fixture.detectChanges();
+
+    input().value = 'lodash';
+    input().dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect(input().value).toBe('lodash');
+  });
 });

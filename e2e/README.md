@@ -2465,15 +2465,19 @@ so `panelApi` and `seeder` (per-test run id, cleanup) work unchanged, and adds:
   the UI, API or repo base URL is aborted (Google Tag Manager, gtag, the Font Awesome CDN and Gravatar
   today), so runs are offline-safe. A test's own `page.route()` mock still wins over it.
 - **Guards redirect to `/`, not `/login`.** `AuthGuard` sends an anonymous visitor of a protected route
-  to `/`, and `/` renders the login form _in place_ (`AuthRedirectComponent` picks `LoginComponent` or
-  the dashboard from the session), so the URL stays `/`. Only logout and a direct visit navigate to
-  `/login`. Assert the login form is visible, not a `/login` URL, for a guard redirect.
-- **Timing facts a test must respect.** `PanelLayoutComponent` hides `<router-outlet>` for a fixed
-  500 ms after load, and a splash screen covers it: never assert "navigation finished", wait for the
-  element or response that drives the view (`Shell.waitForView`, `expect(...).toBeVisible()`); there
-  are no fixed sleeps (`eslint-plugin-playwright` errors on `waitForTimeout`). Toasts live 3 s and at
-  most 3 are kept: assert a toast right after the action. The header "Profile" link is a raw relative
-  `href` (a full reload, and from a nested route it resolves under the repo): state does not survive it.
+  to `/?returnUrl=<the route>`, and `/` renders the login form _in place_ (`AuthRedirectComponent`
+  follows the session: the login form, then the dashboard as soon as a login stores one), so the path
+  stays `/`. A login there returns the visitor to the remembered route (only an in-app path is followed,
+  never `https://...` or `//host`), or to the dashboard. Only logout and a direct visit navigate to
+  `/login`. Assert the login form is visible, not a `/login` URL, for a guard redirect, and read
+  `returnUrl` with a `toHaveURL((url) => ...)` predicate.
+- **Timing facts a test must respect.** A routed view renders after its own requests answer: never
+  assert "navigation finished", wait for the element or response that drives the view
+  (`Shell.waitForView`, `expect(...).toBeVisible()`); there are no fixed sleeps
+  (`eslint-plugin-playwright` errors on `waitForTimeout`). Toasts live 3 s and at most 3 are kept:
+  assert a toast right after the action. (`PanelLayoutComponent` used to hide the outlet for a fixed
+  500 ms and the header "Profile" link used to be a full reload, RPS-1264; both are fixed, PRO-04
+  proves the link with `src/ui/document-marker.ts`.)
 - **Opt-in suites** (`@throttle`, `@scanner`, ...) skip themselves with
   `test.skip(!optedIn('throttle'), 'set REPSY_UI_OPT_IN=throttle')`, never through a `grepInvert` in
   the config.
@@ -2518,19 +2522,22 @@ own credentials (AUTH-01), and negative logins use a seeded user or a name that 
 `src/ui/pages/login-validation.ts` (composed on `LoginPage`) holds the validation helpers and the
 visible message texts; `tests/ui/auth/stored-session.ts` reads the three `localStorage` keys.
 
-| Spec      | Scenarios | What is pinned                                                                                                                                                                                         |
-| --------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `login`   | 01-04, 11 | valid login and its 3 storage keys; 401 toast `Username or password is incorrect.` (wrong password and unknown user alike); every client-side rule with its message; the eye toggle; throttle (opt-in) |
-| `guards`  | 05-07     | anonymous visit of `/repositories`, `/users`, `/security`, `/profile`, `/<repo>` shows the login form at `/`; `/login` bounces a logged-in user; a USER is sent to `/` from `/users` and `/security`   |
-| `session` | 08-10     | expired access token is refreshed transparently; a refused refresh token logs out; sidebar and header logout clear the session                                                                         |
+| Spec      | Scenarios | What is pinned                                                                                                                                                                                                                                                                                             |
+| --------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `login`   | 01-04, 11 | valid login and its 3 storage keys; 401 toast `Username or password is incorrect.` (wrong password and unknown user alike); every client-side rule with its message; the eye toggle; throttle (opt-in)                                                                                                     |
+| `guards`  | 05-07     | anonymous visit of `/repositories`, `/users`, `/security`, `/profile`, `/<repo>` shows the login form at `/` (with `returnUrl`) and a login returns to that page without a reload; unsafe `returnUrl`s are ignored; `/login` bounces a logged-in user; a USER is sent to `/` from `/users` and `/security` |
+| `session` | 08-10     | expired access token is refreshed transparently; a tampered one logs out with a toast, no refresh; a refused refresh token logs out; sidebar and header logout clear the session                                                                                                                           |
 
 Things a later author must know:
 
-- **The 401 of AUTH-08/09 is stubbed, everything after it is real.** An access token lives 30 minutes
-  (not configurable) and only an _expired_ one is answered `sessionExpired`, the one answer that makes
-  `RefreshTokenInterceptor` refresh; a token with a bad signature is answered `accessNotAllowed`, which
-  it ignores. `expireAccessToken()` (`session.spec.ts`) answers calls carrying one given token with that
-  401 (never the `/api/auth/` calls); the refresh, the rotation and the logout run on the real backend.
+- **The 401 of the expired-token AUTH-08 test and of AUTH-09 is stubbed, everything after it is real.**
+  An access token lives 30 minutes (not configurable) and only an _expired_ one is answered
+  `sessionExpired`, the one answer that makes `RefreshTokenInterceptor` refresh once and retry once.
+  Every other 401 logs out at once with a toast, no refresh (RPS-1279): a token with a bad signature is
+  answered `accessNotAllowed`, so the tampered-token AUTH-08 test needs no stub. The rule per `msgId` is
+  documented on `RefreshTokenInterceptor`. `expireAccessToken()` (`session.spec.ts`) answers calls
+  carrying one given token with that 401 (never the `/api/auth/` calls); the refresh, the rotation and
+  the logout run on the real backend.
   The AUTH-09 cases: a refresh token that is garbage, one that was already used (single use), and a
   stubbed `refreshTokenExpired` answer.
 - **The SPA reads `localStorage` once, at boot** (`AuthService`), and `seedSession()` writes once per
@@ -2547,10 +2554,9 @@ Things a later author must know:
   throwaway stack: `AUTH_THROTTLE_MAX_FAILURES=20` in the `repsy` service environment, then
   `REPSY_UI_OPT_IN=throttle ./run.sh test --protocol ui --grep AUTH-11`. Not run by CI or by default.
 - **Known product bugs are `test.fail(true, ...)`**, written for the intended behaviour so the test
-  turns red (and tells you to remove the line) when the bug is fixed: logging in from the in-place form
-  a guard redirect shows (the URL is `/`, and `LoginComponent` navigates to `/` again) stores the session
-  but does not render the dashboard until a reload; and a tampered (not expired) access token is never
-  refreshed or logged out, the dashboard just stays empty.
+  turns red (and tells you to remove the line) when the bug is fixed. None is pinned in the auth specs
+  any more: RPS-1278 (a login from the in-place form at `/` left the user on the form until a reload)
+  and RPS-1279 (a tampered access token was never refreshed or logged out) are fixed.
 
 ### Repositories and dashboard (RPS-1252)
 
@@ -2586,9 +2592,10 @@ Things a test here relies on, which a change to the page can break:
 - **The visibility toggle** is toggled by clicking its label text: the `toggle-input` checkbox is `sr-only`
   under a covering span, so Playwright refuses to click it (read `isChecked()` from it, though).
 - **Known defects, pinned as `test.fail`** (a `✘` line in the list reporter with a passing summary is the
-  expectation): the description textarea's `maxlength="500"` hides the ">500" error (RPS-1265), and the
-  search box keeps its text and the page index stays stale after a refresh or a new search (RPS-1283).
-  Drop the `test.fail` when the fix lands. (A USER's Recent Activity was pinned to RPS-1276 until that
+  expectation): the description textarea's `maxlength="500"` hides the ">500" error (RPS-1265). Drop the
+  `test.fail` when the fix lands. (The search box and page index after a refresh or a new search were
+  pinned to RPS-1283 and are fixed; a refresh during a load, RPS-1293, is covered by a route that holds
+  the first maven answer. A USER's Recent Activity was pinned to RPS-1276 until that
   fix; the row now shows, so DASH-04 asserts it plainly.)
 
 ### Users and profile (RPS-1253)
@@ -2600,17 +2607,18 @@ Specs: `tests/ui/users/{users-create,users-edit-delete,users-reset-password,user
 of the foundation: `src/ui/users-fixtures.ts` (`usersPage`, and `trackUiUser(name)`, which registers a
 user the UI is about to create so a failing test still cleans it up).
 
-| Scenario | Where                                                                                                                          |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| USR-01   | create a USER and an Admin, log in as each from a fresh context (an Admin sees Users, a USER does not), cancel resets the form |
-| USR-02   | one test per validator of the create form, the message texts, a valid form, a duplicate username                               |
-| USR-03   | rename, promote, demote next to another admin, the last-admin warning, edit validation, taken name, cancel                     |
-| USR-04   | reset password: one-time modal, the new password logs in, the old one is refused, cancel resets nothing                        |
-| USR-05   | delete (cancel, then confirm), delete next to another admin, the last-admin toast                                              |
-| USR-06   | 11 users: search (incl. case-insensitive, no match), pagination both ways, refresh                                             |
-| PRO-01   | change password: mismatch, cancel, confirm, re-login with the new one, the old one refused; field validation                   |
-| PRO-02   | change username: reload as the new name, same account, repo protocol URL and repo page still work; validation; taken name      |
-| PRO-03   | delete account: cancel, confirm, logged out, login refused                                                                     |
+| Scenario | Where                                                                                                                                |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| USR-01   | create a USER and an Admin, log in as each from a fresh context (an Admin sees Users, a USER does not), cancel resets the form       |
+| USR-02   | one test per validator of the create form, the message texts, a valid form, a duplicate username                                     |
+| USR-03   | rename, promote, demote next to another admin, the last-admin warning and locked switch, edit validation, taken name, cancel         |
+| USR-04   | reset password: one-time modal, the new password logs in, the old one is refused, cancel resets nothing                              |
+| USR-05   | delete (cancel, then confirm), delete next to another admin, the last-admin toast                                                    |
+| USR-06   | 11 users: search (incl. case-insensitive, no match), pagination both ways, refresh                                                   |
+| PRO-01   | change password: mismatch, cancel, confirm, re-login with the new one, the old one refused; field validation                         |
+| PRO-02   | change username: reload as the new name, same account, repo protocol URL and repo page still work; validation; taken name            |
+| PRO-03   | delete account: cancel, confirm, logged out, login refused                                                                           |
+| PRO-04   | the header Profile link is a router link: no document load from the dashboard, the repository list or a repository page, menu closes |
 
 Rules these specs follow (and a later spec on these pages should too):
 
@@ -2630,8 +2638,8 @@ Rules these specs follow (and a later spec on these pages should too):
 - **Search first.** The list is server-paged (10, newest first) and server-searched (case-insensitive
   substring), and other tests add users, so every list view is a search for a username or for
   `seeder.runId`, which is in exactly the names this test seeded (with 10 or more users, `-user-1` also
-  matches `-user-10`: search the run id, not a name). After an edit or a delete the panel reloads with the
-  OLD search text, so a renamed user is not in the refreshed list until searched again.
+  matches `-user-10`: search the run id, not a name). After an edit or a delete the panel reloads without
+  the search (and empties the box), so a test that checks a row afterwards searches for it again.
 - **Toggle.** Click the `toggle` label (`UserCreateModal.roleToggle`), assert on `toggle-input`
   (`roleSwitch`): a click on the sr-only input is intercepted by the slider.
 - **Eye buttons** (show/hide password) are Font Awesome glyphs, and the network allow-list blocks the
@@ -2806,11 +2814,11 @@ differs the descriptor carries the value (`repoUrlIn`, `detail.delete.landsOn`,
 | 06  | Configure modal (repo name, `YOUR_PASSWORD` where the protocol has one) and the deploy-token variant opened from a token row in the settings                     |
 
 `knownFailures` keys (`PackageScenarioKey`) run their step under `test.fail`, so a fix turns it red and
-the title carries the reason. Pinned today: Maven `04-detail` (RPS-1296) and NuGet `02-versions-search`
-(RPS-1262, the API has no version search). The RPS-1261 (Maven Gradle Groovy block, Docker desktop
-Digest/Config Digest cells, npm Bugs URL/Keywords, PyPI "Post release:" and the mobile "Latest" link),
-RPS-1262 (mobile Delete gate, Cargo/NuGet mobile cards, Helm pager, Go empty pager, the Maven browser's
-Settings button) and RPS-1297 (first click after a cold load) specs are fixed and assert unpinned.
+the title carries the reason. Pinned today: NuGet `02-versions-search` (RPS-1262, the API has no
+version search). The RPS-1261 (Maven Gradle Groovy block, Docker desktop Digest/Config Digest cells,
+npm Bugs URL/Keywords, PyPI "Post release:" and the mobile "Latest" link), RPS-1262 (mobile Delete
+gate, Cargo/NuGet mobile cards, Helm pager, Go empty pager, the Maven browser's Settings button) and
+RPS-1297 (first click after a cold load) specs are fixed and assert unpinned.
 
 Facts the tests rely on (probed, RPS-1256):
 
@@ -2983,9 +2991,8 @@ How the stubs are typed, and the rules they follow:
   `/security` then shows its empty states with a type filter that offers only `ALL`.
 
 Known product defects, pinned with `test.fail` so the test turns red the day it is fixed and the marker
-has to go (a `✘` in the list reporter with a passing summary is the expectation): the `/security`
-Refresh button clears the query but not the search box (RPS-1283 is the same defect on the repository
-list), and three security-modal defects (RPS-1295): the X of a repository or package modal
+has to go (a `✘` in the list reporter with a passing summary is the expectation): three security-modal
+defects (RPS-1295): the X of a repository or package modal
 also opens the row it sits in (the modal is rendered inside the clickable row and only the backdrop and
 the links stop the click), and with a chart the dialog is tall enough that the page header covers its
 title and X at 1440x900.

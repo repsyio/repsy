@@ -45,6 +45,7 @@
     <app-searchbox
       data-testid="security-search"
       placeholder="repository"
+      [value]="repoNameSearch"
       (filter)="search($event)"
       class="w-full sm:max-w-[192px]"
     />

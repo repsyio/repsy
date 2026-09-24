@@ -18,7 +18,8 @@
  * backend only answers `sessionExpired` (the one answer that makes `RefreshTokenInterceptor` refresh)
  * for a really expired token, so a test cannot wait for, or forge, an expiry. The 401 is therefore the
  * one thing that is stubbed (`expireAccessToken`); the refresh call, the token rotation and the
- * logout on a refused refresh token all run against the real backend.
+ * logout on a refused refresh token all run against the real backend. Every other 401 (a tampered
+ * token: `accessNotAllowed`) logs out without a refresh, and needs no stub.
  *
  * Refresh tokens are single-use with family revocation: a token consumed twice logs the whole family
  * out. Every test here has its own login (`adminPage`/`userPage` log in per test) and mutates only
@@ -102,39 +103,41 @@ test.describe('AUTH-08 expired access token (stubbed 401)', () => {
 });
 
 test.describe('AUTH-08 tampered access token', () => {
-  test('is swapped through the refresh token, like an expired one', async ({ adminPage }) => {
-    // Intended behaviour (RPS-1251). Today the backend answers a token with a bad signature 401
-    // `accessNotAllowed`, which RefreshTokenInterceptor ignores (it reacts to `sessionExpired` only): every
-    // call fails and the dashboard stays on screen with no data, no toast and no logout.
-    test.fail(
-      true,
-      'PRODUCT BUG RPS-1279: a tampered access token is never refreshed or logged out',
-    );
+  // The backend answers a token with a bad signature 401 `accessNotAllowed`. Such a token can never
+  // become valid (and a refresh token signed by the same key would not either), so
+  // `RefreshTokenInterceptor` logs out at once, without a refresh call (RPS-1279; before, every
+  // call failed and the dashboard sat on "Loading..." with no toast and no logout). Nothing is
+  // stubbed: the 401 is the real one.
+  test('logs the user out with a toast, without a refresh call', async ({ adminPage }) => {
     const dashboard = new DashboardPage(adminPage);
 
     await dashboard.goto();
     const before = await storedSession(adminPage);
     const tampered = `${before.token}x`;
     await adminPage.evaluate((token) => window.localStorage.setItem('token', token), tampered);
+    let refreshCalls = 0;
+    adminPage.on('request', (request) => {
+      if (new URL(request.url()).pathname === REFRESH_PATH) {
+        refreshCalls += 1;
+      }
+    });
 
     await adminPage.reload();
 
-    await dashboard.expectLoaded();
-    await expect
-      .poll(async () => (await storedSession(adminPage)).token, { timeout: 5_000 })
-      .not.toBe(tampered);
-    expect((await storedSession(adminPage)).refreshToken).not.toBe(before.refreshToken);
+    await expectLoggedOut(adminPage);
+    await new Shell(adminPage).toasts.expectError('Session invalid, please log in again.');
+    expect(refreshCalls).toBe(0);
   });
 });
 
-test.describe('AUTH-09 refused refresh token', () => {
-  /** What a logged-out visitor sees: /login, an empty storage and a working login form. */
-  async function expectLoggedOut(page: Page): Promise<void> {
-    await expect(page).toHaveURL(/\/login$/);
-    await expect(new LoginPage(page).submit).toBeVisible();
-    expect(await storedSession(page)).toEqual(NO_SESSION);
-  }
+/** What a logged-out visitor sees: /login, an empty storage and a working login form. */
+async function expectLoggedOut(page: Page): Promise<void> {
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(new LoginPage(page).submit).toBeVisible();
+  expect(await storedSession(page)).toEqual(NO_SESSION);
+}
 
+test.describe('AUTH-09 refused refresh token', () => {
   /** Boots the dashboard logged in, then returns the page's stored session. */
   async function bootLoggedIn(page: Page) {
     await new DashboardPage(page).goto();
@@ -198,6 +201,7 @@ test.describe('AUTH-09 refused refresh token', () => {
 
     await expect(userPage).toHaveURL(/\/login$/);
     await expectLoggedOut(userPage);
+    await new Shell(userPage).toasts.expectError('Session expired, please log in again.');
   });
 });
 
@@ -222,7 +226,9 @@ test.describe('AUTH-10 logout', () => {
       // Logged out for real: a protected page does not come back, in this tab or after a reload.
       await adminPage.goto('/repositories');
       await expect(new LoginPage(adminPage).submit).toBeVisible();
-      await expect(adminPage).toHaveURL('/');
+      await expect(adminPage).toHaveURL(
+        (url) => url.pathname === '/' && url.searchParams.get('returnUrl') === '/repositories',
+      );
       expect(await storedSession(adminPage)).toEqual(NO_SESSION);
     });
   }

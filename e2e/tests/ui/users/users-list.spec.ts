@@ -88,6 +88,7 @@ test.describe('USR-06 users list', () => {
     const late = await seeder.createUser();
     await expect(usersPage.row(late.username)).toHaveCount(0);
     await usersPage.refresh();
+    await expect(usersPage.searchInput).toHaveValue('');
     await expect(usersPage.pagination.page(1)).toBeDisabled();
     await expect(usersPage.rows()).toHaveCount(PAGE_SIZE);
     await expect(usersPage.row(late.username)).toBeVisible();

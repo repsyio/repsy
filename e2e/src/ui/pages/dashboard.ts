@@ -75,7 +75,7 @@ export class DashboardPage extends UiPage {
     await this.expectLoaded();
   }
 
-  /** The welcome card is on screen (the layout hides the router outlet for 500 ms after load). */
+  /** The welcome card is on screen. */
   async expectLoaded(): Promise<void> {
     await expect(this.welcomeCard).toBeVisible();
   }
