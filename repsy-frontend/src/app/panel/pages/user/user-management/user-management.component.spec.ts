@@ -18,6 +18,7 @@ import moment from 'moment';
 import { of, Subject } from 'rxjs';
 
 import { PagedModelUserResponse, UserResponse } from '../../../../../generated/api';
+import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { UserService } from '../service/user.service';
@@ -44,7 +45,9 @@ describe('UserManagementComponent', () => {
     userService.resetPassword.and.returnValue(of('N3w-Passw0rd'));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModalService = new DangerModalService();
-    component = new UserManagementComponent(userService, toastService, dangerModalService);
+    component = new UserManagementComponent(userService, toastService, dangerModalService, {
+      username: 'admin',
+    } as AuthService);
   });
 
   describe('loading users', () => {
@@ -154,8 +157,24 @@ describe('UserManagementComponent', () => {
     it('asks for confirmation before resetting anything', () => {
       component.resetPassword(target);
 
-      expect(dangerModalService.modal).toEqual({ title: 'Reset Password', action: 'Reset', message: null });
+      expect(dangerModalService.modal.title).toBe('Reset Password');
+      expect(dangerModalService.modal.action).toBe('Reset');
+      expect(dangerModalService.modal.message).toContain(`"${target.username}"`);
+      expect(dangerModalService.modal.message).toContain('shown to you once');
       expect(userService.resetPassword).not.toHaveBeenCalled();
+    });
+
+    it('warns when the row is the signed-in admin', () => {
+      component.resetPassword({ id: '9', username: 'admin', role: 'ADMIN' } as UserResponse);
+
+      expect(dangerModalService.modal.message).toContain('your own account');
+      expect(dangerModalService.modal.message).toContain('signed out');
+    });
+
+    it('does not add the own-account warning for another user', () => {
+      component.resetPassword(target);
+
+      expect(dangerModalService.modal.message).not.toContain('your own account');
     });
 
     it('resets once confirmed, shows the new password for that user and toasts', () => {
