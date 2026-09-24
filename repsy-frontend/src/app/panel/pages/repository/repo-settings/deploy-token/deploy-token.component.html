@@ -76,18 +76,18 @@
                 <app-tooltip
                   data-testid="row-created"
                   class="text-secondary-500 group-hover:underline"
-                  [text]="timeAgo(deployToken.created_at)"
-                  [textHover]="deployToken.created_at | date: 'medium'"
+                  [text]="timeAgo(deployToken.createdAt)"
+                  [textHover]="deployToken.createdAt | date: 'medium'"
                   [always]="true"
                 />
 
                 <!-- Expired Date -->
                 <app-tooltip
                   data-testid="row-expires"
-                  [ngClass]="getBorderForExpireStatus(deployToken.expiration_date)"
+                  [ngClass]="getBorderForExpireStatus(deployToken.expirationDate)"
                   class="group-hover:underline"
-                  [text]="timeAgo(deployToken.expiration_date)"
-                  [textHover]="deployToken.expiration_date | date: 'medium'"
+                  [text]="timeAgo(deployToken.expirationDate)"
+                  [textHover]="deployToken.expirationDate | date: 'medium'"
                   [always]="true"
                 />
 
@@ -95,7 +95,7 @@
                 <app-tooltip
                   data-testid="row-permission"
                   class="text-secondary-500 group-hover:underline"
-                  [text]="deployToken.read_only ? 'R/O' : 'R/W'"
+                  [text]="deployToken.readOnly ? 'R/O' : 'R/W'"
                 />
 
                 <!-- Actions -->
@@ -194,20 +194,20 @@
                     <div class="flex justify-between gap-2">
                       <span class="text-sm text-[#9FA0A0]">Created: </span>
                       <span data-testid="row-created" class="text-secondary-500 break-all">
-                        {{ deployToken.created_at | date: 'medium' }} {{ '(' + timeAgo(deployToken.created_at) + ')' }}
+                        {{ deployToken.createdAt | date: 'medium' }} {{ '(' + timeAgo(deployToken.createdAt) + ')' }}
                       </span>
                     </div>
                     <div class="flex justify-between gap-2">
                       <span class="text-sm text-[#9FA0A0]">Expires: </span>
                       <span data-testid="row-expires" class="text-secondary-500 break-all">
-                        {{ deployToken.expiration_date | date: 'medium' }}
-                        {{ '(' + timeAgo(deployToken.expiration_date) + ')' }}
+                        {{ deployToken.expirationDate | date: 'medium' }}
+                        {{ '(' + timeAgo(deployToken.expirationDate) + ')' }}
                       </span>
                     </div>
                     <div class="flex justify-between gap-2">
                       <span class="text-sm text-[#9FA0A0]">Permissions: </span>
                       <span data-testid="row-permission" class="text-secondary-500">
-                        {{ deployToken.read_only ? 'R/O' : 'R/W' }}
+                        {{ deployToken.readOnly ? 'R/O' : 'R/W' }}
                       </span>
                     </div>
                     <!-- Actions -->

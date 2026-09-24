@@ -21,15 +21,18 @@ import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
 import { Subscription } from 'rxjs';
 import { finalize, switchMap } from 'rxjs/operators';
 
-import { RepoPermissionInfo } from '../../../../../../../generated/api';
+import {
+  CrateDependencyInfo,
+  CrateInfo,
+  CrateVersionInfo,
+  RepoPermissionInfo,
+} from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { MarkdownComponent } from '../../../../../shared/components/markdown/markdown.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { CrateInfo } from '../../dto/crate-info';
-import { CrateDependencyInfo, CrateVersionInfo } from '../../dto/crate-version-info';
 import { CargoService } from '../../service/cargo.service';
 
 @Component({
@@ -139,7 +142,7 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
     const deps = crateVersion.deps ?? [];
     const formatDep = (dep: CrateDependencyInfo): string => {
       const versionReq = dep.req || '*';
-      const key = dep.package || dep.name;
+      const key = dep.packageName || dep.name;
       const extras: string[] = [];
 
       if (dep.features?.length) {
@@ -148,7 +151,7 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
       if (dep.optional) {
         extras.push('optional = true');
       }
-      if (dep.default_features === false) {
+      if (dep.defaultFeatures === false) {
         extras.push('default-features = false');
       }
       if (dep.target) {
@@ -168,7 +171,7 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
 
     const packageLines: string[] = [
       '[package]',
-      `name = "${crate?.original_name || crateVersion.name}"`,
+      `name = "${crate?.originalName || crateVersion.name}"`,
       `version = "${crateVersion.version}"`,
     ];
     if (crate?.description) {
@@ -186,8 +189,8 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
     if (crate?.repository) {
       packageLines.push(`repository = "${crate.repository}"`);
     }
-    if (crateVersion.rust_version) {
-      packageLines.push(`rust-version = "${crateVersion.rust_version}"`);
+    if (crateVersion.rustVersion) {
+      packageLines.push(`rust-version = "${crateVersion.rustVersion}"`);
     }
     if (crateVersion.edition) {
       packageLines.push(`edition = "${crateVersion.edition}"`);

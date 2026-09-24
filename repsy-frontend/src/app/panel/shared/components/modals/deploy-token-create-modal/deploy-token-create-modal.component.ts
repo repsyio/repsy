@@ -136,7 +136,7 @@ export class DeployTokenCreateModalComponent implements OnInit {
       name: formValue.name,
       username: formValue.username?.trim() || undefined,
       description: formValue.description?.trim() || undefined,
-      read_only: formValue.readOnly,
+      readOnly: formValue.readOnly,
     };
 
     if (formValue.expirationDate) {
@@ -151,7 +151,7 @@ export class DeployTokenCreateModalComponent implements OnInit {
         return null;
       }
 
-      payload.expiration_date = expiration.toISOString();
+      payload.expirationDate = expiration.toISOString();
     }
 
     return payload;

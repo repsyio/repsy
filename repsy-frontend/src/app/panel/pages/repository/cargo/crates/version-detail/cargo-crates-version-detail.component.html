@@ -23,7 +23,7 @@
           }
         </div>
         <p data-testid="pkg-detail-published" class="font-courier mb-8 text-[12px] text-[#9C9C9D]">
-          Uploaded at: {{ crateVersion.created_at | date: 'medium' }}
+          Uploaded at: {{ crateVersion.createdAt | date: 'medium' }}
         </p>
 
         @if (crateVersion.hasLib) {
@@ -83,7 +83,7 @@
           </div>
           <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
             <span class="text-white">Rust Version: </span>
-            <span class="text-[#9C9C9D]">{{ crateVersion.rust_version || 'Not specified' }}</span>
+            <span class="text-[#9C9C9D]">{{ crateVersion.rustVersion || 'Not specified' }}</span>
           </div>
         </div>
 

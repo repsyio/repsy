@@ -116,15 +116,15 @@
                   truncate
                   data-testid="row-latest"
                   class="text-[#FDFDFD]"
-                  [text]="crate.max_version"
-                  [textHover]="crate.max_version"
+                  [text]="crate.maxVersion"
+                  [textHover]="crate.maxVersion"
                 />
-                @if (crate.updated_at) {
+                @if (crate.updatedAt) {
                   <app-tooltip
                     data-testid="row-updated"
                     class="text-secondary-500 group-hover:underline"
-                    [text]="timeAgo(crate.updated_at)"
-                    [textHover]="crate.updated_at | date: 'medium'"
+                    [text]="timeAgo(crate.updatedAt)"
+                    [textHover]="crate.updatedAt | date: 'medium'"
                     [always]="true"
                   />
                 } @else {
@@ -216,13 +216,13 @@
                   <div class="flex justify-between gap-2">
                     <span class="text-sm text-[#9FA0A0]">Latest:</span>
                     <span data-testid="row-latest" class="text-right break-all text-[#FDFDFD]">{{
-                      crate.max_version
+                      crate.maxVersion
                     }}</span>
                   </div>
                   <div class="flex justify-between gap-2">
                     <span class="text-sm text-[#9FA0A0]">Last Updated:</span>
                     <span data-testid="row-updated" class="text-right break-all text-[#FDFDFD]">{{
-                      crate.updated_at
+                      crate.updatedAt
                     }}</span>
                   </div>
                   <div class="flex justify-between gap-2">
