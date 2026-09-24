@@ -19,7 +19,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
-import { finalize } from 'rxjs/operators';
+import { finalize, switchMap, tap } from 'rxjs/operators';
 
 import { environment } from '../../../../../../environments/environment';
 import {
@@ -27,6 +27,7 @@ import {
   ProtocolRepoControllerService,
   RepoPermissionInfo,
   RepoUsageInfo,
+  RestResponsePagedModelDeployTokenInfoListItem,
 } from '../../../../../../generated/api';
 import { EllipsisPipe } from '../../../../shared/components/ellipsis/ellipsis.pipe';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -116,15 +117,32 @@ export class DeployTokenComponent implements OnInit {
 
   public fetchDeployTokens() {
     this.fetchRepoUsage();
-    this.protocolDeployTokenControllerService
-      .listDeployTokens({ page: this.pageNum, size: this.pageSize }, this.activeRepository.repoName)
-      .subscribe({
-        next: (r) => {
-          this.pagedData.page = { ...r.data?.page } as PagedData<DeployTokenInfo>['page'];
-          this.deployTokens = (r.data?.content ?? []) as unknown as DeployTokenInfo[];
-        },
-        error: () => {},
-      });
+    this.listPage(this.pageNum).subscribe({
+      next: (r) => this.showTokens(r),
+      error: () => {},
+    });
+  }
+
+  private listPage(pageNum: number) {
+    return this.protocolDeployTokenControllerService.listDeployTokens(
+      { page: pageNum, size: this.pageSize },
+      this.activeRepository.repoName,
+    );
+  }
+
+  private showTokens(r: RestResponsePagedModelDeployTokenInfoListItem) {
+    this.pagedData.page = { ...r.data?.page } as PagedData<DeployTokenInfo>['page'];
+    this.deployTokens = (r.data?.content ?? []) as unknown as DeployTokenInfo[];
+  }
+
+  /**
+   * The page to show once one token is gone: the current page, or the new last page when the
+   * revoked token was the only one on a page that no longer exists.
+   */
+  private pageAfterRevoke(): number {
+    const total = this.pagedData.page?.totalElements ?? this.pageNum * this.pageSize + (this.deployTokens?.length ?? 0);
+    const lastPage = Math.max(0, Math.ceil((total - 1) / this.pageSize) - 1);
+    return Math.min(this.pageNum, lastPage);
   }
 
   public loadPage(pageNum: number) {
@@ -163,30 +181,27 @@ export class DeployTokenComponent implements OnInit {
     });
   }
 
+  // RPS-1285: one chained request. The list is fetched once, after the revoke has completed, for the
+  // page that is left (never for a page past the end), so there is no second answer to race it.
   public revokeDeployToken(deployToken: DeployTokenInfo) {
-    const onSuccess = () => {
-      this.fetchDeployTokens();
-      this.toastService.show(successMsg, 'success');
-
-      if (this.deployTokens.length === 1 && this.pageNum > 0) {
-        this.pageNum = 0;
-        this.fetchDeployTokens();
-      }
-    };
-
-    const successMsg = 'Deploy token revoked successfully';
     this.dangerModalService.show('Delete Deploy Token', 'Delete', () => {
       this.operationLock = true;
 
       this.protocolDeployTokenControllerService
         .revoke(deployToken.id, this.activeRepository.repoName)
         .pipe(
+          tap(() => this.toastService.show('Deploy token revoked successfully', 'success')),
+          switchMap(() => {
+            this.pageNum = this.pageAfterRevoke();
+            this.fetchRepoUsage();
+            return this.listPage(this.pageNum);
+          }),
           finalize(() => {
             this.operationLock = false;
           }),
         )
         .subscribe({
-          next: onSuccess,
+          next: (r) => this.showTokens(r),
           error: () => {},
         });
     });

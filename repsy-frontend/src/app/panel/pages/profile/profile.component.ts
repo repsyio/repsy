@@ -15,7 +15,6 @@
 ///
 
 import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 
 import { BreadcrumbComponent } from '../../shared/components/breadcrumb/breadcrumb.component';
@@ -25,25 +24,13 @@ import { DeleteAccountComponent } from './delete-account/delete-account.componen
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterModule, BreadcrumbComponent, AccountInfoComponent, DeleteAccountComponent],
+  imports: [RouterModule, BreadcrumbComponent, AccountInfoComponent, DeleteAccountComponent],
   templateUrl: './profile.component.html',
 })
 export class ProfileComponent implements OnInit {
-  form: FormGroup;
   username = '';
 
-  constructor(private readonly fb: FormBuilder) {}
-
   ngOnInit(): void {
-    // Load user data first
     this.username = localStorage.getItem('username') || '';
-
-    this.form = this.fb.group({
-      username: [this.username, Validators.required],
-      fullName: ['', [Validators.maxLength(100)]],
-      email: ['', [Validators.required, Validators.email, Validators.minLength(4), Validators.maxLength(150)]],
-      address: ['', [Validators.maxLength(300)]],
-      phone: ['', [Validators.maxLength(15)]],
-    });
   }
 }

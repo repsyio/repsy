@@ -23,6 +23,7 @@ import { finalize } from 'rxjs';
 import { PagedModelUserResponse, UserResponse } from '../../../../../generated/api';
 import { DropdownComponent } from '../../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../../shared/components/ellipsis/ellipsis.pipe';
+import { EmptyListComponent } from '../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { UserCreateModalComponent } from '../../../shared/components/modals/user-create-modal/user-create-modal.component';
 import { UserEditModalComponent } from '../../../shared/components/modals/user-edit-modal/user-edit-modal.component';
@@ -47,6 +48,7 @@ import { UserService } from '../service/user.service';
     EllipsisPipe,
     CommonModule,
     DropdownComponent,
+    EmptyListComponent,
     SearchboxComponent,
   ],
   templateUrl: './user-management.component.html',
