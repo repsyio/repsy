@@ -117,12 +117,12 @@ test.describe('AUTH-02 wrong credentials', () => {
   });
 });
 
-// RPS-1265: the rules and sentences are the shared credential ones (`credential-messages.ts`). The password
-// rule is the create-user one because the backend's LoginForm enforces it too: a weaker password gets a 400
-// from the API, so the form answers it in place instead of sending it.
+// RPS-1265: the sentences are the shared credential ones (`credential-messages.ts`). RPS-1308: the login
+// password is checked for its shape only (typed, at most 72 characters). The complexity rule is for a
+// password that is SET: an account from before the policy, or an admin bootstrapped from a short
+// ADMIN_INITIAL_PASSWORD, must be able to type its own password, and a wrong one is the server's 401.
 test.describe('AUTH-03 client-side validation', () => {
   const VALID_PASSWORD = 'Valid-Pass1';
-  // Aa1 + filler: lower, upper and a digit, so only the length can be wrong.
   const passwordOfLength = (length: number) => `Aa1${'x'.repeat(length - 3)}`;
 
   test.describe('username', () => {
@@ -167,13 +167,7 @@ test.describe('AUTH-03 client-side validation', () => {
   test.describe('password', () => {
     const cases = [
       { name: 'empty', value: '', error: 'required' },
-      { name: 'too short (5 chars, otherwise valid)', value: 'Aa1bc', error: 'minlength' },
-      { name: 'without an upper-case letter', value: 'abcdef12', error: 'pattern' },
-      { name: 'without a lower-case letter', value: 'ABCDEF12', error: 'pattern' },
-      { name: 'without a digit', value: 'Abcdefgh', error: 'pattern' },
-      { name: 'with a space', value: 'Abc 1234', error: 'pattern' },
-      { name: 'with a trailing space', value: 'Abcd1234 ', error: 'pattern' },
-      { name: 'too long (51 chars)', value: passwordOfLength(51), error: 'maxlength' },
+      { name: 'too long (73 chars)', value: passwordOfLength(73), error: 'maxlength' },
     ] as const;
 
     for (const { name, value, error } of cases) {
@@ -191,17 +185,51 @@ test.describe('AUTH-03 client-side validation', () => {
       });
     }
 
-    test('both length limits are accepted', async ({ page }) => {
-      const login = new LoginPage(page);
-      const validation = new LoginValidation(login);
+    // What the create/change forms refuse and the login form must accept (RPS-1308).
+    const weak = [
+      { name: 'a single character', value: 'a' },
+      { name: 'too short for a new password', value: 'abc' },
+      { name: 'without an upper-case letter', value: 'abcdef12' },
+      { name: 'without a lower-case letter', value: 'ABCDEF12' },
+      { name: 'without a digit', value: 'Abcdefgh' },
+      { name: 'with a space', value: 'Abc 1234' },
+      { name: 'longer than a new password (60 chars)', value: passwordOfLength(60) },
+      { name: 'the longest one, 72 chars', value: passwordOfLength(72) },
+    ] as const;
 
-      await login.goto();
-      await validation.enter('username', 'valid.user');
-      for (const value of [passwordOfLength(6), passwordOfLength(50)]) {
+    for (const { name, value } of weak) {
+      test(`${name} is accepted: no inline message, submit enabled`, async ({ page }) => {
+        const login = new LoginPage(page);
+        const validation = new LoginValidation(login);
+
+        await login.goto();
+        await validation.enter('username', 'valid.user');
         await validation.enter('password', value);
+
         await validation.expectNoError('password');
         await expect(login.submit).toBeEnabled();
-      }
+      });
+    }
+
+    test('a wrong weak password gets the invalid-credentials toast from the server, not an inline message', async ({
+      page,
+      seededUser,
+    }) => {
+      const login = new LoginPage(page);
+      const validation = new LoginValidation(login);
+      const shell = new Shell(page);
+
+      await login.goto();
+      await validation.enter('username', seededUser.username);
+      await validation.enter('password', 'abc');
+      await validation.expectNoError('password');
+      await expect(login.submit).toBeEnabled();
+      await login.submit.click();
+
+      await shell.toasts.expectError(WRONG_CREDENTIALS_TOAST);
+      await validation.expectNoError('password');
+      await expect(page).toHaveURL(/\/login$/);
+      expect(await storedSession(page)).toEqual(NO_SESSION);
     });
   });
 
@@ -233,8 +261,8 @@ test.describe('AUTH-03 client-side validation', () => {
 
     await login.goto();
     await login.username.fill('valid.user');
-    await validation.enter('password', 'Ab1de');
-    await validation.expectOnlyError('password', 'minlength');
+    await validation.enter('password', '');
+    await validation.expectOnlyError('password', 'required');
     await login.password.press('Enter');
 
     await expect(login.submit).toBeDisabled();

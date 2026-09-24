@@ -150,6 +150,7 @@ e2e/
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe; both tests tagged @smoke
     skeleton/repo-settings.spec.ts  # RPS-1200 settings-PUT field-by-field matrix across RepoTypes; untagged (not smoke-sized)
     skeleton/repo-type-casing.spec.ts  # RPS-1269 repo type: /format answers upper case; type accepted in any case (query and body)
+    skeleton/login-password.spec.ts  # RPS-1308 POST /api/auth/login: a wrong password of any strength is 401 invalidCredentials; malformed shapes stay 400
     maven/
       publish-consume.spec.ts   # registerPublishConsumeLoop(mavenAdapter) + the RPS-1196 real-client test
       upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules
@@ -2494,11 +2495,11 @@ only `runners/ui.Dockerfile` or `pnpm-lock.yaml` does (`-b`), because the browse
 the locked `@playwright/test` version (the image installs it from `node_modules/.bin/playwright`, so
 it follows the lockfile by itself).
 
-**`REPSY_ADMIN_PASSWORD` must satisfy the panel's login form** (6-50 chars, a lower-case letter, an
-upper-case letter and a digit, no whitespace) or UI login is impossible. The backend already refuses
-to boot with a password that fails the complexity part but does not check the length, so the `ui`
-project runs a worker-scoped preflight (`assertAdminCredentialsUsableInUi`) that fails every test with
-a message saying exactly that. `e2e/.env.example` documents it next to the `REPSY_UI_*` variables.
+**`REPSY_ADMIN_PASSWORD` must be 1-72 characters**, the only rule of the panel's login form (RPS-1308:
+login checks the shape of an existing password, not the complexity rule of a new one, so weak legacy
+passwords can log in; the backend still refuses to boot with an `ADMIN_INITIAL_PASSWORD` that fails
+the complexity rule, and one over 72 bytes). The `ui` project runs a worker-scoped preflight
+(`assertAdminCredentialsUsableInUi`) that fails every test with a message saying exactly that. `e2e/.env.example` documents it next to the `REPSY_UI_*` variables.
 
 | Variable              | Default                                            | Effect                                                                                  |
 | --------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -2664,8 +2665,10 @@ Things a later author must know:
 - **Inline validation messages appear on blur** (`touched`), one at a time, in the order required,
   pattern, minlength, maxlength; `LoginValidation.enter()` types and blurs. The texts are the shared credential
   sentences of `src/ui/credential-messages.ts` (RPS-1265: one wording for a username, a password and a
-  description on every form); the login password rule is the create-user one because the backend's `LoginForm`
-  holds a login password to the same rule, so a weaker one is answered by the form, not the server.
+  description on every form); the login password has only `required` and `maxlength` (72) messages (RPS-1308: the complexity rule
+  is for a password that is set, so a weak password is submitted and a wrong one is the server's 401 toast,
+  see AUTH-03). An account whose password breaks the creation rule cannot be seeded (creation enforces the
+  rule), so that it can log in is proved by `AuthControllerIT`, not here.
 - **AUTH-11 (`@throttle`) is skipped by default.** It needs a stack whose `AUTH_THROTTLE_MAX_FAILURES` is
   below 30 (the harness stack raises it to 100000, see `docker-compose.stack.yml`) and, once it trips,
   the client stays refused for the window (`AUTH_THROTTLE_WINDOW_SECONDS`), so run it alone, on a
