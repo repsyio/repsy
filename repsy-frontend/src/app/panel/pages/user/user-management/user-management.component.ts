@@ -21,6 +21,7 @@ import moment from 'moment';
 import { finalize } from 'rxjs';
 
 import { PagedModelUserResponse, UserResponse } from '../../../../../generated/api';
+import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { DropdownComponent } from '../../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../../shared/components/ellipsis/ellipsis.pipe';
 import { EmptyListComponent } from '../../../shared/components/empty-list/empty-list.component';
@@ -71,6 +72,7 @@ export class UserManagementComponent implements OnInit {
     private readonly userService: UserService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
+    private readonly authService: AuthService,
   ) {}
 
   public ngOnInit(): void {
@@ -128,7 +130,7 @@ export class UserManagementComponent implements OnInit {
   }
 
   public resetPassword(user: UserResponse): void {
-    this.dangerModalService.show('Reset Password', 'Reset', () => {
+    this.dangerModalService.showWithMessage('Reset Password', 'Reset', this.resetPasswordMessage(user), () => {
       this.operationLock = true;
 
       this.userService
@@ -145,6 +147,19 @@ export class UserManagementComponent implements OnInit {
           this.toastService.show('Password reset successfully', 'success');
         });
     });
+  }
+
+  public resetPasswordMessage(user: UserResponse): string {
+    const message =
+      `A new random password for "${user.username}" is generated and shown to you once. ` +
+      'The current password stops working and every signed-in session and CLI login of that account is revoked.';
+    if (user.username !== this.authService.username) {
+      return message;
+    }
+    return (
+      `${message} This is your own account: you will be signed out and must sign in again with the new password. ` +
+      'To keep your session, change it under Profile instead.'
+    );
   }
 
   public deleteUser(user: UserResponse): void {
