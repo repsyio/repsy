@@ -48,7 +48,7 @@
             <app-copy-clipboard [text]="gemfileSnippet" />
           </div>
           <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
-        <code [highlight]="gemfileSnippet" language="ruby" lineNumbers>
+        <code tabindex="0" [highlight]="gemfileSnippet" language="ruby" lineNumbers>
         </code>
       </pre>
         </div>
@@ -65,7 +65,7 @@
           </div>
           <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
             <span class="text-white">Checksum (SHA256): </span>
-            <span class="font-courier break-all text-[12px] text-[#9C9C9D]">{{ gemVersion.checksum }}</span>
+            <span class="font-courier text-[12px] break-all text-[#9C9C9D]">{{ gemVersion.checksum }}</span>
           </div>
           @if (gemVersion.requiredRubyVersion) {
             <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
@@ -82,7 +82,12 @@
           @if (gemVersion.homepage) {
             <div class="inline-flex flex-wrap items-center gap-2 rounded-lg bg-[#101112] p-[14px]">
               <span class="text-white">Homepage: </span>
-              <a class="text-blue-400 hover:underline break-all" [href]="gemVersion.homepage" target="_blank" rel="noopener">
+              <a
+                class="break-all text-blue-400 hover:underline"
+                [href]="gemVersion.homepage"
+                target="_blank"
+                rel="noopener"
+              >
                 {{ gemVersion.homepage }}
               </a>
             </div>

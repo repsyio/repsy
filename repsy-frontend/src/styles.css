@@ -233,6 +233,37 @@ router-outlet + * {
   display: block;
 }
 
+/*
+ * List rows are plain containers with ONE real link: `<div class="row-link-host"><a class="row-link"
+ * [routerLink] aria-label="name"></a> ...cells...</div>`. The link is stretched over the whole row,
+ * so the row stays clickable with the mouse, opens in a new tab on ctrl/middle click and is reached
+ * with Tab and Enter like any link. Everything else interactive in the row (secondary links, the
+ * security badge, the action menu) is a sibling of the link, never a child, and is lifted above it:
+ * a positioned element later in the tree paints over the earlier positioned link without a z-index,
+ * so an open dropdown menu (`z-1`) still paints over the next rows. Tooltips are lifted too, so
+ * their hover popup keeps working, and forward a click to the row link (see TooltipComponent).
+ */
+@layer components {
+  .row-link-host {
+    position: relative;
+  }
+
+  .row-link {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+
+  .row-link:focus-visible {
+    outline: 2px solid #ff69b4;
+    outline-offset: -2px;
+  }
+
+  :where(.row-link-host) :where(a:not(.row-link), button, app-dropdown, app-tooltip) {
+    position: relative;
+  }
+}
+
 .repsy-btn-base {
   display: flex;
   justify-content: center;
@@ -475,6 +506,24 @@ code {
   padding: 1em 1.2em;
   overflow-x: unset;
   overflow-y: unset;
+}
+
+/*
+ * The highlight.js theme (monokai-sublime, loaded after this file) paints keys and keywords #f92672 on
+ * #23241f, 4.1:1, and comments #75715e, 2.9:1, both below the 4.5:1 that WCAG AA asks for. A lighter
+ * pink of the same hue is 5.4:1, a lighter comment grey 5.7:1.
+ */
+.hljs .hljs-keyword,
+.hljs .hljs-selector-tag,
+.hljs .hljs-name,
+.hljs .hljs-attr {
+  color: #ff5c93;
+}
+
+.hljs .hljs-comment,
+.hljs .hljs-deletion,
+.hljs .hljs-meta {
+  color: #a09d8a;
 }
 
 .hljs.hljs-line-numbers {

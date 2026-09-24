@@ -101,17 +101,17 @@
           class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block"
         >
           @for (tag of tags; track tag.name; let i = $index) {
-            <div
-              [attr.data-testid]="'pkg-versions-row-' + tag.name"
-              role="button"
-              appKeyboardActivate
-              [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name + '/detail'"
-            >
+            <div [attr.data-testid]="'pkg-versions-row-' + tag.name">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === tags.length - 1 }"
-                class="grid grid-cols-[minmax(0,2fr)_1.2fr_minmax(0,1fr)_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="row-link-host grid grid-cols-[minmax(0,2fr)_1.2fr_minmax(0,1fr)_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
+                <a
+                  class="row-link"
+                  [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name + '/detail'"
+                  [attr.aria-label]="tag.name"
+                ></a>
                 <div class="flex w-max items-center gap-2">
                   <a
                     data-testid="row-manifests-link"
@@ -199,12 +199,14 @@
           @for (tag of tags; track tag.name; let i = $index) {
             <div animate.enter="fade-in-down" class="lg:hidden">
               <div
-                class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+                class="row-link-host relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
                 [attr.data-testid]="'pkg-versions-card-' + tag.name"
-                role="button"
-                appKeyboardActivate
-                [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name + '/detail'"
               >
+                <a
+                  class="row-link"
+                  [routerLink]="'/' + activeRepo.repoName + '/' + imageName + '/' + tag.name + '/detail'"
+                  [attr.aria-label]="tag.name"
+                ></a>
                 @if (activeRepo.canManage) {
                   <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
                     <button

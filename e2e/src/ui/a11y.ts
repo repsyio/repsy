@@ -19,15 +19,15 @@
  *
  * Two modes, controlled in ONE place:
  *
- *  - `report` (the default): every scan attaches its findings to the test report (`axe-<label>.json`
- *    plus a one-line `axe-<label>.txt` and a test annotation), prints a compact summary line and NEVER
- *    fails. This is how the baseline is recorded while the panel still has real accessibility debt
- *    (RPS-1266).
- *  - `enforce`: the same, and the test fails when a violation of a blocking impact (`serious` or
+ *  - `enforce` (the default since RPS-1266 part 4): every scan attaches its findings to the test
+ *    report (`axe-<label>.json` plus a one-line `axe-<label>.txt` and a test annotation), prints a
+ *    compact summary line, and the test fails when a violation of a blocking impact (`serious` or
  *    `critical`) is present.
+ *  - `report`: the same, and NEVER fails. This is how the baseline was recorded while the panel still
+ *    had accessibility debt, and how to look at a page that is not clean yet.
  *
- * Flip the default for everyone by changing `DEFAULT_A11Y_MODE` below (that is the "one config flag"
- * of the story), or for a single run with `REPSY_UI_OPT_IN=a11y-enforce` (or `a11y-report`), which
+ * Change the default for everyone with `DEFAULT_A11Y_MODE` below (that is the "one config flag" of
+ * the story), or for a single run with `REPSY_UI_OPT_IN=a11y-report` (or `a11y-enforce`), which
  * `docker-compose.runners.yml` already forwards to the ui runner. A dedicated `REPSY_UI_A11Y`
  * variable would not reach the container without editing that file.
  *
@@ -48,10 +48,11 @@ import { optedIn } from './session.js';
 export type A11yMode = 'report' | 'enforce';
 
 /**
- * THE switch. `report` while the baseline is being fixed (RPS-1266); flip to `enforce` once the five
- * scanned pages are free of serious/critical violations.
+ * THE switch. It was `report` while the baseline was being fixed (RPS-1266); part 4 made the five
+ * scanned pages, the open modals and the package pages of every protocol free of serious/critical
+ * violations and flipped it to `enforce`.
  */
-export const DEFAULT_A11Y_MODE: A11yMode = 'report';
+export const DEFAULT_A11Y_MODE: A11yMode = 'enforce';
 
 /** The axe impacts that fail a test in `enforce` mode. */
 export const BLOCKING_IMPACTS: readonly string[] = ['serious', 'critical'];
@@ -103,7 +104,8 @@ export function formatSummary(summary: AxeSummary): string {
 
 /**
  * Runs axe on the page as it is NOW (the caller has already waited for the page's own ready element),
- * attaches the findings to the report and, in `enforce` mode, fails on serious/critical violations.
+ * attaches the findings to the report and, in `enforce` mode (the default), fails on serious/critical
+ * violations.
  * Returns the summary so a spec can collect a table.
  */
 export async function scanPage(

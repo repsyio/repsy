@@ -71,18 +71,18 @@
           class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block"
         >
           @for (version of versions; track version.version; let i = $index) {
-            <div
-              [attr.data-testid]="'pkg-versions-row-' + version.version"
-              role="button"
-              appKeyboardActivate
-              [routerLink]="['/' + activeRepo.repoName + '/' + chartName + '/' + version.version]"
-              fragment="security"
-            >
+            <div [attr.data-testid]="'pkg-versions-row-' + version.version">
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === versions.length - 1 }"
-                class="grid grid-cols-[2fr_1.2fr_2fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="row-link-host grid grid-cols-[2fr_1.2fr_2fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
+                <a
+                  class="row-link"
+                  [routerLink]="['/' + activeRepo.repoName + '/' + chartName + '/' + version.version]"
+                  fragment="security"
+                  [attr.aria-label]="version.version"
+                ></a>
                 <div class="flex items-center gap-2">
                   <img ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" class="mb-1" height="18" width="18" />
                   <app-tooltip
@@ -137,12 +137,14 @@
             <div animate.enter="fade-in-down" class="lg:hidden">
               <div
                 [attr.data-testid]="'pkg-versions-card-' + version.version"
-                class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
-                role="button"
-                appKeyboardActivate
-                [routerLink]="['/' + activeRepo.repoName + '/' + chartName + '/' + version.version]"
-                fragment="security"
+                class="row-link-host relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
               >
+                <a
+                  class="row-link"
+                  [routerLink]="['/' + activeRepo.repoName + '/' + chartName + '/' + version.version]"
+                  fragment="security"
+                  [attr.aria-label]="version.version"
+                ></a>
                 @if (activeRepo.canManage) {
                   <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
                     <button

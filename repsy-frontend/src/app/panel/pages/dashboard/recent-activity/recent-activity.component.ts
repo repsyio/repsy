@@ -20,12 +20,11 @@ import { RouterLink } from '@angular/router';
 import moment from 'moment';
 
 import { RepoListInfo, RepoType } from '../../../../../generated/api';
-import { KeyboardActivateDirective } from '../../../shared/directives/keyboard-activate.directive';
 import { ByteFormatter } from '../../../shared/util/byte-formatter';
 
 @Component({
   selector: 'app-recent-activity',
-  imports: [KeyboardActivateDirective, CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink],
   templateUrl: './recent-activity.component.html',
   standalone: true,
 })
