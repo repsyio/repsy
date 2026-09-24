@@ -144,6 +144,16 @@ repsy:
     docker:
       internal-registry-base-url: ${DOCKER_INTERNAL_REGISTRY_BASE_URL:http://localhost:9090}
 
+  # Renames the manifest files an earlier version stored under a name generated from the tag to
+  # manifests/<digest> and fills in the sha512 digest of those manifests (RPS-1216). Until it has run
+  # the registry reads the legacy names, so switching it off only delays the cleanup. Durations are
+  # ISO-8601.
+  docker:
+    manifest-layout-repair:
+      enabled: ${DOCKER_MANIFEST_LAYOUT_REPAIR_ENABLED:true}
+      initial-delay: ${DOCKER_MANIFEST_LAYOUT_REPAIR_INITIAL_DELAY:PT10M}
+      interval: ${DOCKER_MANIFEST_LAYOUT_REPAIR_INTERVAL:PT24H}
+
   storage:
     # Deletes the Docker layer and Helm OCI blob uploads that were started and never finalized, and
     # releases the disk usage they were charged for. An upload counts as abandoned once its temp

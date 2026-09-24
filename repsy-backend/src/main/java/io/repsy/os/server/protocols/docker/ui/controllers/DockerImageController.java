@@ -33,7 +33,6 @@ import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.os.shared.utils.SortValidator;
-import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
 import java.util.Set;
@@ -153,9 +152,7 @@ public class DockerImageController {
       @PathVariable final String imageName,
       @PathVariable final String tagName) {
 
-    final var usages = this.tagDeletionComponent.deleteTag(repoInfo, imageName, tagName);
-
-    this.updateUsage(repoInfo, usages);
+    this.tagDeletionComponent.deleteTag(repoInfo, imageName, tagName);
 
     return this.restResponseFactory.success("tagDeleted");
   }
@@ -185,14 +182,11 @@ public class DockerImageController {
       @PathVariable final String reference)
       throws IOException {
 
-    final var manifestName =
-        this.manifestService.findManifestNameByReference(
+    final var fileNames =
+        this.manifestService.findManifestFileNamesByReference(
             repoInfo.getStorageKey(), imageName, reference);
 
-    final var fileName =
-        ManifestNameGenerator.generate(repoInfo.getStorageKey(), imageName, manifestName);
-
-    final var manifest = this.dockerApiFacade.getManifest(repoInfo, fileName);
+    final var manifest = this.dockerApiFacade.getManifest(repoInfo, fileNames);
 
     return this.restResponseFactory.success("manifestFetched", manifest);
   }

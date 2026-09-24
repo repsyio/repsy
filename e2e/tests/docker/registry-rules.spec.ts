@@ -417,8 +417,8 @@ test.describe('docker registry rules (raw HTTP)', () => {
   );
 
   test(
-    'R7/B2: overriding a tag makes the PREVIOUS manifest unpullable by digest',
-    { tag: ['@settings', '@negative'] },
+    'R7/B2: overriding a tag keeps the PREVIOUS manifest pullable by digest (RPS-1216, fixed)',
+    { tag: ['@settings'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'overridedigest');
       const admin = adminCredential();
@@ -433,14 +433,26 @@ test.describe('docker registry rules (raw HTTP)', () => {
       const second = await rawPushImage(layout, admin, 'tag1', 'v2');
       expect(second.manifestRes.status, 'allowOverride defaults to true').toBe(201);
 
+      // A manifest is content-addressed: an override moves the tag pointer and leaves the manifest
+      // it pointed at stored, pullable by its own digest.
       const getOldAfter = await rawGetManifest(layout.repoName, admin, layout.image, oldDigest);
-      test.fail(
-        true,
-        'RPS-1216 (B2): overriding a tag reuses/overwrites its one Manifest row in ' +
-          'place (ManifestTxService.updateManifestProperties), so the PREVIOUS manifest becomes ' +
-          'unpullable by digest even though nothing ever explicitly deleted it -- confirmed live.',
-      );
       expect(getOldAfter.status, 'the old manifest is still pullable by its own digest').toBe(200);
+      expect(sha256Hex(getOldAfter.body), 'byte-identical to what was pushed').toBe(
+        sha256Hex(first.built.manifestBytes),
+      );
+      const headOldAfter = await rawHeadManifest(layout.repoName, admin, layout.image, oldDigest);
+      expect(headOldAfter.status, 'HEAD by the old digest mirrors GET').toBe(200);
+
+      // The tag itself now serves the new manifest.
+      const getTag = await rawGetManifest(layout.repoName, admin, layout.image, 'tag1');
+      expect(sha256Hex(getTag.body)).toBe(sha256Hex(second.built.manifestBytes));
+      const getNewByDigest = await rawGetManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        second.built.manifestDigest,
+      );
+      expect(getNewByDigest.status, 'the new manifest is pullable by its digest as well').toBe(200);
     },
   );
 

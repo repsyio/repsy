@@ -335,6 +335,38 @@ admin resets its password, either from the users page in the web UI or directly 
 [password reset marker file](#forgot-admin-password) resets the password of any account, not only
 an admin's, from inside the container.
 
+### Docker manifests are content-addressed (RPS-1216)
+
+Docker manifests used to be stored as a child of a tag: pushing a tag again with a new manifest
+rewrote the tag's manifest in place, so the previous manifest could no longer be pulled by its
+digest (`image@sha256:...`). A manifest is now stored once per image and digest, and a tag is only a
+pointer to it. Upgrading needs a database migration (`V0024`) and renames the stored manifest files.
+
+**Back up the database and the storage directory before upgrading.** Flyway migrations are
+forward-only, and once the manifest files have been renamed the previous version can no longer read
+them: to go back, restore the backup. (The previous version cannot push against the migrated schema
+either.)
+
+**What the migration does** (in one transaction, on PostgreSQL and on H2):
+
+- one `docker_manifest` row per image and digest: the copies that older versions kept per tag (and
+  the rows they added for the children of a multi-platform tag) are folded into the row of the
+  original push;
+- each tag points to the row of its digest; the extra `sha256:...` and `sha512:...` tags that a
+  digest-pushed index or a `sha512` push left behind are removed (their manifests stay, pullable by
+  digest), and so is a tag that already answered `404` because its manifest row was gone;
+- a multi-platform tag's children are recorded as the index's references;
+- rows of failed pushes that belonged to no tag are removed.
+
+**The file rename** is done by a background job that starts 10 minutes after the application
+(`DOCKER_MANIFEST_LAYOUT_REPAIR_INITIAL_DELAY`), reads every legacy manifest file, checks that its
+bytes hash to the recorded digest, renames it to `manifests/<digest>` and records the `sha512`
+digest. It is idempotent and resumable: a rerun (or a restart in the middle) finishes what is left.
+Until a manifest has been renamed it is served from its old file name, so pulls keep working during
+and after the upgrade. A manifest whose file is missing or does not match its digest is logged at
+`WARN` and left exactly as it was. Progress and results are logged at `INFO`
+(`Docker manifest layout repair: ...`).
+
 ## Configuration
 
 ### Environment Variables
@@ -374,6 +406,9 @@ an admin's, from inside the container.
 | `TRASH_RETENTION` | How long deleted items stay in the trash before they are removed for good (ISO-8601 duration, at least `P1D`; a shorter value stops the application from starting). Raise it to keep deleted items recoverable for longer | `P7D` |
 | `TRASH_CLEANUP_INTERVAL` | How often the trash is emptied (ISO-8601 duration) | `PT24H` |
 | `TRASH_CLEANUP_INITIAL_DELAY` | How long after startup the first trash cleanup runs (ISO-8601 duration) | `PT15M` |
+| `DOCKER_MANIFEST_LAYOUT_REPAIR_ENABLED` | After upgrading past RPS-1216, rename the Docker manifest files of earlier versions (named after the tag they were pushed under) to `manifests/<digest>` and record their `sha512` digest. Until a manifest is repaired it is served from its old file name, so switching the job off only delays the cleanup. See [Upgrading](#docker-manifests-are-content-addressed-rps-1216) | `true` |
+| `DOCKER_MANIFEST_LAYOUT_REPAIR_INITIAL_DELAY` | How long after startup the first repair pass runs (ISO-8601 duration) | `PT10M` |
+| `DOCKER_MANIFEST_LAYOUT_REPAIR_INTERVAL` | How often the repair pass runs again (ISO-8601 duration); once nothing is left to repair it costs one query | `PT24H` |
 | `MULTIPART_MAX_FILE_SIZE` | Largest single file a multipart upload may carry: the package archive of a PyPI (`twine upload`), Helm (`POST /{repo}/api/charts`) or NuGet push. A larger upload is answered with `413`. Accepts a size such as `100MB` or `1GB`. A Helm chart is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory, so keep that directory on a disk with room for the largest chart | `500MB` |
 | `MULTIPART_MAX_REQUEST_SIZE` | Largest total size of a multipart request, all parts included. Keep it at least as large as `MULTIPART_MAX_FILE_SIZE` | `500MB` |
 | `RUBY_MAX_GEM_SIZE` | Largest gem a `gem push` may carry (the raw request body, so the multipart limits do not apply to it). A larger gem is answered with `413`. The gem is copied to a temporary file (in `java.io.tmpdir`) while it is checked and stored, not held in memory. Accepts a size such as `100MB` or `1GB` | `500MB` |
@@ -495,6 +530,26 @@ Deploy tokens are scoped to a single repository, so use one to give a CI job or 
 access to that repository without a user account. Only create user accounts for people you trust
 with every repository on the instance; to keep repositories apart between teams, run one Repsy
 instance per team.
+
+### Docker Registry Semantics
+
+- **Manifests are content-addressed.** A manifest is stored once per image and digest and stays
+  pullable by that digest, `docker pull repo/image@sha256:...`, whatever happens to the tags that
+  point at it. Both `sha256:` and `sha512:` references are accepted; the registry reports the
+  `sha256` digest.
+- **A tag is a movable pointer.** Pushing a tag again with a different manifest (when the
+  repository allows overriding) moves the pointer; the manifest it pointed at before stays stored
+  and pullable by its digest. Pushing the manifest a tag already points at changes nothing.
+  Deleting a tag in the web UI removes the pointer only, in the same way.
+- **Untagged manifests accumulate.** Nothing deletes a manifest automatically, so every override
+  and every deleted tag leaves the previous manifest, and the layers only it used, on disk and in
+  the repository's usage. Deleting a whole image removes its manifests (a manifest file that
+  another image of the repository shares is kept until the last image that has it is gone).
+  Removing untagged manifests without deleting the image is not offered yet; it is tracked as
+  follow-up work.
+- **"Delete orphan layers"** in the repository settings deletes the layer blobs that no manifest
+  uses (for example, left by a refused push). It does not touch manifests.
+- There is no `tags/list`, referrers API or protocol-level `DELETE` yet.
 
 ### Signed Maven Deploys
 

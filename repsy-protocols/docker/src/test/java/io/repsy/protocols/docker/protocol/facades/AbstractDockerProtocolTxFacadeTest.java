@@ -25,6 +25,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -37,8 +38,11 @@ import io.repsy.protocols.docker.shared.layer.services.LayerService;
 import io.repsy.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.protocols.docker.shared.tag.dtos.BaseManifestDetail;
 import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
+import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
 import io.repsy.protocols.docker.shared.utils.BaseParsedPath;
+import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
+import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.ByteArrayInputStream;
@@ -51,6 +55,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
@@ -251,7 +257,6 @@ class AbstractDockerProtocolTxFacadeTest {
     when(this.manifestService.findActiveTagByNameAndRepoAndImage(REPO_ID, IMAGE_NAME, "latest"))
         .thenReturn(Optional.of(BaseTagDetail.<UUID>builder().digest(digest).build()));
     final var manifestDetail = new BaseManifestDetail<UUID>();
-    manifestDetail.setName("latest");
     manifestDetail.setMediaType("application/vnd.oci.image.manifest.v1+json");
     manifestDetail.setDigest(digest);
     when(this.manifestService.findManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
@@ -267,16 +272,16 @@ class AbstractDockerProtocolTxFacadeTest {
     verify(this.manifestService).findActiveTagByNameAndRepoAndImage(REPO_ID, IMAGE_NAME, "latest");
   }
 
-  @Test
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"sha256", "sha512"})
   @DisplayName(
-      "getManifest() short-circuits a sha256 reference straight to the digest, skipping "
-          + "the tag lookup entirely")
-  void getManifestShortCircuitsASha256Reference() throws Exception {
+      "getManifest() short-circuits a digest reference of either algorithm straight to the "
+          + "digest, skipping the tag lookup entirely")
+  void getManifestShortCircuitsADigestReference(final String algorithm) throws Exception {
     final var context = newContext();
     final var imageInfo = this.stubImage();
-    final var digest = sha256Of("manifest-body".getBytes(StandardCharsets.UTF_8));
+    final var digest = algorithm + ":" + "a".repeat("sha256".equals(algorithm) ? 64 : 128);
     final var manifestDetail = new BaseManifestDetail<UUID>();
-    manifestDetail.setName(digest);
     manifestDetail.setMediaType("application/vnd.oci.image.manifest.v1+json");
     manifestDetail.setDigest(digest);
     when(this.manifestService.findManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
@@ -290,6 +295,143 @@ class AbstractDockerProtocolTxFacadeTest {
     assertThat(result.digest()).isEqualTo(digest);
     assertThat(result.body()).isEqualTo("manifest-body");
     verify(this.manifestService, never()).findActiveTagByNameAndRepoAndImage(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("getManifest() reads a manifest by its digest, wherever tags point (RPS-1216)")
+  void getManifestReadsTheFileAtTheDigest() throws Exception {
+    final var context = newContext();
+    final var imageInfo = this.stubImage();
+    final var digest = sha256Of("manifest-body".getBytes(StandardCharsets.UTF_8));
+    final var manifestDetail = new BaseManifestDetail<UUID>();
+    manifestDetail.setMediaType("application/vnd.oci.image.manifest.v1+json");
+    manifestDetail.setDigest(digest);
+    when(this.manifestService.findManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
+        .thenReturn(manifestDetail);
+    when(this.dockerStorageService.getResource(
+            argThat(
+                path -> path != null && path.getPath().equals(REPO_ID + "/manifests/" + digest)),
+            eq(REPO_NAME)))
+        .thenReturn(
+            Optional.of(new ByteArrayResource("manifest-body".getBytes(StandardCharsets.UTF_8))));
+
+    final var result =
+        this.facade()
+            .getManifest(context, digest, IMAGE_NAME, "/v2/images/app/manifests/" + digest);
+
+    assertThat(result.body()).isEqualTo("manifest-body");
+  }
+
+  @Test
+  @DisplayName(
+      "getManifest() reads the legacy file named after the storage name until the repair service"
+          + " has renamed it")
+  void getManifestReadsALegacyFileThroughTheStorageName() throws Exception {
+    final var context = newContext();
+    final var imageInfo = this.stubImage();
+    final var digest = sha256Of("manifest-body".getBytes(StandardCharsets.UTF_8));
+    final var manifestDetail = new BaseManifestDetail<UUID>();
+    manifestDetail.setMediaType("application/vnd.oci.image.manifest.v1+json");
+    manifestDetail.setDigest(digest);
+    manifestDetail.setStorageName("latest");
+    when(this.manifestService.findManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
+        .thenReturn(manifestDetail);
+    final var legacyPath =
+        REPO_ID + "/manifests/" + ManifestNameGenerator.generate(REPO_ID, IMAGE_NAME, "latest");
+    when(this.dockerStorageService.existsResource(
+            argThat(path -> path != null && path.getPath().equals(legacyPath)), eq(REPO_NAME)))
+        .thenReturn(true);
+    when(this.dockerStorageService.getResource(
+            argThat(path -> path != null && path.getPath().equals(legacyPath)), eq(REPO_NAME)))
+        .thenReturn(
+            Optional.of(new ByteArrayResource("legacy-body".getBytes(StandardCharsets.UTF_8))));
+
+    final var result =
+        this.facade()
+            .getManifest(context, digest, IMAGE_NAME, "/v2/images/app/manifests/" + digest);
+
+    assertThat(result.body()).isEqualTo("legacy-body");
+  }
+
+  @Test
+  @DisplayName(
+      "getManifest() falls back to the digest file when the legacy file is already gone, so a"
+          + " rename that beat the row update loses nothing")
+  void getManifestFallsBackToTheDigestFile() throws Exception {
+    final var context = newContext();
+    final var imageInfo = this.stubImage();
+    final var digest = sha256Of("manifest-body".getBytes(StandardCharsets.UTF_8));
+    final var manifestDetail = new BaseManifestDetail<UUID>();
+    manifestDetail.setMediaType("application/vnd.oci.image.manifest.v1+json");
+    manifestDetail.setDigest(digest);
+    manifestDetail.setStorageName("latest");
+    when(this.manifestService.findManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
+        .thenReturn(manifestDetail);
+    when(this.dockerStorageService.existsResource(any(), eq(REPO_NAME))).thenReturn(false);
+    when(this.dockerStorageService.getResource(
+            argThat(
+                path -> path != null && path.getPath().equals(REPO_ID + "/manifests/" + digest)),
+            eq(REPO_NAME)))
+        .thenReturn(
+            Optional.of(new ByteArrayResource("manifest-body".getBytes(StandardCharsets.UTF_8))));
+
+    final var result =
+        this.facade()
+            .getManifest(context, digest, IMAGE_NAME, "/v2/images/app/manifests/" + digest);
+
+    assertThat(result.body()).isEqualTo("manifest-body");
+  }
+
+  private static ManifestForm formFor(final String reference, final byte[] bytes)
+      throws NoSuchAlgorithmException {
+    return ManifestForm.builder()
+        .tagName(reference)
+        .contentType("application/vnd.oci.image.manifest.v1+json")
+        .manifestJson(new String(bytes, StandardCharsets.UTF_8))
+        .digest(DockerDigestCalculator.calculateDigest(bytes))
+        .digestSha512(DockerDigestCalculator.calculateSha512Digest(bytes))
+        .manifestBytes(bytes)
+        .relativePath(new RelativePath("manifests/x"))
+        .build();
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"sha256", "sha512"})
+  @DisplayName(
+      "saveManifest() refuses a digest reference that is not the manifest's own digest, of either"
+          + " algorithm, before anything is written")
+  void saveManifestRefusesAWrongDigestReference(final String algorithm) throws Exception {
+    final var reference = algorithm + ":" + "0".repeat("sha256".equals(algorithm) ? 64 : 128);
+    final var form = formFor(reference, "{}".getBytes(StandardCharsets.UTF_8));
+    final var imageInfo =
+        BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name(IMAGE_NAME).build();
+
+    assertThatThrownBy(() -> this.facade().saveManifest(newContext(), imageInfo, form))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("digestMismatch");
+    verify(this.dockerStorageService, never()).writeInputStreamToPath(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName(
+      "saveManifest() refuses to move an existing tag to another manifest while overriding is off")
+  void saveManifestRefusesAnOverrideWhenItIsOff() throws Exception {
+    final var bytes = "{}".getBytes(StandardCharsets.UTF_8);
+    final var context = newContext();
+    final var repoInfo =
+        io.repsy.protocols.shared.utils.ProtocolContextUtils.<UUID>getRepoInfo(context);
+    repoInfo.setAllowOverride(false);
+    final var imageInfo =
+        BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name(IMAGE_NAME).build();
+    when(this.manifestService.findActiveTagByNameAndRepoAndImage(REPO_ID, IMAGE_NAME, "latest"))
+        .thenReturn(
+            Optional.of(BaseTagDetail.<UUID>builder().digest("sha256:" + "1".repeat(64)).build()));
+
+    assertThatThrownBy(
+            () -> this.facade().saveManifest(context, imageInfo, formFor("latest", bytes)))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("packageOverrideDisabled");
+    verify(this.dockerStorageService, never()).writeInputStreamToPath(any(), any(), any());
   }
 
   @Test

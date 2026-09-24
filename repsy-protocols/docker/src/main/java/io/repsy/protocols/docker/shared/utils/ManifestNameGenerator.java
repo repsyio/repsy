@@ -23,13 +23,36 @@ import java.util.Locale;
 import java.util.UUID;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
+/**
+ * Names the manifest files of a repo. A manifest is stored once per digest, at {@code
+ * manifests/<sha256 digest>} (like {@code blobs/<digest>}). Versions before RPS-1216 generated the
+ * name from the image and the tag the manifest was pushed under; {@link #generate} is what is left
+ * of that scheme, for the files that have not been renamed yet ({@code
+ * docker_manifest.storage_name}).
+ */
 @UtilityClass
 @NullMarked
 public final class ManifestNameGenerator {
 
   private static final int SHORT_HASH_LENGTH = 12;
   private static final int UUID_LENGTH = 8;
+
+  /**
+   * The name of the file a manifest is stored under, inside the repo's {@code manifests} directory.
+   *
+   * @param storageName The manifest's {@code storage_name}: the reference a legacy file name was
+   *     generated from, or {@code null} once the file lives at its digest
+   */
+  public static String fileName(
+      final UUID repoUuid,
+      final String imageName,
+      final String digest,
+      final @Nullable String storageName) {
+
+    return storageName == null ? digest : generate(repoUuid, imageName, storageName);
+  }
 
   public static String generate(
       final UUID repoUuid, final String imageName, final String reference) {

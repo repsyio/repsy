@@ -19,19 +19,49 @@ import static java.security.MessageDigest.getInstance;
 
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Locale;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.codec.digest.MessageDigestAlgorithms;
 import org.jspecify.annotations.NullMarked;
 
+/**
+ * Calculates the OCI digests of a manifest. A manifest is stored under its {@code sha256} digest
+ * and also carries its {@code sha512} digest, so a client that names it by either algorithm finds
+ * it.
+ */
 @UtilityClass
 @NullMarked
 public class DockerDigestCalculator {
 
-  private static final String DIGEST_PREFIX = "sha256:";
+  public static final String SHA256_PREFIX = "sha256:";
+  public static final String SHA512_PREFIX = "sha512:";
 
   public static String calculateDigest(final byte[] bytes) throws NoSuchAlgorithmException {
 
-    return DIGEST_PREFIX
+    return SHA256_PREFIX
         + HexFormat.of().formatHex(getInstance(MessageDigestAlgorithms.SHA_256).digest(bytes));
+  }
+
+  public static String calculateSha512Digest(final byte[] bytes) throws NoSuchAlgorithmException {
+
+    return SHA512_PREFIX
+        + HexFormat.of().formatHex(getInstance(MessageDigestAlgorithms.SHA_512).digest(bytes));
+  }
+
+  /**
+   * The form a digest is stored and looked up in: the hex digits are case-insensitive in a request
+   * but stored lower-cased.
+   */
+  public static String normalize(final String digest) {
+
+    return digest.toLowerCase(Locale.ROOT);
+  }
+
+  /**
+   * Tells whether the (normalized) digest is a {@code sha512} one, so it is not a {@code sha256}.
+   */
+  public static boolean isSha512(final String digest) {
+
+    return digest.startsWith(SHA512_PREFIX);
   }
 }

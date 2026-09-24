@@ -30,5 +30,6 @@ public class ManifestForm {
   final String servletPath;
   final RelativePath relativePath;
   final String digest;
+  final String digestSha512;
   final byte[] manifestBytes;
 }

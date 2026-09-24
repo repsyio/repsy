@@ -21,7 +21,6 @@ import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import io.repsy.os.server.protocols.docker.shared.image.mappers.ImageConverter;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
-import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagPlatformRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
@@ -44,7 +43,6 @@ public class ImageTxService implements ImageService<UUID> {
   private final ImageConverter imageConverter;
   private final ImageRepository imageRepository;
   private final RepoRepository repoRepository;
-  private final TagPlatformRepository tagPlatformRepository;
   private final LayerRepository layerRepository;
 
   @Override
@@ -85,15 +83,11 @@ public class ImageTxService implements ImageService<UUID> {
 
     final var image = this.findByRepoIdAndName(repoId, imageName);
 
-    final var tagPlatforms = this.tagPlatformRepository.findAllByTagImageId(image.getId());
-
-    final var manifests = tagPlatforms.stream().flatMap(tp -> tp.getManifests().stream()).toList();
-
-    for (final var manifest : manifests) {
-      manifest.getLayers().clear();
-    }
-
+    // The image's tags go with it through the mapping; its manifests, their layer links and their
+    // index edges go through the database's ON DELETE CASCADE. Flushed here, so a caller that asks
+    // which manifest digests the repo still has sees them gone.
     this.imageRepository.delete(image);
+    this.imageRepository.flush();
   }
 
   public Page<io.repsy.os.generated.model.ImageListItem> findAllByRepoIdAndContainsName(
