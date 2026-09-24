@@ -185,21 +185,7 @@ public final class NuGetPackageUtils {
    * 1.0.0-alpha, 1.0.0+Build → 1.0.0. The pre-release suffix is kept as is.
    */
   public static String normalizeNuGetVersion(final String rawVersion) {
-    return normalize(rawVersion, false);
-  }
-
-  /**
-   * Answers the form {@link #normalizeNuGetVersion} produced before it dropped build metadata,
-   * {@code 1.0.0+Build → 1.0.0+build}. Versions published before then were stored, and their files
-   * written, under this form, so it is still how they are found.
-   */
-  public static String legacyNuGetVersion(final String rawVersion) {
-    return normalize(rawVersion, true);
-  }
-
-  /** Whether the version carries a {@code +...} build metadata suffix. */
-  public static boolean hasBuildMetadata(final String version) {
-    return version.indexOf('+') >= 0;
+    return normalize(rawVersion);
   }
 
   /**
@@ -209,7 +195,7 @@ public final class NuGetPackageUtils {
    * semVerLevel} rely on to be left with versions they can parse.
    */
   public static boolean isSemVer2(final String version) {
-    return hasBuildMetadata(version)
+    return version.indexOf('+') >= 0
         || preRelease(version.strip().toLowerCase(Locale.ROOT)).indexOf('.') >= 0;
   }
 
@@ -227,11 +213,10 @@ public final class NuGetPackageUtils {
     return matcher.matches() && new BigInteger(matcher.group(1)).compareTo(BigInteger.TWO) >= 0;
   }
 
-  private static String normalize(final String rawVersion, final boolean keepBuildMetadata) {
+  private static String normalize(final String rawVersion) {
 
     final var lower = rawVersion.strip().toLowerCase(Locale.ROOT);
     final var withoutBuild = substringBefore(lower, '+');
-    final var build = keepBuildMetadata ? lower.substring(withoutBuild.length()) : "";
 
     final var core = substringBefore(withoutBuild, '-');
     final var preRelease = withoutBuild.substring(core.length());
@@ -243,7 +228,7 @@ public final class NuGetPackageUtils {
       end--;
     }
 
-    return buildVersionString(components, end) + preRelease + build;
+    return buildVersionString(components, end) + preRelease;
   }
 
   private static String substringBefore(final String value, final char separator) {

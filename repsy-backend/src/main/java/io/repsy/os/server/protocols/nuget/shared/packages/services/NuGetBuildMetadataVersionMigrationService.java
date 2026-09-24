@@ -165,7 +165,8 @@ public class NuGetBuildMetadataVersionMigrationService {
 
   private void deleteLegacyFiles(final NuGetBuildMetadataVersion legacy, final String packageId) {
     try {
-      this.nuGetStorageService.deletePackageVersion(legacy.repoId(), packageId, legacy.version());
+      this.nuGetStorageService.deleteBuildMetadataVersion(
+          legacy.repoId(), packageId, legacy.version());
     } catch (final IOException | RuntimeException e) {
       log.warn(
           "Could not remove the files NuGet package {} {} of repo {} was moved out of",
