@@ -125,3 +125,138 @@ describe('list row with a stretched link', () => {
     expect(item.contains(centre(item))).toBeTrue();
   });
 });
+
+/**
+ * RPS-1324: a Docker image row has a digest and a size column, and a row's centre is a cell of its own
+ * (the digest) instead of empty row space. Its hover popup, a button that stopped the click, used to sit
+ * over the row centre while it faded in, so a click on the middle of the row did not open the image.
+ * Every cell, the popup included, has to hand a click at any point of the row to the row link.
+ */
+@Component({
+  imports: [RouterLink, DropdownComponent, TooltipComponent],
+  template: `
+    <div data-testid="rows" style="width: 600px">
+      <div class="row-link-host grid grid-cols-[minmax(0,3fr)_1fr_3fr_2fr_1fr_40px] items-center gap-4 p-4">
+        <a class="row-link" [routerLink]="'/image'" aria-label="image"></a>
+        <app-tooltip truncate data-testid="row-name" [text]="longName" [textHover]="longName" />
+        <span data-testid="row-security">secure</span>
+        <app-tooltip data-testid="row-digest" [text]="digest.substring(0, 20) + '...'" [textHover]="digest" />
+        <app-tooltip data-testid="row-updated" [text]="'2 days ago'" [textHover]="'Jan 1, 2026'" [always]="true" />
+        <app-tooltip data-testid="row-size" class="text-right" [text]="'123.45 MB'" [textHover]="'123.45 MB'" />
+        <app-dropdown data-testid="row-menu"><button data-testid="item" type="button">Item</button></app-dropdown>
+      </div>
+    </div>
+  `,
+})
+class DigestRowHostComponent {
+  longName = 'a-repository-image-with-a-rather-long-name-that-is-clipped-by-the-name-column';
+  digest = 'sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+}
+
+describe('list row with digest and size columns', () => {
+  let fixture: ComponentFixture<DigestRowHostComponent>;
+  let viewport: HTMLElement;
+  let root: HTMLElement;
+  let linkClicks: number;
+
+  const q = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
+
+  /** The element the browser would give a click at `x`, `y` (page coordinates of the fixed container). */
+  const at = (x: number, y: number) => document.elementFromPoint(x, y);
+
+  /** Sends a click to what sits at the point, as the browser does, and tells whether the row link got it. */
+  const clickOpensRow = (x: number, y: number): boolean => {
+    const before = linkClicks;
+    at(x, y)?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    return linkClicks === before + 1;
+  };
+
+  /** What the pointer does on arriving at a point: the tooltip under it (if any) opens its popup. */
+  const arrive = (x: number, y: number) => {
+    at(x, y)?.closest('app-tooltip')?.dispatchEvent(new MouseEvent('mouseenter'));
+    fixture.detectChanges();
+  };
+
+  beforeEach(async () => {
+    TestBed.configureTestingModule({ imports: [DigestRowHostComponent], providers: [provideRouter([])] });
+    viewport = document.createElement('div');
+    viewport.setAttribute('data-testid', 'row-link-viewport');
+    viewport.style.cssText = 'position: fixed; top: 0; left: 0; width: 700px; z-index: 2147483000; background: white;';
+    document.body.appendChild(viewport);
+    fixture = TestBed.createComponent(DigestRowHostComponent);
+    viewport.appendChild(fixture.nativeElement);
+    root = fixture.nativeElement;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    linkClicks = 0;
+    q('.row-link').addEventListener('click', (event) => {
+      linkClicks++;
+      event.preventDefault();
+    });
+  });
+
+  afterEach(() => {
+    fixture.destroy();
+    viewport.remove();
+  });
+
+  const row = () => q('.row-link-host').getBoundingClientRect();
+
+  /** The centre and three more points across the row that are cells of the row, not its menu toggle. */
+  const points = () => {
+    const box = row();
+    const y = box.y + box.height / 2;
+    return [0.5, 0.1, 0.35, 0.65, 0.85].map((fraction) => [box.x + box.width * fraction, y] as const);
+  };
+
+  it('has a digest cell that covers the centre of the row', () => {
+    const [x, y] = points()[0];
+
+    expect(q('[data-testid="row-digest"]').contains(at(x, y))).toBeTrue();
+  });
+
+  it('hands a click at the centre and across the row to the row link', () => {
+    for (const [x, y] of points()) {
+      expect(clickOpensRow(x, y))
+        .withContext(`a click at ${Math.round(x)},${Math.round(y)}`)
+        .toBeTrue();
+    }
+  });
+
+  it('still opens the row when the pointer has just arrived and the popup of the cell is open', () => {
+    for (const [x, y] of points()) {
+      arrive(x, y);
+      const popup = root.querySelector<HTMLElement>('[data-testid="tooltip-popup"]');
+
+      expect(popup?.contains(at(x, y)) ?? false)
+        .withContext(`the popup covers ${Math.round(x)},${Math.round(y)}`)
+        .toBeFalse();
+      expect(clickOpensRow(x, y))
+        .withContext(`a click at ${Math.round(x)},${Math.round(y)}`)
+        .toBeTrue();
+      root.querySelectorAll('app-tooltip').forEach((tip) => tip.dispatchEvent(new MouseEvent('mouseleave')));
+      fixture.detectChanges();
+    }
+  });
+
+  it('lets a click through an open popup, wherever the popup lies', () => {
+    const digest = q('[data-testid="row-digest"]');
+    digest.dispatchEvent(new MouseEvent('mouseenter'));
+    fixture.detectChanges();
+    const popup = q('[data-testid="tooltip-popup"]');
+    const box = popup.getBoundingClientRect();
+
+    expect(getComputedStyle(popup).pointerEvents).toBe('none');
+    expect(popup.contains(at(box.x + box.width / 2, box.y + box.height / 2))).toBeFalse();
+    expect(popup.closest('a, button')).toBeNull();
+    expect(popup.tagName).not.toBe('BUTTON');
+  });
+
+  it('keeps the menu toggle above the row link', () => {
+    const toggle = q('[data-testid="dropdown-toggle"]');
+    const box = toggle.getBoundingClientRect();
+
+    expect(toggle.contains(at(box.x + box.width / 2, box.y + box.height / 2))).toBeTrue();
+  });
+});

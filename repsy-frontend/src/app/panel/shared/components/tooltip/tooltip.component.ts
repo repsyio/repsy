@@ -29,7 +29,9 @@ import { booleanAttribute, Component, ElementRef, HostListener, inject, Input, V
  *
  * Inside a list row (`.row-link-host`) the tooltip sits above the row's stretched link so that its
  * hover keeps working; a click on its text is then handed to that link, so the whole row still opens
- * on a click.
+ * on a click. The popup itself never takes the pointer (`pointer-events-none`): it fades in under the
+ * arriving pointer, and a popup that took the click there swallowed the click on the middle of the row
+ * (RPS-1324).
  */
 @Component({
   selector: 'app-tooltip',
