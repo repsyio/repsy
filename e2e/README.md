@@ -1215,7 +1215,7 @@ never scope-checked, only an expired/revoked/wrong credential fails at the token
 read-only token's write refusal at the OPERATION hop, reads still working (R3); monolithic/chunked
 blob upload, a wrong digest, and dedup (R4); manifest push validation — missing blobs, a wrong
 `sha256:` reference, an unknown `Content-Type` (R5, **B4**); the override rule and an orphaned blob
-after a refusal (R6); overriding a tag breaking the OLD manifest's pull-by-digest (R7, **B2**);
+after a refusal (R6); overriding a tag leaving the OLD manifest pullable by digest (R7, **B2, fixed by RPS-1216**);
 `HEAD` vs. `GET` by digest (R8, **B1, fixed by RPS-1215**); retagging the same digest under a second tag (R9); a
 config blob missing `os`/`architecture` (R12, **B5**); a multi-arch index referencing a
 digest-pushed child (R13); and that even a PUBLIC repo still needs real credentials to WRITE,
@@ -1266,7 +1266,8 @@ prediction, the actual observed behaviour is what got pinned, not the guess.
   blobs are present): confirmed live — R6.
 - **H9** (`override`: the new digest is served; the OLD digest's pullability, left open by the plan
   pending a live check): confirmed the new digest is served (R6); the OLD digest turned out to be
-  **UNPULLABLE** — **B2 (RPS-1216)** (R7).
+  **UNPULLABLE** — **B2 (RPS-1216)** (R7). Since RPS-1216 it stays pullable (R7 no longer carries
+  `test.fail`): manifests are content-addressed, an override only moves the tag.
 - **H10** (`HEAD` vs. `GET` by digest): confirmed live at the time — `HEAD` by digest was `404` even
   right after a `GET` by that same digest served `200` — **B1, filed as
   [RPS-1215](https://zyfera.atlassian.net/browse/RPS-1215) and since fixed** (R8). `HEAD` now
@@ -1307,19 +1308,24 @@ createdAt DESC`, could pick a DB-only "this manifest is also part of that multi-
   (removed, along with its one now-unreachable caller and its dead 404 branch). See "H10" above for
   the two further, previously-masked bugs this fix's own live verification surfaced and fixed in the
   same PR (a manifest-list's child-by-digest resolution, and a shared-digest row-ordering bug).
-- **B2 (filed as [RPS-1216](https://zyfera.atlassian.net/browse/RPS-1216))** — Overriding a tag
-  (`allowOverride: true`) makes the PREVIOUS manifest unpullable BY DIGEST, even though nothing ever
-  explicitly deleted it: the tag's one `Manifest` row is reused in place (`ManifestTxService`'s
-  `findOrCreateManifest`/`updateManifestProperties`), so the row's own digest simply becomes the NEW
-  one. Confirmed live: `registry-rules.spec.ts`'s R7 — `GET manifests/sha256:<old digest>` is `200`
-  right after the first push, then `404` right after an accepted override of the same tag.
-- **B3** — _Not reproduced_ (time-boxed, per the plan). Pushing the SAME already-existing digest
-  under a SECOND tag (`registry-rules.spec.ts`'s R9) was probed: both tags still resolve with a
-  plain `GET`, byte-identical, right after. Since the digest (and therefore the manifest bytes) is
-  identical either way, a byte-comparison alone cannot distinguish "one shared row, re-parented" from
-  "each tag has its own row" — the plan's own suggested deeper repro (deleting one tag, checking
-  whether the other breaks) was left unexplored, as the plan explicitly allows. Not filed; flagged
-  here as an open question for whoever picks this up next, not a confirmed bug.
+- **B2 (filed as [RPS-1216](https://zyfera.atlassian.net/browse/RPS-1216), fixed)** — Overriding a tag
+  (`allowOverride: true`) used to make the PREVIOUS manifest unpullable BY DIGEST, even though nothing
+  ever explicitly deleted it: the tag's one `Manifest` row was reused in place, so the row's own digest
+  simply became the NEW one. A manifest is now content-addressed (one `docker_manifest` row per image
+  and digest, its file stored once at `manifests/<sha256 digest>`), and a tag is a pointer to it: an
+  override moves the pointer and the old manifest stays pullable by its digest. `registry-rules.spec.ts`'s
+  R7 pins that: `GET manifests/sha256:<old digest>` is `200`, byte-identical, before AND after an
+  accepted override of the same tag (it used to be `test.fail`-pinned). Nothing deletes the old manifest
+  automatically: it stays untagged (and charged to the repo) until someone deletes it.
+- **B3 (fixed by RPS-1216)** — Pushing the SAME already-existing digest under a SECOND tag
+  (`registry-rules.spec.ts`'s R9) was probed while this suite was written: both tags resolved with a
+  plain `GET`, byte-identical, so a byte comparison could not tell "one shared row, re-parented" from
+  "each tag has its own row"; the deeper repro (deleting one tag, checking the other) was left open.
+  It was real: the second tag re-parented the first tag's manifest row and the two tags shared one
+  storage file named after a tag. A manifest is now one row and one file per digest and a tag only a
+  pointer, so a second tag adds a pointer and deleting a tag (panel `DELETE .../tags/{tag}`, which only
+  removes the pointer) cannot affect another tag. The protocol has no `DELETE`, so this is pinned by the
+  backend integration test `DockerManifestOverrideIT.retagSharesOneRowAndOneFile`, not by R9.
 - **B4 (pre-existing story, [RPS-1110](https://zyfera.atlassian.net/browse/RPS-1110) — commented with
   this live evidence, not a new ticket)** — An unknown manifest `Content-Type` (anything outside the
   5 known docker/OCI types) answers a flat `500 UNKNOWN`, not a `4xx`: `saveManifest`'s `switch`

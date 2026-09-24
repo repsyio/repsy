@@ -33,9 +33,6 @@ public interface TagRepository extends JpaRepository<Tag, UUID> {
 
   Optional<Tag> findByImageRepoIdAndImageNameAndName(UUID repoId, String imageName, String tagName);
 
-  Optional<Tag> findDistinctFirstByImageRepoIdAndImageNameAndDigestOrderByCreatedAtDesc(
-      UUID repoId, String imageName, String digest);
-
   @Query(
       """
         select t from Tag t
@@ -48,4 +45,9 @@ public interface TagRepository extends JpaRepository<Tag, UUID> {
   List<Tag> findAllByImageRepoIdAndImageId(UUID repoId, UUID imageId);
 
   Optional<Tag> findByImageRepoIdAndImageIdAndName(UUID repoId, UUID imageId, String name);
+
+  Optional<Tag> findByImageIdAndName(UUID imageId, String name);
+
+  @Query("select t.name from Tag t where t.image.id = :imageId and t.digest = :digest")
+  List<String> findNamesByImageIdAndDigest(UUID imageId, String digest);
 }

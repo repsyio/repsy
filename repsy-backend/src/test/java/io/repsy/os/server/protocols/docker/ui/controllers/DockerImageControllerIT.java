@@ -27,21 +27,18 @@ import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.layer.services.LayerTxService;
+import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerForm;
-import io.repsy.protocols.docker.shared.tag.dtos.Config;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestInfo;
-import io.repsy.protocols.docker.shared.tag.dtos.ManifestLayer;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestList;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestListManifest;
-import io.repsy.protocols.docker.shared.tag.dtos.ManifestListManifestInfo;
 import io.repsy.protocols.docker.shared.tag.dtos.Platform;
 import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
-import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -75,6 +72,7 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
   @Autowired private ImageTxService imageService;
   @Autowired private LayerTxService layerService;
   @Autowired private ManifestTxService manifestService;
+  @Autowired private ManifestRepository manifestRepository;
   @Autowired private ObjectMapper objectMapper;
   @MockitoBean private UsageUpdateService usageUpdateService;
 
@@ -146,11 +144,7 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
     Files.createDirectories(storage.resolve("manifests"));
     Files.writeString(storage.resolve("blobs").resolve(configDigest), configJson);
     Files.writeString(storage.resolve("blobs").resolve(layerDigest), "abc");
-    Files.writeString(
-        storage
-            .resolve("manifests")
-            .resolve(ManifestNameGenerator.generate(repo.getId(), imageName, tag)),
-        manifestJson);
+    Files.writeString(storage.resolve("manifests").resolve(manifestDigest), manifestJson);
     this.entityManager.flush();
     this.entityManager.clear();
     return new ImageFixture(imageName, tag, configDigest, manifestDigest, manifestJson);
@@ -181,7 +175,7 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
     Files.writeString(storage.resolve("blobs").resolve(layerDigest), "abc");
 
     final var listEntries = new java.util.ArrayList<ManifestListManifest>();
-    final var children = new java.util.ArrayList<ManifestListManifestInfo>();
+    final var childDigests = new java.util.ArrayList<String>();
     final var childJsons = new java.util.ArrayList<String>();
     for (final var arch : List.of("amd64", "arm64")) {
       final String configDigest = "sha256:" + (arch.equals("amd64") ? "3" : "4").repeat(64);
@@ -205,28 +199,28 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
               .build(),
           repo.getId());
       Files.writeString(storage.resolve("blobs").resolve(configDigest), configJson);
-      Files.writeString(
-          storage
-              .resolve("manifests")
-              .resolve(ManifestNameGenerator.generate(repo.getId(), imageName, childDigest)),
-          childJson);
+      Files.writeString(storage.resolve("manifests").resolve(childDigest), childJson);
 
-      final var config = new Config();
-      config.setMediaType(CONFIG_MEDIA_TYPE);
-      config.setDigest(configDigest);
-      config.setSize((long) configJson.length());
-      final var layer = new ManifestLayer();
-      layer.setMediaType(LAYER_MEDIA_TYPE);
-      layer.setDigest(layerDigest);
-      layer.setSize(3L);
-      final var child = new ManifestListManifestInfo();
-      child.setSchemaVersion(2);
-      child.setMediaType(MANIFEST_MEDIA_TYPE);
-      child.setDigest(childDigest);
-      child.setPlatform("linux/" + arch);
-      child.setConfig(config);
-      child.setLayers(List.of(layer));
-      children.add(child);
+      // A child is pushed by its digest before the index that references it: a manifest row
+      // without a tag.
+      final var childForm =
+          ManifestForm.builder()
+              .tagName(childDigest)
+              .contentType(MANIFEST_MEDIA_TYPE)
+              .manifestJson(childJson)
+              .manifestBytes(childJson.getBytes(StandardCharsets.UTF_8))
+              .digest(childDigest)
+              .build();
+      this.manifestService.createSinglePlatformManifest(
+          repo.getId(),
+          image,
+          TagForm.of(
+              childForm,
+              imageName,
+              "linux/" + arch,
+              this.objectMapper.readValue(childJson, ManifestInfo.class)));
+
+      childDigests.add(childDigest);
       childJsons.add(childJson);
       listEntries.add(
           new ManifestListManifest(
@@ -238,11 +232,7 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
     manifestList.setMediaType(MANIFEST_LIST_MEDIA_TYPE);
     manifestList.setManifests(listEntries);
     final String listJson = this.objectMapper.writeValueAsString(manifestList);
-    Files.writeString(
-        storage
-            .resolve("manifests")
-            .resolve(ManifestNameGenerator.generate(repo.getId(), imageName, tag)),
-        listJson);
+    Files.writeString(storage.resolve("manifests").resolve(listDigest), listJson);
 
     final var form =
         ManifestForm.builder()
@@ -253,19 +243,10 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
             .digest(listDigest)
             .build();
     this.manifestService.createManifestList(
-        repo.getId(),
-        image.getId(),
-        TagForm.of(form, imageName, "Multiplatform", manifestList),
-        children);
+        repo.getId(), image.getId(), TagForm.of(form, imageName, "Multiplatform", manifestList));
     this.entityManager.flush();
     this.entityManager.clear();
-    return new MultiPlatformFixture(
-        imageName,
-        tag,
-        listDigest,
-        listJson,
-        children.stream().map(ManifestListManifestInfo::getDigest).toList(),
-        childJsons);
+    return new MultiPlatformFixture(imageName, tag, listDigest, listJson, childDigests, childJsons);
   }
 
   private record MultiPlatformFixture(
@@ -661,7 +642,7 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
     @DisplayName("deletes a tag while keeping the image and returns a full success envelope")
     void deletesTag() throws Exception {
       final var repo = DockerImageControllerIT.this.dockerRepo();
-      DockerImageControllerIT.this.seedImage(repo, "app", "latest");
+      final var fixture = DockerImageControllerIT.this.seedImage(repo, "app", "latest");
       final var body =
           DockerImageControllerIT.this.expectSuccess(
               DockerImageControllerIT.this.perform(
@@ -678,6 +659,22 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           "tagNotFound",
           "tagNotFound",
           "Tag not found.");
+      // A tag is only a pointer: its manifest stays stored, with its file, and pullable by digest
+      // (RPS-1216).
+      final var image =
+          DockerImageControllerIT.this.imageService.findImageInfoByRepoIdAndName(
+              repo.getId(), fixture.imageName);
+      assertThat(DockerImageControllerIT.this.manifestRepository.findAllByImageId(image.getId()))
+          .extracting(manifest -> manifest.getDigest())
+          .containsExactly(fixture.manifestDigest);
+      assertThat(storageDirOf(repo).resolve("manifests").resolve(fixture.manifestDigest)).exists();
+      DockerImageControllerIT.this.expectSuccess(
+          DockerImageControllerIT.this.perform(
+              get("/api/docker/images/%s/app/manifests/%s"
+                      .formatted(repo.getName(), fixture.manifestDigest))
+                  .header(AUTHORIZATION, DockerImageControllerIT.this.adminBearerToken())),
+          "manifestFetched",
+          "Manifest fetched.");
     }
 
     @Test
