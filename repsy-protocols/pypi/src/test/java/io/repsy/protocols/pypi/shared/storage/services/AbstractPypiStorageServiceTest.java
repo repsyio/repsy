@@ -25,6 +25,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import freemarker.template.Configuration;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
@@ -157,6 +158,18 @@ class AbstractPypiStorageServiceTest {
   @Nested
   @DisplayName("deleteRelease() still filters by isFileBelongsRelease")
   class DeleteReleaseTests {
+
+    @Test
+    @DisplayName("frees nothing and deletes nothing when the package directory is gone (RPS-1290)")
+    void isIdempotentWhenThePackageDirectoryIsGone() {
+      when(storageStrategy.listDirectoryContents(any(StoragePath.class)))
+          .thenThrow(new ItemNotFoundException("resourceNotFound"));
+
+      final var usage = service.deleteRelease(REPO_ID, NORMALIZED_NAME, "1.0.0");
+
+      assertThat(usage).isZero();
+      verify(storageStrategy, never()).delete(any());
+    }
 
     @Test
     @DisplayName("deletes only archive files belonging to the given release version")

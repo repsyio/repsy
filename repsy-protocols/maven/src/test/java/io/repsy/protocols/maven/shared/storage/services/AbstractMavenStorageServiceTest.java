@@ -109,6 +109,20 @@ class AbstractMavenStorageServiceTest {
   }
 
   @Test
+  @DisplayName("deleteGroup succeeds when the group directory is already gone (RPS-1290)")
+  void deleteGroupIsIdempotentWhenDirectoryMissing() {
+
+    when(this.storageStrategy.listDirectoryContents(any()))
+        .thenThrow(new ItemNotFoundException("resourceNotFound"));
+    when(this.storageStrategy.calculatePathUsage(any())).thenReturn(0L);
+
+    final var usage = this.storageService.deleteGroup(REPO_ID, GROUP, List.of(ARTIFACT));
+
+    assertThat(usage).isZero();
+    verify(this.storageStrategy).delete(argThat(pathEndingWith("com/example/demo")));
+  }
+
+  @Test
   @DisplayName("deleteArtifactVersion deletes the directory and returns its usage when present")
   void deleteArtifactVersionDeletesExistingDirectory() {
 

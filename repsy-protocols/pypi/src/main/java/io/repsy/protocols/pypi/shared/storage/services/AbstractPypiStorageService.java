@@ -87,8 +87,18 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
     final Predicate<StorageItemInfo> predicate =
         si -> isFileBelongsRelease(si.getName(), releaseVersion);
 
-    final var archiveResources =
-        this.storageStrategy.listDirectoryContents(storagePath).stream().filter(predicate).toList();
+    final List<StorageItemInfo> archiveResources;
+
+    try {
+      archiveResources =
+          this.storageStrategy.listDirectoryContents(storagePath).stream()
+              .filter(predicate)
+              .toList();
+    } catch (final ItemNotFoundException _) {
+      // The package directory is already gone (an earlier partial delete, a manual cleanup): there
+      // is nothing left to remove, and the caller still deletes the release's rows (RPS-1290).
+      return 0L;
+    }
 
     if (archiveResources.isEmpty()) {
       return 0L;

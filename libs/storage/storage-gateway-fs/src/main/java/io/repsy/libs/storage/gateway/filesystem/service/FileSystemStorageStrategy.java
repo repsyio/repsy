@@ -40,6 +40,8 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardOpenOption;
@@ -437,6 +439,12 @@ public class FileSystemStorageStrategy implements StorageStrategy {
    * <trashPath>/<today>/<timestamp>/<path>}, so it stays recoverable until {@link #clearTrash()}
    * removes it for good after the retention period elapses. {@code Files.move} does not distinguish
    * a file from a directory, so a single object and a whole tree are soft-deleted the same way.
+   *
+   * <p>Idempotent: an object that is already gone (an earlier partial delete, a manual cleanup, a
+   * database restored without its files, or a concurrent delete that got there first) counts as
+   * deleted, so a caller that removes its rows next is not stuck behind a file that will never come
+   * back. Only the absence of the object itself is tolerated: an object that exists but cannot be
+   * moved still fails, so the caller can undo what it did before.
    */
   @SneakyThrows
   @Override
@@ -450,8 +458,20 @@ public class FileSystemStorageStrategy implements StorageStrategy {
             storagePath.getPath());
     final Path trashPathObj = this.trashPath.resolve(relativePath);
 
+    if (Files.notExists(basePathObj, LinkOption.NOFOLLOW_LINKS)) {
+      return;
+    }
+
     Files.createDirectories(trashPathObj.getParent());
-    Files.move(basePathObj, trashPathObj);
+
+    try {
+      Files.move(basePathObj, trashPathObj);
+    } catch (final NoSuchFileException e) {
+      // The object vanished between the check and the move; anything else missing is a failure.
+      if (Files.exists(basePathObj, LinkOption.NOFOLLOW_LINKS)) {
+        throw e;
+      }
+    }
   }
 
   /**

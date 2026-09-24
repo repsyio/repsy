@@ -222,6 +222,19 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
     return usage;
   }
 
+  /**
+   * Lists a directory that may already be gone (an earlier partial delete, a manual cleanup): a
+   * missing directory has no items, so a group delete does not fail on it (RPS-1290).
+   */
+  private List<StorageItemInfo> listDirectoryOrEmpty(final StoragePath storagePath) {
+
+    try {
+      return this.storageStrategy.listDirectoryContents(storagePath);
+    } catch (final ItemNotFoundException _) {
+      return List.of();
+    }
+  }
+
   private boolean directoryExists(final StoragePath storagePath) {
 
     try {
@@ -275,7 +288,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
     for (final var path : groupPaths) {
       final var sp = StoragePath.of(repoUuid, path + "/");
 
-      if (!this.storageStrategy.listDirectoryContents(sp).isEmpty()) {
+      if (!this.listDirectoryOrEmpty(sp).isEmpty()) {
         break;
       }
 
@@ -296,7 +309,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
 
     var usage = 0L;
 
-    for (final var item : this.storageStrategy.listDirectoryContents(groupStoragePath)) {
+    for (final var item : this.listDirectoryOrEmpty(groupStoragePath)) {
       if (item.isDirectory() || !item.getName().startsWith(METADATA_FILENAME)) {
         continue;
       }
