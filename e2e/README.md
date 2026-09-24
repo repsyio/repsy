@@ -2528,18 +2528,18 @@ own stub below, so the unchanged heading lines keep git's hunks apart; the Layou
 
 ### Auth, guards and session (RPS-1251)
 
-`tests/ui/auth/{login,guards,session}.spec.ts` (AUTH-01..11). Run them with
+`tests/ui/auth/{login,guards,session}.spec.ts` (AUTH-01..12). Run them with
 `./run.sh test --protocol ui --grep AUTH-`. UI login is typed ONLY in these specs; every other UI suite
 logs in through the API fixtures. No test changes the admin or its password: the admin only types its
 own credentials (AUTH-01), and negative logins use a seeded user or a name that does not exist.
 `src/ui/pages/login-validation.ts` (composed on `LoginPage`) holds the validation helpers and the
 visible message texts; `tests/ui/auth/stored-session.ts` reads the three `localStorage` keys.
 
-| Spec      | Scenarios | What is pinned                                                                                                                                                                                                                                                                                             |
-| --------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `login`   | 01-04, 11 | valid login and its 3 storage keys; 401 toast `Username or password is incorrect.` (wrong password and unknown user alike); every client-side rule with its message; the eye toggle; throttle (opt-in)                                                                                                     |
-| `guards`  | 05-07     | anonymous visit of `/repositories`, `/users`, `/security`, `/profile`, `/<repo>` shows the login form at `/` (with `returnUrl`) and a login returns to that page without a reload; unsafe `returnUrl`s are ignored; `/login` bounces a logged-in user; a USER is sent to `/` from `/users` and `/security` |
-| `session` | 08-10     | expired access token is refreshed transparently; a tampered one logs out with a toast, no refresh; a refused refresh token logs out; sidebar and header logout clear the session                                                                                                                           |
+| Spec      | Scenarios | What is pinned                                                                                                                                                                                                                                                                                                                         |
+| --------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `login`   | 01-04, 11 | valid login and its 3 storage keys; 401 toast `Username or password is incorrect.` (wrong password and unknown user alike); every client-side rule with its message; the eye toggle; throttle (opt-in)                                                                                                                                 |
+| `guards`  | 05-07     | anonymous visit of `/repositories`, `/users`, `/security`, `/profile`, `/<repo>` shows the login form at `/` (with `returnUrl`) and a login returns to that page without a reload; unsafe `returnUrl`s are ignored; `/login` bounces a logged-in user; a USER is sent to `/` from `/users` and `/security`                             |
+| `session` | 08-10, 12 | expired access token is refreshed transparently; a tampered one logs out with a toast, no refresh; a refused refresh token logs out; sidebar and header logout clear the session; a USER on a MANAGE route gets 403 `accessDenied` and stays signed in (AUTH-12, RPS-1284), a tampered token still 401 `accessNotAllowed` and a logout |
 
 Things a later author must know:
 
@@ -2551,6 +2551,10 @@ Things a later author must know:
   documented on `RefreshTokenInterceptor`. `expireAccessToken()` (`session.spec.ts`) answers calls
   carrying one given token with that 401 (never the `/api/auth/` calls); the refresh, the rotation and
   the logout run on the real backend.
+  A permission failure is NOT a 401 (RPS-1284): a signed-in USER on any route that needs MANAGE (usage,
+  settings, description, rename, deploy tokens, key stores, deletes) is answered `403 accessDenied`, which
+  `RefreshTokenInterceptor` never touches; AUTH-12 pins that the session stays and DASH-04 that the
+  dashboard's nine per-repository usage calls are refused 403 without a toast.
   The AUTH-09 cases: a refresh token that is garbage, one that was already used (single use), and a
   stubbed `refreshTokenExpired` answer.
 - **The SPA reads `localStorage` once, at boot** (`AuthService`), and `seedSession()` writes once per

@@ -22,6 +22,7 @@ import static io.repsy.os.shared.auth.utils.AuthUtils.isBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBearerToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.removeBasicPrefix;
 
+import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.generated.model.RepoPermissionInfo;
@@ -50,6 +51,8 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class ProtocolAuthService {
+
+  private static final @NonNull String ACCESS_DENIED = "accessDenied";
 
   protected final @NonNull UserTxService userTxService;
   protected final @NonNull JwtUtils jwtUtils;
@@ -217,6 +220,11 @@ public class ProtocolAuthService {
     this.handleUsernamePasswordAuthentication(credentials, permission);
   }
 
+  /**
+   * Authorizes an already authenticated user on a protocol (wire) route. A user without the needed
+   * permission is answered {@code unAuthorized} (401), which is the answer package managers expect
+   * and act on. The web UI API uses {@link #authorizePanelUser} instead.
+   */
   public @NonNull PermissionInfo authorizeUser(
       final @Nullable UserInfo userInfo, final @NonNull Permission permission) {
 
@@ -231,6 +239,27 @@ public class ProtocolAuthService {
     return PermissionInfo.builder().canRead(true).canWrite(true).canManage(isAdmin).build();
   }
 
+  /**
+   * Authorizes an already authenticated user on a web UI API route ({@code @RepoOperation}). It
+   * differs from {@link #authorizeUser} in one thing: a signed-in user who lacks the role for the
+   * operation ({@code MANAGE} needs ADMIN) is answered {@code accessDenied} (403, as {@code
+   * PanelAuthHelper#requireAdmin} does), not {@code unAuthorized} (401). Only a missing or invalid
+   * credential is a 401 there, so the SPA can tell a lost session from a refused action (RPS-1284).
+   * A {@code null} user is still a 401.
+   */
+  public @NonNull PermissionInfo authorizePanelUser(
+      final @Nullable UserInfo userInfo, final @NonNull Permission permission) {
+
+    if (userInfo != null
+        && permission == Permission.MANAGE
+        && userInfo.getRole() != UserRole.ADMIN) {
+      throw new AccessNotAllowedException(ACCESS_DENIED);
+    }
+
+    return this.authorizeUser(userInfo, permission);
+  }
+
+  /** Authorizes a web UI API request to one repo, see {@link #authorizePanelUser}. */
   public @NonNull RepoPermissionInfo authorizeUserRequest(
       final @NonNull RepoInfo repoInfo,
       final @Nullable String authHeader,
@@ -422,7 +451,7 @@ public class ProtocolAuthService {
       final @NonNull Permission permission) {
 
     final var userInfo = this.authenticateUser(authHeader);
-    final var permissionInfo = this.authorizeUser(userInfo, permission);
+    final var permissionInfo = this.authorizePanelUser(userInfo, permission);
 
     return RepoPermissionInfo.builder()
         .repoName(repoInfo.getName())

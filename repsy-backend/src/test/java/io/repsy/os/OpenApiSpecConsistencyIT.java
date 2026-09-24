@@ -403,6 +403,43 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName("every operation that needs MANAGE documents 403 next to 401 (RPS-1284)")
+  void everyManageOperationDocuments403() throws IOException {
+    final var doc = loadSpec();
+    final var routes = this.panelRoutes();
+    final var findings = new TreeSet<String>();
+    var manageOperations = 0;
+
+    for (final var operation : specOperations(doc).values()) {
+      final var handlers =
+          routes.stream().filter(route -> route.key().equals(operation.key())).toList();
+
+      if (handlers.isEmpty()
+          || !handlers.stream()
+              .allMatch(
+                  route ->
+                      route.repoOperation() != null
+                          && route.repoOperation().permission() == Permission.MANAGE)) {
+        continue;
+      }
+
+      manageOperations++;
+
+      final var codes =
+          asMap(operation.raw().get("responses")).keySet().stream()
+              .map(String::valueOf)
+              .collect(Collectors.toSet());
+
+      if (!codes.contains("403")) {
+        findings.add(operation.key() + " (" + operation.id() + ")");
+      }
+    }
+
+    assertThat(manageOperations).as("operations that need MANAGE").isGreaterThan(30);
+    assertNoNewFindings("MANAGE operations without a 403", findings, Map.of());
+  }
+
+  @Test
   @DisplayName("every $ref in the spec resolves")
   void referencesResolve() throws IOException {
     final var doc = loadSpec();

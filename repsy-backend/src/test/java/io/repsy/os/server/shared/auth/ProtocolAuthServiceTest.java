@@ -26,6 +26,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
@@ -896,7 +897,23 @@ class ProtocolAuthServiceTest {
       assertThat(permissionInfo.isCanRead()).isTrue();
       assertThat(permissionInfo.isCanWrite()).isTrue();
       assertThat(permissionInfo.isCanManage()).isFalse();
+      // The protocol (wire) answer stays 401 unAuthorized: package managers act on it.
       assertUnauthorized(() -> authService.authorizeUser(ALICE, Permission.MANAGE));
+    }
+
+    @Test
+    @DisplayName("the web UI answers a non-admin user 403 accessDenied for MANAGE, not 401")
+    void panelAnswersForbiddenForManage() {
+      final var authService = ProtocolAuthServiceTest.this.authService;
+
+      assertThat(authService.authorizePanelUser(ALICE, Permission.WRITE).isCanWrite()).isTrue();
+      assertThat(authService.authorizePanelUser(this.admin, Permission.MANAGE).isCanManage())
+          .isTrue();
+      assertThatThrownBy(() -> authService.authorizePanelUser(ALICE, Permission.MANAGE))
+          .isInstanceOf(AccessNotAllowedException.class)
+          .hasMessage("accessDenied");
+      // No user at all is still a missing credential.
+      assertUnauthorized(() -> authService.authorizePanelUser(null, Permission.MANAGE));
     }
 
     @Test
@@ -925,8 +942,11 @@ class ProtocolAuthServiceTest {
       assertThat(write.getCanRead()).isTrue();
       assertThat(write.getCanWrite()).isTrue();
       assertThat(write.getCanManage()).isFalse();
-      assertUnauthorized(
-          () -> authService.authorizeUserRequest(this.privateRepo, authHeader, Permission.MANAGE));
+      assertThatThrownBy(
+              () ->
+                  authService.authorizeUserRequest(this.privateRepo, authHeader, Permission.MANAGE))
+          .isInstanceOf(AccessNotAllowedException.class)
+          .hasMessage("accessDenied");
     }
 
     @Test

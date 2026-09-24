@@ -360,8 +360,9 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
                 .param("modulePath", MODULE)
                 .with(apiPort())
                 .header(AUTHORIZATION, token))
-        .andExpect(status().isUnauthorized())
-        .andExpect(jsonPath("$.type").value("ERROR"));
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.type").value("ERROR"))
+        .andExpect(jsonPath("$.msgId").value("accessDenied"));
   }
 
   @Test

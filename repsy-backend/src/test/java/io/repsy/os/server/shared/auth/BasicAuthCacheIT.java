@@ -149,6 +149,8 @@ class BasicAuthCacheIT extends AbstractIntegrationTest {
     user.setRole(UserRole.USER);
     this.userRepository.save(user);
 
-    this.basicRequest(username, VALID_PASSWORD, 401);
+    // Still a valid credential, but no longer allowed to manage: a permission failure is a 403
+    // (RPS-1284), not the 401 of a wrong password.
+    this.basicRequest(username, VALID_PASSWORD, 403);
   }
 }

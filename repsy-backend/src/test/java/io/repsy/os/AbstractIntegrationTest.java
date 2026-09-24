@@ -467,6 +467,20 @@ public abstract class AbstractIntegrationTest {
     return body;
   }
 
+  /**
+   * Asserts the 403 {@code accessDenied} of a signed-in caller who lacks the permission (a
+   * non-admin on a MANAGE route). It is the counterpart of a 401, which means the credential is
+   * missing or invalid (RPS-1284).
+   */
+  protected static void expectForbidden(final ResultActions result) throws Exception {
+    expectError(
+        result,
+        HttpStatus.FORBIDDEN,
+        "accessDenied",
+        "accessDenied",
+        "Access Denied. Please check your credentials.");
+  }
+
   /** Asserts a complete ERROR envelope, including the generated {@code errorCode} UUID. */
   protected static void expectError(
       final ResultActions result,

@@ -436,7 +436,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 401 unAuthorized for a non-admin caller (no MANAGE) and changes nothing")
+    @DisplayName("returns 403 accessDenied for a non-admin caller (no MANAGE) and changes nothing")
     void callerWithoutManagePermission(final Endpoint endpoint) throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var repo = it.createRepo(RepoType.MAVEN);
@@ -444,7 +444,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final var before = it.stateOf(seeded.getId());
       final var caller = it.createUser(uniqueName("plain"), UserRole.USER);
 
-      expectUnauthorized(
+      expectForbidden(
           it.perform(
               endpoint
                   .request()
@@ -516,13 +516,13 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("endpoints")
-    @DisplayName("returns 401 unAuthorized, not 404, for a missing repo and a non-admin caller")
+    @DisplayName("returns 403 accessDenied, not 404, for a missing repo and a non-admin caller")
     void repoDoesNotExistForCallerWithoutManagePermission(final Endpoint endpoint)
         throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var caller = it.createUser(uniqueName("plain"), UserRole.USER);
 
-      expectUnauthorized(
+      expectForbidden(
           it.perform(
               endpoint
                   .request()

@@ -110,7 +110,7 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
     final var authComponent = this.getUnknownRepoAuthComponent(methodHandler);
     final var userInfo = authComponent.authenticateUser(authHeader);
 
-    authComponent.authorizeUser(userInfo, this.getPermission(methodHandler));
+    authComponent.authorizePanelUser(userInfo, this.getPermission(methodHandler));
 
     return new ItemNotFoundException("repoNotFound");
   }
@@ -137,12 +137,12 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
     final var authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
     if (authHeader == null) {
-      authComponent.authorizeUser(null, permission);
+      authComponent.authorizePanelUser(null, permission);
       return;
     }
 
     final var userInfo = authComponent.authenticateUser(authHeader);
-    authComponent.authorizeUser(userInfo, permission);
+    authComponent.authorizePanelUser(userInfo, permission);
   }
 
   @SuppressWarnings("unchecked")

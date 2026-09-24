@@ -14,12 +14,14 @@
 /// limitations under the License.
 ///
 
+import { HttpContext } from '@angular/common/http';
 import { ChangeDetectorRef, Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
 
 import { RepoListInfo, RepoType, TotalUsageInfo } from '../../../../../generated/api';
 import { ProtocolRepoControllerService } from '../../../../../generated/api';
+import { SILENT_ERROR } from '../../../../shared/interceptor/error-handler.interceptor';
 import { RepositoryCreateModalComponent } from '../../../shared/components/modals/repository-create-modal/repository-create-modal.component';
 import { ProfileService } from '../../profile/service/profile.service';
 import { RecentActivityComponent } from '../recent-activity/recent-activity.component';
@@ -28,6 +30,10 @@ import { SecurityOverviewCardComponent } from '../security-overview-card/securit
 import { UsageService } from '../service/usage.service';
 import { TotalDiskComponent } from '../total-disk/total-disk.component';
 import { WelcomeCardComponent } from '../welcome-card/welcome-card.component';
+
+// The usage of a repository needs MANAGE, so a USER gets a 403 for every repository and the card shows
+// an unknown disk usage instead: nine "Access denied" toasts on every visit would only be noise.
+const SILENT_USAGE = new HttpContext().set(SILENT_ERROR, true);
 
 interface Repository {
   type: RepoType;
@@ -136,7 +142,7 @@ export class DashboardContentComponent {
           }
           return forkJoin(
             repos.map((repo) =>
-              this.protocolRepoControllerService.getUsage(repo.name).pipe(
+              this.protocolRepoControllerService.getUsage(repo.name, 'body', false, { context: SILENT_USAGE }).pipe(
                 // A repository whose usage cannot be fetched still shows, with an unknown disk usage,
                 // instead of failing the forkJoin and dropping every repository of its type.
                 map((r) => r.data?.diskUsed?.value),

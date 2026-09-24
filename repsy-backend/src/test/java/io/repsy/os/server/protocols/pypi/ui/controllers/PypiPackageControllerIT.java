@@ -462,8 +462,8 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
             this.perform(
                     delete("/api/pypi/packages/" + repo.getName() + "/keep-package")
                         .header(AUTHORIZATION, userToken))
-                .andExpect(status().isUnauthorized()));
-    assertErrorEnvelope(readOnlyResponse, "unAuthorized", "unAuthorized");
+                .andExpect(status().isForbidden()));
+    assertErrorEnvelope(readOnlyResponse, "accessDenied", "accessDenied");
 
     final var releaseDeleteResponse =
         body(
