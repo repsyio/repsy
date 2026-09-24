@@ -140,6 +140,26 @@ export class PanelApi {
     return unwrap(res.data, 'listUsers').content ?? [];
   }
 
+  /**
+   * Every user matching `search`, read page by page (100 a page) until the last page. A user created
+   * or deleted mid-read can still move a row across a page boundary, so an id is kept once. Collect
+   * first, then act: deleting while reading pages skips the rows that move up into the page just read.
+   */
+  async listAllUsers(filter: { search?: string } = {}): Promise<UserResponse[]> {
+    const byId = new Map<string, UserResponse>();
+
+    for (let page = 0; ; page += 1) {
+      const res = await this.client.userController.listUsers({ ...filter, page, size: 100 });
+      const result = unwrap(res.data, 'listAllUsers');
+      for (const user of result.content ?? []) {
+        byId.set(user.id, user);
+      }
+      if (page + 1 >= (result.page?.totalPages ?? 0)) {
+        return [...byId.values()];
+      }
+    }
+  }
+
   /** `POST /api/repos`: the repository type travels in the body; the answer is the created repository. */
   async createRepo(repoType: RepoType, form: RepoCreateForm): Promise<RepoListInfo> {
     const res = await this.client.repoCollectionController.createRepository({

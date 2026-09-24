@@ -15,10 +15,10 @@
 ///
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import moment from 'moment';
-import { finalize } from 'rxjs';
+import { catchError, EMPTY, filter, finalize, map, Subject, Subscription, switchMap, timer } from 'rxjs';
 
 import { PagedModelUserResponse, UserResponse } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/service/auth.service';
@@ -33,6 +33,15 @@ import { SearchboxComponent } from '../../../shared/components/searchbox/searchb
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../shared/components/tooltip/tooltip.component';
 import { UserService } from '../service/user.service';
+
+/** How long the search box must be idle before the typed text is sent to the server. */
+export const USER_SEARCH_DEBOUNCE_MS = 250;
+
+/** One request of the list: what the server is asked for. */
+interface ListRequest {
+  q: string;
+  page: number;
+}
 
 @Component({
   selector: 'app-user-management',
@@ -53,7 +62,7 @@ import { UserService } from '../service/user.service';
   templateUrl: './user-management.component.html',
   styleUrl: './user-management.component.css',
 })
-export class UserManagementComponent implements OnInit {
+export class UserManagementComponent implements OnInit, OnDestroy {
   public operationLock = false;
   public pageNum = 0;
   public pageSize = 10;
@@ -63,29 +72,73 @@ export class UserManagementComponent implements OnInit {
   public showEditUserModal = false;
   public showResetPasswordModal = false;
   public selectedUser: UserResponse;
+  /** The text of the search box: it is emptied whenever the list is loaded without the search, so box and list agree. */
   public searchQuery = '';
+  /** The search the list currently shows; `searchQuery` runs ahead of it while the typing is debounced. */
+  public appliedQuery = '';
   public newPassword: string;
   /** Admins on the server (not only on the loaded page); null until the first answer arrives. */
   public adminCount: number | null = null;
+
+  private readonly requests = new Subject<ListRequest>();
+  private readonly typedSearches = new Subject<string>();
+  private readonly subscriptions = new Subscription();
+  private adminCountSubscription?: Subscription;
 
   constructor(
     private readonly userService: UserService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly authService: AuthService,
-  ) {}
+  ) {
+    // A request supersedes the one before it: switchMap unsubscribes from it, which cancels it on the wire,
+    // so a slow answer of an old search never reaches the view.
+    this.subscriptions.add(
+      this.requests
+        .pipe(
+          switchMap((request) =>
+            this.userService.listUsers(request.q || undefined, request.page, this.pageSize).pipe(
+              // The HTTP error interceptor already shows the toast; the rows on screen stay.
+              catchError(() => EMPTY),
+            ),
+          ),
+        )
+        .subscribe((pagedModel) => {
+          this.pagedData = pagedModel;
+          this.users = pagedModel.content ?? [];
+        }),
+    );
+
+    // The typed text is sent once the box has been idle; a reload that emptied the box meanwhile drops it.
+    this.subscriptions.add(
+      this.typedSearches
+        .pipe(
+          switchMap((text) => timer(USER_SEARCH_DEBOUNCE_MS).pipe(map(() => text))),
+          filter((text) => text === this.searchQuery),
+        )
+        .subscribe((text) => this.applySearch(text)),
+    );
+  }
 
   public ngOnInit(): void {
     this.fetchUsers();
   }
 
+  public ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
+    this.adminCountSubscription?.unsubscribe();
+  }
+
+  /** Loads the current page of the current search, and the admin count that goes with it. */
   public fetchUsers(): void {
-    this.userService.listUsers(this.searchQuery || undefined, this.pageNum, this.pageSize).subscribe((pagedModel) => {
-      this.pagedData = pagedModel;
-      this.users = pagedModel.content ?? [];
-    });
-    this.userService.countAdmins().subscribe((count) => {
-      this.adminCount = count;
+    this.requests.next({ q: this.appliedQuery, page: this.pageNum });
+    this.adminCountSubscription?.unsubscribe();
+    this.adminCountSubscription = this.userService.countAdmins().subscribe({
+      next: (count) => {
+        this.adminCount = count;
+      },
+      // The HTTP error interceptor already shows the failure; the last known count stays.
+      error: () => {},
     });
   }
 
@@ -94,15 +147,16 @@ export class UserManagementComponent implements OnInit {
     this.fetchUsers();
   }
 
+  /** Called on every keystroke; the request goes out when the typing pauses, and it starts from the first page. */
   public search(username: string): void {
     this.searchQuery = username;
-    this.pageNum = 0;
-    this.fetchUsers();
+    this.typedSearches.next(username);
   }
 
   public refreshPage(): void {
     this.pageNum = 0;
     this.searchQuery = '';
+    this.appliedQuery = '';
     this.fetchUsers();
   }
 
@@ -112,8 +166,9 @@ export class UserManagementComponent implements OnInit {
    * first page only when there was a search, since it was counted within the searched list.
    */
   public resetSearch(): void {
-    if (this.searchQuery) {
+    if (this.searchQuery || this.appliedQuery) {
       this.searchQuery = '';
+      this.appliedQuery = '';
       this.pageNum = 0;
     }
   }
@@ -184,14 +239,13 @@ export class UserManagementComponent implements OnInit {
           }),
         )
         .subscribe(() => {
+          // Deleting the only row of a later page leaves that page empty: go back to the first one.
+          if (this.users.length === 1 && this.pageNum > 0) {
+            this.pageNum = 0;
+          }
           this.resetSearch();
           this.fetchUsers();
           this.toastService.show(successMsg, 'success');
-
-          if (this.users.length === 1 && this.pageNum > 0) {
-            this.pageNum = 0;
-            this.fetchUsers();
-          }
         });
     });
   }
@@ -221,6 +275,12 @@ export class UserManagementComponent implements OnInit {
       default:
         return 'badge-default';
     }
+  }
+
+  private applySearch(text: string): void {
+    this.appliedQuery = text;
+    this.pageNum = 0;
+    this.fetchUsers();
   }
 
   protected readonly moment = moment;

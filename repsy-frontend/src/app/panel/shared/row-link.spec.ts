@@ -25,6 +25,13 @@ import { TooltipComponent } from './components/tooltip/tooltip.component';
  * The list-row pattern of RPS-1266 (`.row-link-host` in styles.css): one real link stretched over the
  * row, everything else interactive in the row a sibling above it. This spec runs with the real global
  * styles, so it checks the geometry the pattern depends on.
+ *
+ * The geometry is read with `elementFromPoint`, which answers null for a point outside the viewport. The
+ * Karma page is a small iframe whose body also holds the jasmine reporter, and that reporter grows with every
+ * spec that has run, so a host appended to the end of the body ended up below the visible area for some
+ * random orders (RPS-1319: `innerHeight` 437, host at y=461, page scrolled). The host therefore sits in its
+ * own fixed container in the top-left corner, above everything else, so neither the body's contents nor the
+ * scroll position can move it out of the viewport or cover it.
  */
 @Component({
   imports: [RouterLink, DropdownComponent, TooltipComponent],
@@ -48,6 +55,7 @@ class RowsHostComponent {}
 
 describe('list row with a stretched link', () => {
   let fixture: ComponentFixture<RowsHostComponent>;
+  let viewport: HTMLElement;
   let root: HTMLElement;
 
   const q = <T extends HTMLElement = HTMLElement>(row: string, selector: string) =>
@@ -58,15 +66,25 @@ describe('list row with a stretched link', () => {
     return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     TestBed.configureTestingModule({ imports: [RowsHostComponent], providers: [provideRouter([])] });
+    viewport = document.createElement('div');
+    viewport.setAttribute('data-testid', 'row-link-viewport');
+    viewport.style.cssText = 'position: fixed; top: 0; left: 0; width: 700px; z-index: 2147483000; background: white;';
+    document.body.appendChild(viewport);
     fixture = TestBed.createComponent(RowsHostComponent);
-    document.body.appendChild(fixture.nativeElement);
-    fixture.detectChanges();
+    viewport.appendChild(fixture.nativeElement);
     root = fixture.nativeElement;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    // Let the layout settle (fonts, the global styles) before any geometry is read.
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   });
 
-  afterEach(() => fixture.nativeElement.remove());
+  afterEach(() => {
+    fixture.destroy();
+    viewport.remove();
+  });
 
   it('stretches the link over the whole row, named after the row', () => {
     const link = q<HTMLAnchorElement>('first', '.row-link');
