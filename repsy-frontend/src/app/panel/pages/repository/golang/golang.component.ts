@@ -54,11 +54,10 @@ export class GolangComponent implements OnInit, OnDestroy {
       .subscribe((repoContext) => {
         this.loadRepo(repoContext.repoName);
       });
-
-    const currentRepo = this.repoLookupService.currentRepo;
-    if (currentRepo?.repoType === 'golang') {
-      this.loadRepo(currentRepo.repoName);
-    }
+    // No separate load of `repoLookupService.currentRepo` here: `currentRepo$` is a BehaviorSubject, so
+    // the subscription above already delivers a repository that is set. A second load made the page
+    // fetch the permissions, and with them every list of its children, twice (RPS-1302: the versions
+    // page of an unknown module toasted "Module not found." twice).
   }
 
   public ngOnDestroy(): void {

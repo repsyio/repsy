@@ -53,11 +53,9 @@ export class HelmComponent implements OnInit, OnDestroy {
       .subscribe((repoContext) => {
         this.loadPermissions(repoContext.repoName);
       });
-
-    const currentRepo = this.repoLookupService.currentRepo;
-    if (currentRepo?.repoType === 'helm') {
-      this.loadPermissions(currentRepo.repoName);
-    }
+    // No separate load of `repoLookupService.currentRepo` here: `currentRepo$` is a BehaviorSubject, so
+    // the subscription above already delivers a repository that is set. A second load made the page
+    // fetch the permissions, and with them every list of its children, twice (RPS-1302).
   }
 
   public ngOnDestroy(): void {

@@ -164,4 +164,24 @@ test.describe('Helm charts: OCI and classic', { tag: '@packages' }, () => {
     // eslint-disable-next-line playwright/prefer-to-have-count -- an immediate read, toHaveCount polls
     expect(await detail.toasts.error().count(), 'error toasts after the delete').toBe(0);
   });
+
+  // RPS-1302: the versions page's own Delete of the last version lands on the chart list as well.
+  test('PKG-helm-07 deleting the last version from the versions page shows only the success toast (RPS-1302)', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.HELM);
+    const chart = await seedPackage(repo);
+    const pages = protocolPages(adminPage, helm, repo.name);
+    const versions = pages.versions(chart);
+    await versions.goto();
+    await versions.deleteRow(chart);
+    await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
+    const list = pages.list();
+    await list.expectLoaded();
+    await list.expectNoRow(chart);
+    // eslint-disable-next-line playwright/prefer-to-have-count -- an immediate read, toHaveCount polls
+    expect(await versions.toasts.error().count(), 'error toasts after the delete').toBe(0);
+  });
 });
