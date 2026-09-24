@@ -17,17 +17,23 @@ package io.repsy.os.server.protocols.maven.shared.artifact.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.VersionSignature;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionSignatureRepository;
+import io.repsy.os.shared.repo.entities.Repo;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -198,5 +204,109 @@ class VersionSignatureServiceTest {
 
     verify(this.versionSignatureRepository)
         .deleteByArtifactVersionIdAndFileName(this.version.getId(), "lib-1.0.jar");
+  }
+
+  @Test
+  @DisplayName("without verify-all a version is signed by its POM's signature alone (RPS-1316)")
+  void withoutVerifyAllOnlyThePomCounts() {
+    this.verifiedFiles("lib-1.0.pom");
+
+    this.service.refreshSigned(this.storageKey, this.version, VERSION_PATH, false);
+
+    verify(this.artifactVersionRepository).lockForSignedUpdate(this.version.getId());
+    verify(this.artifactVersionRepository).updateSigned(this.version.getId(), true);
+    verifyNoInteractions(this.storageStrategy);
+  }
+
+  @Test
+  @DisplayName("without verify-all a signed jar without a signed POM does not sign the version")
+  void withoutVerifyAllAJarSignatureDoesNotCount() {
+    this.verifiedFiles("lib-1.0.jar", "lib-1.0-sources.jar");
+
+    this.service.refreshSigned(this.storageKey, this.version, VERSION_PATH, false);
+
+    verify(this.artifactVersionRepository).updateSigned(this.version.getId(), false);
+  }
+
+  @Test
+  @DisplayName("without verify-all any POM of a snapshot counts")
+  void withoutVerifyAllAnyPomOfASnapshotCounts() {
+    this.verifiedFiles("lib-1.0-20260921.101010-1.pom");
+
+    this.service.refreshSigned(this.storageKey, this.version, "com/acme/lib/1.0-SNAPSHOT", false);
+
+    verify(this.artifactVersionRepository).updateSigned(this.version.getId(), true);
+  }
+
+  @Test
+  @DisplayName("refreshSigned without a setting is the verify-all rule")
+  void refreshSignedIsTheVerifyAllRule() {
+    this.directoryHolds("lib-1.0.pom", "lib-1.0.jar");
+    this.verifiedFiles("lib-1.0.pom");
+
+    this.service.refreshSigned(this.storageKey, this.version, VERSION_PATH);
+
+    verify(this.artifactVersionRepository).updateSigned(this.version.getId(), false);
+  }
+
+  private ArtifactVersion storedVersion(final boolean verifyAll) {
+    final var repo = new Repo();
+    repo.setId(this.storageKey);
+    repo.setPgpVerifyAllSignaturesEnabled(verifyAll);
+    final var artifact = new Artifact();
+    artifact.setRepo(repo);
+    artifact.setGroupName("com.acme");
+    artifact.setArtifactName("lib");
+    this.version.setArtifact(artifact);
+    this.version.setVersionName("1.0");
+    when(this.artifactVersionRepository.findById(this.version.getId()))
+        .thenReturn(Optional.of(this.version));
+
+    return this.version;
+  }
+
+  @Test
+  @DisplayName("recompute locks the version first and applies the verify-all rule of its repo")
+  void recomputeAppliesVerifyAllOfTheRepo() {
+    this.storedVersion(true);
+    this.directoryHolds("lib-1.0.pom", "lib-1.0.jar");
+    this.verifiedFiles("lib-1.0.pom");
+
+    assertThat(this.service.recompute(this.version.getId())).isTrue();
+
+    final var order = inOrder(this.artifactVersionRepository, this.storageStrategy);
+    order.verify(this.artifactVersionRepository).lockForSignedUpdate(this.version.getId());
+    order.verify(this.artifactVersionRepository).findById(this.version.getId());
+    order
+        .verify(this.storageStrategy)
+        .listStorageItems(
+            argThat(
+                (StoragePath path) ->
+                    path.getStorageKey().equals(this.storageKey)
+                        && path.getRelativePath().getPath().equals(VERSION_PATH)));
+    order.verify(this.artifactVersionRepository).updateSigned(this.version.getId(), false);
+  }
+
+  @Test
+  @DisplayName("recompute applies the POM rule when the repo does not verify every signature")
+  void recomputeAppliesThePomRuleWhenNotVerifyingAll() {
+    this.storedVersion(false);
+    this.verifiedFiles("lib-1.0.pom");
+
+    assertThat(this.service.recompute(this.version.getId())).isTrue();
+
+    verify(this.artifactVersionRepository).updateSigned(this.version.getId(), true);
+    verifyNoInteractions(this.storageStrategy);
+  }
+
+  @Test
+  @DisplayName("recompute of a version that is gone changes nothing")
+  void recomputeOfAVanishedVersion() {
+    when(this.artifactVersionRepository.findById(this.version.getId()))
+        .thenReturn(Optional.empty());
+
+    assertThat(this.service.recompute(this.version.getId())).isFalse();
+
+    verify(this.artifactVersionRepository, never()).updateSigned(any(), anyBoolean());
   }
 }

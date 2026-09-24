@@ -24,6 +24,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionSi
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -98,7 +99,7 @@ public class VersionSignatureService {
 
   /**
    * Sets {@code version.signed} from what the version directory holds now and what has a verified
-   * signature.
+   * signature, the way a repo that verifies every signature does.
    *
    * <p>The version's row is locked first and the two are read after that, so requests that change
    * them at the same time (a deploy uploads its files and signatures in parallel) are recomputed
@@ -111,20 +112,84 @@ public class VersionSignatureService {
   public void refreshSigned(
       final UUID storageKey, final ArtifactVersion version, final String versionPath) {
 
+    this.refreshSigned(storageKey, version, versionPath, true);
+  }
+
+  /**
+   * Sets {@code version.signed} from what has a verified signature, by the rule of the repo's
+   * setting: with {@code verifyAll} the rule of {@link #refreshSigned(UUID, ArtifactVersion,
+   * String)}; without it the version is signed when the signature of its POM is verified, the only
+   * signature such a repo verifies ({@link #isSignedByPom}). It is what a toggle of the setting
+   * recomputes an existing version by (RPS-1316), so a version ends up as if it had been uploaded
+   * under the setting it has now.
+   */
+  public void refreshSigned(
+      final UUID storageKey,
+      final ArtifactVersion version,
+      final String versionPath,
+      final boolean verifyAll) {
+
     this.lock(version);
 
-    final var items =
-        this.storageStrategy.listStorageItems(StoragePath.of(storageKey, versionPath));
-    final var toSign =
-        ArtifactUtils.filesToSign(
-            versionPath, ArtifactUtils.versionDirFileNames(versionPath, items));
+    // The directory is listed before the rows are read, as it always was: both come after the lock.
+    final var toSign = verifyAll ? this.filesToSign(storageKey, versionPath) : List.<String>of();
     final var verified =
         this.versionSignatureRepository.findFileNamesByArtifactVersionId(version.getId());
 
-    final var signed = isSigned(toSign, verified);
+    final var signed = verifyAll ? isSigned(toSign, verified) : isSignedByPom(verified);
 
     // A bulk update, so the entity is not marked dirty and flushed again with all its columns.
     this.artifactVersionRepository.updateSigned(version.getId(), signed);
+  }
+
+  /**
+   * Recomputes {@code signed} of one version of a repo by the repo's setting as it is now, in a
+   * transaction of its own when it is not called from one. The row lock comes first and the repo's
+   * setting is read after it, so a request that holds the lock and a toggle that commits meanwhile
+   * cannot leave the version computed by the setting that was replaced.
+   *
+   * @return {@code false} when the version is gone
+   */
+  public boolean recompute(final UUID versionId) {
+
+    this.artifactVersionRepository.lockForSignedUpdate(versionId);
+
+    final var version = this.artifactVersionRepository.findById(versionId).orElse(null);
+
+    if (version == null) {
+      return false;
+    }
+
+    final var artifact = version.getArtifact();
+    final var repo = artifact.getRepo();
+    final var versionPath =
+        artifact.getGroupName().replace('.', '/')
+            + "/"
+            + artifact.getArtifactName()
+            + "/"
+            + version.getVersionName();
+
+    this.refreshSigned(repo.getId(), version, versionPath, repo.isPgpVerifyAllSignaturesEnabled());
+
+    return true;
+  }
+
+  private List<String> filesToSign(final UUID storageKey, final String versionPath) {
+
+    final var items =
+        this.storageStrategy.listStorageItems(StoragePath.of(storageKey, versionPath));
+
+    return ArtifactUtils.filesToSign(
+        versionPath, ArtifactUtils.versionDirFileNames(versionPath, items));
+  }
+
+  /**
+   * Whether the POM of the version has a verified signature: what {@code signed} means on a repo
+   * that verifies only the POM's (a snapshot has one POM per build, any of them counts).
+   */
+  static boolean isSignedByPom(final Collection<String> verified) {
+
+    return verified.stream().anyMatch(ArtifactUtils::isPomFile);
   }
 
   /** Whether there is something to sign and every file of it has a verified signature. */
