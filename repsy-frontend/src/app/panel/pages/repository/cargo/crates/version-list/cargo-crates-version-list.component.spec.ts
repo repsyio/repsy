@@ -151,13 +151,21 @@ describe('CargoCratesVersionListComponent', () => {
 });
 
 describe('CargoCratesVersionListComponent template', () => {
-  async function render(canManage: boolean): Promise<HTMLElement> {
+  async function render(canManage: boolean, yankedVersion?: string): Promise<HTMLElement> {
     const cargoService = jasmine.createSpyObj<CargoService>('CargoService', ['fetchCrate', 'fetchCrateVersions'], {
       repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, { canManage })),
     });
     cargoService.fetchCrate.and.returnValue(of(CRATE));
     cargoService.fetchCrateVersions.and.returnValue(
-      of(pageOf([{ version: '1.0.0', created_at: '2026-01-01T00:00:00Z' }, { version: '2.0.0' }], 1) as never),
+      of(
+        pageOf(
+          [
+            { version: '1.0.0', created_at: '2026-01-01T00:00:00Z', yanked: yankedVersion === '1.0.0' },
+            { version: '2.0.0', yanked: yankedVersion === '2.0.0' },
+          ],
+          1,
+        ) as never,
+      ),
     );
     const securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
     securityService.watchVersionSecuritySummary.and.returnValue(of({}));
@@ -191,5 +199,21 @@ describe('CargoCratesVersionListComponent template', () => {
 
     TestBed.resetTestingModule();
     expect((await render(false)).querySelectorAll(menus)).toHaveSize(0);
+  });
+
+  it('marks only the yanked version, on its row and on its card', async () => {
+    const el = await render(true, '2.0.0');
+
+    const badge = (testId: string) => el.querySelector(`[data-testid="${testId}"] [data-testid="row-yanked"]`);
+    expect(badge('pkg-versions-row-2.0.0')?.textContent?.trim()).toBe('yanked');
+    expect(badge('pkg-versions-card-2.0.0')?.textContent?.trim()).toBe('yanked');
+    expect(badge('pkg-versions-row-1.0.0')).toBeNull();
+    expect(badge('pkg-versions-card-1.0.0')).toBeNull();
+  });
+
+  it('shows no yanked badge when no version is yanked', async () => {
+    const el = await render(true);
+
+    expect(el.querySelector('[data-testid="row-yanked"]')).toBeNull();
   });
 });

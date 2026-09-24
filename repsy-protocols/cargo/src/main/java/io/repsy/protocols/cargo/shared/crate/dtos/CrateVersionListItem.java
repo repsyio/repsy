@@ -20,4 +20,5 @@ import java.time.Instant;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked
-public record CrateVersionListItem(String version, @JsonProperty("created_at") Instant createdAt) {}
+public record CrateVersionListItem(
+    String version, boolean yanked, @JsonProperty("created_at") Instant createdAt) {}

@@ -478,7 +478,7 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
       final UUID repoId, final @Nullable String scope, final Pageable pageable) {
 
     return this.npmPackageRepository
-        .findAllByRepoIdAndLatestVersionContainsScope(repoId, scope, pageable)
+        .findAllByRepoIdAndLatestVersionContainsScope(repoId, withoutAtSign(scope), pageable)
         .map(this.npmPackageConverter::toPackageListItemDto);
   }
 
@@ -492,8 +492,18 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
     }
 
     return this.npmPackageRepository
-        .findAllByRepoIdAndLatestVersionAndScopeContainsName(repoId, scope, name, pageable)
+        .findAllByRepoIdAndLatestVersionAndScopeContainsName(
+            repoId, scope, withoutAtSign(name), pageable)
         .map(this.npmPackageConverter::toPackageListItemDto);
+  }
+
+  /**
+   * The list search matches the {@code scope/name} key, in which the scope is stored without its
+   * {@code @}, so a term typed as {@code @scope/name} loses the leading {@code @}.
+   */
+  private static @Nullable String withoutAtSign(final @Nullable String term) {
+
+    return term != null && term.startsWith("@") ? term.substring(1) : term;
   }
 
   public PackageVersionInfo getPackageVersion(final UUID packageId, final String versionName) {

@@ -88,6 +88,11 @@
                     [text]="version.version"
                     [textHover]="version.version"
                   />
+                  @if (version.yanked) {
+                    <span data-testid="row-yanked" class="rounded bg-[#3B1414] px-2 py-0.5 text-[11px] text-[#FF6B6B]"
+                      >yanked</span
+                    >
+                  }
                 </div>
                 <app-version-security-badge
                   data-testid="row-security"
@@ -157,6 +162,11 @@
                   <img class="mt-[2px]" ngSrc="/assets/icons/repo/bookmark.svg" alt="bookmark" height="18" width="18" />
 
                   <span data-testid="row-name" class="text-right break-all text-[#FDFDFD]">{{ version.version }}</span>
+                  @if (version.yanked) {
+                    <span data-testid="row-yanked" class="rounded bg-[#3B1414] px-2 py-0.5 text-[11px] text-[#FF6B6B]"
+                      >yanked</span
+                    >
+                  }
                 </div>
 
                 <div class="space-y-2">

@@ -2614,9 +2614,9 @@ user the UI is about to create so a failing test still cleans it up).
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | USR-01   | create a USER and an Admin, log in as each from a fresh context (an Admin sees Users, a USER does not), cancel resets the form       |
 | USR-02   | one test per validator of the create form, the message texts, a valid form, a duplicate username                                     |
-| USR-03   | rename, promote, demote next to another admin, the last-admin warning and locked switch, edit validation, taken name, cancel         |
+| USR-03   | rename, promote, demote next to another admin, no last-admin warning while another admin exists, edit validation, taken name, cancel |
 | USR-04   | reset password: one-time modal, the new password logs in, the old one is refused, cancel resets nothing                              |
-| USR-05   | delete (cancel, then confirm), delete next to another admin, the last-admin toast                                                    |
+| USR-05   | delete (cancel, then confirm), delete next to another admin, a lone admin in the view is still deletable                             |
 | USR-06   | 11 users: search (incl. case-insensitive, no match with its `No user matches` message), pagination both ways, refresh                |
 | PRO-01   | change password: mismatch, cancel, confirm, re-login with the new one, the old one refused; field validation                         |
 | PRO-02   | change username: reload as the new name, same account, repo protocol URL and repo page still work; validation; taken name            |
@@ -2632,12 +2632,13 @@ Rules these specs follow (and a later spec on these pages should too):
   The suite never edits, demotes or deletes the harness admin. Names a test creates or renames to come from
   `seeder.reserveUsername()`, so the `e2e-` prefix survives and sweep finds them; a renamed user is
   cleaned up by id.
-- **Last admin.** The panel decides "last admin" on the client from the admins in the page it shows
-  (RPS-1246); the server guards the real one, which the backend ITs cover. A shared stack always has the
-  harness admin, so the real last-admin state is unreachable here. What is reachable: search for a seeded
-  admin's exact username, and the view holds a single admin. Those tests pin what the panel does there
-  today, and two `test.fail(... RPS-1246)` tests assert what it should do. Two admins in one view (search
-  for `seeder.runId`, which is in both names) is the "not the last" case.
+- **Last admin.** The panel decides "last admin" from the server's admin count (`GET /api/users/admin-count`,
+  RPS-1246), not from the page it shows, and the server guards the real one, which the backend ITs cover.
+  A shared stack always has the harness admin, so the real last-admin state is unreachable here (the
+  component spec covers the panel's branch). What is reachable: search for a seeded admin's exact username,
+  and the view holds a single admin that must still be editable and deletable, which two tests assert.
+  `UsersPage.goto` waits for the admin-count response. Two admins in one view (search for `seeder.runId`,
+  which is in both names) is the "not the last" case.
 - **Search first.** The list is server-paged (10, newest first) and server-searched (case-insensitive
   substring), and other tests add users, so every list view is a search for a username or for
   `seeder.runId`, which is in exactly the names this test seeded (with 10 or more users, `-user-1` also
@@ -2649,8 +2650,9 @@ Rules these specs follow (and a later spec on these pages should too):
   Font Awesome CDN, so the buttons have no box: they are activated with `dispatchEvent('click')`.
 - **Timing.** The username change ends in `location.reload()` in the tick that raises its toast, so that
   toast is not observable: assert the reload (`ProfilePage.changeUsername`) and the outcome.
-- **Known bugs, pinned with `test.fail`**: RPS-1246 (last-admin check counts one page). The mojibake
-  `â€¢` of the create-user messages (RPS-1261) is fixed and asserted unpinned. The spec text of a `test.fail` states the key.
+- **Known bugs, pinned with `test.fail`**: none left in the users suite. The mojibake `â€¢` of the create-user
+  messages (RPS-1261) and the page-scoped last-admin check (RPS-1246) are fixed and asserted unpinned. The spec text
+  of a `test.fail` states the key.
 
 ### Repository settings and deploy tokens (RPS-1254)
 
@@ -2790,7 +2792,7 @@ protocol-only scenarios. The template is `src/ui/package-scenarios.ts`, the UI c
 registerPackageScenarios(DESCRIPTORS.nuget, {
   knownFailures: {
     '02-versions-search':
-      'RPS-1262: the NuGet version list has no search box (the API has no search parameter)',
+      'RPS-1304: the NuGet version list has no search box (the API has no search parameter)',
   },
 });
 ```
@@ -2811,7 +2813,7 @@ differs the descriptor carries the value (`repoUrlIn`, `detail.delete.landsOn`,
 | 06  | Configure modal (repo name, `YOUR_PASSWORD` where the protocol has one) and the deploy-token variant opened from a token row in the settings                     |
 
 `knownFailures` keys (`PackageScenarioKey`) run their step under `test.fail`, so a fix turns it red and
-the title carries the reason. Pinned today: NuGet `02-versions-search` (RPS-1262, the API has no
+the title carries the reason. Pinned today: NuGet `02-versions-search` (RPS-1304, the API has no
 version search). The RPS-1261 (Maven Gradle Groovy block, Docker desktop Digest/Config Digest cells,
 npm Bugs URL/Keywords, PyPI "Post release:" and the mobile "Latest" link), RPS-1262 (mobile Delete
 gate, Cargo/NuGet mobile cards, Helm pager, Go empty pager, the Maven browser's Settings button) and
@@ -2863,29 +2865,27 @@ keys a crate by its normalised name, `-` becoming `_`), NuGet and Helm `e2e-<run
 (`clients/{cargo,nuget,helm,helm-chart,golang,ruby}-raw.ts`); the only edits there are
 `buildPublishBody`'s optional `readme`/`deps` and `export` on Helm's two OCI body builders.
 
-| ID        | What it does                                                                                                                                                                                                                                                                                             |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| cargo-07  | README renders (and is absent when none was published); deps in the Cargo.toml block; Add Dependency vs Install Binary; the four sorts (crates at different versions); latest version and every version; delete a crate with two versions; a yanked version still listed (the panel shows no yank state) |
-| nuget-07  | stable and pre-release side by side; a stable-only repo (`releases`/`snapshots`) refuses a pre-release and keeps the list; unlist/relist flips `Listed` on the detail (the version stays listed); the four install snippets, no dependencies, nuspec metadata                                            |
-| helm-07   | a chart published to each module (OCI and classic) in one list, both open with digest and Chart.yaml; one chart with versions from both modules; deleting a classic chart; the Latest link                                                                                                               |
-| golang-07 | list -> `/modules?modulePath=` -> `/modules/version?modulePath=&version=` with the breadcrumb; deep link; GOPROXY endpoints; "Version 'x' not found"; the detail without its query goes to the list; a module path with slashes is searchable                                                            |
-| ruby-07   | yanked badge on the versions list and on the detail after a yank through the API; install commands, platform and checksum; the Latest link                                                                                                                                                               |
+| ID        | What it does                                                                                                                                                                                                                                                                                                                                                                                          |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| cargo-07  | README renders (and is absent when none was published); deps in the Cargo.toml block; Add Dependency vs Install Binary; the four sorts (crates published out of version and name order); Newest puts the crate published last on top; latest version and every version; delete a crate with two versions; a yanked version stays listed and is marked yanked on the list and on its detail (RPS-1301) |
+| nuget-07  | stable and pre-release side by side; a stable-only repo (`releases`/`snapshots`) refuses a pre-release and keeps the list; unlist/relist flips `Listed` on the detail (the version stays listed); the four install snippets, no dependencies, nuspec metadata                                                                                                                                         |
+| helm-07   | a chart published to each module (OCI and classic) in one list, both open with digest and Chart.yaml; one chart with versions from both modules; deleting a classic chart; the Latest link; deleting the last version toasts once and lands on the chart list (RPS-1302)                                                                                                                              |
+| golang-07 | list -> `/modules?modulePath=` -> `/modules/version?modulePath=&version=` with the breadcrumb; deep link; GOPROXY endpoints; "Version 'x' not found"; the detail without its query goes to the list; a module path with slashes is searchable                                                                                                                                                         |
+| ruby-07   | yanked badge on the versions list and on the detail after a yank through the API; install commands, platform and checksum; the Latest link                                                                                                                                                                                                                                                            |
 
 What the descriptors record (found by running each protocol): a version row's link appends `#security`
 (the template accepts a fragment); a detail Delete lands on the list (Cargo, Ruby), on the versions page
-(NuGet, Helm, Go) and, for the LAST version, on the list for NuGet (`landsOnLast`) and on the empty
-versions page for Helm and Go; deleting the last version removes the package for all but Go, whose module
+(NuGet, Helm, Go) and, for the LAST version, on the list for NuGet and Helm (`landsOnLast`) and on the empty
+versions page for Go; deleting the last version removes the package for all but Go, whose module
 stays listed with no versions (like Docker, RPS-1288 (5)); Cargo/NuGet/Helm/Ruby Configure texts have
 `<YOUR_...>` placeholders and the same body in the deploy-token variant (`deployTokenMarker` is optional
 now: absent = same body, only the title differs), Ruby's title is the same in both.
 
 Pinned with `test.fail` / `knownFailures` (each still fails for the stated reason, checked un-pinned):
 
-| Where                             | Bug                                                                                                                                                                                                                                           |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| nuget `02-versions-search`        | RPS-1262 (3): no search box on the version list: the API has no version search parameter                                                                                                                                                      |
-| cargo-07 Newest by publish time   | RPS-1301: Newest/Oldest order by `max_version` (a text column), not by when a crate was published; the seeder gives each crate its own version so the sort has distinct keys (RPS-1298: ties go by id), and cargo-07 asserts sorts by version |
-| helm-07 deleting the last version | RPS-1302: the versions page of the deleted chart raises two error toasts, "Chart not found." and "[object Object]"                                                                                                                            |
+| Where                      | Bug                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------ |
+| nuget `02-versions-search` | RPS-1304: no search box on the version list: the API has no version search parameter |
 
 `seed-proof.spec.ts` (RPS-1255) now covers all nine protocols; its generic search/sort/delete walk stays on
 the first four (the other five have the protocol-aware version of it in PKG-<proto>-02 and -04).

@@ -18,6 +18,9 @@
         >
           <img ngSrc="/assets/icons/cursor/tick.svg" alt="tick" height="12" width="16" />
           {{ crateVersion.version }}
+          @if (crateVersion.yanked) {
+            <span data-testid="pkg-detail-yanked" class="text-error-500 ml-1">(yanked)</span>
+          }
         </div>
         <p data-testid="pkg-detail-published" class="font-courier mb-8 text-[12px] text-[#9C9C9D]">
           Uploaded at: {{ crateVersion.created_at | date: 'medium' }}

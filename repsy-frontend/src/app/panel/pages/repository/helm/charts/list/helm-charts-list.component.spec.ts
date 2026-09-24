@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { fakeAsync, flushMicrotasks } from '@angular/core/testing';
 import moment from 'moment';
 import { BehaviorSubject, of, throwError } from 'rxjs';
@@ -63,7 +64,10 @@ describe('HelmChartsListComponent', () => {
       load: service.searchCharts,
       args: { search: 0, sort: 1, page: 2 },
       respond: (content, totalPages) => service.searchCharts.and.returnValue(of(pageOf(content, totalPages) as never)),
-      fail: () => service.searchCharts.and.returnValue(throwError(() => 'boom')),
+      fail: () =>
+        service.searchCharts.and.returnValue(
+          throwError(() => new HttpErrorResponse({ status: 500, error: { text: 'Charts cannot be listed' } })),
+        ),
       security: { watch: securityService.watchArtifactSecuritySummary, argsFor: (repoName) => [repoName] },
     };
   }
@@ -72,7 +76,7 @@ describe('HelmChartsListComponent', () => {
     describeRepoListBehavior(build, {
       security: true,
       search: { typed: 'acme', loaded: 'acme' },
-      failureMessage: 'boom',
+      failureMessage: 'Charts cannot be listed',
     }));
 
   describe('deleteChart', () => {
@@ -85,7 +89,6 @@ describe('HelmChartsListComponent', () => {
       title: 'Delete Chart',
       message: 'Chart deleted successfully',
       removeArgs: ['nginx'],
-      failureToast: 'boom',
     }));
   });
 

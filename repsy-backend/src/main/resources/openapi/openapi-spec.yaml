@@ -180,6 +180,23 @@ paths:
               schema:
                 "$ref": "#/components/schemas/RestResponseLoginInfo"
       summary: Update the current user's password
+  "/api/users/admin-count":
+    get:
+      tags:
+        - user-controller
+      operationId: countAdmins
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseLong"
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: Admin role required
+      summary: Count the users that hold the admin role, regardless of any paging or search
   "/api/users":
     get:
       tags:
@@ -4935,6 +4952,8 @@ components:
           format: int64
         hasLib:
           type: boolean
+        yanked:
+          type: boolean
         license_file:
           type: string
         rust_version:
@@ -4983,6 +5002,8 @@ components:
       properties:
         version:
           type: string
+        yanked:
+          type: boolean
         created_at:
           type: string
           format: date-time

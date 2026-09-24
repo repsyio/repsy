@@ -130,36 +130,58 @@ test.describe('Helm charts: OCI and classic', { tag: '@packages' }, () => {
     await expect(page.pagination.root).toBeVisible();
   });
 
-  // RPS-1302: after the LAST version is deleted the panel navigates to the chart's
-  // versions page, which no longer exists, and that load shows an error toast, "Chart not found.
-  // [object Object]", next to the success toast.
-  test.fail(
-    'PKG-helm-07 deleting the last version shows no error toast (RPS-1302: "Chart not found. [object Object]")',
-    async ({ adminPage, seeder, seedPackage }) => {
-      const repo = await seeder.createRepo(RepoType.HELM);
-      const chart = await seedPackage(repo);
-      const pages = protocolPages(adminPage, helm, repo.name);
-      const detail = pages.detail(chart);
-      await detail.goto();
-      // The versions page it lands on asks for the chart that is gone. Wait for that request's answer
-      // (a fix that stops asking just lets the wait run out), so the toasts are read after they would show.
-      const versions = pages.versions(chart);
-      const answered = adminPage
-        .waitForResponse(
-          (res) =>
-            res.request().method() === 'GET' &&
-            new URL(res.url()).pathname === `/api/helm/charts/${repo.name}/${chart.name}`,
-          { timeout: 5_000 },
-        )
-        .catch(() => undefined);
-      await detail.delete();
-      await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}/${chart.name}$`));
-      await answered;
-      await versions.expectLoaded();
-      await expect(versions.emptyList.root).toBeVisible();
-      // Read at once, not polled: toasts dismiss themselves after three seconds.
-      // eslint-disable-next-line playwright/prefer-to-have-count -- an immediate read, toHaveCount polls
-      expect(await detail.toasts.error().count(), 'error toasts after the delete').toBe(0);
-    },
-  );
+  // RPS-1302: after the LAST version was deleted the panel navigated to the chart's versions page,
+  // which no longer exists, and that load showed two error toasts, "Chart not found." and
+  // "[object Object]", next to the success toast. It now lands on the chart list.
+  test('PKG-helm-07 deleting the last version shows no error toast and lands on the chart list (RPS-1302)', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.HELM);
+    const chart = await seedPackage(repo);
+    const pages = protocolPages(adminPage, helm, repo.name);
+    const detail = pages.detail(chart);
+    await detail.goto();
+    // The page it must NOT ask for: the versions of the chart that is gone (a fix that never asks
+    // just lets the wait run out), so the toasts are read after they would show.
+    const goneAnswered = adminPage
+      .waitForResponse(
+        (res) =>
+          res.request().method() === 'GET' &&
+          new URL(res.url()).pathname === `/api/helm/charts/${repo.name}/${chart.name}` &&
+          res.status() === 404,
+        { timeout: 5_000 },
+      )
+      .catch(() => undefined);
+    await detail.delete();
+    await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
+    const list = pages.list();
+    await list.expectLoaded();
+    await list.expectNoRow(chart);
+    expect(await goneAnswered, 'a request for the versions of the removed chart').toBeUndefined();
+    // Read at once, not polled: toasts dismiss themselves after three seconds.
+    // eslint-disable-next-line playwright/prefer-to-have-count -- an immediate read, toHaveCount polls
+    expect(await detail.toasts.error().count(), 'error toasts after the delete').toBe(0);
+  });
+
+  // RPS-1302: the versions page's own Delete of the last version lands on the chart list as well.
+  test('PKG-helm-07 deleting the last version from the versions page shows only the success toast (RPS-1302)', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.HELM);
+    const chart = await seedPackage(repo);
+    const pages = protocolPages(adminPage, helm, repo.name);
+    const versions = pages.versions(chart);
+    await versions.goto();
+    await versions.deleteRow(chart);
+    await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
+    const list = pages.list();
+    await list.expectLoaded();
+    await list.expectNoRow(chart);
+    // eslint-disable-next-line playwright/prefer-to-have-count -- an immediate read, toHaveCount polls
+    expect(await versions.toasts.error().count(), 'error toasts after the delete').toBe(0);
+  });
 });

@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { fakeAsync, flushMicrotasks } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import moment from 'moment';
@@ -113,12 +114,15 @@ describe('HelmChartsVersionListComponent', () => {
       expect(helmService.getChartVersions).not.toHaveBeenCalled();
     }));
 
-    it('toasts the failure and stops loading when the versions cannot be loaded', fakeAsync(() => {
-      helmService.getChartVersions.and.returnValue(throwError(() => 'Chart not found'));
+    it('stops loading without a toast of its own when the versions cannot be loaded (the interceptor shows it)', fakeAsync(() => {
+      helmService.getChartVersions.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 404, error: { text: 'Chart not found.' } })),
+      );
 
       selectRepo();
 
-      expect(toastService.show).toHaveBeenCalledOnceWith('Chart not found', 'error');
+      // RPS-1302: the error is an HttpErrorResponse, so toasting it read "[object Object]".
+      expect(toastService.show).not.toHaveBeenCalled();
       expect(component.loading).toBeFalse();
       expect(component.versions).toEqual([]);
     }));

@@ -161,6 +161,34 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
     await versions.expectRow(nested);
   });
 
+  // RPS-1302: the page loaded its permissions twice, so the versions of an unknown module were asked
+  // for twice and the same "Module not found." toasted twice.
+  test('PKG-golang-07 the versions page of an unknown module shows its error once (RPS-1302)', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.GOLANG);
+    const versions = protocolPages(adminPage, golang, repo.name).versions({
+      name: `e2e.repsy.test/e2e-${seeder.runId}-none`,
+      version: 'v1.0.0',
+    });
+    let asked = 0;
+    adminPage.on('response', (res) => {
+      if (res.request().method() === 'GET' && res.url().includes('/api/go/modules/')) {
+        asked += 1;
+      }
+    });
+    await versions.goto();
+    await expect(versions.emptyList.root).toBeVisible();
+    await expect(
+      adminPage.getByTestId('toast').filter({ hasText: 'Module not found.' }),
+    ).toHaveCount(1);
+    // Read at once, not polled: a second toast would already be there and toasts dismiss themselves.
+    // eslint-disable-next-line playwright/prefer-to-have-count -- an immediate read, toHaveCount polls
+    expect(await adminPage.getByTestId('toast').count(), 'toasts on the versions page').toBe(1);
+    expect(asked, 'requests for the versions of the module').toBe(1);
+  });
+
   // RPS-1262 (3): `<app-pagination>` used to sit after the versions page's `@if/@else`, so it also
   // rendered under the empty state and, for a module with no versions, printed "1 NaN".
   test('PKG-golang-07 the empty versions page of an unknown module shows no pager (RPS-1262)', async ({
