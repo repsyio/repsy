@@ -38,12 +38,15 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -1108,6 +1111,78 @@ class NpmDeleteStorageConsistencyIT extends AbstractIntegrationTest {
     assertThat(this.packageCount(repo, name)).isZero();
     assertThat(this.storedVersionCount(repo, name)).isZero();
     assertThat(storageDirOf(repo).resolve(name)).doesNotExist();
+  }
+
+  /** Removes the package's directory behind the database's back, as a partial failure would. */
+  private void loseTheDirectoryOf(final Repo repo, final String name) throws IOException {
+    try (final var walk = Files.walk(storageDirOf(repo).resolve(name))) {
+      walk.sorted(Comparator.reverseOrder()).map(Path::toFile).forEach(File::delete);
+    }
+    assertThat(storageDirOf(repo).resolve(name)).doesNotExist();
+  }
+
+  @Test
+  @DisplayName("a package whose directory is already gone can be deleted from the panel (RPS-1290)")
+  void panelDeleteOfAPackageWithoutADirectory() throws Exception {
+    final var repo = this.npmRepo();
+    final var token = this.adminToken();
+    final var name = this.publishedVersions(repo, token, "1.0.0", "1.1.0");
+    this.loseTheDirectoryOf(repo, name);
+
+    final var usages = this.npmApiFacade.deletePackage(this.infoOf(repo), null, name);
+
+    assertThat(usages.getDiskUsage()).isZero();
+    assertThat(this.packageCount(repo, name)).isZero();
+    assertThat(this.storedVersionCount(repo, name)).isZero();
+  }
+
+  @Test
+  @DisplayName("a package whose directory is already gone can be deleted over the protocol")
+  void protocolDeleteOfAPackageWithoutADirectory() throws Exception {
+    final var repo = this.npmRepo();
+    final var token = this.adminToken();
+    final var name = this.publishedVersions(repo, token, "1.0.0");
+    this.loseTheDirectoryOf(repo, name);
+
+    final var response = this.deletePackageOverHttp(repo, name, token);
+
+    assertThat(response.getStatus()).isEqualTo(200);
+    assertThat(this.packageCount(repo, name)).isZero();
+  }
+
+  @Test
+  @DisplayName("the only version of a package whose directory is gone can be deleted")
+  void panelDeleteOfTheLastVersionWithoutADirectory() throws Exception {
+    final var repo = this.npmRepo();
+    final var token = this.adminToken();
+    final var name = this.publishedVersions(repo, token, "1.0.0");
+    this.loseTheDirectoryOf(repo, name);
+
+    this.npmApiFacade.deletePackageVersion(this.infoOf(repo), null, name, "1.0.0");
+
+    assertThat(this.packageCount(repo, name)).isZero();
+  }
+
+  @Test
+  @DisplayName("a directory that exists but cannot be removed still rolls the package delete back")
+  void existingDirectoryThatCannotBeRemovedKeepsThePackage() throws Exception {
+    final var repo = this.npmRepo();
+    final var token = this.adminToken();
+    final var name = this.publishedVersions(repo, token, "1.0.0");
+    doAnswer(
+            invocation -> {
+              throw new UncheckedIOException(new IOException("disk failure"));
+            })
+        .when(this.npmStorageStrategy)
+        .delete(any());
+
+    final var thrown =
+        failureOf(
+            this.attempt(() -> this.npmApiFacade.deletePackage(this.infoOf(repo), null, name)));
+
+    assertThat(thrown).isNotNull();
+    assertThat(this.packageCount(repo, name)).isOne();
+    assertThat(tarballFile(repo, name, "1.0.0")).exists();
   }
 
   @Test

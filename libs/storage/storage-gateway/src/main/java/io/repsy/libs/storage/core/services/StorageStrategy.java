@@ -39,6 +39,9 @@ public interface StorageStrategy {
    * erased, so it is recoverable until {@link #clearTrash()} permanently removes it after the
    * configured retention period elapses. There is no separate hard-delete operation; a caller that
    * needs the space back immediately still has to wait out the retention period.
+   *
+   * <p>Idempotent: an object that does not exist (any more) counts as deleted and the call returns
+   * without doing anything. An object that exists but cannot be removed still fails.
    */
   void delete(@NonNull StoragePath storagePath);
 

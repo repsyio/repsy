@@ -518,6 +518,59 @@ class FileSystemStorageStrategyIT {
         assertThat(trashEntries).hasSize(2);
       }
     }
+
+    @Test
+    @DisplayName("an object that does not exist counts as deleted and leaves the trash alone")
+    void doNothingWhenTheObjectIsMissing() throws Exception {
+      final var key = UUID.randomUUID();
+      FileSystemStorageStrategyIT.this.seedFile(key + "/other.txt", "data");
+
+      FileSystemStorageStrategyIT.this.strategy.delete(
+          FileSystemStorageStrategyIT.this.storagePath(key, "missing.txt"));
+      FileSystemStorageStrategyIT.this.strategy.delete(
+          FileSystemStorageStrategyIT.this.storagePath(key, "missing-dir/deeper"));
+
+      assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/other.txt")).exists();
+      assertThat(FileSystemStorageStrategyIT.this.trashPath).doesNotExist();
+    }
+
+    @Test
+    @DisplayName("a whole directory that is already gone counts as deleted")
+    void doNothingWhenTheDirectoryIsMissing() {
+      final var sp = FileSystemStorageStrategyIT.this.storagePath(UUID.randomUUID(), "pkg");
+
+      FileSystemStorageStrategyIT.this.strategy.delete(sp);
+
+      assertThat(FileSystemStorageStrategyIT.this.trashPath).doesNotExist();
+    }
+
+    @Test
+    @DisplayName("deleting the same directory twice succeeds both times")
+    void deleteTwiceSucceeds() throws Exception {
+      final var key = UUID.randomUUID();
+      FileSystemStorageStrategyIT.this.seedFile(key + "/pkg/a.txt", "a");
+      final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "pkg");
+
+      FileSystemStorageStrategyIT.this.strategy.delete(sp);
+      FileSystemStorageStrategyIT.this.strategy.delete(sp);
+
+      assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/pkg")).doesNotExist();
+    }
+
+    @Test
+    @DisplayName("an object that exists but cannot be moved to the trash still fails")
+    void failWhenAnExistingObjectCannotBeMoved() throws Exception {
+      final var key = UUID.randomUUID();
+      FileSystemStorageStrategyIT.this.seedFile(key + "/pkg/a.txt", "a");
+      // A regular file where the trash directory belongs: the object exists, the move cannot work.
+      Files.writeString(FileSystemStorageStrategyIT.this.trashPath, "not a directory");
+      final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "pkg");
+
+      assertThatThrownBy(() -> FileSystemStorageStrategyIT.this.strategy.delete(sp))
+          .isInstanceOf(IOException.class);
+
+      assertThat(FileSystemStorageStrategyIT.this.basePath.resolve(key + "/pkg/a.txt")).exists();
+    }
   }
 
   @Nested
