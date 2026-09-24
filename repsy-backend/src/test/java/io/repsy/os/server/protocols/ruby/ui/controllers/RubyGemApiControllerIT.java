@@ -475,7 +475,8 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
               delete("/api/ruby/gems/{repo}/{gem}", repo.getName(), "existing")
                   .with(apiPort())
                   .header(AUTHORIZATION, RubyGemApiControllerIT.this.bearerTokenFor(user)))
-          .andExpect(status().isUnauthorized())
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.msgId").value("accessDenied"))
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
     }
 

@@ -14,12 +14,12 @@
 /// limitations under the License.
 ///
 
-import { HttpClient, HttpErrorResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpErrorResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 
 import { ToastService } from '../../panel/shared/components/toast/toast.service';
-import { errorHandlerInterceptor } from './error-handler.interceptor';
+import { errorHandlerInterceptor, SILENT_ERROR } from './error-handler.interceptor';
 
 describe('errorHandlerInterceptor', () => {
   let http: HttpClient;
@@ -85,6 +85,16 @@ describe('errorHandlerInterceptor', () => {
 
     fail(403, {});
     expect(toastService.show).toHaveBeenCalledWith('Access denied', 'error');
+  });
+
+  it('rethrows a failure of a request marked SILENT_ERROR without a toast', () => {
+    let caught: HttpErrorResponse | undefined;
+    http.get('/api', { context: new HttpContext().set(SILENT_ERROR, true) }).subscribe({ error: (e) => (caught = e) });
+
+    httpTesting.expectOne('/api').flush({ msgId: 'accessDenied' }, { status: 403, statusText: 'Forbidden' });
+
+    expect(caught?.status).toBe(403);
+    expect(toastService.show).not.toHaveBeenCalled();
   });
 
   it('hides the server text behind a generic message for a 5xx', () => {

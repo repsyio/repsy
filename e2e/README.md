@@ -163,7 +163,7 @@ e2e/
       registry-rules.spec.ts    # raw-HTTP pins of the 409/422 override & version-kind rules, service index, X-NuGet-ApiKey (H7)
     docker/
       publish-consume.spec.ts   # registerPublishConsumeLoop(dockerAdapter) + D1-D4 real-client tests (OCI family, auth login, by-digest, retag)
-      registry-rules.spec.ts    # raw-HTTP pins R1-R14: token dance, blob/manifest rules, override, HEAD-vs-GET, retag, bad config/content-type, sha512 digests
+      registry-rules.spec.ts    # raw-HTTP pins R1-R15: token dance, blob/manifest rules, override, HEAD-vs-GET, retag, bad config/content-type, sha512 digests, protocol DELETE
     helm/
       publish-consume.spec.ts          # registerPublishConsumeLoop(helmAdapter) + HL1/HL2/HL4/HL5 real-client tests (OCI mode)
       classic-publish-consume.spec.ts  # registerPublishConsumeLoop(helmClassicAdapter) + C1-C3 real-client tests (classic/ChartMuseum mode)
@@ -1214,7 +1214,7 @@ applies unchanged, with the SAME shared `expect` maven already pins.
 | `maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/`snapshot-*` | n/a                         | `protocols` excludes docker — no releases/snapshots/SNAPSHOT-file concept exists |
 | everything else (`password-admin`, `token-rw`, ...)                      | matches the shared `expect` | unchanged                                                                        |
 
-`registry-rules.spec.ts` additionally pins (R1-R13, mirroring the plan's own hypothesis numbering, plus R14):
+`registry-rules.spec.ts` additionally pins (R1-R13, mirroring the plan's own hypothesis numbering, plus R14 and R15):
 the ping challenge's exact `realm`/`service`/`scope` (R1); the token-endpoint matrix — issuance is
 never scope-checked, only an expired/revoked/wrong credential fails at the token hop (R2); a
 read-only token's write refusal at the OPERATION hop, reads still working (R3); monolithic/chunked
@@ -1225,7 +1225,15 @@ after a refusal (R6); overriding a tag leaving the OLD manifest pullable by dige
 config blob missing `os`/`architecture` (R12, **B5**); a multi-arch index referencing a
 digest-pushed child (R13); a manifest being addressable by both its `sha256` and its `sha512`
 digest, with `Docker-Content-Digest` (and the push's `Location`) reporting the algorithm the client
-used and no tag ever created by a digest push (R14, **RPS-1244**); and that even a PUBLIC repo still
+used and no tag ever created by a digest push (R14, **RPS-1244**); the protocol `DELETE` of a
+manifest or a tag (R15, **RPS-1216**): `DELETE /v2/<repo>/<image>/manifests/<digest>` (`sha256` or
+`sha512`) answers `202`, removes the manifest and every tag that pointed at it (both then `404`
+`MANIFEST_UNKNOWN`) and leaves the others alone; `DELETE .../manifests/<tag>` answers `202` and removes
+only that tag (the manifest stays pullable by digest); an unknown tag or digest is `404`
+`MANIFEST_UNKNOWN`, an unknown image `404` `NAME_UNKNOWN`, a malformed reference `400`; a deleted
+manifest can be pushed again; and both need MANAGE (an admin), so a deploy token (read-write or
+read-only) is `401` with a Bearer challenge at the request hop and an anonymous caller is refused at
+the token hop even on a public repo; and that even a PUBLIC repo still
 needs real credentials to WRITE, refused at the token hop with no OCI body at all (distinct from an
 operation-hop 401's Bearer challenge + OCI envelope).
 
@@ -2549,18 +2557,18 @@ own stub below, so the unchanged heading lines keep git's hunks apart; the Layou
 
 ### Auth, guards and session (RPS-1251)
 
-`tests/ui/auth/{login,guards,session}.spec.ts` (AUTH-01..11). Run them with
+`tests/ui/auth/{login,guards,session}.spec.ts` (AUTH-01..12). Run them with
 `./run.sh test --protocol ui --grep AUTH-`. UI login is typed ONLY in these specs; every other UI suite
 logs in through the API fixtures. No test changes the admin or its password: the admin only types its
 own credentials (AUTH-01), and negative logins use a seeded user or a name that does not exist.
 `src/ui/pages/login-validation.ts` (composed on `LoginPage`) holds the validation helpers and the
 visible message texts; `tests/ui/auth/stored-session.ts` reads the three `localStorage` keys.
 
-| Spec      | Scenarios | What is pinned                                                                                                                                                                                                                                                                                             |
-| --------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `login`   | 01-04, 11 | valid login and its 3 storage keys; 401 toast `Username or password is incorrect.` (wrong password and unknown user alike); every client-side rule with its message; the eye toggle; throttle (opt-in)                                                                                                     |
-| `guards`  | 05-07     | anonymous visit of `/repositories`, `/users`, `/security`, `/profile`, `/<repo>` shows the login form at `/` (with `returnUrl`) and a login returns to that page without a reload; unsafe `returnUrl`s are ignored; `/login` bounces a logged-in user; a USER is sent to `/` from `/users` and `/security` |
-| `session` | 08-10     | expired access token is refreshed transparently; a tampered one logs out with a toast, no refresh; a refused refresh token logs out; sidebar and header logout clear the session                                                                                                                           |
+| Spec      | Scenarios | What is pinned                                                                                                                                                                                                                                                                                                                         |
+| --------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `login`   | 01-04, 11 | valid login and its 3 storage keys; 401 toast `Username or password is incorrect.` (wrong password and unknown user alike); every client-side rule with its message; the eye toggle; throttle (opt-in)                                                                                                                                 |
+| `guards`  | 05-07     | anonymous visit of `/repositories`, `/users`, `/security`, `/profile`, `/<repo>` shows the login form at `/` (with `returnUrl`) and a login returns to that page without a reload; unsafe `returnUrl`s are ignored; `/login` bounces a logged-in user; a USER is sent to `/` from `/users` and `/security`                             |
+| `session` | 08-10, 12 | expired access token is refreshed transparently; a tampered one logs out with a toast, no refresh; a refused refresh token logs out; sidebar and header logout clear the session; a USER on a MANAGE route gets 403 `accessDenied` and stays signed in (AUTH-12, RPS-1284), a tampered token still 401 `accessNotAllowed` and a logout |
 
 Things a later author must know:
 
@@ -2572,6 +2580,10 @@ Things a later author must know:
   documented on `RefreshTokenInterceptor`. `expireAccessToken()` (`session.spec.ts`) answers calls
   carrying one given token with that 401 (never the `/api/auth/` calls); the refresh, the rotation and
   the logout run on the real backend.
+  A permission failure is NOT a 401 (RPS-1284): a signed-in USER on any route that needs MANAGE (usage,
+  settings, description, rename, deploy tokens, key stores, deletes) is answered `403 accessDenied`, which
+  `RefreshTokenInterceptor` never touches; AUTH-12 pins that the session stays and DASH-04 that the
+  dashboard makes no per-repository usage call any more (RPS-1268: the list item carries the disk usage), so a USER's dashboard has nothing to refuse and raises no toast.
   The AUTH-09 cases: a refresh token that is garbage, one that was already used (single use), and a
   stubbed `refreshTokenExpired` answer.
 - **The SPA reads `localStorage` once, at boot** (`AuthService`), and `seedSession()` writes once per

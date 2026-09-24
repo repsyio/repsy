@@ -71,4 +71,15 @@ public interface DockerProtocolFacade<ID> {
   ManifestDetails getManifest(
       ProtocolContext context, String manifestReference, String imageName, String requestPath)
       throws IOException;
+
+  /**
+   * Deletes what a {@code DELETE /v2/<name>/manifests/<reference>} names. A digest (of either
+   * algorithm) deletes the manifest, the tags that point at it and the edges of an index, and
+   * releases its file unless another manifest of the repo has the same digest; the manifests an
+   * index references stay. A tag deletes the tag only.
+   *
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException {@code imageNotFound},
+   *     {@code manifestNotFound} for an unknown digest, {@code tagNotFound} for an unknown tag
+   */
+  void deleteManifest(ProtocolContext context, String imageName, String reference);
 }

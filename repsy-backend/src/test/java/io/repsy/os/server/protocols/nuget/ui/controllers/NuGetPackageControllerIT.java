@@ -346,7 +346,8 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
               delete("/api/nuget/packages/{repo}/{id}", repo.getName(), "missing")
                   .with(apiPort())
                   .header(AUTHORIZATION, NuGetPackageControllerIT.this.bearerTokenFor(user)))
-          .andExpect(status().isUnauthorized())
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.msgId").value("accessDenied"))
           .andExpect(jsonPath("$.errorCode").value(matchesPattern(UUID_PATTERN)));
     }
 

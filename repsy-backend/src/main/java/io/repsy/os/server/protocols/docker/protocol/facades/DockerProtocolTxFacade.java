@@ -16,7 +16,9 @@
 package io.repsy.os.server.protocols.docker.protocol.facades;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
+import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestDeletionComponent;
 import io.repsy.os.server.protocols.docker.shared.utils.PathParserUtils;
 import io.repsy.protocols.docker.protocol.facades.AbstractDockerProtocolTxFacade;
 import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
@@ -43,14 +45,19 @@ import tools.jackson.databind.ObjectMapper;
 @NullMarked
 public class DockerProtocolTxFacade extends AbstractDockerProtocolTxFacade<UUID> {
 
+  private final ManifestDeletionComponent manifestDeletionComponent;
+
   public DockerProtocolTxFacade(
       final ImageService<UUID> imageTxService,
       final LayerService<UUID> layerTxService,
       final ManifestService<UUID> manifestTxService,
       final DockerStorageService<UUID> dockerStorageService,
-      final ObjectMapper objectMapper) {
+      final ObjectMapper objectMapper,
+      final ManifestDeletionComponent manifestDeletionComponent) {
 
     super(dockerStorageService, layerTxService, imageTxService, manifestTxService, objectMapper);
+
+    this.manifestDeletionComponent = manifestDeletionComponent;
   }
 
   @Override
@@ -125,5 +132,23 @@ public class DockerProtocolTxFacade extends AbstractDockerProtocolTxFacade<UUID>
       throws IOException {
 
     return super.getLayer(context, digest, servletPath);
+  }
+
+  /**
+   * Deletes the manifest or tag the reference names, and refunds the bytes of the manifest file
+   * that no other manifest of the repo needs any more.
+   */
+  @Override
+  @Transactional
+  public void deleteManifest(
+      final ProtocolContext context, final String imageName, final String reference) {
+
+    final var repoInfo = io.repsy.os.server.shared.utils.ProtocolContextUtils.getRepoInfo(context);
+
+    final var freed = this.manifestDeletionComponent.delete(repoInfo, imageName, reference);
+
+    if (freed != 0L) {
+      ProtocolContextUtils.addUsages(context, BaseUsages.ofDisk(-freed));
+    }
   }
 }

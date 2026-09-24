@@ -647,9 +647,9 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
               "DELETE",
               "/api/cargo/crates/" + repo.getName() + "/protected",
               CargoCrateControllerIT.this.bearerTokenFor(user)),
-          HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
-          "The user has logged in but has no permissions.");
+          HttpStatus.FORBIDDEN,
+          "accessDenied",
+          "Access Denied. Please check your credentials.");
     }
   }
 

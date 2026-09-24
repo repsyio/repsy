@@ -98,6 +98,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseRepoSettingsInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -124,6 +126,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -161,6 +165,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -188,6 +194,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -508,6 +516,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '409':
@@ -537,6 +547,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -563,6 +575,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -611,6 +625,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -637,6 +653,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '409':
@@ -672,6 +690,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -702,6 +722,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '409':
@@ -742,6 +764,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -825,6 +849,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '409':
@@ -860,6 +886,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -931,6 +959,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseLong"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -950,6 +980,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseRepoUsageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1235,6 +1267,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1293,6 +1327,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1431,6 +1467,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1509,6 +1547,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1567,6 +1607,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1635,6 +1677,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1997,6 +2041,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseNuGetDeletedItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2114,6 +2160,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseNuGetDeletedItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2227,6 +2275,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseDeletedItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2347,6 +2397,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseDeletedItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2425,6 +2477,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseDeletedItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2487,6 +2541,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2565,6 +2621,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2730,6 +2788,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2768,6 +2828,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseUntaggedManifestCleanupResult"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2964,6 +3026,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3032,6 +3096,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3171,6 +3237,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3239,6 +3307,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3359,6 +3429,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3486,6 +3558,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3576,6 +3650,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3663,6 +3739,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3698,6 +3776,8 @@ paths:
                 "$ref": "#/components/schemas/RestResponseVoid"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3732,6 +3812,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4258,15 +4340,16 @@ components:
             "$ref": "#/components/schemas/ErrorResponse"
     Unauthorized:
       description: >-
-        The request is not authenticated (`unAuthorized`, `unauthorizedRequest`): the token or
-        credentials are missing, wrong, or expired (`sessionExpired`), or the account behind the
-        token no longer exists. The panel answers with a `WWW-Authenticate: Bearer` challenge.
+        The request is not authenticated: the token or credentials are missing, wrong or expired,
+        or the account behind the token no longer exists. `msgId` says which
+        (`sessionExpired`: refresh the access token once and retry; `unAuthorized`,
+        `accessNotAllowed`, `refreshTokenExpired`, `invalidCredentials`: the session or the
+        credentials are not valid, sign in again). The panel answers with a `WWW-Authenticate:
+        Bearer` challenge.
 
 
-        Today this status is also the answer for a signed-in user who lacks the permission: an
-        operation that manages a repository answers a user who is not an admin with 401
-        `unAuthorized`, not 403 (RPS-1284 will change that). Only the operations that need the
-        admin role themselves answer 403.
+        A signed-in user who merely lacks the permission is never answered 401: that is a 403
+        `accessDenied`, and the session stays valid (RPS-1284).
       headers:
         WWW-Authenticate:
           description: The `Bearer` challenge, sent by the panel operations.
@@ -4279,7 +4362,10 @@ components:
     Forbidden:
       description: >-
         The caller is signed in but is not allowed to do this: the admin role is required
-        (`accessDenied`).
+        (`accessDenied`). Every operation that manages a repository (settings, usage, description,
+        rename, delete, deploy tokens, key stores, deleting packages and versions, creating a
+        repository) answers a user who is not an admin with this status, whether or not the
+        repository exists. The session stays valid.
       content:
         application/json:
           schema:
@@ -4288,7 +4374,7 @@ components:
       description: >-
         The thing the request names does not exist: a repository (`repoNotFound`), a repository
         type, a user, a token or an item in the repository (`itemNotFound`). A caller who may not
-        read the repository is answered 401 instead, so this does not reveal that it exists.
+        use the repository is answered 401 or 403 instead, so this does not reveal that it exists.
       content:
         application/json:
           schema:

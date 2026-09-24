@@ -21,7 +21,7 @@
  * and then confirmed against a running instance (see `docker-raw.ts`'s file header and README.md's
  * "Docker runner" section for the raw evidence and the full H1-H14 write-up). Sections R1-R13 mirror
  * the implementation plan's own hypothesis numbering 1:1; R14 (RPS-1244) pins the sha512 manifest
- * digests.
+ * digests and R15 (RPS-1216) the protocol `DELETE` of a manifest or a tag.
  */
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -31,10 +31,12 @@ import { buildImage } from '../../src/clients/docker-image.js';
 import { isolatedWorkDir } from '../../src/clients/exec.js';
 import {
   adminCredential,
+  deleteScope,
   ociErrorOf,
   parseBearerChallenge,
   pullScope,
   pushScope,
+  rawDeleteManifest,
   rawGetManifest,
   rawHeadBlob,
   rawHeadManifest,
@@ -731,6 +733,135 @@ test.describe('docker registry rules (raw HTTP)', () => {
         `sha512:${'0'.repeat(128)}`,
       );
       expect(unknown.status).toBe(404);
+    },
+  );
+
+  test(
+    'R15: DELETE by digest removes the manifest and its tags, DELETE by tag only the tag, and ' +
+      'both need MANAGE (RPS-1216)',
+    { tag: ['@settings', '@auth'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'delete', { privateRepo: false });
+      const admin = adminCredential();
+      const a = await rawPushImage(layout, admin, 'tag-a', 'r15-a');
+      expect(a.manifestRes.status).toBe(201);
+      const aAgain = await rawPutManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        'tag-a2',
+        a.built.manifestBytes,
+        a.built.manifestMediaType,
+      );
+      expect(aAgain.status, 'a second tag on the same manifest').toBe(201);
+      const b = await rawPushImage(layout, admin, 'tag-b', 'r15-b');
+      expect(b.manifestRes.status).toBe(201);
+      const sha512 = sha512Digest(a.built.manifestBytes);
+
+      // Deleting needs MANAGE: neither a deploy token (read-write or read-only) nor anonymous.
+      for (const readOnly of [false, true]) {
+        const token = await seeder.createToken(layout.repoName, { readOnly });
+        const cred = {
+          transport: 'basic' as const,
+          username: token.username,
+          password: token.token,
+          kind: 'token' as const,
+        };
+        const byToken = await rawDeleteManifest(
+          layout.repoName,
+          cred,
+          layout.image,
+          a.built.manifestDigest,
+        );
+        expect(byToken.hop, 'issuance is not scope-checked: refused at the request hop').toBe(
+          'request',
+        );
+        expectOci(byToken, 401, 'UNAUTHORIZED');
+        expect(byToken.wwwAuthenticate, 'and challenged').toMatch(/^Bearer realm=/);
+      }
+      const anonymous = await rawToken({}, deleteScope(layout.repoName, layout.image));
+      expect(anonymous.status, 'no anonymous token for a delete scope, even on a public repo').toBe(
+        401,
+      );
+      const stillThere = await rawGetManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        a.built.manifestDigest,
+      );
+      expect(stillThere.status, 'nothing was deleted by the refused requests').toBe(200);
+
+      // By tag: the pointer only; the manifest stays pullable by digest and by its other tag.
+      const byTag = await rawDeleteManifest(layout.repoName, admin, layout.image, 'tag-a2');
+      expect(byTag.status, 'DELETE by tag').toBe(202);
+      expect(byTag.body, 'with no body').toHaveLength(0);
+      expectOci(
+        await rawGetManifest(layout.repoName, admin, layout.image, 'tag-a2'),
+        404,
+        'MANIFEST_UNKNOWN',
+      );
+      expect((await rawGetManifest(layout.repoName, admin, layout.image, 'tag-a')).status).toBe(
+        200,
+      );
+      expect(
+        (await rawGetManifest(layout.repoName, admin, layout.image, a.built.manifestDigest)).status,
+        'the manifest stays pullable by its digest',
+      ).toBe(200);
+      expectOci(
+        await rawDeleteManifest(layout.repoName, admin, layout.image, 'tag-a2'),
+        404,
+        'MANIFEST_UNKNOWN',
+      );
+
+      // By digest (sha512 here; sha256 is the same route): the manifest and its remaining tag go.
+      const byDigest = await rawDeleteManifest(layout.repoName, admin, layout.image, sha512);
+      expect(byDigest.status, 'DELETE by sha512 digest').toBe(202);
+      for (const ref of [a.built.manifestDigest, sha512, 'tag-a']) {
+        const res = await rawGetManifest(layout.repoName, admin, layout.image, ref);
+        expectOci(res, 404, 'MANIFEST_UNKNOWN');
+      }
+      expect(
+        (await rawHeadManifest(layout.repoName, admin, layout.image, a.built.manifestDigest))
+          .status,
+      ).toBe(404);
+      expectOci(
+        await rawDeleteManifest(layout.repoName, admin, layout.image, a.built.manifestDigest),
+        404,
+        'MANIFEST_UNKNOWN',
+      );
+
+      // The other manifest is untouched, and a deleted one can be pushed again.
+      const bAfter = await rawGetManifest(layout.repoName, admin, layout.image, 'tag-b');
+      expect(bAfter.body.equals(b.built.manifestBytes)).toBe(true);
+      const again = await rawPutManifest(
+        layout.repoName,
+        admin,
+        layout.image,
+        'tag-a',
+        a.built.manifestBytes,
+        a.built.manifestMediaType,
+      );
+      expect(again.status, 'the deleted manifest is pushed again').toBe(201);
+      expect(
+        (await rawGetManifest(layout.repoName, admin, layout.image, a.built.manifestDigest)).status,
+      ).toBe(200);
+
+      // Malformed references and unknown names.
+      expectOci(
+        await rawDeleteManifest(layout.repoName, admin, layout.image, 'sha256:short'),
+        400,
+        'DIGEST_INVALID',
+      );
+      expectOci(
+        await rawDeleteManifest(layout.repoName, admin, layout.image, '-not-a-tag'),
+        400,
+        'TAG_INVALID',
+      );
+      expectOci(
+        await rawDeleteManifest(layout.repoName, admin, 'no-such-image', 'tag-a'),
+        404,
+        'NAME_UNKNOWN',
+      );
     },
   );
 

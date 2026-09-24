@@ -416,4 +416,73 @@ class DockerAuthComponentTest {
           () -> this.component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
     }
   }
+
+  /**
+   * RPS-1216: {@code DELETE /v2/<name>/manifests/<reference>} needs MANAGE. A deploy token (the JWT
+   * {@code /v2/token} mints for one) reads and writes, so it must not manage, read-only or not.
+   */
+  @Nested
+  @DisplayName("a deploy-token JWT never authorizes MANAGE")
+  class DeployTokenManage {
+
+    private static final String BEARER = "Bearer signed.jwt.token";
+
+    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+    private final DeployTokenService deployTokenService = Mockito.mock(DeployTokenService.class);
+
+    private final DockerAuthComponent component =
+        new DockerAuthComponent(
+            DockerAuthComponentTest.this.userTxService,
+            this.jwtUtils,
+            this.deployTokenService,
+            new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
+            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+
+    private final UUID repoId = UUID.randomUUID();
+    private final UUID tokenId = UUID.randomUUID();
+
+    DeployTokenManage() {
+      when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenReturn(AuthenticationType.DEPLOY_TOKEN);
+      when(this.jwtUtils.extractUserId(BEARER, TokenRealm.PROTOCOL)).thenReturn(this.tokenId);
+    }
+
+    private void stubToken(final boolean readOnly) {
+      final var info = new DeployTokenInfo();
+      info.setId(this.tokenId);
+      info.setReadOnly(readOnly);
+      when(this.deployTokenService.findByRepoIdAndTokenId(this.repoId, this.tokenId))
+          .thenReturn(Optional.of(info));
+    }
+
+    @Test
+    @DisplayName("a read-write deploy token is refused MANAGE without being looked up")
+    void readWriteTokenIsRefused() {
+      this.stubToken(false);
+
+      assertUnauthorized(
+          () -> this.component.handleBearerAuth(BEARER, this.repoId, Permission.MANAGE));
+      verify(this.deployTokenService, never()).updateLastUsedTime(any());
+    }
+
+    @Test
+    @DisplayName("a read-only deploy token is refused MANAGE")
+    void readOnlyTokenIsRefused() {
+      this.stubToken(true);
+
+      assertUnauthorized(
+          () -> this.component.handleBearerAuth(BEARER, this.repoId, Permission.MANAGE));
+    }
+
+    @Test
+    @DisplayName("a read-write deploy token still reads and writes")
+    void readWriteTokenStillReadsAndWrites() {
+      this.stubToken(false);
+
+      assertThatCode(() -> this.component.handleBearerAuth(BEARER, this.repoId, Permission.READ))
+          .doesNotThrowAnyException();
+      assertThatCode(() -> this.component.handleBearerAuth(BEARER, this.repoId, Permission.WRITE))
+          .doesNotThrowAnyException();
+    }
+  }
 }

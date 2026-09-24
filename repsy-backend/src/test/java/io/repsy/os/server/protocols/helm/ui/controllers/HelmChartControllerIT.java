@@ -1567,13 +1567,14 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("a caller without MANAGE (a plain user or anonymous) changes nothing")
+    @DisplayName(
+        "a caller without MANAGE changes nothing: a plain user gets 403, an anonymous caller 401")
     void requiresManage() throws Exception {
       final var it = HelmChartControllerIT.this;
       final var repo = it.helmRepo();
       it.upload(repo, ChartSpec.of("payments", "1.0.0"), it.adminBearerToken());
 
-      expectUnauthorized(it.deleteVersionRequest(repo, "payments", "1.0.0", it.userBearerToken()));
+      expectForbidden(it.deleteVersionRequest(repo, "payments", "1.0.0", it.userBearerToken()));
       expectUnauthorized(
           it.perform(
               delete(
@@ -1660,7 +1661,8 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("a caller without MANAGE (a plain user or anonymous) changes nothing")
+    @DisplayName(
+        "a caller without MANAGE changes nothing: a plain user gets 403, an anonymous caller 401")
     void requiresManage() throws Exception {
       final var it = HelmChartControllerIT.this;
       final var repo = it.helmRepo();
@@ -1668,7 +1670,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       it.upload(repo, ChartSpec.of("payments", "1.0.0"), admin);
       it.upload(repo, ChartSpec.of("payments", "1.1.0"), admin);
 
-      expectUnauthorized(it.deleteAllRequest(repo, "payments", it.userBearerToken()));
+      expectForbidden(it.deleteAllRequest(repo, "payments", it.userBearerToken()));
       expectUnauthorized(
           it.perform(delete("/api/helm/charts/{repo}/{name}", repo.getName(), "payments")));
 
@@ -2277,7 +2279,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       final var result = this.send(endpoint, repo.getName(), it.userBearerToken());
 
       if (endpoint.manage) {
-        expectUnauthorized(result);
+        expectForbidden(result);
         assertThat(it.storedVersions(repo, "payments")).containsExactly("1.0.0");
       } else {
         expectSuccess(result, endpoint.successMsgId);

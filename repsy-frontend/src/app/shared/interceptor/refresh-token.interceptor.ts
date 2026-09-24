@@ -39,12 +39,10 @@ const SESSION_INVALID_MESSAGE = 'Session invalid, please log in again.';
  *   The retry is not intercepted again, and a 401 on it logs out, so this can never loop.
  * - Any 401 on the refresh call itself (`refreshTokenExpired`: expired, unknown, already used or
  *   revoked), or a refresh that fails otherwise: the session cannot be renewed, log out.
- * - `unAuthorized`: NOT a session problem, passed to the caller as it is. The backend answers it for
- *   "logged in, but no permission for this resource" (a USER asking for the usage of a repository they
- *   cannot see: the dashboard does that nine times) and also when the account behind a valid token is
- *   gone; the two cannot be told apart by msgId. Logging out on it would sign every USER out of their
- *   own dashboard. The removed-account case still ends within one access-token lifetime (30 minutes):
- *   the token expires, `sessionExpired` triggers the refresh, and the refresh is refused.
+ * - `unAuthorized` (the account behind a valid token is gone, or credentials are missing or invalid):
+ *   a lost session like the rest, so it logs out. A signed-in caller who merely lacks the permission
+ *   for an operation is NOT a 401 any more but a 403 `accessDenied` (RPS-1284), which this interceptor
+ *   never touches: the session is fine, the caller shows the refusal and the user stays logged in.
  * - Every other 401 (`accessNotAllowed`: bad signature, wrong token type or realm, e.g. a tampered
  *   token or a backend restarted with a new signing key; `refreshTokenExpired` on an ordinary call; a
  *   401 with no or an unknown body): the token can never become valid, and a refresh token signed by
@@ -91,10 +89,6 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
               ),
             ),
           );
-        }
-
-        if (res.error?.msgId === 'unAuthorized') {
-          return throwError(() => res);
         }
 
         return this._logOut(

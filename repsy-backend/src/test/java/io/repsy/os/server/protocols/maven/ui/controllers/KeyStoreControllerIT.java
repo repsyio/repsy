@@ -355,8 +355,8 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
                       .with(apiPort())
                       .header(AUTHORIZATION, userToken))
               .andReturn();
-      assertThat(readOnlyList.getResponse().getStatus()).isEqualTo(401);
-      assertError(readOnlyList.getResponse().getContentAsString(), "unAuthorized");
+      assertThat(readOnlyList.getResponse().getStatus()).isEqualTo(403);
+      assertError(readOnlyList.getResponse().getContentAsString(), "accessDenied");
 
       final var wrongType =
           KeyStoreControllerIT.this
@@ -387,7 +387,7 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
       final var createByWriteOnlyUser =
           KeyStoreControllerIT.this.performCreate(
               maven, userToken, KeyStoreControllerIT.this.body(server.getId()));
-      assertError(createByWriteOnlyUser, "unAuthorized");
+      assertError(createByWriteOnlyUser, "accessDenied");
       assertThat(KeyStoreControllerIT.this.keyStoreRepository.findAll()).isEmpty();
 
       final var created =
@@ -404,8 +404,8 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
                       .with(apiPort())
                       .header(AUTHORIZATION, userToken))
               .andReturn();
-      assertThat(delete.getResponse().getStatus()).isEqualTo(401);
-      assertError(delete.getResponse().getContentAsString(), "unAuthorized");
+      assertThat(delete.getResponse().getStatus()).isEqualTo(403);
+      assertError(delete.getResponse().getContentAsString(), "accessDenied");
     }
 
     @Test
@@ -428,8 +428,8 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
                       .content(KeyStoreControllerIT.this.body(server.getId())))
               .andReturn();
 
-      assertThat(response.getResponse().getStatus()).isEqualTo(401);
-      assertError(response.getResponse().getContentAsString(), "unAuthorized");
+      assertThat(response.getResponse().getStatus()).isEqualTo(403);
+      assertError(response.getResponse().getContentAsString(), "accessDenied");
       assertThat(KeyStoreControllerIT.this.keyStoreRepository.findAll()).isEmpty();
     }
 
@@ -648,17 +648,17 @@ class KeyStoreControllerIT extends AbstractIntegrationTest {
           this.createPublicKey(
                   repo, userToken, this.armoredKeyBody(PgpTestKeys.generate().armoredPublicKey()))
               .andReturn();
-      assertThat(createAttempt.getResponse().getStatus()).isEqualTo(401);
-      assertError(createAttempt.getResponse().getContentAsString(), "unAuthorized");
+      assertThat(createAttempt.getResponse().getStatus()).isEqualTo(403);
+      assertError(createAttempt.getResponse().getContentAsString(), "accessDenied");
 
       final var listAttempt = this.listPublicKeys(repo, userToken).andReturn();
-      assertThat(listAttempt.getResponse().getStatus()).isEqualTo(401);
-      assertError(listAttempt.getResponse().getContentAsString(), "unAuthorized");
+      assertThat(listAttempt.getResponse().getStatus()).isEqualTo(403);
+      assertError(listAttempt.getResponse().getContentAsString(), "accessDenied");
 
       final var deleteAttempt =
           this.deletePublicKey(repo, userToken, UUID.fromString(id)).andReturn();
-      assertThat(deleteAttempt.getResponse().getStatus()).isEqualTo(401);
-      assertError(deleteAttempt.getResponse().getContentAsString(), "unAuthorized");
+      assertThat(deleteAttempt.getResponse().getStatus()).isEqualTo(403);
+      assertError(deleteAttempt.getResponse().getContentAsString(), "accessDenied");
     }
 
     @Test

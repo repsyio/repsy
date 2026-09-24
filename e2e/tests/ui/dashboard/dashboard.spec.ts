@@ -26,7 +26,9 @@ import { type PanelApi, RepoType } from '../../../src/api/panel-api.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { DashboardPage, RECENT_ACTIVITY_SIZE } from '../../../src/ui/pages/dashboard.js';
 import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
+import { Shell } from '../../../src/ui/pages/shell.js';
 import { UI_REPO_TYPES, uiRepoType } from '../../../src/ui/repo-types.js';
+import { JWT_SHAPE, storedSession } from '../auth/stored-session.js';
 
 const SETTLE_TIMEOUT = 45_000;
 
@@ -226,5 +228,24 @@ test.describe('Dashboard', () => {
       await dashboard.open();
       await expect(dashboard.recentRow(repo.name)).toBeVisible({ timeout: 5_000 });
     }).toPass({ timeout: 20_000 });
+  });
+
+  // RPS-1284: a USER used to be answered 401 (later 403 `accessDenied`) for the usage of every repository
+  // Recent Activity asked about, which needs MANAGE. Since RPS-1268 the list item carries the disk usage
+  // and the dashboard makes no such call, so there is nothing to refuse: no request, no toast, and the
+  // session is untouched. (The 403 itself is pinned by AUTH-12 in `auth/session.spec.ts`.)
+  test('DASH-04: a USER makes no repository usage call, sees no toast and stays signed in', async ({
+    userPage,
+  }) => {
+    const dashboard = new DashboardPage(userPage);
+    const requests = dashboard.trackRepoRequests();
+
+    await dashboard.open();
+    await dashboard.settle();
+
+    expect(requests.usages()).toEqual([]);
+    await expect(new Shell(userPage).toasts.toast()).toHaveCount(0);
+    await expect(userPage).toHaveURL('/');
+    expect((await storedSession(userPage)).token).toMatch(JWT_SHAPE);
   });
 });

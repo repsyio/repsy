@@ -528,7 +528,8 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
       perform(
               delete("/api/npm/packages/{repo}/{package}", repoName, "plain-package")
                   .header(AUTHORIZATION, bearerToken(user, Duration.ofMinutes(30))))
-          .andExpect(status().isUnauthorized());
+          .andExpect(status().isForbidden())
+          .andExpect(jsonPath("$.msgId").value("accessDenied"));
       // Anonymous callers cannot tell a missing repo from a private one (RPS-887).
       perform(get("/api/npm/packages/missing-repo")).andExpect(status().isUnauthorized());
       perform(
