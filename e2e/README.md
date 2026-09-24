@@ -147,6 +147,7 @@ e2e/
     ui/                         # the panel UI suite (Playwright + headless Chromium): smoke.spec.ts (@smoke) and harness.spec.ts, one folder per area from here on -- see "UI suite"
     skeleton/seed.spec.ts       # proves seeding, cleanup and a real auth probe; both tests tagged @smoke
     skeleton/repo-settings.spec.ts  # RPS-1200 settings-PUT field-by-field matrix across RepoTypes; untagged (not smoke-sized)
+    skeleton/repo-type-casing.spec.ts  # RPS-1269 repo type: /format answers upper case; type accepted in any case (query and body)
     maven/
       publish-consume.spec.ts   # registerPublishConsumeLoop(mavenAdapter) + the RPS-1196 real-client test
       upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules

@@ -21,7 +21,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { ReleaseClassifierInfo, ReleaseDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { ReleaseClassifierInfo, ReleaseDetail, RepoPermissionInfo, RepoType } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { MarkdownComponent } from '../../../../../shared/components/markdown/markdown.component';
@@ -48,6 +48,7 @@ type Classifiers = Record<string, [string]>;
   templateUrl: './pypi-packages-version-detail.component.html',
 })
 export class PypiPackagesVersionDetailComponent implements OnDestroy {
+  public readonly securityRepoType = RepoType.Pypi;
   public loading = true;
   public baseUrl: string;
   public error: string;
@@ -78,7 +79,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
         this.loadVersion();
       }
     });
-    this.breadcrumbSecurityLinkService.show('PYPI');
+    this.breadcrumbSecurityLinkService.show(RepoType.Pypi);
   }
 
   public ngOnDestroy(): void {

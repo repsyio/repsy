@@ -19,11 +19,12 @@ import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
-import { RecentScannedVersion, RepoSecurityDetail, RepoType } from '../../../../../generated/api';
+import { RecentScannedVersion, RepoSecurityDetail } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { SecurityService } from '../../../pages/security/service/security.service';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { PortalToBodyDirective } from '../../directives/portal-to-body.directive';
+import { toApiRepoType } from '../../util/repo-api-type';
 import { buildArtifactDetailRoute } from '../../util/security-detail-route.util';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
 import { SeverityBadgeComponent } from '../severity-badge/severity-badge.component';
@@ -105,7 +106,7 @@ export class PackageSecurityModalComponent implements OnChanges {
 
   private buildRecentScanRoute(scan: RecentScannedVersion) {
     return buildArtifactDetailRoute(
-      this.repoType.toUpperCase() as RepoType,
+      toApiRepoType(this.repoType),
       this.repoName,
       scan.artifactName,
       scan.artifactVersion,

@@ -5,7 +5,7 @@
     @if (gemVersion) {
       <div data-testid="pkg-detail" class="mb-4" animate.enter="fade-in-up">
         <app-security-scan-section
-          [repoType]="'RUBY'"
+          [repoType]="securityRepoType"
           [repoName]="activeRepo.repoName"
           [artifactName]="gemName"
           [artifactVersion]="versionName"

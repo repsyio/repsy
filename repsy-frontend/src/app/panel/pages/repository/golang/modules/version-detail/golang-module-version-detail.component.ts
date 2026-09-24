@@ -21,7 +21,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { GoModuleVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { GoModuleVersionListItem, RepoPermissionInfo, RepoType } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -36,6 +36,7 @@ import { GolangService } from '../../service/golang.service';
   templateUrl: './golang-module-version-detail.component.html',
 })
 export class GolangModuleVersionDetailComponent implements OnDestroy {
+  public readonly securityRepoType = RepoType.Golang;
   public loading = true;
   public error: string;
   public modulePath: string;
@@ -137,8 +138,6 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
             return;
           }
           this.versionInfo = found;
-
-
 
           this.canonicalModulePath = info.modulePath ?? this.modulePath;
         },

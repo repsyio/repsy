@@ -22,7 +22,7 @@ import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
 import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
-import { RepoPermissionInfo, TagDetail } from '../../../../../../../generated/api';
+import { RepoPermissionInfo, RepoType, TagDetail } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -50,6 +50,7 @@ type Classifiers = Record<string, [string]>;
   templateUrl: './docker-images-tag-detail.component.html',
 })
 export class DockerImagesTagDetailComponent implements OnDestroy {
+  public readonly securityRepoType = RepoType.Docker;
   public loading = true;
   public imageName: string;
   public tagName: string;
@@ -83,7 +84,7 @@ export class DockerImagesTagDetailComponent implements OnDestroy {
         this.loadTag();
       }
     });
-    this.breadcrumbSecurityLinkService.show('DOCKER');
+    this.breadcrumbSecurityLinkService.show(RepoType.Docker);
   }
 
   public ngOnDestroy(): void {

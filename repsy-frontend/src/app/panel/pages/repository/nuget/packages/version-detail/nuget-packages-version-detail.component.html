@@ -5,7 +5,7 @@
     @if (versionInfo) {
       <div data-testid="pkg-detail" animate.enter="fade-in-up">
         <app-security-scan-section
-          [repoType]="'NUGET'"
+          [repoType]="securityRepoType"
           [repoName]="activeRepo.repoName"
           [artifactName]="versionInfo.packageId"
           [artifactVersion]="versionName"
