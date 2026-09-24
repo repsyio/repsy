@@ -29,7 +29,7 @@ import {
   RepoUsageInfo,
   RestResponsePagedModelDeployTokenInfoListItem,
 } from '../../../../../../generated/api';
-import { EllipsisPipe } from '../../../../shared/components/ellipsis/ellipsis.pipe';
+import { EmptyListComponent } from '../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { DeployTokenCreateModalComponent } from '../../../../shared/components/modals/deploy-token-create-modal/deploy-token-create-modal.component';
 import { DeployTokenInfoModalComponent } from '../../../../shared/components/modals/deploy-token-info-modal/deploy-token-info-modal.component';
@@ -60,6 +60,7 @@ import { TokenCreateInfo } from './dto/token-create-info';
     NgOptimizedImage,
     DeployTokenInfoModalComponent,
     TooltipComponent,
+    EmptyListComponent,
     DockerConfigComponent,
     CargoConfigComponent,
     GolangConfigComponent,
@@ -70,7 +71,6 @@ import { TokenCreateInfo } from './dto/token-create-info';
     PypiConfigComponent,
     NpmConfigComponent,
     RubyConfigComponent,
-    EllipsisPipe,
     CommonModule,
     RouterLink,
   ],

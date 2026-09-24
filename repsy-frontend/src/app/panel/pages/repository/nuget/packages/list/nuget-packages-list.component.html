@@ -54,7 +54,7 @@
     @if (packages?.length > 0) {
       <div class="text-body1">
         <div
-          class="hidden grid-cols-[2fr_1fr_2fr_3fr_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
+          class="hidden grid-cols-[minmax(0,2fr)_1fr_minmax(0,2fr)_minmax(0,3fr)_1fr_40px] gap-4 rounded-t-[12px] border-t border-r border-l border-[#404141] bg-[#101112] p-4 text-[13px] whitespace-nowrap text-[#9FA0A0] lg:grid"
           animate.enter="fade-in-up"
         >
           <div>Package</div>
@@ -79,14 +79,15 @@
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === packages.length - 1 }"
-                class="grid grid-cols-[2fr_1fr_2fr_3fr_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+                class="grid grid-cols-[minmax(0,2fr)_1fr_minmax(0,2fr)_minmax(0,3fr)_1fr_40px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
               >
-                <div class="flex items-center gap-2">
-                  <img ngSrc="/assets/icons/nuget/nuget.svg" alt="NuGet" height="25" width="25" />
+                <div class="flex min-w-0 items-center gap-2">
+                  <img ngSrc="/assets/icons/nuget/nuget.svg" alt="NuGet" height="25" width="25" class="shrink-0" />
                   <app-tooltip
+                    truncate
                     data-testid="row-name"
                     class="text-secondary-500 group-hover:underline"
-                    [text]="pkg.packageId | ellipsis"
+                    [text]="pkg.packageId"
                     [textHover]="pkg.packageId"
                   />
                 </div>
@@ -104,15 +105,17 @@
                   [unscannedFailedCount]="securitySummary[pkg.packageId]?.unscannedFailedCount ?? 0"
                 />
                 <app-tooltip
+                  truncate
                   data-testid="row-latest"
                   class="text-[#FDFDFD]"
-                  [text]="pkg.latestVersion | ellipsis"
+                  [text]="pkg.latestVersion"
                   [textHover]="pkg.latestVersion"
                 />
                 <app-tooltip
+                  truncate
                   data-testid="row-description"
                   class="text-[#9FA0A0]"
-                  [text]="pkg.description || '-' | ellipsis"
+                  [text]="pkg.description || '-'"
                   [textHover]="pkg.description || '-'"
                 />
                 <span data-testid="row-downloads" class="text-[#FDFDFD]">{{ pkg.totalDownloads }}</span>

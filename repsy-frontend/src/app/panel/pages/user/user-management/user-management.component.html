@@ -58,7 +58,7 @@
     <div class="text-body1">
       <!-- User Headers (Desktop) -->
       <div
-        class="hidden grid-cols-[1fr_1fr_1fr_1fr_200px] gap-4 rounded-t-[12px] border-t border-r border-l border-neutral-400 bg-neutral-500 p-4 text-[13px] whitespace-nowrap text-neutral-200 lg:grid"
+        class="hidden grid-cols-[minmax(0,1fr)_1fr_1fr_1fr_200px] gap-4 rounded-t-[12px] border-t border-r border-l border-neutral-400 bg-neutral-500 p-4 text-[13px] whitespace-nowrap text-neutral-200 lg:grid"
         animate.enter="fade-in-up"
       >
         <div>Username</div>
@@ -79,13 +79,14 @@
             <div
               animate.enter="fade-in-down"
               [ngClass]="{ 'rounded-b-[12px]': i === users.length - 1 }"
-              class="grid grid-cols-[1fr_1fr_1fr_1fr_200px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
+              class="grid grid-cols-[minmax(0,1fr)_1fr_1fr_1fr_200px] items-center gap-4 p-4 hover:bg-[#1D1C1C]"
             >
               <!-- Username -->
               <app-tooltip
+                truncate
                 data-testid="row-username"
                 class="text-secondary-500"
-                [text]="user.username | ellipsis"
+                [text]="user.username"
                 [textHover]="user.username"
               />
 

@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
@@ -75,13 +76,15 @@ describe('DeleteAccountComponent', () => {
     expect(component.loading).toBeFalse();
   });
 
-  it('toasts the error, and keeps the user signed in, when the deletion fails', () => {
-    profileService.deleteAccount.and.returnValue(throwError(() => 'Cannot delete the last admin'));
+  it('leaves the toast to the error interceptor, and keeps the user signed in, when the deletion fails', () => {
+    profileService.deleteAccount.and.returnValue(
+      throwError(() => new HttpErrorResponse({ status: 400, error: { text: 'Cannot delete the last admin' } })),
+    );
     component.confirmAccountDelete();
 
     dangerModalService.call();
 
-    expect(toastService.show).toHaveBeenCalledOnceWith('Cannot delete the last admin', 'error');
+    expect(toastService.show).not.toHaveBeenCalled();
     expect(authService.logOut).not.toHaveBeenCalled();
     expect(router.navigateByUrl).not.toHaveBeenCalled();
     expect(component.loading).toBeFalse();

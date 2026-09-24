@@ -66,17 +66,11 @@ export class DeployTokensSection {
   }
 
   /**
-   * Asserts a cell's text. Names and usernames longer than 10 characters are cut to `abcdefghij...`
-   * in the cell and only shown in full in the tooltip popup on hover, so this hovers first.
+   * Asserts a cell's full text. The cell holds the whole value (CSS clips it visually, see TOK-06), so
+   * no hover is needed.
    */
-  async expectCellText(
-    name: string,
-    id: 'row-name' | 'row-username' | 'row-expires',
-    text: string,
-  ): Promise<void> {
-    const cell = this.cell(name, id);
-    await cell.hover();
-    await expect(cell).toContainText(text);
+  async expectCellText(name: string, id: 'row-name' | 'row-username', text: string): Promise<void> {
+    await expect(this.cell(name, id).getByTestId('tooltip-text')).toHaveText(text);
   }
 
   rotateButton(name: string): Locator {

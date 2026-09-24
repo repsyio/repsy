@@ -54,12 +54,8 @@ test.describe('Create repository modal', () => {
         await repos.search(name);
         await expect(repos.row(name)).toBeVisible();
         await expect(repos.visibility(name)).toHaveText('Private');
-        // The cell shows the name cut to ten characters; the full name is in the hover popup.
-        await expect(repos.list.inRow(name, 'row-name')).toContainText(name.slice(0, 8));
-        await repos.list.inRow(name, 'row-name').hover();
-        await expect(repos.list.inRow(name, 'row-name').getByTestId('tooltip-popup')).toHaveText(
-          name,
-        );
+        // The cell holds the whole name (CSS clips it when it does not fit).
+        await expect(repos.list.inRow(name, 'row-name')).toHaveText(name);
         await expect(repos.list.inRow(name, 'row-created')).toContainText('ago');
         await expect(repos.list.inRow(name, 'row-size')).toHaveText('0 B');
         const created = (await panelApi.listRepos(repoType.type)).find(

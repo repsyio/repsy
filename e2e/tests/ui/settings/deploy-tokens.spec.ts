@@ -433,3 +433,44 @@ test.describe('Deploy tokens: the create form', { tag: SETTINGS }, () => {
     },
   );
 });
+
+test.describe('Deploy tokens: long names', { tag: SETTINGS }, () => {
+  test('TOK-06 two long names that differ only at the end stay distinguishable: full text in the row, clipped by CSS (RPS-1267)', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+    const base = `tok-long-${seeder.runId}-`.padEnd(70, 'x');
+    const names = [`${base}a`, `${base}b`];
+    for (const name of names) {
+      await seeder.createToken(repo.name, { name });
+    }
+    const settings = new RepoSettingsPage(adminPage, repo.name);
+    const { tokens } = settings;
+    await settings.goto();
+    await tokens.expectRowCount(2);
+
+    for (const name of names) {
+      // The DOM carries the whole name (the old cell cut it to ten characters and a "..."), so the
+      // two rows differ in their text, not only in a hover popup.
+      await expect(tokens.cell(name, 'row-name').getByTestId('tooltip-text')).toHaveText(name);
+    }
+    // The browser clips it (CSS), the cell does not grow the page.
+    const label = tokens.cell(names[0], 'row-name').getByTestId('tooltip-text');
+    const clipped = await label.evaluate((element) => ({
+      overflowing: element.scrollWidth > element.clientWidth,
+      ellipsis: getComputedStyle(element).textOverflow,
+    }));
+    expect(clipped).toEqual({ overflowing: true, ellipsis: 'ellipsis' });
+    const pageOverflow = await adminPage.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(pageOverflow).toBeLessThanOrEqual(0);
+
+    // Hovering a clipped name still shows it in full.
+    await tokens.cell(names[1], 'row-name').hover();
+    await expect(tokens.cell(names[1], 'row-name').getByTestId('tooltip-popup')).toHaveText(
+      names[1],
+    );
+  });
+});

@@ -186,22 +186,22 @@
                 }
               </div>
 
-              <app-tooltip
+              <app-tooltip truncate
                 class="text-[#9C9C9D]"
-                [text]="finding.packageName ?? '' | ellipsis: 30"
+                [text]="finding.packageName ?? ''"
                 [textHover]="finding.packageName ?? ''"
               />
 
-              <app-tooltip
+              <app-tooltip truncate
                 class="text-[#9C9C9D]"
-                [text]="finding.packageVersion ?? '' | ellipsis: 20"
+                [text]="finding.packageVersion ?? ''"
                 [textHover]="finding.packageVersion ?? ''"
               />
 
               @if (finding.fixedVersion) {
-                <app-tooltip
+                <app-tooltip truncate
                   class="text-[#9C9C9D]"
-                  [text]="finding.fixedVersion | ellipsis: 20"
+                  [text]="finding.fixedVersion"
                   [textHover]="finding.fixedVersion"
                 />
               } @else {

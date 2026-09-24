@@ -30,7 +30,6 @@ import {
 } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
-import { EllipsisPipe } from '../../../../../shared/components/ellipsis/ellipsis.pipe';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { PaginationComponent } from '../../../../../shared/components/pagination/pagination.component';
@@ -60,7 +59,6 @@ import { NpmService } from '../../service/npm.service';
     EmptyListComponent,
     SortSelectorComponent,
     TooltipComponent,
-    EllipsisPipe,
     NgOptimizedImage,
     SpinnerComponent,
     VersionSecurityBadgeComponent,
