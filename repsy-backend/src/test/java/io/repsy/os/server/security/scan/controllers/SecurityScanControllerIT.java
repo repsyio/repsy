@@ -69,6 +69,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -1267,6 +1268,38 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
           Arguments.of("size", "-1"),
           // The declared maximum page size is 100.
           Arguments.of("size", "101"));
+    }
+
+    @Test
+    @DisplayName("sorts by createdAt in both directions, newest first by default")
+    void sortsByCreatedAt() throws Exception {
+      this.seedScans(3);
+      final var token = SecurityScanControllerIT.this.seededAdminBearerToken();
+
+      final var byDefault =
+          expectScans(SecurityScanControllerIT.this.getScans(token, Map.of("size", "100")));
+      final var newestFirst =
+          expectScans(
+              SecurityScanControllerIT.this.getScans(
+                  token, Map.of("size", "100", "sort", "createdAt,desc")));
+      final var oldestFirst =
+          expectScans(
+              SecurityScanControllerIT.this.getScans(
+                  token, Map.of("size", "100", "sort", "createdAt,asc")));
+
+      assertThat(artifactVersions(byDefault)).containsExactly("v3", "v2", "v1");
+      assertThat(artifactVersions(newestFirst)).containsExactly("v3", "v2", "v1");
+      assertThat(artifactVersions(oldestFirst)).containsExactly("v1", "v2", "v3");
+    }
+
+    @ParameterizedTest(name = "sort={0}")
+    @ValueSource(strings = {"bogus,asc", "highestSeverity,desc", "repo.name,asc", "id,asc"})
+    @DisplayName("returns 400 validationError naming sort for a property it cannot sort by")
+    void unknownSortIs400(final String sort) throws Exception {
+      expectValidationError(
+          SecurityScanControllerIT.this.getScans(
+              SecurityScanControllerIT.this.seededAdminBearerToken(), Map.of("sort", sort)),
+          "sort");
     }
 
     @Test

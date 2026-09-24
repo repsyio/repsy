@@ -128,7 +128,7 @@ test.describe('password reset marker file in the Docker image', { tag: '@local-o
 
     // Only the named user was reset, and the admin the seeder logged in with is untouched.
     await new PanelApi(env.apiBaseUrl).login(bystander.username, bystander.password);
-    expect((await panelApi.listUsers({ search: user.username })).map((u) => u.username)).toContain(
+    expect((await panelApi.listUsers({ q: user.username })).map((u) => u.username)).toContain(
       user.username,
     );
   });
@@ -148,7 +148,7 @@ test.describe('password reset marker file in the Docker image', { tag: '@local-o
       )
       .toBe(true);
     expect(await markerExists(missing)).toBe(false);
-    const matches = await panelApi.listUsers({ search: missing });
+    const matches = await panelApi.listUsers({ q: missing });
     expect(matches.filter((u) => u.username === missing)).toEqual([]);
   });
 

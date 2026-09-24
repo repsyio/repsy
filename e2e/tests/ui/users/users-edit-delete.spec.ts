@@ -51,9 +51,9 @@ test.describe('USR-03 edit a user', () => {
     await expect(usersPage.editModal.root).toBeHidden();
 
     // The user keeps its id (the seeder still cleans it up), only the name changed.
-    const matches = await panelApi.listUsers({ search: renamed });
+    const matches = await panelApi.listUsers({ q: renamed });
     expect(matches.find((user) => user.username === renamed)?.id).toBe(seededUser.id);
-    expect(await panelApi.listUsers({ search: seededUser.username })).toHaveLength(0);
+    expect(await panelApi.listUsers({ q: seededUser.username })).toHaveLength(0);
 
     await usersPage.search(renamed);
     await expect(usersPage.row(renamed)).toBeVisible();
@@ -102,7 +102,7 @@ test.describe('USR-03 edit a user', () => {
     // The list reloads without the search (see the rename test): look the user up again.
     await usersPage.search(seededUser.username);
     await expect(usersPage.role(seededUser.username)).toHaveText('ADMIN');
-    const stored = (await panelApi.listUsers({ search: seededUser.username })).find(
+    const stored = (await panelApi.listUsers({ q: seededUser.username })).find(
       (user) => user.id === seededUser.id,
     );
     expect(stored?.role).toBe(UserRole.ADMIN);
@@ -133,7 +133,7 @@ test.describe('USR-03 edit a user', () => {
     await usersPage.search(seeder.runId);
     await expect(usersPage.role(first.username)).toHaveText('USER');
     await expect(usersPage.role(second.username)).toHaveText('ADMIN');
-    const stored = (await panelApi.listUsers({ search: first.username })).find(
+    const stored = (await panelApi.listUsers({ q: first.username })).find(
       (user) => user.id === first.id,
     );
     expect(stored?.role).toBe(UserRole.USER);
@@ -199,7 +199,7 @@ test.describe('USR-03 edit a user', () => {
 
     await usersPage.shell.toasts.expectError(/in use/i);
     await expect(usersPage.editModal.root).toBeVisible();
-    const stored = (await panelApi.listUsers({ search: user.username })).find(
+    const stored = (await panelApi.listUsers({ q: user.username })).find(
       (candidate) => candidate.id === user.id,
     );
     expect(stored?.username).toBe(user.username);
@@ -219,7 +219,7 @@ test.describe('USR-03 edit a user', () => {
 
     await expect(usersPage.editModal.root).toBeHidden();
     await expect(usersPage.row(seededUser.username)).toBeVisible();
-    expect(await panelApi.listUsers({ search: seededUser.username })).toHaveLength(1);
+    expect(await panelApi.listUsers({ q: seededUser.username })).toHaveLength(1);
   });
 });
 
@@ -237,13 +237,13 @@ test.describe('USR-05 delete a user', () => {
     await usersPage.shell.dangerModal.cancel();
     await usersPage.shell.dangerModal.expectClosed();
     await expect(usersPage.row(seededUser.username)).toBeVisible();
-    expect(await panelApi.listUsers({ search: seededUser.username })).toHaveLength(1);
+    expect(await panelApi.listUsers({ q: seededUser.username })).toHaveLength(1);
 
     const reload = usersPage.listResponse('', 0);
     await usersPage.deleteUser(seededUser.username);
     await usersPage.shell.toasts.expectSuccess('User deleted successfully');
     await expect(usersPage.row(seededUser.username)).toHaveCount(0);
-    expect(await panelApi.listUsers({ search: seededUser.username })).toHaveLength(0);
+    expect(await panelApi.listUsers({ q: seededUser.username })).toHaveLength(0);
 
     // The list reloads without the search that led to the user, and the box agrees: it does not
     // show the empty state for a search nobody typed any more.
@@ -274,7 +274,7 @@ test.describe('USR-05 delete a user', () => {
     // this run's users before asserting it is still there (RPS-1303).
     await usersPage.search(seeder.runId);
     await expect(usersPage.row(second.username)).toBeVisible();
-    expect(await panelApi.listUsers({ search: first.username })).toHaveLength(0);
+    expect(await panelApi.listUsers({ q: first.username })).toHaveLength(0);
   });
 
   // RPS-1246: with the seeded admin alone in the view the delete is still offered, since the harness

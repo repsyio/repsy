@@ -21,9 +21,9 @@ import {
   describeCalls,
   describePagedCalls,
   describeRepoSelection,
+  PAGE_ARGS,
   PAGE_INDEX,
   PAGE_SIZE,
-  PAGEABLE,
   PagedCase,
   REPO,
   restResponse,
@@ -76,13 +76,13 @@ describe('PypiService', () => {
         name: 'fetchRepositoryPackagesLikeName',
         invoke: (s, name) => s.fetchRepositoryPackagesLikeName(name, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => pypiApi.listPypiPackages,
-        args: (name) => [PAGEABLE, REPO, name],
+        args: (name) => [REPO, name, ...PAGE_ARGS],
       },
       {
         name: 'fetchPackageReleasesLikeName',
         invoke: (s, version) => s.fetchPackageReleasesLikeName(PACKAGE, version, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => pypiApi.listReleases,
-        args: (version) => [PACKAGE, PAGEABLE, REPO, version],
+        args: (version) => [PACKAGE, REPO, version, ...PAGE_ARGS],
       },
     ];
     describePagedCalls(() => service, paged);

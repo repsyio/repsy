@@ -34,6 +34,9 @@ public final class PagingAssertions {
   /** A sort property no list endpoint has. */
   public static final String UNKNOWN_SORT = "bogus,asc";
 
+  /** A filter text that no seeded row contains. */
+  public static final String NO_MATCH = "zzz-no-match";
+
   private static final String UUID_PATTERN =
       "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
@@ -77,5 +80,34 @@ public final class PagingAssertions {
         .containsEntry("data", parameter)
         .containsEntry("text", "Incoming data couldn't be validated.");
     assertThat((String) envelope.get("errorCode")).matches(UUID_PATTERN);
+  }
+
+  /**
+   * Asserts that a list filters by {@code q} and by nothing else (RPS-1269): the plain list has
+   * rows, the same list asked with the filter's old name and a text no row contains still answers
+   * every row, and asked with {@code q} and that text answers none.
+   *
+   * @param unfiltered The list without a filter; it has to hold at least one row
+   * @param oldName The list with the filter's old parameter name
+   * @param q The list with {@code q}
+   */
+  public static void expectFilterIsQ(
+      final ResultActions unfiltered, final ResultActions oldName, final ResultActions q)
+      throws Exception {
+
+    final var all = totalOf(unfiltered);
+
+    assertThat(all).as("rows of the unfiltered list").isPositive();
+    assertThat(totalOf(oldName))
+        .as("rows with the old filter name, which is ignored")
+        .isEqualTo(all);
+    assertThat(totalOf(q)).as("rows with q and a text no row contains").isZero();
+  }
+
+  private static int totalOf(final ResultActions result) throws Exception {
+    final var body =
+        result.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+    return JsonPath.<Number>read(body, "$.data.page.totalElements").intValue();
   }
 }

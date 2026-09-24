@@ -49,6 +49,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -148,7 +149,7 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
           .mockMvc
           .perform(
               get("/api/nuget/packages/{repo}", repo.getName())
-                  .param("query", "fixture")
+                  .param("q", "fixture")
                   .param("size", "10")
                   .with(apiPort())
                   .header(AUTHORIZATION, token))
@@ -421,6 +422,22 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
       this.list(seed, path, "sort", property + ",desc").andExpect(status().isOk());
     }
 
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+        strings = {
+          "/api/nuget/packages/{repo}",
+          "/api/nuget/packages/{repo}/fixture.package/versions"
+        })
+    @DisplayName("filters by q only: query, its old name, is an unknown parameter")
+    void filtersByQOnly(final String path) throws Exception {
+      final var seed = this.seed();
+
+      PagingAssertions.expectFilterIsQ(
+          this.list(seed, path, "page", "0"),
+          this.list(seed, path, "query", PagingAssertions.NO_MATCH),
+          this.list(seed, path, "q", PagingAssertions.NO_MATCH));
+    }
+
     private static Matcher<Iterable<? extends String>> inOrder(final List<String> values) {
       return contains(values.toArray(String[]::new));
     }
@@ -606,17 +623,17 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
     void findsVersionsCaseInsensitively() throws Exception {
       final var seed = this.seed();
 
-      this.list(seed, "query", "beta", "sort", "version,asc")
+      this.list(seed, "q", "beta", "sort", "version,asc")
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[*].version", inOrder("1.0.1-Beta.1")))
           .andExpect(jsonPath("$.data.page.totalElements").value(1));
-      this.list(seed, "query", "BETA")
+      this.list(seed, "q", "BETA")
           .andExpect(jsonPath("$.data.content[*].version", inOrder("1.0.1-Beta.1")));
-      this.list(seed, "query", "1.0.", "sort", "version,asc")
+      this.list(seed, "q", "1.0.", "sort", "version,asc")
           .andExpect(jsonPath("$.data.content[*].version", inOrder("1.0.0", "1.0.1-Beta.1")))
           .andExpect(jsonPath("$.data.page.totalElements").value(2));
       // A substring anywhere in the version counts, not only a prefix: "1.0" is inside "2.1.0".
-      this.list(seed, "query", "1.0", "sort", "version,asc")
+      this.list(seed, "q", "1.0", "sort", "version,asc")
           .andExpect(
               jsonPath(
                   "$.data.content[*].version", inOrder("1.0.0", "1.0.1-Beta.1", "1.1.0", "2.1.0")));
@@ -625,7 +642,7 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
     @Test
     @DisplayName("answers an empty page when no version contains the text")
     void missAnswersEmptyPage() throws Exception {
-      this.list(this.seed(), "query", "zzz")
+      this.list(this.seed(), "q", "zzz")
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content", hasSize(0)))
           .andExpect(jsonPath("$.data.page.totalElements").value(0));
@@ -636,7 +653,7 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
     void emptyQueryListsEverything() throws Exception {
       final var seed = this.seed();
 
-      this.list(seed, "query", "", "size", "20")
+      this.list(seed, "q", "", "size", "20")
           .andExpect(jsonPath("$.data.content", hasSize(7)))
           .andExpect(jsonPath("$.data.page.totalElements").value(7));
       this.list(seed, "size", "20")
@@ -649,11 +666,11 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
     void searchSpansAllPages() throws Exception {
       final var seed = this.seed();
 
-      this.list(seed, "query", "2.", "size", "2", "page", "0", "sort", "version,asc")
+      this.list(seed, "q", "2.", "size", "2", "page", "0", "sort", "version,asc")
           .andExpect(jsonPath("$.data.content[*].version", inOrder("2.0.0", "2.1.0")))
           .andExpect(jsonPath("$.data.page.totalElements").value(3))
           .andExpect(jsonPath("$.data.page.totalPages").value(2));
-      this.list(seed, "query", "2.", "size", "2", "page", "1", "sort", "version,asc")
+      this.list(seed, "q", "2.", "size", "2", "page", "1", "sort", "version,asc")
           .andExpect(jsonPath("$.data.content[*].version", inOrder("2.2.0")));
     }
 
@@ -662,8 +679,8 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
     void wildcardsAreLiteral() throws Exception {
       final var seed = this.seed();
 
-      this.list(seed, "query", "%").andExpect(jsonPath("$.data.page.totalElements").value(0));
-      this.list(seed, "query", "_.0.0").andExpect(jsonPath("$.data.page.totalElements").value(0));
+      this.list(seed, "q", "%").andExpect(jsonPath("$.data.page.totalElements").value(0));
+      this.list(seed, "q", "_.0.0").andExpect(jsonPath("$.data.page.totalElements").value(0));
     }
   }
 }

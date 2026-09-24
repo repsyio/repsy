@@ -143,7 +143,7 @@ describe('SecurityScanSectionComponent', () => {
 
       bind();
 
-      expect(api.listVulnerabilityScans).toHaveBeenCalledOnceWith(ARTIFACT, VERSION, { page: 0, size: 5 }, REPO);
+      expect(api.listVulnerabilityScans).toHaveBeenCalledOnceWith(ARTIFACT, VERSION, REPO, 0, 5);
       expect(component.scans).toEqual(scans);
       expect(component.totalPages).toBe(3);
       expect(component.neverScanned).toBeFalse();
@@ -157,11 +157,7 @@ describe('SecurityScanSectionComponent', () => {
       expect(component.overview).toEqual(overview);
       expect(api.getVulnerabilityScan).toHaveBeenCalledOnceWith('scan-2', REPO);
       expect(component.selectedScan).toEqual(details['scan-2']);
-      expect(api.getVulnerabilityScanFindings).toHaveBeenCalledOnceWith(
-        'scan-2',
-        { page: 0, size: 10, sort: ['severity,ASC'] },
-        REPO,
-      );
+      expect(api.getVulnerabilityScanFindings).toHaveBeenCalledOnceWith('scan-2', REPO, 0, 10, ['severity,ASC']);
       expect(component.findings).toEqual(findings);
       expect(component.findingsTotalPages).toBe(2);
       expect(component.findingsTotalCount).toBe(14);
@@ -213,12 +209,7 @@ describe('SecurityScanSectionComponent', () => {
 
       component.ngOnChanges({ artifactVersion: new SimpleChange(VERSION, '2.0.0', false) });
 
-      expect(api.listVulnerabilityScans.calls.mostRecent().args).toEqual([
-        ARTIFACT,
-        '2.0.0',
-        { page: 0, size: 5 },
-        REPO,
-      ]);
+      expect(api.listVulnerabilityScans.calls.mostRecent().args).toEqual([ARTIFACT, '2.0.0', REPO, 0, 5]);
       expect(component.pageNum).toBe(0);
     });
 
@@ -229,7 +220,7 @@ describe('SecurityScanSectionComponent', () => {
 
       component.loadPage(2);
 
-      expect(api.listVulnerabilityScans).toHaveBeenCalledOnceWith(ARTIFACT, VERSION, { page: 2, size: 5 }, REPO);
+      expect(api.listVulnerabilityScans).toHaveBeenCalledOnceWith(ARTIFACT, VERSION, REPO, 2, 5);
       expect(api.getScanOverview).not.toHaveBeenCalled();
       expect(component.pageNum).toBe(2);
     });
@@ -246,8 +237,10 @@ describe('SecurityScanSectionComponent', () => {
       expect(component.selectedScan).toEqual(details['scan-1']);
       expect(api.getVulnerabilityScanFindings.calls.mostRecent().args).toEqual([
         'scan-1',
-        { page: 0, size: 10, sort: ['severity,ASC'] },
         REPO,
+        0,
+        10,
+        ['severity,ASC'],
       ]);
     });
 
@@ -257,8 +250,10 @@ describe('SecurityScanSectionComponent', () => {
       expect(component.findingsPageNum).toBe(3);
       expect(api.getVulnerabilityScanFindings.calls.mostRecent().args).toEqual([
         'scan-2',
-        { page: 3, size: 10, sort: ['severity,ASC'] },
         REPO,
+        3,
+        10,
+        ['severity,ASC'],
       ]);
     });
 
@@ -279,20 +274,24 @@ describe('SecurityScanSectionComponent', () => {
 
       expect(component.findingsSortDirection).toBe('DESC');
       expect(component.findingsPageNum).toBe(0);
-      expect(api.getVulnerabilityScanFindings.calls.mostRecent().args[1]).toEqual({
-        page: 0,
-        size: 10,
-        sort: ['severity,DESC'],
-      });
+      expect(api.getVulnerabilityScanFindings.calls.mostRecent().args).toEqual([
+        'scan-2',
+        REPO,
+        0,
+        10,
+        ['severity,DESC'],
+      ]);
 
       component.toggleFindingsSort();
 
       expect(component.findingsSortDirection).toBe('ASC');
-      expect(api.getVulnerabilityScanFindings.calls.mostRecent().args[1]).toEqual({
-        page: 0,
-        size: 10,
-        sort: ['severity,ASC'],
-      });
+      expect(api.getVulnerabilityScanFindings.calls.mostRecent().args).toEqual([
+        'scan-2',
+        REPO,
+        0,
+        10,
+        ['severity,ASC'],
+      ]);
     });
 
     it('toggleFindingsSort without a selected scan only flips the direction', () => {
@@ -449,7 +448,7 @@ describe('SecurityScanSectionComponent', () => {
 
       expect(api.triggerVulnerabilityScan).toHaveBeenCalledOnceWith(ARTIFACT, VERSION, REPO);
       expect(toastService.show).toHaveBeenCalledOnceWith('Vulnerability scan triggered', 'success');
-      expect(api.listVulnerabilityScans).toHaveBeenCalledOnceWith(ARTIFACT, VERSION, { page: 0, size: 5 }, REPO);
+      expect(api.listVulnerabilityScans).toHaveBeenCalledOnceWith(ARTIFACT, VERSION, REPO, 0, 5);
       expect(component.pageNum).toBe(0);
     });
 

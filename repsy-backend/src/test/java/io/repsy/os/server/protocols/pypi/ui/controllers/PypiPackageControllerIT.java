@@ -62,6 +62,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -230,7 +231,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     final var filteredResponse =
         body(
             this.perform(
-                    get("/api/pypi/packages/" + repo.getName() + "?name=My_Package&page=0&size=20")
+                    get("/api/pypi/packages/" + repo.getName() + "?q=My_Package&page=0&size=20")
                         .header(AUTHORIZATION, token))
                 .andExpect(status().isOk()));
     assertSuccessEnvelope(filteredResponse, "packagesFetched");
@@ -243,7 +244,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
             this.perform(
                     get("/api/pypi/packages/"
                             + repo.getName()
-                            + "/my-package/releases?version=2&page=0&size=20")
+                            + "/my-package/releases?q=2&page=0&size=20")
                         .header(AUTHORIZATION, token))
                 .andExpect(status().isOk()));
     assertSuccessEnvelope(releasesResponse, "releasesFetched");
@@ -375,7 +376,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
 
     final var noMatchResponse =
         body(
-            this.perform(get("/api/pypi/packages/" + repo.getName() + "?name=does-not-exist"))
+            this.perform(get("/api/pypi/packages/" + repo.getName() + "?q=does-not-exist"))
                 .andExpect(status().isOk()));
     assertSuccessEnvelope(noMatchResponse, "packagesFetched");
     assertThat((List<?>) JsonPath.read(noMatchResponse, "$.data.content")).isEmpty();
@@ -399,9 +400,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
     assertErrorEnvelope(unknownRelease, "releaseNotFound", "releaseNotFound");
 
     final var noReleaseMatch =
-        body(
-            this.perform(get(path + "/known-package/releases?version=9.9"))
-                .andExpect(status().isOk()));
+        body(this.perform(get(path + "/known-package/releases?q=9.9")).andExpect(status().isOk()));
     assertSuccessEnvelope(noReleaseMatch, "releasesFetched");
     assertThat((List<?>) JsonPath.read(noReleaseMatch, "$.data.content")).isEmpty();
   }
@@ -502,9 +501,9 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
   class PagingAndSorting {
 
     private static final String PACKAGES = "/api/pypi/packages/{repo}";
-    private static final String PACKAGES_LIKE = PACKAGES + "?name=alpha";
+    private static final String PACKAGES_LIKE = PACKAGES + "?q=alpha";
     private static final String RELEASES = PACKAGES + "/alpha/releases";
-    private static final String RELEASES_LIKE = RELEASES + "?version=1";
+    private static final String RELEASES_LIKE = RELEASES + "?q=1";
 
     static Stream<String> endpoints() {
       return Stream.of(PACKAGES, PACKAGES_LIKE, RELEASES, RELEASES_LIKE);
@@ -583,6 +582,21 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
       this.list(seed, RELEASES, "sort", "version,desc")
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].version").value("1.1.0"));
+    }
+
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource({
+      "/api/pypi/packages/{repo},name",
+      "/api/pypi/packages/{repo}/alpha/releases,version"
+    })
+    @DisplayName("filters by q only: the old name of the filter is an unknown parameter")
+    void filtersByQOnly(final String path, final String oldName) throws Exception {
+      final var seed = this.seed();
+
+      PagingAssertions.expectFilterIsQ(
+          this.list(seed, path, "page", "0"),
+          this.list(seed, path, oldName, PagingAssertions.NO_MATCH),
+          this.list(seed, path, "q", PagingAssertions.NO_MATCH));
     }
 
     @ParameterizedTest(name = "{0}")

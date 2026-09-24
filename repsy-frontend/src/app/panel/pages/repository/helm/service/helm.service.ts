@@ -71,11 +71,9 @@ export class HelmService {
     pageSize: number,
   ): Observable<PagedData<HelmChartListItem>> {
     return this.helmChartControllerService
-      .searchHelmCharts(
-        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
-        this.repoName,
-        query || undefined,
-      )
+      .searchHelmCharts(this.repoName, query || undefined, pageIndex, pageSize, [
+        `${sortOption.column},${sortOption.type}`,
+      ])
       .pipe(
         map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<HelmChartListItem>),
       );

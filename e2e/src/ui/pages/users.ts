@@ -190,7 +190,7 @@ export class UsersPage extends UiPage {
       return (
         response.request().method() === 'GET' &&
         url.pathname === '/api/users' &&
-        (url.searchParams.get('search') ?? '') === search &&
+        (url.searchParams.get('q') ?? '') === search &&
         (pageIndex === undefined || url.searchParams.get('page') === String(pageIndex))
       );
     });
