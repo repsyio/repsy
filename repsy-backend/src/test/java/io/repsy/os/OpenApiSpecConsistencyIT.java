@@ -141,6 +141,18 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
           "keyStoreId",
           "scanId");
 
+  /** What a panel JSON property or a query or path parameter is called: camelCase. */
+  private static final Pattern CAMEL_CASE = Pattern.compile("[a-z][a-zA-Z0-9]*");
+
+  /**
+   * The panel schemas that may keep a non-camelCase property name because a wire protocol shares
+   * the DTO, as {@code Schema.property}. It is empty on purpose (RPS-1269): the panel has its own
+   * schema for everything the wire protocols also serve ({@code CrateInfo}, {@code
+   * CrateVersionInfo}, {@code CrateDependencyInfo} next to the crates.io shapes). An entry needs a
+   * comment naming the wire protocol and the reason there is no separate panel schema.
+   */
+  private static final Set<String> WIRE_SHARED_PROPERTIES = Set.of();
+
   @Autowired private RequestMappingHandlerMapping handlerMapping;
 
   // ---------------------------------------------------------------------------------------------
@@ -525,6 +537,44 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
   }
 
   @Test
+  @DisplayName("no panel schema or parameter is named in snake_case")
+  void panelNamesAreCamelCase() throws IOException {
+    final var doc = loadSpec();
+
+    assertNoNewFindings(
+        "non-camelCase panel names", nonCamelCaseNames(doc, WIRE_SHARED_PROPERTIES), Map.of());
+  }
+
+  /**
+   * Flip-and-fail: the rule sees a snake_case property, however deep, and a snake_case parameter.
+   */
+  @Test
+  @DisplayName("the camelCase rule fires on a snake_case property and parameter")
+  void camelCaseRuleFires() throws IOException {
+    final var doc = loadSpec();
+    final var schemas = asMap(asMap(doc.get("components")).get("schemas"));
+
+    // a property of a schema the panel reaches through a response...
+    asMap(asMap(schemas.get("DeployTokenInfoListItem")).get("properties"))
+        .put("read_only_flag", Map.of("type", "boolean"));
+    // ...and one nested in a schema that only a list wrapper references
+    asMap(asMap(schemas.get("CrateDependencyInfo")).get("properties"))
+        .put("default_features", Map.of("type", "boolean"));
+
+    final var listUsers = asMap(asMap(asMap(doc.get("paths")).get("/api/users")).get("get"));
+    asList(listUsers.get("parameters"))
+        .add(Map.of("name", "sort_by", "in", "query", "schema", Map.of("type", "string")));
+
+    assertThat(nonCamelCaseNames(doc, Set.of()))
+        .contains(
+            "DeployTokenInfoListItem.read_only_flag",
+            "CrateDependencyInfo.default_features",
+            "GET /api/users parameter sort_by");
+    assertThat(nonCamelCaseNames(doc, Set.of("DeployTokenInfoListItem.read_only_flag")))
+        .doesNotContain("DeployTokenInfoListItem.read_only_flag");
+  }
+
+  @Test
   @DisplayName("every $ref in the spec resolves")
   void referencesResolve() throws IOException {
     final var doc = loadSpec();
@@ -572,6 +622,81 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
   // ---------------------------------------------------------------------------------------------
   // Loading
   // ---------------------------------------------------------------------------------------------
+
+  /**
+   * The properties of every schema reachable from an operation, and the query and path parameters
+   * of every operation, whose name is not camelCase, minus the allowed wire-shared ones.
+   */
+  private static Set<String> nonCamelCaseNames(
+      final Map<String, Object> doc, final Set<String> allowed) {
+
+    final var findings = new TreeSet<String>();
+    final var visited = new TreeSet<String>();
+
+    for (final var operation : specOperations(doc).values()) {
+      for (final var parameter : operation.parameters(doc)) {
+        final var location = String.valueOf(parameter.get("in"));
+        final var name = String.valueOf(parameter.get("name"));
+
+        if (!"header".equals(location)
+            && !"cookie".equals(location)
+            && !CAMEL_CASE.matcher(name).matches()) {
+          findings.add(operation.method() + " " + operation.template() + " parameter " + name);
+        }
+      }
+
+      collectNonCamelCaseProperties(operation.raw(), doc, operation.id(), visited, findings);
+    }
+
+    findings.removeAll(allowed);
+
+    return findings;
+  }
+
+  /**
+   * Walks a node of the spec, following every {@code $ref} into {@code components} once, and
+   * records each key of a {@code properties} map that is not camelCase as {@code Schema.property}.
+   */
+  private static void collectNonCamelCaseProperties(
+      final Object node,
+      final Map<String, Object> doc,
+      final String schema,
+      final Set<String> visited,
+      final Set<String> findings) {
+
+    if (node instanceof final Map<?, ?> map) {
+      final var ref = map.get("$ref");
+
+      if (ref instanceof final String target && resolves(doc, target)) {
+        if (visited.add(target)) {
+          Object referenced = doc;
+
+          for (final var part : target.substring(2).split("/")) {
+            referenced = asMap(referenced).get(part);
+          }
+
+          final var parts = target.split("/");
+          final var owner = target.startsWith("#/components/schemas/") ? parts[3] : schema;
+
+          collectNonCamelCaseProperties(referenced, doc, owner, visited, findings);
+        }
+
+        return;
+      }
+
+      if (map.get("properties") instanceof final Map<?, ?> properties) {
+        properties.keySet().stream()
+            .map(String::valueOf)
+            .filter(name -> !CAMEL_CASE.matcher(name).matches())
+            .forEach(name -> findings.add(schema + "." + name));
+      }
+
+      map.values()
+          .forEach(value -> collectNonCamelCaseProperties(value, doc, schema, visited, findings));
+    } else if (node instanceof final Collection<?> items) {
+      items.forEach(item -> collectNonCamelCaseProperties(item, doc, schema, visited, findings));
+    }
+  }
 
   private static Map<String, Object> loadSpec() throws IOException {
     final var options = new LoaderOptions();

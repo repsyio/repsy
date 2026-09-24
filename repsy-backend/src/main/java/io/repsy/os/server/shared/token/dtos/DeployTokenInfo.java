@@ -16,7 +16,6 @@
 package io.repsy.os.server.shared.token.dtos;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.Data;
@@ -37,14 +36,11 @@ public class DeployTokenInfo {
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   private String description;
 
-  @JsonProperty("read_only")
   private boolean readOnly;
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  @JsonProperty("expiration_date")
   private Instant expirationDate;
 
-  @JsonProperty("created_at")
   private Instant createdAt;
 
   public boolean isExpired() {

@@ -24,6 +24,7 @@ import io.repsy.os.generated.model.RepoSettingsInfo;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.os.shared.repo.events.PgpVerifyAllSignaturesToggledEvent;
 import io.repsy.os.shared.repo.mappers.RepoConverter;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.repo.utils.RepoUtils;
@@ -42,6 +43,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -73,6 +75,7 @@ public class RepoTxService {
 
   private final @NonNull RepoConverter repoConverter;
   private final @NonNull RepoRepository repoRepository;
+  private final @NonNull ApplicationEventPublisher eventPublisher;
 
   @Transactional
   public @NonNull RepoInfo createRepo(
@@ -142,6 +145,8 @@ public class RepoTxService {
     this.rejectReleasesSnapshotsForUnsupportedType(repo, settings);
     this.rejectPgpSettingsForUnsupportedType(repo, settings);
 
+    final var verifyAllBefore = repo.isPgpVerifyAllSignaturesEnabled();
+
     applyIfPresent(settings.getPrivateRepo(), repo::setPrivateRepo);
     applyIfPresent(settings.getAllowOverride(), repo::setAllowOverride);
     applyIfPresent(settings.getReleases(), repo::setReleases);
@@ -152,6 +157,12 @@ public class RepoTxService {
     applyIfPresent(settings.getPgpKeyServerLookupEnabled(), repo::setPgpKeyServerLookupEnabled);
 
     this.repoRepository.save(repo);
+
+    // Handled once this transaction has committed: the versions of the repo are recomputed by the
+    // new setting in the background, and a rolled back change starts nothing (RPS-1316).
+    if (repo.isPgpVerifyAllSignaturesEnabled() != verifyAllBefore) {
+      this.eventPublisher.publishEvent(new PgpVerifyAllSignaturesToggledEvent(repo.getId()));
+    }
   }
 
   /** Hands {@code value} to {@code setter} unless it is absent from the request. */

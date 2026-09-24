@@ -96,7 +96,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
 
   private static final String[] TOKEN_INFO_KEYS = {"token", "username"};
   private static final String[] LIST_ITEM_KEYS = {
-    "id", "name", "username", "description", "read_only", "expiration_date", "created_at"
+    "id", "name", "username", "description", "readOnly", "expirationDate", "createdAt"
   };
   private static final String[] PAGE_KEYS = {"size", "number", "totalElements", "totalPages"};
 
@@ -284,9 +284,9 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
         .containsEntry("name", expected.getName())
         .containsEntry("username", expected.getUsername())
         .containsEntry("description", expected.getDescription())
-        .containsEntry("read_only", expected.isReadOnly());
-    assertThat(instantOrNull(node.get("expiration_date"))).isEqualTo(expected.getExpirationDate());
-    assertThat(instantOrNull(node.get("created_at"))).isEqualTo(expected.getCreatedAt());
+        .containsEntry("readOnly", expected.isReadOnly());
+    assertThat(instantOrNull(node.get("expirationDate"))).isEqualTo(expected.getExpirationDate());
+    assertThat(instantOrNull(node.get("createdAt"))).isEqualTo(expected.getCreatedAt());
     assertThat(node.values()).doesNotContain(expected.getToken());
   }
 
@@ -587,7 +587,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
                       .content(
                           "{\"name\":\"%s\",\"username\":\"deployer\",\"description\":\"for ci\","
                                   .formatted(name)
-                              + "\"read_only\":true,\"expiration_date\":\"%s\"}"
+                              + "\"readOnly\":true,\"expirationDate\":\"%s\"}"
                                   .formatted(expiration))),
               "tokenCreated");
 
@@ -639,7 +639,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("applies defaults: generated username, 365-day expiry, read_only=false")
+    @DisplayName("applies defaults: generated username, 365-day expiry, readOnly=false")
     void appliesDefaults() throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var repo = it.createRepo(RepoType.MAVEN);
@@ -685,7 +685,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       assertThat((String) JsonPath.read(body, "$.data.username")).matches(DEPLOY_USERNAME_PATTERN);
     }
 
-    /** {@code expiration_date} in the past is not validated; the duration is clamped to 1 day. */
+    /** {@code expirationDate} in the past is not validated; the duration is clamped to 1 day. */
     @Test
     @DisplayName("accepts an expiration date in the past and stores an already-expired token")
     void expirationInThePastIsAccepted() throws Exception {
@@ -698,7 +698,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
               post(tokensUrl(repo))
                   .header(AUTHORIZATION, it.adminBearerToken())
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content("{\"name\":\"past\",\"expiration_date\":\"%s\"}".formatted(past))),
+                  .content("{\"name\":\"past\",\"expirationDate\":\"%s\"}".formatted(past))),
           "tokenCreated");
 
       final var row = it.tokensOf(repo).getFirst();
@@ -847,13 +847,39 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
           Arguments.of(
               "description too long",
               "{\"name\":\"n\",\"description\":\"%s\"}".formatted("d".repeat(501))),
-          Arguments.of("read_only not a boolean", "{\"name\":\"n\",\"read_only\":\"maybe\"}"),
-          Arguments.of("read_only an object", "{\"name\":\"n\",\"read_only\":{}}"),
+          Arguments.of("readOnly not a boolean", "{\"name\":\"n\",\"readOnly\":\"maybe\"}"),
+          Arguments.of("readOnly an object", "{\"name\":\"n\",\"readOnly\":{}}"),
           Arguments.of(
-              "expiration_date not a date", "{\"name\":\"n\",\"expiration_date\":\"tomorrow\"}"),
+              "expirationDate not a date", "{\"name\":\"n\",\"expirationDate\":\"tomorrow\"}"),
           Arguments.of("empty object", "{}"),
           Arguments.of("malformed JSON", "{not-json"),
           Arguments.of("empty body", ""));
+    }
+
+    /**
+     * RPS-1269: the body keys are camelCase now. A client still sending {@code read_only} must not
+     * silently get a read-write token, so the old key is an error, not an ignored property.
+     */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+        strings = {
+          "{\"name\":\"n\",\"read_only\":true}",
+          "{\"name\":\"n\",\"expiration_date\":\"2030-01-01T00:00:00Z\"}"
+        })
+    @DisplayName("returns 400 for a snake_case body key instead of ignoring it")
+    void legacySnakeCaseKeyIsRejected(final String json) throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var repo = it.createRepo(RepoType.MAVEN);
+
+      final var result =
+          it.perform(
+              post(tokensUrl(repo))
+                  .header(AUTHORIZATION, it.adminBearerToken())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(json));
+
+      result.andExpect(status().isBadRequest());
+      assertThat(it.tokensOf(repo)).isEmpty();
     }
 
     @Test
@@ -923,17 +949,17 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
         final var node = content.get(i);
         final var row = expected.get(i);
         if (row.getExpirationDate() == null) {
-          // expiration_date is NON_NULL: a token that never expires omits the key entirely.
-          assertThat(node).doesNotContainKey("expiration_date");
+          // expirationDate is NON_NULL: a token that never expires omits the key entirely.
+          assertThat(node).doesNotContainKey("expirationDate");
           assertThat(node.keySet())
               .containsExactlyInAnyOrder(
-                  "id", "name", "username", "description", "read_only", "created_at");
+                  "id", "name", "username", "description", "readOnly", "createdAt");
           assertThat(node)
               .containsEntry("id", row.getId().toString())
               .containsEntry("name", row.getName())
               .containsEntry("username", row.getUsername())
               .containsEntry("description", row.getDescription())
-              .containsEntry("read_only", row.isReadOnly());
+              .containsEntry("readOnly", row.isReadOnly());
         } else {
           assertListItemJson(node, row);
         }
@@ -959,7 +985,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final List<Map<String, Object>> content = JsonPath.read(body, "$.data.content");
       assertThat(content).hasSize(1);
       assertThat(content.getFirst())
-          .containsOnlyKeys("id", "name", "read_only", "expiration_date", "created_at");
+          .containsOnlyKeys("id", "name", "readOnly", "expirationDate", "createdAt");
     }
 
     @Test
@@ -1245,8 +1271,8 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       final String newSecret = JsonPath.read(body, "$.data");
       assertThat(newSecret).matches(DEPLOY_TOKEN_PATTERN).isNotEqualTo(oldSecret);
 
-      // Only the secret changes; id, name, username, description, read_only, expiry, duration and
-      // created_at all stay as they were before the request.
+      // Only the secret changes; id, name, username, description, readOnly, expiry, duration and
+      // createdAt all stay as they were before the request.
       final var after = it.stateOf(before.id());
       assertThat(after).isEqualTo(before.withToken(DeployTokenHash.hash(newSecret)));
       assertThat(it.deployTokenRepository.findByRepoIdAndToken(repo.getStorageKey(), oldSecret))

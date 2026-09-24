@@ -20,6 +20,7 @@ import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrateIndex;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrateMeta;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
 import java.util.UUID;
 import org.mapstruct.Mapper;
@@ -82,4 +83,15 @@ public interface CargoCrateConverter {
 
   io.repsy.os.generated.model.CrateVersionListItem toCrateVersionListItemDto(
       io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem source);
+
+  /**
+   * The panel's own camelCase crate. {@link BaseCrateInfo} is the crates.io wire shape (snake_case)
+   * and stays untouched.
+   */
+  io.repsy.os.generated.model.CrateInfo toCrateInfoDto(BaseCrateInfo<UUID> source);
+
+  io.repsy.os.generated.model.CrateVersionInfo toCrateVersionInfoDto(
+      BaseCrateVersionInfo<UUID> source);
+
+  io.repsy.os.generated.model.CrateDependencyInfo toCrateDependencyInfoDto(CrateIndexDep source);
 }

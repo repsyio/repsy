@@ -3067,8 +3067,8 @@ paths:
         - cargo-crate-controller
       operationId: searchCargoCrates
       description: >-
-        Sortable by `id`, `name`, `maxVersion`, `downloads`, `totalDownloads`, `lastUpdatedAt`
-        (`property,direction`).
+        Sortable by `id`, `name`, `maxVersion`, `downloads`, `totalDownloads`, `updatedAt`,
+        `lastUpdatedAt` (`property,direction`).
       parameters:
         - name: q
           in: query
@@ -3125,7 +3125,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseBaseCrateInfoUUID"
+                "$ref": "#/components/schemas/RestResponseCrateInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -3190,7 +3190,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseBaseCrateVersionInfoUUID"
+                "$ref": "#/components/schemas/RestResponseCrateVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '404':
@@ -4770,10 +4770,10 @@ components:
           type: string
           maxLength: 500
           minLength: 0
-        read_only:
+        readOnly:
           type: boolean
           nullable: false
-        expiration_date:
+        expirationDate:
           type: string
           format: date-time
       required:
@@ -5254,19 +5254,19 @@ components:
           type: string
         id:
           type: string
-        read_only:
+        readOnly:
           type: boolean
-        created_at:
+        createdAt:
           type: string
           format: date-time
-        expiration_date:
+        expirationDate:
           type: string
           format: date-time
       required:
         - id
         - name
-        - read_only
-        - created_at
+        - readOnly
+        - createdAt
     PagedModelDeployTokenInfoListItem:
       type: object
       properties:
@@ -6166,14 +6166,14 @@ components:
       properties:
         name:
           type: string
-        max_version:
+        maxVersion:
           type: string
         downloads:
           type: integer
           format: int64
         description:
           type: string
-        updated_at:
+        updatedAt:
           type: string
           format: date-time
     PagedModelCrateListItem:
@@ -6198,7 +6198,7 @@ components:
           type: string
         text:
           type: string
-    BaseCrateInfoUUID:
+    CrateInfo:
       type: object
       properties:
         id:
@@ -6226,14 +6226,14 @@ components:
             type: string
         hasLib:
           type: boolean
-        original_name:
+        originalName:
           type: string
-        max_version:
+        maxVersion:
           type: string
-        total_downloads:
+        totalDownloads:
           type: integer
           format: int64
-    RestResponseBaseCrateInfoUUID:
+    RestResponseCrateInfo:
       type: object
       properties:
         msgId:
@@ -6241,12 +6241,12 @@ components:
         type:
           "$ref": "#/components/schemas/ResponseType"
         data:
-          "$ref": "#/components/schemas/BaseCrateInfoUUID"
+          "$ref": "#/components/schemas/CrateInfo"
         errorCode:
           type: string
         text:
           type: string
-    BaseCrateVersionInfoUUID:
+    CrateVersionInfo:
       type: object
       properties:
         crateId:
@@ -6267,7 +6267,7 @@ components:
         deps:
           type: array
           items:
-            "$ref": "#/components/schemas/CrateIndexDep"
+            "$ref": "#/components/schemas/CrateDependencyInfo"
         downloads:
           type: integer
           format: int64
@@ -6275,14 +6275,14 @@ components:
           type: boolean
         yanked:
           type: boolean
-        license_file:
+        licenseFile:
           type: string
-        rust_version:
+        rustVersion:
           type: string
-        created_at:
+        createdAt:
           type: string
           format: date-time
-    CrateIndexDep:
+    CrateDependencyInfo:
       type: object
       properties:
         name:
@@ -6295,7 +6295,7 @@ components:
             type: string
         optional:
           type: boolean
-        default_features:
+        defaultFeatures:
           type: boolean
         target:
           type: string
@@ -6303,9 +6303,9 @@ components:
           type: string
         registry:
           type: string
-        package:
+        packageName:
           type: string
-    RestResponseBaseCrateVersionInfoUUID:
+    RestResponseCrateVersionInfo:
       type: object
       properties:
         msgId:
@@ -6313,7 +6313,7 @@ components:
         type:
           "$ref": "#/components/schemas/ResponseType"
         data:
-          "$ref": "#/components/schemas/BaseCrateVersionInfoUUID"
+          "$ref": "#/components/schemas/CrateVersionInfo"
         errorCode:
           type: string
         text:
@@ -6325,7 +6325,7 @@ components:
           type: string
         yanked:
           type: boolean
-        created_at:
+        createdAt:
           type: string
           format: date-time
     PagedModelCrateVersionListItem:

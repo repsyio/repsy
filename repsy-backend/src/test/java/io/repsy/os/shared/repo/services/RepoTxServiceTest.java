@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -29,6 +30,7 @@ import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.os.generated.model.RepoSettingsForm;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.os.shared.repo.events.PgpVerifyAllSignaturesToggledEvent;
 import io.repsy.os.shared.repo.mappers.RepoConverter;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -46,6 +48,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /**
@@ -62,12 +65,13 @@ class RepoTxServiceTest {
 
   @Mock private RepoConverter repoConverter;
   @Mock private RepoRepository repoRepository;
+  @Mock private ApplicationEventPublisher eventPublisher;
 
   private RepoTxService service;
 
   @BeforeEach
   void setUp() {
-    this.service = new RepoTxService(this.repoConverter, this.repoRepository);
+    this.service = new RepoTxService(this.repoConverter, this.repoRepository, this.eventPublisher);
   }
 
   private static DataIntegrityViolationException uniqueViolation(final String constraintName) {
@@ -444,6 +448,38 @@ class RepoTxServiceTest {
 
       assertThat(repo.isPgpKeyServerLookupEnabled()).isFalse();
       assertThat(repo.isPgpVerifyAllSignaturesEnabled()).isTrue();
+    }
+
+    @Test
+    @DisplayName("toggling verify-all publishes the event that recomputes the repo (RPS-1316)")
+    void togglingVerifyAllPublishesTheRecomputeEvent() {
+      final var repo = this.storedRepoOfType(RepoType.MAVEN);
+
+      RepoTxServiceTest.this.service.updateSettings(
+          repo.getId(), RepoSettingsForm.builder().pgpVerifyAllSignaturesEnabled(true).build());
+      RepoTxServiceTest.this.service.updateSettings(
+          repo.getId(), RepoSettingsForm.builder().pgpVerifyAllSignaturesEnabled(false).build());
+
+      verify(RepoTxServiceTest.this.eventPublisher, times(2))
+          .publishEvent(new PgpVerifyAllSignaturesToggledEvent(repo.getId()));
+    }
+
+    @Test
+    @DisplayName("a PUT that leaves verify-all as it is, or out, publishes nothing (RPS-1316)")
+    void anUnchangedVerifyAllPublishesNothing() {
+      final var repo = this.storedRepoOfType(RepoType.MAVEN);
+      repo.setPgpVerifyAllSignaturesEnabled(true);
+
+      RepoTxServiceTest.this.service.updateSettings(
+          repo.getId(), RepoSettingsForm.builder().pgpVerifyAllSignaturesEnabled(true).build());
+      RepoTxServiceTest.this.service.updateSettings(
+          repo.getId(),
+          RepoSettingsForm.builder()
+              .securityScanEnabled(false)
+              .pgpKeyServerLookupEnabled(false)
+              .build());
+
+      verifyNoInteractions(RepoTxServiceTest.this.eventPublisher);
     }
 
     @Test

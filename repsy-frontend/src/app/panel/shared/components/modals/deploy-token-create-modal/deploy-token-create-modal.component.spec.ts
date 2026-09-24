@@ -133,8 +133,8 @@ describe('DeployTokenCreateModalComponent', () => {
         name: 'ci-token',
         username: 'ci-bot',
         description: 'Used by CI',
-        read_only: true,
-        expiration_date: '2026-03-11T12:00:00.000Z',
+        readOnly: true,
+        expirationDate: '2026-03-11T12:00:00.000Z',
       });
     });
 
@@ -147,8 +147,8 @@ describe('DeployTokenCreateModalComponent', () => {
         name: 'ci-token',
         username: undefined,
         description: undefined,
-        read_only: false,
-        expiration_date: '2027-03-10T12:00:00.000Z',
+        readOnly: false,
+        expirationDate: '2027-03-10T12:00:00.000Z',
       });
     });
 
@@ -167,7 +167,7 @@ describe('DeployTokenCreateModalComponent', () => {
 
       component.createToken();
 
-      expect(Object.keys(sentPayload() as object)).not.toContain('expiration_date');
+      expect(Object.keys(sentPayload() as object)).not.toContain('expirationDate');
       expect(api.createDeployToken).toHaveBeenCalledTimes(1);
     });
 

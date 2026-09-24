@@ -17,6 +17,7 @@ import moment from 'moment';
 import { of, Subject, throwError } from 'rxjs';
 
 import {
+  DeployTokenInfoListItem,
   ProtocolDeployTokenControllerService,
   ProtocolRepoControllerService,
   RepoPermissionInfo,
@@ -26,16 +27,15 @@ import { ToastService } from '../../../../shared/components/toast/toast.service'
 import { permission } from '../../testing/protocol-service-spec-helpers';
 import { renderComponent } from '../../testing/render-spec-helpers';
 import { DeployTokenComponent } from './deploy-token.component';
-import { DeployTokenInfo } from './dto/deploy-token-info';
 
 const REPO = 'acme-repo';
 const USAGE = { totalSize: 42 };
 
-function token(id: string, username = `user-${id}`): DeployTokenInfo {
-  return { id, username, name: id, read_only: false, created_at: '2026-01-01T00:00:00Z' };
+function token(id: string, username = `user-${id}`): DeployTokenInfoListItem {
+  return { id, username, name: id, readOnly: false, createdAt: '2026-01-01T00:00:00Z' };
 }
 
-function listing(tokens: DeployTokenInfo[], totalPages = 1): { data: unknown } {
+function listing(tokens: DeployTokenInfoListItem[], totalPages = 1): { data: unknown } {
   return { data: { content: tokens, page: { number: 0, size: 3, totalElements: tokens.length, totalPages } } };
 }
 
@@ -329,7 +329,7 @@ describe('DeployTokenComponent', () => {
 });
 
 describe('DeployTokenComponent template', () => {
-  async function render(canManage: boolean, tokens: DeployTokenInfo[] = [token('a')]): Promise<HTMLElement> {
+  async function render(canManage: boolean, tokens: DeployTokenInfoListItem[] = [token('a')]): Promise<HTMLElement> {
     const tokenService = jasmine.createSpyObj<ProtocolDeployTokenControllerService>(
       'ProtocolDeployTokenControllerService',
       ['listDeployTokens'],

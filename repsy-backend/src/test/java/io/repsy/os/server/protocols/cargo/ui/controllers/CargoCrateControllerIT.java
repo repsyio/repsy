@@ -291,9 +291,9 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
           .containsOnlyKeys(
               "id",
               "name",
-              "original_name",
-              "max_version",
-              "total_downloads",
+              "originalName",
+              "maxVersion",
+              "totalDownloads",
               "description",
               "homepage",
               "repository",
@@ -302,7 +302,7 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
               "categories",
               "hasLib");
       assertThat(JsonPath.<String>read(crate, "$.data.name")).isEqualTo("demo_crate");
-      assertThat(JsonPath.<String>read(crate, "$.data.max_version")).isEqualTo("2.0.0");
+      assertThat(JsonPath.<String>read(crate, "$.data.maxVersion")).isEqualTo("2.0.0");
 
       final var version =
           CargoCrateControllerIT.this
@@ -314,19 +314,22 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
       assertThat(data(version))
           .containsKeys(
               "crateId",
-              "created_at",
+              "createdAt",
               "deps",
               "documentation",
               "downloads",
-              "edition",
               "hasLib",
               "license",
-              "license_file",
               "name",
               "readme",
-              "rust_version",
+              "rustVersion",
               "version",
               "yanked");
+      // The panel omits an absent optional property (edition, licenseFile here) and, unlike the
+      // crates.io wire shape it is mapped from, never uses a snake_case key (RPS-1269).
+      assertThat(data(version)).doesNotContainKeys("edition", "licenseFile");
+      assertThat(data(crate).keySet()).noneMatch(key -> key.contains("_"));
+      assertThat(data(version).keySet()).noneMatch(key -> key.contains("_"));
       assertThat(JsonPath.<Boolean>read(version, "$.data.yanked")).isFalse();
 
       final var versions =
@@ -385,15 +388,14 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
               "version",
               "readme",
               "license",
-              "license_file",
+              "licenseFile",
               "documentation",
-              "edition",
-              "rust_version",
+              "rustVersion",
               "deps",
               "downloads",
               "hasLib",
               "yanked",
-              "created_at");
+              "createdAt");
       assertThat(JsonPath.<Boolean>read(response, "$.data.yanked")).isTrue();
       assertThat(JsonPath.<Map<String, Object>>read(response, "$.data.deps[0]"))
           .containsOnlyKeys(
@@ -401,13 +403,13 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
               "req",
               "features",
               "optional",
-              "default_features",
+              "defaultFeatures",
               "target",
               "kind",
               "registry",
-              "package");
+              "packageName");
       assertThat(JsonPath.<String>read(response, "$.data.license")).isEqualTo("MIT");
-      assertThat(JsonPath.<String>read(response, "$.data.rust_version")).isEqualTo("1.85");
+      assertThat(JsonPath.<String>read(response, "$.data.rustVersion")).isEqualTo("1.85");
       assertThat(
               CargoCrateControllerIT.this
                   .crateIndexRepository
@@ -684,8 +686,7 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
                   "maxVersion",
                   "lastUpdatedAt",
                   "totalDownloads",
-                  "max_version",
-                  "updated_at",
+                  "updatedAt",
                   "downloads")
               .map(property -> Arguments.of(CRATES, property)),
           Stream.of("version", "createdAt").map(property -> Arguments.of(VERSIONS, property)));
@@ -739,23 +740,23 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
     }
 
     @ParameterizedTest(name = "sort={0}")
-    @ValueSource(strings = {"max_version", "maxVersion"})
-    @DisplayName("orders the crates by the response's max_version or the entity's maxVersion")
+    @ValueSource(strings = {"maxVersion"})
+    @DisplayName("orders the crates by maxVersion")
     void ordersCratesByMaxVersion(final String property) throws Exception {
       final var repo = this.seededRepo();
 
       this.list(repo, CRATES, "sort", property + ",asc")
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].name").value("other"))
-          .andExpect(jsonPath("$.data.content[0].max_version").value("0.1.0"));
+          .andExpect(jsonPath("$.data.content[0].maxVersion").value("0.1.0"));
       this.list(repo, CRATES, "sort", property + ",desc")
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].name").value("paged"))
-          .andExpect(jsonPath("$.data.content[0].max_version").value("1.1.0"));
+          .andExpect(jsonPath("$.data.content[0].maxVersion").value("1.1.0"));
     }
 
     @ParameterizedTest(name = "sort={0}")
-    @ValueSource(strings = {"updated_at", "lastUpdatedAt"})
+    @ValueSource(strings = {"updatedAt", "lastUpdatedAt"})
     @DisplayName("orders the crates by when they were last updated")
     void ordersCratesByLastUpdate(final String property) throws Exception {
       final var repo = this.seededRepo();
@@ -809,6 +810,14 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
     void unknownSortIs400(final String path) throws Exception {
       PagingAssertions.expectInvalidParameter(
           this.list(this.seededRepo(), path, "sort", PagingAssertions.UNKNOWN_SORT), "sort");
+    }
+
+    @ParameterizedTest(name = "sort={0}")
+    @ValueSource(strings = {"max_version", "updated_at", "created_at"})
+    @DisplayName("returns 400 validationError naming sort for a snake_case sort key (RPS-1269)")
+    void snakeCaseSortIsRejected(final String property) throws Exception {
+      PagingAssertions.expectInvalidParameter(
+          this.list(this.seededRepo(), CRATES, "sort", property + ",asc"), "sort");
     }
 
     @ParameterizedTest(name = "{0} {1}={2}")

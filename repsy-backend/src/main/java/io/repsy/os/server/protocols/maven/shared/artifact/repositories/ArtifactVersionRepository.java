@@ -84,6 +84,19 @@ public interface ArtifactVersionRepository extends JpaRepository<ArtifactVersion
       @NonNull UUID artifactId, @NonNull String versionName);
 
   /**
+   * The ids of the versions of a repo after {@code after}, in id order and at most a page of them:
+   * a repo of any size is walked page by page, and a version added meanwhile is either met or was
+   * recomputed by its own upload (RPS-1316).
+   */
+  @Query(
+      """
+        select v.id from ArtifactVersion v
+        where v.artifact.repo.id = :repoId and v.id > :after
+        order by v.id
+      """)
+  @NonNull List<UUID> findIdsByRepoIdAfter(UUID repoId, UUID after, Pageable pageable);
+
+  /**
    * Takes the row lock of a version without changing it: the statement is an update, so the lock is
    * the one an update takes (it does not block the insert of a signature row that references the
    * version) and it is held until the transaction ends (RPS-1188).
