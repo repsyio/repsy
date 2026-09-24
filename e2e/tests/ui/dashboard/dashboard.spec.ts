@@ -26,7 +26,9 @@ import { type PanelApi, RepoType } from '../../../src/api/panel-api.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { DashboardPage, RECENT_ACTIVITY_SIZE } from '../../../src/ui/pages/dashboard.js';
 import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
+import { Shell } from '../../../src/ui/pages/shell.js';
 import { UI_REPO_TYPES, uiRepoType } from '../../../src/ui/repo-types.js';
+import { JWT_SHAPE, storedSession } from '../auth/stored-session.js';
 
 const SETTLE_TIMEOUT = 45_000;
 
@@ -199,5 +201,34 @@ test.describe('Dashboard', () => {
       await dashboard.open({ admin: false });
       await expect(dashboard.recentRow(repo.name)).toBeVisible({ timeout: 5_000 });
     }).toPass({ timeout: 20_000 });
+  });
+
+  // RPS-1284: Recent Activity asks for the usage of every repository, which needs MANAGE. A USER used
+  // to be answered 401 `unAuthorized` (a session-lost status: the SPA had to special-case it), and is
+  // now answered 403 `accessDenied`. The dashboard shows the rows with an unknown disk usage, raises
+  // no toast for the refusals, and the session is untouched.
+  test('DASH-04: a USER is answered 403 for every repository usage, silently, and stays signed in', async ({
+    userPage,
+  }) => {
+    const dashboard = new DashboardPage(userPage);
+    const usages: { status: number; body: Promise<{ msgId?: string } | null> }[] = [];
+    userPage.on('response', (response) => {
+      if (/\/api\/repos\/[^/]+\/usage(\?|$)/.test(response.url())) {
+        usages.push({
+          status: response.status(),
+          body: response.json().catch(() => null),
+        });
+      }
+    });
+
+    await dashboard.open({ admin: false });
+    await expect.poll(() => usages.length, { timeout: 20_000 }).toBeGreaterThan(0);
+    await dashboard.settle();
+
+    expect(usages.map((usage) => usage.status).filter((status) => status !== 403)).toEqual([]);
+    expect((await usages[0].body)?.msgId).toBe('accessDenied');
+    await expect(new Shell(userPage).toasts.toast()).toHaveCount(0);
+    await expect(userPage).toHaveURL('/');
+    expect((await storedSession(userPage)).token).toMatch(JWT_SHAPE);
   });
 });

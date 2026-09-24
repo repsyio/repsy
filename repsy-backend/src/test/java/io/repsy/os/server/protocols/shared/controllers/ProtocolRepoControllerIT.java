@@ -574,9 +574,9 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("typeOnlyManageEndpoints")
-    @DisplayName("returns 401 unAuthorized for a plain USER on a type-only MANAGE route")
+    @DisplayName("returns 403 accessDenied for a plain USER on a type-only MANAGE route")
     void typeOnlyManageRouteAsPlainUser(final Endpoint endpoint) throws Exception {
-      expectUnauthorized(
+      expectForbidden(
           ProtocolRepoControllerIT.this.perform(
               endpoint
                   .request()
@@ -587,13 +587,13 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("repoManageEndpoints")
     @DisplayName(
-        "returns 401 unAuthorized for a non-admin caller on a MANAGE route, changing nothing")
+        "returns 403 accessDenied for a non-admin caller on a MANAGE route, changing nothing")
     void manageRouteAsPlainUser(final Endpoint endpoint) throws Exception {
       final var repo = ProtocolRepoControllerIT.this.seedMaven();
       final var before = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
       final var target = new Target(repo.getName(), "MAVEN");
 
-      expectUnauthorized(
+      expectForbidden(
           ProtocolRepoControllerIT.this.perform(
               endpoint
                   .request()
@@ -910,7 +910,7 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     void plainUserCannotCreate() throws Exception {
       final var name = uniqueRepoName("byuser");
 
-      expectUnauthorized(
+      expectForbidden(
           ProtocolRepoControllerIT.this.perform(
               json(post("/api/repos/MAVEN"), createBody(name))
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())));
@@ -2250,12 +2250,12 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
-    @DisplayName("returns 401 unAuthorized for a plain USER because count requires MANAGE")
+    @DisplayName("returns 403 accessDenied for a plain USER because count requires MANAGE")
     void plainUserIsRejected() throws Exception {
       ProtocolRepoControllerIT.this.deleteDefaultRepos();
       ProtocolRepoControllerIT.this.seedRepo(RepoType.PYPI, uniqueRepoName("p"));
 
-      expectUnauthorized(
+      expectForbidden(
           ProtocolRepoControllerIT.this.perform(
               get("/api/repos/PYPI/count")
                   .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken())));

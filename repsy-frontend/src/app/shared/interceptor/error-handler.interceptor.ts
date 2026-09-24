@@ -14,18 +14,27 @@
 /// limitations under the License.
 ///
 
-import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { HttpContextToken, HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 
 import { ToastService } from '../../panel/shared/components/toast/toast.service';
+
+/**
+ * Set on a request whose failure the caller handles itself (a background load that degrades to an
+ * "unknown" value), so the interceptor does not toast it. The error still reaches the caller.
+ */
+export const SILENT_ERROR = new HttpContextToken<boolean>(() => false);
 
 export const errorHandlerInterceptor: HttpInterceptorFn = (req, next) => {
   const toastService = inject(ToastService);
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
-      if (error.status === 401) {
+      // 401 is a session problem, handled by RefreshTokenInterceptor and the login form. A 403
+      // (signed in, not allowed: `accessDenied`) is a plain error and gets its toast below; it never
+      // ends the session (RPS-1284).
+      if (error.status === 401 || req.context.get(SILENT_ERROR)) {
         return throwError(() => error);
       }
 

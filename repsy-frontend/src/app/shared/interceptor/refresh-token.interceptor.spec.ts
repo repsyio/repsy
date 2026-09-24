@@ -209,15 +209,10 @@ describe('RefreshTokenInterceptor', () => {
       expectLoggedOut('Session invalid, please log in again.');
     });
 
-    it('unAuthorized (no permission for the resource) is left to the caller: the session is fine', () => {
+    it('unAuthorized (account gone, credentials missing or invalid) logs out without a refresh', () => {
       call();
       refuse('unAuthorized');
-
-      expect(errors.length).toBe(1);
-      expect(authService.refreshToken).not.toHaveBeenCalled();
-      expect(authService.logOut).not.toHaveBeenCalled();
-      expect(toastService.show).not.toHaveBeenCalled();
-      expect(router.navigateByUrl).not.toHaveBeenCalled();
+      expectLoggedOut('Session invalid, please log in again.');
     });
 
     it('refreshTokenExpired logs out without a refresh', () => {
@@ -261,12 +256,14 @@ describe('RefreshTokenInterceptor', () => {
       expect(router.navigateByUrl).not.toHaveBeenCalled();
     });
 
-    it('leaves non-401 errors to their caller', () => {
+    it('a 403 accessDenied (signed in, not allowed) leaves the session alone: no refresh, no logout (RPS-1284)', () => {
       call();
       httpTesting.expectOne('/a').flush({ msgId: 'accessDenied' }, { status: 403, statusText: 'Forbidden' });
 
       expect(errors.length).toBe(1);
+      expect(authService.refreshToken).not.toHaveBeenCalled();
       expect(authService.logOut).not.toHaveBeenCalled();
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
       expect(toastService.show).not.toHaveBeenCalled();
     });
 

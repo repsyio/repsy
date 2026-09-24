@@ -424,7 +424,8 @@ class DockerUntaggedManifestCleanupIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("needs the manage permission: anonymous and read-only users are refused")
+  @DisplayName(
+      "needs the manage permission: anonymous is refused with 401, a read-only user with 403")
   void protectsTheCleanup() throws Exception {
     final var repo = this.dockerRepo();
     final var manifest = this.push(repo, IMAGE, "latest", "layer-one");
@@ -440,10 +441,10 @@ class DockerUntaggedManifestCleanupIT extends AbstractIntegrationTest {
         "The user has logged in but has no permissions.");
     this.expectError(
         this.perform(delete(path).header(AUTHORIZATION, this.panelTokenOf(user))),
-        HttpStatus.UNAUTHORIZED,
-        "unAuthorized",
-        "unAuthorized",
-        "The user has logged in but has no permissions.");
+        HttpStatus.FORBIDDEN,
+        "accessDenied",
+        "accessDenied",
+        "Access Denied. Please check your credentials.");
 
     assertThat(this.status(repo, IMAGE, manifest)).as("nothing was deleted").isEqualTo(200);
     assertThat(this.manifestRows(repo)).isEqualTo(2);

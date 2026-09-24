@@ -632,10 +632,10 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           DockerImageControllerIT.this.perform(
               delete("/api/docker/images/%s/app".formatted(repo.getName()))
                   .header(AUTHORIZATION, DockerImageControllerIT.this.userBearerToken())),
-          HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
-          "unAuthorized",
-          "The user has logged in but has no permissions.");
+          HttpStatus.FORBIDDEN,
+          "accessDenied",
+          "accessDenied",
+          "Access Denied. Please check your credentials.");
     }
 
     @Test
@@ -715,10 +715,10 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
           DockerImageControllerIT.this.perform(
               delete("/api/docker/images/blobs/%s/orphan-layers".formatted(repo.getName()))
                   .header(AUTHORIZATION, token)),
-          HttpStatus.UNAUTHORIZED,
-          "unAuthorized",
-          "unAuthorized",
-          "The user has logged in but has no permissions.");
+          HttpStatus.FORBIDDEN,
+          "accessDenied",
+          "accessDenied",
+          "Access Denied. Please check your credentials.");
     }
   }
 

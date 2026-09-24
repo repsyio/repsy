@@ -173,7 +173,12 @@ describe('DashboardContentComponent', () => {
       expect(component.repoListInfos.map((r) => r.name)).toEqual(['new-npm', 'mid-npm', 'old-maven']);
       expect(component.repoListInfos.map((r) => r.type)).toEqual([RepoType.Npm, RepoType.Npm, RepoType.Maven]);
       expect(component.repoListInfos.map((r) => r.diskUsage)).toEqual([700, 700, 900]);
-      expect(repoService.getUsage).toHaveBeenCalledWith('new-npm');
+      expect(repoService.getUsage).toHaveBeenCalledWith(
+        'new-npm',
+        jasmine.anything(),
+        jasmine.anything(),
+        jasmine.anything(),
+      );
     });
 
     it('keeps only the six newest of all types together', () => {

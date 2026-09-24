@@ -14,7 +14,7 @@
 /// limitations under the License.
 
 /**
- * AUTH-08 .. AUTH-10: the session. Access tokens live 30 minutes and are not configurable, and the
+ * AUTH-08 .. AUTH-10 and AUTH-12: the session. Access tokens live 30 minutes and are not configurable, and the
  * backend only answers `sessionExpired` (the one answer that makes `RefreshTokenInterceptor` refresh)
  * for a really expired token, so a test cannot wait for, or forge, an expiry. The 401 is therefore the
  * one thing that is stubbed (`expireAccessToken`); the refresh call, the token rotation and the
@@ -28,6 +28,7 @@
  */
 import type { Page } from '@playwright/test';
 
+import { RepoType } from '../../../src/api/panel-api.js';
 import { env } from '../../../src/env.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
@@ -202,6 +203,78 @@ test.describe('AUTH-09 refused refresh token', () => {
     await expect(userPage).toHaveURL(/\/login$/);
     await expectLoggedOut(userPage);
     await new Shell(userPage).toasts.expectError('Session expired, please log in again.');
+  });
+});
+
+/**
+ * AUTH-12 (RPS-1284): "signed in, not allowed" is a 403 and "not signed in" a 401, and only the 401
+ * ends the session. Every repository operation that needs MANAGE (the ADMIN role) answers a USER 403
+ * `accessDenied`; it used to be 401 `unAuthorized`, the same status as a lost session, so the SPA
+ * could not tell them apart. Nothing is stubbed: both answers are the real ones.
+ */
+test.describe('AUTH-12 permission failure is not a lost session', () => {
+  test('a USER is answered 403 by a MANAGE route and stays signed in', async ({
+    userPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    const dashboard = new DashboardPage(userPage);
+    await dashboard.goto();
+    const before = await storedSession(userPage);
+    expect(before.token).toMatch(JWT_SHAPE);
+    const authorization = { Authorization: `Bearer ${before.token}` };
+    const repoUrl = `${env.apiBaseUrl}/api/repos/${encodeURIComponent(repo.name)}`;
+
+    // The route families that need MANAGE: usage, settings (read/write), deploy tokens, description,
+    // rename and delete. The stack's default USER may read the repo (`/permissions`), not manage it.
+    const refused = [
+      await userPage.request.get(`${repoUrl}/usage`, { headers: authorization }),
+      await userPage.request.get(`${repoUrl}/settings`, { headers: authorization }),
+      await userPage.request.get(`${repoUrl}/deploy-tokens`, { headers: authorization }),
+      await userPage.request.patch(`${repoUrl}/description`, {
+        headers: authorization,
+        data: { description: 'not allowed' },
+      }),
+      await userPage.request.delete(repoUrl, { headers: authorization }),
+    ];
+    for (const response of refused) {
+      expect(response.status(), `${response.url()}`).toBe(403);
+      expect(((await response.json()) as { msgId: string }).msgId).toBe('accessDenied');
+    }
+    expect(
+      (await userPage.request.get(`${repoUrl}/permissions`, { headers: authorization })).ok(),
+    ).toBe(true);
+
+    // The refusals did not touch the session: same stored pair, and a reload is still the dashboard.
+    expect(await storedSession(userPage)).toEqual(before);
+    await userPage.reload();
+    await dashboard.expectLoaded();
+    await expect(userPage).toHaveURL('/');
+    expect(await storedSession(userPage)).toEqual(before);
+  });
+
+  test('a token that is not valid is still a 401 on the same route, and logs the user out', async ({
+    userPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    await new DashboardPage(userPage).goto();
+    const before = await storedSession(userPage);
+    const tampered = `${before.token}x`;
+
+    const response = await userPage.request.get(
+      `${env.apiBaseUrl}/api/repos/${encodeURIComponent(repo.name)}/usage`,
+      { headers: { Authorization: `Bearer ${tampered}` } },
+    );
+    expect(response.status()).toBe(401);
+    // A msgId of its own, so nothing can mistake it for the permission failure above.
+    expect(((await response.json()) as { msgId: string }).msgId).toBe('accessNotAllowed');
+
+    await userPage.evaluate((token) => window.localStorage.setItem('token', token), tampered);
+    await userPage.reload();
+
+    await expectLoggedOut(userPage);
+    await new Shell(userPage).toasts.expectError('Session invalid, please log in again.');
   });
 });
 
