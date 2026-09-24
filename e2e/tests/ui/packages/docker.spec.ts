@@ -128,7 +128,7 @@ test.describe('Docker image, tags, manifests and tag detail', { tag: '@packages'
     const manifests = protocolPages(mobile, docker, repo.name).manifests(image);
     await manifests.goto();
     await expect(manifests.card(image)).toBeVisible();
-    // The card is right where the desktop grid is not (RPS-1261): each digest under its own label.
+    // Each digest under its own label (the desktop grid is asserted below, RPS-1261).
     await expect(manifests.card(image)).toContainText('Platform: linux/amd64');
     await expect(manifests.card(image)).toContainText(`Digest: ${image.extra['digest']}`);
     await expect(manifests.card(image)).toContainText(
@@ -136,25 +136,25 @@ test.describe('Docker image, tags, manifests and tag detail', { tag: '@packages'
     );
   });
 
-  // RPS-1261 (2): in the DESKTOP manifest table the Digest cell shows the platform and the Config Digest
-  // cell shows the manifest digest; the mobile card above is right. Rows are found by id, and these
-  // cells are the only place the ids and the values disagree.
-  test.fail(
-    'PKG-docker-07 the desktop manifest row shows the digest and the config digest in their own columns (RPS-1261)',
-    async ({ adminPage, seeder, seedPackage }) => {
-      const repo = await seeder.createRepo(RepoType.DOCKER);
-      const image = await seedPackage(repo);
-      const manifests = protocolPages(adminPage, docker, repo.name).manifests(image);
-      await manifests.goto();
-      // The cells cut a digest to 15 characters (`sha256:e4cb7d5c...`); the full one is in the tooltip.
-      await expect(manifests.inRow(image, 'row-digest')).toContainText(
-        image.extra['digest'].slice(0, 15),
-      );
-      await expect(manifests.inRow(image, 'row-config-digest')).toContainText(
-        image.extra['configDigest'].slice(0, 15),
-      );
-    },
-  );
+  // RPS-1261 (2): the DESKTOP manifest table's Digest cell used to show the platform and its Config Digest
+  // cell the manifest digest; the mobile card above was always right.
+  test('PKG-docker-07 the desktop manifest row shows the digest and the config digest in their own columns (RPS-1261)', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.DOCKER);
+    const image = await seedPackage(repo);
+    const manifests = protocolPages(adminPage, docker, repo.name).manifests(image);
+    await manifests.goto();
+    // The cells cut a digest to 15 characters (`sha256:e4cb7d5c...`); the full one is in the tooltip.
+    await expect(manifests.inRow(image, 'row-digest')).toContainText(
+      image.extra['digest'].slice(0, 15),
+    );
+    await expect(manifests.inRow(image, 'row-config-digest')).toContainText(
+      image.extra['configDigest'].slice(0, 15),
+    );
+  });
 
   test('PKG-docker-07 deleting a tag from its detail page removes that tag only, and the registry agrees', async ({
     adminPage,

@@ -22,6 +22,7 @@ import { RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
+import { renderComponent } from '../../../testing/render-spec-helpers';
 import { describeRepoListBehavior, ListFixture, pageOf, REPO_NAME } from '../../../testing/repo-list-spec-helpers';
 import { getRepoDomain } from '../../docker-repo-util';
 import { DockerService } from '../../service/docker.service';
@@ -89,5 +90,39 @@ describe('DockerImagesManifestListComponent', () => {
       component.openConfig(false);
       expect(component.showConfig).toBeFalse();
     });
+  });
+});
+
+describe('DockerImagesManifestListComponent template', () => {
+  it('shows the digest and the config digest in their own columns of the desktop row (RPS-1261)', async () => {
+    const digest = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const configDigest = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const dockerService = jasmine.createSpyObj<DockerService>('DockerService', ['searchManifests'], {
+      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME)),
+    });
+    dockerService.searchManifests.and.returnValue(
+      of(
+        pageOf(
+          [{ name: 'latest', platform: 'linux/amd64', digest, configDigest, createdAt: '2026-01-01T00:00:00Z' }],
+          1,
+        ) as never,
+      ),
+    );
+
+    const { el } = await renderComponent(DockerImagesManifestListComponent, [
+      {
+        provide: ActivatedRoute,
+        useValue: { snapshot: { paramMap: convertToParamMap({ image: 'nginx', tag: 'latest' }) } },
+      },
+      { provide: AuthService, useValue: { username: 'alice' } },
+      { provide: DockerService, useValue: dockerService },
+    ]);
+
+    const row = el.querySelector('[data-testid="pkg-manifests-row-latest"]');
+    const cell = (testId: string): string | undefined =>
+      row?.querySelector(`[data-testid="${testId}"]`)?.textContent?.trim();
+    expect(cell('row-platform')).toBe('linux/amd64');
+    expect(cell('row-digest')).toBe(digest.slice(0, 15) + '...');
+    expect(cell('row-config-digest')).toBe(configDigest.slice(0, 15) + '...');
   });
 });

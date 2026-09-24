@@ -22,6 +22,7 @@ import { NpmPackageListItem, RepoPermissionInfo } from '../../../../../../../gen
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
+import { renderComponent } from '../../../testing/render-spec-helpers';
 import {
   describeEmptyingDelete,
   describeRepoListBehavior,
@@ -124,5 +125,30 @@ describe('NpmPackagesScopeFilterComponent', () => {
       component.openConfig(false);
       expect(component.showConfig).toBeFalse();
     });
+  });
+});
+
+describe('NpmPackagesScopeFilterComponent template', () => {
+  async function render(flags: Parameters<typeof permission>[1]): Promise<HTMLElement> {
+    const npmService = jasmine.createSpyObj<NpmService>('NpmService', ['searchScopedPackages'], {
+      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, flags)),
+    });
+    npmService.searchScopedPackages.and.returnValue(of(pageOf([PACKAGE], 1) as never));
+
+    const { el } = await renderComponent(NpmPackagesScopeFilterComponent, [
+      { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ scope: 'acme' }) } } },
+      { provide: NpmService, useValue: npmService },
+    ]);
+    return el;
+  }
+
+  const cardMenu = '[data-testid="pkg-sublist-card-ui"] [data-testid="row-menu"]';
+
+  it('offers Delete on the mobile card to a manager', async () => {
+    expect((await render({ canWrite: true, canManage: true })).querySelector(cardMenu)).not.toBeNull();
+  });
+
+  it('offers no Delete on the mobile card to a user who can write but not manage (RPS-1262)', async () => {
+    expect((await render({ canWrite: true, canManage: false })).querySelector(cardMenu)).toBeNull();
   });
 });

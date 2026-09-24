@@ -22,7 +22,7 @@ import { NEWEST_OLDEST, NEWEST_OLDEST_NAME, need, type ProtocolDescriptor } from
  *    `classic` (ChartMuseum HTTP API). Both feed the same chart list, so a seeded chart of either
  *    kind renders identically; `seedVariants` names them for `SeedPackageOptions.variant`.
  *  - A chart row opens the VERSIONS page; `row-latest-link` opens the latest version's detail.
- *  - The version list has NO pagination (RPS-1262), so `pagination` is false there.
+ *  - The version list pages CLIENT-SIDE (the API returns every version of the chart): ten per page.
  *  - The install block is the "Classic Helm" one, its text in a `<pre>`; the detail page has extra
  *    `pkg-detail-type` and `pkg-detail-digest` and two snippets (`oci`, `chart-yaml`).
  */

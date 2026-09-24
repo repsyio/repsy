@@ -250,10 +250,9 @@ test.describe('USR-02 create validation', () => {
     );
   });
 
-  // RPS-1261: the modal's template was saved double-encoded, so its bullet renders as the three
-  // characters "â€¢". This asserts the intended text; while the bug exists the test is expected to
-  // fail, and turns red (unexpected pass) the day it is fixed, prompting removal of `fail`.
-  test.fail('the messages start with a bullet, not mojibake RPS-1261', async ({ usersPage }) => {
+  // RPS-1261: the modal's template was saved double-encoded, so its bullet rendered as the three
+  // characters "â€¢".
+  test('the messages start with a bullet, not mojibake RPS-1261', async ({ usersPage }) => {
     await usersPage.goto();
     await usersPage.openCreateModal();
     const modal = usersPage.createModal;

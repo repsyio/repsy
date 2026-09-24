@@ -37,15 +37,16 @@
       <img ngSrc="/assets/icons/input/configure.svg" alt="configure" height="16" width="16" />
       Configure
     </button>
-    <button
-      data-testid="pkg-settings"
-      [disabled]="!activeRepo.canManage"
-      [routerLink]="'/' + activeRepo.repoName + '/settings'"
-      class="repsy-btn-ghost w-full sm:w-auto"
-    >
-      <img ngSrc="/assets/icons/input/settings.svg" alt="settings" height="18" width="18" />
-      Settings
-    </button>
+    @if (activeRepo.canManage) {
+      <button
+        data-testid="pkg-settings"
+        [routerLink]="'/' + activeRepo.repoName + '/settings'"
+        class="repsy-btn-ghost w-full sm:w-auto"
+      >
+        <img ngSrc="/assets/icons/input/settings.svg" alt="settings" height="18" width="18" />
+        Settings
+      </button>
+    }
   </div>
 </div>
 

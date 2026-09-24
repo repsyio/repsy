@@ -30,14 +30,8 @@ import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
 const cargo = DESCRIPTORS.cargo;
 
 // The seeder gives every crate its own version (see `seedCargo`), so the crate list's sort and pager
-// have distinct keys. RPS-1262 (2): the Cargo version list only has the `hidden ... lg:block` desktop
-// table, no mobile cards, so at a phone's width the page renders nothing but the pager; the template's
-// mobile-versions step (a card per version, no Delete for a USER) can only fail today.
-registerPackageScenarios(cargo, {
-  knownFailures: {
-    '05-mobile-versions': 'RPS-1262: the version list renders no cards below lg',
-  },
-});
+// have distinct keys.
+registerPackageScenarios(cargo);
 
 const README = '# Cargo README\n\nA **bold** claim with `code`.\n';
 

@@ -40,8 +40,8 @@ class SecurityScanSectionStubComponent {
 describe('NpmPackagesVersionDetailComponent README', () => {
   let npmService: jasmine.SpyObj<NpmService>;
 
-  function render(readme: string | undefined): HTMLElement {
-    const versionInfo: PackageVersionDetail = { packageName: 'acme-lib', readme };
+  function render(readme: string | undefined, extra: Partial<PackageVersionDetail> = {}): HTMLElement {
+    const versionInfo: PackageVersionDetail = { packageName: 'acme-lib', readme, ...extra };
     npmService.fetchPackageVersion.and.returnValue(of(versionInfo));
 
     const fixture: ComponentFixture<NpmPackagesVersionDetailComponent> = TestBed.createComponent(
@@ -117,5 +117,35 @@ describe('NpmPackagesVersionDetailComponent README', () => {
     const el = render('  \n\n ');
 
     expect(el.querySelector('[data-testid="readme"]')).toBeNull();
+  });
+
+  function metadataLine(el: HTMLElement, label: string): string {
+    const line = Array.from(el.querySelectorAll('[data-testid="pkg-detail-metadata"] > div')).find((div) =>
+      div.textContent?.includes(label),
+    );
+    return line?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  }
+
+  it('prints the bugs URL of the package, not its name', () => {
+    const el = render(undefined, { bugsUrl: 'https://example.com/bugs' });
+
+    expect(metadataLine(el, 'Bugs URL:')).toBe('Bugs URL: https://example.com/bugs');
+  });
+
+  it('says so when the package has no bugs URL', () => {
+    const el = render(undefined);
+
+    expect(metadataLine(el, 'Bugs URL:')).toBe('Bugs URL: No bugs URL found!');
+  });
+
+  it('lists the keywords of the package', () => {
+    const el = render(undefined, { keywords: [{ keyword: 'alpha' }, { keyword: 'beta' }] });
+
+    expect(metadataLine(el, 'Keywords:')).toBe('Keywords: alpha, beta');
+  });
+
+  it('says so when the package has no keywords', () => {
+    expect(metadataLine(render(undefined), 'Keywords:')).toBe('Keywords: No keywords found!');
+    expect(metadataLine(render(undefined, { keywords: [] }), 'Keywords:')).toBe('Keywords: No keywords found!');
   });
 });

@@ -19,6 +19,7 @@ import { of, throwError } from 'rxjs';
 import { ProtocolRepoControllerService } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
+import { renderComponent } from '../../testing/render-spec-helpers';
 import { generalParentForm, lastSentForm, releaseAwareParentForm } from '../testing/repo-settings-spec-helpers';
 import { PackageOverrideComponent } from './package-override.component';
 
@@ -121,5 +122,23 @@ describe('PackageOverrideComponent', () => {
     expect(component.parentForm.get('allowOverride').value).toBeTrue();
     expect(fetchCount).toBe(0);
     expect(toastService.show).not.toHaveBeenCalled();
+  });
+});
+
+describe('PackageOverrideComponent template', () => {
+  it('describes what Allow and Deny do instead of "when active ... will be blocked" (RPS-1261)', async () => {
+    const { el } = await renderComponent(
+      PackageOverrideComponent,
+      [
+        { provide: ProtocolRepoControllerService, useValue: {} },
+        { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+      ],
+      { repoName: REPO, repoType: RepoType.NPM, parentForm: generalParentForm({ allowOverride: true }) },
+    );
+
+    expect(el.querySelector('[data-testid="toggle-label"]')?.textContent?.trim()).toBe('Allow');
+    expect(el.textContent).not.toContain('will be blocked');
+    expect(el.textContent).toContain('Allow: users can upload the same version again and overwrite it.');
+    expect(el.textContent).toContain('Deny: uploading the same version again is blocked.');
   });
 });
