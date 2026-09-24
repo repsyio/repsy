@@ -107,7 +107,13 @@ export interface DetailLevel {
   /** The page renders `data-testid="readme"`. */
   readme: boolean;
   /** The Delete button (managers only) and where the browser lands after a confirmed delete. */
-  delete: (DeleteAffordance & { landsOn: LevelName | 'unverified' }) | null;
+  delete:
+    | (DeleteAffordance & {
+        landsOn: LevelName | 'unverified';
+        /** Where deleting the package's LAST version lands, when that differs from `landsOn` (NuGet, Helm). */
+        landsOnLast?: LevelName;
+      })
+    | null;
 }
 
 /**
@@ -126,8 +132,11 @@ export interface ConfigureModal {
   contains: (repoName: string, repoUrl: string) => readonly string[];
   /** The password placeholder of the normal variant; absent = the modal has none (npm, docker). */
   passwordMarker?: string;
-  /** What the deploy-token variant says where the password would be (`YOUR_DEPLOY_TOKEN`). */
-  deployTokenMarker: string;
+  /**
+   * What the deploy-token variant says where the password would be (`YOUR_DEPLOY_TOKEN`). Absent = the
+   * two variants have the SAME body and differ only by their title (Cargo, Ruby): nothing to tell apart.
+   */
+  deployTokenMarker?: string;
 }
 
 export interface ProtocolDescriptor {

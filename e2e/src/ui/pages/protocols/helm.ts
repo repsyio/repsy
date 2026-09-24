@@ -47,7 +47,7 @@ export const helmDescriptor: ProtocolDescriptor = {
       rowKey: (t) => need(t, 'helm').version,
       search: { placeholder: 'version', term: (t) => t.version },
       sort: NEWEST_OLDEST,
-      pagination: false,
+      pagination: true,
       mobileCards: true,
       rowDelete: { dialogTitle: 'Delete Version', successToast: 'Version deleted successfully' },
       rowOpens: 'detail',
@@ -75,11 +75,22 @@ export const helmDescriptor: ProtocolDescriptor = {
       delete: {
         dialogTitle: 'Delete Version',
         successToast: 'Version deleted successfully',
-        landsOn: 'unverified',
+        landsOn: 'versions',
+        landsOnLast: 'versions',
       },
     },
   },
-  lastVersionRemovesPackage: 'unverified',
+  lastVersionRemovesPackage: true,
+  configure: {
+    title: 'Helm Configuration',
+    deployTokenTitle: 'Deploy Token Usage',
+    // Both variants render the same body; only the title differs.
+    contains: (repo, url) => [
+      `helm repo add ${repo} ${url}`,
+      '<YOUR_PASSWORD_OR_DEPLOY_TOKEN>',
+      `oci://${new URL(url).host}/${repo}`,
+    ],
+  },
   toolbar: { browseFiles: false },
   extraPaths: {},
   seedVariants: ['oci', 'classic'],

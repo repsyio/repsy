@@ -45,10 +45,10 @@ export const nugetDescriptor: ProtocolDescriptor = {
     versions: {
       path: (repo, t) => `/${repo}/${need(t, 'nuget').name}`,
       rowKey: (t) => need(t, 'nuget').version,
-      search: null,
+      search: { placeholder: 'version', term: (t) => t.version },
       sort: NEWEST_OLDEST,
       pagination: true,
-      mobileCards: false,
+      mobileCards: true,
       rowDelete: { dialogTitle: 'Delete Version', successToast: 'Version deleted successfully' },
       rowOpens: 'detail',
       rowLinks: {},
@@ -76,11 +76,18 @@ export const nugetDescriptor: ProtocolDescriptor = {
       delete: {
         dialogTitle: 'Delete Version',
         successToast: 'Version deleted successfully',
-        landsOn: 'unverified',
+        landsOn: 'versions',
+        landsOnLast: 'list',
       },
     },
   },
-  lastVersionRemovesPackage: 'unverified',
+  lastVersionRemovesPackage: true,
+  configure: {
+    title: 'NuGet Configuration',
+    deployTokenTitle: 'Deploy Token Usage',
+    // Both variants render the same body; only the title differs.
+    contains: (_repo, url) => [`${url}/v3/index.json`, '<YOUR_PASSWORD_OR_DEPLOY_TOKEN>'],
+  },
   toolbar: { browseFiles: false },
   extraPaths: {},
 };

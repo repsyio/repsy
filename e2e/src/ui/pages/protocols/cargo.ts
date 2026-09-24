@@ -46,7 +46,7 @@ export const cargoDescriptor: ProtocolDescriptor = {
       search: { placeholder: 'version', term: (t) => t.version },
       sort: NEWEST_OLDEST,
       pagination: true,
-      mobileCards: false,
+      mobileCards: true,
       rowDelete: { dialogTitle: 'Delete Version', successToast: 'Version deleted successfully' },
       rowOpens: 'detail',
       rowLinks: {},
@@ -70,7 +70,17 @@ export const cargoDescriptor: ProtocolDescriptor = {
       },
     },
   },
-  lastVersionRemovesPackage: 'unverified',
+  lastVersionRemovesPackage: true,
+  configure: {
+    title: 'Cargo Configuration',
+    deployTokenTitle: 'Deploy Token Usage',
+    // Both variants render the same body (the deploy token is a `<YOUR_DEPLOY_TOKEN>` placeholder in each).
+    contains: (repo, url) => [
+      repo,
+      `sparse+${url}/`,
+      'cargo login --registry repsy <YOUR_DEPLOY_TOKEN>',
+    ],
+  },
   toolbar: { browseFiles: false },
   extraPaths: {},
 };

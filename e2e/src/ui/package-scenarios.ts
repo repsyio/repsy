@@ -106,13 +106,16 @@ function repoTypeOf(descriptor: ProtocolDescriptor): RepoType {
   return RepoType[descriptor.protocol.toUpperCase() as keyof typeof RepoType];
 }
 
-function escapeRegExp(text: string): string {
+export function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** A URL ending in `path` (query string included), whatever the base URL is. */
+/**
+ * A URL ending in `path` (query string included), whatever the base URL is. A version row's own link
+ * appends `#security` (cargo, Go, ...), so an optional fragment is accepted.
+ */
 function endsWith(path: string): RegExp {
-  return new RegExp(`${escapeRegExp(path)}$`);
+  return new RegExp(`${escapeRegExp(path)}(#[\\w-]+)?$`);
 }
 
 /** A page a row click opened, narrowed to the version detail (a wrong descriptor fails here, loudly). */
@@ -515,7 +518,13 @@ export function registerPackageScenarios(
           const page = pages.detail(pkg);
           await page.goto();
           await page.delete();
-          await expectLandedOn(adminPage, descriptor, detailDelete, repo.name, pkg);
+          await expectLandedOn(
+            adminPage,
+            descriptor,
+            { ...detailDelete, landsOn: detailDelete.landsOnLast ?? detailDelete.landsOn },
+            repo.name,
+            pkg,
+          );
 
           const list = pages.list();
           await list.goto();
@@ -745,7 +754,9 @@ export function registerPackageScenarios(
           await expect(modal.root).toContainText(configure.passwordMarker);
         }
         // The password variant is not the deploy-token one.
-        await expect(modal.root).not.toContainText(configure.deployTokenMarker);
+        if (configure.deployTokenMarker) {
+          await expect(modal.root).not.toContainText(configure.deployTokenMarker);
+        }
 
         await modal.closeButton.click();
         await expect(modal.root).toHaveCount(0);
@@ -755,7 +766,9 @@ export function registerPackageScenarios(
     test(
       title(
         '06',
-        `the deploy-token variant of the Configure modal says ${configure.deployTokenMarker}`,
+        configure.deployTokenMarker
+          ? `the deploy-token variant of the Configure modal says ${configure.deployTokenMarker}`
+          : 'the deploy-token variant of the Configure modal has its own title and names the repository',
         '06-deploy-token',
       ),
       async ({ adminPage, seeder }) => {
@@ -770,7 +783,9 @@ export function registerPackageScenarios(
         await expect(modal.root).toBeVisible();
         await expect(modal.title).toHaveText(configure.deployTokenTitle);
         await expect(modal.root).toContainText(repo.name);
-        await expect(modal.root).toContainText(configure.deployTokenMarker);
+        if (configure.deployTokenMarker) {
+          await expect(modal.root).toContainText(configure.deployTokenMarker);
+        }
         if (configure.passwordMarker) {
           await expect(modal.root).not.toContainText(configure.passwordMarker);
         }

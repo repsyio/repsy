@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 /** Small helpers every per-protocol seeder shares. */
+import { MODULE_DOMAIN } from '../../clients/golang-raw.js';
 import type { RawResponse } from '../../clients/raw-http.js';
 import type { PackageProtocol } from '../packages.js';
 
@@ -35,8 +36,9 @@ export function expectPublished(
 
 /**
  * A default identity that is valid for `protocol` and unique per test and `index` (lower-case, so it
- * is also a legal docker image and PEP 503 name). Only the four seeded protocols are defined here;
- * RPS-1257 adds the rest next to their seeders.
+ * is also a legal docker image, PEP 503 name and Helm chart name). Cargo and Ruby names use
+ * underscores only (the panel keys a crate by its normalised name, `-` becoming `_`), and a Go module
+ * is a path under the harness's reserved `.test` domain.
  */
 export function defaultPackageName(
   protocol: PackageProtocol,
@@ -52,12 +54,15 @@ export function defaultPackageName(
       return `io.repsy.e2e.${runId.replace(/[^a-z0-9]/gi, '')}.g${index}:pkg-${index}`;
     case 'npm':
       return scoped ? `@e2e-${runId}/pkg-${index}` : base;
+    case 'cargo':
+    case 'ruby':
+      return `e2e_${runId.replace(/[^a-z0-9]/gi, '').toLowerCase()}_pkg_${index}`;
+    case 'golang':
+      return `${MODULE_DOMAIN}/${base}`;
     case 'docker':
     case 'pypi':
+    case 'nuget':
+    case 'helm':
       return base;
-    default:
-      throw new Error(
-        `defaultPackageName: "${protocol}" has no default name yet (RPS-1257 adds it)`,
-      );
   }
 }
