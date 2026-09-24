@@ -35,6 +35,8 @@ import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
 import io.repsy.os.server.shared.token.utils.TokenUsernameGenerator;
+import io.repsy.os.shared.auth.dtos.AuthenticationType;
+import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.token.utils.TokenFactory;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -46,6 +48,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -73,6 +76,8 @@ class AuthThrottleIT extends AbstractIntegrationTest {
   private static final int MAX_FAILURES = 20;
   private static final String COUNT_URL = "/api/repos/MAVEN/count";
   private static final String PRIVATE_READ = "/{repo}/com/example/lib/1.0/lib-1.0.pom";
+  private static final String NPM_BEARER_CHALLENGE =
+      "Bearer realm=\"Repsy Managed Registry\", Basic realm=\"Repsy Managed Registry\"";
   private static final String OTHER_CLIENT = "198.51.100.9";
   private static final String TOO_MANY_TEXT =
       "Too many failed authentication attempts. Please try again later.";
@@ -182,7 +187,19 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     return this.seedRepo(RepoType.MAVEN, uniqueRepoName("thr"), true, null);
   }
 
-  private record DeployCredential(String username, String secret) {}
+  private Repo seedNpmRepo() {
+    return this.seedRepo(RepoType.NPM, uniqueRepoName("thr"), true, null);
+  }
+
+  private MockHttpServletResponse npmBearer(final Repo repo, final String authorization)
+      throws Exception {
+    return this.send(
+        get("/{repo}/some-package", repo.getName())
+            .header(AUTHORIZATION, authorization)
+            .with(protocolPort()));
+  }
+
+  private record DeployCredential(UUID id, String username, String secret) {}
 
   private DeployCredential seedDeployToken(final Repo repo) {
     final var secret = TokenFactory.deployToken();
@@ -198,7 +215,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     this.deployTokenRepository.save(entity);
     this.entityManager.flush();
 
-    return new DeployCredential(entity.getUsername(), secret);
+    return new DeployCredential(entity.getId(), entity.getUsername(), secret);
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -474,5 +491,112 @@ class AuthThrottleIT extends AbstractIntegrationTest {
     assertThat(response.getStatus()).isEqualTo(401);
     assertThat(response.getHeader(RETRY_AFTER)).isNull();
     assertThat(response.getHeader(WWW_AUTHENTICATE)).isEqualTo("Bearer");
+  }
+
+  /**
+   * RPS-1209: npm sends every deploy token as a Bearer {@code _authToken}, so a revoked or rotated
+   * one is a wrong credential like a wrong Basic password: {@code unAuthorized}, counted, and 429
+   * once the client is over the limit.
+   */
+  @Test
+  @DisplayName("counts an npm Bearer token that is no deploy token like a wrong password")
+  void npmBearerTokenThatIsNoDeployTokenIsCounted() throws Exception {
+    final var repo = this.seedNpmRepo();
+    final var revoked = this.seedDeployToken(repo);
+    this.deployTokenRepository.deleteById(revoked.id());
+    this.entityManager.flush();
+
+    for (var i = 0; i < MAX_FAILURES; i++) {
+      final var response = this.npmBearer(repo, "Bearer " + revoked.secret());
+
+      assertThat(response.getStatus()).as(body(response)).isEqualTo(401);
+      assertThat(JsonPath.<String>read(body(response), "$.msgId")).isEqualTo("unAuthorized");
+      assertThat(response.getHeader(WWW_AUTHENTICATE)).isEqualTo(NPM_BEARER_CHALLENGE);
+    }
+
+    final var refused = this.npmBearer(repo, "Bearer " + revoked.secret());
+    expectThrottled(refused);
+    // The count is the client's, so a wrong Basic password on any route is refused as well.
+    expectThrottled(this.protocolBasic(this.seedDeployTokenRepo(), this.username, "wrong"));
+  }
+
+  @Test
+  @DisplayName("counts a Bearer value that is neither a deploy token nor a JWT on any route")
+  void garbageBearerIsCounted() throws Exception {
+    final var repo = this.seedNpmRepo();
+
+    for (var i = 0; i < MAX_FAILURES; i++) {
+      final var response = this.npmBearer(repo, "Bearer not.a.token." + i);
+
+      assertThat(response.getStatus()).isEqualTo(401);
+      assertThat(JsonPath.<String>read(body(response), "$.msgId")).isEqualTo("unAuthorized");
+    }
+
+    expectThrottled(this.npmBearer(repo, "Bearer not.a.token"));
+  }
+
+  @Test
+  @DisplayName("lets a valid Bearer deploy token and a valid protocol JWT through while blocked")
+  void validBearerCredentialsPassWhileBlocked() throws Exception {
+    final var repo = this.seedNpmRepo();
+    final var deployToken = this.seedDeployToken(repo);
+    final var jwt = this.adminProtocolBearerToken();
+
+    for (var i = 0; i < MAX_FAILURES; i++) {
+      assertThat(this.npmBearer(repo, "Bearer not.a.token." + i).getStatus()).isEqualTo(401);
+    }
+    expectThrottled(this.npmBearer(repo, "Bearer not.a.token"));
+
+    // Neither is a 401 or a 429: the package does not exist, which is what an authorized read of
+    // an empty repo answers.
+    assertThat(this.npmBearer(repo, "Bearer " + deployToken.secret()).getStatus()).isEqualTo(404);
+    assertThat(this.npmBearer(repo, jwt).getStatus()).isEqualTo(404);
+  }
+
+  @Test
+  @DisplayName("does not count a deploy-token JWT whose token was revoked")
+  void revokedDeployTokenJwtIsNotCounted() throws Exception {
+    final var repo = this.seedNpmRepo();
+    final var deployToken = this.seedDeployToken(repo);
+    final var jwt =
+        AuthUtils.AUTH_BEARER
+            + this.jwtUtils.createProtocolToken(
+                deployToken.id(),
+                deployToken.username(),
+                Duration.ofMinutes(30),
+                AuthenticationType.DEPLOY_TOKEN);
+    this.deployTokenRepository.deleteById(deployToken.id());
+    this.entityManager.flush();
+
+    for (var i = 0; i < MAX_FAILURES * 2; i++) {
+      final var response = this.npmBearer(repo, jwt);
+
+      assertThat(response.getStatus()).as(body(response)).isEqualTo(401);
+      assertThat(JsonPath.<String>read(body(response), "$.msgId")).isEqualTo("unAuthorized");
+    }
+  }
+
+  @Test
+  @DisplayName(
+      "does not count an expired but validly signed protocol JWT, which keeps sessionExpired")
+  void expiredProtocolJwtIsNotCounted() throws Exception {
+    final var repo = this.seedNpmRepo();
+    final var user = this.createUser(uniqueUsername("expired"), UserRole.USER);
+    final var expired =
+        AuthUtils.AUTH_BEARER
+            + this.jwtUtils.createProtocolToken(
+                user.getId(), user.getUsername(), Duration.ofSeconds(-60));
+
+    for (var i = 0; i < MAX_FAILURES * 2; i++) {
+      final var response = this.npmBearer(repo, expired);
+
+      assertThat(response.getStatus()).as(body(response)).isEqualTo(401);
+      assertThat(JsonPath.<String>read(body(response), "$.msgId")).isEqualTo("sessionExpired");
+    }
+
+    // The count is untouched: the first wrong credential is a 401, not a 429.
+    final var wrong = this.npmBearer(repo, "Bearer not.a.token");
+    assertThat(wrong.getStatus()).isEqualTo(401);
+    assertThat(JsonPath.<String>read(body(wrong), "$.msgId")).isEqualTo("unAuthorized");
   }
 }

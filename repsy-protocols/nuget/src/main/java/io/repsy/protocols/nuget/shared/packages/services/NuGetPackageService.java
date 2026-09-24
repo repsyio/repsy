@@ -86,8 +86,12 @@ public interface NuGetPackageService<ID> {
       boolean prerelease,
       boolean semVer2);
 
+  /**
+   * @param query a case-insensitive text the version contains; empty lists every version. It is
+   *     applied before paging, so it spans all pages.
+   */
   Page<NuGetVersionInfo> getVersionInfosPage(
-      BaseRepoInfo<ID> repoInfo, String packageId, Pageable pageable);
+      BaseRepoInfo<ID> repoInfo, String packageId, String query, Pageable pageable);
 
   /**
    * @param semVer2 whether SemVer 2.0.0-only versions count: when they do not, they are left out of

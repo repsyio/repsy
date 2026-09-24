@@ -23,7 +23,9 @@ import { test as plainTest, expect as plainExpect } from '@playwright/test';
 
 import { env } from '../../src/env.js';
 import { expect, test } from '../../src/ui/fixtures.js';
+import { serveReadsFromNode } from '../../src/ui/defaults.js';
 import { DashboardPage } from '../../src/ui/pages/dashboard.js';
+import { LoginPage } from '../../src/ui/pages/login.js';
 import { Shell } from '../../src/ui/pages/shell.js';
 import { assertAdminCredentialsUsableInUi, assertNotAdmin, optedIn } from '../../src/ui/session.js';
 
@@ -123,6 +125,53 @@ test.describe('UI harness fixtures', () => {
       };
     });
     expect(outcomes).toEqual({ sameOrigin: 'reached', gravatar: 'blocked', tagManager: 'blocked' });
+  });
+
+  // RPS-1303: Chromium fails in-flight requests with net::ERR_NETWORK_CHANGED when the host's network
+  // changes, which leaves the SPA unbooted. Its scripts, styles and API reads are therefore fetched by
+  // Playwright (`serveReadsFromNode`); a test cannot make Chromium report the real error, so these two
+  // prove the wiring: the reads come through it, and it steps aside when its own fetch fails.
+  test('the panel scripts and API reads are served by Playwright, not Chromium', async ({
+    page,
+    context,
+    baseURL,
+  }) => {
+    const served: string[] = [];
+    await serveReadsFromNode(context, new Set([new URL(baseURL ?? env.apiBaseUrl).origin]), {
+      onServed: (url) => served.push(new URL(url).pathname),
+    });
+
+    await page.goto('/login');
+
+    await expect(new LoginPage(page).form).toBeVisible();
+    expect(served.some((path) => /\/main-[^/]+\.js$/.test(path))).toBe(true);
+    expect(served.some((path) => path.endsWith('.css'))).toBe(true);
+    const status = await page.evaluate(async () => (await fetch('/api/repos/NPM/info')).status);
+    expect([200, 401]).toContain(status);
+    expect(served).toContain('/api/repos/NPM/info');
+    // A write is not among them.
+    const write = await page.evaluate(
+      async () => (await fetch('/api/nothing', { method: 'POST' })).status,
+    );
+    expect(write).toBeGreaterThanOrEqual(400);
+    expect(served).not.toContain('/api/nothing');
+  });
+
+  test('a failing Playwright fetch falls back to Chromium and the page still boots', async ({
+    page,
+    context,
+    baseURL,
+  }) => {
+    const served: string[] = [];
+    await serveReadsFromNode(context, new Set([new URL(baseURL ?? env.apiBaseUrl).origin]), {
+      fetch: () => Promise.reject(new Error('the fetch is broken')),
+      onServed: (url) => served.push(url),
+    });
+
+    await page.goto('/login');
+
+    await expect(new LoginPage(page).form).toBeVisible();
+    expect(served).toEqual([]);
   });
 
   test('adminPage and userPage are two independent sessions', async ({

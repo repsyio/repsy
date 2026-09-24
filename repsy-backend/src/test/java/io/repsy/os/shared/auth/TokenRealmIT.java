@@ -208,10 +208,14 @@ class TokenRealmIT extends AbstractIntegrationTest {
       final var result =
           protocol(get(PACKUMENT, repoName).header(AUTHORIZATION, bearerTokenFor(user)));
 
+      // RPS-1209: a Bearer value that is no deploy token and no protocol JWT is a wrong credential,
+      // answered like a wrong password.
       assertThat(result.getResponse().getStatus()).isEqualTo(401);
-      assertThat(result.getResponse().getContentAsString()).contains("accessNotAllowed");
+      assertThat(result.getResponse().getContentAsString()).contains("unAuthorized");
+      assertThat(result.getResponse().getContentAsString()).doesNotContain("accessNotAllowed");
       assertThat(result.getResponse().getHeader(WWW_AUTHENTICATE))
-          .isEqualTo("Basic realm=\"Repsy Managed Registry\"");
+          .isEqualTo(
+              "Bearer realm=\"Repsy Managed Registry\", Basic realm=\"Repsy Managed Registry\"");
     }
 
     @Test
