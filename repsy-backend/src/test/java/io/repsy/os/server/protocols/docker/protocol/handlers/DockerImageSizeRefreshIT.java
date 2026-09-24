@@ -223,4 +223,32 @@ class DockerImageSizeRefreshIT extends AbstractIntegrationTest {
     assertThat(this.storedSize(repo)).as("the child is untagged now").isZero();
     assertThat(this.storedDigest(repo)).isNull();
   }
+
+  @Test
+  @DisplayName("a single-platform push sets the size and the digest, no delete needed (RPS-1314)")
+  void aSinglePlatformPushSetsSizeAndDigest() throws Exception {
+    final var repo = this.dockerRepo();
+
+    final var first = this.push(repo, "v1", "layer-one");
+
+    assertThat(this.storedSize(repo)).isEqualTo(this.sizeOf(repo, "layer-one"));
+    assertThat(this.storedDigest(repo)).isEqualTo(first);
+
+    final var second = this.push(repo, "v2", "layer-two");
+
+    assertThat(this.storedDigest(repo)).isEqualTo(second);
+    assertThat(this.storedSize(repo))
+        .as("the shared config blob is counted once")
+        .isEqualTo(this.sizeOf(repo, "layer-one") + bytes("layer-two").length);
+  }
+
+  @Test
+  @DisplayName("a push by digest does not make an untagged manifest the image's digest")
+  void aDigestPushDoesNotSetTheDigest() throws Exception {
+    final var repo = this.dockerRepo();
+    this.push(repo, sha256(bytes(imageManifest("layer-one"))), "layer-one");
+
+    assertThat(this.storedDigest(repo)).isNull();
+    assertThat(this.storedSize(repo)).isZero();
+  }
 }

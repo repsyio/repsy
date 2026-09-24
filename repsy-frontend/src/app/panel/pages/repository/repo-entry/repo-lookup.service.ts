@@ -18,8 +18,10 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, map, Observable, of, tap } from 'rxjs';
 
 import { ProtocolRepoControllerService } from '../../../../../generated/api';
+import { RepoRouteSlug, toRouteSlug } from '../../../shared/util/repo-api-type';
 
-export type RepoType = 'maven' | 'npm' | 'pypi' | 'docker' | 'golang' | 'cargo' | 'helm' | 'nuget' | 'ruby';
+/** A repository type as the routes spell it (`maven`); the API's own spelling is the upper-case enum. */
+export type RepoType = RepoRouteSlug;
 
 export interface RepoContext {
   repoName: string;
@@ -70,6 +72,14 @@ export class RepoLookupService {
   }
 
   private fetchRepoType(repoName: string): Observable<RepoType> {
-    return this.protocolRepoControllerService.getRepoType(repoName).pipe(map((r) => r.data as RepoType));
+    return this.protocolRepoControllerService.getRepoType(repoName).pipe(
+      map((r) => {
+        const slug = toRouteSlug(r.data);
+        if (!slug) {
+          throw new Error(`Unknown repository type "${r.data}" for ${repoName}`);
+        }
+        return slug;
+      }),
+    );
   }
 }

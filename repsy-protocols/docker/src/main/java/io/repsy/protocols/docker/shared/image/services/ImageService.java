@@ -25,7 +25,11 @@ public interface ImageService<ID> {
 
   BaseImageInfo<ID> findImageInfoByRepoIdAndName(ID repoId, String imageName);
 
-  void updateImageSize(ID repoId, ID imageId, String manifestDigest);
+  /**
+   * Recomputes the size and the digest the image is listed with from the tags it has now: the size
+   * of the layers the tagged manifests reach, and the digest of the most recently moved tag.
+   */
+  void refreshImageSize(ID repoId, ID imageId);
 
   void deleteImage(ID repoId, String imageName);
 }

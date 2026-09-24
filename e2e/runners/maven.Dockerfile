@@ -13,7 +13,8 @@
 # limitations under the License.
 
 # The maven runner: the harness itself (see base.Dockerfile) plus a pinned Temurin JDK and Maven,
-# nothing else. Its first layers intentionally repeat base.Dockerfile's rather than `FROM` a
+# and the two signing toolchains of the signed-deploy specs (tests/maven/gpg-signed-deploy.spec.ts):
+# the `gpg` binary that maven-gpg-plugin and Gradle's `signing` plugin drive, and a pinned Gradle. Its first layers intentionally repeat base.Dockerfile's rather than `FROM` a
 # separately built tag: Docker Compose has no way to guarantee that a sibling service's image
 # ("the base runner image") is built before this one, short of an extra explicit prebuild step, and
 # duplicating ~15 cheap, well-cached layers here keeps the already-proven "skeleton" service in
@@ -39,14 +40,25 @@ RUN chmod +x ./entrypoint.sh
 
 ARG TEMURIN_VERSION=21
 ARG MAVEN_VERSION=3.9.9
+# The published checksum of gradle-${GRADLE_VERSION}-bin.zip (https://gradle.org/release-checksums/);
+# change both together. The build fails on a mismatch.
+ARG GRADLE_VERSION=8.14.3
+ARG GRADLE_SHA256=bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531
 
 ENV JAVA_HOME="/opt/java/temurin"
 ENV MAVEN_HOME="/opt/maven"
-ENV PATH="${JAVA_HOME}/bin:${MAVEN_HOME}/bin:${PATH}"
+ENV GRADLE_HOME="/opt/gradle"
+ENV PATH="${JAVA_HOME}/bin:${MAVEN_HOME}/bin:${GRADLE_HOME}/bin:${PATH}"
 
+# gpg + gpg-agent (Debian bookworm's GnuPG 2.2, pinned by the base image's release) rather than the
+# full `gnupg` metapackage: signing needs no dirmngr/gpgsm/keyserver tooling, and the specs turn the
+# key server lookup off or register the key by hand. unzip is for the Gradle distribution below.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
+    gpg \
+    gpg-agent \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/java \
@@ -57,6 +69,13 @@ RUN mkdir -p /opt/java \
 RUN curl -fsSL "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
     | tar -xzC /opt \
     && mv "/opt/apache-maven-${MAVEN_VERSION}" "${MAVEN_HOME}"
+
+RUN curl -fsSL -o /tmp/gradle.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
+    && echo "${GRADLE_SHA256}  /tmp/gradle.zip" | sha256sum -c - \
+    && unzip -q /tmp/gradle.zip -d /opt \
+    && mv "/opt/gradle-${GRADLE_VERSION}" "${GRADLE_HOME}" \
+    && rm /tmp/gradle.zip \
+    && chmod -R a+rX "${GRADLE_HOME}"
 
 # Readable/executable (not necessarily owned) by whatever uid the container runs as
 # (docker-compose.runners.yml's "user:", the host user) -- installed as root during the build, run
@@ -69,6 +88,6 @@ RUN chmod -R a+rX "${JAVA_HOME}" "${MAVEN_HOME}"
 # of a fresh named volume copies that (world-writable) ownership instead of defaulting to root.
 RUN mkdir -p /app/.maven-shared-m2 && chmod 777 /app/.maven-shared-m2
 
-RUN java --version && mvn --version
+RUN java --version && mvn --version && GRADLE_USER_HOME=/tmp/gradle-check gradle --version && rm -rf /tmp/gradle-check && gpg --version | head -1
 
 CMD ["./entrypoint.sh", "maven"]

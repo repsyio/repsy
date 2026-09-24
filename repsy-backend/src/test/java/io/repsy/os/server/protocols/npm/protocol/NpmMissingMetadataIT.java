@@ -23,6 +23,10 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -38,6 +42,7 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
+import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -58,8 +63,10 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -74,10 +81,14 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * RPS-1300: a package whose row exists but whose {@code package.json} (or whole directory) is gone
- * from storage can still have a version deleted, unpublished or deprecated, and a tag changed. The
- * database is the source of truth, so the metadata is rebuilt from its rows (and from what is left
- * of the tarballs) and the operation goes on as usual, rolling back with the rows when it fails.
+ * RPS-1310 (see the sections at the end): the same holds for publishing a new version, for the
+ * version page of the panel, and for a {@code package.json} that is there but corrupt.
+ *
+ * <p>RPS-1300: a package whose row exists but whose {@code package.json} (or whole directory) is
+ * gone from storage can still have a version deleted, unpublished or deprecated, and a tag changed.
+ * The database is the source of truth, so the metadata is rebuilt from its rows (and from what is
+ * left of the tarballs) and the operation goes on as usual, rolling back with the rows when it
+ * fails.
  *
  * <p>Each test loses the file behind the database's back, on purpose, and then acts through the
  * panel facade or the wire protocol the way the real client does (npm reads the packument first).
@@ -94,6 +105,7 @@ class NpmMissingMetadataIT extends AbstractIntegrationTest {
   private static final String VERSION_TRIGGER = "it_refuse_missing_metadata_version_delete";
   private static final String HOST = "http://localhost:9090";
   private static final String PACKAGE_PATH = "/{repo}/{packagePath}";
+  private static final String CORRUPT = "{\"name\":\"half-written\",\"versions\":{\"1.0.0\":{\"na";
 
   @MockitoBean private UsageUpdateService usageUpdateService;
 
@@ -107,11 +119,20 @@ class NpmMissingMetadataIT extends AbstractIntegrationTest {
   @Autowired private RepoTxService repoTxService;
   @Autowired private ObjectMapper objectMapper;
 
+  private final ListAppender<ILoggingEvent> warnings = new ListAppender<>();
   private final List<UUID> createdRepoIds = new ArrayList<>();
   private final List<UUID> createdUserIds = new ArrayList<>();
 
+  @BeforeEach
+  void captureWarnings() {
+    this.warnings.start();
+    ((Logger) LoggerFactory.getLogger(AbstractNpmStorageService.class)).addAppender(this.warnings);
+  }
+
   @AfterEach
   void deleteCommittedData() {
+    ((Logger) LoggerFactory.getLogger(AbstractNpmStorageService.class))
+        .detachAppender(this.warnings);
     RequestContextHolder.resetRequestAttributes();
     this.jdbcTemplate.execute(
         "drop trigger if exists " + VERSION_TRIGGER + " on npm_package_version");
@@ -177,6 +198,15 @@ class NpmMissingMetadataIT extends AbstractIntegrationTest {
   }
 
   private byte[] publishBody(final Repo repo, final String name, final String version) {
+    return this.publishBody(repo, name, version, "latest", null);
+  }
+
+  private byte[] publishBody(
+      final Repo repo,
+      final String name,
+      final String version,
+      final String tag,
+      final String readme) {
     final var tarball = tarballOf(name, version);
     final var dist = new LinkedHashMap<String, Object>();
     dist.put(
@@ -198,10 +228,14 @@ class NpmMissingMetadataIT extends AbstractIntegrationTest {
     versionMetadata.put("dependencies", Map.of("left-pad", "^1.3.0"));
     versionMetadata.put("dist", dist);
 
+    if (readme != null) {
+      versionMetadata.put("readme", readme);
+    }
+
     final var body = new LinkedHashMap<String, Object>();
     body.put("_id", name);
     body.put("name", name);
-    body.put("dist-tags", Map.of("latest", version));
+    body.put("dist-tags", Map.of(tag, version));
     body.put("versions", Map.of(version, versionMetadata));
     body.put(
         "_attachments",
@@ -236,6 +270,20 @@ class NpmMissingMetadataIT extends AbstractIntegrationTest {
     assertThat(response.getStatus()).as("publish %s@%s", name, version).isEqualTo(200);
   }
 
+  private MockHttpServletResponse publishWith(
+      final Repo repo,
+      final String name,
+      final String version,
+      final String tag,
+      final String token)
+      throws Exception {
+    return this.protocol(
+        put(PACKAGE_PATH, repo.getName(), name)
+            .header(AUTHORIZATION, token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(this.publishBody(repo, name, version, tag, null)));
+  }
+
   private String publishedVersions(final Repo repo, final String token, final String... versions)
       throws Exception {
     final var name = "lost-" + randomTag();
@@ -263,6 +311,11 @@ class NpmMissingMetadataIT extends AbstractIntegrationTest {
   private static void loseTheMetadataOf(final Repo repo, final String name) throws IOException {
     Files.delete(metadataFile(repo, name));
     assertThat(metadataFile(repo, name)).doesNotExist();
+  }
+
+  /** Corrupts the metadata file behind the database's back: it is there, and cannot be parsed. */
+  private static void corruptTheMetadataOf(final Repo repo, final String name) throws IOException {
+    Files.writeString(metadataFile(repo, name), CORRUPT);
   }
 
   /** Loses the whole package directory behind the database's back. */
@@ -772,6 +825,258 @@ class NpmMissingMetadataIT extends AbstractIntegrationTest {
     assertThat(this.rowVersions(repo, name)).containsExactly("1.0.0", "1.1.0", "2.0.0");
     assertThat(tarballFile(repo, name, "1.1.0")).exists();
     assertThat(metadataFile(repo, name)).doesNotExist();
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Publishing a new version (RPS-1310)
+  // -------------------------------------------------------------------------------------------
+
+  @Test
+  @DisplayName("publishing a new latest version works when package.json is gone")
+  void publishWithoutMetadata() throws Exception {
+    final var repo = this.npmRepo();
+    final var token = this.adminToken();
+    final var name = this.publishedVersions(repo, token, "1.0.0", "2.0.0");
+    loseTheMetadataOf(repo, name);
+
+    this.publish(repo, name, "3.0.0", token);
+
+    assertThat(this.rowVersions(repo, name)).containsExactly("1.0.0", "2.0.0", "3.0.0");
+    assertThat(this.storedMetadataVersions(repo, name))
+        .containsExactlyInAnyOrder("1.0.0", "2.0.0", "3.0.0");
+    assertThat(this.storedMetadataTags(repo, name)).containsExactly(Map.entry("latest", "3.0.0"));
+    assertThat(this.storedMetadata(repo, name)).containsEntry("description", "version 3.0.0");
+    // The rebuilt versions keep what the rows and their tarballs hold; the new one is as sent.
+    assertThat(this.storedVersion(repo, name, "1.0.0"))
+        .containsEntry("description", "version 1.0.0")
+        .containsEntry("dependencies", Map.of("left-pad", "^1.3.0"));
+    assertThat(this.storedVersion(repo, name, "3.0.0")).containsKey("dist");
+    assertThat(tarballFile(repo, name, "3.0.0")).exists();
+  }
+
+  @Test
+  @DisplayName("publishing under another tag works when package.json is gone, and keeps latest")
+  void publishUnderATagWithoutMetadata() throws Exception {
+    final var repo = this.npmRepo();
+    final var token = this.adminToken();
+    final var name = this.publishedVersions(repo, token, "1.0.0", "2.0.0");
+    loseTheMetadataOf(repo, name);
+
+    assertThat(this.publishWith(repo, name, "3.0.0-next.1", "next", token).getStatus())
+        .isEqualTo(200);
+
+    assertThat(this.storedMetadataVersions(repo, name))
+        .containsExactlyInAnyOrder("1.0.0", "2.0.0", "3.0.0-next.1");
+    assertThat(this.storedMetadataTags(repo, name))
+        .containsExactly(Map.entry("latest", "2.0.0"), Map.entry("next", "3.0.0-next.1"));
+  }
+
+  @Test
+  @DisplayName("publishing a new version works when the whole package directory is gone")
+  void publishWithoutTheDirectory() throws Exception {
+    final var repo = this.npmRepo();
+    final var token = this.adminToken();
+    final var name = this.publishedVersions(repo, token, "1.0.0", "2.0.0");
+    loseTheDirectoryOf(repo, name);
+
+    this.publish(repo, name, "3.0.0", token);
+
+    assertThat(this.storedMetadataVersions(repo, name))
+        .containsExactlyInAnyOrder("1.0.0", "2.0.0", "3.0.0");
+    assertThat(tarballFile(repo, name, "3.0.0")).exists();
+    // The tarballs of the others are gone too, so nothing can vouch for them: no invented digests.
+    @SuppressWarnings("unchecked")
+    final var dist = (Map<String, Object>) this.storedVersion(repo, name, "1.0.0").get("dist");
+    assertThat(dist).doesNotContainKeys("shasum", "integrity");
+  }
+
+  @Test
+  @DisplayName("a publish that fails leaves the missing file missing and no trace of the version")
+  void failedPublishWithoutMetadataLeavesNothing() throws Exception {
+    final var repo = this.npmRepo();
+    final var token = this.adminToken();
+    final var name = this.publishedVersions(repo, token, "1.0.0", "2.0.0");
+    loseTheMetadataOf(repo, name);
+    doAnswer(
+            invocation -> {
+              throw new IllegalStateException("storage went away");
+            })
+        .when(this.npmStorageService)
+        .writeMetadataToFile(any(), any(), any());
+
+    final var response =
+        this.protocol(
+            put(PACKAGE_PATH, repo.getName(), name)
+                .header(AUTHORIZATION, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(this.publishBody(repo, name, "3.0.0")));
+
+    assertThat(response.getStatus()).isGreaterThanOrEqualTo(500);
+    assertThat(this.rowVersions(repo, name)).containsExactly("1.0.0", "2.0.0");
+    assertThat(metadataFile(repo, name)).doesNotExist();
+    assertThat(tarballFile(repo, name, "3.0.0")).doesNotExist();
+    assertThat(tarballFile(repo, name, "2.0.0")).exists();
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // A package.json that is there but corrupt (RPS-1310)
+  // -------------------------------------------------------------------------------------------
+
+  @Test
+  @DisplayName("publishing a new version works when package.json is corrupt, and warns")
+  void publishWithCorruptMetadata() throws Exception {
+    final var repo = this.npmRepo();
+    final var token = this.adminToken();
+    final var name = this.publishedVersions(repo, token, "1.0.0", "2.0.0");
+    corruptTheMetadataOf(repo, name);
+
+    this.publish(repo, name, "3.0.0", token);
+
+    assertThat(this.storedMetadataVersions(repo, name))
+        .containsExactlyInAnyOrder("1.0.0", "2.0.0", "3.0.0");
+    assertThat(this.storedMetadataTags(repo, name)).containsExactly(Map.entry("latest", "3.0.0"));
+    assertThat(this.corruptionWarnings()).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("a publish that fails puts the corrupt file back, as it was")
+  void failedPublishRestoresTheCorruptFile() throws Exception {
+    final var repo = this.npmRepo();
+    final var token = this.adminToken();
+    final var name = this.publishedVersions(repo, token, "1.0.0", "2.0.0");
+    corruptTheMetadataOf(repo, name);
+    doAnswer(
+            invocation -> {
+              throw new IllegalStateException("storage went away");
+            })
+        .when(this.npmStorageService)
+        .writeMetadataToFile(any(), any(), any());
+
+    final var response =
+        this.protocol(
+            put(PACKAGE_PATH, repo.getName(), name)
+                .header(AUTHORIZATION, token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(this.publishBody(repo, name, "3.0.0")));
+
+    assertThat(response.getStatus()).isGreaterThanOrEqualTo(500);
+    assertThat(this.rowVersions(repo, name)).containsExactly("1.0.0", "2.0.0");
+    assertThat(Files.readString(metadataFile(repo, name))).isEqualTo(CORRUPT);
+    assertThat(tarballFile(repo, name, "3.0.0")).doesNotExist();
+  }
+
+  @Test
+  @DisplayName("deleting a version from the panel works when package.json is corrupt")
+  void panelDeleteWithCorruptMetadata() throws Exception {
+    final var repo = this.npmRepo();
+    final var name = this.publishedVersions(repo, this.adminToken(), "1.0.0", "1.1.0", "2.0.0");
+    corruptTheMetadataOf(repo, name);
+
+    this.panelDelete(repo, name, "1.1.0");
+
+    assertThat(this.rowVersions(repo, name)).containsExactly("1.0.0", "2.0.0");
+    assertThat(this.storedMetadataVersions(repo, name)).containsExactlyInAnyOrder("1.0.0", "2.0.0");
+    assertThat(tarballFile(repo, name, "1.1.0")).doesNotExist();
+  }
+
+  @Test
+  @DisplayName("npm deprecate works when package.json is corrupt")
+  void protocolDeprecateWithCorruptMetadata() throws Exception {
+    final var repo = this.npmRepo();
+    final var token = this.adminToken();
+    final var name = this.publishedVersions(repo, token, "1.0.0", "1.1.0");
+    corruptTheMetadataOf(repo, name);
+
+    final var payload = withDeprecation(this.readPackument(repo, name, token), "1.0.0", "use 1.1");
+    final var response = this.putPackument(repo, name, payload, token);
+
+    assertThat(response.getStatus()).isEqualTo(200);
+    assertThat(this.storedVersion(repo, name, "1.0.0")).containsEntry("deprecated", "use 1.1");
+    assertThat(this.storedMetadataVersions(repo, name)).containsExactlyInAnyOrder("1.0.0", "1.1.0");
+  }
+
+  @Test
+  @DisplayName(
+      "reading a package whose metadata is corrupt serves it from the rows, and writes nothing")
+  void readingACorruptFileServesTheRows() throws Exception {
+    final var repo = this.npmRepo();
+    final var token = this.adminToken();
+    final var name = this.publishedVersions(repo, token, "1.0.0", "2.0.0");
+    corruptTheMetadataOf(repo, name);
+
+    final var packument = this.readPackument(repo, name, token);
+
+    assertThat(Files.readString(metadataFile(repo, name))).isEqualTo(CORRUPT);
+    assertThat(this.versionsOf(packument)).containsExactlyInAnyOrder("1.0.0", "2.0.0");
+    assertThat(this.tagsOf(packument)).containsEntry("latest", "2.0.0");
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // The version page of the panel (RPS-1310)
+  // -------------------------------------------------------------------------------------------
+
+  private String versionPageReadme(final Repo repo, final String name, final String version)
+      throws IOException {
+    RequestContextHolder.resetRequestAttributes();
+
+    return this.npmApiFacade.getVersion(this.infoOf(repo), null, name, version).getReadme();
+  }
+
+  @Test
+  @DisplayName("the version page shows the readme of a package whose metadata is there")
+  void versionPageShowsTheReadme() throws Exception {
+    final var repo = this.npmRepo();
+    final var name = "readme-" + randomTag();
+    assertThat(
+            this.protocol(
+                    put(PACKAGE_PATH, repo.getName(), name)
+                        .header(AUTHORIZATION, this.adminToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(this.publishBody(repo, name, "1.0.0", "latest", "# Hello")))
+                .getStatus())
+        .isEqualTo(200);
+
+    assertThat(this.versionPageReadme(repo, name, "1.0.0")).isEqualTo("# Hello");
+  }
+
+  @Test
+  @DisplayName("the version page renders without a readme when package.json is gone")
+  void versionPageWithoutMetadata() throws Exception {
+    final var repo = this.npmRepo();
+    final var name = this.publishedVersions(repo, this.adminToken(), "1.0.0", "2.0.0");
+    loseTheMetadataOf(repo, name);
+
+    assertThat(this.versionPageReadme(repo, name, "1.0.0")).isNull();
+    assertThat(metadataFile(repo, name)).doesNotExist();
+  }
+
+  @Test
+  @DisplayName("the version page renders without a readme when package.json is corrupt")
+  void versionPageWithCorruptMetadata() throws Exception {
+    final var repo = this.npmRepo();
+    final var name = this.publishedVersions(repo, this.adminToken(), "1.0.0", "2.0.0");
+    corruptTheMetadataOf(repo, name);
+
+    assertThat(this.versionPageReadme(repo, name, "1.0.0")).isNull();
+    assertThat(Files.readString(metadataFile(repo, name))).isEqualTo(CORRUPT);
+  }
+
+  @Test
+  @DisplayName("the version page of a package the rows do not know is still not found")
+  void versionPageOfAnUnknownPackage() throws Exception {
+    final var repo = this.npmRepo();
+
+    org.junit.jupiter.api.Assertions.assertThrows(
+        io.repsy.core.error_handling.exceptions.ItemNotFoundException.class,
+        () -> this.versionPageReadme(repo, "never-published-" + randomTag(), "1.0.0"));
+  }
+
+  private List<String> corruptionWarnings() {
+    return this.warnings.list.stream()
+        .filter(event -> event.getLevel() == Level.WARN)
+        .map(ILoggingEvent::getFormattedMessage)
+        .filter(message -> message.contains("corrupt"))
+        .toList();
   }
 
   @SuppressWarnings("unchecked")

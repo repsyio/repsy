@@ -19,10 +19,11 @@ import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
-import { RepoType, ScanOverview, VulnerabilityScanControllerService } from '../../../../../generated/api';
+import { ScanOverview, VulnerabilityScanControllerService } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { PortalToBodyDirective } from '../../directives/portal-to-body.directive';
+import { toApiRepoType } from '../../util/repo-api-type';
 import { recentScanNote } from '../../util/rescan-status.util';
 import { buildArtifactDetailRoute } from '../../util/security-detail-route.util';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
@@ -89,7 +90,7 @@ export class VersionSecurityModalComponent implements OnChanges {
 
   private buildDetailRoute() {
     return buildArtifactDetailRoute(
-      this.repoType.toUpperCase() as RepoType,
+      toApiRepoType(this.repoType),
       this.repoName,
       this.artifactName,
       this.artifactVersion,

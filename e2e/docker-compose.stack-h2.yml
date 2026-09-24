@@ -41,6 +41,10 @@ services:
       DB_USERNAME: repsy
       DB_PASSWORD: repsy123
       ADMIN_INITIAL_PASSWORD: ${REPSY_ADMIN_PASSWORD:?Set REPSY_ADMIN_PASSWORD in e2e/.env}
+      # The panel's client snippets (docker login/pull, mvn, npm ...) print this host and port
+      # (entrypoint.sh writes it into static-env.js); the image defaults to http://localhost:9090
+      # whatever port the stack is published on (RPS-1314).
+      REPO_BASE_URL: ${REPSY_REPO_BASE_URL:-http://localhost:9090}
       # Negative-auth scenarios (wrong password, revoked/expired token) authenticate wrong on
       # purpose; a stack this harness owns can raise the limit far above anything a run could trip
       # (see target.ts: canTuneThrottle is false for a "remote" target, which cannot do this).

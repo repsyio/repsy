@@ -26,6 +26,7 @@ import {
   CrateInfo,
   CrateVersionInfo,
   RepoPermissionInfo,
+  RepoType,
 } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
@@ -51,6 +52,7 @@ import { CargoService } from '../../service/cargo.service';
   templateUrl: './cargo-crates-version-detail.component.html',
 })
 export class CargoCratesVersionDetailComponent implements OnDestroy {
+  public readonly securityRepoType = RepoType.Cargo;
   public loading = true;
   public error: string;
   public packageName: string;

@@ -14,7 +14,7 @@
 /// limitations under the License.
 
 import { RepoType } from '../../../../generated/api';
-import { toApiRepoType } from './repo-api-type';
+import { toApiRepoType, toRouteSlug } from './repo-api-type';
 
 describe('toApiRepoType', () => {
   it('maps every generated type from its lower-case UI spelling and from its own', () => {
@@ -30,5 +30,26 @@ describe('toApiRepoType', () => {
     expect(toApiRepoType('')).toBeUndefined();
     expect(toApiRepoType(null)).toBeUndefined();
     expect(toApiRepoType(undefined)).toBeUndefined();
+  });
+});
+
+describe('toRouteSlug', () => {
+  it('maps every generated type, in either case, to its lower-case route slug', () => {
+    for (const type of Object.values(RepoType)) {
+      expect(toRouteSlug(type)).toBe(type.toLowerCase() as Lowercase<RepoType>);
+      expect(toRouteSlug(type.toLowerCase())).toBe(type.toLowerCase() as Lowercase<RepoType>);
+    }
+  });
+
+  it('round-trips with toApiRepoType', () => {
+    for (const type of Object.values(RepoType)) {
+      expect(toApiRepoType(toRouteSlug(type))).toBe(type);
+    }
+  });
+
+  it('gives undefined for the "all" option, an unknown type and nothing', () => {
+    expect(toRouteSlug('all')).toBeUndefined();
+    expect(toRouteSlug('')).toBeUndefined();
+    expect(toRouteSlug(undefined)).toBeUndefined();
   });
 });

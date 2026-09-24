@@ -911,6 +911,35 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
       assertPage(body, 10, 0, expectedVersions.size(), expectedVersions.isEmpty() ? 0 : 1);
     }
 
+    @ParameterizedTest(name = "repoType={0}")
+    @ValueSource(strings = {"maven", "Maven", "mAvEn"})
+    @DisplayName("reads repoType without regard to case")
+    void repoTypeIsCaseInsensitive(final String spelling) throws Exception {
+      this.seedFilterFixture();
+
+      final var body =
+          expectScans(
+              SecurityScanControllerIT.this.getScans(
+                  SecurityScanControllerIT.this.seededAdminBearerToken(),
+                  Map.of("repoType", spelling)));
+
+      assertThat(artifactVersions(body))
+          .containsExactly("mavenB-high", "mavenA-clean", "mavenA-high", "mavenA-critical");
+      assertThat(content(body))
+          .extracting(scan -> scan.get("repoType"))
+          .as("the answer spells the type in upper case whatever the request did")
+          .containsOnly("MAVEN");
+    }
+
+    @Test
+    @DisplayName("still reads severity case-sensitively: the RepoType leniency is not global")
+    void severityStaysCaseSensitive() throws Exception {
+      expectValidationError(
+          SecurityScanControllerIT.this.getScans(
+              SecurityScanControllerIT.this.seededAdminBearerToken(), Map.of("severity", "high")),
+          "severity");
+    }
+
     static Stream<Arguments> repoTypeFilterExpectations() {
       return Stream.of(
           Arguments.of(
@@ -1100,8 +1129,9 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
     }
 
     static Stream<String> invalidEnumValues() {
-      // Enum binding is case-sensitive, so a lowercase spelling is rejected as well.
-      return Stream.of("BOGUS", "high", "maven", "1", "%20");
+      // The repo type is read without regard to case, so "maven" is a valid repoType (see
+      // repoTypeIsCaseInsensitive). Every other enum, the severity here, stays case-sensitive.
+      return Stream.of("BOGUS", "high", "mvn", "1", "%20");
     }
 
     // -------------------------------------------------------------------------------------------
@@ -1590,6 +1620,19 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
       assertSummary(docker, 0, 0, 0, 0, 0);
     }
 
+    @ParameterizedTest(name = "repoType={0}")
+    @ValueSource(strings = {"maven", "Maven", "mAvEn"})
+    @DisplayName("reads repoType without regard to case")
+    void repoTypeIsCaseInsensitive(final String spelling) throws Exception {
+      final var t = SecurityScanControllerIT.this;
+      this.seedFilterFixture();
+
+      final var maven =
+          expectSummary(t.getSummary(t.seededAdminBearerToken(), Map.of("repoType", spelling)));
+
+      assertSummary(maven, 1, 2, 0, 1, 0);
+    }
+
     @Test
     @DisplayName("filters by repoName")
     void filterByRepoName() throws Exception {
@@ -1686,7 +1729,7 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
     }
 
     static Stream<String> invalidRepoTypes() {
-      return Stream.of("BOGUS", "maven", "1");
+      return Stream.of("BOGUS", "mvn", "1");
     }
   }
 

@@ -16,7 +16,7 @@
 
 import { firstValueFrom, of, throwError } from 'rxjs';
 
-import { ProtocolRepoControllerService } from '../../../../../generated/api';
+import { ProtocolRepoControllerService, RepoType } from '../../../../../generated/api';
 import { RepoLookupService } from './repo-lookup.service';
 
 describe('RepoLookupService', () => {
@@ -26,7 +26,7 @@ describe('RepoLookupService', () => {
   beforeEach(() => {
     getRepoType = jasmine
       .createSpy('getRepoType')
-      .and.callFake((repoName: string) => of({ data: repoName.startsWith('npm') ? 'npm' : 'maven' }));
+      .and.callFake((repoName: string) => of({ data: repoName.startsWith('npm') ? 'NPM' : 'MAVEN' }));
     service = new RepoLookupService({ getRepoType } as unknown as ProtocolRepoControllerService);
   });
 
@@ -40,6 +40,23 @@ describe('RepoLookupService', () => {
 
       expect(getRepoType).toHaveBeenCalledOnceWith('acme-maven');
       expect(service.currentRepo).toEqual({ repoName: 'acme-maven', repoType: 'maven' });
+    });
+
+    it('maps the API type (upper case) to the lower-case route slug, for every type', async () => {
+      for (const type of Object.values(RepoType)) {
+        getRepoType.and.returnValue(of({ data: type }));
+
+        expect(await firstValueFrom(service.checkRepoType(`repo-${type}`))).toBe(type.toLowerCase());
+      }
+    });
+
+    it('fails a lookup that answers a type it does not know', async () => {
+      getRepoType.and.returnValue(of({ data: 'BOGUS' }));
+
+      await expectAsync(firstValueFrom(service.getRepoType('acme-maven'))).toBeRejectedWithError(
+        'Unknown repository type "BOGUS" for acme-maven',
+      );
+      expect(service.currentRepo).toBeNull();
     });
 
     it('serves a repeated lookup from the cache', async () => {
@@ -73,7 +90,7 @@ describe('RepoLookupService', () => {
     it('does not cache or publish a failed lookup, so the next call retries', async () => {
       getRepoType.and.returnValues(
         throwError(() => new Error('not found')),
-        of({ data: 'maven' }),
+        of({ data: 'MAVEN' }),
       );
 
       await expectAsync(firstValueFrom(service.getRepoType('acme-maven'))).toBeRejectedWithError('not found');

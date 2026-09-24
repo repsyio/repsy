@@ -71,19 +71,14 @@ public class ImageTxService implements ImageService<UUID> {
     return this.imageConverter.toImageInfo(savedImage);
   }
 
-  @Override
-  @Transactional
-  public void updateImageSize(final UUID repoId, final UUID imageId, final String manifestDigest) {
-
-    this.storeSizeAndDigest(repoId, imageId, manifestDigest);
-  }
-
   /**
-   * Recomputes the size and the digest the panel lists the image with, after a tag or a manifest
-   * was deleted: the size is the one a push stores (see {@link #updateImageSize}), the digest is
-   * the one of the manifest the most recently moved tag points at, and none once no tag is left.
-   * Runs in the caller's transaction, so the numbers never disagree with the rows that changed.
+   * Recomputes the size and the digest the panel lists the image with, after a manifest was pushed
+   * or a tag or a manifest was deleted: the size is that of the layers the tagged manifests reach,
+   * the digest is the one of the manifest the most recently moved tag points at, and none once no
+   * tag is left. Runs in the caller's transaction, so the numbers never disagree with the rows that
+   * changed.
    */
+  @Override
   @Transactional
   public void refreshImageSize(final UUID repoId, final UUID imageId) {
 
