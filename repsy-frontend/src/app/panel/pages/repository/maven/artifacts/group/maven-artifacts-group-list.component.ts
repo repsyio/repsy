@@ -22,7 +22,7 @@ import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import { ArtifactListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { ArtifactListItem, MavenGroupSummary, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
@@ -37,6 +37,18 @@ import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { MavenConfigComponent } from '../../config/maven-config.component';
 import { MavenService } from '../../service/maven.service';
+
+function plural(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? '' : 's'}`;
+}
+
+/** The dialog's message: the group, and what deleting it removes (all of it, when the counts are not known). */
+export function groupDeleteWarning(groupName: string, summary?: MavenGroupSummary): string {
+  const what = summary
+    ? `${plural(summary.artifactCount, 'artifact')} and ${plural(summary.versionCount, 'version')}`
+    : 'all of its artifacts and versions';
+  return `The whole group ${groupName} will be deleted, not just this artifact: ${what}. This cannot be undone.`;
+}
 
 @Component({
   selector: 'app-maven-group-list',
@@ -130,11 +142,24 @@ export class MavenArtifactsGroupListComponent implements OnDestroy {
     return moment(date).fromNow();
   }
 
+  /**
+   * Deleting from this list removes the whole GROUP, although a row is one artifact (RPS-1288): the
+   * confirmation names the group and says how many artifacts and versions go with it.
+   */
   public deleteGroup(artifact: ArtifactListItem) {
-    this.dangerModalService.show('Delete Group', 'Delete', () => {
+    const groupName = artifact.groupName;
+    this.mavenService.getGroupSummary(groupName).subscribe({
+      next: (summary) => this.confirmGroupDelete(groupName, groupDeleteWarning(groupName, summary)),
+      // The counts are a courtesy: without them the dialog still names the group and what goes with it.
+      error: () => this.confirmGroupDelete(groupName, groupDeleteWarning(groupName)),
+    });
+  }
+
+  private confirmGroupDelete(groupName: string, warning: string) {
+    this.dangerModalService.showWithMessage('Delete Group', 'Delete', warning, () => {
       this.loading = true;
       this.mavenService
-        .deleteGroup(artifact.groupName)
+        .deleteGroup(groupName)
         .pipe(
           finalize(() => {
             this.loading = false;

@@ -28,6 +28,12 @@ import { CopyClipboardComponent } from '../../../../../shared/components/copy-cl
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import {
+  deleteVersionAndCheckLast$,
+  landAfterVersionDelete,
+  VERSION_PROBE_SIZE,
+  VERSION_PROBE_SORT,
+} from '../../../../../shared/util/version-delete-landing.util';
 import { RubyService } from '../../service/ruby.service';
 
 @Component({
@@ -109,18 +115,24 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
   public deleteVersion(): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
-      this.rubyService
-        .deleteGemVersion(this.gemName, this.versionName, this.gemVersion?.platform ?? 'ruby')
+      deleteVersionAndCheckLast$(
+        this.rubyService.fetchGemVersions(this.gemName, '', VERSION_PROBE_SORT, 0, VERSION_PROBE_SIZE),
+        () => this.rubyService.deleteGemVersion(this.gemName, this.versionName, this.gemVersion?.platform ?? 'ruby'),
+      )
         .pipe(
           finalize(() => {
             this.loading = false;
           }),
         )
         .subscribe({
-          next: () => {
-            this.router.navigate(['../..'], { relativeTo: this.route }).then(() => {
-              this.toastService.show('Version deleted successfully', 'success');
-            });
+          next: (wasLastVersion) => {
+            landAfterVersionDelete(
+              this.router,
+              this.route,
+              this.toastService,
+              this.activeRepo.repoName,
+              wasLastVersion,
+            );
           },
           error: () => {},
         });

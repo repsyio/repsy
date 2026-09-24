@@ -29,6 +29,12 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
+import {
+  deleteVersionAndCheckLast$,
+  landAfterVersionDelete,
+  VERSION_PROBE_SIZE,
+  VERSION_PROBE_SORT,
+} from '../../../../../shared/util/version-delete-landing.util';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { PypiService } from '../../service/pypi.service';
 
@@ -133,18 +139,24 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
   public deleteVersion() {
     this.dangerModalService.show('Delete Release', 'Delete', () => {
       this.loading = true;
-      this.pypiService
-        .deleteRelease(this.packageName, this.versionInfo.version)
+      deleteVersionAndCheckLast$(
+        this.pypiService.fetchPackageReleasesLikeName(this.packageName, '', VERSION_PROBE_SORT, 0, VERSION_PROBE_SIZE),
+        () => this.pypiService.deleteRelease(this.packageName, this.versionInfo.version),
+      )
         .pipe(
           finalize(() => {
             this.loading = false;
           }),
         )
         .subscribe({
-          next: () => {
-            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
-              this.toastService.show('Version deleted successfully', 'success');
-            });
+          next: (wasLastVersion) => {
+            landAfterVersionDelete(
+              this.router,
+              this.route,
+              this.toastService,
+              this.activeRepo.repoName,
+              wasLastVersion,
+            );
           },
           error: () => {},
         });

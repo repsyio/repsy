@@ -52,7 +52,8 @@ function packageBase(repo: string, target: PackageRef | undefined): string {
  *    detail (list) or that version's detail; `row-package-link` opens the versions page. The scope
  *    link exists only on SCOPED rows (unscoped rows get a plain `row-scope` `~` div instead).
  *  - The versions page has a `pkg-dist-tags` bar (and one `pkg-dist-tag-<tag>` per tag).
- *  - The detail page renders `readme`.
+ *  - The detail page renders `readme` and, next to the install command, the `.npmrc` registry line of
+ *    the repo (`pkg-detail-snippet-npmrc`, scoped for a scoped package; RPS-1288 (6)).
  */
 export const npmDescriptor: ProtocolDescriptor = {
   protocol: 'npm',
@@ -105,15 +106,19 @@ export const npmDescriptor: ProtocolDescriptor = {
     detail: {
       path: (repo, t) => `${packageBase(repo, t)}/${split(t).version}`,
       installContains: (_repo, t) => [`npm install ${need(t, 'npm').name}`],
-      repoUrlIn: 'none',
+      repoUrlIn: 'snippet:npmrc',
+      // The trailing slash matters to npm (RPS-1206); a scoped package gets its scope's line.
+      repoConfigContains: (repo, url, t) => {
+        const { scope } = split(t);
+        return [`${scope ? `@${scope}:` : ''}registry=${url}/${repo}/`];
+      },
       installTextElement: 'span',
-      snippets: [],
+      snippets: ['npmrc'],
       extraIds: ['pkg-detail-version', 'pkg-detail-published'],
       readme: true,
       delete: {
         dialogTitle: 'Delete Version',
         successToast: 'Version deleted successfully',
-        landsOn: 'list',
       },
     },
   },

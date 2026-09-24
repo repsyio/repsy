@@ -17,6 +17,7 @@ import { TestBed } from '@angular/core/testing';
 
 import {
   MavenArtifactControllerService,
+  MavenGroupControllerService,
   ProtocolRepoControllerService,
   RepoSettingsForm,
 } from '../../../../../../generated/api';
@@ -44,6 +45,7 @@ const PATH = 'io/acme/widget';
 describe('MavenService', () => {
   let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
   let mavenApi: jasmine.SpyObj<MavenArtifactControllerService>;
+  let groupApi: jasmine.SpyObj<MavenGroupControllerService>;
   let service: MavenService;
 
   beforeEach(() => {
@@ -62,10 +64,14 @@ describe('MavenService', () => {
       'deleteMavenArtifact',
       'deleteMavenArtifactVersion',
     ]);
+    groupApi = jasmine.createSpyObj<MavenGroupControllerService>('MavenGroupControllerService', [
+      'getMavenGroupSummary',
+    ]);
     TestBed.configureTestingModule({
       providers: [
         { provide: ProtocolRepoControllerService, useValue: repoApi },
         { provide: MavenArtifactControllerService, useValue: mavenApi },
+        { provide: MavenGroupControllerService, useValue: groupApi },
       ],
     });
     service = TestBed.inject(MavenService);
@@ -108,6 +114,7 @@ describe('MavenService', () => {
     const files = [{ name: 'widget-1.2.3.jar', path: `${PATH}/1.2.3` }];
     const info = { version: VERSION };
     const deleted = { deletedVersionCount: 3 };
+    const summary = { groupName: GROUP, artifactCount: 2, versionCount: 5 };
     const settings = { versionPolicy: 'RELEASE' } as unknown as RepoSettingsForm;
     const calls: CallCase<MavenService>[] = [
       {
@@ -141,6 +148,15 @@ describe('MavenService', () => {
         args: [GROUP, ARTIFACT, VERSION, REPO],
         response: restResponse(info),
         expected: info,
+      },
+      {
+        name: 'getGroupSummary',
+        invoke: (s) => s.getGroupSummary(GROUP),
+        api: () => groupApi.getMavenGroupSummary,
+        args: [GROUP, REPO],
+        response: restResponse(summary),
+        expected: summary,
+        notCalled: () => [mavenApi.deleteGroup],
       },
       {
         name: 'deleteGroup',

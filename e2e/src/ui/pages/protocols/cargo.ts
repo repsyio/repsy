@@ -58,15 +58,15 @@ export const cargoDescriptor: ProtocolDescriptor = {
         return `/${repo}/${name}/${version}`;
       },
       installContains: (_repo, t) => [`${need(t, 'cargo').name}@${need(t, 'cargo').version}`],
-      repoUrlIn: 'none',
+      repoUrlIn: 'snippet:cargo-config',
+      repoConfigContains: (repo, url) => ['[registries]', `index = "sparse+${url}/${repo}/"`],
       installTextElement: 'span',
-      snippets: ['cargo-toml'],
+      snippets: ['cargo-config', 'cargo-toml'],
       extraIds: ['pkg-detail-version', 'pkg-detail-published'],
       readme: true,
       delete: {
         dialogTitle: 'Delete Version',
         successToast: 'Version deleted successfully',
-        landsOn: 'list',
       },
     },
   },

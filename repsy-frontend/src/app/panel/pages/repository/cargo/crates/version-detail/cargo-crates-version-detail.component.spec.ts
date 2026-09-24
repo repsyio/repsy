@@ -19,12 +19,14 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { Highlight } from 'ngx-highlightjs';
 import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
-import { BehaviorSubject, of } from 'rxjs';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 
+import { environment } from '../../../../../../../environments/environment';
 import { CrateInfo, CrateVersionInfo, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { VERSION_PROBE_SORT } from '../../../../../shared/util/version-delete-landing.util';
 import { CargoService } from '../../service/cargo.service';
 import { CargoCratesVersionDetailComponent } from './cargo-crates-version-detail.component';
 
@@ -140,5 +142,112 @@ describe('CargoCratesVersionDetailComponent README', () => {
     const el = render(undefined);
 
     expect(el.querySelector('[data-testid="pkg-detail-yanked"]')).toBeNull();
+  });
+});
+
+describe('CargoCratesVersionDetailComponent registry snippet and delete (RPS-1288)', () => {
+  const REPO = 'cargo-repo';
+  let cargoService: jasmine.SpyObj<CargoService>;
+  let router: jasmine.SpyObj<Router>;
+  let toast: jasmine.SpyObj<ToastService>;
+  let danger: jasmine.SpyObj<DangerModalService>;
+  const route = {
+    snapshot: { paramMap: convertToParamMap({ crate: 'acme-lib', version: '1.2.3' }) },
+  } as ActivatedRoute;
+
+  function render(): ComponentFixture<CargoCratesVersionDetailComponent> {
+    const fixture = TestBed.createComponent(CargoCratesVersionDetailComponent);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  beforeEach(() => {
+    cargoService = jasmine.createSpyObj<CargoService>(
+      'CargoService',
+      ['fetchCrate', 'fetchCrateVersion', 'fetchCrateVersions', 'deleteCrateVersion'],
+      {
+        repoChanges: new BehaviorSubject<RepoPermissionInfo>({
+          repoName: REPO,
+          canRead: true,
+          canWrite: true,
+          canManage: true,
+          private: false,
+        }),
+      },
+    );
+    cargoService.fetchCrate.and.returnValue(of({ originalName: 'acme-lib' } as CrateInfo));
+    cargoService.fetchCrateVersion.and.returnValue(
+      of({ name: 'acme-lib', version: '1.2.3', hasLib: true, deps: [] } as unknown as CrateVersionInfo),
+    );
+    cargoService.fetchCrateVersions.and.returnValue(of({ content: [{}, {}] } as never));
+    cargoService.deleteCrateVersion.and.returnValue(of(undefined));
+    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
+    router.navigate.and.resolveTo(true);
+    toast = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
+    danger = jasmine.createSpyObj<DangerModalService>('DangerModalService', ['show']);
+
+    TestBed.configureTestingModule({
+      imports: [CargoCratesVersionDetailComponent],
+      providers: [
+        { provide: CargoService, useValue: cargoService },
+        { provide: ActivatedRoute, useValue: route },
+        { provide: ToastService, useValue: toast },
+        { provide: DangerModalService, useValue: danger },
+        { provide: Router, useValue: router },
+      ],
+    });
+    TestBed.overrideComponent(CargoCratesVersionDetailComponent, {
+      remove: { imports: [SecurityScanSectionComponent, Highlight, HighlightLineNumbers] },
+      add: { imports: [SecurityScanSectionStubComponent, HighlightStubDirective, HighlightLineNumbersStubDirective] },
+    });
+  });
+
+  it('shows the registry entry of this repository next to the add command', () => {
+    const fixture = render();
+
+    const snippet = fixture.nativeElement.querySelector('[data-testid="pkg-detail-snippet-cargo-config"]');
+    expect(snippet).not.toBeNull();
+    expect(fixture.componentInstance.cargoConfig).toBe(
+      `[registries]\nrepsy = { index = "sparse+${environment.repoBaseUrl}/${REPO}/" }`,
+    );
+    // The command names the registry the entry defines.
+    expect(fixture.componentInstance.addDependencyCommand).toBe('cargo add acme-lib@1.2.3 --registry repsy');
+  });
+
+  function confirmDelete(fixture: ComponentFixture<CargoCratesVersionDetailComponent>): Promise<void> {
+    fixture.componentInstance.deleteVersion();
+    danger.show.calls.mostRecent().args[2]();
+    return fixture.whenStable();
+  }
+
+  it('goes to the versions page of the crate after deleting one of several versions', async () => {
+    const fixture = render();
+
+    await confirmDelete(fixture);
+
+    expect(cargoService.fetchCrateVersions).toHaveBeenCalledOnceWith('acme-lib', '', VERSION_PROBE_SORT, 0, 2);
+    expect(cargoService.deleteCrateVersion).toHaveBeenCalledOnceWith('acme-lib', '1.2.3');
+    expect(router.navigate).toHaveBeenCalledOnceWith(['..'], { relativeTo: route });
+    expect(toast.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
+  });
+
+  it('goes to the crate list of the repository after the last version', async () => {
+    cargoService.fetchCrateVersions.and.returnValue(of({ content: [{}] } as never));
+    const fixture = render();
+
+    await confirmDelete(fixture);
+
+    expect(router.navigate).toHaveBeenCalledOnceWith(['/', REPO]);
+    expect(toast.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
+  });
+
+  it('deletes nothing when the versions of the crate cannot be read', async () => {
+    cargoService.fetchCrateVersions.and.returnValue(throwError(() => new Error('boom')));
+    const fixture = render();
+
+    await confirmDelete(fixture);
+
+    expect(cargoService.deleteCrateVersion).not.toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 });

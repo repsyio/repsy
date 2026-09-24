@@ -46,6 +46,16 @@ public interface ArtifactVersionRepository extends JpaRepository<ArtifactVersion
   long countByRepoIdAndGroupNameAndArtifactName(
       UUID repoId, @NonNull String groupName, @NonNull String artifactName);
 
+  /** The versions of every artifact of a group, which is what deleting the group removes. */
+  @Query(
+      """
+        select count(av)
+        from ArtifactVersion av
+        join av.artifact a
+        where a.repo.id = :repoId
+        and a.groupName = :groupName""")
+  long countByRepoIdAndGroupName(UUID repoId, @NonNull String groupName);
+
   @Query(
       """
         select av from ArtifactVersion av

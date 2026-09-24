@@ -73,7 +73,6 @@ export const rubyDescriptor: ProtocolDescriptor = {
       delete: {
         dialogTitle: 'Delete Version',
         successToast: 'Version deleted successfully',
-        landsOn: 'list',
       },
     },
   },

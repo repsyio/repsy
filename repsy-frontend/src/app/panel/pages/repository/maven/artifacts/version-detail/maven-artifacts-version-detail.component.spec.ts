@@ -20,6 +20,7 @@ import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { HIGHLIGHT_OPTIONS } from 'ngx-highlightjs';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
+import { environment } from '../../../../../../../environments/environment';
 import { ArtifactVersionInfo, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -29,6 +30,7 @@ import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/bre
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { renderComponent } from '../../../testing/render-spec-helpers';
+import { DeletedItem } from '../../dto/deleted-item';
 import { MavenService } from '../../service/maven.service';
 import { MavenArtifactsVersionDetailComponent } from './maven-artifacts-version-detail.component';
 
@@ -48,6 +50,9 @@ describe('MavenArtifactsVersionDetailComponent', () => {
   let breadcrumbSecurityLinkService: BreadcrumbSecurityLinkService;
   let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
   let currentRepo: { repoName: string; repoType: string } | null;
+  const route = {
+    snapshot: { paramMap: convertToParamMap({ group: 'org.acme', artifact: 'lib', version: '1.2.3' }) },
+  } as ActivatedRoute;
 
   beforeEach(() => {
     // The component logs every repository emission it ignores; keep that out of the test output.
@@ -58,17 +63,15 @@ describe('MavenArtifactsVersionDetailComponent', () => {
       repoChanges,
     });
     mavenService.fetchArtifactVersion.and.returnValue(of(VERSION));
-    mavenService.deleteVersion.and.returnValue(of(undefined as never));
+    mavenService.deleteVersion.and.returnValue(of(DeletedItem.VERSION));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
-    router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
-    router.navigateByUrl.and.resolveTo(true);
+    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
+    router.navigate.and.resolveTo(true);
     dangerModalService = new DangerModalService();
     breadcrumbSecurityLinkService = new BreadcrumbSecurityLinkService();
     component = new MavenArtifactsVersionDetailComponent(
       mavenService,
-      {
-        snapshot: { paramMap: convertToParamMap({ group: 'org.acme', artifact: 'lib', version: '1.2.3' }) },
-      } as ActivatedRoute,
+      route,
       router,
       dangerModalService,
       toastService,
@@ -181,16 +184,30 @@ describe('MavenArtifactsVersionDetailComponent', () => {
       expect(mavenService.deleteVersion).not.toHaveBeenCalled();
     });
 
-    it('deletes the version, then goes to the repository and toasts', async () => {
+    it('deletes the version, then goes to the versions page of the artifact and toasts', async () => {
       component.deleteVersion();
 
       dangerModalService.call();
       await Promise.resolve();
 
       expect(mavenService.deleteVersion).toHaveBeenCalledOnceWith('org.acme', 'lib', '1.2.3');
-      expect(router.navigateByUrl).toHaveBeenCalledOnceWith(`/${REPO}`);
+      expect(router.navigate).toHaveBeenCalledOnceWith(['..'], { relativeTo: route });
       expect(toastService.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
     });
+
+    // The last version takes its artifact with it (and the last artifact its group), so the versions page is gone.
+    for (const deleted of [DeletedItem.ARTIFACT, DeletedItem.GROUP]) {
+      it(`goes to the package list of the repository when the server deleted the ${deleted.toLowerCase()} with it`, async () => {
+        mavenService.deleteVersion.and.returnValue(of(deleted));
+        component.deleteVersion();
+
+        dangerModalService.call();
+        await Promise.resolve();
+
+        expect(router.navigate).toHaveBeenCalledOnceWith(['/', REPO]);
+        expect(toastService.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
+      });
+    }
 
     it('shows the page as loading until the delete answers', () => {
       const answer = new Subject<never>();
@@ -210,7 +227,7 @@ describe('MavenArtifactsVersionDetailComponent', () => {
 
       dangerModalService.call();
 
-      expect(router.navigateByUrl).not.toHaveBeenCalled();
+      expect(router.navigate).not.toHaveBeenCalled();
       expect(toastService.show).not.toHaveBeenCalled();
       expect(component.loading).toBeFalse();
     });
@@ -218,7 +235,7 @@ describe('MavenArtifactsVersionDetailComponent', () => {
 });
 
 describe('MavenArtifactsVersionDetailComponent template', () => {
-  it('binds the Gradle Groovy DSL block to the Gradle snippet, and the Groovy Grape block to the Grape one (RPS-1261)', async () => {
+  async function render() {
     const mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['fetchArtifactVersion'], {
       repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO, { canManage: true })),
     });
@@ -249,13 +266,34 @@ describe('MavenArtifactsVersionDetailComponent template', () => {
       { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
       { provide: RepoLookupService, useValue: { currentRepo: { repoName: REPO, repoType: 'maven' } } },
     ]);
+    return fixture;
+  }
 
-    const copied = (testId: string): string | undefined =>
-      fixture.debugElement.query(By.css(`[data-testid="${testId}"]`)).query(By.directive(CopyClipboardComponent))
-        .componentInstance.text;
-    expect(copied('pkg-detail-snippet-gradle-groovy')).toBe("implementation 'org.acme:lib:1.2.3'");
-    expect(copied('pkg-detail-snippet-grape')).toBe(
+  const copied = (fixture: Awaited<ReturnType<typeof render>>, testId: string): string | undefined =>
+    fixture.debugElement.query(By.css(`[data-testid="${testId}"]`)).query(By.directive(CopyClipboardComponent))
+      .componentInstance.text;
+
+  it('binds the Gradle Groovy DSL block to the Gradle snippet, and the Groovy Grape block to the Grape one (RPS-1261)', async () => {
+    const fixture = await render();
+
+    expect(copied(fixture, 'pkg-detail-snippet-gradle-groovy')).toBe("implementation 'org.acme:lib:1.2.3'");
+    expect(copied(fixture, 'pkg-detail-snippet-grape')).toBe(
       "@Grapes(\n  @Grab(group='org.acme', module='lib', version='1.2.3')\n)",
     );
+  });
+
+  it('shows the repositories block with the URL of this repository next to the dependency (RPS-1288)', async () => {
+    const fixture = await render();
+
+    const url = `${environment.repoBaseUrl}/${REPO}`;
+    expect(copied(fixture, 'pkg-detail-snippet-repository')).toBe(`<repositories>
+  <repository>
+    <id>repsy</id>
+    <name>${REPO} on Repsy</name>
+    <url>${url}</url>
+  </repository>
+</repositories>`);
+    // The dependency snippet itself is unchanged.
+    expect(copied(fixture, 'pkg-detail-install')).toContain('<artifactId>lib</artifactId>');
   });
 });

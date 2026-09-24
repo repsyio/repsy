@@ -19,7 +19,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Highlight } from 'ngx-highlightjs';
 import { HighlightLineNumbers } from 'ngx-highlightjs/line-numbers';
 import { Subscription } from 'rxjs';
-import { finalize, map, switchMap } from 'rxjs/operators';
+import { finalize, map } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { HelmChartDetail, RepoPermissionInfo, RepoType } from '../../../../../../../generated/api';
@@ -29,6 +29,10 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { ByteFormatter } from '../../../../../shared/util/byte-formatter';
+import {
+  deleteVersionAndCheckLast$,
+  landAfterVersionDelete,
+} from '../../../../../shared/util/version-delete-landing.util';
 import { HelmService } from '../../service/helm.service';
 
 @Component({
@@ -84,24 +88,24 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
       this.loading = true;
       // Deleting the last version removes the chart, so its versions page would answer 404: the page
       // to land on is decided from the versions the chart has right before the delete.
-      this.helmService
-        .getChartVersions(this.chartName)
+      deleteVersionAndCheckLast$(
+        this.helmService.getChartVersions(this.chartName).pipe(map((versions) => ({ content: versions }))),
+        () => this.helmService.deleteChart(this.chartName, this.versionName),
+      )
         .pipe(
-          switchMap((versions) =>
-            this.helmService.deleteChart(this.chartName, this.versionName).pipe(map(() => versions.length <= 1)),
-          ),
           finalize(() => {
             this.loading = false;
           }),
         )
         .subscribe({
           next: (wasLastVersion) => {
-            const target = wasLastVersion
-              ? this.router.navigate(['/', this.activeRepo.repoName])
-              : this.router.navigate(['..'], { relativeTo: this.route });
-            target.then(() => {
-              this.toastService.show('Version deleted successfully', 'success');
-            });
+            landAfterVersionDelete(
+              this.router,
+              this.route,
+              this.toastService,
+              this.activeRepo.repoName,
+              wasLastVersion,
+            );
           },
           // The error interceptor has already shown the failure to the user.
           error: () => {},

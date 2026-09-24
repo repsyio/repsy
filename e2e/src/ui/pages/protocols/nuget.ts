@@ -23,8 +23,8 @@ import { NEWEST_OLDEST, need, type ProtocolDescriptor } from './types.js';
  *  - The VERSION list searches the version string (RPS-1304) and has no mobile card list (UX-12).
  *  - The install block is the ".NET CLI" one; its text sits in a `<pre>` (`pkg-detail-install-text`).
  *    The detail page also renders `readme`, `pkg-detail-tags`, `pkg-detail-listed` and dependencies.
- *  - Deleting the last version deletes the package, so the detail delete lands on the versions page,
- *    or on the list when it was the last version (`landsOn` records the usual case; unverified).
+ *  - Deleting the last version deletes the package (`lastVersionRemovesPackage`); the detail delete
+ *    follows the shared landing convention (versions page, or the list after the last version).
  */
 export const nugetDescriptor: ProtocolDescriptor = {
   protocol: 'nuget',
@@ -76,8 +76,6 @@ export const nugetDescriptor: ProtocolDescriptor = {
       delete: {
         dialogTitle: 'Delete Version',
         successToast: 'Version deleted successfully',
-        landsOn: 'versions',
-        landsOnLast: 'list',
       },
     },
   },

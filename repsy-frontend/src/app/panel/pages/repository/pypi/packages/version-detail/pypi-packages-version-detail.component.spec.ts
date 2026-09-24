@@ -17,7 +17,7 @@
 import { Component, Input } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
-import { BehaviorSubject, of } from 'rxjs';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import { environment } from '../../../../../../../environments/environment';
 import { ReleaseDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
@@ -25,6 +25,7 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
+import { VERSION_PROBE_SORT } from '../../../../../shared/util/version-delete-landing.util';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { PypiService } from '../../service/pypi.service';
 import { PypiPackagesVersionDetailComponent } from './pypi-packages-version-detail.component';
@@ -176,5 +177,107 @@ describe('PypiPackagesVersionDetailComponent description', () => {
       expect(kind({ postRelease: true })).toBe('Post release:');
       expect(kind({ devRelease: true })).toBe('Dev Release:');
     });
+  });
+});
+
+describe('PypiPackagesVersionDetailComponent delete (RPS-1288)', () => {
+  const REPO = 'pypi-repo';
+  let pypiService: jasmine.SpyObj<PypiService>;
+  let router: jasmine.SpyObj<Router>;
+  let toast: jasmine.SpyObj<ToastService>;
+  let danger: jasmine.SpyObj<DangerModalService>;
+  const route = {
+    snapshot: { paramMap: convertToParamMap({ package: 'acme-lib', version: '1.2.3' }) },
+  } as ActivatedRoute;
+
+  function render(): ComponentFixture<PypiPackagesVersionDetailComponent> {
+    const fixture = TestBed.createComponent(PypiPackagesVersionDetailComponent);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  function confirmDelete(fixture: ComponentFixture<PypiPackagesVersionDetailComponent>): Promise<void> {
+    fixture.componentInstance.deleteVersion();
+    danger.show.calls.mostRecent().args[2]();
+    return fixture.whenStable();
+  }
+
+  beforeEach(() => {
+    pypiService = jasmine.createSpyObj<PypiService>(
+      'PypiService',
+      ['fetchRelease', 'fetchPackageReleasesLikeName', 'deleteRelease'],
+      {
+        repoChanges: new BehaviorSubject<RepoPermissionInfo>({
+          repoName: REPO,
+          canRead: true,
+          canWrite: true,
+          canManage: true,
+          private: false,
+        }),
+      },
+    );
+    pypiService.fetchRelease.and.returnValue(
+      of({ packageName: 'acme-lib', version: '1.2.3', classifiers: [] } as ReleaseDetail),
+    );
+    pypiService.fetchPackageReleasesLikeName.and.returnValue(of({ content: [{}, {}] } as never));
+    pypiService.deleteRelease.and.returnValue(of(undefined));
+    router = jasmine.createSpyObj<Router>('Router', ['navigate']);
+    router.navigate.and.resolveTo(true);
+    toast = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
+    danger = jasmine.createSpyObj<DangerModalService>('DangerModalService', ['show']);
+
+    TestBed.configureTestingModule({
+      imports: [PypiPackagesVersionDetailComponent],
+      providers: [
+        { provide: PypiService, useValue: pypiService },
+        { provide: ActivatedRoute, useValue: route },
+        { provide: ToastService, useValue: toast },
+        { provide: DangerModalService, useValue: danger },
+        { provide: Router, useValue: router },
+        {
+          provide: BreadcrumbSecurityLinkService,
+          useValue: jasmine.createSpyObj<BreadcrumbSecurityLinkService>('BreadcrumbSecurityLinkService', [
+            'show',
+            'clear',
+          ]),
+        },
+        { provide: RepoLookupService, useValue: { currentRepo: { repoName: REPO, repoType: 'pypi' } } },
+      ],
+    });
+    TestBed.overrideComponent(PypiPackagesVersionDetailComponent, {
+      remove: { imports: [SecurityScanSectionComponent] },
+      add: { imports: [SecurityScanSectionStubComponent] },
+    });
+  });
+
+  it('goes to the versions page of the package after deleting one of several releases', async () => {
+    const fixture = render();
+
+    await confirmDelete(fixture);
+
+    expect(pypiService.fetchPackageReleasesLikeName).toHaveBeenCalledOnceWith('acme-lib', '', VERSION_PROBE_SORT, 0, 2);
+    expect(pypiService.deleteRelease).toHaveBeenCalledOnceWith('acme-lib', '1.2.3');
+    expect(router.navigate).toHaveBeenCalledOnceWith(['..'], { relativeTo: route });
+    expect(toast.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
+  });
+
+  it('goes to the package list of the repository after the last release', async () => {
+    pypiService.fetchPackageReleasesLikeName.and.returnValue(of({ content: [{}] } as never));
+    const fixture = render();
+
+    await confirmDelete(fixture);
+
+    expect(router.navigate).toHaveBeenCalledOnceWith(['/', REPO]);
+    expect(toast.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
+  });
+
+  it('deletes nothing when the releases of the package cannot be read', async () => {
+    pypiService.fetchPackageReleasesLikeName.and.returnValue(throwError(() => new Error('boom')));
+    const fixture = render();
+
+    await confirmDelete(fixture);
+
+    expect(pypiService.deleteRelease).not.toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 });

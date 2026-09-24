@@ -30,7 +30,9 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
+import { landAfterVersionDelete } from '../../../../../shared/util/version-delete-landing.util';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
+import { DeletedItem } from '../../dto/deleted-item';
 import { MavenService } from '../../service/maven.service';
 
 @Component({
@@ -57,6 +59,7 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
   public activeRepo: RepoPermissionInfo;
   public version: ArtifactVersionInfo;
   public mavenDependencyHtml: string;
+  public mavenRepositoryHtml: string;
   public gradleDependencyHtml: string;
   public gradleKotlinDependencyHtml: string;
   public sbtDependencyHtml: string;
@@ -131,6 +134,13 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
   <artifactId>${this.version.artifactName}</artifactId>
   <version>${this.version.artifactVersionName}</version>
 </dependency>`;
+          this.mavenRepositoryHtml = `<repositories>
+  <repository>
+    <id>repsy</id>
+    <name>${this.activeRepo.repoName} on Repsy</name>
+    <url>${environment.repoBaseUrl}/${this.activeRepo.repoName}</url>
+  </repository>
+</repositories>`;
           this.gradleDependencyHtml = `implementation '${this.version.artifactGroupName}:${this.version.artifactName}:${this.version.artifactVersionName}'`;
           this.gradleKotlinDependencyHtml = `implementation("${this.version.artifactGroupName}:${this.version.artifactName}:${this.version.artifactVersionName}")`;
           this.sbtDependencyHtml = `libraryDependencies += "${this.version.artifactGroupName}" % "${this.version.artifactName}" % "${this.version.artifactVersionName}"`;
@@ -162,10 +172,16 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
           }),
         )
         .subscribe({
-          next: () => {
-            this.router.navigateByUrl(`/${this.activeRepo.repoName}`).then(() => {
-              this.toastService.show('Version deleted successfully', 'success');
-            });
+          // The server says what went with the version: the last version of an artifact takes the artifact
+          // (and the last artifact of a group takes the group) with it.
+          next: (deletedItem) => {
+            landAfterVersionDelete(
+              this.router,
+              this.route,
+              this.toastService,
+              this.activeRepo.repoName,
+              deletedItem !== DeletedItem.VERSION,
+            );
           },
           error: () => {},
         });

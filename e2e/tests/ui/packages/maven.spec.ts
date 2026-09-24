@@ -17,13 +17,15 @@
 /**
  * Maven package pages (RPS-1256): the shared scenarios PKG-maven-01..06 (`registerPackageScenarios`)
  * and PKG-maven-07, the Maven-only routes: the `/browser` file browser with its download-token flow,
- * the group route `/:repo/:group`, and the ten build-tool install snippets of the version detail.
+ * the group route `/:repo/:group`, and the install snippets of the version detail (ten build tools and
+ * the repository block with the repo URL, RPS-1288 (6)).
  */
 import { createHash } from 'node:crypto';
 
 import type { Page } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
+import { env } from '../../../src/env.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { rawGet } from '../../../src/clients/maven-raw.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
@@ -293,19 +295,33 @@ test.describe('Maven group page', { tag: '@packages' }, () => {
     await expect(list.emptyList.root).toBeVisible();
   });
 
-  // Recorded, not asserted as a wish (RPS-1288 (4)): the group list's row is one ARTIFACT, but its
-  // Delete says "Delete Group" and removes the whole group, siblings included.
-  test('PKG-maven-04 deleting from the group list removes the whole group, not one artifact', async ({
+  // RPS-1288 (4), decided: the group list's row is one ARTIFACT, but its Delete says "Delete Group" and
+  // removes the whole group, siblings included. The confirmation says so: it names the group and counts
+  // the artifacts and versions that go.
+  test('PKG-maven-04 deleting from the group list removes the whole group, and the dialog says what goes', async ({
     adminPage,
     seeder,
     seedPackage,
+    seedVersions,
   }) => {
     const repo = await seeder.createRepo(RepoType.MAVEN);
-    const first = await seedPackage(repo);
+    // Two artifacts of one group: `first` with two versions, its sibling with one.
+    const [first] = await seedVersions(repo, ['1.0.0', '2.0.0']);
     const sibling = await seedPackage(repo, { name: maven.levels.sublist!.siblingName!(first, 1) });
     const other = await seedPackage(repo, { index: 2 }); // another group
+    const [group] = first.name.split(':');
     const list = protocolPages(adminPage, maven, repo.name).list();
     await list.goto();
+    await list.expectRow(first);
+    await list.expectRow(sibling);
+
+    const dialog = await list.openDeleteDialog(first);
+    await expect(dialog.message).toContainText(`The whole group ${group} will be deleted`);
+    await expect(dialog.message).toContainText('not just this artifact');
+    await expect(dialog.message).toContainText('2 artifacts and 3 versions');
+    // Cancelling deletes nothing.
+    await dialog.cancel();
+    await dialog.expectClosed();
     await list.expectRow(first);
     await list.expectRow(sibling);
 
@@ -318,10 +334,14 @@ test.describe('Maven group page', { tag: '@packages' }, () => {
 });
 
 test.describe('Maven version detail', { tag: '@packages' }, () => {
-  /** What each of the ten build-tool blocks is called and what it contains for `group:artifact:version`. */
-  const SNIPPETS = (group: string, artifact: string, version: string) =>
+  /**
+   * What each of the eleven blocks (the ten build-tool ones and the repository one) is called and what it
+   * contains for `group:artifact:version` in `repoName`.
+   */
+  const SNIPPETS = (group: string, artifact: string, version: string, repoName: string) =>
     [
       ['pom', 'Pom XML', `<artifactId>${artifact}</artifactId>`],
+      ['repository', 'Apache Maven Repository', `<url>${env.repoBaseUrl}/${repoName}</url>`],
       ['gradle-groovy', 'Gradle Groovy DSL', 'Gradle Groovy DSL'], // content: see the RPS-1261 test below
       ['gradle-kotlin', 'Gradle Kotlin DSL', `implementation("${group}:${artifact}:${version}")`],
       ['sbt', 'Scala SBT', `libraryDependencies += "${group}" % "${artifact}" % "${version}"`],
@@ -358,7 +378,7 @@ test.describe('Maven version detail', { tag: '@packages' }, () => {
     await expect(detail.snippet('purl')).not.toContainText('2.0.0');
   });
 
-  test('PKG-maven-07 the version detail shows the ten build-tool snippets', async ({
+  test('PKG-maven-07 the version detail shows the build-tool snippets and the repository block', async ({
     adminPage,
     seeder,
     seedPackage,
@@ -369,8 +389,8 @@ test.describe('Maven version detail', { tag: '@packages' }, () => {
     const detail = protocolPages(adminPage, maven, repo.name).detail(pkg);
     await detail.goto();
 
-    // The descriptor lists exactly these ten, and the panel renders exactly these.
-    const rows = SNIPPETS(group, artifact, pkg.version);
+    // The descriptor lists exactly these eleven, and the panel renders exactly these.
+    const rows = SNIPPETS(group, artifact, pkg.version, repo.name);
     expect(rows.map(([slug]) => slug).sort()).toEqual([...maven.levels.detail.snippets].sort());
     for (const [slug, heading, content] of rows) {
       await expect(detail.snippet(slug)).toBeVisible();
