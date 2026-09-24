@@ -20,6 +20,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
@@ -102,8 +103,35 @@ public interface NpmStorageService {
 
   long deletePackage(UUID repoId, Path packageBasePath);
 
-  Pair<String, Long> deletePackageVersion(
-      UUID repoId, String repoName, Path packageBasePath, String packageName, String versionName)
+  /**
+   * Removes the version from the package metadata and its tarball from storage, and tells by how
+   * many bytes the package's files grew (a negative number: what was freed).
+   *
+   * <p>The tarball is removed last, because a removed file cannot be put back. A failure before
+   * that puts the metadata back as it was and leaves the tarball. The one thing that stays undone
+   * is a failure of the caller's own commit after this returned: the tarball is then gone and its
+   * row remains.
+   *
+   * @param newLatest the version {@code latest} moves to, or {@code null} when the removed version
+   *     was not the latest
+   */
+  long removeVersion(
+      UUID repoId,
+      String repoName,
+      Path packageBasePath,
+      String packageName,
+      String versionName,
+      @Nullable String newLatest)
+      throws IOException;
+
+  /**
+   * Sets the {@code deprecated} message of the versions in the package metadata as it is stored,
+   * and tells by how many bytes the file grew.
+   *
+   * @param deprecations pairs of version and message; an empty message removes the deprecation
+   */
+  long deprecateVersions(
+      UUID repoId, String repoName, Path packageBasePath, List<Pair<String, String>> deprecations)
       throws IOException;
 
   Map<String, Object> getMetadata(

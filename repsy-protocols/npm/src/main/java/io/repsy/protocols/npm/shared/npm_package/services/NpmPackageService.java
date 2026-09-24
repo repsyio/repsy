@@ -80,22 +80,94 @@ public interface NpmPackageService<ID> {
   BasePackageInfo<ID> getPackage(
       UUID storageKey, @Nullable String scopeName, @NonNull String packageName);
 
-  void deletePackage(ID id);
-
-  void handleDeprecations(
-      UUID storageKey,
+  /**
+   * Deletes the package and its versions and, while that write is still open, removes its files
+   * through {@code remover}.
+   *
+   * <p>Like {@link #publishVersion}, the package row is locked first, the rows are deleted and
+   * flushed second, and the files are removed third, all in one transaction. So a delete the
+   * database rejects never touches storage, a publish of the package waits for the delete instead
+   * of writing into a directory that is being removed, and files that cannot be removed roll the
+   * rows back.
+   *
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the package does not
+   *     exist
+   */
+  @NonNull PackageDeletion deletePackage(
+      @NonNull BaseRepoInfo<ID> repoInfo,
       @Nullable String scopeName,
       @NonNull String packageName,
-      @NonNull List<Pair<String, String>> deprecatedVersions);
+      @NonNull PackageRemover remover);
 
-  boolean isLastVersion(UUID storageKey, @Nullable String scopeName, @NonNull String packageName);
-
-  void deletePackageVersion(
-      BaseRepoInfo<ID> repoInfo,
+  /**
+   * Deletes the version, and the package with it when that was its last version, and while that
+   * write is still open removes the files through {@code versionRemover} or {@code packageRemover},
+   * in the same way as {@link #deletePackage}.
+   *
+   * <p>When the version was the latest, the row of the {@code latest} tag and the package's latest
+   * move to the highest remaining version before the files are touched, and that version is what
+   * {@link VersionRemover#removeVersion} is told.
+   *
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the package or the
+   *     version does not exist
+   */
+  @NonNull PackageDeletion deletePackageVersion(
+      @NonNull BaseRepoInfo<ID> repoInfo,
       @Nullable String scopeName,
       @NonNull String packageName,
       @NonNull String versionName,
-      String first);
+      @NonNull VersionRemover versionRemover,
+      @NonNull PackageRemover packageRemover)
+      throws IOException;
+
+  /**
+   * What a delete removed: the names of the versions that are gone, and the usages that {@link
+   * PackageRemover} or {@link VersionRemover} reported.
+   */
+  record PackageDeletion(@NonNull List<String> versions, @NonNull BaseUsages usages) {}
+
+  /** Removes the files of a package whose rows {@link #deletePackage} has just deleted. */
+  @FunctionalInterface
+  interface PackageRemover {
+
+    /**
+     * Removes every file of the package. Nothing is put back when this fails afterwards, so it is
+     * the last thing that runs in the transaction.
+     */
+    @NonNull BaseUsages removePackage();
+  }
+
+  /** Removes the files of a version whose rows {@link #deletePackageVersion} has just deleted. */
+  @FunctionalInterface
+  interface VersionRemover {
+
+    /**
+     * Rewrites the package metadata and removes the tarball, the tarball last. A remover that fails
+     * must put back the metadata it found, so the rows that are rolled back with the failure and
+     * the metadata keep agreeing. A tarball that was removed cannot be put back, which is why it is
+     * the last thing to go.
+     *
+     * @param newLatest the version {@code latest} moved to, or {@code null} when it did not move
+     */
+    @NonNull BaseUsages removeVersion(@Nullable String newLatest) throws IOException;
+  }
+
+  /**
+   * Sets or clears the deprecation of the versions and, while that write is still open, stores the
+   * package metadata through {@code writer}, in the same way as {@link #addDistributionTag}.
+   *
+   * @param deprecations pairs of version and message; an empty message removes the deprecation
+   * @return the usages reported by {@code writer}
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the package or a
+   *     version does not exist
+   */
+  @NonNull BaseUsages handleDeprecations(
+      @NonNull BaseRepoInfo<ID> repoInfo,
+      @Nullable String scopeName,
+      @NonNull String packageName,
+      @NonNull List<Pair<String, String>> deprecations,
+      @NonNull MetadataWriter writer)
+      throws IOException;
 
   @NonNull List<PackageDistributionTagMapListItem> getDistributionTags(ID id);
 

@@ -265,19 +265,26 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
   public void deletePackage(
       final ProtocolContext context, @Nullable final String scopeName, final String packageName) {
 
-    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
-    final var packageInfo =
-        this.npmPackageService.getPackage(repoInfo.getStorageKey(), scopeName, packageName);
-
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
-    final var removedBytes =
-        this.npmStorageService.deletePackage(repoInfo.getStorageKey(), packageBasePath);
 
-    final var usage = BaseUsages.ofDisk(-1L * removedBytes);
+    // The rows are deleted first and the files second, in one transaction that holds the package
+    // row locked (RPS-1280): see NpmPackageService#deletePackage.
+    final var deletion =
+        this.npmPackageService.deletePackage(
+            repoInfo,
+            scopeName,
+            packageName,
+            () -> this.removePackageFiles(repoInfo, packageBasePath));
 
-    this.npmPackageService.deletePackage(packageInfo.getId());
+    context.addProperty(USAGES, deletion.usages());
+  }
 
-    context.addProperty(USAGES, usage);
+  private BaseUsages removePackageFiles(
+      final BaseRepoInfo<ID> repoInfo, final Path packageBasePath) {
+
+    return BaseUsages.ofDisk(
+        -1L * this.npmStorageService.deletePackage(repoInfo.getStorageKey(), packageBasePath));
   }
 
   private List<PackageDistributionTagMapListItem> getDistributionTags(
@@ -299,27 +306,29 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       throws IOException {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-
-    if (this.npmPackageService.isLastVersion(repoInfo.getStorageKey(), scopeName, packageName)) {
-      this.deletePackage(context, scopeName, packageName);
-      return;
-    }
-
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
-    final var pair =
-        this.npmStorageService.deletePackageVersion(
-            repoInfo.getStorageKey(),
-            repoInfo.getName(),
-            packageBasePath,
+
+    // The rows are deleted first and the files second, in one transaction that holds the package
+    // row locked (RPS-1280): see NpmPackageService#deletePackageVersion. Deleting the last version
+    // deletes the package.
+    final var deletion =
+        this.npmPackageService.deletePackageVersion(
+            repoInfo,
+            scopeName,
             packageName,
-            versionName);
+            versionName,
+            newLatest ->
+                BaseUsages.ofDisk(
+                    this.npmStorageService.removeVersion(
+                        repoInfo.getStorageKey(),
+                        repoInfo.getName(),
+                        packageBasePath,
+                        packageName,
+                        versionName,
+                        newLatest)),
+            () -> this.removePackageFiles(repoInfo, packageBasePath));
 
-    this.npmPackageService.deletePackageVersion(
-        repoInfo, scopeName, packageName, versionName, pair.getFirst());
-
-    final var usage = BaseUsages.ofDisk(pair.getSecond() * -1L);
-
-    context.addProperty(USAGES, usage);
+    context.addProperty(USAGES, deletion.usages());
   }
 
   public void deprecate(
@@ -329,28 +338,34 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final Map<String, Object> payload)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
     final var packageJsonPath = packageBasePath.resolve(PACKAGE_JSON);
 
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), packageJsonPath.toString());
     final var metadata = this.npmStorageService.getMetadata(storagePath, repoInfo.getName());
+    final var deprecations = PackageUtils.findDeprecatedVersions(metadata, payload);
 
-    PackageUtils.updateModifiedTime(payload);
+    // The deprecation rows are written first and the package metadata second, in one transaction
+    // that holds the package row locked (RPS-1280): see NpmPackageService#handleDeprecations.
+    final var usages =
+        this.npmPackageService.handleDeprecations(
+            repoInfo,
+            scopeName,
+            packageName,
+            deprecations,
+            () ->
+                this.rewriteMetadata(
+                    repoInfo,
+                    packageBasePath,
+                    () ->
+                        this.npmStorageService.deprecateVersions(
+                            repoInfo.getStorageKey(),
+                            repoInfo.getName(),
+                            packageBasePath,
+                            deprecations)));
 
-    final var newMetadataLength = PackageUtils.getMetadataLength(payload);
-    final var diskUsageDiff = newMetadataLength - PackageUtils.getMetadataLength(metadata);
-    final var usage = BaseUsages.ofDisk(diskUsageDiff);
-
-    this.npmStorageService.writeMetadataToFile(repoInfo.getName(), payload, storagePath);
-
-    this.npmPackageService.handleDeprecations(
-        repoInfo.getStorageKey(),
-        scopeName,
-        packageName,
-        PackageUtils.findDeprecatedVersions(metadata, payload));
-
-    context.addProperty(USAGES, usage);
+    context.addProperty(USAGES, usages);
   }
 
   public void publish(

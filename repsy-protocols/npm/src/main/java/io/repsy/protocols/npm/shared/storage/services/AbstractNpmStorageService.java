@@ -31,6 +31,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -346,35 +347,61 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
   }
 
   @Override
-  public Pair<String, Long> deletePackageVersion(
+  public long removeVersion(
       final UUID repoId,
       final String repoName,
       final Path packageBasePath,
       final String packageName,
-      final String versionName)
+      final String versionName,
+      final @Nullable String newLatest)
       throws IOException {
 
-    var latestVersion = "";
+    // Read while the caller holds the package row locked, so no other write can have changed it.
+    final var previousMetadata = this.readMetadataBytes(repoId, repoName, packageBasePath);
+
+    try {
+      final var metadataGrowth =
+          this.removeVersionFromMetadata(repoId, repoName, packageBasePath, versionName, newLatest);
+
+      // The tarball goes last: a removed file cannot be put back, so nothing that can still fail
+      // runs after it. Whatever fails before it leaves the tarball, and the metadata is restored.
+      final var tarballSize =
+          this.removeTarball(repoId, repoName, packageBasePath, packageName, versionName);
+
+      return metadataGrowth - tarballSize;
+    } catch (final IOException | RuntimeException e) {
+      this.restoreAfterFailedRemoval(repoId, repoName, packageBasePath, previousMetadata, e);
+      throw e;
+    }
+  }
+
+  private void restoreAfterFailedRemoval(
+      final UUID repoId,
+      final String repoName,
+      final Path packageBasePath,
+      final byte[] previousMetadata,
+      final Exception cause) {
+
+    try {
+      this.restoreMetadataBytes(repoId, repoName, packageBasePath, previousMetadata);
+    } catch (final IOException | RuntimeException e) {
+      // The removal's own failure is the one to report; the leftover is noted on it.
+      cause.addSuppressed(e);
+    }
+  }
+
+  private long removeVersionFromMetadata(
+      final UUID repoId,
+      final String repoName,
+      final Path packageBasePath,
+      final String versionName,
+      final @Nullable String newLatest)
+      throws IOException {
 
     final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
     final var storagePath = StoragePath.of(repoId, metadataPath.toString());
 
-    final var oldMetadataLength = this.calculateFileUsage(storagePath, repoName);
-
     final var metadata = this.getMetadata(storagePath, repoName);
-
-    this.storageStrategy.delete(storagePath);
-
-    final var tarballPath =
-        packageBasePath.resolve(PackageUtils.getTarballFilename(packageName, versionName));
-
-    final var tarballStoragePath = StoragePath.of(repoId, tarballPath.toString());
-
-    final var tarballSize = this.calculateFileUsage(tarballStoragePath, repoName);
-
-    this.storageStrategy.delete(tarballStoragePath);
-
-    final var total = oldMetadataLength + tarballSize;
 
     final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
     final var time = (Map<String, String>) metadata.get("time");
@@ -382,26 +409,67 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
     versions.remove(versionName);
     time.remove(versionName);
 
-    final var currentLatestVersion = PackageUtils.getLatestVersion(metadata);
-
-    if (currentLatestVersion.equals(versionName)) {
-      latestVersion = PackageUtils.resolveLatestVersion(metadata);
-      PackageUtils.liftFieldsToTopLevel(metadata, latestVersion);
+    if (newLatest != null) {
+      PackageUtils.liftFieldsToTopLevel(metadata, newLatest);
 
       final var distTags = (Map<String, String>) metadata.get(NpmConstants.DIST_TAGS);
 
-      distTags.put("latest", latestVersion);
+      distTags.put(NpmConstants.LATEST, newLatest);
     }
 
     PackageUtils.removeAllTagsPointingToVersion(metadata, versionName);
 
-    PackageUtils.getMetadataLength(metadata);
+    return this.writeMetadataToFile(repoName, metadata, storagePath).getDiskUsage();
+  }
 
-    final var metadataUsage =
-        this.writeMetadataToFile(
-            repoName, metadata, StoragePath.of(repoId, metadataPath.toString()));
+  /** Removes the tarball, if there is one, and tells how many bytes it took. */
+  private long removeTarball(
+      final UUID repoId,
+      final String repoName,
+      final Path packageBasePath,
+      final String packageName,
+      final String versionName)
+      throws IOException {
 
-    return Pair.of(latestVersion, total - metadataUsage.getDiskUsage());
+    final var tarballPath =
+        packageBasePath.resolve(PackageUtils.getTarballFilename(packageName, versionName));
+    final var tarballStoragePath = StoragePath.of(repoId, tarballPath.toString());
+
+    final var tarballSize = this.calculateFileUsage(tarballStoragePath, repoName);
+
+    // A version whose tarball is already gone (an interrupted removal) can still be removed.
+    this.deleteIfPresent(tarballStoragePath, repoName);
+
+    return tarballSize;
+  }
+
+  @Override
+  public long deprecateVersions(
+      final UUID repoId,
+      final String repoName,
+      final Path packageBasePath,
+      final List<Pair<String, String>> deprecations)
+      throws IOException {
+
+    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
+    final var storagePath = StoragePath.of(repoId, metadataPath.toString());
+
+    final var metadata = this.getMetadata(storagePath, repoName);
+    final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
+
+    // Applied to the metadata as it is now, not replaced by what the client sent: the client read
+    // its copy earlier, and a version published since would be dropped by that replacement.
+    for (final var deprecation : deprecations) {
+      final var version = (Map<String, Object>) versions.get(deprecation.getFirst());
+
+      if (version != null) {
+        version.put(NpmConstants.DEPRECATED, deprecation.getSecond());
+      }
+    }
+
+    PackageUtils.updateModifiedTime(metadata);
+
+    return this.writeMetadataToFile(repoName, metadata, storagePath).getDiskUsage();
   }
 
   /**

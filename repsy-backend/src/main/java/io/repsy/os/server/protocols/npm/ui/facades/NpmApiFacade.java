@@ -24,6 +24,7 @@ import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageServic
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -90,30 +91,34 @@ public class NpmApiFacade implements ProtocolApiFacade {
         readmeFileContent);
   }
 
+  /**
+   * Deletes the package. The rows and the files go in one transaction under the package's row lock,
+   * see {@link NpmPackageServiceImpl#deletePackage}. The events follow the commit, so a delete that
+   * rolled back reports nothing.
+   */
   public @NonNull BaseUsages deletePackage(
       final @NonNull RepoInfo repoInfo,
       final @Nullable String scopeName,
       final @NonNull String packageName) {
 
-    final var packageInfo =
-        this.npmPackageService.getPackage(repoInfo.getStorageKey(), scopeName, packageName);
-
-    final var versionNames = this.npmPackageService.getVersionNames(packageInfo.getId());
-
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
 
-    final var usage =
-        this.npmStorageService.deletePackage(repoInfo.getStorageKey(), packageBasePath);
+    final var deletion =
+        this.npmPackageService.deletePackage(
+            repoInfo,
+            scopeName,
+            packageName,
+            () -> this.removePackageFiles(repoInfo, packageBasePath));
 
-    final var usages = BaseUsages.builder().diskUsage(-1L * usage).build();
+    this.publishVersionsDeleted(repoInfo, scopeName, packageName, deletion.versions());
 
-    this.npmPackageService.deletePackage(packageInfo.getId());
-
-    this.publishVersionsDeleted(repoInfo, scopeName, packageName, versionNames);
-
-    return usages;
+    return deletion.usages();
   }
 
+  /**
+   * Deletes the version, and the package with it when that was its last version, like {@link
+   * #deletePackage}: see {@link NpmPackageServiceImpl#deletePackageVersion}.
+   */
   public @NonNull BaseUsages deletePackageVersion(
       final @NonNull RepoInfo repoInfo,
       final @Nullable String scopeName,
@@ -121,28 +126,37 @@ public class NpmApiFacade implements ProtocolApiFacade {
       final @NonNull String versionName)
       throws IOException {
 
-    if (this.npmPackageService.isLastVersion(repoInfo.getStorageKey(), scopeName, packageName)) {
-      // deletePackage() publishes ArtifactVersionDeletedEvent for every version it removes,
-      // which at this point is only this one — no separate publish needed here.
-      return this.deletePackage(repoInfo, scopeName, packageName);
-    }
-
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
 
-    final var pair =
-        this.npmStorageService.deletePackageVersion(
-            repoInfo.getStorageKey(),
-            repoInfo.getName(),
-            packageBasePath,
+    // Deleting the last version deletes the package: the events then name that one version, which
+    // is all the package had.
+    final var deletion =
+        this.npmPackageService.deletePackageVersion(
+            repoInfo,
+            scopeName,
             packageName,
-            versionName);
+            versionName,
+            newLatest ->
+                BaseUsages.ofDisk(
+                    this.npmStorageService.removeVersion(
+                        repoInfo.getStorageKey(),
+                        repoInfo.getName(),
+                        packageBasePath,
+                        packageName,
+                        versionName,
+                        newLatest)),
+            () -> this.removePackageFiles(repoInfo, packageBasePath));
 
-    this.npmPackageService.deletePackageVersion(
-        repoInfo, scopeName, packageName, versionName, pair.getFirst());
+    this.publishVersionsDeleted(repoInfo, scopeName, packageName, deletion.versions());
 
-    this.publishVersionDeleted(repoInfo, scopeName, packageName, versionName);
+    return deletion.usages();
+  }
 
-    return BaseUsages.builder().diskUsage(pair.getSecond() * -1L).build();
+  private @NonNull BaseUsages removePackageFiles(
+      final @NonNull RepoInfo repoInfo, final @NonNull Path packageBasePath) {
+
+    return BaseUsages.ofDisk(
+        -1L * this.npmStorageService.deletePackage(repoInfo.getStorageKey(), packageBasePath));
   }
 
   @Override
