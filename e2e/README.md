@@ -2789,12 +2789,7 @@ protocol-only scenarios. The template is `src/ui/package-scenarios.ts`, the UI c
 `scenarios/loop.ts`:
 
 ```ts
-registerPackageScenarios(DESCRIPTORS.nuget, {
-  knownFailures: {
-    '02-versions-search':
-      'RPS-1304: the NuGet version list has no search box (the API has no search parameter)',
-  },
-});
+registerPackageScenarios(DESCRIPTORS.nuget);
 ```
 
 It registers `PKG-<proto>-01..06` for whatever the descriptor (`pages/protocols/<proto>.ts`) says and
@@ -2813,8 +2808,9 @@ differs the descriptor carries the value (`repoUrlIn`, `detail.delete.landsOn`,
 | 06  | Configure modal (repo name, `YOUR_PASSWORD` where the protocol has one) and the deploy-token variant opened from a token row in the settings                     |
 
 `knownFailures` keys (`PackageScenarioKey`) run their step under `test.fail`, so a fix turns it red and
-the title carries the reason. Pinned today: NuGet `02-versions-search` (RPS-1304, the API has no
-version search). The RPS-1261 (Maven Gradle Groovy block, Docker desktop Digest/Config Digest cells,
+the title carries the reason. Nothing is pinned this way today: NuGet `02-versions-search` was the last
+one, and RPS-1304 fixed it (the version list has a search box and `GET /api/nuget/packages/{repo}/{id}/versions`
+takes a `query`). The RPS-1261 (Maven Gradle Groovy block, Docker desktop Digest/Config Digest cells,
 npm Bugs URL/Keywords, PyPI "Post release:" and the mobile "Latest" link), RPS-1262 (mobile Delete
 gate, Cargo/NuGet mobile cards, Helm pager, Go empty pager, the Maven browser's Settings button) and
 RPS-1297 (first click after a cold load) specs are fixed and assert unpinned.
@@ -2881,11 +2877,8 @@ stays listed with no versions (like Docker, RPS-1288 (5)); Cargo/NuGet/Helm/Ruby
 `<YOUR_...>` placeholders and the same body in the deploy-token variant (`deployTokenMarker` is optional
 now: absent = same body, only the title differs), Ruby's title is the same in both.
 
-Pinned with `test.fail` / `knownFailures` (each still fails for the stated reason, checked un-pinned):
-
-| Where                      | Bug                                                                                  |
-| -------------------------- | ------------------------------------------------------------------------------------ |
-| nuget `02-versions-search` | RPS-1304: no search box on the version list: the API has no version search parameter |
+Nothing is pinned with `test.fail` / `knownFailures` today: the last pins (NuGet `02-versions-search`, RPS-1304;
+Cargo `cargo-07` RPS-1301; Helm `helm-07` RPS-1302) are fixed and assert unpinned.
 
 `seed-proof.spec.ts` (RPS-1255) now covers all nine protocols; its generic search/sort/delete walk stays on
 the first four (the other five have the protocol-aware version of it in PKG-<proto>-02 and -04).

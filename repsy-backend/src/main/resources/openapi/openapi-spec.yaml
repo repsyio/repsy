@@ -1465,6 +1465,12 @@ paths:
           required: true
           schema:
             type: string
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+            default: ''
         - name: pageable
           in: query
           required: true

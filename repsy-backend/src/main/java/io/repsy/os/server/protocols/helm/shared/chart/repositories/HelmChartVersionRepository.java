@@ -55,6 +55,11 @@ public interface HelmChartVersionRepository extends JpaRepository<HelmChartVersi
   Optional<HelmChartVersion> findByRepoIdAndNameAndVersion(
       @Param("repoId") UUID repoId, @Param("name") String name, @Param("version") String version);
 
+  /**
+   * The latest version of each chart whose name contains {@code query}: exactly one row per chart.
+   * Versions created in the same instant are told apart by their id (the same order {@link
+   * #findAllByChartOrderByCreatedAtDescIdDesc} lists them in), so a chart is never listed twice.
+   */
   @Query(
       value =
           """
@@ -64,7 +69,8 @@ public interface HelmChartVersionRepository extends JpaRepository<HelmChartVersi
             AND NOT EXISTS (
               SELECT 1 FROM HelmChartVersion v2
               WHERE v2.chart.id = v.chart.id
-                AND v2.createdAt > v.createdAt
+                AND (v2.createdAt > v.createdAt
+                  OR (v2.createdAt = v.createdAt AND v2.id > v.id))
             )
           """,
       countQuery =

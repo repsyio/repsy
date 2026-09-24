@@ -145,6 +145,7 @@ export class NugetService {
 
   public async fetchPackageVersions(
     packageId: string,
+    query: string,
     sortOption: Sort,
     pageIndex: number,
     pageSize: number,
@@ -154,6 +155,7 @@ export class NugetService {
         packageId,
         { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
         this.repoName,
+        query || undefined,
       ),
     );
     return this.toPagedData(response.data);

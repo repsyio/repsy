@@ -96,10 +96,13 @@ public class NuGetApiFacade implements ProtocolApiFacade {
 
   @Transactional(readOnly = true)
   public Page<NuGetVersionListItem> getVersions(
-      final RepoInfo repoInfo, final String packageId, final Pageable pageable) {
+      final RepoInfo repoInfo,
+      final String packageId,
+      final String query,
+      final Pageable pageable) {
 
     return this.nugetPackageService
-        .getVersionInfosPage(repoInfo, packageId, pageable)
+        .getVersionInfosPage(repoInfo, packageId, query, pageable)
         .map(this::toVersionListItem);
   }
 
