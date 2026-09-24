@@ -1,19 +1,27 @@
 <app-helm-config [baseUrl]="baseUrl" [username]="username" [repoName]="activeRepo.repoName" [(open)]="showConfig" />
 
 <div
+  data-testid="pkg-toolbar"
   [ngClass]="{ 'pointer-events-none opacity-50 select-none': loading || this.error }"
   class="mb-7 flex flex-col flex-col-reverse items-start justify-between gap-4 md:items-start lg:flex-row lg:items-center"
 >
   <div class="flex w-full flex-col items-start gap-4 sm:w-auto sm:flex-row sm:items-center">
-    <app-searchbox class="w-full sm:max-w-[192px]" placeholder="chart" (filter)="search($event)" />
+    <app-searchbox
+      data-testid="pkg-search"
+      class="w-full sm:max-w-[192px]"
+      placeholder="chart"
+      (filter)="search($event)"
+    />
     <div class="flex w-full gap-2 sm:w-auto">
       <app-sort-selector
+        data-testid="pkg-sort"
         [options]="sortOptions"
         [(selectedOption)]="sortOption"
         (choose)="sort($event)"
         class="w-full sm:w-auto"
       />
       <button
+        data-testid="pkg-refresh"
         (click)="refreshPage()"
         class="hover:text-secondary-500 flex h-[40px] w-[40px] items-center justify-center text-neutral-200"
       >
@@ -23,12 +31,16 @@
   </div>
 
   <div class="flex w-full items-center justify-end gap-2 sm:w-auto">
-    <button (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
+    <button data-testid="pkg-configure" (click)="openConfig(true)" class="repsy-btn-ghost w-full sm:w-auto">
       <img ngSrc="/assets/icons/input/configure.svg" alt="configure" height="16" width="16" />
       Configure
     </button>
     @if (canManage) {
-      <button [routerLink]="'/' + activeRepo.repoName + '/settings'" class="repsy-btn-ghost w-full sm:w-auto">
+      <button
+        data-testid="pkg-settings"
+        [routerLink]="'/' + activeRepo.repoName + '/settings'"
+        class="repsy-btn-ghost w-full sm:w-auto"
+      >
         <img ngSrc="/assets/icons/input/settings.svg" alt="settings" height="18" width="18" />
         Settings
       </button>
@@ -54,9 +66,18 @@
           <div>Updated</div>
           <div></div>
         </div>
-        <div animate.enter="fade-in-down" class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block">
+        <div
+          data-testid="pkg-list-table"
+          animate.enter="fade-in-down"
+          class="hidden rounded-b-[12px] border border-[#404141] bg-[#101112] lg:block"
+        >
           @for (chart of charts; track chart.name; let i = $index) {
-            <div role="button" appKeyboardActivate [routerLink]="'/' + activeRepo.repoName + '/' + chart.name">
+            <div
+              [attr.data-testid]="'pkg-list-row-' + chart.name"
+              role="button"
+              appKeyboardActivate
+              [routerLink]="'/' + activeRepo.repoName + '/' + chart.name"
+            >
               <div
                 animate.enter="fade-in-down"
                 [ngClass]="{ 'rounded-b-[12px]': i === charts.length - 1 }"
@@ -64,9 +85,15 @@
               >
                 <div class="flex items-center gap-2">
                   <img class="h-[18px] w-[18px]" src="/assets/icons/helm/helm.svg" alt="Helm" />
-                  <app-tooltip class="text-secondary-500" [text]="chart.name | ellipsis" [textHover]="chart.name" />
+                  <app-tooltip
+                    data-testid="row-name"
+                    class="text-secondary-500"
+                    [text]="chart.name | ellipsis"
+                    [textHover]="chart.name"
+                  />
                 </div>
                 <app-package-security-badge
+                  data-testid="row-security"
                   repoType="helm"
                   [repoName]="activeRepo.repoName"
                   [artifactName]="chart.name"
@@ -79,6 +106,7 @@
                   [unscannedFailedCount]="securitySummary[chart.name]?.unscannedFailedCount ?? 0"
                 />
                 <a
+                  data-testid="row-latest-link"
                   class="group text-secondary-500 flex w-max gap-2 text-[14px]"
                   [routerLink]="'/' + activeRepo.repoName + '/' + chart.name + '/' + chart.latestVersion"
                   (click)="$event.stopPropagation()"
@@ -104,23 +132,26 @@
                   </svg>
                 </a>
                 <app-tooltip
+                  data-testid="row-description"
                   class="text-[#9FA0A0]"
                   [text]="(chart.description | ellipsis: 40) || '—'"
                   [textHover]="chart.description || ''"
                 />
                 @if (chart.updatedAt) {
                   <app-tooltip
+                    data-testid="row-updated"
                     class="text-[#9FA0A0]"
                     [text]="timeAgo(chart.updatedAt)"
                     [textHover]="chart.updatedAt | date: 'medium'"
                     [always]="true"
                   />
                 } @else {
-                  <span class="text-[#9FA0A0]">—</span>
+                  <span data-testid="row-updated" class="text-[#9FA0A0]">—</span>
                 }
                 @if (activeRepo.canManage) {
-                  <app-dropdown>
+                  <app-dropdown data-testid="row-menu">
                     <button
+                      data-testid="row-delete"
                       (click)="deleteChart(chart)"
                       [disabled]="loading"
                       class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
@@ -139,86 +170,98 @@
         </div>
 
         <!-- Mobile cards -->
-        @for (chart of charts; track chart.name; let i = $index) {
-          <div animate.enter="fade-in-down" class="lg:hidden">
-            <div
-              class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
-              role="button"
-              appKeyboardActivate
-              [routerLink]="'/' + activeRepo.repoName + '/' + chart.name"
-            >
-              @if (activeRepo.canManage) {
-                <app-dropdown class="relative left-4 ml-auto">
-                  <button
-                    (click)="deleteChart(chart)"
-                    [disabled]="loading"
-                    class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
-                  >
-                    <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
-                    Delete
-                  </button>
-                </app-dropdown>
-              }
-              <div class="space-y-2">
-                <div class="flex items-center gap-2">
-                  <img class="h-[16px] w-[16px]" src="/assets/icons/helm/helm.svg" alt="Helm" />
-                  <span class="text-secondary-500 font-medium break-all">{{ chart.name }}</span>
-                </div>
-                @if (chart.description) {
-                  <span class="text-sm break-all text-[#9FA0A0]">{{ chart.description | ellipsis: 60 }}</span>
-                }
-                <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Security:</span>
-                  <app-package-security-badge
-                    repoType="helm"
-                    [repoName]="activeRepo.repoName"
-                    [artifactName]="chart.name"
-                    [packageRoute]="packageRoute(chart)"
-                    [severity]="securitySummary[chart.name]?.severity ?? null"
-                    [scanned]="securitySummary[chart.name]?.scanned ?? false"
-                    [rescanInProgressCount]="securitySummary[chart.name]?.rescanInProgressCount ?? 0"
-                    [rescanFailedCount]="securitySummary[chart.name]?.rescanFailedCount ?? 0"
-                    [unscannedInProgressCount]="securitySummary[chart.name]?.unscannedInProgressCount ?? 0"
-                    [unscannedFailedCount]="securitySummary[chart.name]?.unscannedFailedCount ?? 0"
-                  />
-                </div>
-                <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Latest:</span>
-                  <a
-                    class="group text-secondary-500 flex gap-2 text-[14px]"
-                    [routerLink]="'/' + activeRepo.repoName + '/' + chart.name + '/' + chart.latestVersion"
-                    (click)="$event.stopPropagation()"
-                  >
-                    <span class="text-right text-sm break-all group-hover:underline">{{ chart.latestVersion }}</span>
-                    <svg
-                      class="mt-[2px] h-[14px] w-[14px] shrink-0 text-[#9FA0A0] group-hover:text-white"
-                      viewBox="0 0 14 14"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
+        <div data-testid="pkg-list-cards">
+          @for (chart of charts; track chart.name; let i = $index) {
+            <div animate.enter="fade-in-down" class="lg:hidden">
+              <div
+                [attr.data-testid]="'pkg-list-card-' + chart.name"
+                class="relative flex flex-col gap-2 rounded-[12px] border border-[#404141] bg-[#101112] p-4 hover:border-[#FDFDFD] hover:bg-[#1D1C1C]"
+                role="button"
+                appKeyboardActivate
+                [routerLink]="'/' + activeRepo.repoName + '/' + chart.name"
+              >
+                @if (activeRepo.canManage) {
+                  <app-dropdown data-testid="row-menu" class="relative left-4 ml-auto">
+                    <button
+                      data-testid="row-delete"
+                      (click)="deleteChart(chart)"
+                      [disabled]="loading"
+                      class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-[#FF6B6B] hover:bg-[#2D2C2C]"
                     >
-                      <path
-                        d="M1 13L13 1M13 1H4M13 1V10"
-                        stroke="currentColor"
-                        stroke-width="1.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      />
-                    </svg>
-                  </a>
-                </div>
-                <div class="flex justify-between gap-2">
-                  <span class="text-sm text-[#9FA0A0]">Updated:</span>
-                  <span class="text-right break-all text-[#FDFDFD]">{{ timeAgo(chart.updatedAt) }}</span>
+                      <img ngSrc="/assets/icons/input/delete.svg" alt="delete" height="18" width="18" />
+                      Delete
+                    </button>
+                  </app-dropdown>
+                }
+                <div class="space-y-2">
+                  <div class="flex items-center gap-2">
+                    <img class="h-[16px] w-[16px]" src="/assets/icons/helm/helm.svg" alt="Helm" />
+                    <span data-testid="row-name" class="text-secondary-500 font-medium break-all">{{
+                      chart.name
+                    }}</span>
+                  </div>
+                  @if (chart.description) {
+                    <span data-testid="row-description" class="text-sm break-all text-[#9FA0A0]">{{
+                      chart.description | ellipsis: 60
+                    }}</span>
+                  }
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Security:</span>
+                    <app-package-security-badge
+                      data-testid="row-security"
+                      repoType="helm"
+                      [repoName]="activeRepo.repoName"
+                      [artifactName]="chart.name"
+                      [packageRoute]="packageRoute(chart)"
+                      [severity]="securitySummary[chart.name]?.severity ?? null"
+                      [scanned]="securitySummary[chart.name]?.scanned ?? false"
+                      [rescanInProgressCount]="securitySummary[chart.name]?.rescanInProgressCount ?? 0"
+                      [rescanFailedCount]="securitySummary[chart.name]?.rescanFailedCount ?? 0"
+                      [unscannedInProgressCount]="securitySummary[chart.name]?.unscannedInProgressCount ?? 0"
+                      [unscannedFailedCount]="securitySummary[chart.name]?.unscannedFailedCount ?? 0"
+                    />
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Latest:</span>
+                    <a
+                      data-testid="row-latest-link"
+                      class="group text-secondary-500 flex gap-2 text-[14px]"
+                      [routerLink]="'/' + activeRepo.repoName + '/' + chart.name + '/' + chart.latestVersion"
+                      (click)="$event.stopPropagation()"
+                    >
+                      <span class="text-right text-sm break-all group-hover:underline">{{ chart.latestVersion }}</span>
+                      <svg
+                        class="mt-[2px] h-[14px] w-[14px] shrink-0 text-[#9FA0A0] group-hover:text-white"
+                        viewBox="0 0 14 14"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M1 13L13 1M13 1H4M13 1V10"
+                          stroke="currentColor"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </a>
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <span class="text-sm text-[#9FA0A0]">Updated:</span>
+                    <span data-testid="row-updated" class="text-right break-all text-[#FDFDFD]">{{
+                      timeAgo(chart.updatedAt)
+                    }}</span>
+                  </div>
                 </div>
               </div>
+              @if (i !== charts.length - 1) {
+                <div class="px-2 py-4">
+                  <div class="h-[1px] bg-[#404141]"></div>
+                </div>
+              }
             </div>
-            @if (i !== charts.length - 1) {
-              <div class="px-2 py-4">
-                <div class="h-[1px] bg-[#404141]"></div>
-              </div>
-            }
-          </div>
-        }
+          }
+        </div>
 
         <app-pagination
           (pageNumChange)="loadPage($event)"
@@ -230,7 +273,7 @@
       <app-empty-list />
     }
   } @else {
-    <div animate.enter="fade-in-up" class="p-8 text-center">
+    <div data-testid="pkg-error" animate.enter="fade-in-up" class="p-8 text-center">
       <img
         class="mx-auto mb-[70px]"
         ngSrc="/assets/images/hippo-empty.svg"
@@ -238,7 +281,7 @@
         height="243"
         width="510"
       />
-      <p class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
+      <p data-testid="pkg-error-message" class="text-error-500 mt-2 text-[20px]">{{ this.error }}</p>
     </div>
   }
 }
