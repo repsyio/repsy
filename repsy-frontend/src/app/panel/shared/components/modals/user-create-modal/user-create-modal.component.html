@@ -1,23 +1,32 @@
 <!-- Modal Backdrop -->
 @if (open) {
-  <button
+  <div
     data-testid="user-create-backdrop"
     animate.enter="fade-in-up"
     class="bg-opacity-50 fixed inset-0 z-3 backdrop-blur-sm"
     (click)="closeModal()"
-  >
-    <div></div>
-  </button>
+    aria-hidden="true"
+  ></div>
 
   <!-- Modal Content -->
   <div
     data-testid="user-create-modal"
+    appDialog
+    #dialog="appDialog"
+    (appDialogClose)="closeModal()"
+    [appDialogClosable]="!loading"
     class="fixed top-1/2 left-1/2 z-4 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-[#404141] bg-[#101112] p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px]"
   >
     <!-- Header -->
     <div class="flex justify-between">
-      <h1 class="text-[24px] leading-6 text-white">Create User</h1>
-      <button data-testid="user-create-close" (click)="closeModal()" class="hover:text-secondary-500 text-neutral-200">
+      <h1 [id]="dialog.titleId" class="text-[24px] leading-6 text-white">Create User</h1>
+      <button
+        data-testid="user-create-close"
+        type="button"
+        aria-label="Close dialog"
+        (click)="closeModal()"
+        class="hover:text-secondary-500 text-neutral-200"
+      >
         <svg
           width="15"
           height="15"
@@ -43,12 +52,13 @@
       <div class="flex flex-col text-[#9FA0A0]">
         <!-- Username Input -->
         <div class="form-group w-full">
-          <label for="username">Username <span class="text-error">*</span></label>
+          <label [attr.for]="id('username')">Username <span class="text-error">*</span></label>
           <input
             data-testid="user-create-username"
+            data-dialog-focus
             formControlName="username"
             placeholder="Enter username"
-            id="username"
+            [id]="id('username')"
             required
             type="text"
             class="input-text-secondary w-full"
@@ -76,24 +86,27 @@
 
         <!-- Password Input -->
         <div class="form-group w-full">
-          <label for="password">Password <span class="text-error">*</span></label>
+          <label [attr.for]="id('password')">Password <span class="text-error">*</span></label>
           <div class="relative">
             <input
               data-testid="user-create-password"
               formControlName="password"
               placeholder="Enter password"
-              id="password"
+              [id]="id('password')"
               required
               [type]="showPassword ? 'text' : 'password'"
               class="input-text-secondary w-full pr-10"
             />
             <button
               data-testid="user-create-password-toggle"
+              [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'"
+              [attr.aria-pressed]="showPassword"
               type="button"
               class="absolute top-1/2 right-3 -translate-y-1/2 text-neutral-400 hover:text-neutral-200"
               (click)="togglePasswordVisibility()"
             >
               <i
+                aria-hidden="true"
                 class="fa-solid"
                 [ngClass]="{
                   'fa-eye': showPassword,
@@ -125,24 +138,27 @@
 
         <!-- Confirm Password Input -->
         <div class="form-group w-full">
-          <label for="confirmPassword">Confirm Password <span class="text-error">*</span></label>
+          <label [attr.for]="id('confirmPassword')">Confirm Password <span class="text-error">*</span></label>
           <div class="relative">
             <input
               data-testid="user-create-confirm-password"
               formControlName="confirmPassword"
               placeholder="Re-enter password"
-              id="confirmPassword"
+              [id]="id('confirmPassword')"
               required
               [type]="showConfirmPassword ? 'text' : 'password'"
               class="input-text-secondary w-full pr-10"
             />
             <button
               data-testid="user-create-confirm-password-toggle"
+              [attr.aria-label]="showConfirmPassword ? 'Hide password confirmation' : 'Show password confirmation'"
+              [attr.aria-pressed]="showConfirmPassword"
               type="button"
               class="absolute top-1/2 right-3 -translate-y-1/2 text-neutral-400 hover:text-neutral-200"
               (click)="toggleConfirmPasswordVisibility()"
             >
               <i
+                aria-hidden="true"
                 class="fa-solid"
                 [ngClass]="{
                   'fa-eye': showConfirmPassword,
@@ -168,10 +184,10 @@
 
         <!-- Admin Role Toggle -->
         <div class="form-group w-full">
-          <label for="isAdmin" class="mb-2 block text-[14px] text-neutral-200">Role</label>
+          <span [id]="id('role')" class="mb-2 block text-[14px] text-neutral-200">Role</span>
           <app-toggle-component
             data-testid="user-create-role"
-            id="isAdmin"
+            [labelledBy]="id('role')"
             [checked]="form.get('isAdmin').value"
             checkedLabel="Admin"
             uncheckedLabel="User"

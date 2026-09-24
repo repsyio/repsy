@@ -1,23 +1,32 @@
 <!-- Modal Backdrop -->
 @if (open) {
-  <button
+  <div
     data-testid="token-create-backdrop"
     animate.enter="fade-in-up"
     class="bg-opacity-50 fixed inset-0 z-40 backdrop-blur-sm"
     (click)="closeModal()"
-  >
-    <div></div>
-  </button>
+    aria-hidden="true"
+  ></div>
 
   <!-- Modal Content -->
   <div
     data-testid="token-create-modal"
+    appDialog
+    #dialog="appDialog"
+    (appDialogClose)="closeModal()"
+    [appDialogClosable]="!loading"
     class="fixed top-1/2 left-1/2 z-50 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-[#404141] bg-[#101112] p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px] lg:max-w-[882px]"
   >
     <!-- Header -->
     <div class="flex justify-between">
-      <h1 class="text-[24px] leading-6 text-white">Create Deploy Token</h1>
-      <button data-testid="token-create-close" (click)="closeModal()" class="hover:text-secondary-500 text-neutral-200">
+      <h1 [id]="dialog.titleId" class="text-[24px] leading-6 text-white">Create Deploy Token</h1>
+      <button
+        data-testid="token-create-close"
+        type="button"
+        aria-label="Close dialog"
+        (click)="closeModal()"
+        class="hover:text-secondary-500 text-neutral-200"
+      >
         <svg
           width="15"
           height="15"
@@ -44,12 +53,13 @@
         <!-- Name Input -->
 
         <div class="form-group w-full">
-          <label for="name">Name <span class="text-error">*</span></label>
+          <label [attr.for]="id('name')">Name <span class="text-error">*</span></label>
           <input
             data-testid="token-create-name"
+            data-dialog-focus
             formControlName="name"
             placeholder="Enter token name"
-            id="name"
+            [id]="id('name')"
             required
             type="text"
             class="input-text-secondary w-full"
@@ -67,12 +77,12 @@
 
         <!-- Username Input -->
         <div class="form-group w-full">
-          <label for="username">Username</label>
+          <label [attr.for]="id('username')">Username</label>
           <input
             data-testid="token-create-username"
             formControlName="username"
             placeholder="Enter username"
-            id="username"
+            [id]="id('username')"
             type="text"
             class="input-text-secondary w-full"
           />
@@ -95,10 +105,10 @@
 
         <!-- Description Input -->
         <div class="form-group w-full">
-          <label for="description">Description</label>
+          <label [attr.for]="id('description')">Description</label>
           <textarea
             data-testid="token-create-description"
-            id="description"
+            [id]="id('description')"
             formControlName="description"
             placeholder="Enter description about token"
             class="input-text-secondary w-full"
@@ -114,7 +124,7 @@
             </div>
             <p
               data-testid="token-create-description-counter"
-              class="shrink-0 text-neutral-400"
+              class="shrink-0 text-[#9FA0A0]"
               [class.text-error]="(form.get('description').value?.length ?? 0) > descriptionMaxLength"
             >
               {{ form.get('description').value?.length ?? 0 }}/{{ descriptionMaxLength }}
@@ -125,9 +135,10 @@
         <!-- ReadOnly Radio Buttons and Expiration Date -->
         <div class="flex flex-col gap-4 sm:flex-row">
           <div class="flex-1">
-            <div class="mb-2 block text-sm text-[#9FA0A0]">Access Type</div>
+            <div [id]="id('access')" class="mb-2 block text-sm text-[#9FA0A0]">Access Type</div>
             <app-radio-group
               data-testid="token-create-access"
+              [labelledBy]="id('access')"
               [options]="accessTypeOptions"
               [selectedValue]="form.get('readOnly').value"
               name="accessType"
@@ -136,7 +147,7 @@
           </div>
 
           <div class="flex-1">
-            <label for="expirationDate">Expiration Date</label>
+            <label [attr.for]="id('expirationDate')">Expiration Date</label>
             <input
               data-testid="token-create-expiration"
               (click)="expirationDateInput.showPicker()"
@@ -144,7 +155,7 @@
               formControlName="expirationDate"
               [min]="minDate"
               [max]="maxDate"
-              id="expirationDate"
+              [id]="id('expirationDate')"
               type="date"
               class="h-[50px] w-full cursor-pointer rounded-lg border border-[#404141] bg-[#101112] bg-transparent px-4 text-[14px] text-white [color-scheme:dark] outline-none placeholder:text-[#9FA0A0] focus-within:border-[#FDFDFD]"
             />

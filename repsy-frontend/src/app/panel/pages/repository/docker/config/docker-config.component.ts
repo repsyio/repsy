@@ -17,12 +17,13 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 
 import { MarkdownComponent } from '../../../../shared/components/markdown/markdown.component';
+import { DialogDirective } from '../../../../shared/directives/dialog.directive';
 import { getRepoDomain } from '../docker-repo-util';
 
 @Component({
   selector: 'app-docker-config',
   standalone: true,
-  imports: [MarkdownComponent],
+  imports: [DialogDirective, MarkdownComponent],
   styleUrl: './docker-config.component.css',
   templateUrl: './docker-config.component.html',
 })

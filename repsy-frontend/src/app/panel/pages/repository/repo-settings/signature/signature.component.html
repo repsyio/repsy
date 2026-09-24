@@ -22,6 +22,7 @@
         />
         <button
           data-testid="settings-pgp-add"
+          aria-label="Add keyserver"
           type="button"
           (click)="createKeyStore()"
           [disabled]="isSubmitting"
@@ -44,20 +45,17 @@
         class="mb-6 flex max-h-[460px] flex-col gap-2 overflow-y-auto"
       >
         @for (keyStore of keyStores; track keyStore.id) {
-          <div
-            [attr.data-testid]="'settings-pgp-keystore-' + keyStore.host"
-            class="flex min-w-0 justify-between gap-2"
-          >
-            <div
-              class="flex w-full min-w-0 justify-between gap-2 rounded-lg border border-neutral-400 px-4 py-2"
-            >
-              <div class="flex w-full items-start gap-2 text-body1 text-white">
+          <div [attr.data-testid]="'settings-pgp-keystore-' + keyStore.host" class="flex min-w-0 justify-between gap-2">
+            <div class="flex w-full min-w-0 justify-between gap-2 rounded-lg border border-neutral-400 px-4 py-2">
+              <div class="text-body1 flex w-full items-start gap-2 text-white">
                 {{ keyStore.displayName }} ({{ keyStore.host }})
               </div>
             </div>
 
             <button
               data-testid="row-delete"
+              type="button"
+              [attr.aria-label]="'Remove keyserver ' + keyStore.host"
               (click)="deleteKeyStore(keyStore.id)"
               class="hover:text-error-500 flex h-[40px] min-w-[40px] flex-shrink-0 items-center justify-center rounded-lg border border-neutral-400 font-bold text-white"
             >
@@ -88,10 +86,8 @@
           [attr.data-testid]="'settings-pgp-builtin-' + server.host"
           class="flex min-h-10 min-w-0 cursor-not-allowed justify-between gap-2 opacity-40"
         >
-          <div
-            class="flex w-full min-w-0 justify-between gap-2 rounded-lg border border-neutral-400 px-4 py-2"
-          >
-            <div class="flex w-full items-start gap-2 text-body1 text-white">
+          <div class="flex w-full min-w-0 justify-between gap-2 rounded-lg border border-neutral-400 px-4 py-2">
+            <div class="text-body1 flex w-full items-start gap-2 text-white">
               {{ server.displayName }} ({{ server.host }})
             </div>
           </div>

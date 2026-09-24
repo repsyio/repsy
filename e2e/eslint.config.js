@@ -64,6 +64,7 @@ export default tseslint.config(
             'expectPublish',
             'expectOci',
             'expectMsgId',
+            'expectDialogContract',
           ],
         },
       ],

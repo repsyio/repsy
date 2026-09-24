@@ -25,11 +25,13 @@ import {
   RepoCreateForm,
   RepoType as ApiRepoType,
 } from '../../../../../../generated/api';
+import { idFactory } from '../../../../../shared/util/unique-id';
 import {
   DESCRIPTION_MAX_LENGTH,
   DESCRIPTION_MAX_MESSAGE,
   descriptionValidators,
 } from '../../../../../shared/validators/description.validators';
+import { DialogDirective } from '../../../directives/dialog.directive';
 import { RepoType } from '../../../dto/repo/repo-type';
 import { reservedRepoNameValidator } from '../../../util/reserved-repo-names';
 import { SelectorComponent } from '../../selector/selector.component';
@@ -39,11 +41,14 @@ import { ToggleComponent } from '../../toggle/toggle.component';
 @Component({
   selector: 'app-repository-modal',
   standalone: true,
-  imports: [SelectorComponent, ReactiveFormsModule, ToggleComponent],
+  imports: [DialogDirective, SelectorComponent, ReactiveFormsModule, ToggleComponent],
   templateUrl: './repository-create-modal.component.html',
   styleUrl: './repository-create-modal.component.css',
 })
 export class RepositoryCreateModalComponent implements OnInit {
+  /** Element ids of this instance: see `idFactory`. */
+  public readonly id = idFactory('repo-create');
+
   @Output() openChange = new EventEmitter<boolean>();
   @Output() created = new EventEmitter<void>();
   @Input() public open: boolean;

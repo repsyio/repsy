@@ -76,4 +76,63 @@ test.describe('Accessibility (axe)', { tag: '@a11y' }, () => {
     const summary = await scanPage(adminPage, testInfo, 'users');
     expect(summary.label).toBe('users');
   });
+
+  // The page scans above cannot see an open modal: scan the dialog itself (RPS-1266, parts 2 and 3).
+  test('A11Y-01: create-repository modal', async ({ adminPage }, testInfo) => {
+    const repos = new RepositoriesPage(adminPage);
+    await repos.goto();
+    const modal = await repos.openCreateModal();
+    await expect(modal.root).toBeVisible();
+    const summary = await scanPage(
+      adminPage,
+      testInfo,
+      'modal-repo-create',
+      '[data-testid="repo-create-modal"]',
+    );
+    expect(summary.label).toBe('modal-repo-create');
+  });
+
+  test('A11Y-01: create-token modal', async ({ adminPage, seeder }, testInfo) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+    const settings = new RepoSettingsPage(adminPage, repo.name);
+    await settings.goto();
+    await settings.tokens.openCreateModal();
+    const summary = await scanPage(
+      adminPage,
+      testInfo,
+      'modal-token-create',
+      '[data-testid="token-create-modal"]',
+    );
+    expect(summary.label).toBe('modal-token-create');
+  });
+
+  test('A11Y-01: user modals (create, delete confirmation, one-time password)', async ({
+    adminPage,
+    seededUser,
+  }, testInfo) => {
+    const users = new UsersPage(adminPage);
+    await users.goto();
+    await users.search(seededUser.username);
+    await users.openCreateModal();
+    const create = await scanPage(
+      adminPage,
+      testInfo,
+      'modal-user-create',
+      '[data-testid="user-create-modal"]',
+    );
+    expect(create.label).toBe('modal-user-create');
+    await adminPage.keyboard.press('Escape');
+    await expect(users.createModal.root).toHaveCount(0);
+
+    await users.clickResetPassword(seededUser.username);
+    await scanPage(adminPage, testInfo, 'modal-danger', '[data-testid="danger-modal"]');
+    await users.shell.dangerModal.confirm();
+    await users.resetPasswordModal.expectOpen();
+    await scanPage(
+      adminPage,
+      testInfo,
+      'modal-reset-password',
+      '[data-testid="user-reset-password-modal"]',
+    );
+  });
 });

@@ -1,23 +1,32 @@
 <!-- Modal Backdrop -->
 @if (open) {
-  <button
+  <div
     data-testid="user-edit-backdrop"
     animate.enter="fade-in-up"
     class="bg-opacity-50 fixed inset-0 z-3 backdrop-blur-sm"
     (click)="closeModal()"
-  >
-    <div></div>
-  </button>
+    aria-hidden="true"
+  ></div>
 
   <!-- Modal Content -->
   <div
     data-testid="user-edit-modal"
+    appDialog
+    #dialog="appDialog"
+    (appDialogClose)="closeModal()"
+    [appDialogClosable]="!loading"
     class="fixed top-1/2 left-1/2 z-4 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-[#404141] bg-[#101112] p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px]"
   >
     <!-- Header -->
     <div class="flex justify-between">
-      <h1 class="text-[24px] leading-6 text-white">Edit User</h1>
-      <button data-testid="user-edit-close" (click)="closeModal()" class="hover:text-secondary-500 text-neutral-200">
+      <h1 [id]="dialog.titleId" class="text-[24px] leading-6 text-white">Edit User</h1>
+      <button
+        data-testid="user-edit-close"
+        type="button"
+        aria-label="Close dialog"
+        (click)="closeModal()"
+        class="hover:text-secondary-500 text-neutral-200"
+      >
         <svg
           width="15"
           height="15"
@@ -44,12 +53,13 @@
         <div class="flex flex-col text-[#9FA0A0]">
           <!-- Username Input (Editable) -->
           <div class="form-group w-full">
-            <label for="username">Username <span class="text-error">*</span></label>
+            <label [attr.for]="id('username')">Username <span class="text-error">*</span></label>
             <input
               data-testid="user-edit-username"
+              data-dialog-focus
               formControlName="username"
               placeholder="Enter username"
-              id="username"
+              [id]="id('username')"
               required
               type="text"
               class="input-text-secondary w-full"
@@ -77,10 +87,10 @@
 
           <!-- Admin Role Toggle -->
           <div class="form-group w-full">
-            <label for="isAdmin" class="mb-2 block text-[14px] text-neutral-200">Role</label>
+            <span [id]="id('role')" class="mb-2 block text-[14px] text-neutral-200">Role</span>
             <app-toggle-component
               data-testid="user-edit-role"
-              id="isAdmin"
+              [labelledBy]="id('role')"
               formControlName="isAdmin"
               checkedLabel="Admin"
               uncheckedLabel="User"

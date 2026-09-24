@@ -25,6 +25,7 @@ import {
   RepoPermissionInfo,
   RepoRenameForm,
 } from '../../../../../../generated/api';
+import { idFactory } from '../../../../../shared/util/unique-id';
 import {
   DESCRIPTION_MAX_LENGTH,
   DESCRIPTION_MAX_MESSAGE,
@@ -41,6 +42,9 @@ import { reservedRepoNameValidator } from '../../../../shared/util/reserved-repo
   imports: [ReactiveFormsModule, RouterLink],
 })
 export class RepoInfoComponent implements OnInit {
+  /** Element ids of this instance: see `idFactory`. */
+  public readonly id = idFactory('repo-info');
+
   @Input() public repoType: string;
   @Input() public activeRepository: RepoPermissionInfo;
   public renameForm: FormGroup;

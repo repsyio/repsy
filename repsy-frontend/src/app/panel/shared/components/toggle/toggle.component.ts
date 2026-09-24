@@ -17,6 +17,8 @@
 import { Component, EventEmitter, forwardRef, Input, Output } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
+import { uniqueId } from '../../../../shared/util/unique-id';
+
 /**
  * A switch that works both ways: with `[checked]`/`(checkedChange)`, and as a form control
  * (`formControlName`/`formControl`), where it follows the control's value and its disabled state.
@@ -28,6 +30,8 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
   providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => ToggleComponent), multi: true }],
 })
 export class ToggleComponent implements ControlValueAccessor {
+  /** The id of the element that names what the switch controls; the state text is appended to it. */
+  @Input() public labelledBy: string | null = null;
   @Input() public checked: boolean;
   @Input() public checkedLabel: string;
   @Input() public uncheckedLabel: string;
@@ -35,6 +39,8 @@ export class ToggleComponent implements ControlValueAccessor {
   @Input() public disabled = false;
   @Output() public checkedChange = new EventEmitter<boolean>();
   @Output() public switch = new EventEmitter<boolean>();
+
+  public readonly labelId = uniqueId('toggle-label');
 
   /** Set through `setDisabledState` when the bound form control is disabled. */
   private disabledByForm = false;

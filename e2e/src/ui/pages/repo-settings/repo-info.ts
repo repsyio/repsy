@@ -16,8 +16,7 @@
 
 /**
  * The Repository Info section: rename (a form of its own, confirmed through the danger modal) and
- * the description (save/reset, no confirmation). The rename input is `#name` and the description
- * `#description`, ids the create-token modal reuses, so both are reached by their `settings-*` ids.
+ * the description (save/reset, no confirmation). Both inputs are reached by their `settings-*` test ids.
  */
 import { type Locator, type Page } from '@playwright/test';
 

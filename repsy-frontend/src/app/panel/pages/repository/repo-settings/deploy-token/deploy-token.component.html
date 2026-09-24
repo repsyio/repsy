@@ -102,6 +102,7 @@
                 <div class="flex justify-end gap-3">
                   <button
                     data-testid="row-rotate"
+                    [attr.aria-label]="'Rotate deploy token ' + deployToken.name"
                     class="hover:text-secondary-500 text-neutral-200"
                     (click)="rotateDeployToken(deployToken)"
                   >
@@ -122,6 +123,7 @@
                   </button>
                   <button
                     data-testid="row-configure"
+                    [attr.aria-label]="'Configure deploy token ' + deployToken.name"
                     class="hover:text-secondary-500 text-neutral-200"
                     (click)="configure(deployToken)"
                   >
@@ -147,6 +149,7 @@
                   </button>
                   <button
                     data-testid="row-revoke"
+                    [attr.aria-label]="'Revoke deploy token ' + deployToken.name"
                     class="hover:text-error-500 text-neutral-200"
                     (click)="revokeDeployToken(deployToken)"
                   >
@@ -211,6 +214,7 @@
                     <div class="flex justify-end gap-3">
                       <button
                         data-testid="row-rotate"
+                        [attr.aria-label]="'Rotate deploy token ' + deployToken.name"
                         class="hover:text-secondary-500 text-neutral-200"
                         (click)="rotateDeployToken(deployToken)"
                       >
@@ -231,6 +235,7 @@
                       </button>
                       <button
                         data-testid="row-configure"
+                        [attr.aria-label]="'Configure deploy token ' + deployToken.name"
                         class="hover:text-secondary-500 text-neutral-200"
                         (click)="configure(deployToken)"
                       >
@@ -261,6 +266,7 @@
                       </button>
                       <button
                         data-testid="row-revoke"
+                        [attr.aria-label]="'Revoke deploy token ' + deployToken.name"
                         class="hover:text-error-500 text-neutral-200"
                         (click)="revokeDeployToken(deployToken)"
                       >

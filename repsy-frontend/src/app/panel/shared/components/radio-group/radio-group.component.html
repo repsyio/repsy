@@ -1,4 +1,4 @@
-<div data-testid="radio-group" class="flex flex-col gap-2">
+<div data-testid="radio-group" role="radiogroup" [attr.aria-labelledby]="labelledBy" class="flex flex-col gap-2">
   @for (option of options; track option.value) {
     <label
       class="flex cursor-pointer items-center gap-2 text-[#9FA0A0] transition-colors hover:text-white"

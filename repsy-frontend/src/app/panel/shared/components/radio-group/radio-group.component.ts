@@ -29,6 +29,8 @@ export interface RadioOption<T = boolean | string | number> {
   standalone: true,
 })
 export class RadioGroupComponent<T = boolean | string | number> {
+  /** The id of the element that names the group. */
+  @Input() public labelledBy: string | null = null;
   @Input() public options: RadioOption<T>[] = [];
   @Input() public selectedValue: T | null = null;
   @Input() public name = 'radio-group';

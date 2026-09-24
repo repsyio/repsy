@@ -18,17 +18,22 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 
+import { idFactory } from '../../../../../shared/util/unique-id';
 import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dto/token-create-info';
+import { DialogDirective } from '../../../directives/dialog.directive';
 import { CopyClipboardComponent } from '../../copy-clipboard/copy-clipboard.component';
 
 @Component({
   selector: 'app-deploy-token-info-modal',
-  imports: [FormsModule, ReactiveFormsModule, CopyClipboardComponent, NgOptimizedImage, CommonModule],
+  imports: [DialogDirective, FormsModule, ReactiveFormsModule, CopyClipboardComponent, NgOptimizedImage, CommonModule],
   standalone: true,
   templateUrl: './deploy-token-info-modal.component.html',
   styleUrl: './deploy-token-info-modal.component.css',
 })
 export class DeployTokenInfoModalComponent {
+  /** Element ids of this instance: see `idFactory`. */
+  public readonly id = idFactory('token-info');
+
   @Output() openChange = new EventEmitter<boolean>();
   @Input() public open: boolean;
   @Input() public tokenInfo: TokenCreateInfo;

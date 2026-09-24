@@ -416,22 +416,28 @@ test.describe('Deploy tokens: the create form', { tag: SETTINGS }, () => {
     await expect(tokens.empty).toBeVisible();
   });
 
-  // RPS-1266: `#name` and `#description` (and `#username`) exist twice on this page, once in the
-  // rename / description form of Repository Info and once in the create-token modal, so a
-  // `<label for>` or `getByLabel('Name')` resolves to the wrong control. Ids must be unique per
-  // document; expected to fail until the components get scoped ids.
-  test.fail(
-    'TOK-05 the create-token modal does not reuse the ids of the rename form (RPS-1266)',
-    async ({ adminPage, seeder }) => {
-      const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
-      const settings = new RepoSettingsPage(adminPage, repo.name);
-      await settings.goto();
-      await settings.tokens.openCreateModal();
+  // RPS-1266: the rename / description form of Repository Info and the create-token modal share a page,
+  // so their inputs must not share ids (a `<label for>` would resolve to the wrong control).
+  test('TOK-05 the create-token modal does not reuse the ids of the rename form (RPS-1266)', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+    const settings = new RepoSettingsPage(adminPage, repo.name);
+    await settings.goto();
+    const modal = await settings.tokens.openCreateModal();
 
-      await expect(adminPage.locator('#name')).toHaveCount(1);
-      await expect(adminPage.locator('#description')).toHaveCount(1);
-    },
-  );
+    await expect(adminPage.locator('#name')).toHaveCount(0);
+    await expect(adminPage.locator('#description')).toHaveCount(0);
+    const ids = await adminPage.evaluate(() =>
+      Array.from(document.querySelectorAll('[id]'), (element) => element.id),
+    );
+    expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([]);
+    // The modal's own labels reach the modal's inputs, not the rename form's.
+    await modal.root.getByLabel('Name *', { exact: true }).fill('label-target');
+    await expect(modal.name).toHaveValue('label-target');
+    await expect(settings.info.renameInput).not.toHaveValue('label-target');
+  });
 });
 
 test.describe('Deploy tokens: long names', { tag: SETTINGS }, () => {

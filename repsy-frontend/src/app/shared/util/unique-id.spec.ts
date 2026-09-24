@@ -14,27 +14,21 @@
 /// limitations under the License.
 ///
 
-import { Component } from '@angular/core';
+import { idFactory, uniqueId } from './unique-id';
 
-import { DialogDirective } from '../../../directives/dialog.directive';
-import { DangerModalService } from './danger-modal.service';
+describe('unique ids', () => {
+  it('never repeats an id', () => {
+    const ids = new Set(Array.from({ length: 50 }, () => uniqueId('x')));
+    expect(ids.size).toBe(50);
+  });
 
-@Component({
-  selector: 'app-danger-modal',
-  standalone: true,
-  imports: [DialogDirective],
-  templateUrl: './danger-modal.component.html',
-  styleUrl: './danger-modal.component.css',
-})
-export class DangerModalComponent {
-  constructor(public readonly dangerModalService: DangerModalService) {}
+  it('gives every instance its own prefix and keeps it stable within the instance', () => {
+    const first = idFactory('form');
+    const second = idFactory('form');
 
-  onClose() {
-    this.dangerModalService.close();
-  }
-
-  onClick() {
-    this.dangerModalService.call();
-    this.onClose();
-  }
-}
+    expect(first('name')).toBe(first('name'));
+    expect(first('name')).not.toBe(first('description'));
+    expect(first('name')).not.toBe(second('name'));
+    expect(first('name')).toMatch(/^form-\d+-name$/);
+  });
+});

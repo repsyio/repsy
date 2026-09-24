@@ -106,8 +106,15 @@ export function formatSummary(summary: AxeSummary): string {
  * attaches the findings to the report and, in `enforce` mode, fails on serious/critical violations.
  * Returns the summary so a spec can collect a table.
  */
-export async function scanPage(page: Page, testInfo: TestInfo, label: string): Promise<AxeSummary> {
-  const results = await new AxeBuilder({ page }).withTags(AXE_TAGS).analyze();
+export async function scanPage(
+  page: Page,
+  testInfo: TestInfo,
+  label: string,
+  /** A CSS selector to scan only that subtree (an open modal), instead of the whole page. */
+  include?: string,
+): Promise<AxeSummary> {
+  const builder = new AxeBuilder({ page }).withTags(AXE_TAGS);
+  const results = await (include ? builder.include(include) : builder).analyze();
 
   const rules: RuleSummary[] = results.violations.map((violation) => ({
     id: violation.id,

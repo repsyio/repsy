@@ -21,6 +21,7 @@ import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { LoginInfo } from '../../../../../generated/api';
+import { idFactory } from '../../../../shared/util/unique-id';
 import {
   PASSWORD_MESSAGES,
   PASSWORD_MISMATCH_MESSAGE,
@@ -49,6 +50,9 @@ export class PasswordFormUi {
   templateUrl: './account-info.component.html',
 })
 export class AccountInfoComponent implements OnInit {
+  /** Element ids of this instance: see `idFactory`. */
+  public readonly id = idFactory('profile');
+
   @Input() passwordForm: FormGroup;
   @Input() usernameForm: FormGroup;
   @Input() username: string;

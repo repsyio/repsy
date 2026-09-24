@@ -22,6 +22,7 @@ import { finalize } from 'rxjs/operators';
 import { RecentScannedVersion, RepoSecurityDetail, RepoType } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { SecurityService } from '../../../pages/security/service/security.service';
+import { DialogDirective } from '../../directives/dialog.directive';
 import { PortalToBodyDirective } from '../../directives/portal-to-body.directive';
 import { buildArtifactDetailRoute } from '../../util/security-detail-route.util';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
@@ -32,7 +33,14 @@ import { SeverityBreakdownComponent } from '../severity-breakdown/severity-break
   selector: 'app-repo-security-modal',
   standalone: true,
   hostDirectives: [PortalToBodyDirective],
-  imports: [CommonModule, SpinnerComponent, RescanNoteComponent, SeverityBadgeComponent, SeverityBreakdownComponent],
+  imports: [
+    DialogDirective,
+    CommonModule,
+    SpinnerComponent,
+    RescanNoteComponent,
+    SeverityBadgeComponent,
+    SeverityBreakdownComponent,
+  ],
   templateUrl: './repo-security-modal.component.html',
 })
 export class RepoSecurityModalComponent implements OnChanges {
