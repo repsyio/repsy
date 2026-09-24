@@ -114,8 +114,8 @@ test.describe('Helm charts: OCI and classic', { tag: '@packages' }, () => {
     await expect(list.emptyList.root).toBeVisible();
   });
 
-  // RPS-1262 (3): the Helm version list has no `<app-pagination>` at all (nor a page size the API
-  // could be told), so with more than ten versions only the first page can ever be reached.
+  // RPS-1262 (3): the Helm version list has no `<app-pagination>` at all, so twelve versions all
+  // render on one page (the API is never asked for a page).
   test.fail(
     'PKG-helm-07 twelve versions of a chart page at ten per page (RPS-1262)',
     async ({ adminPage, seeder, seedVersions }) => {
@@ -140,15 +140,24 @@ test.describe('Helm charts: OCI and classic', { tag: '@packages' }, () => {
       const pages = protocolPages(adminPage, helm, repo.name);
       const detail = pages.detail(chart);
       await detail.goto();
-      await detail.delete();
-      // The versions page it lands on asks for the chart that is gone; wait for that request to be
-      // answered (an idle network), so the error toasts are read after they would have shown.
+      // The versions page it lands on asks for the chart that is gone. Wait for that request's answer
+      // (a fix that stops asking just lets the wait run out), so the toasts are read after they would show.
       const versions = pages.versions(chart);
+      const answered = adminPage
+        .waitForResponse(
+          (res) =>
+            res.request().method() === 'GET' &&
+            new URL(res.url()).pathname === `/api/helm/charts/${repo.name}/${chart.name}`,
+          { timeout: 5_000 },
+        )
+        .catch(() => undefined);
+      await detail.delete();
       await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}/${chart.name}$`));
-      await adminPage.waitForLoadState('networkidle');
+      await answered;
       await versions.expectLoaded();
       await expect(versions.emptyList.root).toBeVisible();
-      await expect(detail.toasts.error()).toHaveCount(0);
+      // Read at once, not polled: toasts dismiss themselves after three seconds.
+      expect(await detail.toasts.error().count(), 'error toasts after the delete').toBe(0);
     },
   );
 });
