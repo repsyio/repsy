@@ -19,7 +19,7 @@
  * animates almost everything (`animate.enter` on ~200 elements, a 400 ms toast slide-in) and loads a
  * handful of third-party resources; neither should decide whether a test passes.
  */
-import type { BrowserContext, Page, Request } from '@playwright/test';
+import type { APIResponse, BrowserContext, Route } from '@playwright/test';
 
 /**
  * Near-zero motion, deliberately not `animation: none`: Angular's `animate.enter`/`animate.leave`
@@ -45,7 +45,8 @@ const STYLE_ELEMENT_ID = 'repsy-e2e-no-motion';
  * The route is a URL predicate, so same-origin traffic is never intercepted, and a test's own
  * `page.route()` mock (page routes win over context routes) keeps working.
  *
- * It also installs `healHostNetworkChange` (RPS-1303, below).
+ * Reads of the panel itself (its scripts, styles and API GETs) are fetched by Playwright instead of
+ * Chromium, see `serveReadsFromNode` (RPS-1303).
  */
 export async function applyUiDefaults(
   context: BrowserContext,
@@ -84,109 +85,64 @@ export async function applyUiDefaults(
     (route) => route.abort('blockedbyclient'),
   );
 
-  healHostNetworkChange(context, allowed);
+  await serveReadsFromNode(context, allowed);
 }
 
-/** What Chromium reports for a request it aborted because the HOST's network configuration changed. */
-export const HOST_NETWORK_CHANGED = /ERR_NETWORK_CHANGED/;
+/** The requests whose loss leaves the panel unbooted or a view empty. Images and fonts are not among them. */
+const READ_RESOURCE_TYPES: ReadonlySet<string> = new Set(['script', 'stylesheet', 'xhr', 'fetch']);
+
+export interface ServeReadsOptions {
+  /** How a read is fetched; `route.fetch()` (Playwright's own HTTP client) unless a test replaces it. */
+  fetch?: (route: Route) => Promise<APIResponse>;
+  /** Called with the URL of every read this route served, for the harness proof. */
+  onServed?: (url: string) => void;
+}
 
 /**
- * The requests whose loss leaves a page unbooted or empty. An image, a font or a beacon lost to the
- * same event costs the panel nothing, and a reload for it would throw away what a test is in the
- * middle of (AUTH-09 lost its "Session expired" toast to a reload caused by two icons).
- */
-const HEALED_RESOURCE_TYPES: ReadonlySet<string> = new Set([
-  'script',
-  'stylesheet',
-  'xhr',
-  'fetch',
-]);
-
-/** How many reloads `healHostNetworkChange` gives one page before the failure is left to the test. */
-export const MAX_NETWORK_CHANGE_RELOADS = 5;
-
-/**
- * RPS-1303. The `ui` runner shares the host's network namespace (`network_mode: host`, so that
- * `localhost:8080` reaches the stack), and Chromium aborts every in-flight request with
+ * RPS-1303. Fetches the panel's own reads (`GET` of a script, a stylesheet, or an `xhr`/`fetch` call to
+ * an allowed origin) with Playwright's HTTP client (`route.fetch()`, Node) and hands the answer to the
+ * page, instead of letting Chromium's network stack do it.
+ *
+ * Why: the `ui` runner shares the host's network namespace (`network_mode: host`, so that
+ * `localhost:8080` reaches the stack), and Chromium fails every in-flight request with
  * `net::ERR_NETWORK_CHANGED` whenever that namespace's addresses or links change: a wifi interface
  * refreshing its IPv6 lifetimes, or any other container (a second stack, a Testcontainers run) starting
- * or stopping and its veth/bridge coming up, which is a burst of events over several seconds. Measured:
- * the trace of a failed run shows `main-*.js`, `polyfills-*.js` and six chunks of the SPA failing with it
- * while the document itself was a 200, so the panel never booted and the test then waited 10 s for
- * `pkg-toolbar` / `settings-page` / `user-title` of a blank page. Nothing in the panel or the test is
- * wrong: a reload gets the page.
+ * or stopping and its veth/bridge coming up, a burst of events over several seconds. Measured on a
+ * failed run: `main-*.js`, `polyfills-*.js` and six chunks of the SPA failed with it while the document
+ * itself was a 200, so the panel never booted and the test then waited 10 s for `pkg-toolbar` /
+ * `settings-page` / `user-title` of a blank page. Node's sockets do not care about the host's
+ * interfaces, so a read served from here cannot be lost that way. Nothing else changes: the page sees
+ * the same request events, statuses, headers and bodies, and a test's own `page.route()` still wins
+ * (it runs first, and `route.fallback()` from it ends up here).
  *
- * So a same-origin GET (the SPA's scripts and styles, or a panel-API read that the view renders from,
- * `HEALED_RESOURCE_TYPES`; never an icon or an image) that fails with exactly that error reloads its page, and reloads again when that load is hit too, up
- * to `MAX_NETWORK_CHANGE_RELOADS` times (a failure of a request issued after the reload started is the
- * reload's own). A write (POST/PUT/DELETE) is never replayed: its outcome is unknown. Top-level
- * navigations are left alone, since a `page.goto()` that is refused reports the error to its caller
- * itself. Only this one error text matches, so a test that aborts a request on purpose
- * (`route.abort()`) is unaffected. `matches` exists for the harness proof, which has no way to make
- * Chromium report the real error.
+ * Left to Chromium on purpose: navigations (a refused `page.goto()` reports the error to its caller),
+ * writes (never replayed), images and fonts (losing one costs the panel nothing), and a read whose
+ * Playwright fetch itself fails (it falls back, so this can only remove a failure, never add one).
  */
-export function healHostNetworkChange(
+export async function serveReadsFromNode(
   context: BrowserContext,
   allowedOrigins: ReadonlySet<string>,
-  matches: RegExp = HOST_NETWORK_CHANGED,
-): void {
-  const reloads = new WeakMap<Page, number>();
-  // Requests in issue order: a failure of a request issued before the reload started belongs to the
-  // load being replaced (Chromium fails everything in flight at once), one issued after it to the reload.
-  let issued = 0;
-  const order = new WeakMap<Request, number>();
-  const startedAfter = new WeakMap<Page, number>();
-  const running = new WeakSet<Page>();
-  const again = new WeakSet<Page>();
-
-  const heal = async (page: Page, failedUrl: string): Promise<void> => {
-    running.add(page);
-    try {
-      do {
-        again.delete(page);
-        const done = (reloads.get(page) ?? 0) + 1;
-        reloads.set(page, done);
-        startedAfter.set(page, issued);
-        console.warn(
-          `[ui] host network changed (${failedUrl}): reloading ${page.url()} (${done}/${MAX_NETWORK_CHANGE_RELOADS})`,
-        );
-        await page.reload().catch(() => undefined);
-      } while (
-        again.has(page) &&
-        !page.isClosed() &&
-        (reloads.get(page) ?? 0) < MAX_NETWORK_CHANGE_RELOADS
-      );
-    } finally {
-      running.delete(page);
-      again.delete(page);
-    }
-  };
-
-  context.on('request', (request: Request) => {
-    issued += 1;
-    order.set(request, issued);
-  });
-
-  context.on('requestfailed', (request: Request) => {
-    if (
-      request.method() !== 'GET' ||
-      request.isNavigationRequest() ||
-      !HEALED_RESOURCE_TYPES.has(request.resourceType()) ||
-      !matches.test(request.failure()?.errorText ?? '') ||
-      !allowedOrigins.has(new URL(request.url()).origin)
-    ) {
-      return;
-    }
-    const page = request.frame()?.page();
-    if (!page || page.isClosed() || (reloads.get(page) ?? 0) >= MAX_NETWORK_CHANGE_RELOADS) {
-      return;
-    }
-    if (running.has(page)) {
-      if ((order.get(request) ?? 0) > (startedAfter.get(page) ?? Infinity)) {
-        again.add(page);
+  options: ServeReadsOptions = {},
+): Promise<void> {
+  const fetchRead = options.fetch ?? ((route: Route) => route.fetch());
+  await context.route(
+    (url) =>
+      (url.protocol === 'http:' || url.protocol === 'https:') && allowedOrigins.has(url.origin),
+    async (route) => {
+      const request = route.request();
+      if (request.method() !== 'GET' || !READ_RESOURCE_TYPES.has(request.resourceType())) {
+        await route.fallback();
+        return;
       }
-      return;
-    }
-    void heal(page, request.url());
-  });
+      let response: APIResponse;
+      try {
+        response = await fetchRead(route);
+      } catch {
+        await route.fallback().catch(() => undefined);
+        return;
+      }
+      options.onServed?.(request.url());
+      await route.fulfill({ response }).catch(() => undefined);
+    },
+  );
 }
