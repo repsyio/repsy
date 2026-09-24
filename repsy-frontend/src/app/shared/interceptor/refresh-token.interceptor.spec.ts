@@ -27,6 +27,7 @@ import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 
 import { AuthService } from '../../auth/pages/service/auth.service';
+import { ToastService } from '../../panel/shared/components/toast/toast.service';
 import { RefreshTokenInterceptor } from './refresh-token.interceptor';
 
 const SESSION_EXPIRED = { status: 401, statusText: 'Unauthorized' };
@@ -36,11 +37,17 @@ describe('RefreshTokenInterceptor', () => {
   let httpTesting: HttpTestingController;
   let authService: jasmine.SpyObj<AuthService>;
   let router: jasmine.SpyObj<Router>;
+  let toastService: jasmine.SpyObj<ToastService>;
+  let session: boolean;
   let refreshes: Subject<string>[];
 
   beforeEach(() => {
     refreshes = [];
-    authService = jasmine.createSpyObj<AuthService>('AuthService', ['refreshToken', 'logOut']);
+    session = true;
+    authService = jasmine.createSpyObj<AuthService>('AuthService', ['refreshToken', 'logOut', 'isAuthenticated']);
+    authService.isAuthenticated.and.callFake(() => session);
+    authService.logOut.and.callFake(() => (session = false));
+    toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     authService.refreshToken.and.callFake(() => {
       const refresh = new Subject<string>();
       refreshes.push(refresh);
@@ -55,6 +62,7 @@ describe('RefreshTokenInterceptor', () => {
         { provide: HTTP_INTERCEPTORS, useClass: RefreshTokenInterceptor, multi: true },
         { provide: AuthService, useValue: authService },
         { provide: Router, useValue: router },
+        { provide: ToastService, useValue: toastService },
       ],
     });
     http = TestBed.inject(HttpClient);
@@ -103,7 +111,8 @@ describe('RefreshTokenInterceptor', () => {
 
     expect(errors).toEqual([failure, failure]);
     expect(authService.logOut).toHaveBeenCalledTimes(1);
-    expect(router.navigateByUrl).toHaveBeenCalledOnceWith('login');
+    expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/login');
+    expect(toastService.show).toHaveBeenCalledOnceWith('Session expired, please log in again.', 'error');
   });
 
   it('starts a clean refresh after a failed one, so concurrent requests are retried with the new token', () => {
@@ -116,6 +125,7 @@ describe('RefreshTokenInterceptor', () => {
     expect(errors.length).toBe(2);
 
     // The user signs in again, and two requests expire together.
+    session = true;
     const results: unknown[] = [];
     http.get('/c').subscribe({ next: (r) => results.push(r), error: (e) => errors.push(e) });
     http.get('/d').subscribe({ next: (r) => results.push(r), error: (e) => errors.push(e) });
@@ -133,5 +143,165 @@ describe('RefreshTokenInterceptor', () => {
     expect(results).toEqual([{ ok: '/c' }, { ok: '/d' }]);
     expect(errors.length).toBe(2);
     expect(authService.logOut).toHaveBeenCalledTimes(1);
+  });
+
+  // RPS-1279: the rule per 401 msgId is documented on RefreshTokenInterceptor.
+  describe('a 401 on an ordinary call', () => {
+    const REFUSED = { status: 401, statusText: 'Unauthorized' };
+    let completed: boolean;
+    let errors: unknown[];
+
+    beforeEach(() => {
+      completed = false;
+      errors = [];
+    });
+
+    function call(url = '/a'): void {
+      http.get(url).subscribe({ error: (e) => errors.push(e), complete: () => (completed = true) });
+    }
+
+    function refuse(msgId: string | null, url = '/a'): void {
+      httpTesting.expectOne(url).flush(msgId ? { msgId } : null, REFUSED);
+    }
+
+    function expectLoggedOut(message: string): void {
+      expect(authService.refreshToken).not.toHaveBeenCalled();
+      expect(authService.logOut).toHaveBeenCalledTimes(1);
+      expect(toastService.show).toHaveBeenCalledOnceWith(message, 'error');
+      expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/login');
+      expect(completed).toBeTrue();
+      expect(errors).toEqual([]);
+    }
+
+    it('sessionExpired refreshes once and retries once', () => {
+      const results: unknown[] = [];
+      http.get('/a').subscribe((r) => results.push(r));
+
+      refuse('sessionExpired');
+      refreshes[0].next('token-1');
+      refreshes[0].complete();
+
+      expectRetriedWith('/a', 'token-1');
+      expect(results).toEqual([{ ok: '/a' }]);
+      expect(authService.refreshToken).toHaveBeenCalledTimes(1);
+      expect(authService.logOut).not.toHaveBeenCalled();
+      expect(toastService.show).not.toHaveBeenCalled();
+    });
+
+    it('sessionExpired that is refused again after the refresh logs out instead of looping', () => {
+      call();
+
+      refuse('sessionExpired');
+      refreshes[0].next('token-1');
+      refreshes[0].complete();
+      httpTesting.expectOne('/a').flush({ msgId: 'sessionExpired' }, REFUSED);
+
+      expect(authService.refreshToken).toHaveBeenCalledTimes(1);
+      expect(authService.logOut).toHaveBeenCalledTimes(1);
+      expect(toastService.show).toHaveBeenCalledOnceWith('Session invalid, please log in again.', 'error');
+      expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/login');
+      expect(completed).toBeTrue();
+    });
+
+    it('accessNotAllowed (bad signature) logs out without a refresh', () => {
+      call();
+      refuse('accessNotAllowed');
+      expectLoggedOut('Session invalid, please log in again.');
+    });
+
+    it('unAuthorized (no permission for the resource) is left to the caller: the session is fine', () => {
+      call();
+      refuse('unAuthorized');
+
+      expect(errors.length).toBe(1);
+      expect(authService.refreshToken).not.toHaveBeenCalled();
+      expect(authService.logOut).not.toHaveBeenCalled();
+      expect(toastService.show).not.toHaveBeenCalled();
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+    });
+
+    it('refreshTokenExpired logs out without a refresh', () => {
+      call();
+      refuse('refreshTokenExpired');
+      expectLoggedOut('Session expired, please log in again.');
+    });
+
+    it('an unknown msgId logs out without a refresh', () => {
+      call();
+      refuse('somethingNew');
+      expectLoggedOut('Session invalid, please log in again.');
+    });
+
+    it('a 401 without a body logs out without a refresh', () => {
+      call();
+      refuse(null);
+      expectLoggedOut('Session invalid, please log in again.');
+    });
+
+    it('logs out once when several calls are refused together', () => {
+      call('/a');
+      call('/b');
+
+      refuse('accessNotAllowed', '/a');
+      refuse('accessNotAllowed', '/b');
+
+      expect(authService.logOut).toHaveBeenCalledTimes(1);
+      expect(toastService.show).toHaveBeenCalledTimes(1);
+      expect(router.navigateByUrl).toHaveBeenCalledTimes(1);
+    });
+
+    it('passes a 401 on quietly when there is no session any more', () => {
+      session = false;
+      call();
+      refuse('accessNotAllowed');
+
+      expect(errors.length).toBe(1);
+      expect(authService.logOut).not.toHaveBeenCalled();
+      expect(toastService.show).not.toHaveBeenCalled();
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+    });
+
+    it('leaves non-401 errors to their caller', () => {
+      call();
+      httpTesting.expectOne('/a').flush({ msgId: 'accessDenied' }, { status: 403, statusText: 'Forbidden' });
+
+      expect(errors.length).toBe(1);
+      expect(authService.logOut).not.toHaveBeenCalled();
+      expect(toastService.show).not.toHaveBeenCalled();
+    });
+
+    it('leaves the invalidCredentials of a login attempt to the login form', () => {
+      call('/api/auth/login?x=1');
+      refuse('invalidCredentials', '/api/auth/login?x=1');
+
+      expect(errors.length).toBe(1);
+      expect(authService.logOut).not.toHaveBeenCalled();
+      expect(toastService.show).not.toHaveBeenCalled();
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+    });
+
+    ['refreshTokenExpired', 'sessionExpired', 'accessNotAllowed'].forEach((msgId) => {
+      it(`${msgId} on the refresh call itself logs out and never refreshes again`, () => {
+        call('/api/auth/tokens/refresh');
+        refuse(msgId, '/api/auth/tokens/refresh');
+
+        expect(authService.refreshToken).not.toHaveBeenCalled();
+        expect(authService.logOut).toHaveBeenCalledTimes(1);
+        expect(toastService.show).toHaveBeenCalledOnceWith('Session expired, please log in again.', 'error');
+        expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/login');
+        expect(completed).toBeTrue();
+      });
+    });
+
+    it('leaves a failed retry that is not a 401 to its caller', () => {
+      call();
+      refuse('sessionExpired');
+      refreshes[0].next('token-1');
+      refreshes[0].complete();
+      httpTesting.expectOne('/a').flush(null, { status: 500, statusText: 'Server Error' });
+
+      expect(errors.length).toBe(1);
+      expect(authService.logOut).not.toHaveBeenCalled();
+    });
   });
 });

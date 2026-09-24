@@ -15,16 +15,20 @@
 
 /**
  * AUTH-05 .. AUTH-07: the route guards. `AuthGuard` sends an anonymous visitor of a protected route
- * to `/`, and `/` renders the login form IN PLACE (`AuthRedirectComponent`), so the URL is `/`, not
- * `/login`: these tests assert what the visitor sees. `/login` for a logged-in user bounces to `/`
- * (`AuthRedirectGuard`), and `adminGuard` bounces a non-admin from `/users` and `/security` to `/`.
+ * to `/?returnUrl=<the route>`, and `/` renders the login form IN PLACE (`AuthRedirectComponent`), so
+ * the path is `/`, not `/login`: these tests assert what the visitor sees. A login there follows the
+ * session at once (RPS-1278) and returns the visitor to the requested route. `/login` for a logged-in
+ * user bounces to `/` (`AuthRedirectGuard`), and `adminGuard` bounces a non-admin from `/users` and
+ * `/security` to `/`.
  */
 import type { Page } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
+import { documentIsMarked, markDocument } from '../../../src/ui/document-marker.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
+import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { Shell } from '../../../src/ui/pages/shell.js';
 import { NO_SESSION, storedSession } from './stored-session.js';
 
@@ -35,8 +39,8 @@ test.describe('AUTH-05 anonymous visitor', () => {
     test(`${route} shows the login form`, async ({ page }) => {
       await page.goto(route);
 
-      await expectLoginInPlace(page);
-      await expect(page).toHaveURL('/');
+      await expectLoginInPlace(page, route);
+      await expect(page).toHaveURL(returnsTo(route));
     });
   }
 
@@ -46,38 +50,121 @@ test.describe('AUTH-05 anonymous visitor', () => {
 
     await page.goto(`/${repo.name}`);
 
-    await expectLoginInPlace(page);
-    await expect(page).toHaveURL('/');
+    await expectLoginInPlace(page, `/${repo.name}`);
+    await expect(page).toHaveURL(returnsTo(`/${repo.name}`));
   });
 
-  test('logging in from the redirected form opens the dashboard', async ({ page, seededUser }) => {
-    // Intended behaviour. Today the login succeeds (the session is stored) but the page stays on the
-    // form: it sits at "/" inside AuthRedirectComponent and LoginComponent navigates to "/" again,
-    // which changes nothing, so the dashboard only appears after a reload. Remove this line with the fix.
-    test.fail(
-      true,
-      'PRODUCT BUG RPS-1278: login from the in-place form at "/" does not render the dashboard',
-    );
-
+  test('logging in from the redirected form returns to the requested page', async ({
+    page,
+    seededUser,
+  }) => {
     await page.goto('/repositories');
+    const login = new LoginPage(page);
+    await expect(login.submit).toBeVisible();
+    // A marker that a document load (a reload, a full navigation) would wipe: RPS-1278 needed one.
+    await markDocument(page);
+
+    await login.login(seededUser.username, seededUser.password);
+
+    await expect(page).toHaveURL('/repositories');
+    await expect(new RepositoriesPage(page).title).toBeVisible();
+    await expect(login.form).toHaveCount(0);
+    expect((await storedSession(page)).username).toBe(seededUser.username);
+    expect(await documentIsMarked(page)).toBe(true);
+  });
+
+  test('logging in from the redirected form of a repository returns to that repository', async ({
+    page,
+    seededUser,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    await page.goto(`/${repo.name}`);
     const login = new LoginPage(page);
     await expect(login.submit).toBeVisible();
 
     await login.login(seededUser.username, seededUser.password);
 
-    // The login itself worked ...
-    await expect.poll(() => storedSession(page).then((s) => s.username)).toBe(seededUser.username);
-    // ... so the visitor must now see the dashboard, not the form again.
+    await expect(page).toHaveURL(`/${repo.name}`);
+    await expect(login.form).toHaveCount(0);
+    await expect(new Shell(page).sidebar.root).toBeVisible();
+  });
+
+  test('logging in from the bare form at "/" opens the dashboard without a reload', async ({
+    page,
+    seededUser,
+  }) => {
+    await page.goto('/');
+    const login = new LoginPage(page);
+    await expect(login.submit).toBeVisible();
+    await markDocument(page);
+
+    await login.login(seededUser.username, seededUser.password);
+
+    // The router is already at "/", so nothing navigates: the form has to follow the session itself.
     const dashboard = new DashboardPage(page);
     await dashboard.expectLoaded();
     await expect(dashboard.welcomeUsername).toContainText(seededUser.username);
     await expect(login.form).toHaveCount(0);
+    await expect(page).toHaveURL('/');
+    expect(await documentIsMarked(page)).toBe(true);
+  });
+
+  // The value is read from the address bar, so it is attacker-controlled: only an in-app path may
+  // be followed, anything else is ignored and the visitor lands on the dashboard.
+  const unsafeReturnUrls = [
+    'https://evil.example/phish',
+    '//evil.example/phish',
+    '/\\evil.example/phish',
+    'javascript:alert(1)',
+  ];
+  for (const returnUrl of unsafeReturnUrls) {
+    test(`a returnUrl of ${returnUrl} is ignored (no open redirect)`, async ({
+      page,
+      seededUser,
+      baseURL,
+    }) => {
+      await page.goto(`/?returnUrl=${encodeURIComponent(returnUrl)}`);
+      const login = new LoginPage(page);
+      await expect(login.submit).toBeVisible();
+
+      await login.login(seededUser.username, seededUser.password);
+
+      const dashboard = new DashboardPage(page);
+      await dashboard.expectLoaded();
+      // Still this app, on its root.
+      await expect(page).toHaveURL(
+        (url) => url.origin === new URL(baseURL!).origin && url.pathname === '/',
+      );
+      await expect(login.form).toHaveCount(0);
+    });
+  }
+
+  test('a returnUrl to an admin-only page is still guarded for a USER', async ({
+    page,
+    seededUser,
+  }) => {
+    await page.goto('/users');
+    const login = new LoginPage(page);
+    await expect(login.submit).toBeVisible();
+
+    await login.login(seededUser.username, seededUser.password);
+
+    // adminGuard bounces the USER from /users to "/".
+    await expect(page).toHaveURL('/');
+    await new DashboardPage(page).expectLoaded();
+    await expect(login.form).toHaveCount(0);
   });
 });
 
-async function expectLoginInPlace(page: Page): Promise<void> {
+/** The address of the in-place login form: "/", with the requested `route` remembered by `AuthGuard`. */
+const returnsTo = (route: string) => (url: URL) =>
+  url.pathname === '/' && url.searchParams.get('returnUrl') === route;
+
+/** The visitor sees the login form (and nothing of the panel), whatever the address. */
+async function expectLoginInPlace(page: Page, route: string): Promise<void> {
   await expect(new LoginPage(page).submit).toBeVisible();
-  await expect(page).toHaveURL('/');
+  await expect(page).toHaveURL(returnsTo(route));
   await expect(new DashboardPage(page).welcomeCard).toHaveCount(0);
   await expect(new Shell(page).sidebar.root).toHaveCount(0);
   expect(await storedSession(page)).toEqual(NO_SESSION);

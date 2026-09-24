@@ -18,18 +18,20 @@
  * PRO-01..03: the self-service profile page. Every test changes the credentials of, or deletes, the
  * account it is logged in as, so all of them use `userPage` (a seeded USER in its own context) and are
  * tagged `@credentials`: the foundation refuses `adminPage` for that tag, and `ProfilePage` refuses to
- * submit while logged in as the harness admin. The page is always reached by a direct navigation
- * (the header link is a full reload, RPS-1264).
+ * submit while logged in as the harness admin. The page is reached by a direct navigation (fewer
+ * moving parts); PRO-04 covers the header link, which is a router link (RPS-1264).
  *
  * Each "did it work" check happens in a second, anonymous context that types the credentials into the
  * real login form, so the outcome is what the server accepts, not what the tab remembers.
  */
 import { RepoType } from '../../../src/api/panel-api.js';
 import { env } from '../../../src/env.js';
+import { documentIsMarked, markDocument } from '../../../src/ui/document-marker.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
 import { ProfilePage } from '../../../src/ui/pages/profile.js';
+import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { Shell } from '../../../src/ui/pages/shell.js';
 import { currentUsername, loginSession } from '../../../src/ui/session.js';
 import type { Page } from '@playwright/test';
@@ -255,4 +257,52 @@ test.describe('PRO-03 delete account', () => {
       await expectLoginRefused(openUiPage, seededUser.username, seededUser.password);
     },
   );
+});
+
+test.describe('PRO-04 header Profile link (RPS-1264)', () => {
+  // A router link: no document load (the SPA keeps its state, the splash does not come back) and the
+  // dropdown closes. It used to be a raw relative `href`, i.e. a full reload of the whole app.
+  const origins = [
+    { name: 'the dashboard', open: async (page: Page) => new DashboardPage(page).goto() },
+    {
+      name: 'the repository list',
+      open: async (page: Page) => new RepositoriesPage(page).goto(),
+    },
+  ];
+
+  for (const { name, open } of origins) {
+    test(`from ${name} it navigates without reloading and closes the menu`, async ({
+      userPage,
+      seededUser,
+    }) => {
+      const shell = new Shell(userPage);
+      await open(userPage);
+      await markDocument(userPage);
+
+      await shell.openAvatarMenu();
+      await shell.header.profile.click();
+
+      const profile = new ProfilePage(userPage);
+      await expect(profile.title).toBeVisible();
+      await expect(profile.username).toHaveValue(seededUser.username);
+      await expect(userPage).toHaveURL('/profile');
+      await expect(shell.header.menu).toHaveCount(0);
+      expect(await documentIsMarked(userPage)).toBe(true);
+    });
+  }
+
+  test('from a repository page it still goes to /profile', async ({ userPage, seeder }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    const shell = new Shell(userPage);
+    await userPage.goto(`/${repo.name}`);
+    await expect(userPage.getByTestId('breadcrumb')).toBeVisible();
+    await markDocument(userPage);
+
+    await shell.openAvatarMenu();
+    await shell.header.profile.click();
+
+    await expect(userPage).toHaveURL('/profile');
+    await expect(new ProfilePage(userPage).title).toBeVisible();
+    expect(await documentIsMarked(userPage)).toBe(true);
+  });
 });

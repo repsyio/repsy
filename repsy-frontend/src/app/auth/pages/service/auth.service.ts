@@ -16,7 +16,7 @@
 
 import { isPlatformBrowser } from '@angular/common';
 import { Inject, Injectable, PLATFORM_ID } from '@angular/core';
-import { map, Observable, throwError } from 'rxjs';
+import { BehaviorSubject, distinctUntilChanged, map, Observable, throwError } from 'rxjs';
 
 import { LoginForm, LoginInfo } from '../../../../generated/api';
 import { AuthControllerService } from '../../../../generated/api/api/auth-controller.service';
@@ -29,6 +29,15 @@ export class AuthService {
   private _refreshToken: string;
   private _username: string;
   private readonly isBrowser: boolean;
+  private readonly _authenticated$ = new BehaviorSubject<boolean>(false);
+
+  /**
+   * Whether a session exists, emitted again whenever that changes (login, logout). Views that
+   * decide once from {@link isAuthenticated} go stale when the session changes under them, e.g.
+   * `AuthRedirectComponent`, which shows the login form at "/" and must swap to the dashboard
+   * after a login without a route change (RPS-1278).
+   */
+  public readonly isAuthenticated$: Observable<boolean> = this._authenticated$.pipe(distinctUntilChanged());
 
   constructor(
     private readonly authControllerService: AuthControllerService,
@@ -40,6 +49,7 @@ export class AuthService {
       this._accessToken = localStorage.getItem('token');
       this._refreshToken = localStorage.getItem('refresh-token');
     }
+    this._authenticated$.next(this.isAuthenticated());
   }
 
   public get username(): string {
@@ -88,6 +98,7 @@ export class AuthService {
       localStorage.removeItem('token');
       localStorage.removeItem('refresh-token');
     }
+    this._authenticated$.next(this.isAuthenticated());
   }
 
   private _update(username: string, accessToken: string, refreshToken: string): void {
@@ -100,5 +111,6 @@ export class AuthService {
       localStorage.setItem('token', this._accessToken);
       localStorage.setItem('refresh-token', this._refreshToken);
     }
+    this._authenticated$.next(this.isAuthenticated());
   }
 }
