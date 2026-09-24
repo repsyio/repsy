@@ -18,7 +18,6 @@ package io.repsy.os.server.protocols.golang.shared.go_module.services;
 import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
-import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.GoModuleInfo;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem;
@@ -155,8 +154,9 @@ public class GoModuleServiceImpl implements GoModuleService<UUID> {
       }
     }
 
-    // Every attempt lost its row to a concurrent delete of the module: a retryable conflict.
-    throw new RetryableException("goModuleBusy");
+    // Every attempt lost its row to a concurrent delete of the module: a conflict that a retry
+    // resolves.
+    throw new ItemAlreadyExistException("goModuleBusy");
   }
 
   @Override
