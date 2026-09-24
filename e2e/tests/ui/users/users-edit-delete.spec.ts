@@ -17,18 +17,18 @@
 /**
  * USR-03 (edit) and USR-05 (delete) on users seeded through the API.
  *
- * LAST-ADMIN SEMANTICS. The panel decides "this is the last admin" on the client, from the admins in
- * the page it currently shows (`UserManagementComponent.isLastAdmin`, RPS-1246); the server guards the
- * REAL last admin (`cannotDeleteLastAdminUser` / `cannotDemoteLastAdminUser`, covered by the backend
- * ITs). These specs never create that state: the harness admin always exists, and it is never edited,
- * demoted or deleted. What they can reach, deterministically, is a view that holds a single admin, by
- * searching for a seeded admin's exact username. The client guard fires there although another admin
- * (the harness one) exists, which is the RPS-1246 bug: the guard tests below pin what the panel does
- * today in that view, and the two `test.fail` tests assert what it should do.
+ * LAST-ADMIN SEMANTICS. The panel decides "this is the last admin" from the server's admin count
+ * (`GET /api/users/admin-count`, RPS-1246), not from the page it shows; the server also guards the REAL
+ * last admin (`cannotDeleteLastAdminUser` / `cannotDemoteLastAdminUser`, covered by the backend ITs).
+ * The harness admin always exists and is never edited, demoted or deleted, so these specs can never
+ * reach the real last-admin state; the panel's last-admin branch is covered by the component spec. What
+ * they check is the other side: a view that holds a single seeded admin (search for its exact username)
+ * does not treat it as the last one while another admin exists.
  *
  * A search is also what keeps every view deterministic on a stack other tests are writing to.
  */
 import { UserRole } from '../../../src/api/panel-api.js';
+import { USERNAME_TEXT, bulleted } from '../../../src/ui/credential-messages.js';
 import { expect, test } from '../../../src/ui/users-fixtures.js';
 
 test.describe('USR-03 edit a user', () => {
@@ -139,10 +139,10 @@ test.describe('USR-03 edit a user', () => {
     expect(stored?.role).toBe(UserRole.USER);
   });
 
-  test('a single admin in the view cannot be demoted: warning, and the role switch is locked', async ({
+  // RPS-1246: a view that holds a single admin is not "the last admin" while another admin exists.
+  test('the last-admin warning is not shown while another admin exists', async ({
     usersPage,
     seeder,
-    panelApi,
   }) => {
     const admin = await seeder.createUser({ role: UserRole.ADMIN });
 
@@ -150,40 +150,9 @@ test.describe('USR-03 edit a user', () => {
     await usersPage.search(admin.username);
     await usersPage.openEdit(admin.username);
 
-    await expect(usersPage.editModal.lastAdminWarning).toBeVisible();
-    await expect(usersPage.editModal.lastAdminWarning).toContainText('This is the only admin user');
-    await expect(usersPage.editModal.roleSwitch).toBeChecked();
-    await expect(usersPage.editModal.roleSwitch).toBeDisabled();
-
-    // The switch is locked: a click on it (dispatched, since Playwright would rather wait than click a
-    // disabled control) changes nothing, and the form still says Admin.
-    await usersPage.editModal.roleToggle.dispatchEvent('click');
-    await expect(usersPage.editModal.roleLabel).toHaveText('Admin');
-    await expect(usersPage.editModal.roleSwitch).toBeChecked();
-    await usersPage.editModal.cancel.click();
-    await expect(usersPage.editModal.root).toBeHidden();
-
-    const stored = (await panelApi.listUsers({ search: admin.username })).find(
-      (user) => user.id === admin.id,
-    );
-    expect(stored?.role).toBe(UserRole.ADMIN);
+    await expect(usersPage.editModal.lastAdminWarning).toHaveCount(0);
+    await expect(usersPage.editModal.roleSwitch).toBeEnabled();
   });
-
-  // RPS-1246: the client counts admins on the visible page only, so the seeded admin looks like the
-  // last one although the harness admin exists. Asserts the intended behaviour; expected to fail today.
-  test.fail(
-    'the last-admin warning is not shown while another admin exists RPS-1246',
-    async ({ usersPage, seeder }) => {
-      const admin = await seeder.createUser({ role: UserRole.ADMIN });
-
-      await usersPage.goto();
-      await usersPage.search(admin.username);
-      await usersPage.openEdit(admin.username);
-
-      await expect(usersPage.editModal.lastAdminWarning).toHaveCount(0);
-      await expect(usersPage.editModal.roleSwitch).toBeEnabled();
-    },
-  );
 
   test('the edit form validates the username', async ({ usersPage, seededUser }) => {
     await usersPage.goto();
@@ -192,19 +161,25 @@ test.describe('USR-03 edit a user', () => {
 
     await usersPage.editModal.username.fill('Bad Name');
     await usersPage.editModal.username.blur();
-    await expect(usersPage.editModal.error('pattern')).toBeVisible();
+    await expect(usersPage.editModal.error('pattern')).toHaveText(bulleted(USERNAME_TEXT.pattern));
     await expect(usersPage.editModal.submit).toBeDisabled();
 
     await usersPage.editModal.username.fill('ab');
-    await expect(usersPage.editModal.error('minlength')).toBeVisible();
+    await expect(usersPage.editModal.error('minlength')).toHaveText(
+      bulleted(USERNAME_TEXT.minlength),
+    );
     await expect(usersPage.editModal.submit).toBeDisabled();
 
     await usersPage.editModal.username.fill('');
-    await expect(usersPage.editModal.error('required')).toBeVisible();
+    await expect(usersPage.editModal.error('required')).toHaveText(
+      bulleted(USERNAME_TEXT.required),
+    );
     await expect(usersPage.editModal.submit).toBeDisabled();
 
     await usersPage.editModal.username.fill('a'.repeat(26));
-    await expect(usersPage.editModal.error('maxlength')).toBeVisible();
+    await expect(usersPage.editModal.error('maxlength')).toHaveText(
+      bulleted(USERNAME_TEXT.maxlength),
+    );
     await expect(usersPage.editModal.submit).toBeDisabled();
   });
 
@@ -277,26 +252,6 @@ test.describe('USR-05 delete a user', () => {
     await expect(usersPage.empty).toHaveCount(0);
   });
 
-  test('a single admin in the view cannot be deleted: the client raises an error toast', async ({
-    usersPage,
-    seeder,
-    panelApi,
-  }) => {
-    const admin = await seeder.createUser({ role: UserRole.ADMIN });
-
-    await usersPage.goto();
-    await usersPage.search(admin.username);
-    await usersPage.clickDelete(admin.username);
-
-    await usersPage.shell.toasts.expectError(
-      'Cannot delete the last admin user. Create another admin first.',
-    );
-    // No confirmation is offered, and nothing was deleted.
-    await usersPage.shell.dangerModal.expectClosed();
-    await expect(usersPage.row(admin.username)).toBeVisible();
-    expect(await panelApi.listUsers({ search: admin.username })).toHaveLength(1);
-  });
-
   test('an admin can be deleted while another admin is in the list', async ({
     usersPage,
     seeder,
@@ -316,20 +271,16 @@ test.describe('USR-05 delete a user', () => {
     expect(await panelApi.listUsers({ search: first.username })).toHaveLength(0);
   });
 
-  // RPS-1246, same cause as above: with the seeded admin alone in the view the guard refuses the
-  // delete although the harness admin exists. Asserts the confirmation is offered; expected to fail
-  // today. It only opens the confirmation and cancels it: nothing is deleted either way.
-  test.fail(
-    'deleting an admin is offered while another admin exists RPS-1246',
-    async ({ usersPage, seeder }) => {
-      const admin = await seeder.createUser({ role: UserRole.ADMIN });
+  // RPS-1246: with the seeded admin alone in the view the delete is still offered, since the harness
+  // admin exists. It only opens the confirmation and cancels it: nothing is deleted.
+  test('deleting an admin is offered while another admin exists', async ({ usersPage, seeder }) => {
+    const admin = await seeder.createUser({ role: UserRole.ADMIN });
 
-      await usersPage.goto();
-      await usersPage.search(admin.username);
-      await usersPage.clickDelete(admin.username);
+    await usersPage.goto();
+    await usersPage.search(admin.username);
+    await usersPage.clickDelete(admin.username);
 
-      await expect(usersPage.shell.dangerModal.root).toBeVisible();
-      await usersPage.shell.dangerModal.cancel();
-    },
-  );
+    await expect(usersPage.shell.dangerModal.root).toBeVisible();
+    await usersPage.shell.dangerModal.cancel();
+  });
 });

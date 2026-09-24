@@ -173,7 +173,7 @@ test.describe('Cargo crate pages', { tag: '@packages' }, () => {
   });
 
   // RPS-1301: Newest/Oldest ordered by `max_version`, a text column, so a crate published later at a
-  // lower version was not "newest"; they now order by the crate's last update, id as tie-breaker.
+  // lower version was not "newest"; they now order by the crate's last update (the id ends every sort, RPS-1298).
   test('PKG-cargo-07 Newest puts the crate published last on top, whatever its version', async ({
     adminPage,
     seeder,

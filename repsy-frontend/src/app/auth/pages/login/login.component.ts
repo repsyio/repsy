@@ -17,13 +17,19 @@
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, OnInit, ViewEncapsulation } from '@angular/core';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { environment } from '../../../../environments/environment';
 import { LoginForm } from '../../../../generated/api';
 import { ToastService } from '../../../panel/shared/components/toast/toast.service';
+import {
+  LOGIN_USERNAME_MESSAGES,
+  loginUsernameValidators,
+  PASSWORD_MESSAGES,
+  passwordValidators,
+} from '../../../shared/validators/credentials.validators';
 import { RETURN_URL_PARAM, safeReturnUrl } from '../../util/return-url';
 import { AuthService } from '../service/auth.service';
 
@@ -37,6 +43,8 @@ import { AuthService } from '../service/auth.service';
 })
 export class LoginComponent implements OnInit {
   public form: FormGroup;
+  public readonly usernameMessages = LOGIN_USERNAME_MESSAGES;
+  public readonly passwordMessages = PASSWORD_MESSAGES;
   public inputType = 'password';
   public visible = false;
   public loading = false;
@@ -57,24 +65,9 @@ export class LoginComponent implements OnInit {
 
     this.setRandomImage();
     this.form = this.fb.group({
-      username: [
-        '',
-        [
-          Validators.required,
-          Validators.minLength(3),
-          Validators.maxLength(150),
-          Validators.pattern(/^[a-zA-Z0-9@_\-.]+$/),
-        ],
-      ],
-      password: [
-        '',
-        [
-          Validators.required,
-          Validators.minLength(6),
-          Validators.maxLength(50),
-          Validators.pattern(/^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=\S+$).+$/),
-        ],
-      ],
+      username: ['', loginUsernameValidators()],
+      // The backend's LoginForm holds the password to the same rule as a new one (RPS-1265).
+      password: ['', passwordValidators()],
     });
   }
 

@@ -15,11 +15,12 @@
 ///
 
 import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup } from '@angular/forms';
 import { ReactiveFormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 
 import { UserResponse, UserUpdateForm } from '../../../../../../generated/api';
+import { USERNAME_MESSAGES, usernameValidators } from '../../../../../shared/validators/credentials.validators';
 import { UserService } from '../../../../pages/user/service/user.service';
 import { ToastService } from '../../toast/toast.service';
 import { ToggleComponent } from '../../toggle/toggle.component';
@@ -40,6 +41,7 @@ export class UserEditModalComponent implements OnChanges {
 
   public loading = false;
   public form: FormGroup;
+  public readonly usernameMessages = USERNAME_MESSAGES;
 
   constructor(
     private readonly fb: FormBuilder,
@@ -47,10 +49,7 @@ export class UserEditModalComponent implements OnChanges {
     private readonly toastService: ToastService,
   ) {
     this.form = this.fb.group({
-      username: [
-        '',
-        [Validators.required, Validators.minLength(3), Validators.maxLength(25), Validators.pattern(/^[a-z0-9_\-]+$/)],
-      ],
+      username: ['', usernameValidators()],
       isAdmin: [false],
     });
   }

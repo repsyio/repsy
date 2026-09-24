@@ -72,15 +72,12 @@ export class CargoService {
     pageIndex: number,
     pageSize: number,
   ): Observable<PagedData<CrateListItem>> {
-    // The id (a time-ordered UUID) breaks ties, so crates that share a sort value keep one order and a
-    // pager never repeats or drops a row.
-    const sort = [`${sortOption.column},${sortOption.type}`];
-    if (sortOption.column !== 'id') {
-      sort.push(`id,${sortOption.type}`);
-    }
-
     return this.cargoCrateControllerService
-      .searchCargoCrates({ page: pageIndex, size: pageSize, sort }, this.repoName, search || undefined)
+      .searchCargoCrates(
+        { page: pageIndex, size: pageSize, sort: [`${sortOption.column},${sortOption.type}`] },
+        this.repoName,
+        search || undefined,
+      )
       .pipe(
         map((r) => ({ content: r.data?.content ?? [], page: r.data?.page }) as unknown as PagedData<CrateListItem>),
       );

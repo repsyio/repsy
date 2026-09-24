@@ -77,6 +77,19 @@ final class UserController {
     return this.resp.success("usersFetched", new PagedModel<>(usersPage));
   }
 
+  /**
+   * The number of admins, whatever page or search the users list is showing (RPS-1246): the panel
+   * uses it to tell whether the admin it is about to delete or demote is the last one.
+   */
+  @GetMapping("/admin-count")
+  public @NonNull RestResponse<Long> countAdmins(
+      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
+
+    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
+
+    return this.resp.success("adminCountFetched", this.userTxService.countAdmins());
+  }
+
   @PostMapping
   public @NonNull RestResponse<UserResponse> createUser(
       @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,

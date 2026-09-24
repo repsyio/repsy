@@ -13,7 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-import { fakeAsync, flushMicrotasks } from '@angular/core/testing';
+import { fakeAsync, flushMicrotasks, TestBed } from '@angular/core/testing';
 
 import { ToastService } from '../../toast/toast.service';
 import { UserResetPasswordModalComponent } from './user-reset-password-modal.component';
@@ -60,4 +60,53 @@ describe('UserResetPasswordModalComponent', () => {
 
     expect(toastService.show).toHaveBeenCalledOnceWith('Copied to clipboard', 'success');
   }));
+});
+
+describe('UserResetPasswordModalComponent template', () => {
+  let toastService: jasmine.SpyObj<ToastService>;
+  let root: HTMLElement;
+  let opened: boolean[];
+
+  beforeEach(() => {
+    toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
+    spyOn(navigator.clipboard, 'writeText').and.resolveTo();
+    TestBed.configureTestingModule({
+      imports: [UserResetPasswordModalComponent],
+      providers: [{ provide: ToastService, useValue: toastService }],
+    });
+    const fixture = TestBed.createComponent(UserResetPasswordModalComponent);
+    opened = [];
+    fixture.componentInstance.openChange.subscribe((value) => opened.push(value));
+    fixture.componentInstance.open = true;
+    fixture.componentInstance.username = 'alice';
+    fixture.componentInstance.newPassword = 'N3w-Passw0rd';
+    fixture.detectChanges();
+    root = fixture.nativeElement;
+  });
+
+  const byTestId = (id: string): HTMLElement => root.querySelector(`[data-testid="${id}"]`);
+
+  it('names the account and says the password is shown only once', () => {
+    expect(root.querySelector('h1').textContent).toContain('New password for alice');
+    expect(root.textContent).toContain("you won't be able to see it again");
+  });
+
+  it('is not dismissed by a click on the backdrop, so the only copy of the password is not lost', () => {
+    byTestId('user-reset-password-backdrop').click();
+
+    expect(opened).toEqual([]);
+    expect(byTestId('user-reset-password-modal')).not.toBeNull();
+  });
+
+  it('closes through the Close button', () => {
+    byTestId('user-reset-password-done').click();
+
+    expect(opened).toEqual([false]);
+  });
+
+  it('copies the password from the footer button', () => {
+    byTestId('user-reset-password-copy-footer').click();
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledOnceWith('N3w-Passw0rd');
+  });
 });

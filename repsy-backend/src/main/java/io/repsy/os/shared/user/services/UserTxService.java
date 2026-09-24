@@ -147,6 +147,10 @@ public class UserTxService {
         .map(this.userConverter::toUserResponseDto);
   }
 
+  public long countAdmins() {
+    return this.userRepository.countByRole(UserRole.ADMIN);
+  }
+
   @Transactional
   public @NonNull UserResponse createUserWithRole(final @NonNull UserCreateForm dto) {
     if (this.userRepository.existsByUsername(dto.getUsername())) {

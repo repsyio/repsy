@@ -120,6 +120,11 @@ export class RepoCreateModal extends UiPage {
     return this.tid('repo-create-description-error-maxlength', this.root);
   }
 
+  /** The "n/500" character counter under the description. */
+  descriptionCounter(): Locator {
+    return this.tid('repo-create-description-counter', this.root);
+  }
+
   /** Every validation message currently on screen, whichever field and validator. */
   anyError(): Locator {
     return this.root.locator(

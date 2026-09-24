@@ -20,6 +20,7 @@
  * half way still deletes it.
  */
 import { RepoType } from '../../../src/api/panel-api.js';
+import { DESCRIPTION_MAX_TEXT, bulleted } from '../../../src/ui/credential-messages.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
@@ -254,24 +255,33 @@ test.describe('Create repository modal', () => {
     test('a description over 500 characters shows "maxlength" and disables Create', async ({
       adminPage,
     }) => {
-      test.fail(
-        true,
-        'RPS-1265: the description textarea has a maxlength="500" attribute, so typed or pasted ' +
-          'text is silently cut at 500 and the ">500" error can never show',
-      );
       const repos = new RepositoriesPage(adminPage);
       await repos.goto();
       const modal = await repos.openCreateModal();
 
       await modal.fillName('valid_name');
-      // Real key presses, not fill(): fill() sets the value from script, which the maxlength
-      // attribute does not limit, and would hide the defect.
+      // The textarea has no maxlength attribute (RPS-1265): the validator and the counter are the limit,
+      // so the browser never cuts typed or pasted text and the message can show.
+      await expect(modal.descriptionInput).not.toHaveAttribute('maxlength', /.*/);
+      await expect(modal.descriptionCounter()).toHaveText('0/500');
+      // Real key presses (what a user types), not fill().
       await modal.descriptionInput.click();
       await modal.descriptionInput.pressSequentially('d'.repeat(501));
       await modal.descriptionInput.blur();
 
-      await expect(modal.descriptionError()).toBeVisible();
+      await expect(modal.descriptionInput).toHaveValue('d'.repeat(501));
+      await expect(modal.descriptionCounter()).toHaveText('501/500');
+      await expect(modal.descriptionError()).toHaveText(bulleted(DESCRIPTION_MAX_TEXT));
       await expect(modal.submitButton).toBeDisabled();
+
+      // Pasted text keeps its whole length as well, and cutting it back to 500 clears the message.
+      await modal.descriptionInput.fill('p'.repeat(600));
+      await expect(modal.descriptionInput).toHaveValue('p'.repeat(600));
+      await expect(modal.descriptionCounter()).toHaveText('600/500');
+      await modal.descriptionInput.fill('d'.repeat(500));
+      await expect(modal.descriptionCounter()).toHaveText('500/500');
+      await expect(modal.descriptionError()).toHaveCount(0);
+      await expect(modal.submitButton).toBeEnabled();
     });
   });
 

@@ -17,12 +17,12 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { Subscription } from 'rxjs';
-import { filter } from 'rxjs/operators';
 
 import { RepoPermissionInfo } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { RepositoryBreadcrumbComponent } from '../breadcrumb/repository-breadcrumb.component';
-import { RepoContext, RepoLookupService } from '../repo-entry/repo-lookup.service';
+import { currentRepoOfType } from '../repo-entry/current-repo-of-type';
+import { RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { GolangService } from './service/golang.service';
 
 @Component({
@@ -49,15 +49,9 @@ export class GolangComponent implements OnInit, OnDestroy {
   public ngOnInit(): void {
     this.isAuthenticated = this.authService.isAuthenticated();
 
-    this.repoSubscription = this.repoLookupService.currentRepo$
-      .pipe(filter((repo): repo is RepoContext => repo !== null && repo.repoType === 'golang'))
-      .subscribe((repoContext) => {
-        this.loadRepo(repoContext.repoName);
-      });
-    // No separate load of `repoLookupService.currentRepo` here: `currentRepo$` is a BehaviorSubject, so
-    // the subscription above already delivers a repository that is set. A second load made the page
-    // fetch the permissions, and with them every list of its children, twice (RPS-1302: the versions
-    // page of an unknown module toasted "Module not found." twice).
+    this.repoSubscription = currentRepoOfType(this.repoLookupService, 'golang').subscribe((repoContext) => {
+      this.loadRepo(repoContext.repoName);
+    });
   }
 
   public ngOnDestroy(): void {

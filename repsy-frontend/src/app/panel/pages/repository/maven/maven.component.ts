@@ -17,12 +17,12 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { Subscription } from 'rxjs';
-import { filter } from 'rxjs/operators';
 
 import { RepoPermissionInfo } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { RepositoryBreadcrumbComponent } from '../breadcrumb/repository-breadcrumb.component';
-import { RepoContext, RepoLookupService } from '../repo-entry/repo-lookup.service';
+import { currentRepoOfType } from '../repo-entry/current-repo-of-type';
+import { RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { MavenService } from './service/maven.service';
 
 @Component({
@@ -49,13 +49,9 @@ export class MavenComponent implements OnInit, OnDestroy {
   public ngOnInit(): void {
     this.isAuthenticated = this.authService.isAuthenticated();
 
-    // currentRepo$ is a BehaviorSubject: it replays the repository that is already current on
-    // subscribe, so the permissions load once here and need no second call for the current value.
-    this.repoSubscription = this.repoLookupService.currentRepo$
-      .pipe(filter((repo): repo is RepoContext => repo !== null && repo.repoType === 'maven'))
-      .subscribe((repoContext) => {
-        this.loadPermissions(repoContext.repoName);
-      });
+    this.repoSubscription = currentRepoOfType(this.repoLookupService, 'maven').subscribe((repoContext) => {
+      this.loadPermissions(repoContext.repoName);
+    });
   }
 
   public ngOnDestroy(): void {

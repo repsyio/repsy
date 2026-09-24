@@ -117,6 +117,9 @@ test.describe('AUTH-02 wrong credentials', () => {
   });
 });
 
+// RPS-1265: the rules and sentences are the shared credential ones (`credential-messages.ts`). The password
+// rule is the create-user one because the backend's LoginForm enforces it too: a weaker password gets a 400
+// from the API, so the form answers it in place instead of sending it.
 test.describe('AUTH-03 client-side validation', () => {
   const VALID_PASSWORD = 'Valid-Pass1';
   // Aa1 + filler: lower, upper and a digit, so only the length can be wrong.

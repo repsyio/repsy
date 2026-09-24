@@ -758,15 +758,15 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "sort={0}")
     @ValueSource(strings = {"updated_at", "lastUpdatedAt"})
-    @DisplayName("orders the crates by when they were last updated, with the id as tie-breaker")
+    @DisplayName("orders the crates by when they were last updated")
     void ordersCratesByLastUpdate(final String property) throws Exception {
       final var repo = this.seededRepo();
 
-      this.list(repo, CRATES, "sort", property + ",desc&sort=id,desc")
+      this.list(repo, CRATES, "sort", property + ",desc")
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].name").value("other"))
           .andExpect(jsonPath("$.data.content[1].name").value("paged"));
-      this.list(repo, CRATES, "sort", property + ",asc&sort=id,asc")
+      this.list(repo, CRATES, "sort", property + ",asc")
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].name").value("paged"))
           .andExpect(jsonPath("$.data.content[1].name").value("other"));
