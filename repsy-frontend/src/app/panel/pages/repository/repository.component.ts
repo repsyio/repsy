@@ -85,11 +85,16 @@ export class RepositoryComponent implements OnDestroy {
   public loading = true;
   public operationLock = false;
   public username: string;
-  public error: string;
+  /** Set when every requested type failed to load: the page shows its error state instead of a list. */
+  public error = '';
+  /** Set when only some of the requested types failed: the loaded ones are listed, and this says which are missing. */
+  public warning = '';
   public isAdmin = false;
   public securitySummary: Record<string, RepoSecuritySummary> = {};
 
   private pendingRepoFetches = 0;
+  private requestedRepoFetches = 0;
+  private failedRepoTypes: RepoType[] = [];
   private securitySummarySubscription?: Subscription;
 
   constructor(
@@ -142,8 +147,12 @@ export class RepositoryComponent implements OnDestroy {
 
   public filterRepos(option: string) {
     this.loading = true;
+    this.error = '';
+    this.warning = '';
+    this.failedRepoTypes = [];
     this.repositories = [];
     this.filteredRepos = [];
+    this.paginatedRepos = [];
     this.securitySummary = {};
     this.securitySummarySubscription?.unsubscribe();
 
@@ -170,6 +179,8 @@ export class RepositoryComponent implements OnDestroy {
             this.refreshPage();
             this.toastService.show('Repository deleted successfully', 'success');
           },
+          // The HTTP error interceptor already shows the failure and the repository stays listed;
+          // the handler only keeps the failure from becoming an unhandled RxJS error.
           error: () => {},
         });
     });
@@ -184,28 +195,41 @@ export class RepositoryComponent implements OnDestroy {
   }
 
   private fetchAllRepositories(): void {
-    this.fetchRepositories(RepoType.MAVEN);
-    this.fetchRepositories(RepoType.NPM);
-    this.fetchRepositories(RepoType.PYPI);
-    this.fetchRepositories(RepoType.DOCKER);
-    this.fetchRepositories(RepoType.CARGO);
-    this.fetchRepositories(RepoType.GOLANG);
-    this.fetchRepositories(RepoType.HELM);
-    this.fetchRepositories(RepoType.NUGET);
-    this.fetchRepositories(RepoType.RUBY);
+    this.fetchRepositoryTypes([
+      RepoType.MAVEN,
+      RepoType.NPM,
+      RepoType.PYPI,
+      RepoType.DOCKER,
+      RepoType.CARGO,
+      RepoType.GOLANG,
+      RepoType.HELM,
+      RepoType.NUGET,
+      RepoType.RUBY,
+    ]);
+  }
+
+  // The number of requests is fixed before the first one is sent, so the outcome (all failed, some
+  // failed, none failed) is decided only once every one of them has answered.
+  private fetchRepositoryTypes(repoTypes: RepoType[]): void {
+    this.requestedRepoFetches = repoTypes.length;
+    this.pendingRepoFetches = repoTypes.length;
+    repoTypes.forEach((repoType) => this.fetchRepositories(repoType));
   }
 
   private fetchRepositories(repoType: RepoType): void {
-    this.loading = true;
-    this.pendingRepoFetches++;
     this.protocolRepoControllerService
       .getInfo(repoType.toUpperCase() as ApiRepoType)
       .pipe(
         finalize(() => {
-          this.loading = false;
           this.pendingRepoFetches--;
           if (this.pendingRepoFetches === 0) {
+            this.loading = false;
+            this.reportFailedFetches();
             this.fetchSecuritySummary();
+          } else if (this.repositories.length > 0) {
+            // Rows show as soon as one type has some; while nothing has arrived the spinner stays,
+            // so a load that is going to fail never flashes the empty state first.
+            this.loading = false;
           }
         }),
         map((r) => r.data as unknown as RepoListItem[]),
@@ -221,8 +245,23 @@ export class RepositoryComponent implements OnDestroy {
           this.filteredRepos.push(...temp);
           this.loadPage(0);
         },
-        error: () => {},
+        // The HTTP error interceptor already shows the toast; the failure is kept for the page.
+        error: () => {
+          this.failedRepoTypes.push(repoType);
+        },
       });
+  }
+
+  private reportFailedFetches(): void {
+    if (this.failedRepoTypes.length === 0) {
+      return;
+    }
+
+    if (this.failedRepoTypes.length === this.requestedRepoFetches) {
+      this.error = 'The repositories could not be loaded. Use the refresh button to try again.';
+    } else {
+      this.warning = `Some repositories could not be loaded (${this.failedRepoTypes.join(', ')}), so the list is incomplete. Use the refresh button to try again.`;
+    }
   }
 
   private fetchSecuritySummary(): void {
@@ -237,6 +276,8 @@ export class RepositoryComponent implements OnDestroy {
       next: (summary) => {
         this.securitySummary = summary;
       },
+      // The HTTP error interceptor already shows the failure; the repositories stay listed, only
+      // without their security badges.
       error: () => {},
     });
   }
@@ -247,14 +288,21 @@ export class RepositoryComponent implements OnDestroy {
         this.fetchAllRepositories();
         break;
       default:
-        this.fetchRepositories(option as RepoType);
+        this.fetchRepositoryTypes([option as RepoType]);
         break;
     }
   }
 
   private loadUserRole(): void {
-    this.profileFacadeService.get().subscribe((profile) => {
-      this.isAdmin = profile.role === 'ADMIN';
+    this.profileFacadeService.get().subscribe({
+      next: (profile) => {
+        this.isAdmin = profile.role === 'ADMIN';
+      },
+      // Without a profile the user is treated as a non-admin: no create button, no delete. The HTTP
+      // error interceptor already shows the failure.
+      error: () => {
+        this.isAdmin = false;
+      },
     });
   }
 }
