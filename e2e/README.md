@@ -2463,7 +2463,15 @@ so `panelApi` and `seeder` (per-test run id, cleanup) work unchanged, and adds:
   transitions to `0s` (`1ms`, not `animation: none`: Angular's `animate.enter`/`animate.leave` wait for
   `animationend`); and an **allow-list** for network access: any http(s) request whose origin is not
   the UI, API or repo base URL is aborted (Google Tag Manager, gtag, the Font Awesome CDN and Gravatar
-  today), so runs are offline-safe. A test's own `page.route()` mock still wins over it.
+  today), so runs are offline-safe. A test's own `page.route()` mock still wins over it. **Host network changes (RPS-1303):** the `ui` runner shares the host's network namespace, and Chromium
+  fails every in-flight request with `net::ERR_NETWORK_CHANGED` when that namespace changes (any other
+  container starting or stopping on the host adds a veth link, a wifi interface refreshes its IPv6
+  lifetimes). The SPA bundle (`main-*.js`, `polyfills-*.js`, chunks) is lost with it, the panel never
+  boots, and the test times out on `pkg-toolbar`, `settings-page` or `user-title` of a blank page.
+  `serveReadsFromNode` (`defaults.ts`) therefore has Playwright's own HTTP client (Node, unaffected by
+  the host's interfaces) fetch the panel's scripts, styles and API GETs and hand them to the page;
+  navigations, writes, images and fonts stay with Chromium, and a failing Node fetch falls back to it.
+  `harness.spec.ts` proves the wiring (Chromium cannot be made to report the real error).
 - **Guards redirect to `/`, not `/login`.** `AuthGuard` sends an anonymous visitor of a protected route
   to `/?returnUrl=<the route>`, and `/` renders the login form _in place_ (`AuthRedirectComponent`
   follows the session: the login form, then the dashboard as soon as a login stores one), so the path
@@ -2487,7 +2495,11 @@ so `panelApi` and `seeder` (per-test run id, cleanup) work unchanged, and adds:
   use, nothing created) and then tracked with `seeder.adoptRepo(name)` / `adoptUser(id)` /
   `await adoptUserByUsername(name)` so `cleanup()` deletes them; a user renamed later is tracked by id,
   and the new name must also come from `reserveUsername()` so it keeps the `e2e-` prefix `sweep.ts`
-  finds. Global counts (dashboard cards) are asserted against a same-moment API read.
+  finds. Global counts (dashboard cards) are asserted against a same-moment API read. A page that lists
+  the WHOLE instance (`/users`, `/repositories`, `/security`, the dashboard) is shared with every
+  parallel test: a list that reloads without the search (after a delete or a refresh) is newest first
+  and may not hold this test's rows on page 1 any more, so search for `seeder.runId` again before
+  asserting a row, and stub the scan list of `/security` (RPS-1303).
 
 ### Page objects (`src/ui/pages/`)
 

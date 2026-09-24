@@ -296,7 +296,13 @@ test.describe('SEC-02d /security', { tag: MOCKED }, () => {
   test('is reached from the admin sidebar, also while no scanner is configured', async ({
     adminPage,
   }) => {
-    // Nothing stubbed: this is the e2e stack as it is, `supported-repo-types` is `[]`.
+    // "No scanner" is `supported-repo-types` = `[]`, which is also what the e2e stack answers
+    // (`SECURITY_SCANNER=disabled`); stubbed explicitly anyway. The scan list and its summary are
+    // stubbed empty because `/security` lists the scans of the WHOLE instance, so a package test
+    // running in parallel with a scan row would break the empty-state assertions (RPS-1303).
+    await stubSupportedRepoTypes(adminPage, []);
+    await stubSecurityScans(adminPage, []);
+    await stubSecurityScansSummary(adminPage, severityCounts([]));
     const dashboard = new DashboardPage(adminPage);
     await dashboard.goto();
 
