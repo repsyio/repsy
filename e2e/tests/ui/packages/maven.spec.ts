@@ -27,7 +27,7 @@ import { RepoType } from '../../../src/api/panel-api.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { rawGet } from '../../../src/clients/maven-raw.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
-import { registerPackageScenarios } from '../../../src/ui/package-scenarios.js';
+import { registerPackageScenarios, rowKeys } from '../../../src/ui/package-scenarios.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
 
 const maven = DESCRIPTORS.maven;
@@ -260,6 +260,37 @@ test.describe('Maven group page', { tag: '@packages' }, () => {
     await groupPage.browseFilesButton.click();
     await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}/browser$`));
     await expect(adminPage.getByTestId('maven-browser-grid')).toBeVisible();
+  });
+
+  // RPS-1288 (2): the list search used to match the group only; it matches the whole `group:artifact`
+  // key a row shows, next to its parts.
+  test('PKG-maven-04 the list search finds a row by group, by artifact and by the whole group:artifact', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN);
+    const first = await seedPackage(repo);
+    const sibling = await seedPackage(repo, { name: maven.levels.sublist!.siblingName!(first, 1) });
+    const other = await seedPackage(repo, { index: 2 }); // another group
+    const list = protocolPages(adminPage, maven, repo.name).list();
+    await list.goto();
+    await expect(list.rows()).toHaveCount(3);
+
+    // The group finds the two artifacts of it, the whole key exactly one row.
+    await list.search(first.name.split(':')[0]);
+    await expect
+      .poll(async () => (await rowKeys(list)).sort())
+      .toEqual([first.name, sibling.name].sort());
+    await list.search(sibling.name);
+    await expect.poll(() => rowKeys(list)).toEqual([sibling.name]);
+    await list.search(other.name);
+    await expect.poll(() => rowKeys(list)).toEqual([other.name]);
+    // An artifact name alone finds its row too.
+    await list.search(other.name.split(':')[1]);
+    await expect.poll(() => rowKeys(list)).toEqual([other.name]);
+    await list.search(`${other.name}-no-such`);
+    await expect(list.emptyList.root).toBeVisible();
   });
 
   // Recorded, not asserted as a wish (RPS-1288 (4)): the group list's row is one ARTIFACT, but its

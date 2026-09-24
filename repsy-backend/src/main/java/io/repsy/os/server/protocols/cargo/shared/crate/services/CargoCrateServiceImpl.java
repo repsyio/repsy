@@ -52,6 +52,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
@@ -269,6 +270,11 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
 
     final var crate = this.findCrate(repoInfo.getId(), name);
     final var versions = this.crateMetaRepository.findAllByCrateId(crate.getId());
+    final var yankedVersions =
+        this.crateIndexRepository.findAllByCrateId(crate.getId()).stream()
+            .filter(CargoCrateIndex::isYanked)
+            .map(CargoCrateIndex::getVers)
+            .collect(Collectors.toSet());
     final var normalizedQuery = query.toLowerCase(Locale.ROOT);
 
     final var sortedAndFiltered =
@@ -277,7 +283,12 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
                 item ->
                     normalizedQuery.isBlank()
                         || item.getVersion().toLowerCase(Locale.ROOT).contains(normalizedQuery))
-            .map(item -> new CrateVersionListItem(item.getVersion(), item.getCreatedAt()))
+            .map(
+                item ->
+                    new CrateVersionListItem(
+                        item.getVersion(),
+                        yankedVersions.contains(item.getVersion()),
+                        item.getCreatedAt()))
             .sorted(CrateUtils.resolveVersionSort(pageable))
             .toList();
 

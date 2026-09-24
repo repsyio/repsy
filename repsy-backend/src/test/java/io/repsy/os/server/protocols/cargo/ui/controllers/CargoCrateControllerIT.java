@@ -323,7 +323,9 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
               "name",
               "readme",
               "rust_version",
-              "version");
+              "version",
+              "yanked");
+      assertThat(JsonPath.<Boolean>read(version, "$.data.yanked")).isFalse();
 
       final var versions =
           CargoCrateControllerIT.this
@@ -337,6 +339,31 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
               .getContentAsString();
       assertThat(JsonPath.<List<?>>read(versions, "$.data.content")).hasSize(1);
       assertThat(JsonPath.<String>read(versions, "$.data.content[0].version")).isEqualTo("2.0.0");
+      assertThat(JsonPath.<Boolean>read(versions, "$.data.content[0].yanked")).isFalse();
+    }
+
+    @Test
+    void marksOnlyTheYankedVersionInTheVersionList() throws Exception {
+      final var repo = CargoCrateControllerIT.this.seedRepo(RepoType.CARGO, false);
+      CargoCrateControllerIT.this.publish(repo, "yank_crate", "1.0.0");
+      CargoCrateControllerIT.this.publish(repo, "yank_crate", "2.0.0");
+      CargoCrateControllerIT.this.crateService.yank(
+          CargoCrateControllerIT.this.repoInfo(repo), "yank_crate", "2.0.0");
+
+      final var versions =
+          CargoCrateControllerIT.this
+              .request(
+                  "GET",
+                  "/api/cargo/crates/" + repo.getName() + "/yank_crate/versions?sort=version,asc",
+                  null)
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      assertThat(JsonPath.<String>read(versions, "$.data.content[0].version")).isEqualTo("1.0.0");
+      assertThat(JsonPath.<Boolean>read(versions, "$.data.content[0].yanked")).isFalse();
+      assertThat(JsonPath.<String>read(versions, "$.data.content[1].version")).isEqualTo("2.0.0");
+      assertThat(JsonPath.<Boolean>read(versions, "$.data.content[1].yanked")).isTrue();
     }
 
     @Test
@@ -365,7 +392,9 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
               "deps",
               "downloads",
               "hasLib",
+              "yanked",
               "created_at");
+      assertThat(JsonPath.<Boolean>read(response, "$.data.yanked")).isTrue();
       assertThat(JsonPath.<Map<String, Object>>read(response, "$.data.deps[0]"))
           .containsOnlyKeys(
               "name",
@@ -725,6 +754,22 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.content[0].name").value("paged"))
           .andExpect(jsonPath("$.data.content[0].max_version").value("1.1.0"));
+    }
+
+    @ParameterizedTest(name = "sort={0}")
+    @ValueSource(strings = {"updated_at", "lastUpdatedAt"})
+    @DisplayName("orders the crates by when they were last updated, with the id as tie-breaker")
+    void ordersCratesByLastUpdate(final String property) throws Exception {
+      final var repo = this.seededRepo();
+
+      this.list(repo, CRATES, "sort", property + ",desc&sort=id,desc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("other"))
+          .andExpect(jsonPath("$.data.content[1].name").value("paged"));
+      this.list(repo, CRATES, "sort", property + ",asc&sort=id,asc")
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.content[0].name").value("paged"))
+          .andExpect(jsonPath("$.data.content[1].name").value("other"));
     }
 
     @ParameterizedTest(name = "sort={0}")

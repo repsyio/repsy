@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 import { TestBed } from '@angular/core/testing';
+import { of } from 'rxjs';
 
 import { CargoCrateControllerService, ProtocolRepoControllerService } from '../../../../../../generated/api';
 import {
@@ -76,7 +77,8 @@ describe('CargoService', () => {
         name: 'searchCrates',
         invoke: (s, search) => s.searchCrates(search, SORT, PAGE_INDEX, PAGE_SIZE),
         api: () => cargoApi.searchCargoCrates,
-        args: (search) => [PAGEABLE, REPO, search],
+        // The crate list adds the id as tie-breaker, so a pager keeps one order.
+        args: (search) => [{ ...PAGEABLE, sort: ['name,DESC', 'id,DESC'] }, REPO, search],
       },
       {
         name: 'fetchCrateVersions',
@@ -86,6 +88,28 @@ describe('CargoService', () => {
       },
     ];
     describePagedCalls(() => service, paged);
+
+    it('searchCrates sorts by the chosen column and then by id in the same direction', () => {
+      cargoApi.searchCargoCrates.and.returnValue(of(restResponse({ content: [], page: {} })) as never);
+
+      service
+        .searchCrates('', { name: 'Oldest', column: 'lastUpdatedAt', type: 'ASC' }, PAGE_INDEX, PAGE_SIZE)
+        .subscribe();
+
+      expect(cargoApi.searchCargoCrates).toHaveBeenCalledWith(
+        { page: PAGE_INDEX, size: PAGE_SIZE, sort: ['lastUpdatedAt,ASC', 'id,ASC'] },
+        REPO,
+        undefined,
+      );
+    });
+
+    it('searchCrates sorted by id does not repeat the id as tie-breaker', () => {
+      cargoApi.searchCargoCrates.and.returnValue(of(restResponse({ content: [], page: {} })) as never);
+
+      service.searchCrates('', { name: 'Newest', column: 'id', type: 'DESC' }, PAGE_INDEX, PAGE_SIZE).subscribe();
+
+      expect(cargoApi.searchCargoCrates.calls.mostRecent().args[0].sort).toEqual(['id,DESC']);
+    });
 
     const crate = { name: CRATE };
     const crateVersion = { name: CRATE, version: VERSION };

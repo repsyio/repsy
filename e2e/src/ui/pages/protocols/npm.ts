@@ -46,7 +46,8 @@ function packageBase(repo: string, target: PackageRef | undefined): string {
  *  - The scope route segment is the scope WITHOUT its `@` (`/:repo/e2e-x/pkg`, probed), `~` when unscoped.
  *  - The list row key is the full name (`@scope/name`, or `name`); the sublist row key is the bare
  *    package name. The list search box has the placeholder `@scope`, and the panel strips a leading
- *    `@` from the query (RPS-1256's PKG-npm-07 asserts it).
+ *    `@` from the query (RPS-1256's PKG-npm-07 asserts it); the query matches the whole row key
+ *    (`@scope/name`, RPS-1288 (2)), so the scope, the name or the pair finds a row.
  *  - `rowOpens: 'detail'` on the list and versions pages: a row click goes to the latest version's
  *    detail (list) or that version's detail; `row-package-link` opens the versions page. The scope
  *    link exists only on SCOPED rows (unscoped rows get a plain `row-scope` `~` div instead).

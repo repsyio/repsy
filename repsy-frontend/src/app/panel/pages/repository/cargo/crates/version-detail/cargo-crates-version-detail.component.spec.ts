@@ -54,7 +54,7 @@ class HighlightLineNumbersStubDirective {}
 describe('CargoCratesVersionDetailComponent README', () => {
   let cargoService: jasmine.SpyObj<CargoService>;
 
-  function render(readme: string | undefined): HTMLElement {
+  function render(readme: string | undefined, yanked = false): HTMLElement {
     const crateVersion = Object.assign(new CrateVersionInfo(), {
       name: 'acme-lib',
       version: '1.2.3',
@@ -62,6 +62,7 @@ describe('CargoCratesVersionDetailComponent README', () => {
       deps: [],
       downloads: 0,
       created_at: new Date('2026-01-01T00:00:00Z'),
+      yanked,
       readme,
     });
     cargoService.fetchCrate.and.returnValue(of(Object.assign(new CrateInfo(), { original_name: 'acme-lib' })));
@@ -128,5 +129,18 @@ describe('CargoCratesVersionDetailComponent README', () => {
     const el = render('  \n\n ');
 
     expect(el.querySelector('[data-testid="readme"]')).toBeNull();
+  });
+
+  it('marks a yanked version next to its number', () => {
+    const el = render(undefined, true);
+
+    expect(el.querySelector('[data-testid="pkg-detail-yanked"]')?.textContent).toBe('(yanked)');
+    expect(el.querySelector('[data-testid="pkg-detail-version"]')?.textContent).toContain('1.2.3');
+  });
+
+  it('shows no yanked mark for a version that is not yanked', () => {
+    const el = render(undefined);
+
+    expect(el.querySelector('[data-testid="pkg-detail-yanked"]')).toBeNull();
   });
 });

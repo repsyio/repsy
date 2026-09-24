@@ -14,6 +14,7 @@
 /// limitations under the License.
 ///
 import { CommonModule, NgOptimizedImage } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import moment from 'moment';
@@ -149,7 +150,8 @@ export class HelmChartsListComponent implements OnDestroy {
             this.refreshPage();
             this.toastService.show('Chart deleted successfully', 'success');
           },
-          error: (err: string) => this.toastService.show(err, 'error'),
+          // The error interceptor has already shown the failure to the user.
+          error: () => {},
         });
     });
   }
@@ -177,9 +179,9 @@ export class HelmChartsListComponent implements OnDestroy {
           this.charts = pagedData.content;
           this.error = null;
         },
-        error: (err: string) => {
-          this.error = err;
-          this.toastService.show(err, 'error');
+        // The error interceptor has already shown the failure to the user; the page keeps its text.
+        error: (err: HttpErrorResponse) => {
+          this.error = err?.error?.text || 'An error occurred';
         },
       });
   }
