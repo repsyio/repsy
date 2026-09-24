@@ -21,6 +21,13 @@ import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { LoginInfo } from '../../../../../generated/api';
+import {
+  PASSWORD_MESSAGES,
+  PASSWORD_MISMATCH_MESSAGE,
+  passwordValidators,
+  USERNAME_MESSAGES,
+  usernameValidators,
+} from '../../../../shared/validators/credentials.validators';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { ProfileService } from '../service/profile.service';
@@ -49,6 +56,9 @@ export class AccountInfoComponent implements OnInit {
   public loading = false;
 
   public readonly formUi = new PasswordFormUi();
+  public readonly usernameMessages = USERNAME_MESSAGES;
+  public readonly passwordMessages = PASSWORD_MESSAGES;
+  public readonly mismatchMessage = PASSWORD_MISMATCH_MESSAGE;
 
   constructor(
     private readonly fb: FormBuilder,
@@ -58,24 +68,10 @@ export class AccountInfoComponent implements OnInit {
   ) {
     this.passwordForm = this.fb.group(
       {
-        newPassword: [
-          '',
-          [
-            Validators.required,
-            Validators.minLength(6),
-            Validators.maxLength(50),
-            Validators.pattern(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=\S+$).+$/),
-          ],
-        ],
-        passwordConfirmation: [
-          '',
-          [
-            Validators.required,
-            Validators.minLength(6),
-            Validators.maxLength(50),
-            Validators.pattern(/^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=\S+$).+$/),
-          ],
-        ],
+        newPassword: ['', passwordValidators()],
+        // The confirmation only has to be filled and equal to the new password (checkPasswords), so it
+        // needs none of the password rules of its own.
+        passwordConfirmation: ['', [Validators.required]],
       },
       {
         validator: this.checkPasswords,
@@ -83,10 +79,7 @@ export class AccountInfoComponent implements OnInit {
     );
 
     this.usernameForm = this.fb.group({
-      username: [
-        '',
-        [Validators.required, Validators.minLength(3), Validators.maxLength(25), Validators.pattern(/^[a-z0-9_-]+$/)],
-      ],
+      username: ['', usernameValidators()],
     });
   }
 

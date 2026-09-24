@@ -25,6 +25,11 @@ import {
   RepoCreateForm,
   RepoType as ApiRepoType,
 } from '../../../../../../generated/api';
+import {
+  DESCRIPTION_MAX_LENGTH,
+  DESCRIPTION_MAX_MESSAGE,
+  descriptionValidators,
+} from '../../../../../shared/validators/description.validators';
 import { RepoType } from '../../../dto/repo/repo-type';
 import { reservedRepoNameValidator } from '../../../util/reserved-repo-names';
 import { SelectorComponent } from '../../selector/selector.component';
@@ -58,6 +63,8 @@ export class RepositoryCreateModalComponent implements OnInit {
   public form: FormGroup;
 
   public loading = false;
+  public readonly descriptionMaxLength = DESCRIPTION_MAX_LENGTH;
+  public readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
 
   constructor(
     private readonly protocolRepoControllerService: ProtocolRepoControllerService,
@@ -82,7 +89,7 @@ export class RepositoryCreateModalComponent implements OnInit {
         ],
       ],
       privateRepo: [true],
-      description: ['', [Validators.maxLength(500)]],
+      description: ['', descriptionValidators()],
     });
   }
 

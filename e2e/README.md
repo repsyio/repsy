@@ -2547,7 +2547,10 @@ Things a later author must know:
   blocks, so the button has no size and Playwright calls it "not visible": use
   `LoginValidation.togglePasswordVisibility()` (a DOM click).
 - **Inline validation messages appear on blur** (`touched`), one at a time, in the order required,
-  pattern, minlength, maxlength; `LoginValidation.enter()` types and blurs.
+  pattern, minlength, maxlength; `LoginValidation.enter()` types and blurs. The texts are the shared credential
+  sentences of `src/ui/credential-messages.ts` (RPS-1265: one wording for a username, a password and a
+  description on every form); the login password rule is the create-user one because the backend's `LoginForm`
+  holds a login password to the same rule, so a weaker one is answered by the form, not the server.
 - **AUTH-11 (`@throttle`) is skipped by default.** It needs a stack whose `AUTH_THROTTLE_MAX_FAILURES` is
   below 30 (the harness stack raises it to 100000, see `docker-compose.stack.yml`) and, once it trips,
   the client stays refused for the window (`AUTH_THROTTLE_WINDOW_SECONDS`), so run it alone, on a
@@ -2591,9 +2594,9 @@ Things a test here relies on, which a change to the page can break:
   `seeder.adoptRepo(name)` BEFORE the submit, so a failure half way still deletes them.
 - **The visibility toggle** is toggled by clicking its label text: the `toggle-input` checkbox is `sr-only`
   under a covering span, so Playwright refuses to click it (read `isChecked()` from it, though).
-- **Known defects, pinned as `test.fail`** (a `✘` line in the list reporter with a passing summary is the
-  expectation): the description textarea's `maxlength="500"` hides the ">500" error (RPS-1265). Drop the
-  `test.fail` when the fix lands. (The search box and page index after a refresh or a new search were
+- **The description textarea has a counter and no `maxlength` attribute** (RPS-1265): text past 500
+  characters is kept, the "n/500" counter and the maxlength message show, and Create is disabled. Type it
+  with `pressSequentially` to prove a real keyboard is not cut. (The search box and page index after a refresh or a new search were
   pinned to RPS-1283 and are fixed; a refresh during a load, RPS-1293, is covered by a route that holds
   the first maven answer. A USER's Recent Activity was pinned to RPS-1276 until that
   fix; the row now shows, so DASH-04 asserts it plainly.)
@@ -2710,7 +2713,7 @@ with the page-2 answer delayed and asserts a single list request (the first page
 remaining rows. Not covered here: the Vulnerability Scanning toggle
 (hidden without a scanner, RPS-1259), the per-protocol "configure" modal behind a token row, the
 `reservedName` rename error (it has no test id), the expiration-date range messages (no test id) and
-the token-name `minLength` branch, which is unreachable (`required` already covers an empty name, RPS-1265).
+the token-name `minLength` branch, which was unreachable and is gone (`required` already covers an empty name, RPS-1265).
 
 ### Package seeding and protocol page objects (RPS-1255)
 
@@ -3185,7 +3188,7 @@ Selector priority: `getByTestId` first, then `getByRole`/`getByLabel`, never CSS
    `@Input() testId`.
 6. Validation messages: `<form>-<field>-error-<validator>`, validator names as Angular reports them
    (`required`, `minlength`, `maxlength`, `pattern`; `mismatch` for confirm-password checks). Key by
-   validator, never by text.
+   validator, never by text (the sentences live once in `src/ui/credential-messages.ts`).
 7. Error branch: `<page>-error` on the wrapper, `<page>-error-message` on the message. Custom empty
    state: `<page>-empty`; `<app-empty-list>` is the shared `empty-list`.
 8. `data-testid="readme"` (cargo/npm/nuget version detail) predates the scheme and Karma specs assert
