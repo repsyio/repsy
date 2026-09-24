@@ -16,7 +16,9 @@
 package io.repsy.os.server.protocols.npm.shared.npm_package.repositories;
 
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageKeywordListItem;
+import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.VersionKeywordListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageKeyword;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
@@ -38,4 +40,11 @@ public interface PackageKeywordRepository extends JpaRepository<PackageKeyword, 
   void deleteAllKeywordsOfVersion(UUID versionId);
 
   List<PackageKeywordListItem> findAllByPackageVersionId(UUID packageVersionId);
+
+  @Query(
+      """
+      select k.packageVersion.id as packageVersionId, k.keyword as keyword
+      from PackageKeyword k
+      where k.packageVersion.id in :versionIds""")
+  List<VersionKeywordListItem> findAllByPackageVersionIdIn(Collection<UUID> versionIds);
 }

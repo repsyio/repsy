@@ -16,7 +16,9 @@
 package io.repsy.os.server.protocols.npm.shared.npm_package.repositories;
 
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageMaintainerListItem;
+import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.VersionMaintainerListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageMaintainer;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
@@ -38,4 +40,12 @@ public interface PackageMaintainerRepository extends JpaRepository<PackageMainta
   void deleteAllMaintainersOfVersion(UUID versionId);
 
   List<PackageMaintainerListItem> findAllByPackageVersionId(UUID packageVersionId);
+
+  @Query(
+      """
+      select m.packageVersion.id as packageVersionId, m.name as name, m.email as email
+      from PackageMaintainer m
+      where m.packageVersion.id in :versionIds
+      order by m.createdAt, m.name""")
+  List<VersionMaintainerListItem> findAllByPackageVersionIdIn(Collection<UUID> versionIds);
 }
