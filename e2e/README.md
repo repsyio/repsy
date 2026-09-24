@@ -2793,7 +2793,53 @@ _Not implemented yet._
 
 ### Errors, navigation, mobile and accessibility (RPS-1258)
 
-_Not implemented yet._
+`tests/ui/{errors,nav,a11y}/*.spec.ts` (ERR-01..03, NAV-01..02, A11Y-01) plus `src/ui/a11y.ts` (the axe
+helper) and `tests/ui/nav/breadcrumb.ts` (the breadcrumb page object). Run them with
+`./run.sh test --protocol ui --grep "ERR-|NAV-|A11Y-"`. `@axe-core/playwright` is the only dependency
+this story added (`package.json`, `pnpm-lock.yaml`), so the `ui` runner image must be rebuilt once
+(`./run.sh test --protocol ui -b`).
+
+| Spec              | Scenarios | What is pinned                                                                                                                                                                                                                                                                                                                                                         |
+| ----------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `errors/errors`   | ERR-01    | all nine `.../{TYPE}/info` calls answered 500: exactly `Server error` (never the body's text), no rows, page alive; ONE type (NPM) failing: the toast, and the other types still list; a failing NuGet package list: `pkg-error` with `Error Occurred` next to the toast; `test.fail`: the repository list's own `repo-error` block never renders (dead `error` field) |
+| `errors/errors`   | ERR-02    | an aborted request (status 0): `Connection error`, on the repository list and on the users page                                                                                                                                                                                                                                                                        |
+| `errors/errors`   | ERR-03    | 403 on `GET /api/users`: `Access denied` (no body) or the server's own `text`; 403 on `/security`: `Access denied` plus `You do not have permission to view this page`, and the redirect to the dashboard                                                                                                                                                              |
+| `nav/breadcrumbs` | NAV-01    | Maven: version -> artifact -> group -> repository -> Repositories, URL, remaining crumbs and the rendered page after each click; npm scoped package: the `@scope` crumb over a URL without `@`                                                                                                                                                                         |
+| `nav/mobile`      | NAV-02    | 390x844: desktop sidebar hidden and burger present (and the reverse at 1440); repository, users, Maven list/group/versions show `<page>-cards` and hide `<page>-table`; `test.fail`: the burger never opens the mobile sidebar (x2: admin flow, USER flow)                                                                                                             |
+| `a11y/a11y`       | A11Y-01   | axe on login, dashboard, repository list, repository settings, users (admin); report-only                                                                                                                                                                                                                                                                              |
+
+Things a later author must know:
+
+- **Routes are stubs, everything else is real.** ERR tests answer one URL with `page.route`, remove it
+  again in a `finally` (`withRoute`), and start asserting the toast BEFORE the navigation that raises it
+  (`expectToastLater`): a toast lives 3 s. The interceptor's mapping is status 0 -> `Connection error`,
+  403 -> the server's `text` or `Access denied`, >= 500 -> `Server error`, other 4xx -> the server's `text`.
+- **The repository list renders whatever arrives** of its nine parallel `info` calls, so one failing type
+  loses only its own rows. Its `repo-error` block can never show: `RepositoryComponent.error` is declared
+  and never assigned, so a failed list shows the empty state.
+- **The mobile sidebar cannot be opened.** `PanelLayoutComponent` renders `<app-panel-header />` without a
+  `(mobileMenuToggle)` handler, so `isMobileMenuOpen` stays false. The two `test.fail` NAV-02 tests are
+  written from the templates (open, link, X, backdrop, USER without Users/Security, logout); the steps after
+  the burger have not run against a working sidebar and may need adjusting when it is fixed.
+- **axe, report-only by default.** `scanPage()` (`src/ui/a11y.ts`) runs the WCAG 2.0/2.1 A and AA rules,
+  attaches `axe-<page>.json` (summary + every violation with its nodes) and `axe-<page>.txt` to the report,
+  writes the JSON to `test-results/<test>/axe-<page>.json` and prints one `AXE <page> [report]: ...` line, and
+  never fails. `DEFAULT_A11Y_MODE` in `src/ui/a11y.ts` is the one flag that makes it fail on
+  serious/critical violations (RPS-1266 flips it once the baseline is clean); for a single run use
+  `REPSY_UI_OPT_IN=a11y-enforce` (or `a11y-report`), because `docker-compose.runners.yml` forwards that
+  variable already. Font Awesome (a blocked CDN in this harness) icons render as empty boxes; each summary
+  counts them as `faNodes` per rule so they stay separable. Axe cannot judge a modal or dropdown that is not
+  open: the five scans are of the pages at rest.
+
+Baseline on `main` (RPS-1266 tracks fixing it; serious/critical only, WCAG A/AA):
+
+| Page                | Violations                                                                                                                                   |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| login               | `button-name` (critical, 1): the password eye toggle                                                                                         |
+| dashboard           | none                                                                                                                                         |
+| repository list     | `button-name` (critical, 1): the refresh button; `nested-interactive` (serious, 1): a `role="button"` row containing a link and the row menu |
+| repository settings | `button-name` (critical, 1): the PGP add button; `color-contrast` (serious, 2): the disabled keyserver rows                                  |
+| users (admin)       | `color-contrast` (serious, 1): the `USER` role badge                                                                                         |
 
 ### Security scanning UI (RPS-1259)
 
