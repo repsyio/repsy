@@ -32,8 +32,11 @@ public final class NuGetServiceIndexResources {
    * that only saw the bare type reported "The source does not have a Search service!". The bare
    * type stays advertised too (for clients that follow the docs to the letter), next to the
    * versioned type the NuGet client resolves; both point to the same URL, which the client queries
-   * once. {@code /3.0.0-beta} rather than {@code /3.4.0} because this server does not honour {@code
-   * semVerLevel}.
+   * once. {@code /3.0.0-beta}, the alias of the bare type the search docs list, and not {@code
+   * /3.4.0} or {@code /3.5.0}: the docs define no {@code /3.4.0} for search or autocomplete, and
+   * {@code /3.5.0} promises the {@code packageType} filter, which this server does not have.
+   * Nothing needs them: {@code semVerLevel} is a parameter of the base resource (RPS-1275), which
+   * this server honours whatever type the client found the URL under.
    */
   public static List<NuGetServiceIndexResource> build(final String baseUrl) {
 

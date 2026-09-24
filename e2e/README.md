@@ -1045,6 +1045,14 @@ v3/search?q=...&semVerLevel=2.0.0`. The service index now advertises the bare ty
   `/3.0.0-beta` for both, at the same URLs (the client queries the shared URL once), and
   `tests/nuget/protocol-specific.spec.ts`'s `dotnet package search` test runs the real client to
   completion (`tests/nuget/registry-rules.spec.ts`'s H6 test pins the served shape).
+  **RPS-1275** made the search and autocomplete endpoints honour the `semVerLevel` parameter the
+  client sends with every search: without it (or below `2.0.0`) SemVer 2.0.0-only versions (a
+  dot-separated pre-release label, build metadata) and the packages that only have such versions
+  are left out, as the search/autocomplete docs prescribe. `/3.4.0` is still not advertised (the
+  docs define no such type for search, and `/3.5.0` would promise the `packageType` filter);
+  `tests/nuget/protocol-specific.spec.ts`'s `semVerLevel` test pins the behaviour raw and through
+  the real client. The registration index and flat container have no `semVerLevel` parameter in
+  the docs and keep listing every version.
 - **H7** (`X-NuGet-ApiKey: <user password>` → `401`, contradicting the panel's Option B text):
   confirmed live, exactly as predicted —
   `X-NuGet-ApiKey: <admin password>` → `401`; `X-NuGet-ApiKey: <deploy token>` → `201`;

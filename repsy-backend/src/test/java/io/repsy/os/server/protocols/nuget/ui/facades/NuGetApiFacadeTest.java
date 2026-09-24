@@ -76,7 +76,7 @@ class NuGetApiFacadeTest {
     @DisplayName("passes the requested page and sort to the package service")
     void passesPageableThrough() {
       final var pageable = PageRequest.of(2, 5, Sort.by(Sort.Direction.DESC, "packageId"));
-      when(nugetPackageService.searchPage(REPO_INFO, "fixture", pageable, false))
+      when(nugetPackageService.searchPage(REPO_INFO, "fixture", pageable, false, true))
           .thenReturn(
               new PageImpl<>(
                   List.of(

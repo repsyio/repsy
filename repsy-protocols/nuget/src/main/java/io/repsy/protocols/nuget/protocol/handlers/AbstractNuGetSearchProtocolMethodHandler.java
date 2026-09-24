@@ -91,6 +91,7 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler implements Protoc
       final var skipStr = request.getParameter("skip");
       final var takeStr = request.getParameter("take");
       final var prerelease = "true".equalsIgnoreCase(request.getParameter("prerelease"));
+      final var semVer2 = NuGetPackageUtils.acceptsSemVer2(request.getParameter("semVerLevel"));
 
       final var skip = NuGetPackageUtils.parseNonNegativeParam(skipStr, 0, "skip");
       final var take =
@@ -102,7 +103,7 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler implements Protoc
       final var baseUrl = buildBaseUrl(request, repoName);
 
       final var results =
-          this.facade.search(context, q != null ? q : "", skip, take, prerelease, baseUrl);
+          this.facade.search(context, q != null ? q : "", skip, take, prerelease, semVer2, baseUrl);
 
       return ResponseEntity.ok().contentType(APPLICATION_JSON).body(results);
     } catch (final IllegalArgumentException e) {

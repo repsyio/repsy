@@ -151,23 +151,43 @@ export function unlistRelistPath(idLower: string, verLower: string): string {
   return `v3/package/${idLower}/${verLower}`;
 }
 
-export function searchPath(query: string, prerelease: boolean, skip = 0, take = 20): string {
+/** `semVerLevel` is left off the query string when `undefined`, the way a client that predates
+ *  SemVer 2.0.0 (RPS-1275) sends none; `dotnet package search` always sends `2.0.0`. */
+export function searchPath(
+  query: string,
+  prerelease: boolean,
+  skip = 0,
+  take = 20,
+  semVerLevel?: string,
+): string {
   const params = new URLSearchParams({
     q: query,
     skip: String(skip),
     take: String(take),
     prerelease: String(prerelease),
   });
+  if (semVerLevel !== undefined) {
+    params.set('semVerLevel', semVerLevel);
+  }
   return `v3/search?${params.toString()}`;
 }
 
-export function autocompletePath(query: string, prerelease: boolean, skip = 0, take = 20): string {
+export function autocompletePath(
+  query: string,
+  prerelease: boolean,
+  skip = 0,
+  take = 20,
+  semVerLevel?: string,
+): string {
   const params = new URLSearchParams({
     q: query,
     skip: String(skip),
     take: String(take),
     prerelease: String(prerelease),
   });
+  if (semVerLevel !== undefined) {
+    params.set('semVerLevel', semVerLevel);
+  }
   return `v3/autocomplete?${params.toString()}`;
 }
 
@@ -383,8 +403,9 @@ export async function rawSearch(
   credential: MaterializedCredential,
   query: string,
   prerelease = true,
+  semVerLevel?: string,
 ): Promise<RawResponse> {
-  return rawRequest(`${repoUrl(repoName)}${searchPath(query, prerelease)}`, {
+  return rawRequest(`${repoUrl(repoName)}${searchPath(query, prerelease, 0, 20, semVerLevel)}`, {
     headers: nugetReadHeaders(credential),
   });
 }
@@ -395,10 +416,12 @@ export async function rawAutocomplete(
   credential: MaterializedCredential,
   query: string,
   prerelease = true,
+  semVerLevel?: string,
 ): Promise<RawResponse> {
-  return rawRequest(`${repoUrl(repoName)}${autocompletePath(query, prerelease)}`, {
-    headers: nugetReadHeaders(credential),
-  });
+  return rawRequest(
+    `${repoUrl(repoName)}${autocompletePath(query, prerelease, 0, 20, semVerLevel)}`,
+    { headers: nugetReadHeaders(credential) },
+  );
 }
 
 /** One `NuGetSearchData` entry the way the server serializes it: `id` is `@JsonProperty("id")` on
@@ -410,6 +433,8 @@ export interface SearchResultData {
   id: string;
   version: string;
   registration: string;
+  /** The `version` of each `versions[]` entry, in the order the server lists them. */
+  versions: string[];
 }
 
 export interface SearchResponse {
@@ -421,7 +446,12 @@ export interface SearchResponse {
 export function parseSearchResponse(body: Buffer): SearchResponse {
   const parsed = JSON.parse(body.toString('utf8')) as {
     totalHits?: unknown;
-    data?: { id?: unknown; version?: unknown; registration?: unknown }[];
+    data?: {
+      id?: unknown;
+      version?: unknown;
+      registration?: unknown;
+      versions?: { version?: unknown }[];
+    }[];
   };
   const data = (parsed.data ?? [])
     .filter(
@@ -434,6 +464,9 @@ export function parseSearchResponse(body: Buffer): SearchResponse {
       id: d.id as string,
       version: d.version as string,
       registration: d.registration as string,
+      versions: (d.versions ?? [])
+        .map((v) => v.version)
+        .filter((v): v is string => typeof v === 'string'),
     }));
   return { totalHits: typeof parsed.totalHits === 'number' ? parsed.totalHits : 0, data };
 }

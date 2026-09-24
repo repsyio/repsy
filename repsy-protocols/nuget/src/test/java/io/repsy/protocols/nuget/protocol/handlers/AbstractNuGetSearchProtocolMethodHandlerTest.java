@@ -40,6 +40,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -104,27 +105,69 @@ class AbstractNuGetSearchProtocolMethodHandlerTest {
   @DisplayName("defaults skip to 0 and take to 20 when absent")
   void defaultsWhenParamsAbsent() {
     final var ctx = context(SEARCH_PATH);
-    when(this.facade.search(eq(ctx), anyString(), anyInt(), anyInt(), anyBoolean(), anyString()))
+    when(this.facade.search(
+            eq(ctx), anyString(), anyInt(), anyInt(), anyBoolean(), anyBoolean(), anyString()))
         .thenReturn(new NuGetSearchResponse(0, List.of()));
 
     final var response = this.handler.handle(ctx, request(null), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    verify(this.facade).search(eq(ctx), eq(""), eq(0), eq(20), eq(false), anyString());
+    verify(this.facade).search(eq(ctx), eq(""), eq(0), eq(20), eq(false), eq(false), anyString());
   }
 
   @Test
   @DisplayName("clamps a huge take to the maximum instead of passing it through unbounded")
   void clampsTakeToMaximum() {
     final var ctx = context(SEARCH_PATH);
-    when(this.facade.search(eq(ctx), anyString(), anyInt(), anyInt(), anyBoolean(), anyString()))
+    when(this.facade.search(
+            eq(ctx), anyString(), anyInt(), anyInt(), anyBoolean(), anyBoolean(), anyString()))
         .thenReturn(new NuGetSearchResponse(0, List.of()));
 
     final var response =
         this.handler.handle(ctx, request("take=2000000000"), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    verify(this.facade).search(eq(ctx), eq(""), eq(0), eq(1000), eq(false), anyString());
+    verify(this.facade).search(eq(ctx), eq(""), eq(0), eq(1000), eq(false), eq(false), anyString());
+  }
+
+  @ParameterizedTest(name = "semVerLevel={0} opts in: {1}")
+  @CsvSource(
+      value = {
+        "2.0.0, true",
+        "2.1.0, true",
+        "3.0.0, true",
+        "1.0.0, false",
+        "1.0, false",
+        "0.5, false",
+        "abc, false",
+        "'', false"
+      })
+  @DisplayName("opts in to SemVer 2.0.0 only for a semVerLevel of 2.0.0 or more (RPS-1275)")
+  void semVerLevel(final String level, final boolean optedIn) {
+    final var ctx = context(SEARCH_PATH);
+    when(this.facade.search(
+            eq(ctx), anyString(), anyInt(), anyInt(), anyBoolean(), anyBoolean(), anyString()))
+        .thenReturn(new NuGetSearchResponse(0, List.of()));
+
+    final var response =
+        this.handler.handle(
+            ctx, request("semVerLevel=" + level.replace("'", "")), new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    verify(this.facade).search(eq(ctx), eq(""), eq(0), eq(20), eq(false), eq(optedIn), anyString());
+  }
+
+  @Test
+  @DisplayName("does not opt in to SemVer 2.0.0 when the client sends no semVerLevel (RPS-1275)")
+  void semVerLevelAbsent() {
+    final var ctx = context(SEARCH_PATH);
+    when(this.facade.search(
+            eq(ctx), anyString(), anyInt(), anyInt(), anyBoolean(), anyBoolean(), anyString()))
+        .thenReturn(new NuGetSearchResponse(0, List.of()));
+
+    this.handler.handle(ctx, request("q=x"), new MockHttpServletResponse());
+
+    verify(this.facade).search(eq(ctx), eq("x"), eq(0), eq(20), eq(false), eq(false), anyString());
   }
 
   @ParameterizedTest(name = "skip={0}")
@@ -159,7 +202,8 @@ class AbstractNuGetSearchProtocolMethodHandlerTest {
   @DisplayName("still answers 500 for an unexpected failure, and still logs it")
   void unexpectedFailureStillLogsAndAnswers500() {
     final var ctx = context(SEARCH_PATH);
-    when(this.facade.search(eq(ctx), anyString(), anyInt(), anyInt(), anyBoolean(), anyString()))
+    when(this.facade.search(
+            eq(ctx), anyString(), anyInt(), anyInt(), anyBoolean(), anyBoolean(), anyString()))
         .thenThrow(new IllegalStateException("storage down"));
 
     final var response = this.handler.handle(ctx, request(null), new MockHttpServletResponse());

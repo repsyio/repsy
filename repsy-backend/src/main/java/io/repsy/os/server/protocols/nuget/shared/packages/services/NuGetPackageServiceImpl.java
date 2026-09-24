@@ -206,7 +206,8 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final String query,
       final int skip,
       final int take,
-      final boolean prerelease) {
+      final boolean prerelease,
+      final boolean semVer2) {
 
     if (take <= 0) {
       return new org.springframework.data.domain.PageImpl<>(List.of());
@@ -215,7 +216,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     // skip is the client's exact offset. A PageRequest can only start at a multiple of take, so it
     // would serve the window that starts at the previous multiple instead.
     return this.searchPage(
-        repoInfo, query, OffsetPageRequest.of(Math.max(skip, 0), take), prerelease);
+        repoInfo, query, OffsetPageRequest.of(Math.max(skip, 0), take), prerelease, semVer2);
   }
 
   @Override
@@ -223,7 +224,8 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final BaseRepoInfo<UUID> repoInfo,
       final String query,
       final Pageable pageable,
-      final boolean prerelease) {
+      final boolean prerelease,
+      final boolean semVer2) {
 
     // package_id is unique per repo, so it alone gives every page a stable order.
     final var sortedPageable =
@@ -235,10 +237,10 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
                 : Sort.by(Sort.Direction.ASC, "packageId"));
 
     final var pkgPage =
-        this.packageRepository.findByRepoIdAndPackageIdContainingIgnoreCase(
-            repoInfo.getId(), query, sortedPageable);
+        this.packageRepository.search(
+            repoInfo.getId(), likePattern("%", query, "%"), semVer2, sortedPageable);
 
-    return pkgPage.map(pkg -> this.toSearchResult(pkg, prerelease));
+    return pkgPage.map(pkg -> this.toSearchResult(pkg, prerelease, semVer2));
   }
 
   @Override
@@ -247,7 +249,8 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
       final String query,
       final int skip,
       final int take,
-      final boolean prerelease) {
+      final boolean prerelease,
+      final boolean semVer2) {
 
     if (take <= 0) {
       return List.of();
@@ -256,9 +259,11 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
     // skip is not capped, so even a capped take can still overflow int here (e.g. skip near
     // Integer.MAX_VALUE); addExact turns that into an ArithmeticException the handler maps to 400
     // instead of silently wrapping to a negative page size.
-    final var pageable = Pageable.ofSize(Math.max(Math.addExact(skip, take), 1));
+    final var pageable =
+        PageRequest.of(
+            0, Math.max(Math.addExact(skip, take), 1), Sort.by(Sort.Direction.ASC, "packageId"));
     return this.packageRepository
-        .findByRepoIdAndPackageIdStartingWithIgnoreCase(repoInfo.getId(), query, pageable)
+        .search(repoInfo.getId(), likePattern("", query, "%"), semVer2, pageable)
         .stream()
         .skip(skip)
         .limit(take)
@@ -472,13 +477,26 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
         : sort;
   }
 
+  /** The lower-cased {@code LIKE} pattern of {@code query} with its wildcards taken literally. */
+  private static String likePattern(final String prefix, final String query, final String suffix) {
+
+    final var escaped =
+        query
+            .toLowerCase(Locale.ROOT)
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_");
+
+    return prefix + escaped + suffix;
+  }
+
   private NuGetPackageSearchResult toSearchResult(
-      final NuGetPackage pkg, final boolean prerelease) {
+      final NuGetPackage pkg, final boolean prerelease, final boolean semVer2) {
 
     final var allVersions =
         this.packageVersionRepository.findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDesc(
             pkg.getId());
 
-    return this.converter.toSearchResult(pkg, prerelease, allVersions);
+    return this.converter.toSearchResult(pkg, prerelease, semVer2, allVersions);
   }
 }
