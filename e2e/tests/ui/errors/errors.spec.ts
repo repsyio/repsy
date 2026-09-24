@@ -100,18 +100,39 @@ test.describe('Error handling', () => {
     );
   });
 
-  test('ERR-01: the list shows its error state when every type fails', async ({ adminPage }) => {
-    test.fail(
-      true,
-      'RepositoryComponent declares `error` but never sets it, so the `repo-error` block can never ' +
-        'render: a failed list shows the empty state instead (RPS-1292).',
-    );
+  test('ERR-01: the list shows its error state, not the empty state, when every type fails', async ({
+    adminPage,
+  }) => {
+    const repos = new RepositoriesPage(adminPage);
+    await withRoute(adminPage, INFO_URL, respondWith(500), async () => {
+      const raised = expectToastLater(repos.toasts, 'Server error');
+      await adminPage.goto('/repositories');
+      await raised;
+
+      await expect(repos.error).toBeVisible();
+      await expect(adminPage.getByTestId('repo-error-message')).not.toBeEmpty();
+      // A failed load is not "you have no repositories".
+      await expect(repos.emptyList.root).toHaveCount(0);
+      await expect(repos.spinner.root).toBeHidden();
+      await expect(repos.rows()).toHaveCount(0);
+      await expect(adminPage.getByTestId('repo-warning')).toHaveCount(0);
+    });
+  });
+
+  test('ERR-01: the refresh button retries a failed list and the error state goes away', async ({
+    adminPage,
+  }) => {
     const repos = new RepositoriesPage(adminPage);
     await withRoute(adminPage, INFO_URL, respondWith(500), async () => {
       await adminPage.goto('/repositories');
-      await expect(repos.error).toBeVisible({ timeout: 3_000 });
-      await expect(adminPage.getByTestId('repo-error-message')).not.toBeEmpty();
+      await expect(repos.error).toBeVisible();
     });
+
+    // The stub is gone: the same button that was pressed for a fresh list now retries for real.
+    await repos.refresh();
+    await expect(repos.error).toHaveCount(0);
+    await expect(repos.rows().first()).toBeVisible();
+    await expect(adminPage.getByTestId('repo-warning')).toHaveCount(0);
   });
 
   test('ERR-01: a package list that fails shows its error block next to the toast', async ({
@@ -133,7 +154,7 @@ test.describe('Error handling', () => {
     });
   });
 
-  test('ERR-01: one failing type raises the toast while the other types still list', async ({
+  test('ERR-01: one failing type raises the toast and a warning while the other types still list', async ({
     adminPage,
     seeder,
   }) => {
@@ -156,6 +177,11 @@ test.describe('Error handling', () => {
         await repos.search(`e2e-${seeder.runId}-`);
         await expect(repos.row(maven.name)).toBeVisible();
         await expect(repos.row(npm.name)).toHaveCount(0);
+
+        // The list is not the error state: a warning names the type that is missing.
+        await expect(repos.error).toHaveCount(0);
+        await expect(adminPage.getByTestId('repo-warning')).toBeVisible();
+        await expect(adminPage.getByTestId('repo-warning-message')).toContainText('npm');
       },
     );
   });

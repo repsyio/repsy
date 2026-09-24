@@ -2569,7 +2569,7 @@ npm and docker, REPO-06, REPO-10) are also `@smoke`.
 
 Things a test here relies on, which a change to the page can break:
 
-- **The list loads nine `getInfo` calls, not one.** It shows the spinner after the FIRST answer and renders
+- **The list loads nine `getInfo` calls, not one.** It shows the spinner until an answer has rows (or the last one is in) and renders
   rows as the others arrive; search, type filter and pagination run client-side over what has arrived. So
   `RepositoriesPage.afterInfoResponses()` (used by `goto`, `selectType`, `refresh`, `confirmDelete`) waits
   for every answer of the reload, then `settle()`s (two animation frames, so a negative assertion does not
@@ -2793,7 +2793,7 @@ this story added (`package.json`, `pnpm-lock.yaml`), so the `ui` runner image mu
 
 | Spec              | Scenarios | What is pinned                                                                                                                                                                                                                                                                                                                                                         |
 | ----------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `errors/errors`   | ERR-01    | all nine `.../{TYPE}/info` calls answered 500: exactly `Server error` (never the body's text), no rows, page alive; ONE type (NPM) failing: the toast, and the other types still list; a failing NuGet package list: `pkg-error` with `Error Occurred` next to the toast; `test.fail`: the repository list's own `repo-error` block never renders (dead `error` field) |
+| `errors/errors`   | ERR-01    | all nine `.../{TYPE}/info` calls answered 500: exactly `Server error` (never the body's text), no rows, page alive; ONE type (NPM) failing: the toast plus the `repo-warning`, others still list; all types failing: `repo-error`, not `empty-list`, and the refresh button retries; a failing NuGet package list: `pkg-error` with `Error Occurred` next to the toast |
 | `errors/errors`   | ERR-02    | an aborted request (status 0): `Connection error`, on the repository list and on the users page                                                                                                                                                                                                                                                                        |
 | `errors/errors`   | ERR-03    | 403 on `GET /api/users`: `Access denied` (no body) or the server's own `text`; 403 on `/security`: `Access denied` plus `You do not have permission to view this page`, and the redirect to the dashboard                                                                                                                                                              |
 | `nav/breadcrumbs` | NAV-01    | Maven: version -> artifact -> group -> repository -> Repositories, URL, remaining crumbs and the rendered page after each click; npm scoped package: the `@scope` crumb over a URL without `@`                                                                                                                                                                         |
@@ -2807,8 +2807,8 @@ Things a later author must know:
   (`expectToastLater`): a toast lives 3 s. The interceptor's mapping is status 0 -> `Connection error`,
   403 -> the server's `text` or `Access denied`, >= 500 -> `Server error`, other 4xx -> the server's `text`.
 - **The repository list renders whatever arrives** of its nine parallel `info` calls, so one failing type
-  loses only its own rows. Its `repo-error` block can never show: `RepositoryComponent.error` is declared
-  and never assigned, so a failed list shows the empty state.
+  loses only its own rows and the page shows `repo-warning`; only when EVERY request failed does it show
+  `repo-error` (never the empty state), and the refresh button retries.
 - **The mobile sidebar cannot be opened.** `PanelLayoutComponent` renders `<app-panel-header />` without a
   `(mobileMenuToggle)` handler, so `isMobileMenuOpen` stays false. The two `test.fail` NAV-02 tests are
   written from the templates (open, link, X, backdrop, USER without Users/Security, logout); the steps after
