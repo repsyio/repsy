@@ -2778,7 +2778,57 @@ test('lists a seeded package', async ({ adminPage, seeder, seedPackage }) => {
 
 ### Package tests: Maven, npm, Docker, PyPI (RPS-1256)
 
-_Not implemented yet._
+`tests/ui/packages/{maven,npm,docker,pypi}.spec.ts`, each one line of the shared template plus the
+protocol-only scenarios. The template is `src/ui/package-scenarios.ts`, the UI counterpart of
+`scenarios/loop.ts`:
+
+```ts
+registerPackageScenarios(DESCRIPTORS.npm, {
+  knownFailures: {
+    '05-mobile-sublist': 'RPS-1262: mobile scope-list cards gate Delete on canWrite',
+  },
+});
+```
+
+It registers `PKG-<proto>-01..06` for whatever the descriptor (`pages/protocols/<proto>.ts`) says and
+never asks which protocol it is: a missing feature (`search: null`, `sort: null`, `pagination: false`,
+no `rowDelete`, no `sublist`) registers the scenario that asserts its absence, and where a protocol
+differs the descriptor carries the value (`repoUrlIn`, `detail.delete.landsOn`,
+`lastVersionRemovesPackage`, `configure`, `levels.sublist.siblingName`).
+
+| ID  | What it does (`@packages`; `01` is also `@smoke`)                                                                                                                |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 01  | seeded package on the list; row -> versions -> detail; install snippet (+ repo URL where `repoUrlIn` says); the copy button and the clipboard                    |
+| 02  | search a package (the descriptor's term), search a version, every sort option, 12 packages over two pages                                                        |
+| 03  | a fresh repo shows the empty list                                                                                                                                |
+| 04  | delete from the detail page (toast, landing page), the last version, a list row (cancel first), a versions row, a sublist row (Maven group page, npm scope page) |
+| 05  | a USER sees no Settings, no row dropdown, no detail Delete; and no Delete on the mobile cards of each level (the admin is the control on the same page)          |
+| 06  | Configure modal (repo name, `YOUR_PASSWORD` where the protocol has one) and the deploy-token variant opened from a token row in the settings                     |
+
+`knownFailures` keys (`PackageScenarioKey`) run their step under `test.fail`, so a fix turns it red and
+the title carries the reason. Pinned today: `05-mobile-*` (RPS-1262: npm scope list and version list,
+PyPI list and version list gate the mobile Delete on `canWrite`), Maven `04-detail` (RPS-1296), and in the
+specs Maven Gradle Groovy = Grape block (RPS-1261), Docker desktop manifest Digest/Config Digest cells
+(RPS-1261), npm Bugs URL and Keywords (RPS-1261), PyPI "Pre release:" for a post release and the mobile
+"Latest" link (RPS-1261), the Maven browser's Settings button for a USER (RPS-1262) and its first click
+after a cold load (RPS-1297).
+
+Facts the tests rely on (probed, RPS-1256):
+
+- A row's dropdown opens over the NEXT row, whose `fade-in-down` class (`animation ... forwards`) is a
+  stacking context of its own and paints above the menu: a mouse click on the middle of Delete lands
+  on the next row. `ProtocolListPage.openDeleteDialog` therefore dispatches the button's `click`.
+- The Maven browser's first directory click after a cold load does not descend (the permissions load
+  twice and the second load empties the directory stack under an in-flight listing): `enterDirectory`
+  in `maven.spec.ts` clicks until the breadcrumb shows.
+- Maven's version detail of a non-latest version shows and deletes the LATEST version, so the shared
+  delete scenario is pinned for Maven and PKG-maven-07 asserts the content separately.
+- The Configure modal differs per protocol (`ProtocolDescriptor.configure`): Maven and PyPI print
+  `YOUR_PASSWORD`, npm and Docker have no password placeholder; the token variant says
+  `YOUR_DEPLOY_TOKEN` (Maven, npm), `<repsy_deploy_token>` (Docker), `your deploy token` (PyPI).
+- The seeders publish no README or description, so `npm.spec.ts` (README, keywords, bugs URL) and
+  `pypi.spec.ts` (long description, home page) publish their own rich package with the raw builders.
+- "Version 'x' not found" exists on the Go detail page only; nothing asserts it here.
 
 ### Package tests: Cargo, NuGet, Helm, Go, Ruby (RPS-1257)
 

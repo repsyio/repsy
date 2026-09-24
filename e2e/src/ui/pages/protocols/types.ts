@@ -74,6 +74,13 @@ export interface ListLevel {
   rowLinks: Partial<Record<LevelName, string>>;
   /** Docker's install bar above the tag and manifest lists (`pkg-install-snippet`). */
   installBar: boolean;
+  /**
+   * RPS-1256: a package name that lands on the SAME page of this level as `target` (maven: the same
+   * group, npm: the same scope), `n` telling siblings apart. Only the `sublist` level needs it: it
+   * lets the shared delete scenario seed two artifacts of one group and delete one. Absent = the
+   * template does not run a sublist delete for this level.
+   */
+  siblingName?: (target: PackageRef, n: number) => string;
 }
 
 /** The version detail page (docker: the tag detail). Every detail page has exactly one `pkg-detail-install`. */
@@ -103,6 +110,26 @@ export interface DetailLevel {
   delete: (DeleteAffordance & { landsOn: LevelName | 'unverified' }) | null;
 }
 
+/**
+ * The "Configure" modal (`pkg-configure` opens it on every list page; the settings page's token row
+ * opens the same component in its deploy-token variant). RPS-1256 added it: the four first protocols
+ * already differ (maven and PyPI say `YOUR_PASSWORD`, npm and Docker have no password placeholder at all).
+ * A descriptor without one gets the template's default (`<label> Configuration`, `YOUR_PASSWORD`,
+ * `YOUR_DEPLOY_TOKEN`), which RPS-1257 replaces per protocol as it runs them.
+ */
+export interface ConfigureModal {
+  /** `config-modal-title` of the normal variant (`Maven Configuration`, `NPM Configuration`). */
+  title: string;
+  /** `config-modal-title` of the deploy-token variant (opened from a token row in the settings). */
+  deployTokenTitle: string;
+  /** Substrings the normal variant shows (always the repo name; its URL where the modal prints one). */
+  contains: (repoName: string, repoUrl: string) => readonly string[];
+  /** The password placeholder of the normal variant; absent = the modal has none (npm, docker). */
+  passwordMarker?: string;
+  /** What the deploy-token variant says where the password would be (`YOUR_DEPLOY_TOKEN`). */
+  deployTokenMarker: string;
+}
+
 export interface ProtocolDescriptor {
   protocol: PackageProtocol;
   /** How the panel names the format in prose. */
@@ -124,6 +151,8 @@ export interface ProtocolDescriptor {
   lastVersionRemovesPackage: boolean | 'unverified';
   /** Routes that are not a level (maven's `/:repo/browser`). */
   extraPaths: Readonly<Record<string, (repo: string) => string>>;
+  /** The Configure modal's texts (RPS-1256); absent = the template's default. */
+  configure?: ConfigureModal;
   /** `SeedPackageOptions.variant` values the seeder accepts (helm: two backend modules); absent = one way. */
   seedVariants?: readonly string[];
 }
