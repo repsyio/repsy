@@ -261,24 +261,34 @@ test.describe('Cargo crate pages', { tag: '@packages' }, () => {
     await expect(detail.root).not.toContainText(/yanked/i);
   });
 
-  // RPS-1299: the open menu of a non-last row paints under the NEXT row, so a real mouse click on its
-  // Delete item is refused by Playwright's hit check ("<div ...> intercepts pointer events") and, by
-  // hand, lands on that row; `openDeleteDialog` dispatches the click to get past it.
-  test.fail(
-    'PKG-cargo-07 the row menu of a non-last row takes a real mouse click on Delete (RPS-1299)',
-    async ({ adminPage, seeder, seedPackage }) => {
-      const repo = await seeder.createRepo(RepoType.CARGO);
-      for (const index of [1, 2, 3]) {
-        await seedPackage(repo, { index });
-      }
-      const list = protocolPages(adminPage, cargo, repo.name).list();
-      await list.goto();
-      // The first row in the DOM is the one whose menu the row after it can cover.
-      const [top] = await rowKeys(list);
-      const menu = await list.openRowMenu({ name: top, version: '1.0.0' });
-      await menu.getByTestId('row-delete').click({ timeout: 3_000 });
-      await list.dangerModal.expectOpen('Delete Crate');
-      await expect(list.dangerModal.root).toBeVisible();
-    },
-  );
+  // RPS-1299: the open menu of a non-last row used to paint under the NEXT row, so a real mouse click
+  // on its Delete item landed on that row (and Playwright refused it: "intercepts pointer events").
+  test('PKG-cargo-07 the row menu of a non-last row is on top and takes a real mouse click on Delete', async ({
+    adminPage,
+    seeder,
+    seedPackage,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.CARGO);
+    for (const index of [1, 2, 3]) {
+      await seedPackage(repo, { index });
+    }
+    const list = protocolPages(adminPage, cargo, repo.name).list();
+    await list.goto();
+    // The first row in the DOM is the one whose menu the row after it can cover.
+    const [top] = await rowKeys(list);
+    const menu = await list.openRowMenu({ name: top, version: '1.0.0' });
+    const item = menu.getByTestId('row-delete');
+    await expect(item).toBeVisible();
+    // The element at the item's centre is the item (or a child of it), not the next row.
+    const hit = await item.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const found = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+      return found !== null && element.contains(found);
+    });
+    expect(hit).toBe(true);
+
+    await item.click({ timeout: 3_000 });
+    await list.dangerModal.expectOpen('Delete Crate');
+    await expect(list.dangerModal.root).toBeVisible();
+  });
 });

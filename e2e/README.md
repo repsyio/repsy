@@ -2687,10 +2687,6 @@ How the tests are written, and what they had to work around:
   and `settings-*` ids are used, never a label or `#id`.
 - **Toggles are flipped through their label** (`toggle-label`): the `role="switch"` checkbox is
   `sr-only` and covered by the drawn switch, so Playwright refuses to click it as "intercepted".
-- **A forced click for Orphan Layers.** Every settings section is `mt-[-100px] pt-[100px]` (an anchor
-  offset), so the Delete Repository section's transparent padding overlaps the lower part of the
-  Orphan Layers button and Playwright's hit-target check never clicks it. `OrphanLayersSection.delete()`
-  uses `click({ force: true })`, which lands on the button's own label like a real mouse.
 - **The token "show" eye is clicked by event.** Its icon is a Font Awesome glyph from a CDN that the
   UI suite blocks (`src/ui/defaults.ts`), so the button has no size; `toggleTokenVisibility()`
   dispatches the click and the test asserts `aria-pressed` and the input's `type`.
@@ -2776,10 +2772,8 @@ test('lists a seeded package', async ({ adminPage, seeder, seedPackage }) => {
   `snippet(slug)`, `delete()`. `protocolPages(...).extraPath('browser')` is maven's file browser.
 - **Facts the proof pinned.** A maven group-list Delete removes the whole GROUP. Group and npm list
   searches match the group / scope only (not `group:artifact` or `@scope/name`). The npm scope route
-  segment has no `@`. The sort menu stays open after a choice. Docker's manifest row is keyed by the tag,
-  and its last-tag delete leaves the image listed. Playwright's own click is refused by every detail
-  page's Delete button (the page host is reported above it), so `VersionDetailPage` clicks it with
-  `force`.
+  segment has no `@`. Docker's manifest row is keyed by the tag,
+  and its last-tag delete leaves the image listed.
 - **Not covered here.** The scenario templates live in RPS-1256 (maven, npm, docker, pypi) and RPS-1257
   (cargo, nuget, helm, golang, ruby).
 
@@ -2880,7 +2874,6 @@ Pinned with `test.fail` / `knownFailures` (each still fails for the stated reaso
 | Where                             | Bug                                                                                                                                                                                                                                           |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | nuget `02-versions-search`        | RPS-1262 (3): no search box on the version list: the API has no version search parameter                                                                                                                                                      |
-| cargo-07 row menu real click      | RPS-1299: the menu of a non-last row paints under the next row, Playwright's click is refused ("subtree intercepts pointer events")                                                                                                           |
 | cargo-07 Newest by publish time   | RPS-1301: Newest/Oldest order by `max_version` (a text column), not by when a crate was published; the seeder gives each crate its own version so the sort and pager have distinct keys (RPS-1298), and cargo-07 asserts the sorts by version |
 | helm-07 deleting the last version | RPS-1302: the versions page of the deleted chart raises two error toasts, "Chart not found." and "[object Object]"                                                                                                                            |
 
@@ -2989,13 +2982,6 @@ How the stubs are typed, and the rules they follow:
   value back.
 - **The sidebar Security link does not need a scanner**: it shows for every admin (`isAdmin` only), and
   `/security` then shows its empty states with a type filter that offers only `ALL`.
-
-Known product defects, pinned with `test.fail` so the test turns red the day it is fixed and the marker
-has to go (a `✘` in the list reporter with a passing summary is the expectation): three security-modal
-defects (RPS-1295): the X of a repository or package modal
-also opens the row it sits in (the modal is rendered inside the clickable row and only the backdrop and
-the links stop the click), and with a chart the dialog is tall enough that the page header covers its
-title and X at 1440x900.
 
 ## Running
 

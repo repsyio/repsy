@@ -218,6 +218,58 @@ test.describe('Repository settings: orphan layers', { tag: SETTINGS }, () => {
     await settings.shell.toasts.expectSuccess('Orphan layers deleted successfully');
     await expect(settings.orphanLayers.deleteButton).toBeEnabled();
   });
+
+  // RPS-1286: every section used to carry an invisible 100 px top padding (an anchor offset done with a
+  // negative margin) that covered the lower part of the section above, so the corners of a button near
+  // a section's end hit the next section. The offset is `scroll-margin-top` now.
+  test('SET-07 no settings section covers its neighbour, and a section link scrolls to its section', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.DOCKER, { privateRepo: true });
+    const settings = new RepoSettingsPage(adminPage, repo.name);
+    await settings.goto();
+    await expect(settings.orphanLayers.deleteButton).toBeVisible();
+
+    // Every visible button inside a section: each corner hits the button itself or its own section.
+    const covered = await adminPage.evaluate(() => {
+      const problems: string[] = [];
+      for (const button of document.querySelectorAll<HTMLElement>('section[id] button')) {
+        const box = button.getBoundingClientRect();
+        if (box.width === 0 || box.height === 0) {
+          continue;
+        }
+        button.scrollIntoView({ block: 'center' });
+        const section = button.closest('section');
+        const moved = button.getBoundingClientRect();
+        for (const [x, y] of [
+          [moved.left + 3, moved.top + 3],
+          [moved.right - 3, moved.top + 3],
+          [moved.left + 3, moved.bottom - 3],
+          [moved.right - 3, moved.bottom - 3],
+        ]) {
+          const hit = document.elementFromPoint(x, y);
+          if (hit === null || !(button.contains(hit) || section?.contains(hit))) {
+            problems.push(
+              `${button.textContent?.trim()} at ${x},${y} hits ${hit?.tagName}#${hit?.id}`,
+            );
+          }
+        }
+      }
+      return problems;
+    });
+    expect(covered).toEqual([]);
+
+    // A section's self-link scrolls to it, below the fixed header.
+    await settings.orphanLayers.link.click();
+    await expect(adminPage).toHaveURL(/#delete-orphan-layers$/);
+    const headerBottom = await settings.shell.header.root.evaluate(
+      (el) => el.getBoundingClientRect().bottom,
+    );
+    await expect
+      .poll(() => settings.orphanLayers.root.evaluate((el) => el.getBoundingClientRect().top))
+      .toBeGreaterThanOrEqual(headerBottom);
+  });
 });
 
 test.describe('Repository settings: storage', { tag: SETTINGS }, () => {

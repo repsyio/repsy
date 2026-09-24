@@ -3,7 +3,7 @@
   <button
     data-testid="package-security-modal-backdrop"
     animate.enter="fade-in-up"
-    class="bg-opacity-50 fixed inset-0 z-3 backdrop-blur-sm"
+    class="bg-opacity-50 fixed inset-0 z-50 backdrop-blur-sm"
     (click)="$event.stopPropagation(); closeModal()"
   >
     <div></div>
@@ -12,7 +12,7 @@
   <!-- Modal Content -->
   <div
     data-testid="package-security-modal"
-    class="fixed top-1/2 left-1/2 z-4 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-[#404141] bg-[#101112] p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px]"
+    class="fixed top-1/2 left-1/2 z-50 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-[#404141] bg-[#101112] p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px]"
   >
     <div class="flex flex-col flex-col-reverse items-center justify-between sm:flex-row">
       <h1 class="text-[20px] leading-6 break-all text-white">
