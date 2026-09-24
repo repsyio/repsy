@@ -286,6 +286,123 @@ paths:
         '403':
           description: Admin role required
       summary: Reset a user's password
+  "/api/repos":
+    get:
+      tags:
+        - repo-collection-controller
+      operationId: listRepos
+      description: >-
+        Lists the repositories of every type, one page at a time. Open to every authenticated
+        user. Bearer token only (Basic authentication is not accepted).
+      parameters:
+        - name: type
+          in: query
+          required: false
+          description: Only repositories of this type. Case-insensitive.
+          schema:
+            "$ref": "#/components/schemas/RepoType"
+        - name: q
+          in: query
+          required: false
+          description: >-
+            Only repositories whose name contains this text, case-insensitive. The characters
+            `%`, `_` and `\` match themselves.
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 0
+            minimum: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+            default: 10
+            minimum: 1
+            maximum: 100
+        - name: sort
+          in: query
+          required: false
+          description: >-
+            `property,direction`, with the property one of `createdAt`, `name`, `type` and
+            `diskUsage`. The default is `createdAt,desc`. Ties are broken by id, so pages never
+            repeat or skip a repository.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponsePagedModelRepoListInfo"
+        '400':
+          description: >-
+            `validationError`: unknown `type` (the response data is `type`), `page` below 0, `size`
+            outside 1-100 or a `sort` property that is not allowed (the data names the parameter).
+        '401':
+          description: Missing or invalid token
+      summary: List repositories, filtered by type and name
+    post:
+      tags:
+        - repo-collection-controller
+      operationId: createRepository
+      description: >-
+        Creates a repository of the type given in the body and returns it. Admin only. Bearer token
+        only (Basic authentication is not accepted).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/RepoCreateRequest"
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseRepoListInfo"
+        '400':
+          description: >-
+            `validationError` (missing or unknown `type`, invalid name or description),
+            `invalidRequest` (a name with characters outside `a-z A-Z 0-9 _ -`) or
+            `repoNameReserved`.
+        '401':
+          description: Missing or invalid token
+        '403':
+          description: "`accessDenied`: the role is not ADMIN"
+        '409':
+          description: "`repoExists`: the name is taken, by a repository of any type"
+      summary: Create a new repository
+  "/api/repos/counts":
+    get:
+      tags:
+        - repo-collection-controller
+      operationId: getRepoCounts
+      description: >-
+        The number of repositories of each type. Every type is a key, zero included. Open to every
+        authenticated user. Bearer token only (Basic authentication is not accepted).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/RestResponseRepoCounts"
+        '401':
+          description: Missing or invalid token
+      summary: Count the repositories of each type
   "/api/repos/{repoType}":
     post:
       tags:
@@ -3809,6 +3926,8 @@ components:
       properties:
         name:
           type: string
+        description:
+          type: string
         type:
           "$ref": "#/components/schemas/RepoType"
         privateRepo:
@@ -3823,6 +3942,84 @@ components:
       required:
         - name
         - createdAt
+    RepoCreateRequest:
+      type: object
+      description: >-
+        A new repository. The same fields as RepoCreateForm plus the repository type, which
+        `POST /api/repos` takes from the body instead of the path.
+      properties:
+        name:
+          type: string
+          maxLength: 25
+          minLength: 0
+          pattern: "^[a-zA-Z0-9_][a-zA-Z0-9_\\-]*$"
+        description:
+          type: string
+          maxLength: 500
+        privateRepo:
+          type: boolean
+          nullable: false
+        type:
+          "$ref": "#/components/schemas/RepoType"
+      required:
+        - name
+        - type
+    PagedModelRepoListInfo:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RepoListInfo"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    RestResponsePagedModelRepoListInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/PagedModelRepoListInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RestResponseRepoListInfo:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/RepoListInfo"
+        errorCode:
+          type: string
+        text:
+          type: string
+    RepoCounts:
+      type: object
+      description: >-
+        The number of repositories per repository type, keyed by the RepoType names. All of them are
+        present, with 0 for a type that has no repository.
+      additionalProperties:
+        type: integer
+        format: int64
+    RestResponseRepoCounts:
+      type: object
+      properties:
+        msgId:
+          type: string
+        type:
+          "$ref": "#/components/schemas/ResponseType"
+        data:
+          "$ref": "#/components/schemas/RepoCounts"
+        errorCode:
+          type: string
+        text:
+          type: string
     RestResponseListRepoListInfo:
       type: object
       properties:

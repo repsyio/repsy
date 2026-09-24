@@ -22,6 +22,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -65,4 +68,22 @@ public interface RepoRepository extends JpaRepository<Repo, UUID> {
   @NonNull List<String> findAllRepoNames();
 
   long countAllByType(@NonNull RepoType type);
+
+  /**
+   * The repos whose name matches {@code pattern}, a lower-cased {@code LIKE} pattern that escapes
+   * its wildcards with a backslash ({@code LikePatterns}), narrowed to one type when {@code type}
+   * is given.
+   */
+  @Query(
+      """
+      select r from Repo r
+      where (:type is null or r.type = :type)
+        and lower(r.name) like :pattern escape '\\'
+      """)
+  @NonNull Page<Repo> search(
+      @Nullable RepoType type, @NonNull String pattern, @NonNull Pageable pageable);
+
+  /** The number of repos of each type, as {@code [RepoType, Long]} rows. */
+  @Query("select r.type, count(r) from Repo r group by r.type")
+  @NonNull List<Object[]> countGroupedByType();
 }

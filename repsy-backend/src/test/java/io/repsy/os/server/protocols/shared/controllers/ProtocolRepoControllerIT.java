@@ -104,6 +104,12 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   private static final String[] REPO_LIST_KEYS = {
     "name", "type", "privateRepo", "diskUsage", "createdAt"
   };
+
+  /** {@code description} is part of the item only when the repo has one (JSON omits nulls). */
+  private static final String[] REPO_LIST_KEYS_WITH_DESCRIPTION = {
+    "name", "type", "privateRepo", "diskUsage", "createdAt", "description"
+  };
+
   private static final String[] SETTINGS_KEYS = {
     "privateRepo", "releases", "snapshots", "allowOverride", "searchable", "securityScanEnabled"
   };
@@ -2003,7 +2009,8 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
         final var item = byName.get(repo.getName());
         final var row = ProtocolRepoControllerIT.this.reloadRepo(repo.getName());
         assertThat(item)
-            .containsOnlyKeys(REPO_LIST_KEYS)
+            .containsOnlyKeys(
+                row.getDescription() == null ? REPO_LIST_KEYS : REPO_LIST_KEYS_WITH_DESCRIPTION)
             .containsEntry("name", row.getName())
             .containsEntry("type", "NPM")
             .containsEntry("privateRepo", row.isPrivateRepo());
@@ -2575,8 +2582,8 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
 
     static Stream<Arguments> unmappedRoutes() {
       return Stream.of(
-          Arguments.of("GET /api/repos", "GET", "/api/repos"),
-          Arguments.of("POST /api/repos", "POST", "/api/repos"),
+          Arguments.of("PUT /api/repos", "PUT", "/api/repos"),
+          Arguments.of("DELETE /api/repos", "DELETE", "/api/repos"),
           Arguments.of("GET /api/repos/{repoType}", "GET", "/api/repos/MAVEN"),
           Arguments.of("PUT /api/repos/{repoType}", "PUT", "/api/repos/MAVEN"),
           Arguments.of("PATCH /api/repos/{repoType}", "PATCH", "/api/repos/MAVEN"),
