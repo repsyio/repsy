@@ -2510,7 +2510,46 @@ own stub below, so the unchanged heading lines keep git's hunks apart; the Layou
 
 ### Auth, guards and session (RPS-1251)
 
-_Not implemented yet._
+`tests/ui/auth/{login,guards,session}.spec.ts` (AUTH-01..11). Run them with
+`./run.sh test --protocol ui --grep AUTH-`. UI login is typed ONLY in these specs; every other UI suite
+logs in through the API fixtures. No test changes the admin or its password: the admin only types its
+own credentials (AUTH-01), and negative logins use a seeded user or a name that does not exist.
+`src/ui/pages/login-validation.ts` (composed on `LoginPage`) holds the validation helpers and the
+visible message texts; `tests/ui/auth/stored-session.ts` reads the three `localStorage` keys.
+
+| Spec      | Scenarios | What is pinned                                                                                                                                                                                         |
+| --------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `login`   | 01-04, 11 | valid login and its 3 storage keys; 401 toast `Username or password is incorrect.` (wrong password and unknown user alike); every client-side rule with its message; the eye toggle; throttle (opt-in) |
+| `guards`  | 05-07     | anonymous visit of `/repositories`, `/users`, `/security`, `/profile`, `/<repo>` shows the login form at `/`; `/login` bounces a logged-in user; a USER is sent to `/` from `/users` and `/security`   |
+| `session` | 08-10     | expired access token is refreshed transparently; a refused refresh token logs out; sidebar and header logout clear the session                                                                         |
+
+Things a later author must know:
+
+- **The 401 of AUTH-08/09 is stubbed, everything after it is real.** An access token lives 30 minutes
+  (not configurable) and only an _expired_ one is answered `sessionExpired`, the one answer that makes
+  `RefreshTokenInterceptor` refresh; a token with a bad signature is answered `accessNotAllowed`, which
+  it ignores. `expireAccessToken()` (`session.spec.ts`) answers calls carrying one given token with that
+  401 (never the `/api/auth/` calls); the refresh, the rotation and the logout run on the real backend.
+  The AUTH-09 cases: a refresh token that is garbage, one that was already used (single use), and a
+  stubbed `refreshTokenExpired` answer.
+- **The SPA reads `localStorage` once, at boot** (`AuthService`), and `seedSession()` writes once per
+  tab: change the storage, then `reload()`; the change survives it. Two tokens minted in the same second
+  are byte-identical, so compare a refreshed access token with a value the test wrote, not with the old one.
+- **The password eye button is only a Font Awesome glyph**, and the font is a CDN resource the harness
+  blocks, so the button has no size and Playwright calls it "not visible": use
+  `LoginValidation.togglePasswordVisibility()` (a DOM click).
+- **Inline validation messages appear on blur** (`touched`), one at a time, in the order required,
+  pattern, minlength, maxlength; `LoginValidation.enter()` types and blurs.
+- **AUTH-11 (`@throttle`) is skipped by default.** It needs a stack whose `AUTH_THROTTLE_MAX_FAILURES` is
+  below 30 (the harness stack raises it to 100000, see `docker-compose.stack.yml`) and, once it trips,
+  the client stays refused for the window (`AUTH_THROTTLE_WINDOW_SECONDS`), so run it alone, on a
+  throwaway stack: `AUTH_THROTTLE_MAX_FAILURES=20` in the `repsy` service environment, then
+  `REPSY_UI_OPT_IN=throttle ./run.sh test --protocol ui --grep AUTH-11`. Not run by CI or by default.
+- **Known product bugs are `test.fail(true, ...)`**, written for the intended behaviour so the test
+  turns red (and tells you to remove the line) when the bug is fixed: logging in from the in-place form
+  a guard redirect shows (the URL is `/`, and `LoginComponent` navigates to `/` again) stores the session
+  but does not render the dashboard until a reload; and a tampered (not expired) access token is never
+  refreshed or logged out, the dashboard just stays empty.
 
 ### Repositories and dashboard (RPS-1252)
 
