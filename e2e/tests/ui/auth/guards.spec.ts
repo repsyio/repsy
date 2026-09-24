@@ -56,7 +56,7 @@ test.describe('AUTH-05 anonymous visitor', () => {
     // which changes nothing, so the dashboard only appears after a reload. Remove this line with the fix.
     test.fail(
       true,
-      'PRODUCT BUG (ticket pending, see PR): login from the in-place form at "/" does not render the dashboard',
+      'PRODUCT BUG RPS-1278: login from the in-place form at "/" does not render the dashboard',
     );
 
     await page.goto('/repositories');

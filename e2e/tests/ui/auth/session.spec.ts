@@ -108,7 +108,7 @@ test.describe('AUTH-08 tampered access token', () => {
     // call fails and the dashboard stays on screen with no data, no toast and no logout.
     test.fail(
       true,
-      'PRODUCT BUG (ticket pending, see PR): a tampered access token is never refreshed or logged out',
+      'PRODUCT BUG RPS-1279: a tampered access token is never refreshed or logged out',
     );
     const dashboard = new DashboardPage(adminPage);
 
