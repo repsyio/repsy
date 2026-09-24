@@ -1767,8 +1767,6 @@ download` in the catalog loop succeeds against pages carrying it.
   RPS-1223.
 - **H16** (`badVersionString` used to leave an orphaned, downloadable file+sidecar): confirmed live,
   then fixed by RPS-1124/#508 — see P4.
-- **H16** (`badVersionString` leaves an orphaned, downloadable file+sidecar): confirmed live — see
-  P4/RPS-1124.
 - **H17** (a missing `sha256_digest` is a 500; a wrong one is served as-is): confirmed live — see
   RPS-1224/RPS-1225.
 - **H18** (`HEAD` of a never-published path was 200): confirmed live, then fixed — see RPS-1226.
