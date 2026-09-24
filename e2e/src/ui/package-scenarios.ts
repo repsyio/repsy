@@ -20,7 +20,7 @@
  * for the protocol the descriptor (`pages/protocols/<proto>.ts`) describes, and a spec is one line:
  *
  * ```ts
- * registerPackageScenarios(DESCRIPTORS.maven, { knownFailures: { '05-mobile-list': 'RPS-1262' } });
+ * registerPackageScenarios(DESCRIPTORS.nuget, { knownFailures: { '02-versions-search': 'RPS-1262' } });
  * ```
  *
  * Everything that differs between protocols is DATA in the descriptor (routes, row keys, search terms,
@@ -395,6 +395,11 @@ export function registerPackageScenarios(
             await list.sortBy(option);
             await expect.poll(() => rowKeys(list)).toEqual(order(option));
           }
+
+          // The menu closes by itself after a choice (`sortBy` asserts that) and on Escape.
+          const menu = await list.openSortMenu();
+          await adminPage.keyboard.press('Escape');
+          await expect(menu).toBeHidden();
         },
       );
     } else {

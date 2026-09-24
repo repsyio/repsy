@@ -19,6 +19,7 @@ import { FormBuilder } from '@angular/forms';
 import { config, of, Subject, throwError } from 'rxjs';
 
 import { UserResponse } from '../../../../../../generated/api';
+import { renderComponent } from '../../../../pages/repository/testing/render-spec-helpers';
 import { UserService } from '../../../../pages/user/service/user.service';
 import { ToastService } from '../../toast/toast.service';
 import { UserCreateModalComponent } from './user-create-modal.component';
@@ -132,6 +133,26 @@ describe('UserCreateModalComponent', () => {
       expect(component.form.errors).toEqual({ passwordMismatch: true });
       expect(component.form.get('confirmPassword').hasError('passwordMismatch')).toBeTrue();
       expect(component.form.invalid).toBeTrue();
+    });
+
+    it('reports an empty confirmation as required, not as a mismatch, once a password is typed', () => {
+      fill({ confirmPassword: '' });
+
+      const confirmation = component.form.get('confirmPassword');
+      expect(confirmation.hasError('required')).toBeTrue();
+      expect(confirmation.hasError('passwordMismatch')).toBeFalse();
+      expect(component.form.errors).toBeNull();
+      expect(component.form.invalid).toBeTrue();
+    });
+
+    it('goes from a mismatch back to required when the confirmation is emptied', () => {
+      fill({ confirmPassword: 'Passw0rd2' });
+      expect(component.form.get('confirmPassword').hasError('passwordMismatch')).toBeTrue();
+
+      component.form.patchValue({ confirmPassword: '' });
+
+      expect(component.form.get('confirmPassword').hasError('required')).toBeTrue();
+      expect(component.form.get('confirmPassword').hasError('passwordMismatch')).toBeFalse();
     });
 
     it('clears the mismatch once the confirmation is corrected', () => {
@@ -269,5 +290,53 @@ describe('UserCreateModalComponent', () => {
       expect(component.showPassword).toBeFalse();
       expect(openChange).toEqual([false]);
     });
+  });
+});
+
+describe('UserCreateModalComponent template', () => {
+  it('starts every validation message with a bullet, not with the mojibake "â€¢" (RPS-1261)', async () => {
+    const { fixture, el } = await renderComponent(
+      UserCreateModalComponent,
+      [
+        { provide: UserService, useValue: jasmine.createSpyObj<UserService>('UserService', ['createUser']) },
+        { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+      ],
+      { open: true },
+    );
+    const form = fixture.componentInstance.form;
+    const message = (testId: string): string | undefined =>
+      el.querySelector(`[data-testid="${testId}"]`)?.textContent?.trim();
+    const touch = (control: string, value: string): void => {
+      form.get(control).setValue(value);
+      form.get(control).markAsTouched();
+      fixture.detectChanges();
+    };
+
+    touch('username', '');
+    expect(message('user-create-username-error-required')).toBe('• Should not be empty');
+    touch('username', 'ab');
+    expect(message('user-create-username-error-minlength')).toBe('• Should be minimum 3 characters');
+    touch('username', 'a'.repeat(26));
+    expect(message('user-create-username-error-maxlength')).toBe('• Should be maximum 25 characters');
+    touch('username', 'Bad Name');
+    expect(message('user-create-username-error-pattern')).toMatch(/^• Can contain only lowercase/);
+
+    touch('password', '');
+    expect(message('user-create-password-error-required')).toBe('• Should not be empty');
+    touch('password', 'Ab1');
+    expect(message('user-create-password-error-minlength')).toBe('• Should be minimum 6 characters');
+    touch('password', 'A'.repeat(51));
+    expect(message('user-create-password-error-maxlength')).toBe('• Should be maximum 50 characters');
+    touch('password', 'abcdefgh');
+    expect(message('user-create-password-error-pattern')).toMatch(/^• Should contain at least 1 lowercase/);
+
+    form.get('password').setValue('');
+    touch('confirmPassword', '');
+    expect(message('user-create-confirm-password-error-required')).toBe('• Should not be empty');
+    form.get('password').setValue('Passw0rd');
+    touch('confirmPassword', 'different');
+    expect(message('user-create-confirm-password-error-mismatch')).toBe('• Passwords do not match');
+
+    expect(el.textContent).not.toContain('â€');
   });
 });

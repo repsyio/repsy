@@ -1,4 +1,4 @@
-<section data-testid="token-section" id="deploy-tokens" class="mt-[-100px] pt-[100px]">
+<section data-testid="token-section" id="deploy-tokens" class="scroll-mt-[100px]">
   <div class="flex w-full justify-between rounded-t-[12px] border border-[#404141] bg-[#101112] p-4 sm:p-6">
     <h3 class="font-medium text-[#FDFDFD]">
       <a [routerLink]="[]" fragment="deploy-tokens"> Deploy Tokens </a>
@@ -12,14 +12,16 @@
     <!-- Description and Create Button -->
     <div class="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
       <p class="text-sm text-[#9FA0A0]">Manage deploy tokens for this repository.</p>
-      <div class="w-full sm:w-auto">
-        <button data-testid="token-create" class="repsy-btn-confirm w-full sm:w-auto" (click)="createDeployToken()">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8 2V14M2 8H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-          </svg>
-          Create Token
-        </button>
-      </div>
+      @if (activeRepository.canManage) {
+        <div class="w-full sm:w-auto">
+          <button data-testid="token-create" class="repsy-btn-confirm w-full sm:w-auto" (click)="createDeployToken()">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 2V14M2 8H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+            Create Token
+          </button>
+        </div>
+      }
     </div>
 
     <!-- Collaborator list when not empty -->

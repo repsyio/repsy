@@ -128,22 +128,29 @@ test.describe('Repository settings: visibility', { tag: SETTINGS }, () => {
     },
   );
 
-  // RPS-1261: the two help texts of the section describe the OPPOSITE of the toggle. The fixed line
-  // says "When active, only authorized users can access the repository" while "active" (checked) is
-  // labelled Public, and the dynamic hint tells a private repo to "Deactivate it for private
-  // visibility". This asserts what a reader needs: with the repo Public, the section may not claim
-  // that only authorised users get in. Expected to fail until the copy is fixed.
-  test.fail(
-    'SET-02 the Visibility help text does not contradict a Public repo (RPS-1261)',
-    async ({ adminPage, seeder }) => {
-      const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: false });
-      const settings = new RepoSettingsPage(adminPage, repo.name);
-      await settings.goto();
+  // RPS-1261: the two help texts of the section used to describe the OPPOSITE of the toggle ("When
+  // active, only authorized users can access the repository" while "active" (checked) is labelled
+  // Public; the dynamic hint told a private repo to "Deactivate it for private visibility"). With the
+  // repo Public the section may not claim that only authorised users get in, and each hint names the
+  // switch that leads to the OTHER state.
+  test('SET-02 the Visibility help text does not contradict a Public repo (RPS-1261)', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: false });
+    const settings = new RepoSettingsPage(adminPage, repo.name);
+    await settings.goto();
 
-      await settings.visibility.expectChecked(true);
-      await expect(settings.visibility.root).not.toContainText('only authorized users can access');
-    },
-  );
+    await settings.visibility.expectChecked(true);
+    await expect(settings.visibility.root).not.toContainText('only authorized users can access');
+    await expect(settings.visibility.hint).toHaveText(
+      'Turn it off to restrict access to authorized users.',
+    );
+
+    await settings.visibility.flip();
+    await settings.shell.toasts.expectSuccess('Repository visibility has changed as private');
+    await expect(settings.visibility.hint).toHaveText('Turn it on to make the repository public.');
+  });
 });
 
 test.describe('Repository settings: package override', { tag: SETTINGS }, () => {
@@ -184,20 +191,20 @@ test.describe('Repository settings: package override', { tag: SETTINGS }, () => 
     });
   }
 
-  // RPS-1261: same contradiction as Visibility. The fixed line says "When active, package override
+  // RPS-1261: same contradiction as Visibility. The fixed line said "When active, package override
   // (uploading same version again) will be blocked" while active (checked) is labelled Allow.
-  test.fail(
-    'SET-03 the Package Override help text does not contradict Allow (RPS-1261)',
-    async ({ adminPage, seeder }) => {
-      const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
-      await seeder.setSettings(repo.name, { allowOverride: true });
-      const settings = new RepoSettingsPage(adminPage, repo.name);
-      await settings.goto();
+  test('SET-03 the Package Override help text does not contradict Allow (RPS-1261)', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.NPM, { privateRepo: true });
+    await seeder.setSettings(repo.name, { allowOverride: true });
+    const settings = new RepoSettingsPage(adminPage, repo.name);
+    await settings.goto();
 
-      await settings.packageOverride.expectChecked(true);
-      await expect(settings.packageOverride.root).not.toContainText('will be blocked');
-    },
-  );
+    await settings.packageOverride.expectChecked(true);
+    await expect(settings.packageOverride.root).not.toContainText('will be blocked');
+  });
 });
 
 /**

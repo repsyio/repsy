@@ -15,8 +15,9 @@
 ///
 
 import { HttpErrorResponse } from '@angular/common/http';
+import { TestBed } from '@angular/core/testing';
 import { FormBuilder } from '@angular/forms';
-import { Router } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 
 import { ToastService } from '../../../panel/shared/components/toast/toast.service';
@@ -28,12 +29,15 @@ const INVALID_CREDENTIALS_TEXT = 'Username or password is incorrect.';
 describe('LoginComponent', () => {
   let component: LoginComponent;
   let authService: jasmine.SpyObj<AuthService>;
-  let router: jasmine.SpyObj<Router>;
+  let router: Router;
+  let navigateByUrl: jasmine.Spy;
   let toastService: jasmine.SpyObj<ToastService>;
 
   beforeEach(() => {
     authService = jasmine.createSpyObj<AuthService>('AuthService', ['logIn']);
-    router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    router = TestBed.inject(Router);
+    navigateByUrl = spyOn(router, 'navigateByUrl').and.resolveTo(true);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
 
     component = new LoginComponent(router, new FormBuilder(), authService, toastService);
@@ -51,15 +55,43 @@ describe('LoginComponent', () => {
 
     component.login();
 
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/');
+    expect(navigateByUrl).toHaveBeenCalledOnceWith('/');
     expect(toastService.show).not.toHaveBeenCalled();
+  });
+
+  describe('returnUrl (RPS-1278)', () => {
+    function loginAt(url: string): void {
+      spyOnProperty(router, 'url', 'get').and.returnValue(url);
+      authService.logIn.and.returnValue(of(undefined));
+      component.login();
+    }
+
+    it('returns to the page AuthGuard remembered', () => {
+      loginAt('/?returnUrl=%2Fmy-repo%2Fpackages%3Ftab%3D1');
+
+      expect(navigateByUrl).toHaveBeenCalledOnceWith('/my-repo/packages?tab=1');
+    });
+
+    it('also works on /login', () => {
+      loginAt('/login?returnUrl=%2Frepositories');
+
+      expect(navigateByUrl).toHaveBeenCalledOnceWith('/repositories');
+    });
+
+    ['https://evil.example/', '//evil.example', '/\\evil.example', 'javascript:alert(1)', ''].forEach((returnUrl) => {
+      it(`ignores the unsafe returnUrl ${JSON.stringify(returnUrl)} and goes home`, () => {
+        loginAt(`/?returnUrl=${encodeURIComponent(returnUrl)}`);
+
+        expect(navigateByUrl).toHaveBeenCalledOnceWith('/');
+      });
+    });
   });
 
   it('shows the invalidCredentials text on a 401, which errorHandlerInterceptor leaves to the caller', () => {
     failLogin(401, { msgId: 'invalidCredentials', text: INVALID_CREDENTIALS_TEXT });
 
     expect(toastService.show).toHaveBeenCalledOnceWith(INVALID_CREDENTIALS_TEXT, 'error');
-    expect(router.navigateByUrl).not.toHaveBeenCalled();
+    expect(navigateByUrl).not.toHaveBeenCalled();
     expect(component.loading).toBeFalse();
     expect(component.form.enabled).toBeTrue();
   });

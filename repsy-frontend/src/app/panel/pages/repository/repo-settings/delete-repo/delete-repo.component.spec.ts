@@ -22,6 +22,7 @@ import { ProtocolRepoControllerService } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { permission } from '../../testing/protocol-service-spec-helpers';
+import { renderComponent } from '../../testing/render-spec-helpers';
 import { DeleteRepoComponent } from './delete-repo.component';
 
 const REPO = 'acme-repo';
@@ -94,5 +95,20 @@ describe('DeleteRepoComponent', () => {
     expect(router.navigate).not.toHaveBeenCalled();
     expect(toastService.show).not.toHaveBeenCalled();
     expect(component.loading).toBeFalse();
+  });
+});
+
+describe('DeleteRepoComponent template', () => {
+  it('warns that the action is irreversible, in correct English (RPS-1261)', async () => {
+    const { el } = await renderComponent(
+      DeleteRepoComponent,
+      [
+        { provide: ProtocolRepoControllerService, useValue: {} },
+        { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+      ],
+      { activeRepository: permission('acme-repo', { canManage: true }), repoType: 'NPM' },
+    );
+
+    expect(el.textContent).toContain('This action is irreversible and will delete repository');
   });
 });

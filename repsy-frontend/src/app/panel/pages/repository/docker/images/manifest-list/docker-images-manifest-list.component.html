@@ -132,14 +132,14 @@
               <app-tooltip
                 class="text-[14px] text-[#FDFDFD]"
                 data-testid="row-digest"
-                [text]="manifest.platform | ellipsis: 15"
+                [text]="manifest.digest | ellipsis: 15"
                 [textHover]="manifest.digest"
               />
 
               <app-tooltip
                 class="text-[14px] text-[#FDFDFD]"
                 data-testid="row-config-digest"
-                [text]="manifest.digest | ellipsis: 15"
+                [text]="manifest.configDigest | ellipsis: 15"
                 [textHover]="manifest.configDigest"
               />
 

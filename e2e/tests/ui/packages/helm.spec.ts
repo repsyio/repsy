@@ -114,20 +114,21 @@ test.describe('Helm charts: OCI and classic', { tag: '@packages' }, () => {
     await expect(list.emptyList.root).toBeVisible();
   });
 
-  // RPS-1262 (3): the Helm version list has no `<app-pagination>` at all, so twelve versions all
-  // render on one page (the API is never asked for a page).
-  test.fail(
-    'PKG-helm-07 twelve versions of a chart page at ten per page (RPS-1262)',
-    async ({ adminPage, seeder, seedVersions }) => {
-      const repo = await seeder.createRepo(RepoType.HELM);
-      const versions = Array.from({ length: 12 }, (_, i) => `1.0.${i}`);
-      const seeded = await seedVersions(repo, versions);
-      const page = protocolPages(adminPage, helm, repo.name).versions(seeded[0]);
-      await page.goto();
-      await expect(page.rows()).toHaveCount(10);
-      await expect(page.pagination.root).toBeVisible();
-    },
-  );
+  // RPS-1262 (3): the Helm version list had no `<app-pagination>` at all, so twelve versions all
+  // rendered on one page. It pages client-side now (the API returns every version).
+  test('PKG-helm-07 twelve versions of a chart page at ten per page (RPS-1262)', async ({
+    adminPage,
+    seeder,
+    seedVersions,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.HELM);
+    const versions = Array.from({ length: 12 }, (_, i) => `1.0.${i}`);
+    const seeded = await seedVersions(repo, versions);
+    const page = protocolPages(adminPage, helm, repo.name).versions(seeded[0]);
+    await page.goto();
+    await expect(page.rows()).toHaveCount(10);
+    await expect(page.pagination.root).toBeVisible();
+  });
 
   // RPS-1302: after the LAST version is deleted the panel navigates to the chart's
   // versions page, which no longer exists, and that load shows an error toast, "Chart not found.

@@ -17,12 +17,12 @@
 import { Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-import { PanelLayoutContentComponent } from '../../shared/layout/layout-content/panel-layout-content.component';
+import { PanelLayoutComponent } from '../../shared/layout/panel-layout.component';
 import { DashboardContentComponent } from './dashboard-content/dashboard-content.component';
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterModule, PanelLayoutContentComponent, DashboardContentComponent],
+  imports: [RouterModule, PanelLayoutComponent, DashboardContentComponent],
   templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent {}

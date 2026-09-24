@@ -10,6 +10,7 @@
         <app-searchbox
           data-testid="user-search"
           placeholder="Search username"
+          [value]="searchQuery"
           (filter)="search($event)"
           class="w-full sm:max-w-[320px]"
         />
@@ -324,10 +325,8 @@
     </div>
   } @else {
     <!-- Empty State -->
-    <img class="mx-auto" ngSrc="/assets/images/hippo-empty.svg" priority alt="hippo-empty" height="150" width="300" />
-    <div data-testid="user-empty" class="mx-auto mt-4 text-center">
-      <p class="text-[14px] text-[#9FA0A0]">No users found,</p>
-      <p class="mt-2 text-[14px] text-[#9FA0A0]">create your first user to get started!</p>
+    <div data-testid="user-empty">
+      <app-empty-list [message]="searchQuery ? 'No user matches “' + searchQuery + '”.' : 'No users found.'" />
     </div>
   }
 </section>
@@ -339,7 +338,7 @@
   [(open)]="showEditUserModal"
   [user]="selectedUser"
   [isLastAdmin]="selectedUser?.role === 'ADMIN' && isLastAdmin()"
-  (updated)="fetchUsers()"
+  (updated)="userUpdated()"
 />
 
 <app-user-reset-password-modal

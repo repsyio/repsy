@@ -14,14 +14,20 @@
 /// limitations under the License.
 ///
 
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, forwardRef, Input, Output } from '@angular/core';
+import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
+/**
+ * A switch that works both ways: with `[checked]`/`(checkedChange)`, and as a form control
+ * (`formControlName`/`formControl`), where it follows the control's value and its disabled state.
+ */
 @Component({
   selector: 'app-toggle-component',
   templateUrl: './toggle.component.html',
   imports: [],
+  providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => ToggleComponent), multi: true }],
 })
-export class ToggleComponent {
+export class ToggleComponent implements ControlValueAccessor {
   @Input() public checked: boolean;
   @Input() public checkedLabel: string;
   @Input() public uncheckedLabel: string;
@@ -30,12 +36,40 @@ export class ToggleComponent {
   @Output() public checkedChange = new EventEmitter<boolean>();
   @Output() public switch = new EventEmitter<boolean>();
 
+  /** Set through `setDisabledState` when the bound form control is disabled. */
+  private disabledByForm = false;
+  private onChange: (value: boolean) => void = () => {};
+  private onTouched: () => void = () => {};
+
+  /** Locked either by the `disabled` input or by a disabled form control. */
+  public get isDisabled(): boolean {
+    return this.disabled || this.disabledByForm;
+  }
+
   toggle() {
-    if (this.disabled) {
+    if (this.isDisabled) {
       return;
     }
     this.checked = !this.checked;
+    this.onChange(this.checked);
+    this.onTouched();
     this.checkedChange.emit(this.checked);
     this.switch.emit(this.checked);
+  }
+
+  writeValue(value: boolean | null): void {
+    this.checked = !!value;
+  }
+
+  registerOnChange(fn: (value: boolean) => void): void {
+    this.onChange = fn;
+  }
+
+  registerOnTouched(fn: () => void): void {
+    this.onTouched = fn;
+  }
+
+  setDisabledState(isDisabled: boolean): void {
+    this.disabledByForm = isDisabled;
   }
 }

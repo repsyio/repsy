@@ -80,6 +80,12 @@ test.describe('USR-06 users list', () => {
     await usersPage.search(`${seeder.runId}-nobody`);
     await expect(usersPage.empty).toBeVisible();
     await expect(usersPage.rows()).toHaveCount(0);
+    // RPS-1267: a search without a match is not an invitation to create the first user. The shared
+    // hippo (`empty-list`) carries the message. An empty instance cannot be reached here: the admin
+    // that signs in always exists, so "No users found." only shows for an empty answer without a search.
+    await expect(usersPage.empty.getByTestId('empty-list')).toBeVisible();
+    await expect(usersPage.emptyMessage).toHaveText(`No user matches “${seeder.runId}-nobody”.`);
+    await expect(usersPage.empty).not.toContainText('create your first user');
 
     // Refresh drops the search and returns to page 1 of the whole list: a user created after the
     // page was loaded, the newest of all, is on it, and the list is a full page again.
@@ -88,6 +94,7 @@ test.describe('USR-06 users list', () => {
     const late = await seeder.createUser();
     await expect(usersPage.row(late.username)).toHaveCount(0);
     await usersPage.refresh();
+    await expect(usersPage.searchInput).toHaveValue('');
     await expect(usersPage.pagination.page(1)).toBeDisabled();
     await expect(usersPage.rows()).toHaveCount(PAGE_SIZE);
     await expect(usersPage.row(late.username)).toBeVisible();

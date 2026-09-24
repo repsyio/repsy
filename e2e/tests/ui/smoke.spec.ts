@@ -64,11 +64,13 @@ test.describe('UI smoke', () => {
   test('anonymous visit to /repositories lands on login', { tag: ['@smoke'] }, async ({ page }) => {
     await page.goto('/repositories');
 
-    // AuthGuard sends an anonymous visitor to "/", and "/" renders the login form IN PLACE
-    // (AuthRedirectComponent picks LoginComponent or the dashboard by session): the URL is "/", not
-    // "/login". Assert what the visitor sees, not a URL that is the dashboard's for everyone else.
+    // AuthGuard sends an anonymous visitor to "/?returnUrl=/repositories", and "/" renders the login
+    // form IN PLACE (AuthRedirectComponent follows the session): the path is "/", not "/login".
+    // Assert what the visitor sees, not a URL that is the dashboard's for everyone else.
     await expect(new LoginPage(page).submit).toBeVisible();
-    await expect(page).toHaveURL('/');
+    await expect(page).toHaveURL(
+      (url) => url.pathname === '/' && url.searchParams.get('returnUrl') === '/repositories',
+    );
     await expect(new DashboardPage(page).welcomeCard).toHaveCount(0);
   });
 });

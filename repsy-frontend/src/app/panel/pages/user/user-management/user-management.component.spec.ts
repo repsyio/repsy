@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import moment from 'moment';
 import { of, Subject } from 'rxjs';
 
@@ -106,6 +107,30 @@ describe('UserManagementComponent', () => {
     });
   });
 
+  describe('after an edit', () => {
+    it('reloads without the old search, from the first page, so a renamed user stays listed', () => {
+      component.search('user-1');
+      component.loadPage(2);
+      userService.listUsers.calls.reset();
+
+      component.userUpdated();
+
+      expect(component.searchQuery).toBe('');
+      expect(component.pageNum).toBe(0);
+      expect(userService.listUsers).toHaveBeenCalledOnceWith(undefined, 0, 10);
+    });
+
+    it('keeps the page when there was no search, since it is a page of the same list', () => {
+      component.loadPage(2);
+      userService.listUsers.calls.reset();
+
+      component.userUpdated();
+
+      expect(component.pageNum).toBe(2);
+      expect(userService.listUsers).toHaveBeenCalledOnceWith(undefined, 2, 10);
+    });
+  });
+
   describe('the modals', () => {
     it('createUser opens the create modal', () => {
       component.createUser();
@@ -184,6 +209,18 @@ describe('UserManagementComponent', () => {
       expect(component.operationLock).toBeFalse();
     });
 
+    it('reloads without the old search, from the first page', () => {
+      component.search('user-1');
+      component.loadPage(1);
+      component.deleteUser(user('1'));
+      userService.listUsers.calls.reset();
+
+      dangerModalService.call();
+
+      expect(component.searchQuery).toBe('');
+      expect(userService.listUsers.calls.allArgs()[0]).toEqual([undefined, 0, 10]);
+    });
+
     it('goes back to the first page when the last user of a later page is deleted', () => {
       userService.listUsers.and.returnValue(of(pageOf([user('9')], 2)));
       component.loadPage(1);
@@ -252,5 +289,59 @@ describe('UserManagementComponent', () => {
       expect(component.getRoleBadgeClass('USER')).toBe('badge-user');
       expect(component.getRoleBadgeClass('OTHER')).toBe('badge-default');
     });
+  });
+});
+
+describe('UserManagementComponent search box', () => {
+  let fixture: ComponentFixture<UserManagementComponent>;
+  let userService: jasmine.SpyObj<UserService>;
+
+  const box = (): HTMLInputElement => fixture.nativeElement.querySelector('[data-testid="user-search"] input');
+
+  function type(text: string): void {
+    box().value = text;
+    box().dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+  }
+
+  beforeEach(() => {
+    userService = jasmine.createSpyObj<UserService>('UserService', ['listUsers', 'deleteUser', 'resetPassword']);
+    userService.listUsers.and.returnValue(of(pageOf([user('1'), user('2', 'ADMIN')])));
+    TestBed.configureTestingModule({
+      imports: [UserManagementComponent],
+      providers: [
+        { provide: UserService, useValue: userService },
+        { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+      ],
+    });
+    fixture = TestBed.createComponent(UserManagementComponent);
+    fixture.detectChanges();
+  });
+
+  it('is emptied by the refresh button together with the query', () => {
+    type('user-1');
+    expect(userService.listUsers).toHaveBeenCalledWith('user-1', 0, 10);
+
+    fixture.nativeElement.querySelector('[data-testid="user-refresh"]').click();
+    fixture.detectChanges();
+
+    expect(box().value).toBe('');
+    expect(userService.listUsers.calls.mostRecent().args).toEqual([undefined, 0, 10]);
+  });
+
+  it('is emptied when the list reloads after an edit', () => {
+    type('user-1');
+
+    fixture.componentInstance.userUpdated();
+    fixture.detectChanges();
+
+    expect(box().value).toBe('');
+    expect(userService.listUsers.calls.mostRecent().args).toEqual([undefined, 0, 10]);
+  });
+
+  it('keeps the typed text while it is the query', () => {
+    type('user-1');
+
+    expect(box().value).toBe('user-1');
   });
 });

@@ -41,13 +41,18 @@ class SecurityScanSectionStubComponent {
 describe('PypiPackagesVersionDetailComponent description', () => {
   let pypiService: jasmine.SpyObj<PypiService>;
 
-  function render(description: string | undefined, descriptionContentType: string | undefined): HTMLElement {
+  function render(
+    description: string | undefined,
+    descriptionContentType: string | undefined,
+    extra: Partial<ReleaseDetail> = {},
+  ): HTMLElement {
     const versionInfo: ReleaseDetail = {
       packageName: 'acme-lib',
       version: '1.2.3',
       classifiers: [],
       description,
       descriptionContentType,
+      ...extra,
     };
     pypiService.fetchRelease.and.returnValue(of(versionInfo));
 
@@ -159,5 +164,17 @@ describe('PypiPackagesVersionDetailComponent description', () => {
       `pip install acme-lib==1.2.3 --extra-index-url ${environment.repoBaseUrl}/pypi-repo/simple`,
     );
     expect(el.textContent).not.toContain('hello-world');
+  });
+
+  describe('the release kind label', () => {
+    const kind = (extra: Partial<ReleaseDetail>): string | undefined =>
+      render(undefined, undefined, extra).querySelector('[data-testid="pkg-detail-release-kind"]')?.textContent?.trim();
+
+    it('names each kind of release, a post release included (RPS-1261)', () => {
+      expect(kind({ finalRelease: true })).toBe('Final release:');
+      expect(kind({ preRelease: true })).toBe('Pre release:');
+      expect(kind({ postRelease: true })).toBe('Post release:');
+      expect(kind({ devRelease: true })).toBe('Dev Release:');
+    });
   });
 });

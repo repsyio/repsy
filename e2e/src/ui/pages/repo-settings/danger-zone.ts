@@ -33,22 +33,19 @@ export class StorageSection {
 
 export class OrphanLayersSection {
   readonly root: Locator;
+  /** The heading's self-link (`#delete-orphan-layers`). */
+  readonly link: Locator;
   readonly deleteButton: Locator;
 
   constructor(page: Page) {
     this.root = page.getByTestId('settings-orphan-layers');
+    this.link = this.root.getByRole('link', { name: 'Orphan Layers' });
     this.deleteButton = this.root.getByTestId('settings-orphan-layers-delete');
   }
 
-  /**
-   * Clicks "Delete Orphan Layers". Every settings section is `mt-[-100px] pt-[100px]` (an anchor
-   * offset), so the Delete Repository section below it overlaps this button's lower part with its
-   * transparent padding: Playwright's hit-target check reports that section as "intercepting" the
-   * click and never clicks. A forced click goes to whatever is under the button's centre, which is
-   * the button's own label, exactly what a mouse user gets.
-   */
+  /** Clicks "Delete Orphan Layers" with a normal (actionability-checked) click. */
   async delete(): Promise<void> {
-    await this.deleteButton.click({ force: true });
+    await this.deleteButton.click();
   }
 }
 

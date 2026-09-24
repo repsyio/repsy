@@ -130,6 +130,7 @@ export class UsersPage extends UiPage {
   readonly list: DesktopList;
   readonly pagination: Pagination;
   readonly empty: Locator;
+  readonly emptyMessage: Locator;
   readonly title: Locator;
   readonly searchInput: Locator;
   readonly refreshButton: Locator;
@@ -143,8 +144,9 @@ export class UsersPage extends UiPage {
     this.shell = new Shell(page);
     this.list = new DesktopList(page, 'user');
     this.pagination = new Pagination(page);
-    // `user-empty` is the users page's own empty state (the shared `empty-list` is not used here).
+    // `user-empty` wraps the shared `empty-list`, which shows `empty-list-message` (RPS-1267).
     this.empty = this.tid('user-empty');
+    this.emptyMessage = this.tid('empty-list-message', this.empty);
     this.title = this.tid('user-title');
     this.searchInput = this.tid('user-search').getByTestId('search-input');
     this.refreshButton = this.tid('user-refresh');
@@ -174,7 +176,7 @@ export class UsersPage extends UiPage {
   }
 
   /** Resolves with the next `GET /api/users` answered for this exact search text (`''` = no search). */
-  private listResponse(search: string, pageIndex?: number) {
+  listResponse(search: string, pageIndex?: number) {
     return this.page.waitForResponse((response) => {
       const url = new URL(response.url());
       return (
@@ -193,7 +195,7 @@ export class UsersPage extends UiPage {
     await response;
   }
 
-  /** The reload button: page 0 with no search (the search box text itself is not cleared by the panel). */
+  /** The reload button: page 0 with no search, and the search box is emptied too. */
   async refresh(): Promise<void> {
     const response = this.listResponse('', 0);
     await this.refreshButton.click();

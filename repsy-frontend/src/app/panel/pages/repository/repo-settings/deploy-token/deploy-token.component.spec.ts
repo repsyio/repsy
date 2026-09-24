@@ -24,6 +24,7 @@ import {
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { permission } from '../../testing/protocol-service-spec-helpers';
+import { renderComponent } from '../../testing/render-spec-helpers';
 import { DeployTokenComponent } from './deploy-token.component';
 import { DeployTokenInfo } from './dto/deploy-token-info';
 
@@ -184,30 +185,86 @@ describe('DeployTokenComponent', () => {
       expect(component.operationLock).toBeFalse();
     });
 
-    it('goes back to the first page when the last token of a later page is revoked', () => {
+    it('goes back to the first page when the last token of a later page is revoked, fetching one page only', () => {
       tokenService.listDeployTokens.and.returnValue(of(listing([token('only')], 2)) as never);
       component.loadPage(1);
       component.revokeDeployToken(token('only'));
       tokenService.listDeployTokens.calls.reset();
+      tokenService.listDeployTokens.and.returnValue(of(listing([token('a'), token('b'), token('c')], 1)) as never);
 
       dangerModalService.call();
 
       expect(component.pageNum).toBe(0);
-      expect(tokenService.listDeployTokens.calls.allArgs()).toEqual([
-        [{ page: 1, size: 3 }, REPO],
-        [{ page: 0, size: 3 }, REPO],
-      ]);
+      expect(tokenService.listDeployTokens.calls.allArgs()).toEqual([[{ page: 0, size: 3 }, REPO]]);
+      expect(component.deployTokens.map((t) => t.id)).toEqual(['a', 'b', 'c']);
     });
 
-    it('stays on the page when other tokens remain on it, or when it is the first page', () => {
-      tokenService.listDeployTokens.and.returnValue(of(listing([token('only')], 1)) as never);
-      component.loadPage(0);
-      component.revokeDeployToken(token('only'));
+    it('goes back one page, not to the first, when the last token of a later page is revoked', () => {
+      // 7 tokens, 3 per page: page 2 holds one token. Once it is gone, page 1 is the last page.
+      tokenService.listDeployTokens.and.returnValue(
+        of({ data: { content: [token('g')], page: { number: 2, size: 3, totalElements: 7, totalPages: 3 } } }) as never,
+      );
+      component.loadPage(2);
+      component.revokeDeployToken(token('g'));
       tokenService.listDeployTokens.calls.reset();
 
       dangerModalService.call();
 
+      expect(component.pageNum).toBe(1);
+      expect(tokenService.listDeployTokens.calls.allArgs()).toEqual([[{ page: 1, size: 3 }, REPO]]);
+    });
+
+    it('fetches the tokens only after the revoke has completed, and only once', () => {
+      const revoked = new Subject<object>();
+      tokenService.revoke.and.returnValue(revoked as never);
+      tokenService.listDeployTokens.and.returnValue(of(listing([token('only')], 2)) as never);
+      component.loadPage(1);
+      component.revokeDeployToken(token('only'));
+      tokenService.listDeployTokens.calls.reset();
+      dangerModalService.call();
+
+      expect(tokenService.listDeployTokens).not.toHaveBeenCalled();
+      expect(component.operationLock).toBeTrue();
+
+      revoked.next({});
+      revoked.complete();
+
       expect(tokenService.listDeployTokens).toHaveBeenCalledTimes(1);
+      expect(component.operationLock).toBeFalse();
+    });
+
+    // RPS-1285: the usage request and the list request used to be raced by a second list request.
+    // Whichever of the two answers arrives first, the tokens shown are those of the one list.
+    [
+      { order: 'the usage answer first', usageFirst: true },
+      { order: 'the list answer first', usageFirst: false },
+    ].forEach(({ order, usageFirst }) => {
+      it(`shows the remaining tokens with ${order} after revoking the last token on page 2`, () => {
+        tokenService.listDeployTokens.and.returnValue(
+          of({
+            data: { content: [token('d')], page: { number: 1, size: 3, totalElements: 4, totalPages: 2 } },
+          }) as never,
+        );
+        component.loadPage(1);
+        component.revokeDeployToken(token('d'));
+        tokenService.listDeployTokens.calls.reset();
+        const list = new Subject<unknown>();
+        const usage = new Subject<unknown>();
+        tokenService.listDeployTokens.and.returnValue(list as never);
+        repoService.getUsage.and.returnValue(usage as never);
+
+        dangerModalService.call();
+        const answers = [
+          () => usage.next({ data: USAGE }),
+          () => list.next(listing([token('a'), token('b'), token('c')], 1)),
+        ];
+        (usageFirst ? answers : [...answers].reverse()).forEach((answer) => answer());
+
+        expect(tokenService.listDeployTokens).toHaveBeenCalledTimes(1);
+        expect(component.pageNum).toBe(0);
+        expect(component.deployTokens.map((t) => t.id)).toEqual(['a', 'b', 'c']);
+        expect(component.repoUsage as unknown).toEqual(USAGE);
+      });
     });
 
     it('neither reloads nor toasts, and releases the lock, when the revoke fails', () => {
@@ -266,5 +323,44 @@ describe('DeployTokenComponent', () => {
     it('renders a relative time', () => {
       expect(component.timeAgo(moment().subtract(3, 'days').toDate())).toBe('3 days ago');
     });
+  });
+});
+
+describe('DeployTokenComponent template', () => {
+  async function render(canManage: boolean): Promise<HTMLElement> {
+    const tokenService = jasmine.createSpyObj<ProtocolDeployTokenControllerService>(
+      'ProtocolDeployTokenControllerService',
+      ['listDeployTokens'],
+    );
+    tokenService.listDeployTokens.and.returnValue(of(listing([token('a')])) as never);
+    const repoService = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'getUsage',
+    ]);
+    repoService.getUsage.and.returnValue(of({ data: USAGE }) as never);
+
+    const { el } = await renderComponent(
+      DeployTokenComponent,
+      [
+        { provide: ProtocolDeployTokenControllerService, useValue: tokenService },
+        { provide: ProtocolRepoControllerService, useValue: repoService },
+        { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+      ],
+      { activeRepository: permission(REPO, { canManage }), repoType: 'MAVEN' },
+    );
+    return el;
+  }
+
+  it('offers Create Token to a repository manager', async () => {
+    const el = await render(true);
+
+    expect(el.querySelector('[data-testid="token-create"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="token-table"]')).not.toBeNull();
+  });
+
+  it('offers neither the Create Token button nor the token list to anyone else (RPS-1262)', async () => {
+    const el = await render(false);
+
+    expect(el.querySelector('[data-testid="token-create"]')).toBeNull();
+    expect(el.querySelector('[data-testid="token-table"]')).toBeNull();
   });
 });

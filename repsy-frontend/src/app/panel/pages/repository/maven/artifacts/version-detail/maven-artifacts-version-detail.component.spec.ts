@@ -13,15 +13,22 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+import { Component, Input } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
+import { HIGHLIGHT_OPTIONS } from 'ngx-highlightjs';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import { ArtifactVersionInfo, RepoPermissionInfo } from '../../../../../../../generated/api';
+import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
+import { renderComponent } from '../../../testing/render-spec-helpers';
 import { MavenService } from '../../service/maven.service';
 import { MavenArtifactsVersionDetailComponent } from './maven-artifacts-version-detail.component';
 
@@ -207,5 +214,48 @@ describe('MavenArtifactsVersionDetailComponent', () => {
       expect(toastService.show).not.toHaveBeenCalled();
       expect(component.loading).toBeFalse();
     });
+  });
+});
+
+describe('MavenArtifactsVersionDetailComponent template', () => {
+  it('binds the Gradle Groovy DSL block to the Gradle snippet, and the Groovy Grape block to the Grape one (RPS-1261)', async () => {
+    const mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['fetchArtifactVersion'], {
+      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO, { canManage: true })),
+    });
+    mavenService.fetchArtifactVersion.and.returnValue(of(VERSION));
+
+    @Component({ selector: 'app-security-scan-section', standalone: true, template: '' })
+    class SecurityScanSectionStubComponent {
+      @Input() public repoType: string;
+      @Input() public repoName: string;
+      @Input() public artifactName: string;
+      @Input() public artifactVersion: string;
+      @Input() public canTriggerScan: boolean;
+    }
+    TestBed.overrideComponent(MavenArtifactsVersionDetailComponent, {
+      remove: { imports: [SecurityScanSectionComponent] },
+      add: { imports: [SecurityScanSectionStubComponent] },
+    });
+
+    const { fixture } = await renderComponent(MavenArtifactsVersionDetailComponent, [
+      { provide: MavenService, useValue: mavenService },
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          snapshot: { paramMap: convertToParamMap({ group: 'org.acme', artifact: 'lib', version: '1.2.3' }) },
+        },
+      },
+      { provide: HIGHLIGHT_OPTIONS, useValue: {} },
+      { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
+      { provide: RepoLookupService, useValue: { currentRepo: { repoName: REPO, repoType: 'maven' } } },
+    ]);
+
+    const copied = (testId: string): string | undefined =>
+      fixture.debugElement.query(By.css(`[data-testid="${testId}"]`)).query(By.directive(CopyClipboardComponent))
+        .componentInstance.text;
+    expect(copied('pkg-detail-snippet-gradle-groovy')).toBe("implementation 'org.acme:lib:1.2.3'");
+    expect(copied('pkg-detail-snippet-grape')).toBe(
+      "@Grapes(\n  @Grab(group='org.acme', module='lib', version='1.2.3')\n)",
+    );
   });
 });

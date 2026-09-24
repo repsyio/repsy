@@ -1,4 +1,4 @@
-<section data-testid="profile-account" id="account-information" class="mt-[-100px] pt-[100px]">
+<section data-testid="profile-account" id="account-information" class="scroll-mt-[100px]">
   <h2
     class="rounded-t-[12px] border border-[#e8546a] border-b-[#404141] bg-[#101112] p-4 text-[16px] font-medium text-white sm:p-6"
   >
@@ -113,7 +113,7 @@
               class="text-error"
               animate.enter="fade-in-up"
             >
-              • Password confirmation should be minimum 6 characterss
+              • Password confirmation should be minimum 6 characters
             </p>
           } @else if (
             passwordForm.get('passwordConfirmation').errors?.['maxlength'] &&

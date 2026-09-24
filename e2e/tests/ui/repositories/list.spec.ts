@@ -69,27 +69,67 @@ test.describe('Repository list', () => {
     await expect(repos.rows()).toHaveCount(REPO_PAGE_SIZE);
   });
 
-  test('REPO-04: refresh also clears the search box', async ({ adminPage, seeder }) => {
-    test.fail(
-      true,
-      'The search box keeps its text after refresh (and after a type change) while the list is ' +
-        'unfiltered again: RPS-1283',
-    );
+  test('REPO-04: refresh and a type change empty the search box, and the list is unfiltered', async ({
+    adminPage,
+    seeder,
+  }) => {
     const repos = new RepositoriesPage(adminPage);
     await seeder.createRepo(RepoType.MAVEN);
+    const mine = `e2e-${seeder.runId}-`;
     await repos.goto();
-    await repos.search(`e2e-${seeder.runId}-`);
+    await repos.search(mine);
     await expect(repos.rows()).toHaveCount(1);
 
     await repos.refresh();
 
-    // Whichever way it is fixed, list and box must agree: the box is empty and the list unfiltered,
-    // or the filter is still applied.
-    const boxIsEmpty = (await repos.searchInput.inputValue()) === '';
-    const listIsFiltered = (await repos.rows().count()) === 1;
-    expect(boxIsEmpty || listIsFiltered, 'the box shows a filter the list no longer applies').toBe(
-      true,
-    );
+    // List and box agree: the box is empty and the list is the unfiltered one (RPS-1283).
+    await expect(repos.searchInput).toHaveValue('');
+    await expect(repos.rows()).toHaveCount(REPO_PAGE_SIZE);
+
+    await repos.search(mine);
+    await expect(repos.rows()).toHaveCount(1);
+    await repos.selectType(uiRepoType(RepoType.MAVEN));
+    await expect(repos.searchInput).toHaveValue('');
+    await expect(repos.rows().first()).toBeVisible();
+    expect(await repos.rows().count()).toBeGreaterThan(1);
+  });
+
+  test('REPO-04: a refresh during a load supersedes it, so its late answer never joins the list', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repos = new RepositoriesPage(adminPage);
+    const maven = await seeder.createRepo(RepoType.MAVEN);
+    const mine = `e2e-${seeder.runId}-`;
+
+    // Hold the answer of the FIRST maven request: the other eight types answer with rows and end the
+    // spinner, so the toolbar works while maven is still outstanding (RPS-1293).
+    let releaseFirst!: () => void;
+    const firstMavenHeld = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let mavenRequests = 0;
+    await adminPage.route(/\/api\/repos\/MAVEN\/info$/, async (route) => {
+      mavenRequests++;
+      if (mavenRequests === 1) {
+        await firstMavenHeld;
+      }
+      // The held request is cancelled by the panel when the refresh starts: continuing it may fail.
+      await route.continue().catch(() => undefined);
+    });
+
+    await adminPage.goto('/repositories');
+    await expect(repos.rows().first()).toBeVisible();
+    await expect.poll(() => mavenRequests).toBe(1);
+
+    await repos.refresh();
+    releaseFirst();
+    await repos.settle();
+
+    await repos.search(mine);
+    await expect(repos.rows()).toHaveCount(1);
+    await expect(repos.row(maven.name)).toHaveCount(1);
+    await expect(repos.spinner.root).toBeHidden();
   });
 
   test('REPO-05: eleven repositories paginate by ten, with prev/next disabled at the ends', async ({
@@ -133,11 +173,6 @@ test.describe('Repository list', () => {
   });
 
   test('REPO-05: a new search starts on page 1 again', async ({ adminPage, seeder }) => {
-    test.fail(
-      true,
-      'The list keeps the old page index when the search changes, so after narrowing and widening ' +
-        'the search it shows page 1 with page 2 marked as current: RPS-1283',
-    );
     const repos = new RepositoriesPage(adminPage);
     for (let count = 0; count < REPO_PAGE_SIZE + 1; count++) {
       await seeder.createRepo(RepoType.MAVEN);

@@ -251,48 +251,54 @@ test.describe('Deploy tokens: rotate, revoke and paging', { tag: SETTINGS }, () 
     expect(await repoRootStatus(repo.name, revoked)).toBe(401);
   });
 
-  // RPS-1285. Revoking the only token on page 2 makes `revokeDeployToken`
-  // refetch page 2 (now past the end, an empty list) and, in the same tick, page 1, because it tests
-  // `deployTokens.length === 1` right after starting the first request. Whichever response lands LAST
-  // wins, so when the empty page-2 answer is the slower one the section shows "Your list is empty"
-  // while three tokens exist. The delay below makes that order certain instead of a coin toss.
-  test.fail(
-    'TOK-03 revoking the last token on page 2 shows the remaining tokens, whatever order the lists arrive in (RPS-1285)',
-    async ({ adminPage, seeder }) => {
-      const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
-      for (const name of ['tok-a', 'tok-b', 'tok-c', 'tok-d']) {
-        await seeder.createToken(repo.name, { name });
+  // RPS-1285. Revoking the only token on page 2 used to refetch page 2 (past the end, an empty list)
+  // and, in the same tick, page 1: whichever answer landed LAST won, so a slow empty page-2 answer
+  // left "Your list is empty" over three tokens. It is now one chained request for the page that is
+  // left. The page-2 delay below is what made the old order certain; it stays as the regression
+  // guard: a page-2 request after the revoke would be slow, and wins if it is sent.
+  test('TOK-03 revoking the last token on page 2 shows the remaining tokens from a single list request (RPS-1285)', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+    for (const name of ['tok-a', 'tok-b', 'tok-c', 'tok-d']) {
+      await seeder.createToken(repo.name, { name });
+    }
+    const settings = new RepoSettingsPage(adminPage, repo.name);
+    const { tokens } = settings;
+    await settings.goto();
+    await tokens.numberedButton(2).click();
+    await expect.poll(() => tokens.rowNames()).toHaveLength(1);
+
+    // From here on the list is watched, and a request for the (soon empty) second page is slowed down.
+    const listPages: (string | null)[] = [];
+    adminPage.on('request', (request) => {
+      const url = new URL(request.url());
+      if (isTokenListRequest(url, repo.name, 0) || isTokenListRequest(url, repo.name, 1)) {
+        listPages.push(url.searchParams.get('page'));
       }
-      const settings = new RepoSettingsPage(adminPage, repo.name);
-      const { tokens } = settings;
-      await settings.goto();
-      await tokens.numberedButton(2).click();
-      await expect.poll(() => tokens.rowNames()).toHaveLength(1);
+    });
+    const isSecondPageRequest = (url: URL) => isTokenListRequest(url, repo.name, 1);
+    await adminPage.route(isSecondPageRequest, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      await route.continue();
+    });
 
-      // Only the request for the (soon empty) second page is slowed down, from here on.
-      const isSecondPageRequest = (url: URL) => isTokenListRequest(url, repo.name, 1);
-      await adminPage.route(isSecondPageRequest, async (route) => {
-        await new Promise((resolve) => setTimeout(resolve, 1_500));
-        await route.continue();
-      });
-      const slowAnswer = adminPage.waitForResponse((res) =>
-        isSecondPageRequest(new URL(res.url())),
-      );
+    const [lastName] = await tokens.rowNames();
+    await tokens.revokeButton(lastName).click();
+    await settings.shell.dangerModal.confirm();
+    await settings.shell.toasts.expectSuccess('Deploy token revoked successfully');
 
-      const [lastName] = await tokens.rowNames();
-      await tokens.revokeButton(lastName).click();
-      await settings.shell.dangerModal.confirm();
-      await settings.shell.toasts.expectSuccess('Deploy token revoked successfully');
-
-      // Wait for the late answer AND for the browser to paint it: the three tokens show up first
-      // (the fast page-1 list), so a bare row count could pass on that transient state.
-      await slowAnswer;
-      await adminPage.evaluate(
-        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-      );
-      await tokens.expectRowCount(3);
-    },
-  );
+    // Long enough for the slowed page-2 answer to have arrived, had it been requested, and for the
+    // browser to paint whatever came last.
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    await adminPage.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
+    await tokens.expectRowCount(3);
+    await expect(tokens.empty).toHaveCount(0);
+    expect(listPages).toEqual(['0']);
+  });
 });
 
 test.describe('Deploy tokens: on the repo port', { tag: SETTINGS }, () => {
