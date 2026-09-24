@@ -48,7 +48,6 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -178,10 +177,10 @@ class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
     final var out = new ByteArrayOutputStream();
 
     try (final var zip = new ZipOutputStream(out)) {
-      zip.putNextEntry(new ZipEntry(id + ".nuspec"));
+      zip.putNextEntry(FixtureZipEntry.named(id + ".nuspec"));
       zip.write(nuspec.getBytes(StandardCharsets.UTF_8));
       zip.closeEntry();
-      zip.putNextEntry(new ZipEntry("lib/net8.0/" + id + ".dll"));
+      zip.putNextEntry(FixtureZipEntry.named("lib/net8.0/" + id + ".dll"));
       zip.write(content.getBytes(StandardCharsets.UTF_8));
       zip.closeEntry();
     } catch (final IOException e) {
