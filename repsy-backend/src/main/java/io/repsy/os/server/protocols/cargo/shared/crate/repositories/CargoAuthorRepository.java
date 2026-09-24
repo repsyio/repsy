@@ -20,6 +20,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -27,4 +29,24 @@ import org.springframework.stereotype.Repository;
 public interface CargoAuthorRepository extends JpaRepository<CargoAuthor, UUID> {
 
   Optional<CargoAuthor> findByAuthor(String author);
+
+  /**
+   * Inserts the author unless it already exists. It does not raise the unique-index violation,
+   * which would abort the caller's PostgreSQL transaction: that transaction also holds the version
+   * row while the crate file is written (RPS-1124). When a concurrent publish has inserted the same
+   * author but not committed yet, the statement waits for it and then skips the insert, so the
+   * caller reads the row back with {@link #findByAuthor}.
+   *
+   * @return 1 when the row was inserted, 0 when it already existed
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      value =
+          """
+          insert into "public"."cargo_author" ("id", "author")
+            values (:id, :author)
+            on conflict do nothing
+          """,
+      nativeQuery = true)
+  int insertIfAbsent(UUID id, String author);
 }

@@ -120,6 +120,7 @@ public final class NuGetPackageUtils {
       Pattern.compile(
           "^(0|[1-9][0-9]*)(?:\\.(0|[1-9][0-9]*)){0,3}(?:-[a-zA-Z0-9][a-zA-Z0-9.-]*)?"
               + "(?:\\+[a-zA-Z0-9][a-zA-Z0-9.-]*)?$");
+  private static final Pattern SEMVER_LEVEL_PATTERN = Pattern.compile("^([0-9]+)(?:[.+-].*)?$");
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   /**
@@ -199,6 +200,31 @@ public final class NuGetPackageUtils {
   /** Whether the version carries a {@code +...} build metadata suffix. */
   public static boolean hasBuildMetadata(final String version) {
     return version.indexOf('+') >= 0;
+  }
+
+  /**
+   * Whether the version is SemVer 2.0.0-only, that is not a valid SemVer 1.0.0 version: it carries
+   * build metadata ({@code 1.0.0+abc}) or a pre-release label with dot-separated identifiers
+   * ({@code 1.0.0-beta.1}). This is nuget.org's definition, which clients that send no {@code
+   * semVerLevel} rely on to be left with versions they can parse.
+   */
+  public static boolean isSemVer2(final String version) {
+    return hasBuildMetadata(version)
+        || preRelease(version.strip().toLowerCase(Locale.ROOT)).indexOf('.') >= 0;
+  }
+
+  /**
+   * Whether the {@code semVerLevel} query parameter of the search and autocomplete endpoints opts
+   * in to SemVer 2.0.0 versions: a version string whose major part is 2 or more ({@code 2.0.0}). A
+   * missing, blank or lower value (or one that is not a version at all) is the SemVer 1.0.0
+   * default, as it is on nuget.org.
+   */
+  public static boolean acceptsSemVer2(final @Nullable String semVerLevel) {
+    if (semVerLevel == null) {
+      return false;
+    }
+    final var matcher = SEMVER_LEVEL_PATTERN.matcher(semVerLevel.strip());
+    return matcher.matches() && new BigInteger(matcher.group(1)).compareTo(BigInteger.TWO) >= 0;
   }
 
   private static String normalize(final String rawVersion, final boolean keepBuildMetadata) {

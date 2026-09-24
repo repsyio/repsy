@@ -79,7 +79,14 @@ public interface NuGetPackageConverter {
   default NuGetPackageSearchResult toSearchResult(
       final NuGetPackage pkg,
       final boolean prerelease,
-      final List<NuGetPackageVersion> allVersions) {
+      final boolean semVer2,
+      final List<NuGetPackageVersion> listedVersions) {
+
+    // A client that did not opt in to SemVer 2.0.0 must not be handed a version it cannot parse.
+    final var allVersions =
+        listedVersions.stream()
+            .filter(v -> semVer2 || !NuGetPackageUtils.isSemVer2(v.getVersion()))
+            .toList();
 
     // Highest version first, as NuGet orders versions: a backport published after a newer release
     // (1.0.5 after 2.0.0) must not be reported as the latest.

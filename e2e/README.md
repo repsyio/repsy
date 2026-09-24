@@ -1045,6 +1045,14 @@ v3/search?q=...&semVerLevel=2.0.0`. The service index now advertises the bare ty
   `/3.0.0-beta` for both, at the same URLs (the client queries the shared URL once), and
   `tests/nuget/protocol-specific.spec.ts`'s `dotnet package search` test runs the real client to
   completion (`tests/nuget/registry-rules.spec.ts`'s H6 test pins the served shape).
+  **RPS-1275** made the search and autocomplete endpoints honour the `semVerLevel` parameter the
+  client sends with every search: without it (or below `2.0.0`) SemVer 2.0.0-only versions (a
+  dot-separated pre-release label, build metadata) and the packages that only have such versions
+  are left out, as the search/autocomplete docs prescribe. `/3.4.0` is still not advertised (the
+  docs define no such type for search, and `/3.5.0` would promise the `packageType` filter);
+  `tests/nuget/protocol-specific.spec.ts`'s `semVerLevel` test pins the behaviour raw and through
+  the real client. The registration index and flat container have no `semVerLevel` parameter in
+  the docs and keep listing every version.
 - **H7** (`X-NuGet-ApiKey: <user password>` → `401`, contradicting the panel's Option B text):
   confirmed live, exactly as predicted —
   `X-NuGet-ApiKey: <admin password>` → `401`; `X-NuGet-ApiKey: <deploy token>` → `201`;
@@ -2510,7 +2518,46 @@ own stub below, so the unchanged heading lines keep git's hunks apart; the Layou
 
 ### Auth, guards and session (RPS-1251)
 
-_Not implemented yet._
+`tests/ui/auth/{login,guards,session}.spec.ts` (AUTH-01..11). Run them with
+`./run.sh test --protocol ui --grep AUTH-`. UI login is typed ONLY in these specs; every other UI suite
+logs in through the API fixtures. No test changes the admin or its password: the admin only types its
+own credentials (AUTH-01), and negative logins use a seeded user or a name that does not exist.
+`src/ui/pages/login-validation.ts` (composed on `LoginPage`) holds the validation helpers and the
+visible message texts; `tests/ui/auth/stored-session.ts` reads the three `localStorage` keys.
+
+| Spec      | Scenarios | What is pinned                                                                                                                                                                                         |
+| --------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `login`   | 01-04, 11 | valid login and its 3 storage keys; 401 toast `Username or password is incorrect.` (wrong password and unknown user alike); every client-side rule with its message; the eye toggle; throttle (opt-in) |
+| `guards`  | 05-07     | anonymous visit of `/repositories`, `/users`, `/security`, `/profile`, `/<repo>` shows the login form at `/`; `/login` bounces a logged-in user; a USER is sent to `/` from `/users` and `/security`   |
+| `session` | 08-10     | expired access token is refreshed transparently; a refused refresh token logs out; sidebar and header logout clear the session                                                                         |
+
+Things a later author must know:
+
+- **The 401 of AUTH-08/09 is stubbed, everything after it is real.** An access token lives 30 minutes
+  (not configurable) and only an _expired_ one is answered `sessionExpired`, the one answer that makes
+  `RefreshTokenInterceptor` refresh; a token with a bad signature is answered `accessNotAllowed`, which
+  it ignores. `expireAccessToken()` (`session.spec.ts`) answers calls carrying one given token with that
+  401 (never the `/api/auth/` calls); the refresh, the rotation and the logout run on the real backend.
+  The AUTH-09 cases: a refresh token that is garbage, one that was already used (single use), and a
+  stubbed `refreshTokenExpired` answer.
+- **The SPA reads `localStorage` once, at boot** (`AuthService`), and `seedSession()` writes once per
+  tab: change the storage, then `reload()`; the change survives it. Two tokens minted in the same second
+  are byte-identical, so compare a refreshed access token with a value the test wrote, not with the old one.
+- **The password eye button is only a Font Awesome glyph**, and the font is a CDN resource the harness
+  blocks, so the button has no size and Playwright calls it "not visible": use
+  `LoginValidation.togglePasswordVisibility()` (a DOM click).
+- **Inline validation messages appear on blur** (`touched`), one at a time, in the order required,
+  pattern, minlength, maxlength; `LoginValidation.enter()` types and blurs.
+- **AUTH-11 (`@throttle`) is skipped by default.** It needs a stack whose `AUTH_THROTTLE_MAX_FAILURES` is
+  below 30 (the harness stack raises it to 100000, see `docker-compose.stack.yml`) and, once it trips,
+  the client stays refused for the window (`AUTH_THROTTLE_WINDOW_SECONDS`), so run it alone, on a
+  throwaway stack: `AUTH_THROTTLE_MAX_FAILURES=20` in the `repsy` service environment, then
+  `REPSY_UI_OPT_IN=throttle ./run.sh test --protocol ui --grep AUTH-11`. Not run by CI or by default.
+- **Known product bugs are `test.fail(true, ...)`**, written for the intended behaviour so the test
+  turns red (and tells you to remove the line) when the bug is fixed: logging in from the in-place form
+  a guard redirect shows (the URL is `/`, and `LoginComponent` navigates to `/` again) stores the session
+  but does not render the dashboard until a reload; and a tampered (not expired) access token is never
+  refreshed or logged out, the dashboard just stays empty.
 
 ### Repositories and dashboard (RPS-1252)
 
@@ -2553,7 +2600,53 @@ Things a test here relies on, which a change to the page can break:
 
 ### Users and profile (RPS-1253)
 
-_Not implemented yet._
+Specs: `tests/ui/users/{users-create,users-edit-delete,users-reset-password,users-list}.spec.ts` and
+`tests/ui/profile/profile.spec.ts`. Page objects: `src/ui/pages/{users,profile,one-time-secret-modal}.ts`
+(`UsersPage` with its `UserCreateModal`/`UserEditModal`, `ProfilePage`, `OneTimeSecretModal` for the
+"shown once" reset-password modal, parameterised by ids so a token modal can reuse it). Fixtures on top
+of the foundation: `src/ui/users-fixtures.ts` (`usersPage`, and `trackUiUser(name)`, which registers a
+user the UI is about to create so a failing test still cleans it up).
+
+| Scenario | Where                                                                                                                          |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| USR-01   | create a USER and an Admin, log in as each from a fresh context (an Admin sees Users, a USER does not), cancel resets the form |
+| USR-02   | one test per validator of the create form, the message texts, a valid form, a duplicate username                               |
+| USR-03   | rename, promote, demote next to another admin, the last-admin warning, edit validation, taken name, cancel                     |
+| USR-04   | reset password: one-time modal, the new password logs in, the old one is refused, cancel resets nothing                        |
+| USR-05   | delete (cancel, then confirm), delete next to another admin, the last-admin toast                                              |
+| USR-06   | 11 users: search (incl. case-insensitive, no match), pagination both ways, refresh                                             |
+| PRO-01   | change password: mismatch, cancel, confirm, re-login with the new one, the old one refused; field validation                   |
+| PRO-02   | change username: reload as the new name, same account, repo protocol URL and repo page still work; validation; taken name      |
+| PRO-03   | delete account: cancel, confirm, logged out, login refused                                                                     |
+
+Rules these specs follow (and a later spec on these pages should too):
+
+- **Credentials.** `profile.spec.ts` tests change or delete the account they are logged in as: they use
+  `userPage` (a seeded USER) and are tagged `@credentials`, and `ProfilePage.submit*`/`requestAccountDeletion`
+  refuse the harness admin. USR-04/05 act as the admin on SEEDED users (`adminPage`, not tagged: the
+  admin's own credentials are untouched); `UsersPage.clickDelete`/`clickResetPassword` refuse the admin's row.
+  The suite never edits, demotes or deletes the harness admin. Names a test creates or renames to come from
+  `seeder.reserveUsername()`, so the `e2e-` prefix survives and sweep finds them; a renamed user is
+  cleaned up by id.
+- **Last admin.** The panel decides "last admin" on the client from the admins in the page it shows
+  (RPS-1246); the server guards the real one, which the backend ITs cover. A shared stack always has the
+  harness admin, so the real last-admin state is unreachable here. What is reachable: search for a seeded
+  admin's exact username, and the view holds a single admin. Those tests pin what the panel does there
+  today, and two `test.fail(... RPS-1246)` tests assert what it should do. Two admins in one view (search
+  for `seeder.runId`, which is in both names) is the "not the last" case.
+- **Search first.** The list is server-paged (10, newest first) and server-searched (case-insensitive
+  substring), and other tests add users, so every list view is a search for a username or for
+  `seeder.runId`, which is in exactly the names this test seeded (with 10 or more users, `-user-1` also
+  matches `-user-10`: search the run id, not a name). After an edit or a delete the panel reloads with the
+  OLD search text, so a renamed user is not in the refreshed list until searched again.
+- **Toggle.** Click the `toggle` label (`UserCreateModal.roleToggle`), assert on `toggle-input`
+  (`roleSwitch`): a click on the sr-only input is intercepted by the slider.
+- **Eye buttons** (show/hide password) are Font Awesome glyphs, and the network allow-list blocks the
+  Font Awesome CDN, so the buttons have no box: they are activated with `dispatchEvent('click')`.
+- **Timing.** The username change ends in `location.reload()` in the tick that raises its toast, so that
+  toast is not observable: assert the reload (`ProfilePage.changeUsername`) and the outcome.
+- **Known bugs, pinned with `test.fail`**: RPS-1261 (create-user messages start with mojibake `â€¢`),
+  RPS-1246 (last-admin check counts one page). The spec text of a `test.fail` states the key.
 
 ### Repository settings and deploy tokens (RPS-1254)
 

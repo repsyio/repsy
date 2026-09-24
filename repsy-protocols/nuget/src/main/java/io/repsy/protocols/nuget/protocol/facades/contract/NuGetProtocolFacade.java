@@ -39,8 +39,19 @@ public interface NuGetProtocolFacade {
 
   NuGetServiceIndexResponse getServiceIndex(ProtocolContext context, String baseUrl);
 
+  /**
+   * @param semVer2 whether the client opted in to SemVer 2.0.0 versions ({@code
+   *     semVerLevel=2.0.0}); when it did not, SemVer 2.0.0-only versions, and the packages that
+   *     only have such versions, are left out
+   */
   NuGetSearchResponse search(
-      ProtocolContext context, String q, int skip, int take, boolean prerelease, String baseUrl);
+      ProtocolContext context,
+      String q,
+      int skip,
+      int take,
+      boolean prerelease,
+      boolean semVer2,
+      String baseUrl);
 
   NuGetAutocompleteResponse autocomplete(
       ProtocolContext context,
@@ -48,7 +59,8 @@ public interface NuGetProtocolFacade {
       @Nullable String id,
       int skip,
       int take,
-      boolean prerelease);
+      boolean prerelease,
+      boolean semVer2);
 
   NuGetRegistrationIndexResponse getRegistrationIndex(ProtocolContext context, String baseUrl);
 

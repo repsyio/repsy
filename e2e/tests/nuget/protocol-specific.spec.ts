@@ -63,6 +63,12 @@
  *    &semVerLevel=2.0.0`. The service index now advertises `SearchQueryService/3.0.0-beta` and
  *    `SearchAutocompleteService/3.0.0-beta` next to the bare types, and the test below runs the real
  *    client to completion.
+ *  - HN-4 (RPS-1275, fixed): the client's `semVerLevel=2.0.0` was ignored, so a client that sends
+ *    none (or a level below 2.0.0) was handed SemVer 2.0.0-only versions (a dot-separated
+ *    pre-release label, build metadata) and packages that only have such versions. The search and
+ *    autocomplete endpoints now leave them out unless `semVerLevel` is 2.0.0 or more, as the
+ *    search/autocomplete docs prescribe. The registration index and flat container have no
+ *    `semVerLevel` parameter in the docs, and keep listing every version.
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import * as nuget from '../../src/clients/nuget.js';
@@ -75,10 +81,12 @@ import {
   parseSearchResponse,
   parseServiceIndex,
   parseVersions,
+  buildNupkg,
   rawAutocomplete,
   rawGetRegistrationIndex,
   rawGetServiceIndex,
   rawGetVersions,
+  rawPublish,
   rawRelist,
   rawSearch,
   rawUnlist,
@@ -354,6 +362,87 @@ test(
       searchResult.stdout,
       'a real, working search would list the published package id in the command output',
     ).toContain(layout.packageId);
+  },
+);
+
+test(
+  'nuget > search honours semVerLevel: SemVer 2.0.0-only versions need the opt-in (RPS-1275)',
+  { tag: ['@smoke'] },
+  async ({ seeder }) => {
+    const layout = await newRepoWithToken(seeder, 'semver');
+    const admin = adminCredential();
+    const mixedId = `${layout.packageId}-mixed`;
+    const onlyId = `${layout.packageId}-only`;
+
+    // "mixed" has a SemVer 1.0.0 release and a SemVer 2.0.0-only pre-release (a dot-separated
+    // label); "only" has nothing a SemVer 1.0.0 client can use.
+    for (const [packageId, version] of [
+      [mixedId, '1.0.0'],
+      [mixedId, '2.0.0-beta.1'],
+      [onlyId, '1.0.0-rc.1'],
+    ] as const) {
+      const bytes = buildNupkg({ packageId, version });
+      const res = await rawPublish(layout.repoName, admin, bytes);
+      expect(res.status, `raw publish ${packageId}@${version}: ${res.status}`).toBe(201);
+    }
+
+    // A client that predates SemVer 2.0.0 sends no semVerLevel (as does one that sends 1.0.0).
+    for (const level of [undefined, '1.0.0']) {
+      const res = await rawSearch(layout.repoName, admin, layout.packageId, true, level);
+      expect(res.status, `raw search (semVerLevel=${level}): ${res.status}`).toBe(200);
+      const body = parseSearchResponse(res.body);
+      expect(
+        body.data.map((d) => d.id),
+        `semVerLevel=${level}: ids`,
+      ).toEqual([mixedId.toLowerCase()]);
+      expect(body.totalHits, `semVerLevel=${level}: totalHits`).toBe(1);
+      expect(body.data[0]?.version, `semVerLevel=${level}: latest version`).toBe('1.0.0');
+      expect(body.data[0]?.versions, `semVerLevel=${level}: versions`).toEqual(['1.0.0']);
+
+      const auto = await rawAutocomplete(layout.repoName, admin, layout.packageId, true, level);
+      expect(
+        parseAutocompleteResponse(auto.body).data,
+        `semVerLevel=${level}: autocomplete`,
+      ).toEqual([mixedId.toLowerCase()]);
+    }
+
+    const optedIn = await rawSearch(layout.repoName, admin, layout.packageId, true, '2.0.0');
+    expect(optedIn.status).toBe(200);
+    const optedInBody = parseSearchResponse(optedIn.body);
+    expect(optedInBody.totalHits).toBe(2);
+    const mixed = optedInBody.data.find((d) => d.id === mixedId.toLowerCase());
+    expect(mixed?.version, 'semVerLevel=2.0.0: the SemVer 2.0.0 pre-release is the latest').toBe(
+      '2.0.0-beta.1',
+    );
+    expect(mixed?.versions).toEqual(['2.0.0-beta.1', '1.0.0']);
+    expect(optedInBody.data.map((d) => d.id)).toContain(onlyId.toLowerCase());
+
+    // The real client always sends semVerLevel=2.0.0, so it lists the SemVer 2.0.0 pre-release.
+    const { home, work } = await isolatedWorkDir(`nuget-semver-${seeder.runId}`);
+    const cfgPath = await renderNugetConfig(home, layout.repoName, layout.credential);
+    const searchResult = await run(
+      'dotnet',
+      [
+        'package',
+        'search',
+        mixedId,
+        '--prerelease',
+        '--exact-match',
+        '--source',
+        'repsy',
+        '--configfile',
+        cfgPath,
+      ],
+      {
+        cwd: work,
+        env: nugetEnv(home),
+        timeoutMs: 60_000,
+        redact: layout.credential.password ? [layout.credential.password] : [],
+        label: 'nuget-package-search-semver',
+      },
+    );
+    expect(searchResult.exitCode, `dotnet package search: ${searchResult.command}`).toBe(0);
+    expect(searchResult.stdout, 'the SemVer 2.0.0 pre-release is listed').toContain('2.0.0-beta.1');
   },
 );
 

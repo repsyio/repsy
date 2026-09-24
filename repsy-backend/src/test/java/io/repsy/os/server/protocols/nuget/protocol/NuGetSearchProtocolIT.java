@@ -239,6 +239,122 @@ class NuGetSearchProtocolIT extends AbstractIntegrationTest {
             jsonPath("$.data[0].versions[*].version", contains("3.0.0-beta", "1.1.0", "1.0.0")));
   }
 
+  /** Two packages for the SemVer tests: one with every kind of version, one with SemVer2 only. */
+  private void seedSemVerPackages() {
+    this.seedVersions(
+        "search.semver.mixed", "1.0.0", "1.1.0-beta2", "1.2.0+build.5", "2.0.0-beta.1");
+    this.seedVersions("search.semver.only", "1.0.0-rc.1", "1.0.0+meta");
+  }
+
+  /**
+   * RPS-1275: {@code dotnet package search} and Visual Studio send {@code semVerLevel=2.0.0} with
+   * every search, while a client that predates SemVer 2.0.0 sends nothing and must not be handed a
+   * version it cannot parse: a pre-release label with dot-separated identifiers, or build metadata.
+   */
+  @Test
+  @DisplayName("leaves SemVer 2.0.0-only versions out of a search that sends no semVerLevel")
+  void searchWithoutSemVerLevel() throws Exception {
+    this.seedSemVerPackages();
+
+    this.search("?q=search.semver&take=10&prerelease=true")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalHits").value(1))
+        .andExpect(jsonPath("$.data[*].id", contains("search.semver.mixed")))
+        .andExpect(jsonPath("$.data[0].version").value("1.1.0-beta2"))
+        .andExpect(jsonPath("$.data[0].versions[*].version", contains("1.1.0-beta2", "1.0.0")));
+  }
+
+  @Test
+  @DisplayName("treats a semVerLevel below 2.0.0 like a missing one")
+  void searchWithSemVerLevelOne() throws Exception {
+    this.seedSemVerPackages();
+
+    this.search("?q=search.semver&take=10&prerelease=true&semVerLevel=1.0.0")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalHits").value(1))
+        .andExpect(jsonPath("$.data[0].versions[*].version", contains("1.1.0-beta2", "1.0.0")));
+  }
+
+  @Test
+  @DisplayName("includes every version, and every package, when semVerLevel is 2.0.0")
+  void searchWithSemVerLevelTwo() throws Exception {
+    this.seedSemVerPackages();
+
+    this.search("?q=search.semver&take=10&prerelease=true&semVerLevel=2.0.0")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalHits").value(2))
+        .andExpect(jsonPath("$.data[*].id", contains("search.semver.mixed", "search.semver.only")))
+        .andExpect(jsonPath("$.data[0].version").value("2.0.0-beta.1"))
+        .andExpect(
+            jsonPath(
+                "$.data[0].versions[*].version",
+                contains("2.0.0-beta.1", "1.2.0+build.5", "1.1.0-beta2", "1.0.0")))
+        .andExpect(jsonPath("$.data[1].versions[*].version", contains("1.0.0+meta", "1.0.0-rc.1")));
+  }
+
+  @Test
+  @DisplayName("still honours prerelease=false next to semVerLevel=2.0.0")
+  void semVerLevelTwoKeepsThePrereleaseFilter() throws Exception {
+    this.seedSemVerPackages();
+
+    this.search("?q=search.semver.mixed&take=10&semVerLevel=2.0.0")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].versions[*].version", contains("1.2.0+build.5", "1.0.0")));
+  }
+
+  @Test
+  @DisplayName("counts and pages only the packages a client that did not opt in can see")
+  void semVerFilterAppliesBeforeTheWindow() throws Exception {
+    this.seedVersions("search.semver.a", "1.0.0-alpha.1");
+    this.seedVersions("search.semver.b", "1.0.0");
+    this.seedVersions("search.semver.c", "2.0.0+meta");
+    this.seedVersions("search.semver.d", "3.0.0");
+
+    this.search("?q=search.semver&skip=1&take=1")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalHits").value(2))
+        .andExpect(jsonPath("$.data[*].id", contains("search.semver.d")));
+    this.search("?q=search.semver&skip=1&take=1&semVerLevel=2.0.0")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalHits").value(4))
+        .andExpect(jsonPath("$.data[*].id", contains("search.semver.b")));
+  }
+
+  @Test
+  @DisplayName("takes the wildcards of a query literally")
+  void queryWildcardsAreLiteral() throws Exception {
+    this.search("?q=search_fixture").andExpect(jsonPath("$.totalHits").value(0));
+    this.search("?q=%25").andExpect(jsonPath("$.totalHits").value(0));
+    this.search("?q=SEARCH.FIXTURE.0").andExpect(jsonPath("$.totalHits").value(10));
+  }
+
+  @Test
+  @DisplayName("autocompletes only the package ids a client that did not opt in can use")
+  void autocompleteIdsHonourSemVerLevel() throws Exception {
+    this.seedSemVerPackages();
+
+    this.request(AUTOCOMPLETE_PATH, "?q=search.semver&prerelease=true")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data", contains("search.semver.mixed")));
+    this.request(AUTOCOMPLETE_PATH, "?q=search.semver&prerelease=true&semVerLevel=2.0.0")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data", contains("search.semver.mixed", "search.semver.only")));
+  }
+
+  @Test
+  @DisplayName("autocompletes only the versions a client that did not opt in can use")
+  void autocompleteVersionsHonourSemVerLevel() throws Exception {
+    this.seedSemVerPackages();
+
+    this.request(AUTOCOMPLETE_PATH, "?id=search.semver.mixed&prerelease=true")
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data", contains("1.0.0", "1.1.0-beta2")));
+    this.request(AUTOCOMPLETE_PATH, "?id=search.semver.mixed&prerelease=true&semVerLevel=2.0.0")
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.data", contains("1.0.0", "1.1.0-beta2", "1.2.0+build.5", "2.0.0-beta.1")));
+  }
+
   private static Stream<Arguments> endpoints() {
     return Stream.of(Arguments.of(SEARCH_PATH), Arguments.of(AUTOCOMPLETE_PATH));
   }

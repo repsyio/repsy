@@ -177,6 +177,42 @@ class AbstractNpmProtocolFacadePublishTest {
   }
 
   @Test
+  @DisplayName("replaces a tarball that has no version row (RPS-1272)")
+  void replacesAnOrphanedTarball() throws Exception {
+    final var payload = payload();
+    final var usages = BaseUsages.ofDisk(42L);
+    this.publishRuns(PublishKind.NEW_VERSION);
+    when(this.storageService.tarballExists(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, VERSION))
+        .thenReturn(true);
+    when(this.storageService.processVersionPayload(any(), any(), any(), any()))
+        .thenReturn(Pair.of(Pair.of(1L, 2L), payload));
+    when(this.storageService.writeTarballAndMetadata(
+            REPO_ID, REPO_NAME, payload, BASE_PATH, PACKAGE, VERSION))
+        .thenReturn(usages);
+
+    this.publish(payload);
+
+    verify(this.storageService)
+        .writeTarballAndMetadata(REPO_ID, REPO_NAME, payload, BASE_PATH, PACKAGE, VERSION);
+    assertThat(this.context.<BaseUsages>getProperty("usages")).isSameAs(usages);
+  }
+
+  @Test
+  @DisplayName("does not look for an orphan when it replaces a version that has its rows")
+  void doesNotLookForAnOrphanWhenReplacing() throws Exception {
+    final var payload = payload();
+    this.publishRuns(PublishKind.REPLACES_VERSION);
+    when(this.storageService.processVersionPayload(any(), any(), any(), any()))
+        .thenReturn(Pair.of(Pair.of(1L, 2L), payload));
+    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any(), any()))
+        .thenReturn(BaseUsages.ofDisk(1L));
+
+    this.publish(payload);
+
+    verify(this.storageService, never()).tarballExists(any(), any(), any(), any(), any());
+  }
+
+  @Test
   @DisplayName("does not touch storage when the rows are rejected, and reports nothing")
   void writesNothingWhenTheRowsAreRejected() throws Exception {
     when(this.packageService.publishVersion(any(), any(), any(), any(), any(), any()))

@@ -41,6 +41,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -106,27 +107,73 @@ class AbstractNuGetAutocompleteProtocolMethodHandlerTest {
   @DisplayName("defaults skip to 0 and take to 20 when absent")
   void defaultsWhenParamsAbsent() {
     final var ctx = context(AUTOCOMPLETE_PATH);
-    when(this.facade.autocomplete(eq(ctx), anyString(), any(), anyInt(), anyInt(), anyBoolean()))
+    when(this.facade.autocomplete(
+            eq(ctx), anyString(), any(), anyInt(), anyInt(), anyBoolean(), anyBoolean()))
         .thenReturn(new NuGetAutocompleteResponse(0, List.of()));
 
     final var response = this.handler.handle(ctx, request(null), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    verify(this.facade).autocomplete(eq(ctx), eq(""), eq(null), eq(0), eq(20), eq(false));
+    verify(this.facade)
+        .autocomplete(eq(ctx), eq(""), eq(null), eq(0), eq(20), eq(false), eq(false));
   }
 
   @Test
   @DisplayName("clamps a huge take to the maximum instead of passing it through unbounded")
   void clampsTakeToMaximum() {
     final var ctx = context(AUTOCOMPLETE_PATH);
-    when(this.facade.autocomplete(eq(ctx), anyString(), any(), anyInt(), anyInt(), anyBoolean()))
+    when(this.facade.autocomplete(
+            eq(ctx), anyString(), any(), anyInt(), anyInt(), anyBoolean(), anyBoolean()))
         .thenReturn(new NuGetAutocompleteResponse(0, List.of()));
 
     final var response =
         this.handler.handle(ctx, request("take=2000000000"), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    verify(this.facade).autocomplete(eq(ctx), eq(""), eq(null), eq(0), eq(1000), eq(false));
+    verify(this.facade)
+        .autocomplete(eq(ctx), eq(""), eq(null), eq(0), eq(1000), eq(false), eq(false));
+  }
+
+  @ParameterizedTest(name = "semVerLevel={0} opts in: {1}")
+  @CsvSource(
+      value = {
+        "2.0.0, true",
+        "2.1.0, true",
+        "3.0.0, true",
+        "1.0.0, false",
+        "1.0, false",
+        "0.5, false",
+        "abc, false",
+        "'', false"
+      })
+  @DisplayName("opts in to SemVer 2.0.0 only for a semVerLevel of 2.0.0 or more (RPS-1275)")
+  void semVerLevel(final String level, final boolean optedIn) {
+    final var ctx = context(AUTOCOMPLETE_PATH);
+    when(this.facade.autocomplete(
+            eq(ctx), anyString(), any(), anyInt(), anyInt(), anyBoolean(), anyBoolean()))
+        .thenReturn(new NuGetAutocompleteResponse(0, List.of()));
+
+    final var response =
+        this.handler.handle(
+            ctx, request("semVerLevel=" + level.replace("'", "")), new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    verify(this.facade)
+        .autocomplete(eq(ctx), eq(""), eq(null), eq(0), eq(20), eq(false), eq(optedIn));
+  }
+
+  @Test
+  @DisplayName("does not opt in to SemVer 2.0.0 when the client sends no semVerLevel (RPS-1275)")
+  void semVerLevelAbsent() {
+    final var ctx = context(AUTOCOMPLETE_PATH);
+    when(this.facade.autocomplete(
+            eq(ctx), anyString(), any(), anyInt(), anyInt(), anyBoolean(), anyBoolean()))
+        .thenReturn(new NuGetAutocompleteResponse(0, List.of()));
+
+    this.handler.handle(ctx, request("q=x"), new MockHttpServletResponse());
+
+    verify(this.facade)
+        .autocomplete(eq(ctx), eq("x"), eq(null), eq(0), eq(20), eq(false), eq(false));
   }
 
   @ParameterizedTest(name = "skip={0}")
@@ -162,7 +209,8 @@ class AbstractNuGetAutocompleteProtocolMethodHandlerTest {
       "answers 400, without an ERROR log, when skip + take overflows int deeper in the service")
   void skipPlusTakeOverflowAnswers400() {
     final var ctx = context(AUTOCOMPLETE_PATH);
-    when(this.facade.autocomplete(eq(ctx), anyString(), any(), anyInt(), anyInt(), anyBoolean()))
+    when(this.facade.autocomplete(
+            eq(ctx), anyString(), any(), anyInt(), anyInt(), anyBoolean(), anyBoolean()))
         .thenThrow(new ArithmeticException("integer overflow"));
 
     final var response = this.handler.handle(ctx, request(null), new MockHttpServletResponse());
@@ -175,7 +223,8 @@ class AbstractNuGetAutocompleteProtocolMethodHandlerTest {
   @DisplayName("still answers 500 for an unexpected failure, and still logs it")
   void unexpectedFailureStillLogsAndAnswers500() {
     final var ctx = context(AUTOCOMPLETE_PATH);
-    when(this.facade.autocomplete(eq(ctx), anyString(), any(), anyInt(), anyInt(), anyBoolean()))
+    when(this.facade.autocomplete(
+            eq(ctx), anyString(), any(), anyInt(), anyInt(), anyBoolean(), anyBoolean()))
         .thenThrow(new IllegalStateException("storage down"));
 
     final var response = this.handler.handle(ctx, request(null), new MockHttpServletResponse());

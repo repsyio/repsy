@@ -24,6 +24,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.ReleaseDetail;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PackageInfo;
+import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PypiDeletion;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.PypiPackage;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.Release;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.ReleaseClassifier;
@@ -33,6 +34,7 @@ import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.Pypi
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseClassifierRepository;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseProjectURLRepository;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseRepository;
+import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
@@ -69,6 +71,7 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
   private static final String ERR_PACKAGE_NOT_FOUND = "packageNotFound";
 
   private final RepoRepository repoRepository;
+  private final PypiStorageService pypiStorageService;
   private final ReleaseRepository releaseRepository;
   private final ConversionService conversionService;
   private final Configuration freeMarkerConfiguration;
@@ -149,48 +152,108 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
     return this.releaseRepository.findAllByPypiPackageId(packageId);
   }
 
+  /**
+   * Deletes the package, its releases and its archives, in one transaction that holds the package's
+   * row lock.
+   *
+   * <p>An upload of the package waits for the lock like an upload waits for another upload. So it
+   * either ran first and this delete removes what it stored, or it runs after this delete has
+   * committed, finds no package and creates one afresh in an empty directory. The rows are deleted
+   * and flushed first and the archives second, so rows the database refuses to delete never cost
+   * the package its files, and archives that cannot be removed roll the rows back.
+   *
+   * @param normalizeName the normalized package name
+   */
   @Transactional
-  public void deletePackage(final UUID repoId, final String normalizeName) {
+  public PypiDeletion deletePackage(final UUID repoId, final String normalizeName) {
 
-    final var pythonPypiPackage =
-        this.pypiPackageRepository
-            .findByRepoIdAndNormalizedName(repoId, normalizeName)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
+    final var pythonPypiPackage = this.lockPackage(repoId, normalizeName);
 
-    this.pypiPackageRepository.delete(pythonPypiPackage);
+    final var versions =
+        this.releaseRepository.findAllByPypiPackageId(pythonPypiPackage.getId()).stream()
+            .map(ReleaseVersionRequiresPython::getVersion)
+            .toList();
+
+    return this.removePackage(repoId, pythonPypiPackage, versions);
   }
 
-  /** delete given release, version should be normalized */
+  /**
+   * Deletes a release and its archives, and the package with it when that was its last release, in
+   * one transaction that holds the package's row lock. See {@link #deletePackage} for what the
+   * lock, and the order of rows before archives, guarantee.
+   *
+   * @param normalizeName the normalized package name
+   * @param releaseVersion the version as given by the caller, normalized here
+   */
   @Transactional
-  public void deleteRelease(final UUID packageId, final String releaseVersion) {
+  public PypiDeletion deleteRelease(
+      final UUID repoId, final String normalizeName, final String releaseVersion) {
+
+    final var pythonPypiPackage = this.lockPackage(repoId, normalizeName);
+
+    final var version = ReleaseVersion.of(releaseVersion).getVersion();
 
     final var release =
         this.releaseRepository
-            .findByPypiPackageIdAndVersion(packageId, releaseVersion)
+            .findByPypiPackageIdAndVersion(pythonPypiPackage.getId(), version)
             .orElseThrow(() -> new ItemNotFoundException("releaseNotFound"));
 
     this.releaseRepository.delete(release);
+    this.releaseRepository.flush();
+
+    final var remaining =
+        this.releaseRepository.findAllByPypiPackageIdOrderByCreatedAtDesc(
+            pythonPypiPackage.getId());
+
+    if (remaining.isEmpty()) {
+      return this.removePackage(repoId, pythonPypiPackage, List.of(version));
+    }
+
+    this.updateVersionsIfNecessary(pythonPypiPackage, remaining, version);
+
+    return new PypiDeletion(
+        List.of(version), this.pypiStorageService.deleteRelease(repoId, normalizeName, version));
   }
 
-  @Transactional
-  public void updatePackageReleaseVersionsIfNecessary(
-      final PackageInfo packageInfo, final String releaseVersion) {
+  private PypiPackage lockPackage(final UUID repoId, final String normalizedName) {
 
-    if (releaseVersion.equals(packageInfo.getStableVersion())
-        || releaseVersion.equals(packageInfo.getLatestVersion())) {
-      final var releases =
-          this.releaseRepository.findAllByPypiPackageIdOrderByCreatedAtDesc(packageInfo.getId());
+    return this.pypiPackageRepository
+        .findLockedByRepoIdAndNormalizedName(repoId, normalizedName)
+        .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
+  }
 
-      final var latest = releases.getFirst();
+  private PypiDeletion removePackage(
+      final UUID repoId, final PypiPackage pythonPypiPackage, final List<String> versions) {
 
-      final var stableVersionOptional =
-          releases.stream().filter(Release::isFinalRelease).findFirst();
+    this.pypiPackageRepository.delete(pythonPypiPackage);
+    // Flush so a rejection by the database fails here, before any archive is removed.
+    this.pypiPackageRepository.flush();
 
-      final var newStableVersion = stableVersionOptional.map(Release::getVersion).orElse(null);
+    return new PypiDeletion(
+        versions,
+        this.pypiStorageService.deletePackage(repoId, pythonPypiPackage.getNormalizedName()));
+  }
 
-      this.pypiPackageRepository.updatePackageLatestVersionAndStableVersion(
-          packageInfo.getId(), latest.getVersion(), newStableVersion);
+  /** Points the package at the newest remaining releases when it pointed at the deleted one. */
+  private void updateVersionsIfNecessary(
+      final PypiPackage pythonPypiPackage,
+      final List<Release> remaining,
+      final String deletedVersion) {
+
+    if (!deletedVersion.equals(pythonPypiPackage.getStableVersion())
+        && !deletedVersion.equals(pythonPypiPackage.getLatestVersion())) {
+      return;
     }
+
+    pythonPypiPackage.setLatestVersion(remaining.getFirst().getVersion());
+    pythonPypiPackage.setStableVersion(
+        remaining.stream()
+            .filter(Release::isFinalRelease)
+            .findFirst()
+            .map(Release::getVersion)
+            .orElse(null));
+
+    this.pypiPackageRepository.saveAndFlush(pythonPypiPackage);
   }
 
   public ReleaseDetail getReleaseDetail(final UUID packageId, final String releaseVersion) {
@@ -265,11 +328,6 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
         FreeMarkerTemplateUtils.processTemplateIntoString(
                 template, Map.of("packages", packages, "repoName", repoName, "repoUri", repoUri))
             .getBytes(UTF_8));
-  }
-
-  public boolean isPackageHasNoReleases(final UUID packageId) {
-
-    return this.releaseRepository.countAllByPypiPackageId(packageId) == 0;
   }
 
   /**

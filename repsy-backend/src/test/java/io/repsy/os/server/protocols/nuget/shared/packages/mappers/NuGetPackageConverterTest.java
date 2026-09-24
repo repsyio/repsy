@@ -66,7 +66,7 @@ class NuGetPackageConverterTest {
     final var older = version("1.0.4", 1, 1);
 
     final var result =
-        this.converter.toSearchResult(this.pkg, false, List.of(backport, newer, older));
+        this.converter.toSearchResult(this.pkg, false, true, List.of(backport, newer, older));
 
     assertThat(result.latestVersion()).isEqualTo("2.0.0");
     assertThat(result.title()).isEqualTo("Title of 2.0.0");
@@ -82,6 +82,7 @@ class NuGetPackageConverterTest {
         this.converter.toSearchResult(
             this.pkg,
             false,
+            true,
             List.of(version("1.9.0", 3, 0), version("1.10.0", 1, 0), version("1.2.0", 2, 0)));
 
     assertThat(result.latestVersion()).isEqualTo("1.10.0");
@@ -95,6 +96,7 @@ class NuGetPackageConverterTest {
         this.converter.toSearchResult(
             this.pkg,
             false,
+            true,
             List.of(version("1.0.0.10", 1, 0), version("1.0.0.9", 2, 0), version("1.0.0", 3, 0)));
 
     assertThat(result.latestVersion()).isEqualTo("1.0.0.10");
@@ -108,6 +110,7 @@ class NuGetPackageConverterTest {
         this.converter.toSearchResult(
             this.pkg,
             false,
+            true,
             List.of(version("2.0.0-beta", 3, 100), version("1.0.0", 2, 1), version("1.1.0", 1, 2)));
 
     assertThat(result.latestVersion()).isEqualTo("1.1.0");
@@ -122,6 +125,7 @@ class NuGetPackageConverterTest {
         this.converter.toSearchResult(
             this.pkg,
             true,
+            true,
             List.of(version("1.1.0", 3, 2), version("2.0.0-beta", 1, 100), version("1.0.0", 2, 1)));
 
     assertThat(result.latestVersion()).isEqualTo("2.0.0-beta");
@@ -135,6 +139,7 @@ class NuGetPackageConverterTest {
     final var result =
         this.converter.toSearchResult(
             this.pkg,
+            true,
             true,
             List.of(
                 version("2.0.0-alpha", 4, 0),
@@ -155,6 +160,7 @@ class NuGetPackageConverterTest {
         this.converter.toSearchResult(
             this.pkg,
             false,
+            true,
             List.of(
                 version("1.0.0-rc", 3, 1),
                 version("2.0.0-beta", 1, 2),
@@ -169,7 +175,7 @@ class NuGetPackageConverterTest {
   @Test
   @DisplayName("answers an empty result for a package without listed versions")
   void noVersions() {
-    final var result = this.converter.toSearchResult(this.pkg, true, List.of());
+    final var result = this.converter.toSearchResult(this.pkg, true, true, List.of());
 
     assertThat(result.packageId()).isEqualTo("Some.Package");
     assertThat(result.latestVersion()).isEmpty();
@@ -184,7 +190,42 @@ class NuGetPackageConverterTest {
     final var second = version("3.0.0", 2, 0);
     final var third = version("2.0.0", 3, 0);
 
-    assertThat(this.converter.toSearchResult(this.pkg, false, List.of(first, second, third)))
-        .isEqualTo(this.converter.toSearchResult(this.pkg, false, List.of(third, first, second)));
+    assertThat(this.converter.toSearchResult(this.pkg, false, true, List.of(first, second, third)))
+        .isEqualTo(
+            this.converter.toSearchResult(this.pkg, false, true, List.of(third, first, second)));
+  }
+
+  @Test
+  @DisplayName(
+      "leaves SemVer 2.0.0-only versions out unless the client opted in to them (RPS-1275)")
+  void semVer2VersionsNeedAnOptIn() {
+    final var versions =
+        List.of(
+            version("2.0.0-beta.1", 4, 40),
+            version("1.1.0+build.5", 3, 30),
+            version("1.0.1-beta2", 2, 20),
+            version("1.0.0", 1, 10));
+
+    final var without = this.converter.toSearchResult(this.pkg, true, false, versions);
+    final var with = this.converter.toSearchResult(this.pkg, true, true, versions);
+
+    assertThat(without.latestVersion()).isEqualTo("1.0.1-beta2");
+    assertThat(versionsOf(without)).containsExactly("1.0.1-beta2", "1.0.0");
+    assertThat(without.totalDownloads()).isEqualTo(30);
+    assertThat(with.latestVersion()).isEqualTo("2.0.0-beta.1");
+    assertThat(versionsOf(with))
+        .containsExactly("2.0.0-beta.1", "1.1.0+build.5", "1.0.1-beta2", "1.0.0");
+    assertThat(with.totalDownloads()).isEqualTo(100);
+  }
+
+  @Test
+  @DisplayName("answers an empty result when a package only has SemVer 2.0.0-only versions")
+  void onlySemVer2Versions() {
+    final var result =
+        this.converter.toSearchResult(
+            this.pkg, true, false, List.of(version("1.0.0-rc.1", 1, 1), version("1.0.0+b", 2, 2)));
+
+    assertThat(result.latestVersion()).isEmpty();
+    assertThat(result.versions()).isEmpty();
   }
 }

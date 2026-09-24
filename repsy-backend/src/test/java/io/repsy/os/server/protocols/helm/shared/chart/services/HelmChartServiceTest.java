@@ -106,7 +106,7 @@ class HelmChartServiceTest {
   @DisplayName("findOrCreate() for an absent version creates a row from every form field")
   void findOrCreateCreatesForAnAbsentVersion() {
     final var chart = chartRow();
-    when(this.helmChartRepository.findByRepoIdAndName(REPO_ID, NAME))
+    when(this.helmChartRepository.findWithLockByRepoIdAndName(REPO_ID, NAME))
         .thenReturn(Optional.of(chart));
     when(this.helmChartVersionRepository.findByChartAndVersion(chart, VERSION))
         .thenReturn(Optional.empty());
@@ -138,7 +138,7 @@ class HelmChartServiceTest {
     existing.setDigest("sha256:" + "1".repeat(64));
     existing.setSize(10L);
 
-    when(this.helmChartRepository.findByRepoIdAndName(REPO_ID, NAME))
+    when(this.helmChartRepository.findWithLockByRepoIdAndName(REPO_ID, NAME))
         .thenReturn(Optional.of(chart));
     when(this.helmChartVersionRepository.findByChartAndVersion(chart, VERSION))
         .thenReturn(Optional.of(existing));
@@ -171,7 +171,7 @@ class HelmChartServiceTest {
     existing.setAppVersion("0.1");
     existing.setType("library");
 
-    when(this.helmChartRepository.findByRepoIdAndName(REPO_ID, NAME))
+    when(this.helmChartRepository.findWithLockByRepoIdAndName(REPO_ID, NAME))
         .thenReturn(Optional.of(chart));
     when(this.helmChartVersionRepository.findByChartAndVersion(chart, VERSION))
         .thenReturn(Optional.of(existing));
@@ -189,7 +189,7 @@ class HelmChartServiceTest {
   @DisplayName("findOrCreate() reuses an existing chart parent instead of creating a duplicate")
   void findOrCreateReusesExistingChartParent() {
     final var chart = chartRow();
-    when(this.helmChartRepository.findByRepoIdAndName(REPO_ID, NAME))
+    when(this.helmChartRepository.findWithLockByRepoIdAndName(REPO_ID, NAME))
         .thenReturn(Optional.of(chart));
     when(this.helmChartVersionRepository.findByChartAndVersion(chart, VERSION))
         .thenReturn(Optional.empty());
@@ -252,7 +252,7 @@ class HelmChartServiceTest {
   @DisplayName("findOrCreate() inserts an absent chart parent without failing on the unique index")
   void findOrCreateInsertsAnAbsentChartParentIfAbsent() {
     final var chart = chartRow();
-    when(this.helmChartRepository.findByRepoIdAndName(REPO_ID, NAME))
+    when(this.helmChartRepository.findWithLockByRepoIdAndName(REPO_ID, NAME))
         .thenReturn(Optional.empty(), Optional.of(chart));
     when(this.helmChartVersionRepository.findByChartAndVersion(chart, VERSION))
         .thenReturn(Optional.empty());
@@ -268,7 +268,7 @@ class HelmChartServiceTest {
   @DisplayName("publish() flushes the version row before it hands over to the file writer")
   void publishFlushesTheRowBeforeTheFileIsWritten() throws Exception {
     final var chart = chartRow();
-    when(this.helmChartRepository.findByRepoIdAndName(REPO_ID, NAME))
+    when(this.helmChartRepository.findWithLockByRepoIdAndName(REPO_ID, NAME))
         .thenReturn(Optional.of(chart));
     when(this.helmChartVersionRepository.findByChartAndVersion(chart, VERSION))
         .thenReturn(Optional.empty());
@@ -304,7 +304,7 @@ class HelmChartServiceTest {
   void publishReportsTheReplacedVersion() throws Exception {
     final var chart = chartRow();
     final var existing = versionRow(chart, 10L);
-    when(this.helmChartRepository.findByRepoIdAndName(REPO_ID, NAME))
+    when(this.helmChartRepository.findWithLockByRepoIdAndName(REPO_ID, NAME))
         .thenReturn(Optional.of(chart));
     when(this.helmChartVersionRepository.findByChartAndVersion(chart, VERSION))
         .thenReturn(Optional.of(existing));
@@ -323,7 +323,7 @@ class HelmChartServiceTest {
   @DisplayName("publish() refuses an existing version that may not be replaced, writing nothing")
   void publishRefusesAnExistingVersionWithoutOverride() throws Exception {
     final var chart = chartRow();
-    when(this.helmChartRepository.findByRepoIdAndName(REPO_ID, NAME))
+    when(this.helmChartRepository.findWithLockByRepoIdAndName(REPO_ID, NAME))
         .thenReturn(Optional.of(chart));
     when(this.helmChartVersionRepository.findByChartAndVersion(chart, VERSION))
         .thenReturn(Optional.of(versionRow(chart, 10L)));
@@ -340,7 +340,7 @@ class HelmChartServiceTest {
   @DisplayName("publish() answers a conflict for the version's unique index and writes nothing")
   void publishMapsTheVersionIndexToAConflict() {
     final var chart = chartRow();
-    when(this.helmChartRepository.findByRepoIdAndName(REPO_ID, NAME))
+    when(this.helmChartRepository.findWithLockByRepoIdAndName(REPO_ID, NAME))
         .thenReturn(Optional.of(chart));
     when(this.helmChartVersionRepository.findByChartAndVersion(chart, VERSION))
         .thenReturn(Optional.empty());
@@ -364,7 +364,7 @@ class HelmChartServiceTest {
   @DisplayName("publish() lets any other database violation surface instead of a conflict")
   void publishLeavesOtherViolationsAlone() {
     final var chart = chartRow();
-    when(this.helmChartRepository.findByRepoIdAndName(REPO_ID, NAME))
+    when(this.helmChartRepository.findWithLockByRepoIdAndName(REPO_ID, NAME))
         .thenReturn(Optional.of(chart));
     when(this.helmChartVersionRepository.findByChartAndVersion(chart, VERSION))
         .thenReturn(Optional.empty());
@@ -383,7 +383,7 @@ class HelmChartServiceTest {
   @DisplayName("publish() propagates a failing file writer, after the row was written")
   void publishPropagatesAFailingFileWriter() {
     final var chart = chartRow();
-    when(this.helmChartRepository.findByRepoIdAndName(REPO_ID, NAME))
+    when(this.helmChartRepository.findWithLockByRepoIdAndName(REPO_ID, NAME))
         .thenReturn(Optional.of(chart));
     when(this.helmChartVersionRepository.findByChartAndVersion(chart, VERSION))
         .thenReturn(Optional.empty());
