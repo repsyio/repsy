@@ -29,15 +29,9 @@ import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
 
 const nuget = DESCRIPTORS.nuget;
 
-// RPS-1304 (was RPS-1262 (3)): unlike every other version list the NuGet one has no search box (the sort is there):
-// `GET /api/nuget/packages/{repo}/{id}/versions` takes no search parameter, so the box needs a backend
-// change first and stays pinned.
-registerPackageScenarios(nuget, {
-  knownFailures: {
-    '02-versions-search':
-      'RPS-1304: the NuGet version list has no search box (the API has no search parameter)',
-  },
-});
+// The version list has a search box since RPS-1304 (`GET /api/nuget/packages/{repo}/{id}/versions`
+// takes a `query`), so nothing is pinned.
+registerPackageScenarios(nuget);
 
 test.describe('NuGet package pages', { tag: '@packages' }, () => {
   test('PKG-nuget-07 stable and pre-release versions are listed side by side, newest first', async ({
@@ -103,6 +97,37 @@ test.describe('NuGet package pages', { tag: '@packages' }, () => {
     await expect(versions.rows()).toHaveCount(3);
     await expect.poll(() => rowKeys(versions)).toEqual(['3.0.0', '2.0.0-beta.1', '1.0.0']);
     await expect(versions.row({ ...first, version: '3.0.0-rc.1' })).toHaveCount(0);
+  });
+
+  // RPS-1304: the version search runs on the server before paging, so a version that sits on the
+  // second page of the unfiltered list is found, and a search from page 2 starts again on page 1.
+  test('PKG-nuget-07 the version search spans all pages and restarts from the first', async ({
+    adminPage,
+    seeder,
+    seedVersions,
+  }) => {
+    const repo = await seeder.createRepo(RepoType.NUGET);
+    const seeded = await seedVersions(
+      repo,
+      Array.from({ length: 12 }, (_, i) => `1.0.${i}`),
+    );
+    const oldest = seeded[0];
+    const versions = protocolPages(adminPage, nuget, repo.name).versions(oldest);
+    await versions.goto();
+    await expect(versions.rows()).toHaveCount(10);
+    await versions.expectNoRow(oldest);
+
+    await versions.pagination.next.click();
+    await versions.expectRow(oldest);
+
+    await versions.searchFor(oldest);
+    await expect(versions.rows()).toHaveCount(1);
+    await versions.expectRow(oldest);
+    await expect(versions.pagination.page(2)).toHaveCount(0);
+
+    await versions.search('');
+    await expect(versions.rows()).toHaveCount(10);
+    await expect(versions.pagination.page(1)).toBeVisible();
   });
 
   test('PKG-nuget-07 an unlisted version stays on the versions page and its detail says Listed: No', async ({

@@ -35,6 +35,7 @@ import { DropdownComponent } from '../../../../../shared/components/dropdown/dro
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { PaginationComponent } from '../../../../../shared/components/pagination/pagination.component';
+import { SearchboxComponent } from '../../../../../shared/components/searchbox/searchbox.component';
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
@@ -54,6 +55,7 @@ import { NugetService } from '../../service/nuget.service';
     CommonModule,
     RouterLink,
     SpinnerComponent,
+    SearchboxComponent,
     SortSelectorComponent,
     PaginationComponent,
     DropdownComponent,
@@ -70,6 +72,7 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
   public showConfig = false;
   public pageNum = 0;
   public pageSize = 10;
+  public searchText = '';
   public error: string;
   public packageId: string;
   public pkg: NuGetPackageInfo;
@@ -112,6 +115,12 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
   public ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
+  }
+
+  public search(text: string): void {
+    this.pageNum = 0;
+    this.searchText = text;
+    this.fetchVersions();
   }
 
   public sort(option: Sort): void {
@@ -163,7 +172,13 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
       .fetchPackage(this.packageId)
       .then((pkg) => {
         this.pkg = pkg;
-        return this.nugetService.fetchPackageVersions(this.packageId, this.sortOption, this.pageNum, this.pageSize);
+        return this.nugetService.fetchPackageVersions(
+          this.packageId,
+          this.searchText,
+          this.sortOption,
+          this.pageNum,
+          this.pageSize,
+        );
       })
       .then((pagedData) => {
         this.pagedData.page = pagedData.page;

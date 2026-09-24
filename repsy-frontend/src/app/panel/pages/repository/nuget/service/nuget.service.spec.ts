@@ -158,10 +158,9 @@ describe('NugetService', () => {
       },
       {
         name: 'fetchPackageVersions',
-        invoke: (s) => from(s.fetchPackageVersions(PACKAGE, SORT, PAGE_INDEX, PAGE_SIZE)),
+        invoke: (s, query) => from(s.fetchPackageVersions(PACKAGE, query, SORT, PAGE_INDEX, PAGE_SIZE)),
         api: () => nugetApi.listNugetVersions,
-        args: () => [PACKAGE, PAGEABLE, ''],
-        searchable: false,
+        args: (query) => [PACKAGE, PAGEABLE, '', query],
       },
     ];
     describePagedCalls(() => service, paged);

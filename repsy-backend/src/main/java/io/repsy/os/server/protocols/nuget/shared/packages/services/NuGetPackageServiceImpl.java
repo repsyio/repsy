@@ -174,7 +174,10 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
   @Override
   public Page<NuGetVersionInfo> getVersionInfosPage(
-      final BaseRepoInfo<UUID> repoInfo, final String packageId, final Pageable pageable) {
+      final BaseRepoInfo<UUID> repoInfo,
+      final String packageId,
+      final String query,
+      final Pageable pageable) {
 
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
 
@@ -186,7 +189,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
                 pageable.getSort(), Sort.by(Sort.Direction.DESC, "publishedAt"), "version"));
 
     return this.packageVersionRepository
-        .findByNugetPackageId(pkg.getId(), sortedPageable)
+        .searchByNugetPackageId(pkg.getId(), likePattern("%", query, "%"), sortedPageable)
         .map(v -> this.converter.toVersionInfo(v, packageId));
   }
 
