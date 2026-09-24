@@ -76,6 +76,8 @@ class AuthThrottleIT extends AbstractIntegrationTest {
   private static final int MAX_FAILURES = 20;
   private static final String COUNT_URL = "/api/repos/MAVEN/count";
   private static final String PRIVATE_READ = "/{repo}/com/example/lib/1.0/lib-1.0.pom";
+  private static final String NPM_BEARER_CHALLENGE =
+      "Bearer realm=\"Repsy Managed Registry\", Basic realm=\"Repsy Managed Registry\"";
   private static final String OTHER_CLIENT = "198.51.100.9";
   private static final String TOO_MANY_TEXT =
       "Too many failed authentication attempts. Please try again later.";
@@ -509,7 +511,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
 
       assertThat(response.getStatus()).as(body(response)).isEqualTo(401);
       assertThat(JsonPath.<String>read(body(response), "$.msgId")).isEqualTo("unAuthorized");
-      assertThat(response.getHeader(WWW_AUTHENTICATE)).isNotNull();
+      assertThat(response.getHeader(WWW_AUTHENTICATE)).isEqualTo(NPM_BEARER_CHALLENGE);
     }
 
     final var refused = this.npmBearer(repo, "Bearer " + revoked.secret());
