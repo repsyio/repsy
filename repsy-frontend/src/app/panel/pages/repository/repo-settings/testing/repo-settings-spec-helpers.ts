@@ -22,6 +22,8 @@ export interface ParentFormValues {
   securityScanEnabled: boolean;
   releases: boolean;
   snapshots: boolean;
+  pgpVerifyAllSignaturesEnabled: boolean;
+  pgpKeyServerLookupEnabled: boolean;
 }
 
 const DEFAULTS: ParentFormValues = {
@@ -30,6 +32,8 @@ const DEFAULTS: ParentFormValues = {
   securityScanEnabled: true,
   releases: false,
   snapshots: false,
+  pgpVerifyAllSignaturesEnabled: false,
+  pgpKeyServerLookupEnabled: true,
 };
 
 /** The `generalSettingsForm` the settings page hands to its children: no releases or snapshots controls. */
@@ -44,13 +48,23 @@ export function generalParentForm(values: Partial<ParentFormValues> = {}): FormG
 
 /** The `mavenSettingsForm` the settings page hands to its children for Maven and NuGet repositories. */
 export function releaseAwareParentForm(values: Partial<ParentFormValues> = {}): FormGroup {
-  const { privateRepository, allowOverride, securityScanEnabled, releases, snapshots } = { ...DEFAULTS, ...values };
+  const {
+    privateRepository,
+    allowOverride,
+    securityScanEnabled,
+    releases,
+    snapshots,
+    pgpVerifyAllSignaturesEnabled,
+    pgpKeyServerLookupEnabled,
+  } = { ...DEFAULTS, ...values };
   return new FormGroup({
     privateRepository: new FormControl(privateRepository),
     releases: new FormControl(releases),
     snapshots: new FormControl(snapshots),
     allowOverride: new FormControl(allowOverride),
     securityScanEnabled: new FormControl(securityScanEnabled),
+    pgpVerifyAllSignaturesEnabled: new FormControl(pgpVerifyAllSignaturesEnabled),
+    pgpKeyServerLookupEnabled: new FormControl(pgpKeyServerLookupEnabled),
   });
 }
 

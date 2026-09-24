@@ -21,8 +21,8 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Caps how much of an upload the Maven protocol facade buffers in memory (or spools to disk) before
  * storing it, so a client cannot exhaust the instance's heap or disk with an oversized {@code
- * maven-metadata.xml}, POM or POM signature. A real one is at most a few kilobytes to a few
- * megabytes; these limits leave generous headroom above that (RPS-1121).
+ * maven-metadata.xml}, POM or signature. A real one is at most a few kilobytes to a few megabytes;
+ * these limits leave generous headroom above that (RPS-1121).
  */
 @UtilityClass
 @NullMarked
@@ -37,6 +37,6 @@ public class MavenUploadLimits {
   /** The largest {@code .pom} accepted. */
   public static final long MAX_POM_BYTES = 10 * MEBIBYTE;
 
-  /** The largest {@code .pom.asc} signature accepted. */
-  public static final long MAX_POM_SIGNATURE_BYTES = 64 * KIBIBYTE;
+  /** The largest {@code .asc} signature of an artifact file accepted. */
+  public static final long MAX_SIGNATURE_BYTES = 64 * KIBIBYTE;
 }

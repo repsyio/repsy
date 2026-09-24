@@ -181,7 +181,7 @@ class MavenUploadSizeLimitIT extends AbstractIntegrationTest {
         HttpStatus.BAD_REQUEST,
         "mavenSignatureTooLarge",
         "mavenSignatureTooLarge",
-        "The POM signature file is larger than 64 KiB.");
+        "The signature file is larger than 64 KiB.");
 
     assertThat(stored(repo, POM_SIGNATURE_PATH)).doesNotExist();
     assertThat(this.artifactCount(repo)).isZero();

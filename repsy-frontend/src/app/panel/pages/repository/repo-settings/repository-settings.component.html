@@ -46,7 +46,14 @@
       </div>
 
       @if (repoType === 'maven') {
-        <div><app-signature [repoType]="repoType" [activeRepository]="activeRepository" /></div>
+        <div>
+          <app-signature
+            [repoType]="repoType"
+            [activeRepository]="activeRepository"
+            [parentForm]="mavenSettingsForm"
+            (fetch)="getRepoSettings()"
+          />
+        </div>
       }
       <div><app-deploy-token [repoType]="repoType" [activeRepository]="activeRepository"></app-deploy-token></div>
       <div><app-repo-storage [repoType]="repoType" [repoName]="activeRepository?.repoName" /></div>

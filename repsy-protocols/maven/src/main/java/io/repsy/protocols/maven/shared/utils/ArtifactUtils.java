@@ -18,13 +18,21 @@ package io.repsy.protocols.maven.shared.utils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.shared.artifact.services.VersionComparator;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
@@ -48,10 +56,12 @@ public class ArtifactUtils {
   private static final String METADATA_FILENAME = "maven-metadata.xml";
   private static final String MAVEN_PLUGIN = "maven-plugin";
   private static final String POM_SUFFIX = ".pom";
-  private static final String SIGNED_POM_SUFFIX = ".asc";
+  private static final String SIGNATURE_SUFFIX = ".asc";
   private static final Set<String> CHECKSUM_TYPES = Set.of(".md5", ".sha1", ".sha256", ".sha512");
   private static final String SNAPSHOT_SUFFIX = "SNAPSHOT";
   private static final String SNAPSHOT_MARKER = "(SNAPSHOT|\\d{8}\\.\\d{6}-\\d+)[.-]";
+  private static final String SNAPSHOT_BUILD_MARKER = "(?:SNAPSHOT|(\\d{8}\\.\\d{6})-(\\d+))[.-]";
+  private static final SnapshotBuild LITERAL_SNAPSHOT = new SnapshotBuild("", BigInteger.ZERO);
 
   /**
    * Tells whether a file is the {@code jar} of the given classifier, for example {@code sources} or
@@ -334,8 +344,133 @@ public class ArtifactUtils {
    */
   public static boolean isPomSignature(final StoragePath storagePath) {
     final var fileName = storagePath.getRelativePath().getFileName();
-    return fileName.endsWith(SIGNED_POM_SUFFIX)
-        && isPomFile(fileName.substring(0, fileName.length() - SIGNED_POM_SUFFIX.length()));
+    return fileName.endsWith(SIGNATURE_SUFFIX)
+        && isPomFile(fileName.substring(0, fileName.length() - SIGNATURE_SUFFIX.length()));
+  }
+
+  /**
+   * The {@code .asc} (case-sensitive, like {@link #isMetadataSignature}) of any stored artifact
+   * file: a POM, a jar, a classifier jar, a {@code .module}. The signature of a {@code
+   * maven-metadata.xml} is not one, it is stored unverified (RPS-1185), and neither is the checksum
+   * of a signature ({@code .asc.sha1}), which is a checksum (RPS-1183) (RPS-1188).
+   */
+  public static boolean isArtifactSignature(final StoragePath storagePath) {
+    final var fileName = storagePath.getRelativePath().getFileName();
+    return fileName.endsWith(SIGNATURE_SUFFIX) && !isMetadataFamilyFile(fileName);
+  }
+
+  /**
+   * Tells whether an upload must have its signature verified before it is stored: a {@code
+   * .pom.asc} always, any other artifact {@code .asc} only when the repo verifies every signature
+   * (RPS-1188).
+   */
+  public static boolean isSignatureToVerify(
+      final StoragePath storagePath, final boolean verifyAllSignatures) {
+    return isPomSignature(storagePath) || (verifyAllSignatures && isArtifactSignature(storagePath));
+  }
+
+  /**
+   * Tells whether a signing tool signs a file of a version directory: everything but a checksum, a
+   * signature ({@code .asc}, any case) and the metadata family. That is the POM, the main artifact
+   * and every attached one ({@code -sources.jar}, {@code .module}, {@code .klib}, ...), which
+   * maven-gpg-plugin and Gradle's {@code signing} plugin both sign (RPS-1188).
+   */
+  public static boolean isSignableFile(final String fileName) {
+    return !isChecksumFile(fileName)
+        && !endsWithIgnoreCase(fileName, SIGNATURE_SUFFIX)
+        && !isMetadataFamilyFile(fileName);
+  }
+
+  /**
+   * The file names of a version directory that a version needs a verified signature for to count as
+   * signed (RPS-1188): the {@linkplain #isSignableFile signable} ones. In a {@code SNAPSHOT}
+   * directory only the newest build counts, the files of the highest {@code yyyyMMdd.HHmmss-N}
+   * (older builds are superseded and never signed again, and a literal {@code SNAPSHOT} file counts
+   * as the oldest build).
+   *
+   * @param versionPath the version directory, {@code <group>/<artifactId>/<version>}
+   * @param fileNames the names of the files directly in it
+   */
+  public static List<String> filesToSign(
+      final String versionPath, final Collection<String> fileNames) {
+
+    final var signable = fileNames.stream().filter(ArtifactUtils::isSignableFile).toList();
+    final var segments = versionPath.split("/", -1);
+    final var version = segments[segments.length - 1];
+
+    if (!version.endsWith(SNAPSHOT_SUFFIX) || segments.length < 2) {
+      return signable;
+    }
+
+    final var stem = version.substring(0, version.length() - SNAPSHOT_SUFFIX.length());
+    final var buildPattern =
+        Pattern.compile(
+            Pattern.quote(segments[segments.length - 2] + "-" + stem) + SNAPSHOT_BUILD_MARKER);
+
+    return newestBuild(signable, buildPattern);
+  }
+
+  private static List<String> newestBuild(final List<String> signable, final Pattern buildPattern) {
+
+    final Map<SnapshotBuild, List<String>> builds = new HashMap<>();
+
+    for (final var name : signable) {
+      final var matcher = buildPattern.matcher(name);
+
+      if (matcher.lookingAt()) {
+        builds
+            .computeIfAbsent(
+                snapshotBuildOf(matcher.group(1), matcher.group(2)), k -> new ArrayList<>())
+            .add(name);
+      }
+    }
+
+    return builds.entrySet().stream()
+        .max(Map.Entry.comparingByKey())
+        .map(Map.Entry::getValue)
+        .orElse(List.of());
+  }
+
+  private static SnapshotBuild snapshotBuildOf(
+      final @Nullable String timestamp, final @Nullable String buildNumber) {
+
+    if (timestamp == null || buildNumber == null) {
+      return LITERAL_SNAPSHOT;
+    }
+
+    return new SnapshotBuild(timestamp, new BigInteger(buildNumber));
+  }
+
+  /** A snapshot build, ordered by its deploy timestamp, then its build number. */
+  private record SnapshotBuild(String timestamp, BigInteger number)
+      implements Comparable<SnapshotBuild> {
+
+    @Override
+    public int compareTo(final SnapshotBuild other) {
+      return Comparator.comparing(SnapshotBuild::timestamp)
+          .thenComparing(SnapshotBuild::number)
+          .compare(this, other);
+    }
+  }
+
+  /**
+   * The names of the files that sit directly in the version directory {@code versionPath}
+   * (repo-relative, {@code <group>/<artifactId>/<version>}) among the {@code items} of a storage
+   * listing. Directories are skipped, and so are the files of nested directories, which a recursive
+   * listing also returns but which are not files of this version.
+   */
+  public static List<String> versionDirFileNames(
+      final String versionPath, final List<StorageItemInfo> items) {
+
+    return items.stream()
+        .filter(item -> !item.isDirectory())
+        .filter(
+            item ->
+                item.getPath()
+                    .replace("\\", "/")
+                    .endsWith("/" + versionPath + "/" + item.getName()))
+        .map(StorageItemInfo::getName)
+        .toList();
   }
 
   public static void setReleaseAndLatest(final Metadata metadata) {
@@ -427,7 +562,7 @@ public class ArtifactUtils {
    */
   public static boolean isMetadataSignature(final String fileName) {
 
-    return isMetadataFamilyFile(fileName) && fileName.endsWith(SIGNED_POM_SUFFIX);
+    return isMetadataFamilyFile(fileName) && fileName.endsWith(SIGNATURE_SUFFIX);
   }
 
   /**

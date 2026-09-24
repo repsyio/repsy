@@ -66,6 +66,11 @@ public interface ArtifactService<ID> {
    * Verifies a detached signature of a file that is already stored. Nothing is written or deleted,
    * so a refused signature leaves the repository exactly as it was.
    *
+   * <p>A {@code .pom.asc} is verified on every repo, any other artifact {@code .asc} ({@code
+   * .jar.asc}, {@code -sources.jar.asc}, ...) only on a repo that verifies every signature
+   * (RPS-1188); the signer's key is looked up on the key servers unless the repo switched that off
+   * (RPS-1204).
+   *
    * @param signedStoragePath the path of the signature, {@code <file>.asc}; the file it signs is
    *     read from storage at the same path without the {@code .asc}
    * @param signature the signature as the client sent it
@@ -74,8 +79,11 @@ public interface ArtifactService<ID> {
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException {@code itemNotFound} when
    *     the signed file is not stored, or when no key server knows the key that made the signature
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException {@code
-   *     artifactVersionNotFound} when the POM is stored but its version is not registered
-   *     (RPS-1191)
+   *     artifactVersionNotFound} when the version of the signed file is not registered, which its
+   *     POM's upload does (RPS-1191)
+   * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException {@code
+   *     artifactSigningKeyNotRegistered} when the key is not registered and the repo switched the
+   *     key-server lookup off (RPS-1204)
    */
   void verifySignature(
       BaseRepoInfo<ID> repoInfo, StoragePath signedStoragePath, Resource signature);

@@ -67,6 +67,14 @@ public class Repo {
   @Column(name = "security_scan_enabled", nullable = false)
   private boolean securityScanEnabled;
 
+  /** Maven only (RPS-1188): verify every artifact {@code .asc}, not only the {@code .pom.asc}. */
+  @Column(name = "pgp_verify_all_signatures_enabled", nullable = false)
+  private boolean pgpVerifyAllSignaturesEnabled;
+
+  /** Maven only (RPS-1204): ask public key servers for a signer's key that is not registered. */
+  @Column(name = "pgp_key_server_lookup_enabled", nullable = false)
+  private boolean pgpKeyServerLookupEnabled = true;
+
   @Column(name = "disk_usage", nullable = false)
   private long diskUsage;
 

@@ -21,14 +21,20 @@ import java.util.List;
  * Everywhere a repo's Maven key store lets {@link
  * io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService} look for a
  * signer's public key (RPS-1189): its own registered armored keys, tried first, then the key-server
- * hosts the repo allows (the two hardcoded defaults are tried after that, unconditionally).
+ * hosts the repo allows (the two hardcoded defaults are tried after that, unless the repo switched
+ * the key-server lookup off, RPS-1204, in which case no server is asked at all).
  *
  * @param registeredArmoredKeys armored public key blocks registered directly on the repo
  * @param keyServerHosts the repo's allowed key-server hosts
+ * @param keyServerLookupEnabled whether a key that is not registered is looked up on a key server
  */
-public record PublicKeySources(List<String> registeredArmoredKeys, List<String> keyServerHosts) {
+public record PublicKeySources(
+    List<String> registeredArmoredKeys,
+    List<String> keyServerHosts,
+    boolean keyServerLookupEnabled) {
 
+  /** No registered key and no custom host; the key servers are asked. */
   public static PublicKeySources none() {
-    return new PublicKeySources(List.of(), List.of());
+    return new PublicKeySources(List.of(), List.of(), true);
   }
 }

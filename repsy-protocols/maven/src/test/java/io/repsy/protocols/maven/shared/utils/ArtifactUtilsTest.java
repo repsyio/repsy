@@ -20,10 +20,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import org.apache.maven.artifact.repository.metadata.Metadata;
@@ -652,5 +654,145 @@ class ArtifactUtilsTest {
     ArtifactUtils.checkPomGroupIdMatchesPath(mismatching, "io/stray.pom");
     ArtifactUtils.checkPomGroupIdMatchesPath(mismatching, "com/acme/lib/1.0/other-1.0.pom");
     ArtifactUtils.checkPomGroupIdMatchesPath(null, POM_PATH_OF_ACME_LIB);
+  }
+
+  @ParameterizedTest(name = "{0} is an artifact signature: {1}")
+  @CsvSource({
+    "com/acme/lib/1.0/lib-1.0.pom.asc, true",
+    "com/acme/lib/1.0/lib-1.0.jar.asc, true",
+    "com/acme/lib/1.0/lib-1.0-sources.jar.asc, true",
+    "com/acme/lib/1.0/lib-1.0.module.asc, true",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.jar.asc, true",
+    "com/acme/lib/1.0/lib-1.0.jar.asc.sha1, false",
+    "com/acme/lib/1.0/lib-1.0.jar.ASC, false",
+    "com/acme/lib/maven-metadata.xml.asc, false",
+    "com/acme/lib/1.0-SNAPSHOT/maven-metadata.xml.asc, false",
+    "com/acme/lib/1.0/lib-1.0.jar, false"
+  })
+  @DisplayName("tells the .asc signature of any artifact file by its file name alone (RPS-1188)")
+  void recognisesAnArtifactSignature(final String path, final boolean expected) {
+    final var storagePath = StoragePath.of(UUID.randomUUID(), path);
+
+    assertThat(ArtifactUtils.isArtifactSignature(storagePath)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest(name = "{0}, verify all {1}: {2}")
+  @CsvSource({
+    "com/acme/lib/1.0/lib-1.0.pom.asc, false, true",
+    "com/acme/lib/1.0/lib-1.0.pom.asc, true, true",
+    "com/acme/lib/1.0/lib-1.0.jar.asc, false, false",
+    "com/acme/lib/1.0/lib-1.0.jar.asc, true, true",
+    "com/acme/lib/maven-metadata.xml.asc, true, false",
+    "com/acme/lib/1.0/lib-1.0.jar.asc.sha1, true, false",
+    "com/acme/lib/1.0/lib-1.0.jar, true, false"
+  })
+  @DisplayName("a POM signature is always verified, any other one only when verifying all")
+  void tellsWhichSignaturesAreVerified(
+      final String path, final boolean verifyAll, final boolean expected) {
+    final var storagePath = StoragePath.of(UUID.randomUUID(), path);
+
+    assertThat(ArtifactUtils.isSignatureToVerify(storagePath, verifyAll)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest(name = "{0} is signable: {1}")
+  @CsvSource({
+    "lib-1.0.pom, true",
+    "lib-1.0.jar, true",
+    "lib-1.0-sources.jar, true",
+    "lib-1.0-javadoc.jar, true",
+    "lib-1.0.module, true",
+    "lib-1.0.klib, true",
+    "lib-1.0.tar.gz, true",
+    "lib-1.0-kotlin-tooling-metadata.json, true",
+    "lib-1.0.jar.asc, false",
+    "lib-1.0.jar.ASC, false",
+    "lib-1.0.jar.sha1, false",
+    "lib-1.0.jar.md5, false",
+    "lib-1.0.jar.sha256, false",
+    "lib-1.0.jar.sha512, false",
+    "lib-1.0.jar.asc.sha1, false",
+    "maven-metadata.xml, false",
+    "maven-metadata.xml.sha1, false",
+    "maven-metadata.xml.asc, false"
+  })
+  @DisplayName("tells the files a signing tool signs: not a checksum, a signature or metadata")
+  void recognisesASignableFile(final String fileName, final boolean expected) {
+    assertThat(ArtifactUtils.isSignableFile(fileName)).isEqualTo(expected);
+  }
+
+  @Test
+  @DisplayName("a release version has to sign every signable file of its directory")
+  void aReleaseVersionSignsEverySignableFile() {
+    final var files =
+        List.of(
+            "lib-1.0.pom",
+            "lib-1.0.pom.asc",
+            "lib-1.0.pom.sha1",
+            "lib-1.0.jar",
+            "lib-1.0-sources.jar",
+            "lib-1.0-sources.jar.asc",
+            "lib-1.0.module",
+            "maven-metadata.xml");
+
+    assertThat(ArtifactUtils.filesToSign("com/acme/lib/1.0", files))
+        .containsExactlyInAnyOrder(
+            "lib-1.0.pom", "lib-1.0.jar", "lib-1.0-sources.jar", "lib-1.0.module");
+  }
+
+  @Test
+  @DisplayName("a snapshot version only has to sign the files of its newest build")
+  void aSnapshotVersionSignsItsNewestBuildOnly() {
+    final var files =
+        List.of(
+            "lib-1.0-20260921.101010-1.pom",
+            "lib-1.0-20260921.101010-1.jar",
+            "lib-1.0-20260921.101010-2.pom",
+            "lib-1.0-20260921.101010-2.jar",
+            "lib-1.0-20260921.101010-2-sources.jar",
+            "lib-1.0-20260921.101010-10.pom",
+            "lib-1.0-20260921.101010-10.jar",
+            "lib-1.0-20260921.101010-10.jar.asc",
+            "lib-1.0-20260920.235959-99.jar",
+            "lib-1.0-20260921.101010-10.jar.sha1",
+            "maven-metadata.xml");
+
+    assertThat(ArtifactUtils.filesToSign("com/acme/lib/1.0-SNAPSHOT", files))
+        .containsExactlyInAnyOrder(
+            "lib-1.0-20260921.101010-10.pom", "lib-1.0-20260921.101010-10.jar");
+  }
+
+  @Test
+  @DisplayName("a timestamped snapshot build is newer than a literal SNAPSHOT file")
+  void aTimestampedBuildBeatsALiteralSnapshotFile() {
+    assertThat(
+            ArtifactUtils.filesToSign(
+                "com/acme/lib/1.0-SNAPSHOT",
+                List.of("lib-1.0-SNAPSHOT.jar", "lib-1.0-20260921.101010-1.jar")))
+        .containsExactly("lib-1.0-20260921.101010-1.jar");
+    assertThat(
+            ArtifactUtils.filesToSign(
+                "com/acme/lib/1.0-SNAPSHOT",
+                List.of("lib-1.0-SNAPSHOT.jar", "lib-1.0-SNAPSHOT.pom")))
+        .containsExactlyInAnyOrder("lib-1.0-SNAPSHOT.jar", "lib-1.0-SNAPSHOT.pom");
+  }
+
+  @Test
+  @DisplayName("lists the files that sit directly in the version directory, not nested ones")
+  void listsTheFilesOfTheVersionDirectoryOnly() {
+    final var items =
+        List.of(
+            item("lib-1.0.jar", "/data/key/com/acme/lib/1.0/lib-1.0.jar", false),
+            item("lib-1.0.jar", "\\data\\key\\com\\acme\\lib\\1.0\\lib-1.0.jar", false),
+            item("1.0", "/data/key/com/acme/lib/1.0", true),
+            item("x.jar", "/data/key/com/acme/lib/1.0/nested/x.jar", false),
+            item("y.jar", "/data/key/com/acme/lib/1.0.1/y.jar", false));
+
+    assertThat(ArtifactUtils.versionDirFileNames("com/acme/lib/1.0", items))
+        .containsExactly("lib-1.0.jar", "lib-1.0.jar");
+  }
+
+  private static StorageItemInfo item(
+      final String name, final String path, final boolean directory) {
+    return StorageItemInfo.builder().name(name).path(path).directory(directory).build();
   }
 }

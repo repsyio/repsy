@@ -18,6 +18,7 @@ package io.repsy.protocols.shared.repo.dtos;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
@@ -40,5 +41,10 @@ public class BaseRepoInfo<ID> {
   private boolean allowOverride;
   private boolean searchable;
   private boolean securityScanEnabled;
+  private boolean pgpVerifyAllSignaturesEnabled;
+
+  /** Defaults to {@code true} like the column, so a hand-built info does not switch it off. */
+  @Builder.Default private boolean pgpKeyServerLookupEnabled = true;
+
   private RepoType type;
 }

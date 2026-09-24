@@ -29,6 +29,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
@@ -141,9 +142,22 @@ class ArtifactServiceImplTest {
   @Mock KeyStoreService keyStoreService;
   @Mock ArtifactUpsertHelper artifactUpsertHelper;
   @Mock ArtifactVersionWriteService artifactVersionWriteService;
+  @Mock VersionSignatureService versionSignatureService;
   @Mock StorageStrategy storageStrategy;
 
   @InjectMocks ArtifactServiceImpl artifactService;
+
+  private static RepoInfo repoVerifyingAllSignatures(final UUID id) {
+    return RepoInfo.builder()
+        .id(id)
+        .storageKey(id)
+        .name("mvn")
+        .releases(true)
+        .snapshots(true)
+        .allowOverride(true)
+        .pgpVerifyAllSignaturesEnabled(true)
+        .build();
+  }
 
   private static RepoInfo repo(
       final UUID id, final boolean releases, final boolean snapshots, final boolean allowOverride) {
@@ -633,7 +647,105 @@ class ArtifactServiceImplTest {
 
     assertThat(version.isSigned()).isTrue();
     verify(this.artifactVersionRepository).save(version);
+    verify(this.versionSignatureService).recordVerified(version, "lib-1.0.pom");
+    verifyNoMoreInteractions(this.versionSignatureService);
     verifyNoInteractions(this.repoRepository, this.pgpVerifierService, this.keyStoreService);
+  }
+
+  @Test
+  @DisplayName("stores an artifact signature as sent, touching no row, when not verifying all")
+  void anArtifactSignatureIsIgnoredWhenNotVerifyingAll() {
+    final var id = UUID.randomUUID();
+
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar.asc"),
+        new ByteArrayResource(new byte[0]));
+    this.artifactService.createOrUpdateArtifact(
+        repo(id, true, true, true),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar"),
+        new ByteArrayResource(new byte[0]));
+
+    verifyNoInteractions(
+        this.artifactRepository,
+        this.artifactVersionRepository,
+        this.versionSignatureService,
+        this.storageStrategy,
+        this.repoRepository);
+  }
+
+  @Test
+  @DisplayName("records an artifact signature and recomputes signed when verifying all (RPS-1188)")
+  void anArtifactSignatureIsRecordedWhenVerifyingAll() {
+    final var id = UUID.randomUUID();
+    final var artifact = this.stubArtifact(id);
+    final var version = new ArtifactVersion();
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(version));
+
+    this.artifactService.createOrUpdateArtifact(
+        repoVerifyingAllSignatures(id),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0-sources.jar.asc"),
+        new ByteArrayResource(new byte[0]));
+
+    verify(this.versionSignatureService).recordVerified(version, "lib-1.0-sources.jar");
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0");
+    verify(this.artifactVersionRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("a POM signature recomputes signed instead of setting it when verifying all")
+  void aPomSignatureRecomputesSignedWhenVerifyingAll() {
+    final var id = UUID.randomUUID();
+    final var artifact = this.stubArtifact(id);
+    final var version = new ArtifactVersion();
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(version));
+
+    this.artifactService.createOrUpdateArtifact(
+        repoVerifyingAllSignatures(id),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
+        new ByteArrayResource(new byte[0]));
+
+    assertThat(version.isSigned()).isFalse();
+    verify(this.versionSignatureService).recordVerified(version, "lib-1.0.pom");
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0");
+  }
+
+  @Test
+  @DisplayName("a signable file stored again loses its verified signature when verifying all")
+  void aStoredSignableFileForgetsItsSignatureWhenVerifyingAll() {
+    final var id = UUID.randomUUID();
+    final var artifact = this.stubArtifact(id);
+    final var version = new ArtifactVersion();
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(version));
+
+    this.artifactService.createOrUpdateArtifact(
+        repoVerifyingAllSignatures(id),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0-sources.jar"),
+        new ByteArrayResource(new byte[0]));
+
+    verify(this.versionSignatureService).forget(version, "lib-1.0-sources.jar");
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0");
+  }
+
+  @Test
+  @DisplayName("a checksum, or a file of a version that is not registered yet, changes nothing")
+  void aChecksumOrAnUnregisteredVersionChangesNothingWhenVerifyingAll() {
+    final var id = UUID.randomUUID();
+    this.stubVersion(this.stubArtifact(id), "1.0", false);
+
+    this.artifactService.createOrUpdateArtifact(
+        repoVerifyingAllSignatures(id),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar.sha1"),
+        new ByteArrayResource(new byte[0]));
+    this.artifactService.createOrUpdateArtifact(
+        repoVerifyingAllSignatures(id),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar"),
+        new ByteArrayResource(new byte[0]));
+
+    verifyNoInteractions(this.versionSignatureService);
   }
 
   @Test
@@ -662,8 +774,8 @@ class ArtifactServiceImplTest {
     when(this.storageStrategy.get(pathOf("com/acme/lib/1.0/lib-1.0.pom"), eq("mvn")))
         .thenReturn(Optional.of(pom));
     this.stubVersion(this.stubArtifact(id), "1.0", true);
-    final var sources = new PublicKeySources(List.of(), List.of("keys.acme.com"));
-    when(this.keyStoreService.findPublicKeySources(id)).thenReturn(sources);
+    final var sources = new PublicKeySources(List.of(), List.of("keys.acme.com"), true);
+    when(this.keyStoreService.findPublicKeySources(id, true)).thenReturn(sources);
 
     this.artifactService.verifySignature(
         repo(id, true, true, true),
@@ -671,6 +783,52 @@ class ArtifactServiceImplTest {
         signature);
 
     verify(this.pgpVerifierService).verify(pom, signature, sources);
+  }
+
+  @Test
+  @DisplayName("verifies a jar signature against the stored jar and passes the lookup switch on")
+  void verifiesAnArtifactSignatureWithTheLookupSwitchOfTheRepo() {
+    final var id = UUID.randomUUID();
+    final var jar = new ByteArrayResource("jar".getBytes(StandardCharsets.UTF_8));
+    final var signature = new ByteArrayResource("signature".getBytes(StandardCharsets.UTF_8));
+    when(this.storageStrategy.get(pathOf("com/acme/lib/1.0/lib-1.0.jar"), eq("mvn")))
+        .thenReturn(Optional.of(jar));
+    this.stubVersion(this.stubArtifact(id), "1.0", true);
+    final var sources = new PublicKeySources(List.of(), List.of(), false);
+    when(this.keyStoreService.findPublicKeySources(id, false)).thenReturn(sources);
+    final var lookupOff =
+        RepoInfo.builder()
+            .id(id)
+            .storageKey(id)
+            .name("mvn")
+            .pgpVerifyAllSignaturesEnabled(true)
+            .pgpKeyServerLookupEnabled(false)
+            .build();
+
+    this.artifactService.verifySignature(
+        lookupOff, StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar.asc"), signature);
+
+    verify(this.pgpVerifierService).verify(jar, signature, sources);
+  }
+
+  @Test
+  @DisplayName("refuses a jar signature whose version is not registered (a jar before its POM)")
+  void verifySignatureRefusesAJarSignatureBeforeThePomRegisteredTheVersion() {
+    final var id = UUID.randomUUID();
+    when(this.storageStrategy.get(pathOf("com/acme/lib/1.0/lib-1.0.jar"), eq("mvn")))
+        .thenReturn(Optional.of(new ByteArrayResource(new byte[0])));
+    this.stubVersion(this.stubArtifact(id), "1.0", false);
+
+    assertThatThrownBy(
+            () ->
+                this.artifactService.verifySignature(
+                    repoVerifyingAllSignatures(id),
+                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar.asc"),
+                    new ByteArrayResource(new byte[0])))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("artifactVersionNotFound");
+
+    verifyNoInteractions(this.pgpVerifierService, this.keyStoreService);
   }
 
   @Test
@@ -683,7 +841,7 @@ class ArtifactServiceImplTest {
         .thenReturn(Optional.of(pom));
     this.stubVersion(this.stubArtifact(id), "1.0", true);
     final var sources = PublicKeySources.none();
-    when(this.keyStoreService.findPublicKeySources(id)).thenReturn(sources);
+    when(this.keyStoreService.findPublicKeySources(id, true)).thenReturn(sources);
     doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
         .when(this.pgpVerifierService)
         .verify(pom, signature, sources);
@@ -764,7 +922,7 @@ class ArtifactServiceImplTest {
     final var signature = new ByteArrayResource(new byte[0]);
     this.stubVersion(this.stubArtifact(id), "1.0-SNAPSHOT", true);
     final var sources = PublicKeySources.none();
-    when(this.keyStoreService.findPublicKeySources(id)).thenReturn(sources);
+    when(this.keyStoreService.findPublicKeySources(id, true)).thenReturn(sources);
 
     this.artifactService.verifySignature(
         repo(id, true, true, true),

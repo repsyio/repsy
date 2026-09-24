@@ -504,7 +504,34 @@ a `.pom.asc` signature is verified, its registered public keys are consulted fir
 server. This lets a signature made with a key that is never published to a public server — a
 company-internal key, a CI key, a freshly generated key — verify without network access. A
 signature whose key is neither registered nor found on any allowed or default key server is
-refused with `404` and nothing is stored.
+refused with `404` and nothing is stored. A key block a key server answered is remembered for ten
+minutes, so a deploy with many signatures by one key asks the server once.
+
+Two per-repository settings (repository settings page, or `PUT /api/repos/{repoName}/settings`
+with `pgpVerifyAllSignaturesEnabled` / `pgpKeyServerLookupEnabled`; Maven repositories only) change
+what is verified and where keys are looked up:
+
+- **Default (`pgpVerifyAllSignaturesEnabled` off):** only the `.pom.asc` is verified. Any other
+  signature (`.jar.asc`, `-sources.jar.asc`, `.module.asc`, ...) is stored as it is sent, and a
+  version shows *Signed* when its POM signature verified.
+- **Verify every signature (`pgpVerifyAllSignaturesEnabled` on):** every artifact `.asc` is verified
+  against the file it signs before it is stored, exactly like the `.pom.asc`: a signature that does
+  not match answers `422` and stores nothing. A version then shows *Signed* only when every file of
+  it that a signing tool signs (the POM, the jar, every classifier jar, the `.module`, ... but not
+  checksums, signatures or `maven-metadata.xml`) has a verified signature, so a partly signed
+  release stays *Unsigned*. Files and signatures may arrive in any order, but a signature is
+  refused with `404 itemNotFound` before the file it signs, and with `404 artifactVersionNotFound`
+  before the version's POM was uploaded (`mvn deploy` and Gradle upload the POM first). Uploading a
+  new file, or storing a file again (with *Allow override*), makes the version *Unsigned* until that
+  file's signature is uploaded and verified. For a snapshot only the files of its newest build
+  count. Turning the setting on is not retroactive: a version keeps the *Signed* value it had until
+  the next file is uploaded into it, which recomputes it under this rule (so an already *Signed*
+  version can show *Unsigned* after a redeploy that does not sign every file).
+- **Air-gapped registries (`pgpKeyServerLookupEnabled` off):** the repository consults its
+  registered keys only. A signature made with a key that is not registered is refused at once with
+  `404 artifactSigningKeyNotRegistered`, without contacting any key server (custom hosts,
+  `keyserver.ubuntu.com` or `keys.openpgp.org`), so no network call and no timeout wait. Defaults to
+  on.
 
 ### Authenticating from CI
 
