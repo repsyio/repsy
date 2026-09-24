@@ -200,6 +200,30 @@ describe('MavenBrowserComponent', () => {
       expect(mavenService.createDownloadToken).toHaveBeenCalledOnceWith('/org/Maven-Metadata.xml');
     });
 
+    it('go on a file whose download token cannot be created: no unhandled error, nothing is downloaded', async () => {
+      component.go(dir('org/'));
+      mavenService.createDownloadToken.and.returnValue(throwError(() => new Error('boom')));
+      // RxJS reports an unhandled subscriber error asynchronously, and Jasmine fails the spec on it.
+      const unhandled: unknown[] = [];
+      const onError = (event: ErrorEvent): void => {
+        unhandled.push(event.error);
+        event.preventDefault();
+      };
+      window.addEventListener('error', onError);
+
+      try {
+        component.go(file('Maven-Metadata.xml'));
+        await new Promise<void>((resolve) => setTimeout(resolve));
+
+        expect(unhandled).toEqual([]);
+        expect(mavenService.createDownloadToken).toHaveBeenCalledOnceWith('/org/Maven-Metadata.xml');
+        expect(paths()).toEqual(['/', '/org/']);
+        expect(component.loading).toBeFalse();
+      } finally {
+        window.removeEventListener('error', onError);
+      }
+    });
+
     it('go and goToDir do nothing while a listing is still loading', () => {
       mavenService.getPathContent.and.returnValue(NEVER);
       component.go(dir('org/'));

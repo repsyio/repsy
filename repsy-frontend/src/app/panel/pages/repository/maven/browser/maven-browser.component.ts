@@ -186,8 +186,13 @@ export class MavenBrowserComponent implements OnDestroy {
   // A navigation cannot set an Authorization header, so the file is requested with a token that
   // opens only this path for a minute, instead of the session's access token.
   private download(fullPath: string): void {
-    this.mavenService.createDownloadToken(fullPath).subscribe((downloadToken) => {
-      location.href = `${environment.repoBaseUrl}/${this.activeRepo.repoName}${fullPath}?downloadToken=${encodeURIComponent(downloadToken)}`;
+    this.mavenService.createDownloadToken(fullPath).subscribe({
+      next: (downloadToken) => {
+        location.href = `${environment.repoBaseUrl}/${this.activeRepo.repoName}${fullPath}?downloadToken=${encodeURIComponent(downloadToken)}`;
+      },
+      // The HTTP error interceptor already shows the failure; nothing is downloaded, and the
+      // failure must not become an unhandled RxJS error.
+      error: () => {},
     });
   }
 
