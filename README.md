@@ -357,7 +357,7 @@ admin resets its password, either from the users page in the web UI or directly 
 | `BASIC_AUTH_CACHE_ENABLED` | Remember successful HTTP Basic password checks, so a client that sends its username and password on every request pays for one password verification instead of one per request. See [Authenticating from CI](#authenticating-from-ci). | `true` |
 | `BASIC_AUTH_CACHE_TTL_SECONDS` | How long a remembered password check stays valid | `300` |
 | `BASIC_AUTH_CACHE_MAX_ENTRIES` | How many remembered password checks are kept | `10000` |
-| `AUTH_THROTTLE_ENABLED` | Limit the failed password checks of one client (HTTP Basic and web UI login), so a flood of wrong credentials cannot keep the CPU busy with password verification. A client over the limit is answered with `429 Too Many Requests`. See [Authenticating from CI](#authenticating-from-ci). | `true` |
+| `AUTH_THROTTLE_ENABLED` | Limit the failed password checks of one client (HTTP Basic, unrecognised Bearer tokens and web UI login), so a flood of wrong credentials cannot keep the CPU busy with password verification. A client over the limit is answered with `429 Too Many Requests`. See [Authenticating from CI](#authenticating-from-ci). | `true` |
 | `AUTH_THROTTLE_MAX_FAILURES` | How many failed password checks one client may make per window before its next password check is refused | `20` |
 | `AUTH_THROTTLE_WINDOW_SECONDS` | Length of the window in seconds. When it ends, the client starts again with a clean count | `60` |
 | `AUTH_THROTTLE_MAX_CLIENTS` | How many clients are tracked at once | `10000` |
@@ -529,13 +529,24 @@ a BCrypt verification, until the window ends. That caps what a flood of wrong cr
 about a second of CPU per client and minute. Set `AUTH_THROTTLE_ENABLED` to `false` to turn the
 limit off.
 
-- **What counts:** only a failed password verification: a wrong password, or a username that does
-  not exist. Both count the same and are refused the same way, so the limit never reveals which
-  usernames exist, and it is keyed on the client, never on the username. A request that succeeds,
-  a deploy token, a bearer token and a request that carries no username do not count, and a success
-  does not reset the count: only the end of the window does.
+- **What counts:** a failed password verification (a wrong password, or a username that does not
+  exist) and a credential sent as a `Bearer` value that Repsy does not recognise: a deploy token
+  that was revoked, rotated or belongs to another repository, an expired or forged token (npm's
+  `_authToken`, a NuGet API key, a Cargo or Ruby token, a `docker` client replaying an old token).
+  All of them count the same and are refused the same way (`401 unAuthorized`), so the limit never
+  reveals which usernames exist, and it is keyed on the client, never on the username. A request
+  that succeeds, a valid deploy token, a valid bearer token, a recognised token that is refused
+  (revoked or read-only for a write, or without the admin role for a management call) and a
+  request that carries no username do not count, and a success does not reset the count: only the
+  end of the window does.
+- **A stale token in CI:** a job that keeps sending a rotated or revoked token (an old
+  `NPM_TOKEN`, an outdated `--api-key`) spends the same budget as a wrong password. `npm install`
+  sends many requests at once, so one stale token can use up the 20 failures within a second and
+  block the address for the rest of the window, until the token is fixed. Valid tokens keep
+  working while an address is blocked. Rotate the secret in the job as soon as you revoke it in
+  Repsy.
 - **Shared addresses:** many users behind one address (a company NAT, shared CI egress) share one
-  count. A password Repsy remembers (see above) and a deploy token cost no verification and keep
+  count. A password Repsy remembers (see above), a valid deploy token and a valid bearer token cost no verification and keep
   working for a client that is over the limit, so a CI job is not locked out by a neighbour that
   sends wrong passwords. A client that keeps sending guesses after it was blocked (ten times the
   limit) loses that as well until its window ends. Raise `AUTH_THROTTLE_MAX_FAILURES` if a shared

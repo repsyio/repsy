@@ -76,6 +76,10 @@ public class ProtocolAuthService {
    * that deploy token: bound to its repo, read-only and expiry checked. Its {@code username} claim
    * is whatever the client typed into the Basic credentials, so it never identifies a user
    * (RPS-979).
+   *
+   * <p>A Bearer value that is neither a live deploy token nor a verifiable protocol JWT answers
+   * {@code unAuthorized} and counts against {@link AuthFailureThrottle}, like a wrong Basic
+   * password (RPS-1209).
    */
   public void handleBearerAuth(
       final @NonNull String authHeader,
@@ -89,7 +93,7 @@ public class ProtocolAuthService {
       return;
     }
 
-    final var authenticationType = this.extractAuthenticationTypeChecked(authHeader);
+    final var authenticationType = this.verifiedAuthenticationType(authHeader);
 
     if (authenticationType == AuthenticationType.DEPLOY_TOKEN) {
       this.authorizeTokenRequestTokenId(
@@ -136,16 +140,26 @@ public class ProtocolAuthService {
   }
 
   /**
-   * {@link JwtUtils#extractAuthenticationType} rejects a claim it does not recognize with {@link
+   * Verifies the bearer JWT and returns its authentication type. A Bearer value that is no live
+   * deploy token and no protocol JWT is a wrong credential: it answers {@code unAuthorized} like a
+   * wrong password and counts as one failure against the client (RPS-1209), whatever the reason the
+   * JWT was refused (bad signature, expired, wrong realm).
+   *
+   * <p>{@link JwtUtils#extractAuthenticationType} rejects a claim it does not recognize with {@link
    * BadRequestException}. That is right for a request body the client controls, but an unrecognized
    * {@code authentication_type} claim in a bearer token is a credential problem, not a bad request,
-   * so every protocol answers it the same way an invalid signature would: 401.
+   * so every protocol answers it the same way an invalid signature would: 401 (RPS-1171).
+   *
+   * <p>The check comes after the verification, so a verified token is never refused for the count,
+   * like a remembered password (RPS-1092). What Repsy recognized but refuses (a revoked or
+   * read-only deploy token, no ADMIN for MANAGE) is decided later and does not count.
    */
-  private @NonNull AuthenticationType extractAuthenticationTypeChecked(
-      final @NonNull String authHeader) {
+  private @NonNull AuthenticationType verifiedAuthenticationType(final @NonNull String authHeader) {
     try {
       return this.jwtUtils.extractAuthenticationType(authHeader, TokenRealm.PROTOCOL);
-    } catch (final BadRequestException _) {
+    } catch (final BadRequestException | UnAuthorizedException _) {
+      this.authFailureThrottle.checkAllowed();
+      this.authFailureThrottle.recordFailure();
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
   }

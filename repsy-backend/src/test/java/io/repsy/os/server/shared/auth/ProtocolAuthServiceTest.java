@@ -437,13 +437,10 @@ class ProtocolAuthServiceTest {
         new VerifiedPasswordCache(new BasicAuthCacheProperties(true, 300, 100));
     private final AuthFailureThrottle throttle =
         new AuthFailureThrottle(new AuthThrottleProperties(true, LIMIT, 60, 100));
+    private final JwtUtils jwt = Mockito.mock(JwtUtils.class);
+    private final DeployTokenService deployTokens = Mockito.mock(DeployTokenService.class);
     private final ProtocolAuthService service =
-        new ProtocolAuthService(
-            this.users,
-            Mockito.mock(JwtUtils.class),
-            Mockito.mock(DeployTokenService.class),
-            this.cache,
-            this.throttle);
+        new ProtocolAuthService(this.users, this.jwt, this.deployTokens, this.cache, this.throttle);
 
     private final UserInfo dave =
         UserInfo.builder()
@@ -531,6 +528,134 @@ class ProtocolAuthServiceTest {
 
       assertThatThrownBy(() -> this.service.authenticateUser(basicAuth("dave", PASSWORD)))
           .isInstanceOf(TooManyRequestsException.class);
+    }
+
+    private static final String BEARER = "Bearer not-a-known-token";
+    private final UUID repoId = UUID.randomUUID();
+
+    private void bearer(final Permission permission) {
+      this.service.handleBearerAuth(BEARER, this.repoId, permission);
+    }
+
+    private void rejectBearerAs(final String messageId) {
+      when(this.deployTokens.findByRepoIdAndToken(any(), anyString())).thenReturn(Optional.empty());
+      when(this.jwt.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenThrow(new UnAuthorizedException(messageId));
+    }
+
+    private void blockTheClientWithBadBearers() {
+      this.rejectBearerAs(ErrorConstants.ACCESS_NOT_ALLOWED);
+      for (var i = 0; i < LIMIT; i++) {
+        assertUnauthorized(() -> this.bearer(Permission.READ));
+      }
+    }
+
+    /** RPS-1209: a bearer value nobody recognizes is a wrong credential, like a wrong password. */
+    @Test
+    @DisplayName("a bearer value that is no deploy token and no JWT is unAuthorized and counted")
+    void unknownBearerIsCounted() {
+      this.rejectBearerAs(ErrorConstants.ACCESS_NOT_ALLOWED);
+
+      for (var i = 0; i < LIMIT; i++) {
+        assertUnauthorized(() -> this.bearer(Permission.READ));
+      }
+
+      assertThatThrownBy(() -> this.bearer(Permission.READ))
+          .isInstanceOf(TooManyRequestsException.class);
+      assertThatThrownBy(() -> this.service.authenticateUser(basicAuth("dave", "wrong")))
+          .isInstanceOf(TooManyRequestsException.class);
+    }
+
+    @Test
+    @DisplayName("an expired protocol JWT answers unAuthorized, not sessionExpired, and is counted")
+    void expiredJwtIsCounted() {
+      this.rejectBearerAs("sessionExpired");
+
+      for (var i = 0; i < LIMIT; i++) {
+        assertUnauthorized(() -> this.bearer(Permission.READ));
+      }
+
+      assertThatThrownBy(() -> this.bearer(Permission.READ))
+          .isInstanceOf(TooManyRequestsException.class);
+    }
+
+    @Test
+    @DisplayName("an unrecognized authentication type claim is counted too")
+    void unrecognizedAuthTypeIsCounted() {
+      when(this.deployTokens.findByRepoIdAndToken(any(), anyString())).thenReturn(Optional.empty());
+      when(this.jwt.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenThrow(new BadRequestException("invalidAuthType"));
+
+      for (var i = 0; i < LIMIT; i++) {
+        assertUnauthorized(() -> this.bearer(Permission.READ));
+      }
+
+      assertThatThrownBy(() -> this.bearer(Permission.READ))
+          .isInstanceOf(TooManyRequestsException.class);
+    }
+
+    @Test
+    @DisplayName("a verified JWT passes while the client is blocked")
+    void verifiedJwtPassesWhileBlocked() {
+      this.blockTheClientWithBadBearers();
+      when(this.jwt.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenReturn(AuthenticationType.USERNAME_PASSWORD);
+      when(this.jwt.verifyAndExtractUsername(anyString(), any(TokenRealm.class)))
+          .thenReturn("dave");
+      when(this.users.getAuthenticatedUserByUsername("dave")).thenReturn(this.dave);
+
+      this.bearer(Permission.WRITE);
+    }
+
+    @Test
+    @DisplayName("a raw deploy token passes while the client is blocked and is not counted")
+    void rawDeployTokenPassesWhileBlocked() {
+      final var info = new DeployTokenInfo();
+      info.setId(UUID.randomUUID());
+
+      // One failure is on the count, the limit is two: the raw tokens below must not add to it.
+      this.rejectBearerAs(ErrorConstants.ACCESS_NOT_ALLOWED);
+      assertUnauthorized(() -> this.bearer(Permission.READ));
+      when(this.deployTokens.findByRepoIdAndToken(this.repoId, "not-a-known-token"))
+          .thenReturn(Optional.of(info));
+      for (var i = 0; i < LIMIT * 3; i++) {
+        this.bearer(Permission.WRITE);
+      }
+      when(this.deployTokens.findByRepoIdAndToken(this.repoId, "not-a-known-token"))
+          .thenReturn(Optional.empty());
+      assertUnauthorized(() -> this.bearer(Permission.READ));
+
+      // Now the client is blocked, and the raw token still passes.
+      when(this.deployTokens.findByRepoIdAndToken(this.repoId, "not-a-known-token"))
+          .thenReturn(Optional.of(info));
+      this.bearer(Permission.WRITE);
+    }
+
+    @Test
+    @DisplayName("a revoked or read-only deploy-token JWT is refused without being counted")
+    void recognizedDeployTokenJwtIsNotCounted() {
+      final var tokenId = UUID.randomUUID();
+      when(this.deployTokens.findByRepoIdAndToken(any(), anyString())).thenReturn(Optional.empty());
+      when(this.jwt.extractAuthenticationType(anyString(), any(TokenRealm.class)))
+          .thenReturn(AuthenticationType.DEPLOY_TOKEN);
+      when(this.jwt.extractUserId(anyString(), any(TokenRealm.class))).thenReturn(tokenId);
+
+      for (var i = 0; i <= LIMIT; i++) {
+        // Revoked: the token id is gone.
+        assertUnauthorized(() -> this.bearer(Permission.READ));
+      }
+
+      final var readOnly = new DeployTokenInfo();
+      readOnly.setId(tokenId);
+      readOnly.setReadOnly(true);
+      when(this.deployTokens.findByRepoIdAndTokenId(this.repoId, tokenId))
+          .thenReturn(Optional.of(readOnly));
+
+      for (var i = 0; i <= LIMIT; i++) {
+        assertUnauthorized(() -> this.bearer(Permission.WRITE));
+      }
+
+      this.bearer(Permission.READ);
     }
   }
 
