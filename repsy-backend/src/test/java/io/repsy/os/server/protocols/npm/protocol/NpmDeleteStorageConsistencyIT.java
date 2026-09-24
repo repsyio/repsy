@@ -195,6 +195,12 @@ class NpmDeleteStorageConsistencyIT extends AbstractIntegrationTest {
     final var name = uniqueRepoName("npm-del");
     final var created = this.repoTxService.createRepo(name, RepoType.NPM, false, null);
     this.createdRepoIds.add(created.getId());
+    // A publish queues a vulnerability scan, and its thread reads the file system through the very
+    // spy the tests stub. Mockito keeps a stub that is being set up on the spy itself, so a call
+    // from that thread between "when" and the stubbed call takes the stub for its own, and the test
+    // fails with UnfinishedStubbingException (RPS-1336). No scan, no thread.
+    this.jdbcTemplate.update(
+        "update repo set security_scan_enabled = false where id = ?", created.getId());
     this.npmStorageService.createRepo(created.getId());
 
     return this.repoRepository.findByName(name).orElseThrow();
