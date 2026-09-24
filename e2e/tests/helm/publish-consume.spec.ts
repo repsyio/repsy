@@ -50,11 +50,13 @@ import {
 import {
   adminCredential,
   chartFileName,
+  classicRepoUrl,
   indexEntry,
   ociChartRef,
   ociRepoRef,
   parseIndex,
   rawGetIndex,
+  registryHost,
 } from '../../src/clients/helm-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import { registerPublishConsumeLoop } from '../../src/scenarios/loop.js';
@@ -81,7 +83,7 @@ test(
       [
         'registry',
         'login',
-        'localhost:9090',
+        registryHost(),
         '-u',
         token.username,
         '--password-stdin',
@@ -103,7 +105,7 @@ test(
     ) as { auths: Record<string, { auth: string }> };
     const expectedAuth = Buffer.from(`${token.username}:${token.token}`).toString('base64');
     expect(
-      written.auths['localhost:9090']?.auth,
+      written.auths[registryHost()]?.auth,
       'the same shape renderHelmRegistryConfig writes',
     ).toBe(expectedAuth);
 
@@ -130,7 +132,7 @@ test(
       [
         'registry',
         'login',
-        'localhost:9090',
+        registryHost(),
         '-u',
         token.username,
         '--password-stdin',
@@ -252,7 +254,7 @@ test(
       [
         'pull',
         '--repo',
-        `http://localhost:9090/${repo.name}`,
+        classicRepoUrl(repo.name),
         chart,
         '--version',
         version,
