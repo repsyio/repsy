@@ -448,10 +448,20 @@ public class CrateUtils {
     return CrateUtils.readU32LittleEndian(inputStream);
   }
 
+  /**
+   * The order of a crate's versions for {@code pageable}. Versions are sorted in memory, so ties on
+   * the requested key (versions published in the same instant) are broken by the version string,
+   * which is unique within a crate, and every page sees the same order (RPS-1298).
+   */
   public static Comparator<CrateVersionListItem> resolveVersionSort(final Pageable pageable) {
 
+    final Comparator<CrateVersionListItem> tieBreaker =
+        Comparator.comparing(CrateVersionListItem::version);
+
     if (pageable.getSort().isUnsorted()) {
-      return Comparator.comparing(CrateVersionListItem::createdAt).reversed();
+      return Comparator.comparing(CrateVersionListItem::createdAt)
+          .reversed()
+          .thenComparing(tieBreaker);
     }
 
     final var order = pageable.getSort().iterator().next();
@@ -464,7 +474,7 @@ public class CrateUtils {
       comparator = comparator.reversed();
     }
 
-    return comparator;
+    return comparator.thenComparing(tieBreaker);
   }
 
   /** Whether the crate has a library target, and the edition its manifest declares, if any. */

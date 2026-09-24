@@ -20,10 +20,13 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
+import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +39,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 @DisplayName("CrateUtils")
 class CrateUtilsTest {
@@ -464,6 +469,52 @@ class CrateUtilsTest {
 
       assertThat(dropped.authors()).isNull();
       assertThat(dropped.categories()).isNull();
+    }
+  }
+
+  @Nested
+  @DisplayName("resolveVersionSort()")
+  class ResolveVersionSort {
+
+    private final Instant sameInstant = Instant.parse("2026-01-01T00:00:00Z");
+
+    private List<CrateVersionListItem> tied() {
+      return List.of(
+          new CrateVersionListItem("1.0.2", this.sameInstant),
+          new CrateVersionListItem("1.0.0", this.sameInstant),
+          new CrateVersionListItem("1.0.10", this.sameInstant),
+          new CrateVersionListItem("1.0.1", this.sameInstant));
+    }
+
+    private List<String> sorted(final PageRequest pageable, final boolean shuffled) {
+      final var input = new java.util.ArrayList<>(this.tied());
+      if (shuffled) {
+        Collections.reverse(input);
+      }
+
+      return input.stream()
+          .sorted(CrateUtils.resolveVersionSort(pageable))
+          .map(CrateVersionListItem::version)
+          .toList();
+    }
+
+    @Test
+    @DisplayName(
+        "versions tied on createdAt come out in the same order whatever order they came in")
+    void tiedOnCreatedAtAreStable() {
+      final var pageable = PageRequest.of(0, 2, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+      assertThat(this.sorted(pageable, false))
+          .containsExactly("1.0.0", "1.0.1", "1.0.10", "1.0.2")
+          .isEqualTo(this.sorted(pageable, true));
+    }
+
+    @Test
+    @DisplayName("the default order is stable for versions tied on createdAt")
+    void defaultOrderIsStable() {
+      final var pageable = PageRequest.of(0, 2);
+
+      assertThat(this.sorted(pageable, false)).isEqualTo(this.sorted(pageable, true));
     }
   }
 }
