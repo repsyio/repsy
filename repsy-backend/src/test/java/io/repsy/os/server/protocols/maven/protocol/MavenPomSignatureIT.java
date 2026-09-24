@@ -455,8 +455,7 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
         HttpStatus.NOT_FOUND,
         "artifactSigningKeyNotRegistered",
         "artifactSigningKeyNotRegistered",
-        "The key that signed this artifact is not registered for the repository, and key-server"
-            + " lookup is disabled.");
+        "The key that signed this artifact is not registered, and key-server lookup is off.");
 
     assertThat(KEY_SERVER_REQUESTS.get()).isZero();
     assertThat(stored(repo, RELEASE_ASC)).doesNotExist();

@@ -521,7 +521,11 @@ what is verified and where keys are looked up:
   checksums, signatures or `maven-metadata.xml`) has a verified signature, so a partly signed
   release stays *Unsigned*. Files and signatures may arrive in any order, but a signature is
   refused with `404 itemNotFound` before the file it signs, and with `404 artifactVersionNotFound`
-  before the version's POM was uploaded (`mvn deploy` and Gradle upload the POM first). Uploading a
+  before the version's POM was uploaded (`mvn deploy` uploads the POM first). Maven 3.9 uploads the
+  other files in parallel by default, so the signature of a large file can reach Repsy before the
+  file has been stored and fail the deploy with that `404`: deploy sequentially with
+  `-Daether.connector.basic.threads=1` (as a Maven argument, or in `.mvn/maven.config`) on a
+  repository that verifies every signature. Uploading a
   new file, or storing a file again (with *Allow override*), makes the version *Unsigned* until that
   file's signature is uploaded and verified. For a snapshot only the files of its newest build
   count. Turning the setting on is not retroactive: a version keeps the *Signed* value it had until

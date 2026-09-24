@@ -190,6 +190,13 @@ public class PGPVerifierService {
       throw new ItemNotFoundException("artifactSigningKeyNotRegistered");
     }
 
+    return this.findOnKeyServers(sources, keyIdHex, keyId);
+  }
+
+  /** The repo's own key-server hosts first, then the two default key servers. */
+  private @NonNull Optional<MatchedKey> findOnKeyServers(
+      final @Nullable PublicKeySources sources, final @NonNull String keyIdHex, final long keyId) {
+
     final var customHosts = sources != null ? sources.keyServerHosts() : null;
 
     final var customKey = this.findInCustomHosts(customHosts, keyIdHex, keyId);
@@ -287,21 +294,35 @@ public class PGPVerifierService {
       final @NonNull String serverUrl, final long keyId) {
 
     final var cachedKeyData = this.keyBlocksByUrl.getIfPresent(serverUrl);
-    final var keyData = cachedKeyData != null ? cachedKeyData : this.downloadKeyData(serverUrl);
 
-    if (keyData == null || !keyData.contains("-----BEGIN PGP PUBLIC KEY BLOCK-----")) {
+    if (cachedKeyData != null) {
+      // A hit is not stored again: it must not push its own expiry back.
+      return this.parseKeyData(cachedKeyData, serverUrl, keyId);
+    }
+
+    final var keyData = this.downloadKeyData(serverUrl);
+
+    if (keyData == null) {
+      return Optional.empty();
+    }
+
+    final var key = this.parseKeyData(keyData, serverUrl, keyId);
+
+    // Only an answer that parsed and holds the key is remembered.
+    key.ifPresent(matched -> this.keyBlocksByUrl.put(serverUrl, keyData));
+
+    return key;
+  }
+
+  private @NonNull Optional<MatchedKey> parseKeyData(
+      final @NonNull String keyData, final @NonNull String serverUrl, final long keyId) {
+
+    if (!keyData.contains("-----BEGIN PGP PUBLIC KEY BLOCK-----")) {
       return Optional.empty();
     }
 
     try {
-      final var key = this.parsePublicKey(keyData, keyId);
-
-      // Only what was just downloaded is stored: a hit must not push its own expiry back.
-      if (key.isPresent() && cachedKeyData == null) {
-        this.keyBlocksByUrl.put(serverUrl, keyData);
-      }
-
-      return key;
+      return this.parsePublicKey(keyData, keyId);
     } catch (final PGPException | IOException | RuntimeException exception) {
       // RPS-1194: a key server can answer something that isn't a valid armored key (a proxy error
       // page, a truncated block). That must be treated the same as "this server does not have the
