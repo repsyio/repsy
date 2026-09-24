@@ -62,7 +62,6 @@
             required
             type="text"
             class="input-text-secondary w-full"
-            (keydown.enter)="form.valid && createRepo()"
           />
           <div class="text-body2 text-error min-h-7 pt-1">
             @if (form.get('name').errors?.['required'] && form.get('name').touched) {
@@ -126,6 +125,7 @@
       <div class="flex flex-col flex-col-reverse gap-2 sm:ml-auto sm:flex-row">
         <button
           data-testid="repo-create-cancel"
+          type="button"
           (click)="closeModal()"
           [disabled]="loading"
           class="repsy-btn-secondary w-full sm:w-auto"

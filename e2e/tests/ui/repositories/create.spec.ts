@@ -117,6 +117,43 @@ test.describe('Create repository modal', () => {
     await expect(modal.typeToggle).toHaveText(cargo.label);
   });
 
+  // RPS-1267: Cancel sits inside the form; it must be a plain button, and Enter in the name field
+  // must send exactly one create request (the form's own submit, not a second key handler).
+  test('REPO-01: Cancel closes the modal without a create request, Enter in the name creates once', async ({
+    adminPage,
+    seeder,
+  }) => {
+    const repos = new RepositoriesPage(adminPage);
+    const maven = uiRepoType(RepoType.MAVEN);
+    const name = seeder.reserveRepoName(maven.type);
+    seeder.adoptRepo(name);
+    const creates: string[] = [];
+    adminPage.on('request', (request) => {
+      if (request.method() === 'POST' && /\/api\/repos\/[A-Za-z]+$/.test(request.url())) {
+        creates.push(request.url());
+      }
+    });
+    await repos.goto();
+
+    const modal = await repos.openCreateModal();
+    await expect(modal.cancelButton).toHaveAttribute('type', 'button');
+    await modal.fillName(name);
+    await modal.cancelButton.click();
+    await modal.expectClosed();
+    // Give a stray submit the time it would need, then check nothing was sent.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(creates).toEqual([]);
+
+    await repos.openCreateModal();
+    await expect(modal.nameInput).toHaveValue('');
+    await modal.selectType(maven);
+    await modal.fillName(name);
+    await repos.afterInfoResponses(() => modal.nameInput.press('Enter'));
+    await repos.toasts.expectSuccess('Repository created successfully');
+    await modal.expectClosed();
+    expect(creates).toHaveLength(1);
+  });
+
   test('REPO-01: creating from the dashboard works too and lands on the list', async ({
     adminPage,
     seeder,

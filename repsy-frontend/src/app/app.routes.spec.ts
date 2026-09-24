@@ -41,7 +41,7 @@ describe('app routes', () => {
       ['login', LoginComponent],
       ['', AuthRedirectComponent],
       ['', PanelLayoutComponent],
-      ['**', NotFoundComponent],
+      ['**', undefined],
     ]);
   });
 
@@ -54,9 +54,10 @@ describe('app routes', () => {
     expect(routes[1].pathMatch).toBe('full');
   });
 
-  it('answers any unknown URL with the not-found page', () => {
-    expect(routes.at(-1)).toEqual(jasmine.objectContaining({ path: '**', component: NotFoundComponent }));
-    expect(routes.at(-1)!.title).toBe('repsy | Not Found');
+  it('sends any unknown URL to the not-found page, which lives inside the panel layout', () => {
+    expect(routes.at(-1)).toEqual(jasmine.objectContaining({ path: '**', redirectTo: 'not-found' }));
+    expect(routes.at(-1)!.component).toBeUndefined();
+    expect(child('not-found').component).toBe(NotFoundComponent);
   });
 
   describe('inside the panel layout', () => {

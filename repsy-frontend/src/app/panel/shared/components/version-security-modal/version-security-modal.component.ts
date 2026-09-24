@@ -21,6 +21,7 @@ import { finalize } from 'rxjs/operators';
 
 import { RepoType, ScanOverview, VulnerabilityScanControllerService } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
+import { PortalToBodyDirective } from '../../directives/portal-to-body.directive';
 import { recentScanNote } from '../../util/rescan-status.util';
 import { buildArtifactDetailRoute } from '../../util/security-detail-route.util';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
@@ -29,6 +30,7 @@ import { SeverityBreakdownComponent } from '../severity-breakdown/severity-break
 @Component({
   selector: 'app-version-security-modal',
   standalone: true,
+  hostDirectives: [PortalToBodyDirective],
   imports: [CommonModule, SpinnerComponent, SeverityBreakdownComponent, RescanNoteComponent],
   templateUrl: './version-security-modal.component.html',
 })

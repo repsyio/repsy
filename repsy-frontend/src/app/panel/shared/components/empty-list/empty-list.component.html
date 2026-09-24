@@ -8,8 +8,12 @@
     alt="hippo-empty"
   />
   <div>
-    <p class="text-[20px] text-[#9FA0A0]">Your list is empty,</p>
-    <p class="mt-2 text-[20px] text-[#9FA0A0]">just like this hippo’s to-do list!</p>
-    <p class="mt-4 text-[14px] text-[#9FA0A0]">Go ahead, add a new item!</p>
+    @if (message()) {
+      <p data-testid="empty-list-message" class="text-[20px] text-[#9FA0A0]">{{ message() }}</p>
+    } @else {
+      <p class="text-[20px] text-[#9FA0A0]">Your list is empty,</p>
+      <p class="mt-2 text-[20px] text-[#9FA0A0]">just like this hippo’s to-do list!</p>
+      <p class="mt-4 text-[14px] text-[#9FA0A0]">Go ahead, add a new item!</p>
+    }
   </div>
 </div>

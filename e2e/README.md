@@ -2569,13 +2569,13 @@ pages open. Files: `src/ui/pages/{dashboard,repositories,repo-create-modal}.ts`,
 `./run.sh test --protocol ui --grep "DASH-|REPO-"` runs it; the P0 cases (DASH-01, REPO-01 for maven,
 npm and docker, REPO-06, REPO-10) are also `@smoke`.
 
-| Spec                           | Scenarios                                                                                                                                            |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dashboard/dashboard.spec.ts`  | DASH-01 cards and counts against the API, DASH-02 Recent Activity, DASH-03 count row -> filtered list, DASH-04 USER                                  |
-| `repositories/create.spec.ts`  | REPO-01 (one case per row of `UI_REPO_TYPES`, plus public+description, default type, from the dashboard), REPO-02 validation, REPO-03 duplicate name |
-| `repositories/list.spec.ts`    | REPO-04 search, type selector and refresh, REPO-05 pagination, REPO-08 empty state, REPO-09 USER                                                     |
-| `repositories/delete.spec.ts`  | REPO-06 delete, REPO-07 cancel                                                                                                                       |
-| `repositories/routing.spec.ts` | REPO-10 `/<unknown>` is the 404 page, `/<repo>` opens the repository                                                                                 |
+| Spec                           | Scenarios                                                                                                                                                                                            |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dashboard/dashboard.spec.ts`  | DASH-01 cards and counts against the API, DASH-02 Recent Activity, DASH-03 count row -> filtered list, DASH-04 USER                                                                                  |
+| `repositories/create.spec.ts`  | REPO-01 (one case per row of `UI_REPO_TYPES`, plus public+description, default type, from the dashboard, Cancel sends no request and Enter creates once), REPO-02 validation, REPO-03 duplicate name |
+| `repositories/list.spec.ts`    | REPO-04 search, type selector and refresh, REPO-05 pagination, REPO-08 empty state, REPO-09 USER                                                                                                     |
+| `repositories/delete.spec.ts`  | REPO-06 delete, REPO-07 cancel                                                                                                                                                                       |
+| `repositories/routing.spec.ts` | REPO-10 `/<unknown>` and a several-segment unknown path are the 404 page (inside the layout, at `/not-found`), `/<repo>` opens the repository                                                        |
 
 Things a test here relies on, which a change to the page can break:
 
@@ -2617,7 +2617,7 @@ user the UI is about to create so a failing test still cleans it up).
 | USR-03   | rename, promote, demote next to another admin, the last-admin warning and locked switch, edit validation, taken name, cancel         |
 | USR-04   | reset password: one-time modal, the new password logs in, the old one is refused, cancel resets nothing                              |
 | USR-05   | delete (cancel, then confirm), delete next to another admin, the last-admin toast                                                    |
-| USR-06   | 11 users: search (incl. case-insensitive, no match), pagination both ways, refresh                                                   |
+| USR-06   | 11 users: search (incl. case-insensitive, no match with its `No user matches` message), pagination both ways, refresh                |
 | PRO-01   | change password: mismatch, cancel, confirm, re-login with the new one, the old one refused; field validation                         |
 | PRO-02   | change username: reload as the new name, same account, repo protocol URL and repo page still work; validation; taken name            |
 | PRO-03   | delete account: cancel, confirm, logged out, login refused                                                                           |
@@ -2690,10 +2690,6 @@ How the tests are written, and what they had to work around:
   and `settings-*` ids are used, never a label or `#id`.
 - **Toggles are flipped through their label** (`toggle-label`): the `role="switch"` checkbox is
   `sr-only` and covered by the drawn switch, so Playwright refuses to click it as "intercepted".
-- **A forced click for Orphan Layers.** Every settings section is `mt-[-100px] pt-[100px]` (an anchor
-  offset), so the Delete Repository section's transparent padding overlaps the lower part of the
-  Orphan Layers button and Playwright's hit-target check never clicks it. `OrphanLayersSection.delete()`
-  uses `click({ force: true })`, which lands on the button's own label like a real mouse.
 - **The token "show" eye is clicked by event.** Its icon is a Font Awesome glyph from a CDN that the
   UI suite blocks (`src/ui/defaults.ts`), so the button has no size; `toggleTokenVisibility()`
   dispatches the click and the test asserts `aria-pressed` and the input's `type`.
@@ -2712,9 +2708,9 @@ How the tests are written, and what they had to work around:
 Known product bugs are pinned with `test.fail('... RPS-nnnn')`, so the test turns red the day the
 bug is fixed and the marker has to go: `#name`/`#description` are duplicated between the
 rename form and the create-token modal (RPS-1266). The Visibility and Package Override help texts
-(RPS-1261) are fixed and asserted unpinned. A second pin is RPS-1285: revoking the only token on page 2
-fires two list requests and the empty page-2 answer can land last, leaving "Your list is empty" over three tokens (the test
-slows that answer to make the order certain). Not covered here: the Vulnerability Scanning toggle
+(RPS-1261) are fixed and asserted unpinned, and so is RPS-1285: TOK-03 revokes the only token on page 2
+with the page-2 answer delayed and asserts a single list request (the first page) and the three
+remaining rows. Not covered here: the Vulnerability Scanning toggle
 (hidden without a scanner, RPS-1259), the per-protocol "configure" modal behind a token row, the
 `reservedName` rename error (it has no test id), the expiration-date range messages (no test id) and
 the token-name `minLength` branch, which was unreachable and is gone (`required` already covers an empty name, RPS-1265).
@@ -2779,10 +2775,8 @@ test('lists a seeded package', async ({ adminPage, seeder, seedPackage }) => {
   `snippet(slug)`, `delete()`. `protocolPages(...).extraPath('browser')` is maven's file browser.
 - **Facts the proof pinned.** A maven group-list Delete removes the whole GROUP. Group and npm list
   searches match the group / scope only (not `group:artifact` or `@scope/name`). The npm scope route
-  segment has no `@`. The sort menu stays open after a choice. Docker's manifest row is keyed by the tag,
-  and its last-tag delete leaves the image listed. Playwright's own click is refused by every detail
-  page's Delete button (the page host is reported above it), so `VersionDetailPage` clicks it with
-  `force`.
+  segment has no `@`. Docker's manifest row is keyed by the tag,
+  and its last-tag delete leaves the image listed.
 - **Not covered here.** The scenario templates live in RPS-1256 (maven, npm, docker, pypi) and RPS-1257
   (cargo, nuget, helm, golang, ruby).
 
@@ -2883,7 +2877,6 @@ Pinned with `test.fail` / `knownFailures` (each still fails for the stated reaso
 | Where                             | Bug                                                                                                                                                                                                                                           |
 | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | nuget `02-versions-search`        | RPS-1262 (3): no search box on the version list: the API has no version search parameter                                                                                                                                                      |
-| cargo-07 row menu real click      | RPS-1299: the menu of a non-last row paints under the next row, Playwright's click is refused ("subtree intercepts pointer events")                                                                                                           |
 | cargo-07 Newest by publish time   | RPS-1301: Newest/Oldest order by `max_version` (a text column), not by when a crate was published; the seeder gives each crate its own version so the sort and pager have distinct keys (RPS-1298), and cargo-07 asserts the sorts by version |
 | helm-07 deleting the last version | RPS-1302: the versions page of the deleted chart raises two error toasts, "Chart not found." and "[object Object]"                                                                                                                            |
 
@@ -2996,13 +2989,6 @@ How the stubs are typed, and the rules they follow:
   value back.
 - **The sidebar Security link does not need a scanner**: it shows for every admin (`isAdmin` only), and
   `/security` then shows its empty states with a type filter that offers only `ALL`.
-
-Known product defects, pinned with `test.fail` so the test turns red the day it is fixed and the marker
-has to go (a `✘` in the list reporter with a passing summary is the expectation): three security-modal
-defects (RPS-1295): the X of a repository or package modal
-also opens the row it sits in (the modal is rendered inside the clickable row and only the backdrop and
-the links stop the click), and with a chart the dialog is tall enough that the page header covers its
-title and X at 1440x900.
 
 ## Running
 

@@ -15,11 +15,14 @@
 ///
 
 import { NgOptimizedImage } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, input } from '@angular/core';
 
 @Component({
   selector: 'app-empty-list',
   templateUrl: './empty-list.component.html',
   imports: [NgOptimizedImage],
 })
-export class EmptyListComponent {}
+export class EmptyListComponent {
+  /** Replaces the default "add a new item" text, e.g. when a search simply has no match. */
+  public readonly message = input<string>();
+}
