@@ -74,9 +74,17 @@ export async function publishCrate(
   return { protocol: 'cargo', repoName, name, version, extra: {} };
 }
 
-export const seedCargo: PackageSeeder = async (repoName, ctx, opts) =>
-  publishCrate(
+/**
+ * The default version is `1.0.0` for the first crate and `1.<index - 1>.0` for the next ones: the
+ * crate list sorts by `max_version` (a text column) and pages on it with no tie-breaker (RPS-1298), so
+ * crates that all sit at one version have no stable order and a pager can repeat or drop a row.
+ * Distinct versions per index make the order well defined (and equal to publish order).
+ */
+export const seedCargo: PackageSeeder = async (repoName, ctx, opts) => {
+  const index = opts.index ?? 1;
+  return publishCrate(
     repoName,
-    opts.name ?? defaultPackageName('cargo', ctx.runId, opts.index),
-    opts.version ?? DEFAULT_VERSION,
+    opts.name ?? defaultPackageName('cargo', ctx.runId, index),
+    opts.version ?? (index > 1 ? `1.${index - 1}.0` : DEFAULT_VERSION),
   );
+};

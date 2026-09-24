@@ -29,16 +29,12 @@ import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
 
 const cargo = DESCRIPTORS.cargo;
 
-// RPS-1262 (2): the Cargo version list only has the `hidden ... lg:block` desktop table, no mobile
-// cards, so at a phone's width the page renders nothing but the pager. The template's mobile-versions
-// step (a card per version, no Delete for a USER) can only fail today.
-// Not filed yet (see the PR): "Newest" and "Oldest" order by `max_version`, a text column, not by
-// publish time, so the shared "sort" step (which publishes three crates at the same version, one after
-// the other) cannot see its order; PKG-cargo-07 below asserts the sorts with crates of differing versions.
+// The seeder gives every crate its own version (see `seedCargo`), so the crate list's sort and pager
+// have distinct keys. RPS-1262 (2): the Cargo version list only has the `hidden ... lg:block` desktop
+// table, no mobile cards, so at a phone's width the page renders nothing but the pager; the template's
+// mobile-versions step (a card per version, no Delete for a USER) can only fail today.
 registerPackageScenarios(cargo, {
   knownFailures: {
-    '02-sort':
-      'unfiled: Newest/Oldest sort by max_version (text), so crates at one version have no publish order',
     '05-mobile-versions': 'RPS-1262: the version list renders no cards below lg',
   },
 });
@@ -180,6 +176,20 @@ test.describe('Cargo crate pages', { tag: '@packages' }, () => {
       await expect.poll(() => rowKeys(list), option).toEqual(order[option]);
     }
   });
+
+  // Not filed yet (see the PR): the crate list's Newest/Oldest order by `max_version`, a text column,
+  // not by when a crate was published, so a crate published later at a lower version is not "newest".
+  test.fail(
+    'PKG-cargo-07 Newest puts the crate published last on top (unfiled: it sorts by max_version)',
+    async ({ adminPage, seeder }) => {
+      const repo = await seeder.createRepo(RepoType.CARGO);
+      const older = await publishCrate(repo.name, `e2e_${seeder.runId}_older`, '3.0.0');
+      const newer = await publishCrate(repo.name, `e2e_${seeder.runId}_newer`, '1.0.0');
+      const list = protocolPages(adminPage, cargo, repo.name).list();
+      await list.goto();
+      await expect.poll(() => rowKeys(list)).toEqual([newer.name, older.name]);
+    },
+  );
 
   test('PKG-cargo-07 the crate row shows the highest version, and the versions list every one', async ({
     adminPage,
