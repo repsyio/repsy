@@ -54,7 +54,7 @@ export class MavenService {
   public getRepository(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
-    return this.protocolRepoControllerService.getPermission(repoName).pipe(
+    return this.protocolRepoControllerService.getRepoPermissions(repoName).pipe(
       map((r) => r.data!),
       tap((info) => this.repoSubject.next(info)),
     );
@@ -69,7 +69,7 @@ export class MavenService {
   }
 
   public updateRepoSettings(form: RepoSettingsForm): Observable<void> {
-    return this.protocolRepoControllerService.updateSettings(this.repoName, form).pipe(map(() => undefined));
+    return this.protocolRepoControllerService.updateRepoSettings(this.repoName, form).pipe(map(() => undefined));
   }
 
   public getPathContent(path: string): Observable<FsItemInfo[]> {
@@ -89,7 +89,7 @@ export class MavenService {
     pageSize: number,
   ): Observable<PagedData<ArtifactListItem>> {
     return this.mavenArtifactControllerService
-      .listContainsGroupName(this.repoName, groupName || undefined, pageIndex, pageSize, [
+      .listMavenGroups(this.repoName, groupName || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
       .pipe(
@@ -105,7 +105,7 @@ export class MavenService {
     pageSize: number,
   ): Observable<PagedData<ArtifactListItem>> {
     return this.mavenArtifactControllerService
-      .listContainsArtifactName(groupName, this.repoName, artifactName || undefined, pageIndex, pageSize, [
+      .listMavenArtifacts(groupName, this.repoName, artifactName || undefined, pageIndex, pageSize, [
         `${sortOption.column},${sortOption.type}`,
       ])
       .pipe(

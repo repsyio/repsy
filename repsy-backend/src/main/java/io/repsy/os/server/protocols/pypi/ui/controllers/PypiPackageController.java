@@ -76,14 +76,14 @@ public class PypiPackageController {
     return this.restResponseFactory.success("packageDeleted");
   }
 
-  @DeleteMapping("/{repoName}/{packageName}/releases/{releaseVersion}")
+  @DeleteMapping("/{repoName}/{packageName}/releases/{version}")
   @RepoOperation(permission = Permission.MANAGE)
   public RestResponse<Void> deleteRelease(
       final RepoInfo repoInfo,
       @PathVariable final String packageName,
-      @PathVariable final String releaseVersion) {
+      @PathVariable final String version) {
 
-    final var usages = this.pypiApiFacade.deleteRelease(repoInfo, packageName, releaseVersion);
+    final var usages = this.pypiApiFacade.deleteRelease(repoInfo, packageName, version);
 
     this.updateUsage(repoInfo, usages);
 
@@ -153,16 +153,16 @@ public class PypiPackageController {
 
   @GetMapping({
     "/{repoName}/{packageName}",
-    "/{repoName}/{packageName}/releases/{releaseVersion}",
+    "/{repoName}/{packageName}/releases/{version}",
   })
   @RepoOperation
   public RestResponse<ReleaseDetail> getRelease(
       final RepoInfo repoInfo,
       @PathVariable final String packageName,
-      @PathVariable final @Nullable String releaseVersion) {
+      @PathVariable final @Nullable String version) {
 
     final var details =
-        this.pypiApiFacade.getReleaseDetail(repoInfo.getStorageKey(), packageName, releaseVersion);
+        this.pypiApiFacade.getReleaseDetail(repoInfo.getStorageKey(), packageName, version);
 
     return this.restResponseFactory.success("releaseDetailFetched", details);
   }

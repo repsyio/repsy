@@ -63,7 +63,7 @@ export class NugetService {
   public selectRepository(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
-    return this.protocolRepoControllerService.getPermission(repoName).pipe(
+    return this.protocolRepoControllerService.getRepoPermissions(repoName).pipe(
       map((r) => r.data!),
       tap((info) => this.repoSubject.next(info)),
     );
@@ -78,21 +78,21 @@ export class NugetService {
   }
 
   public async fetchRepositoryUsage(): Promise<RepoUsageInfo> {
-    const response = await firstValueFrom(this.protocolRepoControllerService.getUsage(this.repoName));
+    const response = await firstValueFrom(this.protocolRepoControllerService.getRepoUsage(this.repoName));
     return response.data!;
   }
 
   public async fetchRepositorySettings(): Promise<RepoSettingsInfo> {
-    const response = await firstValueFrom(this.protocolRepoControllerService.getSettings(this.repoName));
+    const response = await firstValueFrom(this.protocolRepoControllerService.getRepoSettings(this.repoName));
     return response.data!;
   }
 
   public async updateRepoSettings(repoSettingsForm: RepoSettingsForm): Promise<void> {
-    await firstValueFrom(this.protocolRepoControllerService.updateSettings(this.repoName, repoSettingsForm));
+    await firstValueFrom(this.protocolRepoControllerService.updateRepoSettings(this.repoName, repoSettingsForm));
   }
 
   public async updateRepositoryName(repositoryNameForm: RepoRenameForm): Promise<void> {
-    await firstValueFrom(this.protocolRepoControllerService.rename(this.repoName, repositoryNameForm));
+    await firstValueFrom(this.protocolRepoControllerService.renameRepo(this.repoName, repositoryNameForm));
 
     const active = this.repoSubject.getValue();
     if (active) {
@@ -102,7 +102,7 @@ export class NugetService {
 
   public async updateRepoDescription(repositoryDescriptionForm: RepoDescriptionForm): Promise<void> {
     await firstValueFrom(
-      this.protocolRepoControllerService.updateDescription(this.repoName, repositoryDescriptionForm),
+      this.protocolRepoControllerService.updateRepoDescription(this.repoName, repositoryDescriptionForm),
     );
   }
 
@@ -178,7 +178,9 @@ export class NugetService {
   }
 
   public async rotateDeployToken(tokenId: string): Promise<string> {
-    const response = await firstValueFrom(this.protocolDeployTokenControllerService.rotate(tokenId, this.repoName));
+    const response = await firstValueFrom(
+      this.protocolDeployTokenControllerService.rotateDeployToken(tokenId, this.repoName),
+    );
     return response.data!;
   }
 
@@ -190,7 +192,7 @@ export class NugetService {
   }
 
   public async revokeDeployToken(tokenId: string): Promise<void> {
-    await firstValueFrom(this.protocolDeployTokenControllerService.revoke(tokenId, this.repoName));
+    await firstValueFrom(this.protocolDeployTokenControllerService.revokeDeployToken(tokenId, this.repoName));
   }
 
   private toPagedData<T>(data: { content?: T[]; page?: unknown } | undefined): PagedData<T> {

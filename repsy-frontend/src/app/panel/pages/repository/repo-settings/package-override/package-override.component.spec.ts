@@ -32,9 +32,11 @@ describe('PackageOverrideComponent', () => {
   let fetchCount: number;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['updateSettings']);
+    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'updateRepoSettings',
+    ]);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
-    repoApi.updateSettings.and.returnValue(of({}) as never);
+    repoApi.updateRepoSettings.and.returnValue(of({}) as never);
 
     component = new PackageOverrideComponent(repoApi, toastService);
     component.repoName = REPO;
@@ -61,8 +63,8 @@ describe('PackageOverrideComponent', () => {
 
     component.changeOverride();
 
-    expect(repoApi.updateSettings.calls.mostRecent().args[0]).toBe(REPO);
-    expect(lastSentForm(repoApi.updateSettings, 1)).toEqual({
+    expect(repoApi.updateRepoSettings.calls.mostRecent().args[0]).toBe(REPO);
+    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({
       privateRepo: true,
       allowOverride: false,
       securityScanEnabled: false,
@@ -80,7 +82,7 @@ describe('PackageOverrideComponent', () => {
 
     component.changeOverride();
 
-    expect(lastSentForm(repoApi.updateSettings, 1)).toEqual(jasmine.objectContaining({ allowOverride: true }));
+    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual(jasmine.objectContaining({ allowOverride: true }));
     expect(component.parentForm.get('allowOverride').value).toBeTrue();
     expect(toastService.show).toHaveBeenCalledOnceWith('Package override is now allowed', 'success');
   });
@@ -100,7 +102,7 @@ describe('PackageOverrideComponent', () => {
 
       component.changeOverride();
 
-      expect(lastSentForm(repoApi.updateSettings, 1)).toEqual({
+      expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({
         privateRepo: true,
         allowOverride: false,
         releases: true,
@@ -111,7 +113,7 @@ describe('PackageOverrideComponent', () => {
   });
 
   it('keeps the parent form and stays quiet when saving fails', () => {
-    repoApi.updateSettings.and.returnValue(throwError(() => new Error('boom')));
+    repoApi.updateRepoSettings.and.returnValue(throwError(() => new Error('boom')));
     component.repoType = RepoType.NPM;
     component.parentForm = generalParentForm({ allowOverride: true });
     component.ngOnInit();

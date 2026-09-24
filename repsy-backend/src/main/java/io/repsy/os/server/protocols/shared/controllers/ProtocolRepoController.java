@@ -81,7 +81,7 @@ public class ProtocolRepoController {
 
   @GetMapping("/{repoName}/permissions")
   @RepoOperation
-  public RestResponse<RepoPermissionInfo> getPermission(
+  public RestResponse<RepoPermissionInfo> getRepoPermissions(
       final RepoPermissionInfo repoPermissionInfo) {
 
     return this.responseFactory.success("repoPermissionsFetched", repoPermissionInfo);
@@ -121,7 +121,7 @@ public class ProtocolRepoController {
 
   @GetMapping("/{repoName}/settings")
   @RepoOperation(permission = MANAGE)
-  public RestResponse<RepoSettingsInfo> getSettings(final RepoInfo repoInfo) {
+  public RestResponse<RepoSettingsInfo> getRepoSettings(final RepoInfo repoInfo) {
 
     final var settings = this.repoTxService.getRepoSettings(repoInfo.getId());
 
@@ -130,7 +130,7 @@ public class ProtocolRepoController {
 
   @GetMapping("/{repoName}/usage")
   @RepoOperation(permission = MANAGE)
-  public RestResponse<RepoUsageInfo> getUsage(final RepoInfo repoInfo) {
+  public RestResponse<RepoUsageInfo> getRepoUsage(final RepoInfo repoInfo) {
 
     final var usageInfo =
         this.usageService.getRepoUsageInfo(repoInfo.getName(), repoInfo.getType());
@@ -140,7 +140,7 @@ public class ProtocolRepoController {
 
   @PatchMapping("/{repoName}/name")
   @RepoOperation(permission = MANAGE)
-  public RestResponse<Void> rename(
+  public RestResponse<Void> renameRepo(
       final RepoInfo repoInfo, @RequestBody @Valid final RepoRenameForm form) {
 
     this.repoTxService.renameRepo(repoInfo.getName(), form.getName(), repoInfo.getType());
@@ -150,7 +150,7 @@ public class ProtocolRepoController {
 
   @PatchMapping("/{repoName}/description")
   @RepoOperation(permission = MANAGE)
-  public RestResponse<Void> updateDescription(
+  public RestResponse<Void> updateRepoDescription(
       final RepoInfo repoInfo, @RequestBody @Valid final RepoDescriptionForm form) {
 
     this.repoTxService.updateDescription(repoInfo.getStorageKey(), form.getDescription());
@@ -160,7 +160,7 @@ public class ProtocolRepoController {
 
   @PutMapping("/{repoName}/settings")
   @RepoOperation(permission = MANAGE)
-  public RestResponse<Void> updateSettings(
+  public RestResponse<Void> updateRepoSettings(
       final RepoInfo repoInfo, @RequestBody @Valid final RepoSettingsForm form) {
 
     this.repoTxService.updateSettings(repoInfo.getId(), form);
@@ -170,7 +170,7 @@ public class ProtocolRepoController {
 
   @GetMapping("/{repoName}/format")
   @RepoOperation
-  public RestResponse<String> getRepoType(final RepoInfo repoInfo) {
+  public RestResponse<String> getRepoFormat(final RepoInfo repoInfo) {
 
     return this.responseFactory.success(
         "repoTypeFetched", repoInfo.getType().name().toLowerCase(Locale.ROOT));

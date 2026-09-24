@@ -73,63 +73,63 @@ public class NuGetPackageController {
     return this.responseFactory.success("nugetPackagesFetched", new PagedModel<>(packages));
   }
 
-  @GetMapping("/{repoName}/{packageId}")
+  @GetMapping("/{repoName}/{packageName}")
   @RepoOperation
   public RestResponse<NuGetPackageInfo> getPackage(
-      final RepoInfo repoInfo, @PathVariable final String packageId) {
+      final RepoInfo repoInfo, @PathVariable final String packageName) {
 
-    final var pkg = this.nugetApiFacade.getPackage(repoInfo, packageId);
+    final var pkg = this.nugetApiFacade.getPackage(repoInfo, packageName);
 
     return this.responseFactory.success("nugetPackageFetched", pkg);
   }
 
-  @GetMapping("/{repoName}/{packageId}/versions")
+  @GetMapping("/{repoName}/{packageName}/versions")
   @RepoOperation
   public RestResponse<PagedModel<NuGetVersionListItem>> listVersions(
       final RepoInfo repoInfo,
-      @PathVariable final String packageId,
+      @PathVariable final String packageName,
       @RequestParam(name = "q", defaultValue = "") final String query,
       @PageableDefault final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
 
-    final var versions = this.nugetApiFacade.getVersions(repoInfo, packageId, query, pageable);
+    final var versions = this.nugetApiFacade.getVersions(repoInfo, packageName, query, pageable);
 
     return this.responseFactory.success("nugetVersionsFetched", new PagedModel<>(versions));
   }
 
-  @GetMapping("/{repoName}/{packageId}/{version}")
+  @GetMapping("/{repoName}/{packageName}/{version}")
   @RepoOperation
   public RestResponse<io.repsy.os.generated.model.NuGetVersionInfo> getVersion(
       final RepoInfo repoInfo,
-      @PathVariable final String packageId,
+      @PathVariable final String packageName,
       @PathVariable final String version) {
 
-    final var versionInfo = this.nugetApiFacade.getVersion(repoInfo, packageId, version);
+    final var versionInfo = this.nugetApiFacade.getVersion(repoInfo, packageName, version);
 
     return this.responseFactory.success("nugetVersionFetched", versionInfo);
   }
 
-  @DeleteMapping("/{repoName}/{packageId}")
+  @DeleteMapping("/{repoName}/{packageName}")
   @RepoOperation(permission = Permission.MANAGE)
   public RestResponse<NuGetDeletedItem> deletePackage(
-      final RepoInfo repoInfo, @PathVariable final String packageId) {
+      final RepoInfo repoInfo, @PathVariable final String packageName) {
 
-    final var usages = this.nugetApiFacade.deletePackage(repoInfo, packageId);
+    final var usages = this.nugetApiFacade.deletePackage(repoInfo, packageName);
 
     this.usageUpdateService.updateUsage(new UsageChangedInfo(repoInfo.getId(), usages));
 
     return this.responseFactory.success("nugetPackageDeleted", NuGetDeletedItem.PACKAGE);
   }
 
-  @DeleteMapping("/{repoName}/{packageId}/{version}")
+  @DeleteMapping("/{repoName}/{packageName}/{version}")
   @RepoOperation(permission = Permission.MANAGE)
   public RestResponse<NuGetDeletedItem> deleteVersion(
       final RepoInfo repoInfo,
-      @PathVariable final String packageId,
+      @PathVariable final String packageName,
       @PathVariable final String version) {
 
-    final var deletedResult = this.nugetApiFacade.deleteVersion(repoInfo, packageId, version);
+    final var deletedResult = this.nugetApiFacade.deleteVersion(repoInfo, packageName, version);
 
     this.usageUpdateService.updateUsage(
         new UsageChangedInfo(repoInfo.getId(), deletedResult.usages()));

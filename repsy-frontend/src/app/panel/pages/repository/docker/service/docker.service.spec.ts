@@ -42,7 +42,9 @@ describe('DockerService', () => {
   let service: DockerService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['getPermission']);
+    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'getRepoPermissions',
+    ]);
     dockerApi = jasmine.createSpyObj<DockerImageControllerService>('DockerImageControllerService', [
       'listDockerImages',
       'listDockerImageTags',
@@ -64,7 +66,7 @@ describe('DockerService', () => {
 
   describeRepoSelection({
     service: () => service,
-    getPermission: () => repoApi.getPermission,
+    getPermission: () => repoApi.getRepoPermissions,
     probe: (s) => s.deleteImage(IMAGE),
     probeApi: () => dockerApi.deleteDockerImage,
     probeRepoArg: 1,
@@ -72,7 +74,7 @@ describe('DockerService', () => {
   });
 
   describe('with a selected repository', () => {
-    beforeEach(() => selectRepo(service, repoApi.getPermission, REPO));
+    beforeEach(() => selectRepo(service, repoApi.getRepoPermissions, REPO));
 
     // The service signatures put the search term first (or in the middle) while the client wants the image and tag
     // names first, so the argument order is worth pinning.

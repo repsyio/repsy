@@ -102,6 +102,44 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
   private static final Set<String> PUBLIC_OPERATIONS =
       Set.of("login", "refreshToken", "getSupportedRepoTypes", "checkSumdbSupported");
 
+  /**
+   * RPS-1269: the one name a path variable has for each role, across every panel controller. A
+   * generated client names its arguments after these, so two names for one role are two spellings
+   * of the same thing in every client. A new variable is added here on purpose, with its role, and
+   * never as a second name for a role that is already listed.
+   *
+   * <ul>
+   *   <li>{@code repoName}: the repository. {@code ResolverUtils.REPO_NAME} reads it.
+   *   <li>{@code version}: the version of any package, artifact, crate, chart, gem or release. The
+   *       only other name is {@code reference} for Docker: an OCI reference is a tag or a digest.
+   *   <li>{@code packageName}, {@code chartName}, {@code crateName}, {@code gemName}, {@code
+   *       imageName}, {@code artifactName}, {@code groupName}, {@code tagName}, {@code scope}: the
+   *       item of a protocol, named after what that protocol calls it.
+   *   <li>{@code digest}, {@code userId}, {@code tokenId}, {@code publicKeyId}, {@code keyStoreId},
+   *       {@code scanId}: the identifier of a panel entity.
+   * </ul>
+   */
+  private static final Set<String> PATH_VARIABLES =
+      Set.of(
+          "repoName",
+          "version",
+          "reference",
+          "packageName",
+          "chartName",
+          "crateName",
+          "gemName",
+          "imageName",
+          "artifactName",
+          "groupName",
+          "tagName",
+          "scope",
+          "digest",
+          "userId",
+          "tokenId",
+          "publicKeyId",
+          "keyStoreId",
+          "scanId");
+
   @Autowired private RequestMappingHandlerMapping handlerMapping;
 
   // ---------------------------------------------------------------------------------------------
@@ -221,6 +259,32 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
         (prefix, variables) -> findings.add(prefix + " -> " + String.join(" | ", variables)));
 
     assertNoNewFindings("sibling variable names", findings, Map.of());
+  }
+
+  @Test
+  @DisplayName("every path variable is the one name its role has, and a version is {version}")
+  void pathVariablesUseTheOneNameOfTheirRole() throws IOException {
+    final var templates = new TreeSet<String>();
+    specOperations(loadSpec()).values().forEach(operation -> templates.add(operation.template()));
+    this.panelRoutes().forEach(route -> templates.add(route.pattern()));
+
+    final var findings = new TreeSet<String>();
+
+    for (final var template : templates) {
+      for (final var variable : variablesOf(template)) {
+        if (!PATH_VARIABLES.contains(variable)) {
+          findings.add(template + ": {" + variable + "} is not a known path variable");
+        }
+
+        // The set above already rejects vers, versionName, releaseVersion and artifactVersion; this
+        // says why, and also catches a new spelling nobody thought of.
+        if (variable.toLowerCase(Locale.ROOT).contains("vers") && !"version".equals(variable)) {
+          findings.add(template + ": {" + variable + "} is a version, call it {version}");
+        }
+      }
+    }
+
+    assertNoNewFindings("path variable names per role", findings, Map.of());
   }
 
   @Test

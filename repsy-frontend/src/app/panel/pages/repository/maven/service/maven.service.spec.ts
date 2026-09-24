@@ -48,14 +48,14 @@ describe('MavenService', () => {
 
   beforeEach(() => {
     repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getPermission',
-      'updateSettings',
+      'getRepoPermissions',
+      'updateRepoSettings',
       'getPathContent',
       'createDownloadToken',
     ]);
     mavenApi = jasmine.createSpyObj<MavenArtifactControllerService>('MavenArtifactControllerService', [
-      'listContainsGroupName',
-      'listContainsArtifactName',
+      'listMavenGroups',
+      'listMavenArtifacts',
       'listMavenArtifactVersions',
       'getMavenArtifactVersion',
       'deleteGroup',
@@ -73,7 +73,7 @@ describe('MavenService', () => {
 
   describeRepoSelection({
     service: () => service,
-    getPermission: () => repoApi.getPermission,
+    getPermission: () => repoApi.getRepoPermissions,
     probe: (s) => s.getPathContent(PATH),
     probeApi: () => repoApi.getPathContent,
     probeRepoArg: 1,
@@ -81,19 +81,19 @@ describe('MavenService', () => {
   });
 
   describe('with a selected repository', () => {
-    beforeEach(() => selectRepo(service, repoApi.getPermission, REPO));
+    beforeEach(() => selectRepo(service, repoApi.getRepoPermissions, REPO));
 
     const paged: PagedCase<MavenService>[] = [
       {
         name: 'searchGroups',
         invoke: (s, group) => s.searchGroups(group, SORT, PAGE_INDEX, PAGE_SIZE),
-        api: () => mavenApi.listContainsGroupName,
+        api: () => mavenApi.listMavenGroups,
         args: (group) => [REPO, group, ...PAGE_ARGS],
       },
       {
         name: 'searchArtifacts',
         invoke: (s, artifact) => s.searchArtifacts(GROUP, artifact, SORT, PAGE_INDEX, PAGE_SIZE),
-        api: () => mavenApi.listContainsArtifactName,
+        api: () => mavenApi.listMavenArtifacts,
         args: (artifact) => [GROUP, REPO, artifact, ...PAGE_ARGS],
       },
       {
@@ -113,7 +113,7 @@ describe('MavenService', () => {
       {
         name: 'updateRepoSettings',
         invoke: (s) => s.updateRepoSettings(settings),
-        api: () => repoApi.updateSettings,
+        api: () => repoApi.updateRepoSettings,
         args: [REPO, settings],
         response: restResponse('ignored'),
         expected: undefined,

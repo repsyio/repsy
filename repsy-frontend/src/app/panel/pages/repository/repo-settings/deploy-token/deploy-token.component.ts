@@ -107,7 +107,7 @@ export class DeployTokenComponent implements OnInit {
   }
 
   private fetchRepoUsage() {
-    this.protocolRepoControllerService.getUsage(this.activeRepository.repoName).subscribe({
+    this.protocolRepoControllerService.getRepoUsage(this.activeRepository.repoName).subscribe({
       next: (r) => {
         this.repoUsage = r.data!;
       },
@@ -161,7 +161,7 @@ export class DeployTokenComponent implements OnInit {
       this.operationLock = true;
 
       this.protocolDeployTokenControllerService
-        .rotate(deployToken.id, this.activeRepository.repoName)
+        .rotateDeployToken(deployToken.id, this.activeRepository.repoName)
         .pipe(
           finalize(() => {
             this.operationLock = false;
@@ -189,7 +189,7 @@ export class DeployTokenComponent implements OnInit {
       this.operationLock = true;
 
       this.protocolDeployTokenControllerService
-        .revoke(deployToken.id, this.activeRepository.repoName)
+        .revokeDeployToken(deployToken.id, this.activeRepository.repoName)
         .pipe(
           tap(() => this.toastService.show('Deploy token revoked successfully', 'success')),
           switchMap(() => {

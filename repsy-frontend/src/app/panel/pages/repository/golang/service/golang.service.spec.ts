@@ -41,7 +41,9 @@ describe('GolangService', () => {
   let service: GolangService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['getPermission']);
+    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'getRepoPermissions',
+    ]);
     golangApi = jasmine.createSpyObj<GolangModuleControllerService>('GolangModuleControllerService', [
       'listGolangModules',
       'searchGolangModules',
@@ -61,7 +63,7 @@ describe('GolangService', () => {
 
   describeRepoSelection({
     service: () => service,
-    getPermission: () => repoApi.getPermission,
+    getPermission: () => repoApi.getRepoPermissions,
     probe: (s) => s.deleteModule(MODULE),
     probeApi: () => golangApi.deleteGolangModule,
     probeRepoArg: 1,
@@ -69,7 +71,7 @@ describe('GolangService', () => {
   });
 
   describe('with a selected repository', () => {
-    beforeEach(() => selectRepo(service, repoApi.getPermission, REPO));
+    beforeEach(() => selectRepo(service, repoApi.getRepoPermissions, REPO));
 
     const paged: PagedCase<GolangService>[] = [
       {

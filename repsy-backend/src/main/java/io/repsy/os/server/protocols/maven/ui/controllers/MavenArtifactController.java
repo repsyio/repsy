@@ -85,18 +85,18 @@ public class MavenArtifactController {
     return this.restResponseFactory.success("artifactDeleted", deletedItemPair.getFirst());
   }
 
-  @DeleteMapping("/{repoName}/{groupName}/{artifactName}/versions/{versionName}")
+  @DeleteMapping("/{repoName}/{groupName}/{artifactName}/versions/{version}")
   @RepoOperation(permission = Permission.MANAGE)
   public RestResponse<DeletedItem> deleteVersion(
       final RepoInfo repoInfo,
       @PathVariable final String groupName,
       @PathVariable final String artifactName,
-      @PathVariable final String versionName)
+      @PathVariable final String version)
       throws IOException, XmlPullParserException {
 
     final var deletedItemPair =
         this.artifactDeletionComponent.deleteArtifactVersion(
-            repoInfo, groupName, artifactName, versionName);
+            repoInfo, groupName, artifactName, version);
 
     this.updateUsage(repoInfo, deletedItemPair.getSecond());
 
@@ -117,20 +117,20 @@ public class MavenArtifactController {
 
   @GetMapping({
     "/{repoName}/{groupName}/{artifactName}",
-    "/{repoName}/{groupName}/{artifactName}/versions/{versionName}"
+    "/{repoName}/{groupName}/{artifactName}/versions/{version}"
   })
   @RepoOperation
   public RestResponse<ArtifactVersionInfo> getVersion(
       final RepoInfo repoInfo,
       @PathVariable final String groupName,
       @PathVariable final String artifactName,
-      @PathVariable final @Nullable String versionName)
+      @PathVariable final @Nullable String version)
       throws IOException, XmlPullParserException {
 
-    final var version =
-        this.mavenApiFacade.findArtifactVersion(repoInfo, groupName, artifactName, versionName);
+    final var artifactVersion =
+        this.mavenApiFacade.findArtifactVersion(repoInfo, groupName, artifactName, version);
 
-    return this.restResponseFactory.success("artifactVersionFetched", version);
+    return this.restResponseFactory.success("artifactVersionFetched", artifactVersion);
   }
 
   @GetMapping("/{repoName}/{groupName}/{artifactName}/versions")
@@ -172,7 +172,7 @@ public class MavenArtifactController {
 
   @GetMapping("/{repoName}")
   @RepoOperation
-  public RestResponse<PagedModel<ArtifactListItem>> listContainsGroupName(
+  public RestResponse<PagedModel<ArtifactListItem>> listMavenGroups(
       final RepoInfo repoInfo,
       @RequestParam(name = "q", required = false, defaultValue = "") final String groupName,
       @PageableDefault(sort = "id", direction = Sort.Direction.DESC) final Pageable pageable) {
@@ -188,7 +188,7 @@ public class MavenArtifactController {
 
   @GetMapping("/{repoName}/{groupName}")
   @RepoOperation
-  public RestResponse<PagedModel<ArtifactListItem>> listContainsArtifactName(
+  public RestResponse<PagedModel<ArtifactListItem>> listMavenArtifacts(
       final RepoInfo repoInfo,
       @PathVariable final String groupName,
       @RequestParam(name = "q", required = false, defaultValue = "") final String artifactName,

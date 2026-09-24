@@ -52,7 +52,7 @@ export class CargoService {
   public getRepository(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
-    return this.protocolRepoControllerService.getPermission(repoName).pipe(
+    return this.protocolRepoControllerService.getRepoPermissions(repoName).pipe(
       map((r) => r.data!),
       tap((info) => this.repoSubject.next(info)),
     );

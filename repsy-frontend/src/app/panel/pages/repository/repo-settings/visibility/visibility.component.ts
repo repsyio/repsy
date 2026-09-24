@@ -69,7 +69,7 @@ export class VisibilityComponent {
       form.securityScanEnabled = this.parentForm.get('securityScanEnabled').value;
     }
 
-    this.protocolRepoControllerService.updateSettings(this.repoName, form).subscribe({
+    this.protocolRepoControllerService.updateRepoSettings(this.repoName, form).subscribe({
       next: () => {
         this.fetch.emit();
         this.toastService.show(`Repository visibility has changed as ${privacy ? 'private' : 'public'}`, 'success');

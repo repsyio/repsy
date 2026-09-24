@@ -88,7 +88,7 @@ export class RepoInfoComponent implements OnInit {
       this.renameForm.disable();
 
       this.protocolRepoControllerService
-        .rename(this.activeRepository.repoName, form)
+        .renameRepo(this.activeRepository.repoName, form)
         .pipe(
           finalize(() => {
             this.loading = false;
@@ -112,7 +112,7 @@ export class RepoInfoComponent implements OnInit {
     this.renameForm.disable();
 
     this.protocolRepoControllerService
-      .updateDescription(this.activeRepository.repoName, form)
+      .updateRepoDescription(this.activeRepository.repoName, form)
       .pipe(
         finalize(() => {
           this.loading = false;

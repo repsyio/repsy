@@ -23,8 +23,10 @@ describe('RepoStorageComponent', () => {
   let repoService: jasmine.SpyObj<ProtocolRepoControllerService>;
 
   beforeEach(() => {
-    repoService = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['getUsage']);
-    repoService.getUsage.and.returnValue(of({ data: { totalSize: 42 } }) as never);
+    repoService = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'getRepoUsage',
+    ]);
+    repoService.getRepoUsage.and.returnValue(of({ data: { totalSize: 42 } }) as never);
     component = new RepoStorageComponent(repoService);
     component.repoName = 'acme-repo';
     component.repoType = 'MAVEN';
@@ -32,19 +34,19 @@ describe('RepoStorageComponent', () => {
 
   it('shows no usage before it is initialised', () => {
     expect(component.usage).toBeUndefined();
-    expect(repoService.getUsage).not.toHaveBeenCalled();
+    expect(repoService.getRepoUsage).not.toHaveBeenCalled();
   });
 
   it('loads the usage of its repository on init', () => {
     component.ngOnInit();
 
-    expect(repoService.getUsage).toHaveBeenCalledOnceWith('acme-repo');
+    expect(repoService.getRepoUsage).toHaveBeenCalledOnceWith('acme-repo');
     expect(component.usage as unknown).toEqual({ totalSize: 42 });
   });
 
   it('loads the usage again when asked to', () => {
     component.ngOnInit();
-    repoService.getUsage.and.returnValue(of({ data: { totalSize: 50 } }) as never);
+    repoService.getRepoUsage.and.returnValue(of({ data: { totalSize: 50 } }) as never);
 
     component.fetchRepoUsage();
 
@@ -53,7 +55,7 @@ describe('RepoStorageComponent', () => {
 
   it('keeps the last usage when it cannot be loaded', () => {
     component.ngOnInit();
-    repoService.getUsage.and.returnValue(throwError(() => new Error('boom')));
+    repoService.getRepoUsage.and.returnValue(throwError(() => new Error('boom')));
 
     component.fetchRepoUsage();
 

@@ -42,7 +42,9 @@ describe('RubyService', () => {
   let service: RubyService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['getPermission']);
+    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'getRepoPermissions',
+    ]);
     rubyApi = jasmine.createSpyObj<RubyGemApiControllerService>('RubyGemApiControllerService', [
       'listGems',
       'listGemVersions',
@@ -61,7 +63,7 @@ describe('RubyService', () => {
 
   describeRepoSelection({
     service: () => service,
-    getPermission: () => repoApi.getPermission,
+    getPermission: () => repoApi.getRepoPermissions,
     probe: (s) => s.deleteGem(GEM),
     probeApi: () => rubyApi.deleteGem,
     probeRepoArg: 1,
@@ -69,7 +71,7 @@ describe('RubyService', () => {
   });
 
   describe('with a selected repository', () => {
-    beforeEach(() => selectRepo(service, repoApi.getPermission, REPO));
+    beforeEach(() => selectRepo(service, repoApi.getRepoPermissions, REPO));
 
     const paged: PagedCase<RubyService>[] = [
       {

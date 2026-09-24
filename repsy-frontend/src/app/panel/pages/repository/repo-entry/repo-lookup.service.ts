@@ -70,6 +70,6 @@ export class RepoLookupService {
   }
 
   private fetchRepoType(repoName: string): Observable<RepoType> {
-    return this.protocolRepoControllerService.getRepoType(repoName).pipe(map((r) => r.data as RepoType));
+    return this.protocolRepoControllerService.getRepoFormat(repoName).pipe(map((r) => r.data as RepoType));
   }
 }

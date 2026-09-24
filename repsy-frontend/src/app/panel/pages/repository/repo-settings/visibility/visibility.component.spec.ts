@@ -33,9 +33,11 @@ describe('VisibilityComponent', () => {
   let fetchCount: number;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['updateSettings']);
+    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'updateRepoSettings',
+    ]);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
-    repoApi.updateSettings.and.returnValue(of({}) as never);
+    repoApi.updateRepoSettings.and.returnValue(of({}) as never);
 
     component = new VisibilityComponent(repoApi, toastService);
     component.repoName = REPO;
@@ -54,8 +56,8 @@ describe('VisibilityComponent', () => {
     component.changePrivacy(false);
 
     expect(component.parentForm.get('privateRepository').value).toBeTrue();
-    expect(repoApi.updateSettings.calls.mostRecent().args[0]).toBe(REPO);
-    expect(lastSentForm(repoApi.updateSettings, 1)).toEqual({
+    expect(repoApi.updateRepoSettings.calls.mostRecent().args[0]).toBe(REPO);
+    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({
       privateRepo: true,
       allowOverride: false,
       securityScanEnabled: false,
@@ -71,7 +73,7 @@ describe('VisibilityComponent', () => {
     component.changePrivacy(true);
 
     expect(component.parentForm.get('privateRepository').value).toBeFalse();
-    expect(lastSentForm(repoApi.updateSettings, 1)).toEqual(jasmine.objectContaining({ privateRepo: false }));
+    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual(jasmine.objectContaining({ privateRepo: false }));
     expect(toastService.show).toHaveBeenCalledOnceWith('Repository visibility has changed as public', 'success');
   });
 
@@ -81,7 +83,7 @@ describe('VisibilityComponent', () => {
 
     component.changePrivacy(false);
 
-    expect(lastSentForm(repoApi.updateSettings, 1)).toEqual({
+    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual({
       privateRepo: true,
       allowOverride: false,
       releases: true,
@@ -101,7 +103,7 @@ describe('VisibilityComponent', () => {
 
     component.changePrivacy(true);
 
-    expect(lastSentForm(repoApi.updateSettings, 1)).toEqual(
+    expect(lastSentForm(repoApi.updateRepoSettings, 1)).toEqual(
       jasmine.objectContaining({
         privateRepo: false,
         allowOverride: false,
@@ -113,7 +115,7 @@ describe('VisibilityComponent', () => {
   });
 
   it('neither refreshes nor toasts when saving fails, leaving the error to the interceptor', () => {
-    repoApi.updateSettings.and.returnValue(throwError(() => new Error('boom')));
+    repoApi.updateRepoSettings.and.returnValue(throwError(() => new Error('boom')));
     component.repoType = RepoType.NPM;
     component.parentForm = generalParentForm();
 

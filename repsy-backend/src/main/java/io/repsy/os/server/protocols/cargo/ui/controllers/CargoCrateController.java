@@ -101,16 +101,16 @@ public class CargoCrateController {
     return this.responseFactory.success("crateFetched", crate);
   }
 
-  @GetMapping("/{repoName}/{crateName}/{vers}")
+  @GetMapping("/{repoName}/{crateName}/{version}")
   @RepoOperation
   public RestResponse<BaseCrateVersionInfo<UUID>> getVersion(
       final RepoInfo repoInfo,
       @PathVariable final String crateName,
-      @PathVariable final String vers) {
+      @PathVariable final String version) {
 
-    final var version = this.cargoApiFacade.getCrateVersion(repoInfo, crateName, vers);
+    final var crateVersion = this.cargoApiFacade.getCrateVersion(repoInfo, crateName, version);
 
-    return this.responseFactory.success("crateVersionFetched", version);
+    return this.responseFactory.success("crateVersionFetched", crateVersion);
   }
 
   @GetMapping("/{repoName}/{crateName}/versions")
@@ -142,15 +142,15 @@ public class CargoCrateController {
     return this.responseFactory.success("crateDeleted");
   }
 
-  @DeleteMapping("/{repoName}/{crateName}/{vers}")
+  @DeleteMapping("/{repoName}/{crateName}/{version}")
   @RepoOperation(permission = Permission.MANAGE)
   public RestResponse<Void> deleteVersion(
       final RepoInfo repoInfo,
       @PathVariable final String crateName,
-      @PathVariable final String vers)
+      @PathVariable final String version)
       throws IOException {
 
-    final var usages = this.cargoApiFacade.deleteCrateVersion(repoInfo, crateName, vers);
+    final var usages = this.cargoApiFacade.deleteCrateVersion(repoInfo, crateName, version);
 
     final var usageChangedInfo = new UsageChangedInfo(repoInfo.getId(), usages);
 

@@ -41,7 +41,9 @@ describe('CargoService', () => {
   let service: CargoService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['getPermission']);
+    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'getRepoPermissions',
+    ]);
     cargoApi = jasmine.createSpyObj<CargoCrateControllerService>('CargoCrateControllerService', [
       'searchCargoCrates',
       'getCargoCrate',
@@ -61,7 +63,7 @@ describe('CargoService', () => {
 
   describeRepoSelection({
     service: () => service,
-    getPermission: () => repoApi.getPermission,
+    getPermission: () => repoApi.getRepoPermissions,
     probe: (s) => s.deleteCrate(CRATE),
     probeApi: () => cargoApi.deleteCargoCrate,
     probeRepoArg: 1,
@@ -69,7 +71,7 @@ describe('CargoService', () => {
   });
 
   describe('with a selected repository', () => {
-    beforeEach(() => selectRepo(service, repoApi.getPermission, REPO));
+    beforeEach(() => selectRepo(service, repoApi.getRepoPermissions, REPO));
 
     const paged: PagedCase<CargoService>[] = [
       {

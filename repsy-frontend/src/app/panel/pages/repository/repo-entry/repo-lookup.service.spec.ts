@@ -20,14 +20,14 @@ import { ProtocolRepoControllerService } from '../../../../../generated/api';
 import { RepoLookupService } from './repo-lookup.service';
 
 describe('RepoLookupService', () => {
-  let getRepoType: jasmine.Spy;
+  let getRepoFormat: jasmine.Spy;
   let service: RepoLookupService;
 
   beforeEach(() => {
-    getRepoType = jasmine
-      .createSpy('getRepoType')
+    getRepoFormat = jasmine
+      .createSpy('getRepoFormat')
       .and.callFake((repoName: string) => of({ data: repoName.startsWith('npm') ? 'npm' : 'maven' }));
-    service = new RepoLookupService({ getRepoType } as unknown as ProtocolRepoControllerService);
+    service = new RepoLookupService({ getRepoFormat } as unknown as ProtocolRepoControllerService);
   });
 
   it('has no current repo until one is looked up', () => {
@@ -38,7 +38,7 @@ describe('RepoLookupService', () => {
     it('fetches the type and publishes it as the current repo', async () => {
       expect(await firstValueFrom(service.getRepoType('acme-maven'))).toBe('maven');
 
-      expect(getRepoType).toHaveBeenCalledOnceWith('acme-maven');
+      expect(getRepoFormat).toHaveBeenCalledOnceWith('acme-maven');
       expect(service.currentRepo).toEqual({ repoName: 'acme-maven', repoType: 'maven' });
     });
 
@@ -46,7 +46,7 @@ describe('RepoLookupService', () => {
       await firstValueFrom(service.getRepoType('acme-maven'));
       expect(await firstValueFrom(service.getRepoType('acme-maven'))).toBe('maven');
 
-      expect(getRepoType).toHaveBeenCalledTimes(1);
+      expect(getRepoFormat).toHaveBeenCalledTimes(1);
     });
 
     it('still switches the current repo when the type comes from the cache', async () => {
@@ -56,7 +56,7 @@ describe('RepoLookupService', () => {
 
       await firstValueFrom(service.getRepoType('acme-maven'));
 
-      expect(getRepoType).toHaveBeenCalledTimes(2);
+      expect(getRepoFormat).toHaveBeenCalledTimes(2);
       expect(service.currentRepo).toEqual({ repoName: 'acme-maven', repoType: 'maven' });
     });
 
@@ -71,7 +71,7 @@ describe('RepoLookupService', () => {
     });
 
     it('does not cache or publish a failed lookup, so the next call retries', async () => {
-      getRepoType.and.returnValues(
+      getRepoFormat.and.returnValues(
         throwError(() => new Error('not found')),
         of({ data: 'maven' }),
       );
@@ -80,7 +80,7 @@ describe('RepoLookupService', () => {
       expect(service.currentRepo).toBeNull();
 
       expect(await firstValueFrom(service.getRepoType('acme-maven'))).toBe('maven');
-      expect(getRepoType).toHaveBeenCalledTimes(2);
+      expect(getRepoFormat).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -89,7 +89,7 @@ describe('RepoLookupService', () => {
       expect(await firstValueFrom(service.checkRepoType('acme-maven'))).toBe('maven');
       expect(await firstValueFrom(service.checkRepoType('acme-maven'))).toBe('maven');
 
-      expect(getRepoType).toHaveBeenCalledTimes(1);
+      expect(getRepoFormat).toHaveBeenCalledTimes(1);
       expect(service.currentRepo).toBeNull();
     });
 
@@ -97,7 +97,7 @@ describe('RepoLookupService', () => {
       await firstValueFrom(service.checkRepoType('acme-maven'));
       await firstValueFrom(service.getRepoType('acme-maven'));
 
-      expect(getRepoType).toHaveBeenCalledTimes(1);
+      expect(getRepoFormat).toHaveBeenCalledTimes(1);
       expect(service.currentRepo).toEqual({ repoName: 'acme-maven', repoType: 'maven' });
     });
   });

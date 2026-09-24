@@ -47,7 +47,9 @@ describe('NpmService', () => {
   let service: NpmService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['getPermission']);
+    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'getRepoPermissions',
+    ]);
     packageApi = jasmine.createSpyObj<NpmPackageApiControllerService>('NpmPackageApiControllerService', [
       'listNpmPackages',
       'listNpmScopedPackageVersions',
@@ -77,7 +79,7 @@ describe('NpmService', () => {
 
   describeRepoSelection({
     service: () => service,
-    getPermission: () => repoApi.getPermission,
+    getPermission: () => repoApi.getRepoPermissions,
     probe: (s) => s.fetchPackageTags(PACKAGE, ''),
     probeApi: () => packageApi.listNpmPackageTags,
     probeRepoArg: 1,
@@ -85,7 +87,7 @@ describe('NpmService', () => {
   });
 
   describe('with a selected repository', () => {
-    beforeEach(() => selectRepo(service, repoApi.getPermission, REPO));
+    beforeEach(() => selectRepo(service, repoApi.getRepoPermissions, REPO));
 
     const paged: PagedCase<NpmService>[] = [
       {

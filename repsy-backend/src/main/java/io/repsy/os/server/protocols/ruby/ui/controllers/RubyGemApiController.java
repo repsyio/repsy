@@ -92,26 +92,25 @@ public class RubyGemApiController {
     return this.responseFactory.success("gemDeleted");
   }
 
-  @GetMapping("/{repoName}/{gemName}/versions/{versionName}")
+  @GetMapping("/{repoName}/{gemName}/versions/{version}")
   @RepoOperation
   public RestResponse<GemVersionInfo> getVersion(
       final RepoInfo repoInfo,
       @PathVariable final String gemName,
-      @PathVariable final String versionName,
+      @PathVariable final String version,
       @RequestParam(defaultValue = "ruby") final String platform) {
-    final var info = this.rubyApiFacade.getVersionInfo(repoInfo, gemName, versionName, platform);
+    final var info = this.rubyApiFacade.getVersionInfo(repoInfo, gemName, version, platform);
     return this.responseFactory.success("gemVersionFetched", info);
   }
 
-  @DeleteMapping("/{repoName}/{gemName}/versions/{versionName}")
+  @DeleteMapping("/{repoName}/{gemName}/versions/{version}")
   @RepoOperation(permission = Permission.MANAGE)
   public RestResponse<Void> deleteVersion(
       final RepoInfo repoInfo,
       @PathVariable final String gemName,
-      @PathVariable final String versionName,
+      @PathVariable final String version,
       @RequestParam(defaultValue = "ruby") final String platform) {
-    final var usages =
-        this.rubyApiFacade.deleteGemVersion(repoInfo, gemName, versionName, platform);
+    final var usages = this.rubyApiFacade.deleteGemVersion(repoInfo, gemName, version, platform);
     this.usageUpdateService.updateUsage(new UsageChangedInfo(repoInfo.getId(), usages));
     return this.responseFactory.success("gemVersionDeleted");
   }

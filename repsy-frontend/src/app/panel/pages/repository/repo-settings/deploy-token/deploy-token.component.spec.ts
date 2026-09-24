@@ -49,14 +49,16 @@ describe('DeployTokenComponent', () => {
   beforeEach(() => {
     tokenService = jasmine.createSpyObj<ProtocolDeployTokenControllerService>('ProtocolDeployTokenControllerService', [
       'listDeployTokens',
-      'rotate',
-      'revoke',
+      'rotateDeployToken',
+      'revokeDeployToken',
     ]);
     tokenService.listDeployTokens.and.returnValue(of(listing([token('a'), token('b')], 4)) as never);
-    tokenService.rotate.and.returnValue(of({ data: 'new-secret' }) as never);
-    tokenService.revoke.and.returnValue(of({}) as never);
-    repoService = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['getUsage']);
-    repoService.getUsage.and.returnValue(of({ data: USAGE }) as never);
+    tokenService.rotateDeployToken.and.returnValue(of({ data: 'new-secret' }) as never);
+    tokenService.revokeDeployToken.and.returnValue(of({}) as never);
+    repoService = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'getRepoUsage',
+    ]);
+    repoService.getRepoUsage.and.returnValue(of({ data: USAGE }) as never);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModalService = new DangerModalService();
     component = new DeployTokenComponent(tokenService, repoService, toastService, dangerModalService);
@@ -69,7 +71,7 @@ describe('DeployTokenComponent', () => {
       component.ngOnInit();
 
       expect(tokenService.listDeployTokens).toHaveBeenCalledOnceWith(REPO, 0, 3);
-      expect(repoService.getUsage).toHaveBeenCalledOnceWith(REPO);
+      expect(repoService.getRepoUsage).toHaveBeenCalledOnceWith(REPO);
       expect(component.deployTokens.map((t) => t.id)).toEqual(['a', 'b']);
       expect(component.pagedData.page.totalPages).toBe(4);
       expect(component.repoUsage as unknown).toEqual(USAGE);
@@ -85,7 +87,7 @@ describe('DeployTokenComponent', () => {
 
     it('keeps what it has when the tokens or the usage cannot be loaded', () => {
       tokenService.listDeployTokens.and.returnValue(throwError(() => new Error('boom')));
-      repoService.getUsage.and.returnValue(throwError(() => new Error('boom')));
+      repoService.getRepoUsage.and.returnValue(throwError(() => new Error('boom')));
 
       component.ngOnInit();
 
@@ -118,7 +120,7 @@ describe('DeployTokenComponent', () => {
       component.rotateDeployToken(rotated);
 
       expect(dangerModalService.modal).toEqual({ title: 'Rotate Deploy Token', action: 'Rotate', message: null });
-      expect(tokenService.rotate).not.toHaveBeenCalled();
+      expect(tokenService.rotateDeployToken).not.toHaveBeenCalled();
     });
 
     it('rotates once confirmed, reloads, toasts and shows the new secret', () => {
@@ -127,7 +129,7 @@ describe('DeployTokenComponent', () => {
 
       dangerModalService.call();
 
-      expect(tokenService.rotate).toHaveBeenCalledOnceWith('a', REPO);
+      expect(tokenService.rotateDeployToken).toHaveBeenCalledOnceWith('a', REPO);
       expect(tokenService.listDeployTokens).toHaveBeenCalledTimes(1);
       expect(toastService.show).toHaveBeenCalledOnceWith('Deploy token rotated successfully', 'success');
       expect(component.createdDeployToken).toEqual(
@@ -139,7 +141,7 @@ describe('DeployTokenComponent', () => {
 
     it('holds the operation lock while the rotation is running', () => {
       const answer = new Subject<{ data: string }>();
-      tokenService.rotate.and.returnValue(answer as never);
+      tokenService.rotateDeployToken.and.returnValue(answer as never);
       component.rotateDeployToken(rotated);
 
       dangerModalService.call();
@@ -151,7 +153,7 @@ describe('DeployTokenComponent', () => {
     });
 
     it('shows nothing and releases the lock when the rotation fails', () => {
-      tokenService.rotate.and.returnValue(throwError(() => new Error('boom')));
+      tokenService.rotateDeployToken.and.returnValue(throwError(() => new Error('boom')));
       component.rotateDeployToken(rotated);
 
       dangerModalService.call();
@@ -170,7 +172,7 @@ describe('DeployTokenComponent', () => {
       component.revokeDeployToken(token('a'));
 
       expect(dangerModalService.modal).toEqual({ title: 'Delete Deploy Token', action: 'Delete', message: null });
-      expect(tokenService.revoke).not.toHaveBeenCalled();
+      expect(tokenService.revokeDeployToken).not.toHaveBeenCalled();
     });
 
     it('revokes once confirmed, then reloads and toasts', () => {
@@ -179,7 +181,7 @@ describe('DeployTokenComponent', () => {
 
       dangerModalService.call();
 
-      expect(tokenService.revoke).toHaveBeenCalledOnceWith('a', REPO);
+      expect(tokenService.revokeDeployToken).toHaveBeenCalledOnceWith('a', REPO);
       expect(tokenService.listDeployTokens).toHaveBeenCalledTimes(1);
       expect(toastService.show).toHaveBeenCalledOnceWith('Deploy token revoked successfully', 'success');
       expect(component.operationLock).toBeFalse();
@@ -216,7 +218,7 @@ describe('DeployTokenComponent', () => {
 
     it('fetches the tokens only after the revoke has completed, and only once', () => {
       const revoked = new Subject<object>();
-      tokenService.revoke.and.returnValue(revoked as never);
+      tokenService.revokeDeployToken.and.returnValue(revoked as never);
       tokenService.listDeployTokens.and.returnValue(of(listing([token('only')], 2)) as never);
       component.loadPage(1);
       component.revokeDeployToken(token('only'));
@@ -251,7 +253,7 @@ describe('DeployTokenComponent', () => {
         const list = new Subject<unknown>();
         const usage = new Subject<unknown>();
         tokenService.listDeployTokens.and.returnValue(list as never);
-        repoService.getUsage.and.returnValue(usage as never);
+        repoService.getRepoUsage.and.returnValue(usage as never);
 
         dangerModalService.call();
         const answers = [
@@ -268,7 +270,7 @@ describe('DeployTokenComponent', () => {
     });
 
     it('neither reloads nor toasts, and releases the lock, when the revoke fails', () => {
-      tokenService.revoke.and.returnValue(throwError(() => new Error('boom')));
+      tokenService.revokeDeployToken.and.returnValue(throwError(() => new Error('boom')));
       component.revokeDeployToken(token('a'));
       tokenService.listDeployTokens.calls.reset();
 
@@ -334,9 +336,9 @@ describe('DeployTokenComponent template', () => {
     );
     tokenService.listDeployTokens.and.returnValue(of(listing(tokens)) as never);
     const repoService = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getUsage',
+      'getRepoUsage',
     ]);
-    repoService.getUsage.and.returnValue(of({ data: USAGE }) as never);
+    repoService.getRepoUsage.and.returnValue(of({ data: USAGE }) as never);
 
     const { el } = await renderComponent(
       DeployTokenComponent,

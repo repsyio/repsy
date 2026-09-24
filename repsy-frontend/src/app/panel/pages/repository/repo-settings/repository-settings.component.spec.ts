@@ -40,14 +40,14 @@ describe('RepositorySettingsComponent', () => {
 
   beforeEach(() => {
     repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getPermission',
-      'getSettings',
+      'getRepoPermissions',
+      'getRepoSettings',
     ]);
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     currentRepo$ = new BehaviorSubject<RepoContext | null>(null);
 
-    repoApi.getPermission.and.returnValue(reply(permission(REPO, { canManage: true })));
-    repoApi.getSettings.and.returnValue(reply(settings()));
+    repoApi.getRepoPermissions.and.returnValue(reply(permission(REPO, { canManage: true })));
+    repoApi.getRepoSettings.and.returnValue(reply(settings()));
 
     component = new RepositorySettingsComponent(
       repoApi,
@@ -80,19 +80,19 @@ describe('RepositorySettingsComponent', () => {
   it('waits for a repository context before loading anything', () => {
     component.ngOnInit();
 
-    expect(repoApi.getPermission).not.toHaveBeenCalled();
+    expect(repoApi.getRepoPermissions).not.toHaveBeenCalled();
     expect(component.loading).toBeTrue();
   });
 
   it('sends a user who cannot manage the repository back to the repository list', () => {
-    repoApi.getPermission.and.returnValue(reply(permission(REPO, { canManage: false, canWrite: true })));
+    repoApi.getRepoPermissions.and.returnValue(reply(permission(REPO, { canManage: false, canWrite: true })));
     component.ngOnInit();
 
     currentRepo$.next({ repoName: REPO, repoType: 'npm' });
 
-    expect(repoApi.getPermission).toHaveBeenCalledOnceWith(REPO);
+    expect(repoApi.getRepoPermissions).toHaveBeenCalledOnceWith(REPO);
     expect(router.navigate).toHaveBeenCalledOnceWith(['/repositories']);
-    expect(repoApi.getSettings).not.toHaveBeenCalled();
+    expect(repoApi.getRepoSettings).not.toHaveBeenCalled();
   });
 
   it('loads the settings of a manageable repository and remembers its type and permission', () => {
@@ -100,7 +100,7 @@ describe('RepositorySettingsComponent', () => {
 
     currentRepo$.next({ repoName: REPO, repoType: 'npm' });
 
-    expect(repoApi.getSettings).toHaveBeenCalledOnceWith(REPO);
+    expect(repoApi.getRepoSettings).toHaveBeenCalledOnceWith(REPO);
     expect(component.repoType).toBe('npm');
     expect(component.activeRepository.repoName).toBe(REPO);
     expect(component.loading).toBeFalse();
@@ -110,7 +110,7 @@ describe('RepositorySettingsComponent', () => {
   ['npm', 'pypi', 'docker', 'cargo', 'golang', 'helm', 'ruby'].forEach((repoType) => {
     it(`fills the general form for a ${repoType} repository`, () => {
       const info = settings({ privateRepo: true, allowOverride: false, securityScanEnabled: false });
-      repoApi.getSettings.and.returnValue(reply(info));
+      repoApi.getRepoSettings.and.returnValue(reply(info));
       component.ngOnInit();
 
       currentRepo$.next({ repoName: REPO, repoType: repoType as RepoContext['repoType'] });
@@ -133,7 +133,7 @@ describe('RepositorySettingsComponent', () => {
       pgpVerifyAllSignaturesEnabled: true,
       pgpKeyServerLookupEnabled: false,
     });
-    repoApi.getSettings.and.returnValue(reply(info));
+    repoApi.getRepoSettings.and.returnValue(reply(info));
     component.ngOnInit();
 
     currentRepo$.next({ repoName: REPO, repoType: 'maven' });
@@ -154,7 +154,7 @@ describe('RepositorySettingsComponent', () => {
 
   it('fills the release-aware form, not the general one, for a NuGet repository', () => {
     const info = settings({ releases: false, snapshots: true });
-    repoApi.getSettings.and.returnValue(reply(info));
+    repoApi.getRepoSettings.and.returnValue(reply(info));
     component.ngOnInit();
 
     currentRepo$.next({ repoName: REPO, repoType: 'nuget' });
@@ -175,7 +175,7 @@ describe('RepositorySettingsComponent', () => {
   });
 
   it('stops loading and keeps the forms untouched when the settings request fails', () => {
-    repoApi.getSettings.and.returnValue(throwError(() => new Error('boom')));
+    repoApi.getRepoSettings.and.returnValue(throwError(() => new Error('boom')));
     component.ngOnInit();
 
     currentRepo$.next({ repoName: REPO, repoType: 'npm' });
@@ -188,19 +188,19 @@ describe('RepositorySettingsComponent', () => {
   it('getRepoSettings reloads the settings of the active repository', () => {
     component.ngOnInit();
     currentRepo$.next({ repoName: REPO, repoType: 'npm' });
-    repoApi.getSettings.calls.reset();
-    repoApi.getSettings.and.returnValue(reply(settings({ privateRepo: false })));
+    repoApi.getRepoSettings.calls.reset();
+    repoApi.getRepoSettings.and.returnValue(reply(settings({ privateRepo: false })));
 
     component.getRepoSettings();
 
-    expect(repoApi.getSettings).toHaveBeenCalledOnceWith(REPO);
+    expect(repoApi.getRepoSettings).toHaveBeenCalledOnceWith(REPO);
     expect(component.generalSettingsForm.get('privateRepository').value).toBeFalse();
   });
 
   it('drops a pending permission lookup when the user switches repositories', () => {
     const first = new Subject<ReturnType<typeof restResponse>>();
-    repoApi.getPermission.withArgs('first').and.returnValue(first as never);
-    repoApi.getPermission.withArgs('second').and.returnValue(reply(permission('second', { canManage: true })));
+    repoApi.getRepoPermissions.withArgs('first').and.returnValue(first as never);
+    repoApi.getRepoPermissions.withArgs('second').and.returnValue(reply(permission('second', { canManage: true })));
     component.ngOnInit();
 
     currentRepo$.next({ repoName: 'first', repoType: 'npm' });
@@ -209,7 +209,7 @@ describe('RepositorySettingsComponent', () => {
 
     expect(router.navigate).not.toHaveBeenCalled();
     expect(component.activeRepository.repoName).toBe('second');
-    expect(repoApi.getSettings).toHaveBeenCalledOnceWith('second');
+    expect(repoApi.getRepoSettings).toHaveBeenCalledOnceWith('second');
   });
 
   it('stops reacting to repository changes once destroyed', () => {
@@ -218,7 +218,7 @@ describe('RepositorySettingsComponent', () => {
 
     currentRepo$.next({ repoName: REPO, repoType: 'npm' });
 
-    expect(repoApi.getPermission).not.toHaveBeenCalled();
+    expect(repoApi.getRepoPermissions).not.toHaveBeenCalled();
   });
 
   it('can be destroyed before it was initialised', () => {

@@ -41,7 +41,9 @@ describe('HelmService', () => {
   let service: HelmService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', ['getPermission']);
+    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+      'getRepoPermissions',
+    ]);
     helmApi = jasmine.createSpyObj<HelmChartControllerService>('HelmChartControllerService', [
       'searchHelmCharts',
       'getHelmChartVersions',
@@ -61,7 +63,7 @@ describe('HelmService', () => {
 
   describeRepoSelection({
     service: () => service,
-    getPermission: () => repoApi.getPermission,
+    getPermission: () => repoApi.getRepoPermissions,
     probe: (s) => s.getChartVersions(CHART),
     probeApi: () => helmApi.getHelmChartVersions,
     probeRepoArg: 0,
@@ -69,7 +71,7 @@ describe('HelmService', () => {
   });
 
   describe('with a selected repository', () => {
-    beforeEach(() => selectRepo(service, repoApi.getPermission, REPO));
+    beforeEach(() => selectRepo(service, repoApi.getRepoPermissions, REPO));
 
     const paged: PagedCase<HelmService>[] = [
       {
