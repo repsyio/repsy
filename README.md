@@ -535,8 +535,13 @@ instance per team.
 
 - **Manifests are content-addressed.** A manifest is stored once per image and digest and stays
   pullable by that digest, `docker pull repo/image@sha256:...`, whatever happens to the tags that
-  point at it. Both `sha256:` and `sha512:` references are accepted; the registry reports the
-  `sha256` digest.
+  point at it. The registry stores the `sha256` and the `sha512` digest of every manifest, so it is
+  addressable by either, and it answers in the algorithm the client used: a reference by `sha512`
+  gets a `sha512` `Docker-Content-Digest` back (on push, `GET` and `HEAD`, and in the push's
+  `Location`), a tag or a `sha256` reference the `sha256` one. A manifest pushed by a digest never
+  becomes a tag, and a `sha512` reference that is not the manifest's own digest is refused with
+  `400 DIGEST_INVALID`. A manifest written by an earlier version is addressable by its `sha512`
+  once the repair job below has recorded it (or the same bytes are pushed again).
 - **A tag is a movable pointer.** Pushing a tag again with a different manifest (when the
   repository allows overriding) moves the pointer; the manifest it pointed at before stays stored
   and pullable by its digest. Pushing the manifest a tag already points at changes nothing.

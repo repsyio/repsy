@@ -488,7 +488,12 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
         this.getManifestResource(repoInfo, imageName, manifest, requestPath);
     final var manifestStr = manifestResource.getContentAsString(StandardCharsets.UTF_8);
 
-    return new ManifestDetails(manifest.getMediaType(), manifest.getDigest(), manifestStr);
+    // The digest reported is in the algorithm the client asked for: a reference by sha512 gets
+    // the sha512 digest back, a tag or a sha256 reference the canonical sha256 one (RPS-1244).
+    return new ManifestDetails(
+        manifest.getMediaType(),
+        DockerDigestCalculator.reportedDigest(manifestReference, manifest.getDigest()),
+        manifestStr);
   }
 
   /**

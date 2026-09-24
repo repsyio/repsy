@@ -281,9 +281,10 @@ class AbstractDockerProtocolTxFacadeTest {
     final var context = newContext();
     final var imageInfo = this.stubImage();
     final var digest = algorithm + ":" + "a".repeat("sha256".equals(algorithm) ? 64 : 128);
+    // The row's canonical digest is always the sha256 one; the answer echoes the reference.
     final var manifestDetail = new BaseManifestDetail<UUID>();
     manifestDetail.setMediaType("application/vnd.oci.image.manifest.v1+json");
-    manifestDetail.setDigest(digest);
+    manifestDetail.setDigest("sha256:" + "c".repeat(64));
     when(this.manifestService.findManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
         .thenReturn(manifestDetail);
     this.stubManifestStorage("manifest-body".getBytes(StandardCharsets.UTF_8));
@@ -295,6 +296,29 @@ class AbstractDockerProtocolTxFacadeTest {
     assertThat(result.digest()).isEqualTo(digest);
     assertThat(result.body()).isEqualTo("manifest-body");
     verify(this.manifestService, never()).findActiveTagByNameAndRepoAndImage(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName(
+      "getManifest() looks a digest reference up lower-cased and reports it, not the row's sha256,"
+          + " so a sha512 request is answered with a sha512 digest (RPS-1244)")
+  void getManifestReportsTheRequestedAlgorithm() throws Exception {
+    final var context = newContext();
+    final var imageInfo = this.stubImage();
+    final var sha512 = "sha512:" + "ab".repeat(64);
+    final var manifestDetail = new BaseManifestDetail<UUID>();
+    manifestDetail.setMediaType("application/vnd.oci.image.manifest.v1+json");
+    manifestDetail.setDigest("sha256:" + "c".repeat(64));
+    when(this.manifestService.findManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, sha512))
+        .thenReturn(manifestDetail);
+    this.stubManifestStorage("manifest-body".getBytes(StandardCharsets.UTF_8));
+    final var requested = "sha512:" + "AB".repeat(64);
+
+    final var result =
+        this.facade()
+            .getManifest(context, requested, IMAGE_NAME, "/v2/images/app/manifests/" + requested);
+
+    assertThat(result.digest()).isEqualTo(sha512);
   }
 
   @Test

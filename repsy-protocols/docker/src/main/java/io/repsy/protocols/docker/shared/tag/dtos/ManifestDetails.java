@@ -15,4 +15,12 @@
  */
 package io.repsy.protocols.docker.shared.tag.dtos;
 
+/**
+ * A manifest as it is served.
+ *
+ * @param mediaType the manifest's {@code Content-Type}
+ * @param digest the digest reported in {@code Docker-Content-Digest}: in the algorithm the request
+ *     named, {@code sha512} for a {@code sha512:} reference and {@code sha256} otherwise
+ * @param body the manifest JSON
+ */
 public record ManifestDetails(String mediaType, String digest, String body) {}
