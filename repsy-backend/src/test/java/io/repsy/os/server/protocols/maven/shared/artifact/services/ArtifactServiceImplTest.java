@@ -636,6 +636,11 @@ class ArtifactServiceImplTest {
     return argThat(path -> path.getRelativePath().getPath().equals(relativePath));
   }
 
+  /** Like {@link #pathOf}, for a second stubbing of the same method: it is handed a null then. */
+  private static StoragePath pathOfNullSafe(final String relativePath) {
+    return argThat(path -> path != null && path.getRelativePath().getPath().equals(relativePath));
+  }
+
   @Test
   @DisplayName("marks the version signed without verifying the signature again (RPS-1186)")
   void markSignedWithoutVerifyingAgain() {
@@ -733,6 +738,85 @@ class ArtifactServiceImplTest {
 
     verify(this.versionSignatureService).forget(version, "lib-1.0-sources.jar");
     verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0");
+  }
+
+  @Test
+  @DisplayName(
+      "a signature recorded for the stored bytes while the file was being registered is kept")
+  void aRecordedSignatureThatStillVerifiesIsKept() {
+    final var id = UUID.randomUUID();
+    final var artifact = this.stubArtifact(id);
+    final var version = new ArtifactVersion();
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(version));
+    when(this.versionSignatureService.isRecorded(version, "lib-1.0.jar")).thenReturn(true);
+    final var jar = new ByteArrayResource("jar".getBytes(UTF_8));
+    final var signature = new ByteArrayResource(ARMORED_SIGNATURE.getBytes(UTF_8));
+    when(this.storageStrategy.get(pathOfNullSafe("com/acme/lib/1.0/lib-1.0.jar"), eq("mvn")))
+        .thenReturn(Optional.of(jar));
+    when(this.storageStrategy.get(pathOfNullSafe("com/acme/lib/1.0/lib-1.0.jar.asc"), eq("mvn")))
+        .thenReturn(Optional.of(signature));
+    final var sources = new PublicKeySources(List.of(), List.of(), true);
+    when(this.keyStoreService.findPublicKeySources(id, true)).thenReturn(sources);
+
+    this.artifactService.createOrUpdateArtifact(
+        repoVerifyingAllSignatures(id),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar"),
+        new ByteArrayResource(new byte[0]));
+
+    verify(this.pgpVerifierService).verify(jar, signature, sources);
+    verify(this.versionSignatureService, never()).forget(any(), any());
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0");
+  }
+
+  @Test
+  @DisplayName("a recorded signature that no longer verifies the stored bytes is forgotten")
+  void aRecordedSignatureThatDoesNotVerifyIsForgotten() {
+    final var id = UUID.randomUUID();
+    final var artifact = this.stubArtifact(id);
+    final var version = new ArtifactVersion();
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(version));
+    when(this.versionSignatureService.isRecorded(version, "lib-1.0.jar")).thenReturn(true);
+    final var jar = new ByteArrayResource("another jar".getBytes(UTF_8));
+    final var signature = new ByteArrayResource(ARMORED_SIGNATURE.getBytes(UTF_8));
+    when(this.storageStrategy.get(pathOfNullSafe("com/acme/lib/1.0/lib-1.0.jar"), eq("mvn")))
+        .thenReturn(Optional.of(jar));
+    when(this.storageStrategy.get(pathOfNullSafe("com/acme/lib/1.0/lib-1.0.jar.asc"), eq("mvn")))
+        .thenReturn(Optional.of(signature));
+    final var sources = new PublicKeySources(List.of(), List.of(), true);
+    when(this.keyStoreService.findPublicKeySources(id, true)).thenReturn(sources);
+    doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
+        .when(this.pgpVerifierService)
+        .verify(jar, signature, sources);
+
+    this.artifactService.createOrUpdateArtifact(
+        repoVerifyingAllSignatures(id),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar"),
+        new ByteArrayResource(new byte[0]));
+
+    verify(this.versionSignatureService).forget(version, "lib-1.0.jar");
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0");
+  }
+
+  @Test
+  @DisplayName("a recorded signature whose file or signature is gone from storage is forgotten")
+  void aRecordedSignatureOfAMissingFileIsForgotten() {
+    final var id = UUID.randomUUID();
+    final var artifact = this.stubArtifact(id);
+    final var version = new ArtifactVersion();
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(version));
+    when(this.versionSignatureService.isRecorded(version, "lib-1.0.jar")).thenReturn(true);
+    when(this.storageStrategy.get(any(StoragePath.class), eq("mvn"))).thenReturn(Optional.empty());
+
+    this.artifactService.createOrUpdateArtifact(
+        repoVerifyingAllSignatures(id),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar"),
+        new ByteArrayResource(new byte[0]));
+
+    verify(this.versionSignatureService).forget(version, "lib-1.0.jar");
+    verifyNoInteractions(this.pgpVerifierService);
   }
 
   @Test

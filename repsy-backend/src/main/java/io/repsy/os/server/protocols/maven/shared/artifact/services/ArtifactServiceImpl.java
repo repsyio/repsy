@@ -350,12 +350,63 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       return;
     }
 
-    if (!recorded) {
+    // Locked first: a signature request that recorded this file's signature holds the lock until it
+    // commits, so the record is either visible from here on or comes after the recomputation below
+    // (RPS-1320).
+    this.versionSignatureService.lock(version);
+
+    if (!recorded
+        && !this.stillVerifies(repoInfo, version, PendingSignatureService.pathOf(storagePath))) {
       this.versionSignatureService.forget(version, relativePath.getFileName());
     }
 
     this.versionSignatureService.refreshSigned(
         repoInfo.getStorageKey(), version, versionPathOf(storagePath));
+  }
+
+  /**
+   * Whether the verified signature recorded for a file that was just stored is the one of the bytes
+   * that are stored now, and not of the ones they replaced.
+   *
+   * <p>A signature is small and its request often runs whole between the moment the file it signs
+   * is stored and the moment that file's own request gets here: it finds the file, verifies against
+   * these very bytes and records them. Forgetting that record on the file's behalf would leave the
+   * version unsigned for good, as nothing recomputes it afterwards (RPS-1320). So a record that is
+   * there is checked once more against the file and the signature that are stored, and is kept if
+   * it holds. When the file is new no record exists and nothing is read. When it replaced another
+   * (a redeploy) the record is, in general, the one of the old bytes, does not verify and goes; if
+   * the same bytes were stored again it holds, and stays.
+   */
+  private boolean stillVerifies(
+      final BaseRepoInfo<UUID> repoInfo, final ArtifactVersion version, final String filePath) {
+
+    final var fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+
+    if (!this.versionSignatureService.isRecorded(version, fileName)) {
+      return false;
+    }
+
+    final var repoName = repoInfo.getName();
+    final var file =
+        this.storageStrategy.get(StoragePath.of(repoInfo.getStorageKey(), filePath), repoName);
+    final var signature =
+        this.storageStrategy.get(
+            StoragePath.of(repoInfo.getStorageKey(), filePath + SIGNATURE_SUFFIX), repoName);
+
+    if (file.isEmpty() || signature.isEmpty()) {
+      return false;
+    }
+
+    try {
+      this.verifyAgainst(repoInfo, file.get(), signature.get());
+
+      return true;
+    } catch (final RuntimeException e) {
+      // Not verified, or not verifiable now (a key that cannot be found): not vouched for.
+      log.debug("The recorded signature of {} no longer verifies: {}", filePath, e.toString());
+
+      return false;
+    }
   }
 
   /** The version directory a file sits in, {@code <group>/<artifactId>/<version>}. */

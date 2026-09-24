@@ -230,6 +230,20 @@ class MavenArtifactSignatureIT extends AbstractIntegrationTest {
         .getBytes(UTF_8);
   }
 
+  private static byte[] pom(final String version, final String description) {
+    return """
+        <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>com.acme</groupId>
+          <artifactId>lib</artifactId>
+          <version>%s</version>
+          <description>%s</description>
+        </project>
+        """
+        .formatted(version, description)
+        .getBytes(UTF_8);
+  }
+
   private static byte[] bytes(final String text) {
     return text.getBytes(UTF_8);
   }
@@ -409,12 +423,33 @@ class MavenArtifactSignatureIT extends AbstractIntegrationTest {
     this.uploadOk(f.repo(), f.admin(), JAR + ".asc", sign(newJar));
     assertThat(this.signedOf(f.repo(), "1.0")).containsExactly(true);
 
-    this.uploadOk(f.repo(), f.admin(), POM, pom);
+    final var newPom = pom("1.0", "another description");
+    this.uploadOk(f.repo(), f.admin(), POM, newPom);
     assertThat(this.signedOf(f.repo(), "1.0")).containsExactly(false);
     assertThat(this.verifiedFiles(f.repo(), "1.0")).containsExactly("lib-1.0.jar");
 
-    this.uploadOk(f.repo(), f.admin(), POM + ".asc", sign(pom));
+    this.uploadOk(f.repo(), f.admin(), POM + ".asc", sign(newPom));
     assertThat(this.signedOf(f.repo(), "1.0")).containsExactly(true);
+  }
+
+  @Test
+  @DisplayName("a file stored again with the same bytes keeps its signature: it still verifies")
+  void aFileStoredAgainWithTheSameBytesKeepsItsSignature() throws Exception {
+    final var f = this.fixture(true);
+    this.allowOverride(f.repo());
+    final var pom = pom("1.0");
+    final var jar = bytes("jar");
+    this.uploadOk(f.repo(), f.admin(), POM, pom);
+    this.uploadOk(f.repo(), f.admin(), JAR, jar);
+    this.uploadOk(f.repo(), f.admin(), POM + ".asc", sign(pom));
+    this.uploadOk(f.repo(), f.admin(), JAR + ".asc", sign(jar));
+
+    this.uploadOk(f.repo(), f.admin(), JAR, jar);
+    this.uploadOk(f.repo(), f.admin(), POM, pom);
+
+    assertThat(this.signedOf(f.repo(), "1.0")).containsExactly(true);
+    assertThat(this.verifiedFiles(f.repo(), "1.0"))
+        .containsExactlyInAnyOrder("lib-1.0.jar", "lib-1.0.pom");
   }
 
   @Test

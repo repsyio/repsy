@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.maven.protocol;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mockingDetails;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
@@ -106,7 +107,7 @@ class MavenDeferredSignatureIT extends AbstractIntegrationTest {
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private MavenStorageService mavenStorageService;
-  @Autowired private PendingSignatureService pendingSignatureService;
+  @MockitoSpyBean private PendingSignatureService pendingSignatureService;
   @Autowired private ObjectMapper objectMapper;
 
   private final List<UUID> createdRepoIds = new ArrayList<>();
@@ -138,6 +139,7 @@ class MavenDeferredSignatureIT extends AbstractIntegrationTest {
     this.deleteCommittedUsers(this.createdUserIds);
     this.createdUserIds.clear();
     org.mockito.Mockito.reset(this.pgpVerifierService);
+    org.mockito.Mockito.reset(this.pendingSignatureService);
   }
 
   private Repo mavenRepo(final boolean verifyAll) {
@@ -624,6 +626,83 @@ class MavenDeferredSignatureIT extends AbstractIntegrationTest {
     assertThat(this.verifiedFiles(f.repo())).containsExactly("lib-1.0.jar");
   }
 
+  /**
+   * The request of a file has stored it and has not registered it yet, and the request of its
+   * signature (small, so it is often the first to finish) runs whole in that gap: it finds the file
+   * stored, verifies the signature against it and records it. The file's request must not take that
+   * record for the one of the bytes it replaced (RPS-1320).
+   */
+  private void assertSignatureThatRunsInsideTheTailOfItsFileIsKept(
+      final String signedFile,
+      final java.util.function.Consumer<org.mockito.stubbing.Stubber> hookTheTail,
+      final java.util.function.Function<Fixture, List<String>> before,
+      final List<String> verified)
+      throws Exception {
+    final var f = this.fixture();
+    final var pool = Executors.newSingleThreadExecutor();
+    final var fired = new AtomicInteger();
+
+    try {
+      for (final var path : before.apply(f)) {
+        this.uploadOk(f.repo(), f.admin(), path, f.bodies().get(path));
+      }
+
+      hookTheTail.accept(
+          doAnswer(
+              invocation -> {
+                if (fired.getAndIncrement() == 0) {
+                  pool.submit(
+                          () -> {
+                            this.uploadOk(
+                                f.repo(),
+                                f.admin(),
+                                signedFile + ".asc",
+                                f.bodies().get(signedFile + ".asc"));
+
+                            return null;
+                          })
+                      .get(30, TimeUnit.SECONDS);
+                }
+
+                return invocation.callRealMethod();
+              }));
+
+      this.uploadOk(f.repo(), f.admin(), signedFile, f.bodies().get(signedFile));
+    } finally {
+      pool.shutdownNow();
+    }
+
+    assertThat(fired.get()).as("the hook ran").isPositive();
+    assertThat(Files.readAllBytes(stored(f.repo(), signedFile + ".asc")))
+        .isEqualTo(f.bodies().get(signedFile + ".asc"));
+    assertThat(this.verifiedFiles(f.repo())).containsExactlyInAnyOrderElementsOf(verified);
+    assertThat(this.signedOf(f.repo())).containsExactly(true);
+  }
+
+  @Test
+  @DisplayName(
+      "a signature that is recorded while its jar's request is still registering it is kept")
+  void aSignatureRecordedInTheTailOfItsFileIsKept() throws Exception {
+    this.assertSignatureThatRunsInsideTheTailOfItsFileIsKept(
+        JAR,
+        stubber -> stubber.when(this.pendingSignatureService).reconcileFile(any(), eq(JAR)),
+        f -> {
+          return List.of(POM, POM + ".asc");
+        },
+        List.of("lib-1.0.pom", "lib-1.0.jar"));
+  }
+
+  @Test
+  @DisplayName(
+      "a POM signature that is recorded while its POM's request is still registering it is kept")
+  void aPomSignatureRecordedInTheTailOfItsPomIsKept() throws Exception {
+    this.assertSignatureThatRunsInsideTheTailOfItsFileIsKept(
+        POM,
+        stubber -> stubber.when(this.pendingSignatureService).reconcileDirectory(any(), any()),
+        f -> List.of(),
+        List.of("lib-1.0.pom"));
+  }
+
   @Test
   @DisplayName("the six requests of a deploy sent at the same time, 15 times, all end complete")
   void aParallelDeployEndsComplete() throws Exception {
@@ -658,6 +737,83 @@ class MavenDeferredSignatureIT extends AbstractIntegrationTest {
       }
 
       this.assertDeployComplete(f);
+    }
+  }
+
+  /**
+   * What {@code mvn deploy} of a signed release sends, with Maven's default of five connector
+   * threads: the POM, the jar and two classifier jars, the signature of each, and the SHA-1 of all
+   * eight, sent as they come. Each signature is small and overtakes the file it signs, or lands in
+   * the tail of that file's own request (RPS-1320).
+   */
+  @Test
+  @DisplayName(
+      "the sixteen requests of a signed deploy with checksums, five at a time, 30 times, end signed")
+  void aSignedDeployWithChecksumsAndFiveConnectorThreadsEndsSigned() throws Exception {
+    final var failures = new ArrayList<String>();
+    final var runs = Integer.getInteger("rps1320.runs", 30);
+
+    for (int run = 0; run < runs; run++) {
+      final var f = this.fixture();
+      final var javadoc = ("javadoc of " + f.repo().getName()).repeat(20_000).getBytes(UTF_8);
+      final var bodies = new java.util.LinkedHashMap<>(f.bodies());
+      final var javadocPath = DIR + "lib-1.0-javadoc.jar";
+      bodies.put(javadocPath, javadoc);
+      bodies.put(javadocPath + ".asc", sign(javadoc));
+
+      for (final var path : List.copyOf(bodies.keySet())) {
+        bodies.put(path + ".sha1", sha1Hex(bodies.get(path)));
+      }
+
+      final var paths = new ArrayList<>(bodies.keySet());
+      Collections.shuffle(paths, new Random(run));
+      final var pool = Executors.newFixedThreadPool(5);
+
+      try {
+        final List<Future<Integer>> answers = new ArrayList<>();
+
+        for (final var path : paths) {
+          answers.add(pool.submit(() -> this.status(f.repo(), f.admin(), path, bodies.get(path))));
+        }
+
+        for (final var answer : answers) {
+          assertThat(answer.get(60, TimeUnit.SECONDS)).isEqualTo(200);
+        }
+      } finally {
+        pool.shutdownNow();
+      }
+
+      final var signed = this.signedOf(f.repo());
+      final var verified = this.verifiedFiles(f.repo());
+
+      if (!signed.equals(List.of(true))
+          || verified.size() != 4
+          || this.pendingCount(f.repo()) != 0) {
+        failures.add(
+            "run %d: signed=%s, verified=%s, parked=%d, stored=%s"
+                .formatted(
+                    run,
+                    signed,
+                    verified,
+                    this.pendingCount(f.repo()),
+                    java.util.Arrays.stream(
+                            java.util.Objects.requireNonNull(stored(f.repo(), DIR).toFile().list()))
+                        .filter(name -> name.endsWith(".asc"))
+                        .sorted()
+                        .toList()));
+      }
+    }
+
+    assertThat(failures).as("runs of %d that did not end signed", runs).isEmpty();
+  }
+
+  private static byte[] sha1Hex(final byte[] file) {
+    try {
+      return java.util.HexFormat.of()
+          .formatHex(java.security.MessageDigest.getInstance("SHA-1").digest(file))
+          .getBytes(UTF_8);
+    } catch (final java.security.NoSuchAlgorithmException e) {
+      throw new IllegalStateException(e);
     }
   }
 
