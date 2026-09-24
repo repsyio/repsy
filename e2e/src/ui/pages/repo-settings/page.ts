@@ -78,7 +78,7 @@ export class RepoSettingsPage extends UiPage {
     await this.expectLoaded();
   }
 
-  /** The settings page rendered (the layout hides the router outlet for 500 ms after load). */
+  /** The settings page rendered. */
   async expectLoaded(): Promise<void> {
     await expect(this.root).toBeVisible();
     await expect(this.title).toHaveText('Repository Settings');

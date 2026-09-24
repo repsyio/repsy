@@ -18,12 +18,15 @@ import { isPlatformBrowser } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   Inject,
   OnInit,
   PLATFORM_ID,
+  Type,
   ViewChild,
   ViewContainerRef,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ReactiveFormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 
@@ -39,6 +42,7 @@ import { AuthService } from '../../pages/service/auth.service';
 })
 export class AuthRedirectComponent implements OnInit {
   public isAuthenticated = false;
+  private destroyed = false;
 
   @ViewChild('container', { read: ViewContainerRef })
   private readonly container!: ViewContainerRef;
@@ -46,33 +50,44 @@ export class AuthRedirectComponent implements OnInit {
   constructor(
     private readonly authService: AuthService,
     private readonly splashService: SplashService,
+    private readonly destroyRef: DestroyRef,
     @Inject(PLATFORM_ID) private platformId: object,
   ) {
     this.isAuthenticated = this.authService.isAuthenticated();
+    this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
+      // Leaving "/" while a chunk is still loading must not leave the splash (and its scroll lock) up.
+      this.splashService.setLoading = false;
+    });
   }
 
   public ngOnInit(): void {
-    this.splashService.setLoading = true;
-    this.lazyLoadComponent();
+    // "/" shows the login form in place, so a login does not change the route and the router has
+    // nothing to re-evaluate: follow the session instead of deciding once (RPS-1278).
+    this.authService.isAuthenticated$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((isAuthenticated) => {
+      this.isAuthenticated = isAuthenticated;
+      this.splashService.setLoading = true;
+      void this.lazyLoadComponent(isAuthenticated);
+    });
   }
 
-  private lazyLoadComponent(): void {
-    if (this.isAuthenticated) {
-      import('../../../../../src/app/panel/pages/dashboard/dashboard.component').then((m) => {
-        this.container.createComponent(m.DashboardComponent);
-        if (isPlatformBrowser(this.platformId)) {
-          document.title = 'repsy | Dashboard';
-          this.splashService.setLoading = false;
-        }
-      });
-    } else {
-      import('../../../../../src/app/auth/pages/login/login.component').then((m) => {
-        this.container.createComponent(m.LoginComponent);
-        if (isPlatformBrowser(this.platformId)) {
-          document.title = 'repsy | Login';
-          this.splashService.setLoading = false;
-        }
-      });
+  private async lazyLoadComponent(isAuthenticated: boolean): Promise<void> {
+    const loaded: Type<unknown> = isAuthenticated
+      ? await import('../../../../../src/app/panel/pages/dashboard/dashboard.component').then(
+          (m) => m.DashboardComponent,
+        )
+      : await import('../../../../../src/app/auth/pages/login/login.component').then((m) => m.LoginComponent);
+
+    // The route changed while the chunk loaded, or the session changed again: a newer call renders that state.
+    if (this.destroyed || isAuthenticated !== this.isAuthenticated) {
+      return;
+    }
+
+    this.container.clear();
+    this.container.createComponent(loaded);
+    if (isPlatformBrowser(this.platformId)) {
+      document.title = isAuthenticated ? 'repsy | Dashboard' : 'repsy | Login';
+      this.splashService.setLoading = false;
     }
   }
 }

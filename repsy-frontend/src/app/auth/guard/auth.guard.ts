@@ -26,6 +26,7 @@ import {
 import { Observable } from 'rxjs';
 
 import { AuthService } from '../../auth/pages/service/auth.service';
+import { RETURN_URL_PARAM, safeReturnUrl } from '../util/return-url';
 
 @Injectable({
   providedIn: 'root',
@@ -36,18 +37,30 @@ export class AuthGuard implements CanActivate, CanActivateChild {
     private readonly authService: AuthService,
   ) {}
 
-  /* eslint-disable @typescript-eslint/no-unused-vars */
   public canActivate(
     route: ActivatedRouteSnapshot,
     state: RouterStateSnapshot,
   ): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {
-    return this.authService.isAuthenticated() ? true : this.router.navigateByUrl('/');
+    return this.authService.isAuthenticated() ? true : this._toLogin(state);
   }
 
   public canActivateChild(
     childRoute: ActivatedRouteSnapshot,
     state: RouterStateSnapshot,
   ): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {
-    return this.authService.isAuthenticated() ? true : this.router.navigateByUrl('/');
+    return this.authService.isAuthenticated() ? true : this._toLogin(state);
+  }
+
+  /**
+   * "/" renders the login form in place, and remembers the requested URL so that the login can
+   * return the visitor there (RPS-1278). The redirect is a UrlTree, so the router replaces the
+   * blocked navigation instead of racing a second one.
+   */
+  private _toLogin(state: RouterStateSnapshot): UrlTree {
+    const returnUrl = safeReturnUrl(state.url);
+    return this.router.createUrlTree(
+      ['/'],
+      returnUrl && returnUrl !== '/' ? { queryParams: { [RETURN_URL_PARAM]: returnUrl } } : {},
+    );
   }
 }

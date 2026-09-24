@@ -13,7 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 ///
-import { Component } from '@angular/core';
+import { Component, Type } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
@@ -59,7 +59,7 @@ class BlankComponent {}
         ],
       });
       router = TestBed.inject(Router);
-      fixture = TestBed.createComponent(layout);
+      fixture = TestBed.createComponent(layout as Type<PanelLayoutComponent | PanelLayoutContentComponent>);
       fixture.detectChanges();
     });
 
@@ -146,5 +146,29 @@ class BlankComponent {}
       expect(query('mobile-sidebar')).toBeNull();
       expect(burger().getAttribute('aria-expanded')).toBe('false');
     });
+  });
+});
+
+// RPS-1264: the routed page is not held back by a timer.
+describe('PanelLayoutComponent routed content', () => {
+  it('renders the router outlet at once and leaves the splash screen alone', () => {
+    const splash = { setLoading: false };
+    TestBed.configureTestingModule({
+      imports: [PanelLayoutComponent],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: { isAuthenticated: () => true, username: 'admin' } },
+        { provide: ProfileService, useValue: { get: () => of({ role: 'ADMIN' }) } },
+        { provide: SplashService, useValue: splash },
+      ],
+    });
+    const setLoading = jasmine.createSpy('setLoading');
+    Object.defineProperty(splash, 'setLoading', { set: setLoading });
+
+    const fixture = TestBed.createComponent(PanelLayoutComponent);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[data-testid="panel-content"] router-outlet')).not.toBeNull();
+    expect(setLoading).not.toHaveBeenCalled();
   });
 });
