@@ -41,12 +41,12 @@
  *  - A redeploy scenario (`reuseCoordinates` true -- `no-override`/`override`) re-PUTs the EXACT
  *    version the client just (successfully or not) attempted, which is exactly what a real client
  *    would have hit had it not preflighted the query client-side (`verify_unpublished`,
- *    `ops/registry/publish.rs`) -- see `knownPublishSideEffect` below for what that raw re-PUT then
- *    proves about storage being written before the DB duplicate check runs.
+ *    `ops/registry/publish.rs`). The loop then asserts (`expectNothingStored`) that the refused
+ *    duplicate touched neither the DB nor storage (RPS-1124, fixed: the check runs before the write).
  *
  * `resolve`'s `Outcome` is derived from a raw sparse-index GET instead (mirrors npm's packument-GET
  * reasoning): every consume expectation in the catalog is an authn/authz outcome, and an index GET
- * never touches the (possibly storage-corrupted, see `knownPublishSideEffect`) `.crate` bytes.
+ * never touches the `.crate` bytes.
  *
  * Every publish/seed-publish writes a fresh random marker file (`e2e-marker.txt`) into the crate, so
  * two publishes of one coordinate never share content; `AdapterResult.contentSha256` is the sha256 of
@@ -66,7 +66,6 @@ import { env } from '../env.js';
 import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { boundedSemverVersion } from '../scenarios/coordinates.js';
 import { outcomeForStatus } from '../scenarios/types.js';
-import type { Scenario } from '../scenarios/types.js';
 import type { SeedResult, World } from '../scenarios/world.js';
 import {
   adminCredential,
@@ -326,7 +325,7 @@ export async function resolve(world: World): Promise<AdapterResult> {
   });
 
   // The auth-only companion probe (see this file's header): a sparse-index GET never touches the
-  // (possibly storage-corrupted, see knownPublishSideEffect) .crate bytes.
+  // .crate bytes.
   const rawRes = await rawGetIndex(world.repoName, world.credential, packageName);
   const cargoHome = path.join(home, 'cargo');
   const resolved = await findFetchedCrate(cargoHome, packageName, version);
@@ -429,20 +428,4 @@ export const cargoAdapter: ProtocolAdapter<CargoFingerprint> = {
   fingerprint,
   expectNothingStored,
   afterSuccessfulRoundTrip,
-
-  /**
-   * See this file's header and `cargo-raw.ts`'s: `AbstractCargoProtocolFacade.publish` writes the
-   * `.crate` bytes to storage (`TRUNCATE_EXISTING`, overwriting whatever was there) and appends the
-   * index line BEFORE `CargoCrateServiceImpl.publish` runs the duplicate-version check that then
-   * throws and rolls the (Postgres) transaction back. The served sparse index is read straight from
-   * that same, now-rolled-back DB, so it still names the ORIGINAL checksum -- but the download route
-   * reads the crate straight off disk, which the refused attempt already overwrote. Confirmed live,
-   * not just from source: see README.md's "H1" section for the raw evidence.
-   */
-  knownPublishSideEffect: (scenario: Scenario) =>
-    scenario.reuseCoordinates === true
-      ? 'RPS-1124: a refused duplicate-version cargo publish has already overwritten the ' +
-        'stored .crate bytes before the duplicate check runs (AbstractCargoProtocolFacade.publish ' +
-        'writes to storage, then CargoCrateServiceImpl.publish throws and rolls the DB back)'
-      : undefined,
 };
