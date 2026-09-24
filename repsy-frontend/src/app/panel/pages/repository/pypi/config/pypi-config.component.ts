@@ -17,11 +17,12 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 
 import { MarkdownComponent } from '../../../../shared/components/markdown/markdown.component';
+import { DialogDirective } from '../../../../shared/directives/dialog.directive';
 
 @Component({
   selector: 'app-pypi-config',
   standalone: true,
-  imports: [MarkdownComponent, MarkdownComponent],
+  imports: [DialogDirective, MarkdownComponent, MarkdownComponent],
   styleUrl: './pypi-config.component.css',
   templateUrl: './pypi-config.component.html',
 })

@@ -13,6 +13,7 @@
       [checked]="checked"
       [disabled]="isDisabled"
       [attr.aria-checked]="checked"
+      [attr.aria-labelledby]="labelledBy ? labelledBy + ' ' + labelId : null"
       (click)="toggle()"
     />
     <span
@@ -27,7 +28,7 @@
       [class.translate-x-5]="checked"
     ></span>
   </span>
-  <span data-testid="toggle-label" class="font-['Comfortaa'] leading-6 text-[#9FA0A0]">
+  <span [id]="labelId" data-testid="toggle-label" class="font-['Comfortaa'] leading-6 text-[#9FA0A0]">
     {{ staticLabel ? staticLabel : checked ? checkedLabel : uncheckedLabel }}
   </span>
 </label>

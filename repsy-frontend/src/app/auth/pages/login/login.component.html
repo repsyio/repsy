@@ -16,11 +16,11 @@
       <form data-testid="login-form" [formGroup]="form" class="mt-[72px] w-full" (submit)="form.valid && login()">
         <!-- Username or Email -->
         <div>
-          <label class="text-body1 mb-2 inline-block text-neutral-200" for="username">Username</label>
+          <label class="text-body1 mb-2 inline-block text-neutral-200" [attr.for]="id('username')">Username</label>
           <input
             data-testid="login-username"
             type="text"
-            id="username"
+            [id]="id('username')"
             name="username"
             formControlName="username"
             placeholder="username"
@@ -50,12 +50,12 @@
 
         <!-- Password -->
         <div>
-          <label class="text-body1 mb-2 inline-block text-neutral-200" for="password">Password</label>
+          <label class="text-body1 mb-2 inline-block text-neutral-200" [attr.for]="id('password')">Password</label>
           <div class="relative flex items-center">
             <input
               data-testid="login-password"
               [type]="inputType"
-              id="password"
+              [id]="id('password')"
               name="password"
               formControlName="password"
               [placeholder]="visible ? 'password' : '••••••'"
@@ -63,12 +63,14 @@
             />
             <button
               data-testid="login-password-toggle"
+              [attr.aria-label]="visible ? 'Hide password' : 'Show password'"
+              [attr.aria-pressed]="visible"
               type="button"
               class="absolute right-[15px] flex items-center justify-center text-neutral-400 hover:text-neutral-200"
               (click)="toggleVisibility()"
             >
               <i
-                id="password-toggle-icon"
+                aria-hidden="true"
                 class="fa-solid"
                 [ngClass]="{
                   'fa-eye': visible,

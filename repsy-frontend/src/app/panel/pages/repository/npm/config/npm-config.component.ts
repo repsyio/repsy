@@ -17,11 +17,12 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 
 import { MarkdownComponent } from '../../../../shared/components/markdown/markdown.component';
+import { DialogDirective } from '../../../../shared/directives/dialog.directive';
 
 @Component({
   selector: 'app-npm-config',
   standalone: true,
-  imports: [MarkdownComponent, MarkdownComponent],
+  imports: [DialogDirective, MarkdownComponent, MarkdownComponent],
   styleUrl: './npm-config.component.css',
   templateUrl: './npm-config.component.html',
 })

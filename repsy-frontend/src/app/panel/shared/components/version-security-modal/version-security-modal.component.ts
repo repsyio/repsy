@@ -21,6 +21,7 @@ import { finalize } from 'rxjs/operators';
 
 import { RepoType, ScanOverview, VulnerabilityScanControllerService } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
+import { DialogDirective } from '../../directives/dialog.directive';
 import { PortalToBodyDirective } from '../../directives/portal-to-body.directive';
 import { recentScanNote } from '../../util/rescan-status.util';
 import { buildArtifactDetailRoute } from '../../util/security-detail-route.util';
@@ -31,7 +32,7 @@ import { SeverityBreakdownComponent } from '../severity-breakdown/severity-break
   selector: 'app-version-security-modal',
   standalone: true,
   hostDirectives: [PortalToBodyDirective],
-  imports: [CommonModule, SpinnerComponent, SeverityBreakdownComponent, RescanNoteComponent],
+  imports: [DialogDirective, CommonModule, SpinnerComponent, SeverityBreakdownComponent, RescanNoteComponent],
   templateUrl: './version-security-modal.component.html',
 })
 export class VersionSecurityModalComponent implements OnChanges {

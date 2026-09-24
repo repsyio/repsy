@@ -18,11 +18,12 @@ import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChange
 
 import { environment } from '../../../../../../environments/environment';
 import { MarkdownComponent } from '../../../../shared/components/markdown/markdown.component';
+import { DialogDirective } from '../../../../shared/directives/dialog.directive';
 
 @Component({
   selector: 'app-maven-config',
   standalone: true,
-  imports: [MarkdownComponent],
+  imports: [DialogDirective, MarkdownComponent],
   templateUrl: './maven-config.component.html',
   styleUrl: './maven-config.component.css',
 })

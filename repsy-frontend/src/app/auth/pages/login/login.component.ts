@@ -24,6 +24,7 @@ import { finalize } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { LoginForm } from '../../../../generated/api';
 import { ToastService } from '../../../panel/shared/components/toast/toast.service';
+import { idFactory } from '../../../shared/util/unique-id';
 import {
   LOGIN_USERNAME_MESSAGES,
   loginUsernameValidators,
@@ -42,6 +43,9 @@ import { AuthService } from '../service/auth.service';
   encapsulation: ViewEncapsulation.None,
 })
 export class LoginComponent implements OnInit {
+  /** Element ids of this instance: see `idFactory`. */
+  public readonly id = idFactory('login');
+
   public form: FormGroup;
   public readonly usernameMessages = LOGIN_USERNAME_MESSAGES;
   public readonly passwordMessages = PASSWORD_MESSAGES;

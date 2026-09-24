@@ -16,11 +16,12 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 
 import { MarkdownComponent } from '../../../../shared/components/markdown/markdown.component';
+import { DialogDirective } from '../../../../shared/directives/dialog.directive';
 
 @Component({
   selector: 'app-cargo-config',
   standalone: true,
-  imports: [MarkdownComponent],
+  imports: [DialogDirective, MarkdownComponent],
   styleUrl: './cargo-config.component.css',
   templateUrl: './cargo-config.component.html',
 })

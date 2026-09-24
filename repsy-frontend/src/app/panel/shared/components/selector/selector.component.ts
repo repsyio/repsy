@@ -15,9 +15,10 @@
 ///
 
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, HostListener, Input, OnInit, Output } from '@angular/core';
 
 import { OutSideClickDirective } from '../../../../shared/components/outside-click-directive';
+import { uniqueId } from '../../../../shared/util/unique-id';
 
 @Component({
   selector: 'app-selector',
@@ -25,12 +26,15 @@ import { OutSideClickDirective } from '../../../../shared/components/outside-cli
   imports: [CommonModule, OutSideClickDirective],
 })
 export class SelectorComponent implements OnInit {
+  /** The id of the element that labels the selector; the chosen value is appended to that name. */
+  @Input() public labelledBy: string | null = null;
   @Input() public size: 'small' | 'big' = 'small';
   @Input() public options: string[];
   @Input() public selectedOption: string;
   @Output() public selectedOptionChange = new EventEmitter<string>();
   @Output() public choose = new EventEmitter<string>();
   public isOpen = false;
+  public readonly valueId = uniqueId('selector-value');
 
   ngOnInit() {
     if (!this.selectedOption) {
@@ -41,6 +45,15 @@ export class SelectorComponent implements OnInit {
   toggleDropdown(event: Event) {
     event.stopPropagation();
     this.isOpen = !this.isOpen;
+  }
+
+  /** Escape closes an open menu first: it must not also close the dialog the selector sits in. */
+  @HostListener('keydown.escape', ['$event'])
+  closeOnEscape(event: Event) {
+    if (this.isOpen) {
+      event.preventDefault();
+      this.isOpen = false;
+    }
   }
 
   selectOption(option: string) {

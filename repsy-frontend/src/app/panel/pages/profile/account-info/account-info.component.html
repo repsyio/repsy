@@ -17,11 +17,13 @@
     >
       <!-- New Password Field -->
       <div>
-        <label for="new-password" class="text-body1 mb-2 inline-block text-neutral-200">New Password</label>
+        <label [attr.for]="id('new-password')" class="text-body1 mb-2 inline-block text-neutral-200"
+          >New Password</label
+        >
         <div class="relative flex items-center">
           <input
             data-testid="profile-new-password"
-            id="new-password"
+            [id]="id('new-password')"
             [type]="formUi.passwordElement.inputType"
             formControlName="newPassword"
             class="input-text-secondary w-full"
@@ -29,11 +31,14 @@
           />
           <button
             data-testid="profile-new-password-toggle"
+            [attr.aria-label]="formUi.passwordElement.visiblePassword ? 'Hide new password' : 'Show new password'"
+            [attr.aria-pressed]="formUi.passwordElement.visiblePassword"
             type="button"
             (click)="toggleVisibility(formUi.passwordElement)"
             class="absolute right-4 text-neutral-400 hover:text-neutral-200"
           >
             <i
+              aria-hidden="true"
               class="fa-solid"
               [ngClass]="{
                 'fa-eye': !formUi.passwordElement.visiblePassword,
@@ -69,13 +74,13 @@
 
       <!-- Password Confirmation Field -->
       <div>
-        <label for="password-confirmation" class="text-body1 mb-2 inline-block text-neutral-200"
+        <label [attr.for]="id('password-confirmation')" class="text-body1 mb-2 inline-block text-neutral-200"
           >Password Confirmation</label
         >
         <div class="relative flex h-[40px] w-full flex-row items-center">
           <input
             data-testid="profile-password-confirmation"
-            id="password-confirmation"
+            [id]="id('password-confirmation')"
             [type]="formUi.passwordConfirmationElement.inputType"
             formControlName="passwordConfirmation"
             class="input-text-secondary w-full"
@@ -83,11 +88,18 @@
           />
           <button
             data-testid="profile-password-confirmation-toggle"
+            [attr.aria-label]="
+              formUi.passwordConfirmationElement.visiblePassword
+                ? 'Hide password confirmation'
+                : 'Show password confirmation'
+            "
+            [attr.aria-pressed]="formUi.passwordConfirmationElement.visiblePassword"
             type="button"
             (click)="toggleVisibility(formUi.passwordConfirmationElement)"
             class="absolute right-4 text-neutral-400 hover:text-neutral-200"
           >
             <i
+              aria-hidden="true"
               class="fa-solid"
               [ngClass]="{
                 'fa-eye': !formUi.passwordConfirmationElement.visiblePassword,
@@ -130,12 +142,14 @@
       [formGroup]="usernameForm"
       (submit)="usernameForm.valid && updateUsername()"
     >
-      <label for="username" class="text-body1 mt-4 mb-2 inline-block text-neutral-200 sm:mt-0">Username</label>
+      <label [attr.for]="id('username')" class="text-body1 mt-4 mb-2 inline-block text-neutral-200 sm:mt-0"
+        >Username</label
+      >
 
       <div class="relative flex items-center">
         <input
           data-testid="profile-username"
-          id="username"
+          [id]="id('username')"
           type="text"
           formControlName="username"
           placeholder="Enter username"

@@ -10,13 +10,13 @@
       projects and settings.xml.
     </p>
     <div class="form-group">
-      <label for="name" class="mb-2 block text-sm text-[#9FA0A0]">New Repository Name</label>
+      <label [attr.for]="id('name')" class="mb-2 block text-sm text-[#9FA0A0]">New Repository Name</label>
       <form data-testid="settings-rename-form" [formGroup]="renameForm" (submit)="renameForm.valid && renameRepo()">
         <div class="flex w-full flex-col gap-2 sm:w-2/3 sm:flex-row">
           <input
             data-testid="settings-rename-input"
             type="text"
-            id="name"
+            [id]="id('name')"
             formControlName="name"
             required
             placeholder="repository"
@@ -49,7 +49,7 @@
       </form>
     </div>
     <div class="form-group">
-      <label for="description" class="mb-2 block text-sm text-[#9FA0A0]">Description</label>
+      <label [attr.for]="id('description')" class="mb-2 block text-sm text-[#9FA0A0]">Description</label>
       <form
         data-testid="settings-description-form"
         [formGroup]="descriptionForm"
@@ -57,7 +57,7 @@
       >
         <textarea
           data-testid="settings-description-input"
-          id="description"
+          [id]="id('description')"
           formControlName="description"
           placeholder="Enter description about your repository"
           rows="5"

@@ -21,6 +21,7 @@ import moment, { Moment } from 'moment';
 import { finalize } from 'rxjs/operators';
 
 import { DeployTokenForm, ProtocolDeployTokenControllerService } from '../../../../../../generated/api';
+import { idFactory } from '../../../../../shared/util/unique-id';
 import { USERNAME_MESSAGES, usernameValidators } from '../../../../../shared/validators/credentials.validators';
 import {
   DESCRIPTION_MAX_LENGTH,
@@ -28,17 +29,21 @@ import {
   descriptionValidators,
 } from '../../../../../shared/validators/description.validators';
 import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dto/token-create-info';
+import { DialogDirective } from '../../../directives/dialog.directive';
 import { RadioGroupComponent, RadioOption } from '../../radio-group/radio-group.component';
 import { ToastService } from '../../toast/toast.service';
 
 @Component({
   selector: 'app-deploy-token-modal',
-  imports: [ReactiveFormsModule, RadioGroupComponent],
+  imports: [DialogDirective, ReactiveFormsModule, RadioGroupComponent],
   standalone: true,
   templateUrl: './deploy-token-create-modal.component.html',
   styleUrl: './deploy-token-create-modal.component.css',
 })
 export class DeployTokenCreateModalComponent implements OnInit {
+  /** Element ids of this instance: see `idFactory`. */
+  public readonly id = idFactory('token-create');
+
   @Output() openChange = new EventEmitter<boolean>();
   @Output() created = new EventEmitter<TokenCreateInfo>();
   @Input() public open: boolean;

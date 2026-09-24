@@ -16,11 +16,12 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 
 import { MarkdownComponent } from '../../../../shared/components/markdown/markdown.component';
+import { DialogDirective } from '../../../../shared/directives/dialog.directive';
 
 @Component({
   selector: 'app-ruby-config',
   standalone: true,
-  imports: [MarkdownComponent],
+  imports: [DialogDirective, MarkdownComponent],
   styleUrl: './ruby-config.component.css',
   templateUrl: './ruby-config.component.html',
 })

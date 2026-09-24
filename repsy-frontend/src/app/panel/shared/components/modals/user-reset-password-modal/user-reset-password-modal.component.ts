@@ -18,16 +18,21 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 
+import { idFactory } from '../../../../../shared/util/unique-id';
+import { DialogDirective } from '../../../directives/dialog.directive';
 import { ToastService } from '../../toast/toast.service';
 
 @Component({
   selector: 'app-user-reset-password-modal',
-  imports: [FormsModule, ReactiveFormsModule, NgOptimizedImage, CommonModule],
+  imports: [DialogDirective, FormsModule, ReactiveFormsModule, NgOptimizedImage, CommonModule],
   standalone: true,
   templateUrl: './user-reset-password-modal.component.html',
   styleUrl: './user-reset-password-modal.component.css',
 })
 export class UserResetPasswordModalComponent {
+  /** Element ids of this instance: see `idFactory`. */
+  public readonly id = idFactory('user-reset');
+
   @Output() openChange = new EventEmitter<boolean>();
   @Input() public open: boolean;
   @Input() public username: string;
